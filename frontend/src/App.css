@@ -11,7 +11,7 @@
 }
 
 .header-content {
-    @apply container mx-auto px-4 h-16 flex items-center justify-between;
+    @apply px-4 h-16 flex items-center justify-between w-full;
 }
 
 /* Navigation */

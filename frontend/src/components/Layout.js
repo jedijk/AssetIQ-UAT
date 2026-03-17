@@ -19,40 +19,43 @@ const Layout = () => {
     <div className="app-container">
       {/* Header */}
       <header className="app-header">
-        <div className="header-content">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <img 
-              src="/app-icon.png" 
-              alt="ThreatBase" 
-              className="w-9 h-9 rounded-lg"
-            />
-            <span className="text-xl font-bold text-slate-900" data-testid="app-logo">
-              ThreatBase
-            </span>
-          </div>
+        <div className="header-content max-w-7xl mx-auto">
+          {/* Left Section - Logo & Nav */}
+          <div className="flex items-center gap-8">
+            {/* Logo */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <img 
+                src="/app-icon.png" 
+                alt="ThreatBase" 
+                className="w-9 h-9 rounded-lg"
+              />
+              <span className="text-xl font-bold text-slate-900" data-testid="app-logo">
+                ThreatBase
+              </span>
+            </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1" data-testid="desktop-nav">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === "/"}
-                className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-150 ${
-                    isActive 
-                      ? "bg-blue-50 text-blue-700" 
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                  }`
-                }
-                data-testid={`nav-${item.label.toLowerCase()}`}
-              >
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center gap-1" data-testid="desktop-nav">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === "/"}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-150 ${
+                      isActive 
+                        ? "bg-blue-50 text-blue-700" 
+                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    }`
+                  }
+                  data-testid={`nav-${item.label.toLowerCase()}`}
+                >
                 <item.icon className="w-4 h-4" />
                 {item.label}
               </NavLink>
             ))}
           </nav>
+          </div>
 
           {/* Right Side */}
           <div className="flex items-center gap-3">
