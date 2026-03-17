@@ -8,6 +8,7 @@ import RegisterPage from "./pages/RegisterPage";
 import ChatPage from "./pages/ChatPage";
 import ThreatsPage from "./pages/ThreatsPage";
 import ThreatDetailPage from "./pages/ThreatDetailPage";
+import FailureModesPage from "./pages/FailureModesPage";
 import "@/App.css";
 
 const queryClient = new QueryClient({
@@ -97,6 +98,7 @@ function App() {
               <Route index element={<ChatPage />} />
               <Route path="threats" element={<ThreatsPage />} />
               <Route path="threats/:id" element={<ThreatDetailPage />} />
+              <Route path="library" element={<FailureModesPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

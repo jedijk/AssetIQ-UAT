@@ -14,6 +14,13 @@ import jwt
 import bcrypt
 import base64
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from failure_modes import (
+    FAILURE_MODES_LIBRARY, 
+    find_matching_failure_modes, 
+    get_failure_modes_by_category,
+    get_all_categories,
+    get_all_equipment_types
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -128,25 +135,35 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # ============= AI HELPERS =============
 
-THREAT_ANALYSIS_SYSTEM_PROMPT = """You are ThreatBase AI, an expert reliability engineering assistant. Your job is to analyze failure descriptions and extract structured threat information.
+THREAT_ANALYSIS_SYSTEM_PROMPT = """You are ThreatBase AI, an expert reliability engineering assistant with knowledge of FMEA (Failure Mode and Effects Analysis). Your job is to analyze failure descriptions and extract structured threat information.
+
+You have access to a comprehensive failure mode library covering:
+- Rotating Equipment (Pumps, Compressors, Turbines)
+- Static Equipment (Vessels, Heat Exchangers)
+- Piping Systems (Pipes, Valves)
+- Instrumentation (Sensors, Controls, PLCs)
+- Electrical Systems (Motors, Transformers, Switchgear)
+- Process Issues (Operations, Maintenance)
+- Safety Systems
+- Environmental Concerns
 
 When a user describes a failure, extract the following information:
 1. Title: A concise title for the threat (max 60 chars)
 2. Asset: The specific asset affected (e.g., "Pump P-104", "Compressor C-201")
 3. Equipment Type: Category of equipment (e.g., "Centrifugal Pump", "Heat Exchanger")
-4. Failure Mode: How the equipment is failing (e.g., "Bearing Failure", "Seal Leak")
+4. Failure Mode: Standard failure mode from FMEA library (e.g., "Seal Failure", "Bearing Failure", "Corrosion")
 5. Cause: Root cause if known (optional)
 6. Impact: Business impact - one of: "Safety Hazard", "Production Loss", "Equipment Damage", "Environmental"
 7. Frequency: How often this occurs - one of: "First Time", "Rare", "Occasional", "Frequent"
 8. Likelihood: Probability of recurrence - one of: "Very Low", "Low", "Medium", "High", "Very High"
 9. Detectability: How detectable is the failure - one of: "Easy", "Moderate", "Difficult", "Very Difficult"
-10. Recommended Actions: 2-4 specific actionable recommendations
+10. Recommended Actions: 2-4 specific actionable recommendations based on industry best practices
 
-Calculate risk score (1-100) based on:
-- Impact severity (Safety=40, Production=30, Equipment=20, Environmental=35)
-- Frequency factor (First=1, Rare=1.2, Occasional=1.5, Frequent=2)
-- Likelihood factor (Very Low=0.5, Low=0.7, Medium=1, High=1.3, Very High=1.5)
-- Detectability factor (Easy=0.7, Moderate=1, Difficult=1.3, Very Difficult=1.5)
+Calculate risk score (1-100) based on FMEA methodology:
+- Severity (1-10): Safety=10, Production=8, Equipment=6, Environmental=9
+- Occurrence (1-10): First=2, Rare=3, Occasional=5, Frequent=8
+- Detection (1-10): Easy=3, Moderate=5, Difficult=7, Very Difficult=9
+- Risk Score = (Severity * Occurrence * Detection) / 10, capped at 100
 
 Risk Level based on score:
 - Critical: >= 70
@@ -572,6 +589,67 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
 @api_router.get("/")
 async def root():
     return {"message": "ThreatBase API", "version": "1.0.0"}
+
+# ============= FAILURE MODES LIBRARY ENDPOINTS =============
+
+@api_router.get("/failure-modes")
+async def get_failure_modes(
+    category: Optional[str] = None,
+    equipment: Optional[str] = None,
+    search: Optional[str] = None,
+    min_rpn: Optional[int] = None
+):
+    """Get failure modes from the library with optional filters."""
+    results = FAILURE_MODES_LIBRARY.copy()
+    
+    if category:
+        results = [fm for fm in results if fm["category"].lower() == category.lower()]
+    
+    if equipment:
+        results = [fm for fm in results if fm["equipment"].lower() == equipment.lower()]
+    
+    if search:
+        results = find_matching_failure_modes(search, limit=100)
+    
+    if min_rpn:
+        results = [fm for fm in results if fm["rpn"] >= min_rpn]
+    
+    # Sort by RPN descending
+    results.sort(key=lambda x: -x["rpn"])
+    
+    return {
+        "total": len(results),
+        "failure_modes": results
+    }
+
+@api_router.get("/failure-modes/categories")
+async def get_categories():
+    """Get all unique categories."""
+    return {"categories": get_all_categories()}
+
+@api_router.get("/failure-modes/equipment-types")
+async def get_equipment_types():
+    """Get all unique equipment types."""
+    return {"equipment_types": get_all_equipment_types()}
+
+@api_router.get("/failure-modes/high-risk")
+async def get_high_risk_modes(threshold: int = 250):
+    """Get failure modes with RPN above threshold."""
+    high_risk = [fm for fm in FAILURE_MODES_LIBRARY if fm["rpn"] >= threshold]
+    high_risk.sort(key=lambda x: -x["rpn"])
+    return {
+        "threshold": threshold,
+        "total": len(high_risk),
+        "failure_modes": high_risk
+    }
+
+@api_router.get("/failure-modes/{mode_id}")
+async def get_failure_mode_by_id(mode_id: int):
+    """Get a specific failure mode by ID."""
+    for fm in FAILURE_MODES_LIBRARY:
+        if fm["id"] == mode_id:
+            return fm
+    raise HTTPException(status_code=404, detail="Failure mode not found")
 
 # Include router and middleware
 app.include_router(api_router)

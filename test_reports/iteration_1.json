@@ -1,0 +1,58 @@
+{
+  "summary": "Update mode testing: Verified navigation visibility fix (BUG-001) and new Failure Mode Library page. All nav tabs (Chat, Threats, Library) visible and functional. Library page with 100 FMEA failure modes loads correctly with search, category filters, card expansion, and RPN sorting. One bug found: search function only searches keywords list, not equipment/failure_mode name fields.",
+  "mode": "update",
+  "baseline_commit": "4b54a91dcc6fc7c925befd411590ff4b97b1b2e2",
+  "head_commit": "2203a908659e93b5447cb531722c2bbdd1756338",
+  "specs_created": ["/app/tests/e2e/library.spec.ts", "/app/backend/tests/test_failure_modes.py"],
+  "specs_updated": ["/app/tests/e2e/chat-navigation.spec.ts"],
+  "quarantined_tests": [],
+  "test_report_links": [
+    "/app/backend/tests/test_failure_modes.py",
+    "/app/test_reports/pytest/pytest_all_results.xml",
+    "/app/tests/e2e/library.spec.ts",
+    "/app/tests/e2e/chat-navigation.spec.ts",
+    "/app/tests/e2e/threats.spec.ts"
+  ],
+  "regression_results": {
+    "total_specs": 36,
+    "passed": 35,
+    "failed": 1,
+    "skipped": 1
+  },
+  "issues": [
+    {
+      "id": "BUG-002",
+      "issue_type": "bug",
+      "severity": "MEDIUM",
+      "description": "Search endpoint /api/failure-modes?search=... only searches the 'keywords' array of each failure mode. It does NOT search the 'equipment' or 'failure_mode' name fields. Searching 'pump' returns 0 results even though 10 pump failure modes exist. The find_matching_failure_modes() function in failure_modes.py only iterates over fm['keywords'].",
+      "endpoint_or_component": "GET /api/failure-modes?search=pump | find_matching_failure_modes() in backend/failure_modes.py",
+      "surfaces": ["backend"],
+      "reproduction": "GET https://risk-ranker.preview.emergentagent.com/api/failure-modes?search=pump returns {\"total\": 0, \"failure_modes\": []}. Expected: should return pump-related failure modes (Seal Failure, Bearing Failure, Cavitation, etc.)",
+      "affected_test": "backend/tests/test_failure_modes.py::TestFailureModesLibrary::test_search_by_equipment_name"
+    },
+    {
+      "id": "IMP-001",
+      "issue_type": "improvement",
+      "severity": "LOW",
+      "description": "The 'Made with Emergent' badge in the bottom-right corner can block the chat send button click. Tests required badge removal workaround. Consider adjusting send button position or adding z-index to ensure it's always clickable.",
+      "endpoint_or_component": "ChatPage - send-message-button"
+    }
+  ],
+  "action_items": [
+    "Fix BUG-002: Update find_matching_failure_modes() in backend/failure_modes.py to also search fm['equipment'] and fm['failure_mode'] fields in addition to fm['keywords']"
+  ],
+  "updated_files": [
+    "/app/tests/e2e/library.spec.ts",
+    "/app/tests/e2e/chat-navigation.spec.ts",
+    "/app/backend/tests/test_failure_modes.py"
+  ],
+  "test_results": {
+    "backend": "97% (33/34 passed)",
+    "frontend": "97% (35/36 passed, 1 skipped/expected)"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Navigation visibility fix (BUG-001) is confirmed working - all 3 nav tabs visible. Library page at /library route works correctly with 100 FMEA failure modes. Backend search only searches keywords field (BUG-002). Tests in library.spec.ts, chat-navigation.spec.ts (updated with badge removal workaround + toast wait), threats.spec.ts. All passing except BUG-002 test which intentionally fails to document the bug.",
+  "rca_of_issue": "BUG-002 RCA: In failure_modes.py, find_matching_failure_modes() only checks fm['keywords'] for matches. When a user searches for 'pump', no pump failure modes have 'pump' in their keywords list (they have keywords like 'leak', 'seal', 'bearing', etc.). Fix: add checks for keyword in fm['equipment'].lower() or keyword in fm['failure_mode'].lower() in the match loop."
+}

@@ -22,7 +22,7 @@
 }
 
 .nav-link.active {
-    @apply bg-blue-50 text-blue-600;
+    @apply bg-blue-50 text-blue-700 font-semibold;
 }
 
 /* Chat Layout */

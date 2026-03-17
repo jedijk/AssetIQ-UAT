@@ -41,6 +41,8 @@ test.describe('Chat Interface', () => {
   });
 
   test('sending a message shows loading state', async ({ page }) => {
+    // Remove the Emergent badge that can block the send button
+    await page.evaluate(() => { const badge = document.querySelector('[class*="emergent"], [id*="emergent"]'); if (badge) (badge as HTMLElement).style.display = 'none'; });
     await page.getByTestId('chat-message-input').fill('Pump P-200 bearing failure');
     // Start waiting for the API response
     const responsePromise = page.waitForResponse(
@@ -58,6 +60,8 @@ test.describe('Chat Interface', () => {
   });
 
   test('AI response appears after sending message', async ({ page }) => {
+    // Remove the Emergent badge that can block the send button
+    await page.evaluate(() => { const badge = document.querySelector('[class*="emergent"], [id*="emergent"]'); if (badge) (badge as HTMLElement).style.display = 'none'; });
     const initialMsgCount = await page.locator('[data-testid^="chat-message-assistant-"]').count();
     
     await page.getByTestId('chat-message-input').fill('Heat exchanger HX-301 showing reduced efficiency due to fouling');
@@ -113,6 +117,9 @@ test.describe('Navigation and Layout', () => {
 
   test('mobile menu toggle works at small viewport', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
+    // Wait for any toast to dismiss before clicking mobile toggle
+    await page.locator('[data-sonner-toast]').waitFor({ state: 'hidden' }).catch(() => {});
+    await page.waitForTimeout(500);
     await expect(page.getByTestId('mobile-menu-toggle')).toBeVisible();
     await page.getByTestId('mobile-menu-toggle').click({ force: true });
     await expect(page.getByTestId('mobile-nav')).toBeVisible();

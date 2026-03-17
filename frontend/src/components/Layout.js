@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { MessageSquare, AlertTriangle, LogOut, Menu, X } from "lucide-react";
+import { MessageSquare, AlertTriangle, LogOut, Menu, X, BookOpen } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
 
@@ -12,6 +12,7 @@ const Layout = () => {
   const navItems = [
     { path: "/", label: "Chat", icon: MessageSquare },
     { path: "/threats", label: "Threats", icon: AlertTriangle },
+    { path: "/library", label: "Library", icon: BookOpen },
   ];
 
   return (
@@ -37,7 +38,11 @@ const Layout = () => {
                 to={item.path}
                 end={item.path === "/"}
                 className={({ isActive }) =>
-                  `nav-link flex items-center gap-2 ${isActive ? "active" : ""}`
+                  `flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-150 ${
+                    isActive 
+                      ? "bg-blue-50 text-blue-700" 
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  }`
                 }
                 data-testid={`nav-${item.label.toLowerCase()}`}
               >
