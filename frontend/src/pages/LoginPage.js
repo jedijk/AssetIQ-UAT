@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 const LoginPage = () => {
   const { login } = useAuth();
@@ -33,9 +33,11 @@ const LoginPage = () => {
       <div className="auth-card animate-fade-in">
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
-            <AlertTriangle className="w-6 h-6 text-white" />
-          </div>
+          <img 
+            src="/app-icon.png" 
+            alt="ThreatBase" 
+            className="w-10 h-10 rounded-lg"
+          />
           <span className="text-2xl font-bold text-slate-900" data-testid="login-logo">
             ThreatBase
           </span>

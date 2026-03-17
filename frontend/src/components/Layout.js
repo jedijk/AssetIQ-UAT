@@ -22,9 +22,11 @@ const Layout = () => {
         <div className="header-content">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-white" />
-            </div>
+            <img 
+              src="/app-icon.png" 
+              alt="ThreatBase" 
+              className="w-9 h-9 rounded-lg"
+            />
             <span className="text-xl font-bold text-slate-900" data-testid="app-logo">
               ThreatBase
             </span>
