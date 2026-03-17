@@ -62,27 +62,27 @@
 }
 
 .priority-item {
-    @apply flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200 
+    @apply flex items-center gap-2 sm:gap-4 p-3 sm:p-4 bg-white rounded-xl border border-slate-200 
            hover:shadow-md hover:border-slate-300 
            transition-all duration-200 cursor-pointer;
 }
 
 .priority-rank {
-    @apply flex-shrink-0 w-10 h-10 rounded-full bg-slate-100 
+    @apply flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-100 
            flex items-center justify-center font-bold text-slate-600;
 }
 
 /* Stats Cards */
 .stat-card {
-    @apply p-5 bg-white rounded-xl border border-slate-200;
+    @apply p-4 sm:p-5 bg-white rounded-xl border border-slate-200;
 }
 
 .stat-value {
-    @apply text-3xl font-bold text-slate-900;
+    @apply text-2xl sm:text-3xl font-bold text-slate-900;
 }
 
 .stat-label {
-    @apply text-sm font-medium text-slate-500 mt-1;
+    @apply text-xs sm:text-sm font-medium text-slate-500 mt-1;
 }
 
 /* Voice Recording */

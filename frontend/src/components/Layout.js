@@ -132,7 +132,7 @@ const Layout = () => {
       {/* Floating Action Button - Mobile */}
       <button
         onClick={() => setChatOpen(true)}
-        className="sm:hidden fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 hover:shadow-xl active:scale-95 transition-all duration-200 z-30"
+        className="sm:hidden fixed bottom-20 right-6 h-14 w-14 rounded-full shadow-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 hover:shadow-xl active:scale-95 transition-all duration-200 z-30"
         data-testid="fab-report-threat"
       >
         <MessageSquare className="w-6 h-6" />

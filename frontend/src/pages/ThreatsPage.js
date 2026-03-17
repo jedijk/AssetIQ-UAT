@@ -221,13 +221,13 @@ const ThreatsPage = () => {
               data-testid={`threat-item-${threat.id}`}
             >
               {/* Equipment Icon */}
-              <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${
+              <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${
                 threat.risk_level === "Critical" ? "bg-red-50" :
                 threat.risk_level === "High" ? "bg-orange-50" :
                 threat.risk_level === "Medium" ? "bg-yellow-50" :
                 "bg-green-50"
               }`}>
-                <EquipmentIcon className={`w-6 h-6 ${
+                <EquipmentIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${
                   threat.risk_level === "Critical" ? "text-red-600" :
                   threat.risk_level === "High" ? "text-orange-600" :
                   threat.risk_level === "Medium" ? "text-yellow-600" :
@@ -235,32 +235,30 @@ const ThreatsPage = () => {
                 }`} />
               </div>
 
-              <div className="priority-rank" data-testid={`threat-rank-${threat.id}`}>
+              <div className="priority-rank text-sm sm:text-base" data-testid={`threat-rank-${threat.id}`}>
                 #{threat.rank}
               </div>
               
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-1">
-                  <h3 className="font-semibold text-slate-900 truncate">
+                <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
+                  <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-1">
                     {threat.title}
                   </h3>
                   <RiskBadge level={threat.risk_level} size="sm" />
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+                <div className="text-xs sm:text-sm text-slate-500 line-clamp-1">
                   <span>{threat.asset}</span>
-                  <span className="hidden sm:inline">•</span>
-                  <span className="hidden sm:inline">{threat.equipment_type}</span>
-                  <span className="hidden sm:inline">•</span>
-                  <span className="hidden sm:inline">{threat.failure_mode}</span>
+                  <span className="mx-1">•</span>
+                  <span>{threat.equipment_type}</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="hidden md:block text-right">
-                  <div className="text-sm font-medium text-slate-700">
-                    Score: {threat.risk_score}
+              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                <div className="text-right">
+                  <div className="text-xs sm:text-sm font-medium text-slate-700">
+                    {threat.risk_score}
                   </div>
-                  <div className="text-xs text-slate-400">
+                  <div className="text-xs text-slate-400 hidden sm:block">
                     {threat.status}
                   </div>
                 </div>
