@@ -9,7 +9,20 @@ import {
   Clock, 
   CheckCircle,
   Filter,
-  Search
+  Search,
+  Cog,
+  Thermometer,
+  Gauge,
+  Zap,
+  Waves,
+  Wind,
+  Pipette,
+  CircleDot,
+  Settings,
+  Activity,
+  Flame,
+  Droplets,
+  Box
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -22,6 +35,47 @@ import {
 } from "../components/ui/select";
 import ThreatCard from "../components/ThreatCard";
 import RiskBadge from "../components/RiskBadge";
+
+// Equipment type to icon mapping
+const getEquipmentIcon = (equipmentType, asset) => {
+  const type = (equipmentType || "").toLowerCase();
+  const assetLower = (asset || "").toLowerCase();
+  
+  // Check for specific equipment types
+  if (type.includes("pump") || assetLower.includes("pump") || assetLower.startsWith("p-")) {
+    return Droplets;
+  }
+  if (type.includes("compressor") || assetLower.includes("compressor") || assetLower.startsWith("c-")) {
+    return Wind;
+  }
+  if (type.includes("heat exchanger") || assetLower.includes("hx-") || assetLower.includes("exchanger")) {
+    return Thermometer;
+  }
+  if (type.includes("valve") || assetLower.includes("valve") || assetLower.includes("xv-")) {
+    return CircleDot;
+  }
+  if (type.includes("turbine")) {
+    return Cog;
+  }
+  if (type.includes("motor") || type.includes("electrical")) {
+    return Zap;
+  }
+  if (type.includes("vessel") || type.includes("tank")) {
+    return Box;
+  }
+  if (type.includes("pipe") || type.includes("piping")) {
+    return Pipette;
+  }
+  if (type.includes("sensor") || type.includes("instrument")) {
+    return Gauge;
+  }
+  if (type.includes("boiler") || type.includes("furnace") || type.includes("heater")) {
+    return Flame;
+  }
+  
+  // Default icon
+  return Settings;
+};
 
 const ThreatsPage = () => {
   const navigate = useNavigate();
@@ -154,7 +208,9 @@ const ThreatsPage = () => {
         </div>
       ) : (
         <div className="priority-list" data-testid="threats-list">
-          {filteredThreats.map((threat, idx) => (
+          {filteredThreats.map((threat, idx) => {
+            const EquipmentIcon = getEquipmentIcon(threat.equipment_type, threat.asset);
+            return (
             <motion.div
               key={threat.id}
               initial={{ opacity: 0, y: 10 }}
@@ -164,6 +220,21 @@ const ThreatsPage = () => {
               className="priority-item group"
               data-testid={`threat-item-${threat.id}`}
             >
+              {/* Equipment Icon */}
+              <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${
+                threat.risk_level === "Critical" ? "bg-red-50" :
+                threat.risk_level === "High" ? "bg-orange-50" :
+                threat.risk_level === "Medium" ? "bg-yellow-50" :
+                "bg-green-50"
+              }`}>
+                <EquipmentIcon className={`w-6 h-6 ${
+                  threat.risk_level === "Critical" ? "text-red-600" :
+                  threat.risk_level === "High" ? "text-orange-600" :
+                  threat.risk_level === "Medium" ? "text-yellow-600" :
+                  "text-green-600"
+                }`} />
+              </div>
+
               <div className="priority-rank" data-testid={`threat-rank-${threat.id}`}>
                 #{threat.rank}
               </div>
@@ -193,17 +264,10 @@ const ThreatsPage = () => {
                     {threat.status}
                   </div>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-blue-50 transition-colors">
-                  <AlertTriangle className={`w-4 h-4 ${
-                    threat.risk_level === "Critical" ? "text-red-500" :
-                    threat.risk_level === "High" ? "text-orange-500" :
-                    threat.risk_level === "Medium" ? "text-yellow-500" :
-                    "text-green-500"
-                  }`} />
-                </div>
               </div>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
