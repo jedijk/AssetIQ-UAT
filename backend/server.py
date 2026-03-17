@@ -489,9 +489,12 @@ async def send_chat_message(
     
     # Get updated threat
     updated_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+    # Ensure risk_score is int
+    if isinstance(updated_threat.get("risk_score"), float):
+        updated_threat["risk_score"] = int(updated_threat["risk_score"])
     
-    # Store AI response
-    response_text = f"I've logged this threat: **{threat_doc['title']}**\n\nRisk Level: {threat_doc['risk_level']} (Score: {threat_doc['risk_score']})\nRank: #{updated_threat['rank']} of {updated_threat['total_threats']} active threats"
+    # Store AI response with threat summary details
+    response_text = f"Threat recorded successfully."
     
     ai_response = {
         "id": str(uuid.uuid4()),
@@ -499,6 +502,15 @@ async def send_chat_message(
         "role": "assistant",
         "content": response_text,
         "threat_id": threat_id,
+        "threat_title": updated_threat["title"],
+        "threat_asset": updated_threat["asset"],
+        "threat_equipment_type": updated_threat["equipment_type"],
+        "threat_failure_mode": updated_threat["failure_mode"],
+        "threat_risk_level": updated_threat["risk_level"],
+        "threat_risk_score": updated_threat["risk_score"],
+        "threat_rank": updated_threat["rank"],
+        "threat_location": updated_threat.get("location"),
+        "threat_summary": True,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.chat_messages.insert_one(ai_response)

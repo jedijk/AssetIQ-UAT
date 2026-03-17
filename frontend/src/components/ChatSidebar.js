@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { chatAPI, voiceAPI } from "../lib/api";
+import { chatAPI, voiceAPI, threatsAPI } from "../lib/api";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -14,7 +14,11 @@ import {
   ArrowRight,
   HelpCircle,
   MessageSquare,
-  ChevronRight
+  ChevronRight,
+  MapPin,
+  Wrench,
+  Activity,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
@@ -155,23 +159,85 @@ const ChatSidebar = ({ isOpen, onClose }) => {
       );
     }
 
-    const isFollowUp = msg.question_type || msg.content.includes("?");
+    const isFollowUp = msg.question_type || (msg.content.includes("?") && !msg.threat_id);
+    
+    // Check if this message has a threat summary embedded
+    const hasThreatSummary = msg.threat_id && msg.threat_summary;
     
     return (
-      <div className={`bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm p-3 max-w-[85%] shadow-sm text-sm ${isFollowUp ? "border-l-4 border-l-blue-400" : ""}`}>
-        <p className="whitespace-pre-wrap">{msg.content}</p>
+      <div className={`bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm p-3 max-w-[90%] shadow-sm text-sm ${isFollowUp ? "border-l-4 border-l-blue-400" : ""}`}>
+        {/* Show success message for threat creation */}
         {msg.threat_id && (
-          <div className="mt-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 text-green-600 mb-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span className="font-medium">Threat Recorded</span>
+          </div>
+        )}
+        
+        {/* Threat Summary Card */}
+        {msg.threat_id && (
+          <div className="bg-slate-50 rounded-lg p-3 mb-2 border border-slate-200">
+            {/* Title & Risk */}
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h4 className="font-semibold text-slate-900 text-sm leading-tight">
+                {msg.threat_title || "Threat Logged"}
+              </h4>
+              <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                msg.threat_risk_level === "Critical" ? "bg-red-100 text-red-700" :
+                msg.threat_risk_level === "High" ? "bg-orange-100 text-orange-700" :
+                msg.threat_risk_level === "Medium" ? "bg-yellow-100 text-yellow-700" :
+                "bg-green-100 text-green-700"
+              }`}>
+                {msg.threat_risk_level || "Medium"}
+              </span>
+            </div>
+            
+            {/* Key Details */}
+            <div className="space-y-1 text-xs text-slate-600">
+              {msg.threat_asset && (
+                <div className="flex items-center gap-1.5">
+                  <Wrench className="w-3 h-3 text-slate-400" />
+                  <span><strong>Asset:</strong> {msg.threat_asset}</span>
+                </div>
+              )}
+              {msg.threat_failure_mode && (
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-3 h-3 text-slate-400" />
+                  <span><strong>Issue:</strong> {msg.threat_failure_mode}</span>
+                </div>
+              )}
+              {msg.threat_location && (
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3 text-slate-400" />
+                  <span><strong>Location:</strong> {msg.threat_location}</span>
+                </div>
+              )}
+              {msg.threat_risk_score && (
+                <div className="flex items-center gap-1.5">
+                  <Activity className="w-3 h-3 text-slate-400" />
+                  <span><strong>Risk Score:</strong> {msg.threat_risk_score} • <strong>Rank:</strong> #{msg.threat_rank}</span>
+                </div>
+              )}
+            </div>
+            
+            {/* View Details Link */}
             <a 
               href={`/threats/${msg.threat_id}`}
               onClick={onClose}
-              className="inline-flex items-center gap-1 text-blue-600 text-xs font-medium hover:underline"
+              className="mt-2 inline-flex items-center gap-1 text-blue-600 text-xs font-medium hover:underline"
             >
-              View threat details
+              View full details
               <ArrowRight className="w-3 h-3" />
             </a>
           </div>
         )}
+        
+        {/* Regular message content (for non-threat messages) */}
+        {!msg.threat_id && (
+          <p className="whitespace-pre-wrap">{msg.content}</p>
+        )}
+        
+        {/* Follow-up indicator */}
         {isFollowUp && !msg.threat_id && (
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1 text-blue-600 text-xs">
             <HelpCircle className="w-3 h-3" />
