@@ -14,7 +14,6 @@ import {
   ArrowRight,
   HelpCircle,
   MessageSquare,
-  ChevronRight,
   MapPin,
   Wrench,
   Activity,
@@ -161,9 +160,6 @@ const ChatSidebar = ({ isOpen, onClose }) => {
 
     const isFollowUp = msg.question_type || (msg.content.includes("?") && !msg.threat_id);
     
-    // Check if this message has a threat summary embedded
-    const hasThreatSummary = msg.threat_id && msg.threat_summary;
-    
     return (
       <div className={`bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm p-3 max-w-[90%] shadow-sm text-sm ${isFollowUp ? "border-l-4 border-l-blue-400" : ""}`}>
         {/* Show success message for threat creation */}
@@ -177,7 +173,6 @@ const ChatSidebar = ({ isOpen, onClose }) => {
         {/* Threat Summary Card */}
         {msg.threat_id && (
           <div className="bg-slate-50 rounded-lg p-3 mb-2 border border-slate-200">
-            {/* Title & Risk */}
             <div className="flex items-start justify-between gap-2 mb-2">
               <h4 className="font-semibold text-slate-900 text-sm leading-tight">
                 {msg.threat_title || "Threat Logged"}
@@ -192,7 +187,6 @@ const ChatSidebar = ({ isOpen, onClose }) => {
               </span>
             </div>
             
-            {/* Key Details */}
             <div className="space-y-1 text-xs text-slate-600">
               {msg.threat_asset && (
                 <div className="flex items-center gap-1.5">
@@ -220,7 +214,6 @@ const ChatSidebar = ({ isOpen, onClose }) => {
               )}
             </div>
             
-            {/* View Details Link */}
             <a 
               href={`/threats/${msg.threat_id}`}
               onClick={onClose}
@@ -232,12 +225,10 @@ const ChatSidebar = ({ isOpen, onClose }) => {
           </div>
         )}
         
-        {/* Regular message content (for non-threat messages) */}
         {!msg.threat_id && (
           <p className="whitespace-pre-wrap">{msg.content}</p>
         )}
         
-        {/* Follow-up indicator */}
         {isFollowUp && !msg.threat_id && (
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1 text-blue-600 text-xs">
             <HelpCircle className="w-3 h-3" />
@@ -248,32 +239,22 @@ const ChatSidebar = ({ isOpen, onClose }) => {
     );
   };
 
+  // Don't render anything if not open
+  if (!isOpen) return null;
+
   return (
     <>
       {/* Backdrop */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
-          />
-        )}
-      </AnimatePresence>
+      <div
+        onClick={onClose}
+        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
+      />
 
       {/* Sidebar */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 h-full w-full sm:w-[400px] bg-slate-50 shadow-2xl z-50 flex flex-col"
-            data-testid="chat-sidebar"
-          >
+      <div
+        className="fixed right-0 top-0 h-full w-full sm:w-[400px] bg-slate-50 shadow-2xl z-50 flex flex-col"
+        data-testid="chat-sidebar"
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white">
           <div className="flex items-center gap-3">
@@ -315,7 +296,7 @@ const ChatSidebar = ({ isOpen, onClose }) => {
                 Report a Threat
               </h3>
               <p className="text-slate-500 text-sm mb-4">
-                Describe any equipment failure or issue. I'll analyze it and help you prioritize.
+                Describe any equipment failure or issue.
               </p>
               <div className="text-left bg-white rounded-xl p-3 text-xs text-slate-600 border border-slate-200 w-full">
                 <p className="font-medium text-slate-700 mb-2">Try saying:</p>
@@ -325,52 +306,40 @@ const ChatSidebar = ({ isOpen, onClose }) => {
               </div>
             </div>
           ) : (
-            <AnimatePresence>
+            <>
               {messages.map((msg, idx) => (
-                <motion.div
+                <div
                   key={msg.id || idx}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   {renderMessageContent(msg)}
-                </motion.div>
+                </div>
               ))}
-            </AnimatePresence>
+            </>
           )}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
         <div className="border-t border-slate-200 bg-white p-4">
-          {/* Image Preview */}
-          <AnimatePresence>
-            {imagePreview && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mb-3"
-              >
-                <div className="relative inline-block">
-                  <img src={imagePreview} alt="Upload preview" className="rounded-lg max-h-24" />
-                  <button
-                    onClick={() => {
-                      setImageBase64(null);
-                      setImagePreview(null);
-                    }}
-                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-700"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {imagePreview && (
+            <div className="mb-3">
+              <div className="relative inline-block">
+                <img src={imagePreview} alt="Upload preview" className="rounded-lg max-h-24" />
+                <button
+                  onClick={() => {
+                    setImageBase64(null);
+                    setImagePreview(null);
+                  }}
+                  className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-700"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-end gap-2">
-            {/* Upload Button */}
             <input
               ref={fileInputRef}
               type="file"
@@ -389,7 +358,6 @@ const ChatSidebar = ({ isOpen, onClose }) => {
               <ImageIcon className="w-5 h-5" />
             </Button>
 
-            {/* Voice Button */}
             <Button
               type="button"
               variant="ghost"
@@ -403,13 +371,12 @@ const ChatSidebar = ({ isOpen, onClose }) => {
               data-testid="sidebar-voice-record-button"
             >
               {isRecording ? (
-                <MicOff className="w-5 h-5 recording-indicator" />
+                <MicOff className="w-5 h-5" />
               ) : (
                 <Mic className="w-5 h-5" />
               )}
             </Button>
 
-            {/* Text Input */}
             <Textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -420,7 +387,6 @@ const ChatSidebar = ({ isOpen, onClose }) => {
               data-testid="sidebar-chat-message-input"
             />
 
-            {/* Send Button */}
             <Button
               onClick={handleSend}
               disabled={sendMutation.isPending || (!message.trim() && !imageBase64)}
@@ -435,24 +401,14 @@ const ChatSidebar = ({ isOpen, onClose }) => {
             </Button>
           </div>
 
-          {/* Recording Indicator */}
-          <AnimatePresence>
-            {isRecording && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="mt-2 flex items-center gap-2 text-red-600 text-xs"
-              >
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                Recording... Tap to stop
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {isRecording && (
+            <div className="mt-2 flex items-center gap-2 text-red-600 text-xs">
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              Recording... Tap to stop
+            </div>
+          )}
         </div>
-      </motion.div>
-        )}
-      </AnimatePresence>
+      </div>
     </>
   );
 };
