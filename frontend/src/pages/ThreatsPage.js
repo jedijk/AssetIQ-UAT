@@ -138,24 +138,23 @@ const ThreatsPage = () => {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl" data-testid="threats-page">
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="threats-page">
+      {/* Compact Stats Row */}
+      <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
         {statCards.map((stat, idx) => (
-          <motion.div
+          <div
             key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="stat-card"
+            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200"
             data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
           >
-            <div className={`inline-flex p-2 rounded-lg ${stat.bg} mb-3`}>
-              <stat.icon className={`w-5 h-5 ${stat.color}`} />
+            <div className={`p-1.5 rounded-md ${stat.bg}`}>
+              <stat.icon className={`w-4 h-4 ${stat.color}`} />
             </div>
-            <div className="stat-value">{stat.value}</div>
-            <div className="stat-label">{stat.label}</div>
-          </motion.div>
+            <div>
+              <span className="text-lg font-bold text-slate-900">{stat.value}</span>
+              <span className="text-xs text-slate-500 ml-1">{stat.label}</span>
+            </div>
+          </div>
         ))}
       </div>
 
