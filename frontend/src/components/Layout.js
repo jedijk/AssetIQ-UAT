@@ -26,11 +26,12 @@ const Layout = () => {
           <div className="flex items-center gap-4 lg:gap-8">
             {/* Hierarchy Toggle - Desktop */}
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
               onClick={() => setHierarchyOpen(!hierarchyOpen)}
-              className="hidden lg:flex h-9 w-9 text-slate-500 hover:text-slate-700"
+              className="hidden lg:flex h-9 w-9 text-slate-600 hover:text-blue-600 border-slate-300"
               data-testid="hierarchy-toggle"
+              title={hierarchyOpen ? "Hide Equipment Panel" : "Show Equipment Panel"}
             >
               {hierarchyOpen ? (
                 <PanelLeftClose className="w-5 h-5" />
