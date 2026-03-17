@@ -120,9 +120,20 @@ def find_matching_failure_modes(text: str, limit: int = 5) -> list:
     
     for fm in FAILURE_MODES_LIBRARY:
         score = 0
+        # Check keywords
         for keyword in fm["keywords"]:
             if keyword.lower() in text_lower:
                 score += 1
+        # Also check equipment type
+        if fm["equipment"].lower() in text_lower:
+            score += 2
+        # Also check failure mode name
+        if fm["failure_mode"].lower() in text_lower:
+            score += 2
+        # Check category
+        if fm["category"].lower() in text_lower:
+            score += 1
+        
         if score > 0:
             matches.append((score, fm))
     
