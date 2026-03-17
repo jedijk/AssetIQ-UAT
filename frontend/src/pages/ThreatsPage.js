@@ -149,17 +149,8 @@ const ThreatsPage = () => {
           <p className="text-slate-500">
             {searchQuery
               ? "Try adjusting your search query"
-              : "Start by chatting about equipment failures"}
+              : "Click 'Report Threat' to start capturing failures"}
           </p>
-          {!searchQuery && (
-            <Button
-              onClick={() => navigate("/")}
-              className="mt-4 bg-blue-600 hover:bg-blue-700"
-              data-testid="go-to-chat-button"
-            >
-              Go to Chat
-            </Button>
-          )}
         </div>
       ) : (
         <div className="priority-list" data-testid="threats-list">

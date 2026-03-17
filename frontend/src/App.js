@@ -5,7 +5,6 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
-import ChatPage from "./pages/ChatPage";
 import ThreatsPage from "./pages/ThreatsPage";
 import ThreatDetailPage from "./pages/ThreatDetailPage";
 import FailureModesPage from "./pages/FailureModesPage";
@@ -95,8 +94,7 @@ function App() {
                 <Layout />
               </ProtectedRoute>
             }>
-              <Route index element={<ChatPage />} />
-              <Route path="threats" element={<ThreatsPage />} />
+              <Route index element={<ThreatsPage />} />
               <Route path="threats/:id" element={<ThreatDetailPage />} />
               <Route path="library" element={<FailureModesPage />} />
             </Route>

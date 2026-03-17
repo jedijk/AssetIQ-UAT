@@ -1,17 +1,17 @@
-import { Outlet, NavLink, useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { MessageSquare, AlertTriangle, LogOut, Menu, X, BookOpen } from "lucide-react";
 import { useState } from "react";
+import { Outlet, NavLink } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus } from "lucide-react";
 import { Button } from "./ui/button";
+import ChatSidebar from "./ChatSidebar";
 
 const Layout = () => {
   const { user, logout } = useAuth();
-  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const navItems = [
-    { path: "/", label: "Chat", icon: MessageSquare },
-    { path: "/threats", label: "Threats", icon: AlertTriangle },
+    { path: "/", label: "Threats", icon: AlertTriangle },
     { path: "/library", label: "Library", icon: BookOpen },
   ];
 
@@ -54,8 +54,18 @@ const Layout = () => {
             ))}
           </nav>
 
-          {/* User Menu */}
+          {/* Right Side */}
           <div className="flex items-center gap-3">
+            {/* Report Threat Button - Desktop */}
+            <Button
+              onClick={() => setChatOpen(true)}
+              className="hidden sm:flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+              data-testid="report-threat-button"
+            >
+              <Plus className="w-4 h-4" />
+              Report Threat
+            </Button>
+
             <span className="hidden sm:block text-sm font-medium text-slate-600" data-testid="user-name">
               {user?.name}
             </span>
@@ -115,6 +125,18 @@ const Layout = () => {
       <main>
         <Outlet />
       </main>
+
+      {/* Floating Action Button - Mobile */}
+      <button
+        onClick={() => setChatOpen(true)}
+        className="sm:hidden fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 hover:shadow-xl active:scale-95 transition-all duration-200 z-30"
+        data-testid="fab-report-threat"
+      >
+        <MessageSquare className="w-6 h-6" />
+      </button>
+
+      {/* Chat Sidebar */}
+      <ChatSidebar isOpen={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );
 };

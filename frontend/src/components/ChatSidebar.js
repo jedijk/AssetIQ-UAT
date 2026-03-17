@@ -1,0 +1,389 @@
+import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { chatAPI, voiceAPI } from "../lib/api";
+import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Send, 
+  Mic, 
+  MicOff, 
+  Image as ImageIcon, 
+  X, 
+  Loader2,
+  AlertTriangle,
+  ArrowRight,
+  HelpCircle,
+  MessageSquare,
+  ChevronRight
+} from "lucide-react";
+import { Button } from "./ui/button";
+import { Textarea } from "./ui/textarea";
+
+const ChatSidebar = ({ isOpen, onClose }) => {
+  const [message, setMessage] = useState("");
+  const [imageBase64, setImageBase64] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const queryClient = useQueryClient();
+
+  // Fetch chat history
+  const { data: messages = [], isLoading } = useQuery({
+    queryKey: ["chatHistory"],
+    queryFn: () => chatAPI.getHistory(100),
+    enabled: isOpen,
+  });
+
+  // Send message mutation
+  const sendMutation = useMutation({
+    mutationFn: ({ content, image }) => chatAPI.sendMessage(content, image),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      setMessage("");
+      setImageBase64(null);
+      setImagePreview(null);
+    },
+    onError: (error) => {
+      const errorMsg = error.response?.data?.detail || "Failed to send message";
+      toast.error(errorMsg);
+    },
+  });
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    if (isOpen) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isOpen]);
+
+  // Handle send
+  const handleSend = () => {
+    if (!message.trim() && !imageBase64) return;
+    sendMutation.mutate({ content: message, image: imageBase64 });
+  };
+
+  // Handle key press
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // Handle image upload
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
+      toast.error("Please upload a JPEG, PNG, or WebP image");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be less than 5MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result.split(",")[1];
+      setImageBase64(base64);
+      setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle voice recording
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64 = reader.result.split(",")[1];
+          try {
+            const result = await voiceAPI.transcribe(base64);
+            setMessage((prev) => prev + (prev ? " " : "") + result.text);
+            toast.success("Voice transcribed!");
+          } catch (error) {
+            toast.error("Failed to transcribe voice");
+          }
+        };
+        reader.readAsDataURL(blob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (error) {
+      toast.error("Could not access microphone");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      setMediaRecorder(null);
+    }
+  };
+
+  // Render message content
+  const renderMessageContent = (msg) => {
+    if (msg.role === "user") {
+      return (
+        <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm p-3 max-w-[85%] shadow-sm text-sm">
+          <p className="whitespace-pre-wrap">{msg.content}</p>
+          {msg.has_image && (
+            <div className="mt-2 text-blue-200 text-xs flex items-center gap-1">
+              <ImageIcon className="w-3 h-3" />
+              Image attached
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const isFollowUp = msg.question_type || msg.content.includes("?");
+    
+    return (
+      <div className={`bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm p-3 max-w-[85%] shadow-sm text-sm ${isFollowUp ? "border-l-4 border-l-blue-400" : ""}`}>
+        <p className="whitespace-pre-wrap">{msg.content}</p>
+        {msg.threat_id && (
+          <div className="mt-2 pt-2 border-t border-slate-100">
+            <a 
+              href={`/threats/${msg.threat_id}`}
+              onClick={onClose}
+              className="inline-flex items-center gap-1 text-blue-600 text-xs font-medium hover:underline"
+            >
+              View threat details
+              <ArrowRight className="w-3 h-3" />
+            </a>
+          </div>
+        )}
+        {isFollowUp && !msg.threat_id && (
+          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1 text-blue-600 text-xs">
+            <HelpCircle className="w-3 h-3" />
+            <span>Please provide more details</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar */}
+      <motion.div
+        initial={{ x: "100%" }}
+        animate={{ x: isOpen ? 0 : "100%" }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className="fixed right-0 top-0 h-full w-full sm:w-[400px] bg-slate-50 shadow-2xl z-50 flex flex-col"
+        data-testid="chat-sidebar"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+              <MessageSquare className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-900">Report Threat</h2>
+              <p className="text-xs text-slate-500">Describe the failure</p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600"
+            data-testid="close-chat-sidebar"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-4">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-4">
+                <AlertTriangle className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">
+                Report a Threat
+              </h3>
+              <p className="text-slate-500 text-sm mb-4">
+                Describe any equipment failure or issue. I'll analyze it and help you prioritize.
+              </p>
+              <div className="text-left bg-white rounded-xl p-3 text-xs text-slate-600 border border-slate-200 w-full">
+                <p className="font-medium text-slate-700 mb-2">Try saying:</p>
+                <p className="mb-1">"Pump P-104 is leaking from the seal"</p>
+                <p className="mb-1">"Bearing noise on compressor C-201"</p>
+                <p>"Heat exchanger showing reduced efficiency"</p>
+              </div>
+            </div>
+          ) : (
+            <AnimatePresence>
+              {messages.map((msg, idx) => (
+                <motion.div
+                  key={msg.id || idx}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  {renderMessageContent(msg)}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="border-t border-slate-200 bg-white p-4">
+          {/* Image Preview */}
+          <AnimatePresence>
+            {imagePreview && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-3"
+              >
+                <div className="relative inline-block">
+                  <img src={imagePreview} alt="Upload preview" className="rounded-lg max-h-24" />
+                  <button
+                    onClick={() => {
+                      setImageBase64(null);
+                      setImagePreview(null);
+                    }}
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-700"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex items-end gap-2">
+            {/* Upload Button */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-shrink-0 h-10 w-10 rounded-full text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+              data-testid="sidebar-upload-image-button"
+            >
+              <ImageIcon className="w-5 h-5" />
+            </Button>
+
+            {/* Voice Button */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={isRecording ? stopRecording : startRecording}
+              className={`flex-shrink-0 h-10 w-10 rounded-full ${
+                isRecording
+                  ? "bg-red-50 text-red-600 hover:bg-red-100"
+                  : "text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+              }`}
+              data-testid="sidebar-voice-record-button"
+            >
+              {isRecording ? (
+                <MicOff className="w-5 h-5 recording-indicator" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </Button>
+
+            {/* Text Input */}
+            <Textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Describe the issue..."
+              className="flex-1 min-h-[40px] max-h-24 resize-none rounded-xl border-slate-200 text-sm"
+              rows={1}
+              data-testid="sidebar-chat-message-input"
+            />
+
+            {/* Send Button */}
+            <Button
+              onClick={handleSend}
+              disabled={sendMutation.isPending || (!message.trim() && !imageBase64)}
+              className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-600 hover:bg-blue-700"
+              data-testid="sidebar-send-message-button"
+            >
+              {sendMutation.isPending ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </Button>
+          </div>
+
+          {/* Recording Indicator */}
+          <AnimatePresence>
+            {isRecording && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="mt-2 flex items-center gap-2 text-red-600 text-xs"
+              >
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                Recording... Tap to stop
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </>
+  );
+};
+
+export default ChatSidebar;
