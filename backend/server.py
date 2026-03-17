@@ -93,6 +93,7 @@ class ThreatResponse(BaseModel):
     created_at: str
     occurrence_count: int
     image_url: Optional[str] = None
+    location: Optional[str] = None
 
 class ThreatUpdate(BaseModel):
     status: Optional[str] = None
@@ -101,6 +102,7 @@ class ChatResponse(BaseModel):
     message: str
     threat: Optional[ThreatResponse] = None
     follow_up_question: Optional[str] = None
+    question_type: Optional[str] = None  # asset, location, photo, frequency, impact, details
 
 class VoiceTranscriptionResponse(BaseModel):
     text: str
@@ -157,7 +159,24 @@ When a user describes a failure, extract the following information:
 7. Frequency: How often this occurs - one of: "First Time", "Rare", "Occasional", "Frequent"
 8. Likelihood: Probability of recurrence - one of: "Very Low", "Low", "Medium", "High", "Very High"
 9. Detectability: How detectable is the failure - one of: "Easy", "Moderate", "Difficult", "Very Difficult"
-10. Recommended Actions: 2-4 specific actionable recommendations based on industry best practices
+10. Location: Physical location/area if mentioned
+11. Recommended Actions: 2-4 specific actionable recommendations based on industry best practices
+
+## IMPORTANT: ASK CLARIFYING QUESTIONS
+Before creating a threat, check if the following critical information is missing:
+
+**MUST ASK if missing:**
+- Asset ID/Name (e.g., "Which specific equipment? Can you provide the tag number like P-101?")
+- Failure description (e.g., "What exactly is happening? Leak, noise, vibration?")
+
+**SHOULD ASK if missing (pick the most relevant one):**
+- Location: "Where is this equipment located? (Area/Unit/Building)"
+- Photo: "Do you have a photo of the damage? It helps with assessment."
+- Frequency: "Is this the first time, or has this happened before?"
+- Impact severity: "Is this affecting production or safety right now?"
+- When it started: "When did you first notice this issue?"
+
+Only ask ONE question at a time. Prioritize the most critical missing information.
 
 Calculate risk score (1-100) based on FMEA methodology:
 - Severity (1-10): Safety=10, Production=8, Equipment=6, Environmental=9
@@ -171,12 +190,11 @@ Risk Level based on score:
 - Medium: >= 30
 - Low: < 30
 
-If critical information is missing (Asset OR Equipment Type OR Failure Mode), ask ONE specific follow-up question.
-
 RESPOND IN JSON FORMAT ONLY:
 {
   "complete": true/false,
-  "follow_up_question": "question if complete is false",
+  "follow_up_question": "question if complete is false - be specific and helpful",
+  "question_type": "asset|location|photo|frequency|impact|details",
   "threat": {
     "title": "...",
     "asset": "...",
@@ -187,6 +205,7 @@ RESPOND IN JSON FORMAT ONLY:
     "frequency": "...",
     "likelihood": "...",
     "detectability": "...",
+    "location": "...",
     "risk_score": number,
     "risk_level": "Critical/High/Medium/Low",
     "recommended_actions": ["action1", "action2", "action3"]
@@ -385,23 +404,52 @@ async def send_chat_message(
     }
     await db.chat_messages.insert_one(chat_msg)
     
+    # Get recent conversation context for follow-up questions
+    recent_messages = await db.chat_messages.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(10).to_list(10)
+    
+    # Build context from recent messages
+    context = ""
+    if len(recent_messages) > 1:
+        context = "\n\nPrevious conversation context:\n"
+        for msg in reversed(recent_messages[1:6]):  # Last 5 messages excluding current
+            role = "User" if msg["role"] == "user" else "Assistant"
+            context += f"{role}: {msg['content'][:200]}\n"
+    
     # Analyze with AI
-    analysis = await analyze_threat_with_ai(message.content, session_id, message.image_base64)
+    analysis = await analyze_threat_with_ai(
+        message.content + context, 
+        session_id, 
+        message.image_base64
+    )
     
     if not analysis.get("complete", False):
         # Need more info - return follow-up question
+        question = analysis.get("follow_up_question", "Could you provide more details about the failure?")
+        question_type = analysis.get("question_type", "details")
+        
+        # Add helpful prompts based on question type
+        if question_type == "photo":
+            question += "\n\n💡 Tip: Use the camera button to attach a photo."
+        elif question_type == "location":
+            question += "\n\n💡 Tip: Include area, unit, or building name."
+        
         ai_response = {
             "id": str(uuid.uuid4()),
             "user_id": current_user["id"],
             "role": "assistant",
-            "content": analysis.get("follow_up_question", "Could you provide more details about the failure?"),
+            "content": question,
+            "question_type": question_type,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.chat_messages.insert_one(ai_response)
         
         return ChatResponse(
-            message=ai_response["content"],
-            follow_up_question=analysis.get("follow_up_question")
+            message=question,
+            follow_up_question=analysis.get("follow_up_question"),
+            question_type=question_type
         )
     
     # Create threat
@@ -431,7 +479,8 @@ async def send_chat_message(
         "created_by": current_user["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "occurrence_count": 1,
-        "image_url": None
+        "image_url": None,
+        "location": threat_data.get("location")
     }
     await db.threats.insert_one(threat_doc)
     

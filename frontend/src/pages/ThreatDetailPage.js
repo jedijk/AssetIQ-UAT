@@ -111,7 +111,7 @@ const ThreatDetailPage = () => {
     { label: "Frequency", value: threat.frequency, icon: Clock },
     { label: "Likelihood", value: threat.likelihood, icon: Activity },
     { label: "Detectability", value: threat.detectability, icon: Eye },
-    { label: "Occurrences", value: threat.occurrence_count, icon: Activity },
+    { label: "Location", value: threat.location || "Not specified", icon: MapPin },
   ];
 
   return (

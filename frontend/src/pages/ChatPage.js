@@ -11,7 +11,8 @@ import {
   X, 
   Loader2,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  HelpCircle
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
@@ -151,9 +152,11 @@ const ChatPage = () => {
       );
     }
 
-    // AI message
+    // AI message - check if it's a follow-up question
+    const isFollowUp = msg.question_type || msg.content.includes("?");
+    
     return (
-      <div className="chat-bubble-ai">
+      <div className={`chat-bubble-ai ${isFollowUp ? "border-l-4 border-l-blue-400" : ""}`}>
         <p className="whitespace-pre-wrap">{msg.content}</p>
         {msg.threat_id && (
           <div className="mt-3 pt-3 border-t border-slate-100">
@@ -165,6 +168,12 @@ const ChatPage = () => {
               View threat details
               <ArrowRight className="w-4 h-4" />
             </a>
+          </div>
+        )}
+        {isFollowUp && !msg.threat_id && (
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-blue-600 text-sm">
+            <HelpCircle className="w-4 h-4" />
+            <span>Please provide more details</span>
           </div>
         )}
       </div>
