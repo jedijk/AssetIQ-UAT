@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { Outlet, NavLink } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 import { Button } from "./ui/button";
 import ChatSidebar from "./ChatSidebar";
+import EquipmentHierarchy from "./EquipmentHierarchy";
 
 const Layout = () => {
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [hierarchyOpen, setHierarchyOpen] = useState(true); // Open by default on desktop
 
   const navItems = [
     { path: "/", label: "Threats", icon: AlertTriangle },
@@ -19,9 +21,24 @@ const Layout = () => {
     <div className="app-container">
       {/* Header */}
       <header className="app-header">
-        <div className="header-content max-w-7xl mx-auto">
+        <div className="header-content max-w-full px-4">
           {/* Left Section - Logo & Nav */}
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-4 lg:gap-8">
+            {/* Hierarchy Toggle - Desktop */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setHierarchyOpen(!hierarchyOpen)}
+              className="hidden lg:flex h-9 w-9 text-slate-500 hover:text-slate-700"
+              data-testid="hierarchy-toggle"
+            >
+              {hierarchyOpen ? (
+                <PanelLeftClose className="w-5 h-5" />
+              ) : (
+                <PanelLeftOpen className="w-5 h-5" />
+              )}
+            </Button>
+
             {/* Logo */}
             <div className="flex items-center gap-3 flex-shrink-0">
               <img 
@@ -29,7 +46,7 @@ const Layout = () => {
                 alt="ThreatBase" 
                 className="w-9 h-9 rounded-lg"
               />
-              <span className="text-xl font-bold text-slate-900" data-testid="app-logo">
+              <span className="text-xl font-bold text-slate-900 hidden sm:block" data-testid="app-logo">
                 ThreatBase
               </span>
             </div>
@@ -50,15 +67,15 @@ const Layout = () => {
                   }
                   data-testid={`nav-${item.label.toLowerCase()}`}
                 >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+                  <item.icon className="w-4 h-4" />
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
           </div>
 
           {/* Right Side */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Report Threat Button - Desktop */}
             <Button
               onClick={() => setChatOpen(true)}
@@ -69,7 +86,7 @@ const Layout = () => {
               Report Threat
             </Button>
 
-            <span className="hidden sm:block text-sm font-medium text-slate-600" data-testid="user-name">
+            <span className="hidden lg:block text-sm font-medium text-slate-600" data-testid="user-name">
               {user?.name}
             </span>
             <Button
@@ -101,6 +118,14 @@ const Layout = () => {
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <nav className="md:hidden border-t border-slate-200 p-4 bg-white" data-testid="mobile-nav">
+            {/* Hierarchy toggle for mobile */}
+            <button
+              onClick={() => { setHierarchyOpen(true); setMobileMenuOpen(false); }}
+              className="flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-50 w-full"
+            >
+              <PanelLeftOpen className="w-5 h-5" />
+              Equipment Hierarchy
+            </button>
             {navItems.map((item) => (
               <NavLink
                 key={item.path}
@@ -124,10 +149,35 @@ const Layout = () => {
         )}
       </header>
 
-      {/* Main Content */}
-      <main>
-        <Outlet />
-      </main>
+      {/* Main Layout with Sidebar */}
+      <div className="flex min-h-[calc(100vh-64px)]">
+        {/* Equipment Hierarchy Sidebar - Desktop */}
+        {hierarchyOpen && (
+          <div className="hidden lg:block w-72 flex-shrink-0 border-r border-slate-200 bg-white">
+            <div className="sticky top-16 h-[calc(100vh-64px)]">
+              <EquipmentHierarchy 
+                isOpen={true} 
+                onClose={() => setHierarchyOpen(false)}
+                isMobile={false}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Hierarchy Sidebar (overlay) */}
+        <div className="lg:hidden">
+          <EquipmentHierarchy 
+            isOpen={hierarchyOpen} 
+            onClose={() => setHierarchyOpen(false)}
+            isMobile={true}
+          />
+        </div>
+
+        {/* Main Content */}
+        <main className="flex-1 min-w-0">
+          <Outlet />
+        </main>
+      </div>
 
       {/* Floating Action Button - Mobile */}
       <button
