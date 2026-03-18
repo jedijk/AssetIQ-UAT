@@ -137,6 +137,14 @@ export const equipmentHierarchyAPI = {
     return response.data;
   },
   
+  changeNodeLevel: async (nodeId, newLevel, newParentId = null) => {
+    const response = await api.post(`/equipment-hierarchy/nodes/${nodeId}/change-level`, {
+      new_level: newLevel,
+      new_parent_id: newParentId
+    });
+    return response.data;
+  },
+  
   assignCriticality: async (nodeId, assignment) => {
     const response = await api.post(`/equipment-hierarchy/nodes/${nodeId}/criticality`, assignment);
     return response.data;

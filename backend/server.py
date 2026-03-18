@@ -1118,6 +1118,124 @@ async def delete_equipment_node(
     
     return {"message": f"Deleted {result.deleted_count} nodes", "deleted_ids": all_ids}
 
+
+class ChangeLevelRequest(BaseModel):
+    new_level: ISOLevel
+    new_parent_id: Optional[str] = None  # Required when demoting, optional when promoting
+
+
+@api_router.post("/equipment-hierarchy/nodes/{node_id}/change-level")
+async def change_node_level(
+    node_id: str,
+    request: ChangeLevelRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Change the hierarchy level of a node (promote or demote)."""
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    current_level = normalize_level(ISOLevel(node["level"]))
+    new_level = normalize_level(request.new_level)
+    
+    current_idx = ISO_LEVEL_ORDER.index(current_level)
+    new_idx = ISO_LEVEL_ORDER.index(new_level)
+    
+    # Validate level change
+    if new_idx == current_idx:
+        raise HTTPException(status_code=400, detail="Node is already at this level")
+    
+    is_promoting = new_idx < current_idx  # Moving up in hierarchy
+    is_demoting = new_idx > current_idx   # Moving down in hierarchy
+    
+    # Get current parent
+    current_parent = None
+    if node.get("parent_id"):
+        current_parent = await db.equipment_nodes.find_one(
+            {"id": node["parent_id"], "created_by": current_user["id"]}
+        )
+    
+    if is_promoting:
+        # When promoting, the node becomes a sibling of its current parent
+        # The new parent is the grandparent (parent of current parent)
+        if not current_parent:
+            raise HTTPException(status_code=400, detail="Cannot promote a root node")
+        
+        new_parent_id = current_parent.get("parent_id")  # Grandparent (can be None for installation)
+        
+        # Validate the new level is correct for the new parent
+        if new_parent_id:
+            grandparent = await db.equipment_nodes.find_one(
+                {"id": new_parent_id, "created_by": current_user["id"]}
+            )
+            if grandparent:
+                grandparent_level = normalize_level(ISOLevel(grandparent["level"]))
+                if not is_valid_parent_child(grandparent_level, new_level):
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Cannot promote to {new_level.value}. Invalid parent-child relationship."
+                    )
+        else:
+            # Promoting to root level - must be installation
+            if new_level != ISOLevel.INSTALLATION:
+                raise HTTPException(status_code=400, detail="Only installations can be root nodes")
+        
+    else:  # is_demoting
+        # When demoting, user must specify a new parent
+        if not request.new_parent_id:
+            raise HTTPException(status_code=400, detail="Must specify new_parent_id when demoting")
+        
+        new_parent = await db.equipment_nodes.find_one(
+            {"id": request.new_parent_id, "created_by": current_user["id"]}
+        )
+        if not new_parent:
+            raise HTTPException(status_code=400, detail="New parent node not found")
+        
+        parent_level = normalize_level(ISOLevel(new_parent["level"]))
+        if not is_valid_parent_child(parent_level, new_level):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot demote to {new_level.value} under {parent_level.value}"
+            )
+        
+        new_parent_id = request.new_parent_id
+    
+    # Check for duplicate name at new location
+    existing = await db.equipment_nodes.find_one({
+        "name": node["name"],
+        "parent_id": new_parent_id,
+        "created_by": current_user["id"],
+        "id": {"$ne": node_id}
+    })
+    if existing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"A node with name '{node['name']}' already exists at the target location"
+        )
+    
+    # Update the node
+    await db.equipment_nodes.update_one(
+        {"id": node_id},
+        {"$set": {
+            "level": new_level.value,
+            "parent_id": new_parent_id,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # If promoting, also need to update children's parent to maintain hierarchy
+    # Children of this node stay as children
+    
+    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    action = "promoted" if is_promoting else "demoted"
+    return {
+        "message": f"Node {action} to {new_level.value}",
+        "node": updated
+    }
+
+
 @api_router.post("/equipment-hierarchy/nodes/{node_id}/move")
 async def move_equipment_node(
     node_id: str,

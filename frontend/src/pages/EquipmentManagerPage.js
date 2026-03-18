@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { equipmentHierarchyAPI } from "../lib/api";
 import { toast } from "sonner";
 import {
-  ChevronRight, ChevronDown, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
+  ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
-  Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, Move, ArrowRight,
+  Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, Move, ArrowRight, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -32,18 +32,27 @@ const LEVEL_CONFIG = {
   equipment: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" }
 };
 const LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
+const LEGACY_LEVEL_MAP = { "unit": "plant_unit", "system": "section_system", "equipment": "equipment_unit" };
 const CRIT_COLORS = { safety_critical: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", dot: "bg-red-500" }, production_critical: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", dot: "bg-orange-500" }, medium: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", dot: "bg-yellow-500" }, low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } };
 const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process"];
 
+// Normalize legacy levels to ISO 14224 standard
+function normalizeLevel(level) {
+  return LEGACY_LEVEL_MAP[level] || level;
+}
+
 function getValidChildLevels(parentLevel) {
-  const idx = LEVEL_ORDER.indexOf(parentLevel);
+  const normalizedLevel = normalizeLevel(parentLevel);
+  const idx = LEVEL_ORDER.indexOf(normalizedLevel);
   if (idx === -1 || idx >= LEVEL_ORDER.length - 1) return [];
   return [LEVEL_ORDER[idx + 1]];
 }
 
 function canBeChildOf(childLevel, parentLevel) {
-  const parentIdx = LEVEL_ORDER.indexOf(parentLevel);
-  const childIdx = LEVEL_ORDER.indexOf(childLevel);
+  const normalizedParent = normalizeLevel(parentLevel);
+  const normalizedChild = normalizeLevel(childLevel);
+  const parentIdx = LEVEL_ORDER.indexOf(normalizedParent);
+  const childIdx = LEVEL_ORDER.indexOf(normalizedChild);
   return parentIdx >= 0 && childIdx === parentIdx + 1;
 }
 
@@ -211,7 +220,7 @@ function CriticalityChart({ nodes }) {
   );
 }
 
-function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, disciplines, onUpdate, onAssignCriticality, onAssignDiscipline, onStartMove, isMoving }) {
+function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, disciplines, onUpdate, onAssignCriticality, onAssignDiscipline, onStartMove, isMoving, onPromote, onDemote, nodes }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -228,6 +237,12 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   const canMove = node.level !== "installation";
+  
+  // Calculate if node can be promoted or demoted
+  const normalizedLevel = normalizeLevel(node.level);
+  const levelIdx = LEVEL_ORDER.indexOf(normalizedLevel);
+  const canPromote = levelIdx > 0 && node.parent_id; // Can't promote root or installation
+  const canDemote = levelIdx < LEVEL_ORDER.length - 1 && levelIdx >= 0; // Can't demote maintainable items
   
   const handleSave = () => { onUpdate(node.id, { name: editName, description: editDesc }); setIsEditing(false); };
   const startEdit = () => { setEditName(node.name); setEditDesc(node.description || ""); setIsEditing(true); };
@@ -267,6 +282,32 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
               {isMoving ? "Click a valid parent to move" : "Move to different parent"}
             </Button>
           )}
+          
+          {/* Promote/Demote Buttons */}
+          <div className="flex gap-2">
+            {canPromote && (
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={onPromote}
+                data-testid="promote-node-btn"
+              >
+                <ChevronUp className="w-4 h-4 mr-1" />
+                Promote
+              </Button>
+            )}
+            {canDemote && (
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={onDemote}
+                data-testid="demote-node-btn"
+              >
+                <ChevronDown className="w-4 h-4 mr-1" />
+                Demote
+              </Button>
+            )}
+          </div>
           
           <div>
             <Label className="text-xs text-slate-500 mb-1">Description</Label>
@@ -405,6 +446,64 @@ export default function EquipmentManagerPage() {
     } 
   });
   
+  // Change level mutation (promote/demote)
+  const changeLevelMutation = useMutation({
+    mutationFn: ({ nodeId, newLevel, newParentId }) => equipmentHierarchyAPI.changeNodeLevel(nodeId, newLevel, newParentId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["equipment-nodes"]);
+      toast.success(data.message || "Level changed");
+      setSelectedNode(data.node);
+    },
+    onError: e => toast.error(e.response?.data?.detail || "Failed to change level")
+  });
+  
+  // State for demote dialog (need to select new parent)
+  const [demoteDialog, setDemoteDialog] = useState({ open: false, node: null, newLevel: null });
+  
+  const handlePromote = () => {
+    if (!selectedNode) return;
+    const normalizedLevel = normalizeLevel(selectedNode.level);
+    const currentIdx = LEVEL_ORDER.indexOf(normalizedLevel);
+    if (currentIdx <= 0) return;
+    
+    const newLevel = LEVEL_ORDER[currentIdx - 1];
+    changeLevelMutation.mutate({ nodeId: selectedNode.id, newLevel, newParentId: null });
+  };
+  
+  const handleDemote = () => {
+    if (!selectedNode) return;
+    const normalizedLevel = normalizeLevel(selectedNode.level);
+    const currentIdx = LEVEL_ORDER.indexOf(normalizedLevel);
+    if (currentIdx >= LEVEL_ORDER.length - 1) return;
+    
+    const newLevel = LEVEL_ORDER[currentIdx + 1];
+    // Open dialog to select new parent
+    setDemoteDialog({ open: true, node: selectedNode, newLevel });
+  };
+  
+  const handleDemoteConfirm = (newParentId) => {
+    if (demoteDialog.node && demoteDialog.newLevel) {
+      changeLevelMutation.mutate({ 
+        nodeId: demoteDialog.node.id, 
+        newLevel: demoteDialog.newLevel, 
+        newParentId 
+      });
+      setDemoteDialog({ open: false, node: null, newLevel: null });
+    }
+  };
+  
+  // Get valid parents for demoting (nodes at the level above the new level)
+  const getDemoteParentCandidates = () => {
+    if (!demoteDialog.newLevel) return [];
+    const newLevelIdx = LEVEL_ORDER.indexOf(demoteDialog.newLevel);
+    if (newLevelIdx <= 0) return [];
+    const parentLevel = LEVEL_ORDER[newLevelIdx - 1];
+    return nodes.filter(n => {
+      const nodeLevel = normalizeLevel(n.level);
+      return nodeLevel === parentLevel && n.id !== demoteDialog.node?.id;
+    });
+  };
+  
   // Equipment type mutations
   const createTypeMutation = useMutation({ mutationFn: equipmentHierarchyAPI.createEquipmentType, onSuccess: () => { queryClient.invalidateQueries(["equipment-types"]); toast.success("Equipment type created"); setIsTypeDialogOpen(false); resetTypeForm(); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
   const updateTypeMutation = useMutation({ mutationFn: ({ typeId, data }) => equipmentHierarchyAPI.updateEquipmentType(typeId, data), onSuccess: () => { queryClient.invalidateQueries(["equipment-types"]); toast.success("Equipment type updated"); setIsTypeDialogOpen(false); setEditingType(null); resetTypeForm(); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
@@ -464,7 +563,7 @@ export default function EquipmentManagerPage() {
   };
 
   const handleFileUpload = (e) => { const file = e.target.files?.[0]; if (file) { parseFileMutation.mutate(file); e.target.value = ""; } };
-  const getNextLevel = level => { const idx = LEVEL_ORDER.indexOf(level); return idx < LEVEL_ORDER.length - 1 ? LEVEL_ORDER[idx + 1] : null; };
+  const getNextLevel = level => { const normalizedLevel = normalizeLevel(level); const idx = LEVEL_ORDER.indexOf(normalizedLevel); return idx >= 0 && idx < LEVEL_ORDER.length - 1 ? LEVEL_ORDER[idx + 1] : null; };
   const handleAddChild = () => { if (selectedNode) { const next = getNextLevel(selectedNode.level); if (next) { setNewNode({ name: "", level: next, parent_id: selectedNode.id }); setIsCreateOpen(true); } else toast.error("Cannot add children to maintainable items"); } };
   
   const handleEditType = (type) => { setEditingType(type); setNewType({ id: type.id, name: type.name, discipline: type.discipline || "mechanical", icon: type.icon || "cog", iso_class: type.iso_class || "" }); setIsTypeDialogOpen(true); };
@@ -579,6 +678,9 @@ export default function EquipmentManagerPage() {
           onAssignDiscipline={(id, d) => disciplineMutation.mutate({ nodeId: id, discipline: d })}
           onStartMove={handleStartMove}
           isMoving={movingNode?.id === selectedNode?.id}
+          onPromote={handlePromote}
+          onDemote={handleDemote}
+          nodes={nodes}
         />
       </div>
 
@@ -670,6 +772,53 @@ export default function EquipmentManagerPage() {
             </Button>
             <Button onClick={handleAssignToHierarchy} disabled={!assignDialog.selectedLevel || assignToHierarchyMutation.isPending}>
               {assignToHierarchyMutation.isPending ? "Assigning..." : "Assign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Demote Dialog - Select new parent */}
+      <Dialog open={demoteDialog.open} onOpenChange={(open) => !open && setDemoteDialog({ open: false, node: null, newLevel: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Demote to {LEVEL_CONFIG[demoteDialog.newLevel]?.label}</DialogTitle>
+            <DialogDescription>
+              Select a new parent for "{demoteDialog.node?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Select New Parent</Label>
+              <div className="mt-2 max-h-60 overflow-y-auto border rounded-lg">
+                {getDemoteParentCandidates().length === 0 ? (
+                  <div className="p-4 text-center text-slate-500 text-sm">
+                    No valid parent nodes found. Create a {LEVEL_CONFIG[LEVEL_ORDER[LEVEL_ORDER.indexOf(demoteDialog.newLevel) - 1]]?.label} first.
+                  </div>
+                ) : (
+                  getDemoteParentCandidates().map(parent => {
+                    const parentConfig = LEVEL_CONFIG[normalizeLevel(parent.level)] || { icon: Cog, label: "Unknown" };
+                    const ParentIcon = parentConfig.icon;
+                    return (
+                      <button
+                        key={parent.id}
+                        onClick={() => handleDemoteConfirm(parent.id)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 border-b last:border-b-0 text-left"
+                      >
+                        <ParentIcon className="w-5 h-5 text-slate-500" />
+                        <div>
+                          <div className="font-medium text-slate-900">{parent.name}</div>
+                          <div className="text-xs text-slate-500">{parentConfig.label}</div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDemoteDialog({ open: false, node: null, newLevel: null })}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
