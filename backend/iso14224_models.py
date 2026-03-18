@@ -156,3 +156,94 @@ class MoveNodeRequest(BaseModel):
     node_id: str
     new_parent_id: str
     recalculate_criticality: bool = True
+
+class UnstructuredItemCreate(BaseModel):
+    name: str
+    detected_type_id: Optional[str] = None
+    detected_discipline: Optional[str] = None
+    source: Optional[str] = None  # "chat", "file", "paste"
+
+class ParseEquipmentListRequest(BaseModel):
+    content: str
+    source: str = "paste"  # "paste", "chat", "file"
+
+class AssignToHierarchyRequest(BaseModel):
+    parent_id: str
+    level: str  # ISO level to assign
+
+# Equipment type detection keywords
+EQUIPMENT_TYPE_KEYWORDS = {
+    "pump": "pump_centrifugal",
+    "centrifugal pump": "pump_centrifugal",
+    "reciprocating pump": "pump_reciprocating",
+    "compressor": "compressor_centrifugal",
+    "centrifugal compressor": "compressor_centrifugal",
+    "reciprocating compressor": "compressor_reciprocating",
+    "turbine": "turbine_gas",
+    "gas turbine": "turbine_gas",
+    "steam turbine": "turbine_steam",
+    "heat exchanger": "heat_exchanger",
+    "exchanger": "heat_exchanger",
+    "hx": "heat_exchanger",
+    "vessel": "vessel_pressure",
+    "pressure vessel": "vessel_pressure",
+    "tank": "vessel_storage",
+    "storage tank": "vessel_storage",
+    "valve": "valve_control",
+    "control valve": "valve_control",
+    "safety valve": "valve_safety",
+    "relief valve": "valve_safety",
+    "motor": "motor_electric",
+    "electric motor": "motor_electric",
+    "transformer": "transformer",
+    "switchgear": "switchgear",
+    "sensor": "sensor_pressure",
+    "pressure sensor": "sensor_pressure",
+    "temperature sensor": "sensor_temperature",
+    "flow sensor": "sensor_flow",
+    "transmitter": "sensor_pressure",
+    "plc": "plc",
+    "controller": "plc",
+    "pipe": "pipe",
+    "piping": "pipe",
+}
+
+def detect_equipment_type(name: str) -> Optional[dict]:
+    """Detect equipment type from name using keywords."""
+    name_lower = name.lower()
+    
+    # Check for tag patterns like P-101, C-201, HX-301, etc.
+    import re
+    tag_patterns = {
+        r'\bp[-_]?\d': "pump_centrifugal",
+        r'\bc[-_]?\d': "compressor_centrifugal",
+        r'\bhx[-_]?\d': "heat_exchanger",
+        r'\be[-_]?\d': "heat_exchanger",
+        r'\bv[-_]?\d': "vessel_pressure",
+        r'\bt[-_]?\d': "vessel_storage",
+        r'\bfv[-_]?\d': "valve_control",
+        r'\bpv[-_]?\d': "valve_control",
+        r'\bsv[-_]?\d': "valve_safety",
+        r'\bpsv[-_]?\d': "valve_safety",
+        r'\bm[-_]?\d': "motor_electric",
+        r'\bpt[-_]?\d': "sensor_pressure",
+        r'\btt[-_]?\d': "sensor_temperature",
+        r'\bft[-_]?\d': "sensor_flow",
+    }
+    
+    for pattern, type_id in tag_patterns.items():
+        if re.search(pattern, name_lower):
+            equip_type = next((t for t in EQUIPMENT_TYPES if t["id"] == type_id), None)
+            if equip_type:
+                return equip_type
+    
+    # Check keywords (longer matches first)
+    for keyword in sorted(EQUIPMENT_TYPE_KEYWORDS.keys(), key=len, reverse=True):
+        if keyword in name_lower:
+            type_id = EQUIPMENT_TYPE_KEYWORDS[keyword]
+            equip_type = next((t for t in EQUIPMENT_TYPES if t["id"] == type_id), None)
+            if equip_type:
+                return equip_type
+    
+    return None
+

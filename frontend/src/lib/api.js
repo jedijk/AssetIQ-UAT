@@ -151,6 +151,49 @@ export const equipmentHierarchyAPI = {
     const response = await api.get("/equipment-hierarchy/stats");
     return response.data;
   },
+  
+  // Unstructured items operations
+  getUnstructuredItems: async () => {
+    const response = await api.get("/equipment-hierarchy/unstructured");
+    return response.data;
+  },
+  
+  createUnstructuredItem: async (itemData) => {
+    const response = await api.post("/equipment-hierarchy/unstructured", itemData);
+    return response.data;
+  },
+  
+  parseEquipmentList: async (content, source = "paste") => {
+    const response = await api.post("/equipment-hierarchy/parse-list", { content, source });
+    return response.data;
+  },
+  
+  parseEquipmentFile: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post("/equipment-hierarchy/parse-file", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    return response.data;
+  },
+  
+  assignUnstructuredToHierarchy: async (itemId, parentId, level) => {
+    const response = await api.post(`/equipment-hierarchy/unstructured/${itemId}/assign`, {
+      parent_id: parentId,
+      level: level
+    });
+    return response.data;
+  },
+  
+  deleteUnstructuredItem: async (itemId) => {
+    const response = await api.delete(`/equipment-hierarchy/unstructured/${itemId}`);
+    return response.data;
+  },
+  
+  clearUnstructuredItems: async () => {
+    const response = await api.delete("/equipment-hierarchy/unstructured");
+    return response.data;
+  },
 };
 
 export default api;

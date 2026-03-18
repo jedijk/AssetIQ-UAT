@@ -24,7 +24,9 @@ from failure_modes import (
 from iso14224_models import (
     ISOLevel, ISO_LEVEL_ORDER, EQUIPMENT_TYPES, CRITICALITY_PROFILES, Discipline,
     get_valid_parent_level, get_valid_child_levels, is_valid_parent_child,
-    EquipmentNodeCreate, EquipmentNodeUpdate, CriticalityAssignment, MoveNodeRequest
+    EquipmentNodeCreate, EquipmentNodeUpdate, CriticalityAssignment, MoveNodeRequest,
+    UnstructuredItemCreate, ParseEquipmentListRequest, AssignToHierarchyRequest,
+    detect_equipment_type
 )
 
 ROOT_DIR = Path(__file__).parent
@@ -1078,6 +1080,282 @@ async def get_hierarchy_stats(
         "by_level": level_counts,
         "by_criticality": criticality_counts
     }
+
+# ============= UNSTRUCTURED ITEMS ENDPOINTS =============
+
+@api_router.get("/equipment-hierarchy/unstructured")
+async def get_unstructured_items(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all unstructured (unassigned) equipment items."""
+    items = await db.unstructured_items.find(
+        {"created_by": current_user["id"]},
+        {"_id": 0}
+    ).to_list(1000)
+    return {"items": items}
+
+@api_router.post("/equipment-hierarchy/unstructured")
+async def create_unstructured_item(
+    item_data: UnstructuredItemCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a single unstructured equipment item."""
+    # Detect equipment type if not provided
+    detected = detect_equipment_type(item_data.name)
+    
+    item_id = str(uuid.uuid4())
+    item_doc = {
+        "id": item_id,
+        "name": item_data.name,
+        "detected_type_id": item_data.detected_type_id or (detected["id"] if detected else None),
+        "detected_type_name": detected["name"] if detected else None,
+        "detected_discipline": item_data.detected_discipline or (detected["discipline"] if detected else None),
+        "detected_icon": detected["icon"] if detected else None,
+        "source": item_data.source or "manual",
+        "created_by": current_user["id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.unstructured_items.insert_one(item_doc)
+    item_doc.pop("_id", None)
+    return item_doc
+
+@api_router.post("/equipment-hierarchy/parse-list")
+async def parse_equipment_list(
+    request: ParseEquipmentListRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Parse a text list and create unstructured items with auto-detection."""
+    import re
+    
+    content = request.content.strip()
+    
+    # Split by common delimiters: newlines, commas, semicolons, tabs
+    items = re.split(r'[\n\r,;\t]+', content)
+    
+    # Clean and deduplicate
+    seen = set()
+    unique_items = []
+    for item in items:
+        cleaned = item.strip()
+        # Remove common list prefixes like "1.", "- ", "• ", etc.
+        cleaned = re.sub(r'^[\d]+[.\)]\s*', '', cleaned)
+        cleaned = re.sub(r'^[-•*]\s*', '', cleaned)
+        cleaned = cleaned.strip()
+        
+        if cleaned and len(cleaned) > 1 and cleaned.lower() not in seen:
+            seen.add(cleaned.lower())
+            unique_items.append(cleaned)
+    
+    # Create unstructured items
+    created_items = []
+    for name in unique_items:
+        detected = detect_equipment_type(name)
+        
+        item_id = str(uuid.uuid4())
+        item_doc = {
+            "id": item_id,
+            "name": name,
+            "detected_type_id": detected["id"] if detected else None,
+            "detected_type_name": detected["name"] if detected else None,
+            "detected_discipline": detected["discipline"] if detected else None,
+            "detected_icon": detected["icon"] if detected else None,
+            "source": request.source,
+            "created_by": current_user["id"],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.unstructured_items.insert_one(item_doc)
+        item_doc.pop("_id", None)
+        created_items.append(item_doc)
+    
+    return {
+        "parsed_count": len(created_items),
+        "items": created_items
+    }
+
+@api_router.post("/equipment-hierarchy/parse-file")
+async def parse_equipment_file(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Parse an uploaded file (Excel, PDF, CSV, TXT) and extract equipment items."""
+    import io
+    
+    filename = file.filename.lower()
+    content = await file.read()
+    
+    extracted_items = []
+    
+    try:
+        if filename.endswith('.csv') or filename.endswith('.txt'):
+            # Plain text or CSV
+            text_content = content.decode('utf-8', errors='ignore')
+            items = text_content.strip().split('\n')
+            extracted_items = [item.strip() for item in items if item.strip()]
+            
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            # Excel file
+            import pandas as pd
+            df = pd.read_excel(io.BytesIO(content), header=None)
+            # Get all non-empty cells from first column (or all columns)
+            for col in df.columns:
+                for val in df[col].dropna():
+                    if isinstance(val, str) and val.strip():
+                        extracted_items.append(val.strip())
+                    elif not pd.isna(val):
+                        extracted_items.append(str(val).strip())
+                        
+        elif filename.endswith('.pdf'):
+            # PDF file - use PyPDF2 or pdfplumber
+            try:
+                import pdfplumber
+                with pdfplumber.open(io.BytesIO(content)) as pdf:
+                    for page in pdf.pages:
+                        text = page.extract_text()
+                        if text:
+                            lines = text.split('\n')
+                            extracted_items.extend([l.strip() for l in lines if l.strip()])
+            except ImportError:
+                # Fallback to PyPDF2
+                import PyPDF2
+                reader = PyPDF2.PdfReader(io.BytesIO(content))
+                for page in reader.pages:
+                    text = page.extract_text()
+                    if text:
+                        lines = text.split('\n')
+                        extracted_items.extend([l.strip() for l in lines if l.strip()])
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type. Use .txt, .csv, .xlsx, .xls, or .pdf")
+    
+    except Exception as e:
+        logger.error(f"File parsing error: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
+    
+    # Clean and deduplicate
+    import re
+    seen = set()
+    unique_items = []
+    for item in extracted_items:
+        cleaned = item.strip()
+        cleaned = re.sub(r'^[\d]+[.\)]\s*', '', cleaned)
+        cleaned = re.sub(r'^[-•*]\s*', '', cleaned)
+        cleaned = cleaned.strip()
+        
+        if cleaned and len(cleaned) > 1 and cleaned.lower() not in seen:
+            seen.add(cleaned.lower())
+            unique_items.append(cleaned)
+    
+    # Create unstructured items
+    created_items = []
+    for name in unique_items[:100]:  # Limit to 100 items per file
+        detected = detect_equipment_type(name)
+        
+        item_id = str(uuid.uuid4())
+        item_doc = {
+            "id": item_id,
+            "name": name,
+            "detected_type_id": detected["id"] if detected else None,
+            "detected_type_name": detected["name"] if detected else None,
+            "detected_discipline": detected["discipline"] if detected else None,
+            "detected_icon": detected["icon"] if detected else None,
+            "source": "file",
+            "created_by": current_user["id"],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.unstructured_items.insert_one(item_doc)
+        item_doc.pop("_id", None)
+        created_items.append(item_doc)
+    
+    return {
+        "filename": file.filename,
+        "parsed_count": len(created_items),
+        "items": created_items
+    }
+
+@api_router.post("/equipment-hierarchy/unstructured/{item_id}/assign")
+async def assign_unstructured_to_hierarchy(
+    item_id: str,
+    assignment: AssignToHierarchyRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Move an unstructured item into the ISO hierarchy."""
+    # Get the unstructured item
+    item = await db.unstructured_items.find_one(
+        {"id": item_id, "created_by": current_user["id"]}
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Unstructured item not found")
+    
+    # Validate parent exists
+    parent = await db.equipment_nodes.find_one(
+        {"id": assignment.parent_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    )
+    if not parent:
+        raise HTTPException(status_code=400, detail="Parent node not found")
+    
+    # Validate ISO level relationship
+    try:
+        target_level = ISOLevel(assignment.level)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid ISO level: {assignment.level}")
+    
+    parent_level = ISOLevel(parent["level"])
+    if not is_valid_parent_child(parent_level, target_level):
+        valid_children = get_valid_child_levels(parent_level)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot add {target_level.value} under {parent_level.value}. Valid: {[c.value for c in valid_children]}"
+        )
+    
+    # Create the equipment node
+    node_id = str(uuid.uuid4())
+    node_doc = {
+        "id": node_id,
+        "name": item["name"],
+        "level": target_level.value,
+        "parent_id": assignment.parent_id,
+        "equipment_type_id": item.get("detected_type_id"),
+        "description": f"Imported from unstructured list (source: {item.get('source', 'unknown')})",
+        "criticality": None,
+        "discipline": item.get("detected_discipline"),
+        "created_by": current_user["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.equipment_nodes.insert_one(node_doc)
+    node_doc.pop("_id", None)
+    
+    # Delete the unstructured item
+    await db.unstructured_items.delete_one({"id": item_id})
+    
+    return node_doc
+
+@api_router.delete("/equipment-hierarchy/unstructured/{item_id}")
+async def delete_unstructured_item(
+    item_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete an unstructured item."""
+    result = await db.unstructured_items.delete_one(
+        {"id": item_id, "created_by": current_user["id"]}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"message": "Item deleted"}
+
+@api_router.delete("/equipment-hierarchy/unstructured")
+async def clear_unstructured_items(
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete all unstructured items for the current user."""
+    result = await db.unstructured_items.delete_many(
+        {"created_by": current_user["id"]}
+    )
+    return {"message": f"Deleted {result.deleted_count} items"}
 
 # Include router and middleware
 app.include_router(api_router)
