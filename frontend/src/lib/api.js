@@ -194,6 +194,22 @@ export const equipmentHierarchyAPI = {
     const response = await api.delete("/equipment-hierarchy/unstructured");
     return response.data;
   },
+  
+  // Equipment type management
+  createEquipmentType: async (typeData) => {
+    const response = await api.post("/equipment-hierarchy/types", typeData);
+    return response.data;
+  },
+  
+  updateEquipmentType: async (typeId, updateData) => {
+    const response = await api.patch(`/equipment-hierarchy/types/${typeId}`, updateData);
+    return response.data;
+  },
+  
+  deleteEquipmentType: async (typeId) => {
+    const response = await api.delete(`/equipment-hierarchy/types/${typeId}`);
+    return response.data;
+  },
 };
 
 export default api;

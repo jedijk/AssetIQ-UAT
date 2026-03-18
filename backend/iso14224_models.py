@@ -171,6 +171,19 @@ class AssignToHierarchyRequest(BaseModel):
     parent_id: str
     level: str  # ISO level to assign
 
+class EquipmentTypeCreate(BaseModel):
+    id: str
+    name: str
+    iso_class: Optional[str] = None
+    discipline: str = "mechanical"
+    icon: str = "cog"
+
+class EquipmentTypeUpdate(BaseModel):
+    name: Optional[str] = None
+    iso_class: Optional[str] = None
+    discipline: Optional[str] = None
+    icon: Optional[str] = None
+
 # Equipment type detection keywords
 EQUIPMENT_TYPE_KEYWORDS = {
     "pump": "pump_centrifugal",

@@ -1,85 +1,126 @@
-# ThreatBase - Product Requirements Document
+# ThreatBase - AI-Powered Threat Capture & Prioritization Platform
 
-## Original Problem Statement
-AI-Powered Threat Capture & Prioritization Platform for reliability engineers to capture failures via chat, automatically structure them, and receive prioritized risk decisions.
+## Product Requirements Document (PRD)
 
-## User Personas
-- **Primary**: Reliability Engineers, Asset Integrity Engineers
-- **Secondary**: Maintenance Managers, Operations Managers
+### Original Problem Statement
+Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
-## Core Requirements
-1. Chat-based failure capture (< 2 min interaction)
-2. AI structuring engine (GPT-5.2)
-3. Risk ranking and prioritization using FMEA methodology
-4. Threat database with auto-creation from chat
-5. Voice input (OpenAI Whisper)
-6. Image analysis for damage detection (GPT-4 Vision)
-7. Failure Mode Library (100 FMEA modes)
+### Core Modules
 
-## What's Been Implemented (March 17, 2026)
-
-### Backend (FastAPI + MongoDB)
-- JWT authentication (register/login/me)
-- Chat endpoint with AI threat analysis
-- Voice transcription endpoint
-- Threats CRUD with status management
-- Risk score calculation using FMEA methodology
-- Failure Mode Library API (100 modes, 8 categories)
-- Stats endpoint for dashboard
-
-### Frontend (React + Tailwind + Shadcn)
-- Login/Register pages
-- Chat interface with voice recording and image upload
-- Threats list with search, filter, stats
-- Threat detail page with status management
-- Failure Mode Library page with category filters
+#### 1. Chat Interface (Completed)
+- AI-powered chat sidebar for threat reporting
+- Conversational follow-up questions for detail gathering
+- In-chat threat summary cards
 - Mobile-responsive design
-- Light theme with blue highlights
 
-### AI Integration
-- OpenAI GPT-5.2 for threat analysis via Emergent LLM key
-- Extracts: Asset, Equipment Type, Failure Mode, Impact, Frequency, Likelihood, Detectability
-- Calculates risk score and level (Critical/High/Medium/Low)
-- Generates recommended actions
+#### 2. AI Structuring Engine (Completed)
+- Natural language parsing using GPT-5.2
+- Automatic risk classification
+- Action recommendation generation
 
-## Prioritized Backlog
+#### 3. Risk & Prioritization Engine (Completed)
+- Risk scoring algorithm
+- Priority ranking
+- Criticality assessment
 
-### P0 (Critical - Done)
-- [x] Chat-based threat capture
-- [x] AI threat structuring
-- [x] Risk ranking
-- [x] Threat database
+#### 4. Threat Database (Completed)
+- MongoDB storage for threats
+- User authentication (JWT)
+- Full CRUD operations
 
-### P1 (High Priority - Done)
-- [x] Voice input
-- [x] Image analysis
-- [x] Failure Mode Library
+#### 5. Equipment Hierarchy & Criticality Manager - ISO 14224 (Completed - Mar 18, 2026)
+- **Three-panel UI**: Libraries (left), Hierarchy Canvas (center), Properties (right)
+- **ISO 14224 Hierarchy Levels**: Installation → Unit → System → Equipment → Maintainable Item
+- **Criticality Assignment**: Safety Critical, Production Critical, Medium, Low
+- **Discipline Mapping**: Mechanical, Electrical, Instrumentation, Process
+- **Equipment Type Library**: 20+ ISO-compliant equipment types with icons
+- **Custom Equipment Types**: Add/edit/delete custom types
+- **Unstructured Import**: 
+  - Parse equipment lists from text (paste)
+  - Upload files (Excel, PDF, CSV, TXT)
+  - Auto-detect equipment types from names/tags
+- **Drag & Drop**: Direct assignment from unassigned items to hierarchy (no confirmation needed)
 
-### P2 (Medium Priority - Next)
-- [ ] Pattern recognition across threats
-- [ ] Recurring threat detection
-- [ ] Failure prediction based on patterns
-- [ ] Multi-user/team support
+### Technical Architecture
 
-### P3 (Future)
-- [ ] CMMS integration
-- [ ] Advanced dashboards
-- [ ] Multi-site analytics
-- [ ] Export/reporting
-
-## Architecture
 ```
-Frontend (React) → Backend (FastAPI) → MongoDB
-                         ↓
-                   OpenAI GPT-5.2 (via Emergent)
+/app/
+├── backend/
+│   ├── server.py           # FastAPI server with all endpoints
+│   ├── iso14224_models.py  # ISO 14224 data models and validation
+│   ├── failure_modes.py    # Failure modes library
+│   └── services/
+│       └── ai_service.py   # OpenAI GPT-5.2 integration
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Layout.js       # Main layout with Settings menu
+│   │   │   ├── ChatSidebar.jsx # AI chat interface
+│   │   │   └── EquipmentHierarchy.jsx
+│   │   ├── pages/
+│   │   │   ├── ThreatsPage.js
+│   │   │   ├── EquipmentManagerPage.js  # ISO 14224 module
+│   │   │   └── FailureModesPage.js
+│   │   └── lib/
+│   │       └── api.js      # API client
+└── memory/
+    └── PRD.md
 ```
 
-## Environment
-- Backend: Port 8001
-- Frontend: Port 3000
-- Database: MongoDB
-- AI: OpenAI GPT-5.2 via EMERGENT_LLM_KEY
+### Key API Endpoints
 
-## Test Credentials
-- Email: test@example.com
-- Password: test123
+#### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/me` - Get current user
+
+#### Threats
+- `GET /api/threats` - List all threats
+- `GET /api/threats/{id}` - Get threat details
+- `POST /api/chat/send` - Send chat message (creates threats)
+
+#### Equipment Hierarchy (ISO 14224)
+- `GET /api/equipment-hierarchy/types` - Get equipment types (merged default + custom)
+- `POST /api/equipment-hierarchy/types` - Create custom type
+- `PATCH /api/equipment-hierarchy/types/{id}` - Update type
+- `DELETE /api/equipment-hierarchy/types/{id}` - Delete custom type
+- `GET /api/equipment-hierarchy/nodes` - Get hierarchy nodes
+- `POST /api/equipment-hierarchy/nodes` - Create node
+- `PATCH /api/equipment-hierarchy/nodes/{id}` - Update node
+- `DELETE /api/equipment-hierarchy/nodes/{id}` - Delete node (cascades)
+- `POST /api/equipment-hierarchy/nodes/{id}/criticality` - Assign criticality
+- `POST /api/equipment-hierarchy/nodes/{id}/discipline` - Assign discipline
+
+#### Unstructured Import
+- `GET /api/equipment-hierarchy/unstructured` - Get unassigned items
+- `POST /api/equipment-hierarchy/parse-list` - Parse text list
+- `POST /api/equipment-hierarchy/parse-file` - Parse uploaded file
+- `POST /api/equipment-hierarchy/unstructured/{id}/assign` - Assign to hierarchy
+- `DELETE /api/equipment-hierarchy/unstructured/{id}` - Delete item
+
+### Test Credentials
+- Email: test@test.com
+- Password: test
+
+### Completed Features (Mar 18, 2026)
+- [x] Full-stack MVP with React, FastAPI, MongoDB
+- [x] JWT authentication
+- [x] AI chat interface with GPT-5.2
+- [x] Threat management and prioritization
+- [x] Failure Modes Library (100+ modes)
+- [x] Equipment Hierarchy navigator sidebar
+- [x] Mobile-responsive design
+- [x] Equipment Manager module (ISO 14224)
+- [x] Three-panel hierarchy editor
+- [x] Drag-drop unstructured list import
+- [x] Auto-detection of equipment types
+- [x] Editable ISO 14224 equipment type library
+- [x] Direct drag-drop assignment (no confirmation)
+
+### Future Tasks (Backlog)
+- [ ] P2: Voice input for chat interface
+- [ ] P2: Image analysis for damage detection
+- [ ] P2: Failure prediction and pattern recognition
+- [ ] P3: Export hierarchy to PDF/Excel
+- [ ] P3: Bulk criticality assignment
+- [ ] P3: Equipment template library
