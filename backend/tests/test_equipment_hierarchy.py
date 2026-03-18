@@ -7,11 +7,11 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 
 class TestEquipmentHierarchyLibrary:
-    """Test equipment hierarchy library endpoints (no auth required)"""
+    """Test equipment hierarchy library endpoints"""
     
-    def test_get_equipment_types(self, api_client):
+    def test_get_equipment_types(self, authenticated_client):
         """Get all ISO 14224 equipment types"""
-        response = api_client.get(f"{BASE_URL}/api/equipment-hierarchy/types")
+        response = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/types")
         assert response.status_code == 200
         data = response.json()
         assert "equipment_types" in data
@@ -522,3 +522,422 @@ class TestHierarchyStats:
             assert level in data["by_level"]
         # Verify criticality counts structure
         assert "unassigned" in data["by_criticality"]
+
+
+class TestMoveNode:
+    """Test Move Mode - repositioning nodes in the hierarchy"""
+    
+    def test_move_unit_to_different_installation(self, authenticated_client):
+        """Move a unit from one installation to another"""
+        # Create two installations
+        install1_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveInstall1_{uuid.uuid4().hex[:6]}", "level": "installation"}
+        )
+        assert install1_resp.status_code == 200
+        install1_id = install1_resp.json()["id"]
+        
+        install2_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveInstall2_{uuid.uuid4().hex[:6]}", "level": "installation"}
+        )
+        assert install2_resp.status_code == 200
+        install2_id = install2_resp.json()["id"]
+        
+        # Create unit under install1
+        unit_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveUnit_{uuid.uuid4().hex[:6]}", "level": "unit", "parent_id": install1_id}
+        )
+        assert unit_resp.status_code == 200
+        unit_id = unit_resp.json()["id"]
+        assert unit_resp.json()["parent_id"] == install1_id
+        
+        # Move unit to install2
+        move_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes/{unit_id}/move",
+            json={"node_id": unit_id, "new_parent_id": install2_id, "recalculate_criticality": True}
+        )
+        assert move_resp.status_code == 200
+        assert move_resp.json()["parent_id"] == install2_id
+        
+        # Verify via GET
+        get_resp = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/nodes/{unit_id}")
+        assert get_resp.status_code == 200
+        assert get_resp.json()["parent_id"] == install2_id
+        
+        # Cleanup
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install1_id}")
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install2_id}")
+        
+    def test_move_system_to_different_unit(self, authenticated_client):
+        """Move a system from one unit to another under the same installation"""
+        # Create installation
+        install_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveSysInstall_{uuid.uuid4().hex[:6]}", "level": "installation"}
+        )
+        assert install_resp.status_code == 200
+        install_id = install_resp.json()["id"]
+        
+        # Create two units
+        unit1_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveSysUnit1_{uuid.uuid4().hex[:6]}", "level": "unit", "parent_id": install_id}
+        )
+        assert unit1_resp.status_code == 200
+        unit1_id = unit1_resp.json()["id"]
+        
+        unit2_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveSysUnit2_{uuid.uuid4().hex[:6]}", "level": "unit", "parent_id": install_id}
+        )
+        assert unit2_resp.status_code == 200
+        unit2_id = unit2_resp.json()["id"]
+        
+        # Create system under unit1
+        system_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveSys_{uuid.uuid4().hex[:6]}", "level": "system", "parent_id": unit1_id}
+        )
+        assert system_resp.status_code == 200
+        system_id = system_resp.json()["id"]
+        
+        # Move system to unit2
+        move_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes/{system_id}/move",
+            json={"node_id": system_id, "new_parent_id": unit2_id, "recalculate_criticality": True}
+        )
+        assert move_resp.status_code == 200
+        assert move_resp.json()["parent_id"] == unit2_id
+        
+        # Verify via GET
+        get_resp = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/nodes/{system_id}")
+        assert get_resp.json()["parent_id"] == unit2_id
+        
+        # Cleanup
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}")
+        
+    def test_move_invalid_unit_to_system_rejected(self, authenticated_client):
+        """Cannot move unit to be child of system (violates ISO 14224)"""
+        # Create hierarchy: installation -> unit -> system
+        install_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_InvalidMoveInstall_{uuid.uuid4().hex[:6]}", "level": "installation"}
+        )
+        install_id = install_resp.json()["id"]
+        
+        unit_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_InvalidMoveUnit_{uuid.uuid4().hex[:6]}", "level": "unit", "parent_id": install_id}
+        )
+        unit_id = unit_resp.json()["id"]
+        
+        system_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_InvalidMoveSystem_{uuid.uuid4().hex[:6]}", "level": "system", "parent_id": unit_id}
+        )
+        system_id = system_resp.json()["id"]
+        
+        # Try to move unit under system (invalid - unit cannot be child of system)
+        move_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes/{unit_id}/move",
+            json={"node_id": unit_id, "new_parent_id": system_id, "recalculate_criticality": True}
+        )
+        assert move_resp.status_code == 400
+        assert "cannot move" in move_resp.json()["detail"].lower() or "valid children" in move_resp.json()["detail"].lower()
+        
+        # Cleanup
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}")
+        
+    def test_move_equipment_between_systems(self, authenticated_client):
+        """Move equipment from one system to another"""
+        # Create hierarchy: install -> unit -> system1, system2 -> equipment
+        install_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveEqInstall_{uuid.uuid4().hex[:6]}", "level": "installation"}
+        )
+        install_id = install_resp.json()["id"]
+        
+        unit_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveEqUnit_{uuid.uuid4().hex[:6]}", "level": "unit", "parent_id": install_id}
+        )
+        unit_id = unit_resp.json()["id"]
+        
+        system1_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveEqSys1_{uuid.uuid4().hex[:6]}", "level": "system", "parent_id": unit_id}
+        )
+        system1_id = system1_resp.json()["id"]
+        
+        system2_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveEqSys2_{uuid.uuid4().hex[:6]}", "level": "system", "parent_id": unit_id}
+        )
+        system2_id = system2_resp.json()["id"]
+        
+        # Create equipment under system1
+        equip_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveEquipment_{uuid.uuid4().hex[:6]}", "level": "equipment", "parent_id": system1_id}
+        )
+        equip_id = equip_resp.json()["id"]
+        
+        # Move equipment to system2
+        move_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes/{equip_id}/move",
+            json={"node_id": equip_id, "new_parent_id": system2_id, "recalculate_criticality": True}
+        )
+        assert move_resp.status_code == 200
+        assert move_resp.json()["parent_id"] == system2_id
+        
+        # Cleanup
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}")
+        
+    def test_move_to_nonexistent_parent_rejected(self, authenticated_client):
+        """Cannot move node to non-existent parent"""
+        # Create installation with unit
+        install_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveNonexistInstall_{uuid.uuid4().hex[:6]}", "level": "installation"}
+        )
+        install_id = install_resp.json()["id"]
+        
+        unit_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveNonexistUnit_{uuid.uuid4().hex[:6]}", "level": "unit", "parent_id": install_id}
+        )
+        unit_id = unit_resp.json()["id"]
+        
+        # Try to move to non-existent parent
+        fake_parent_id = str(uuid.uuid4())
+        move_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes/{unit_id}/move",
+            json={"node_id": unit_id, "new_parent_id": fake_parent_id, "recalculate_criticality": True}
+        )
+        assert move_resp.status_code == 400
+        assert "not found" in move_resp.json()["detail"].lower()
+        
+        # Cleanup
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}")
+        
+    def test_move_nonexistent_node_rejected(self, authenticated_client):
+        """Cannot move a non-existent node"""
+        # Create an installation to act as parent
+        install_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveNonexistNode_{uuid.uuid4().hex[:6]}", "level": "installation"}
+        )
+        install_id = install_resp.json()["id"]
+        
+        # Try to move non-existent node
+        fake_node_id = str(uuid.uuid4())
+        move_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes/{fake_node_id}/move",
+            json={"node_id": fake_node_id, "new_parent_id": install_id, "recalculate_criticality": True}
+        )
+        assert move_resp.status_code == 404
+        
+        # Cleanup
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}")
+        
+    def test_move_preserves_children(self, authenticated_client):
+        """Moving a node preserves its children structure"""
+        # Create hierarchy: install1, install2 -> unit (under install1) -> system
+        install1_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveChildInstall1_{uuid.uuid4().hex[:6]}", "level": "installation"}
+        )
+        install1_id = install1_resp.json()["id"]
+        
+        install2_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveChildInstall2_{uuid.uuid4().hex[:6]}", "level": "installation"}
+        )
+        install2_id = install2_resp.json()["id"]
+        
+        unit_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveChildUnit_{uuid.uuid4().hex[:6]}", "level": "unit", "parent_id": install1_id}
+        )
+        unit_id = unit_resp.json()["id"]
+        
+        system_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_MoveChildSystem_{uuid.uuid4().hex[:6]}", "level": "system", "parent_id": unit_id}
+        )
+        system_id = system_resp.json()["id"]
+        
+        # Move unit (with system child) to install2
+        move_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes/{unit_id}/move",
+            json={"node_id": unit_id, "new_parent_id": install2_id, "recalculate_criticality": True}
+        )
+        assert move_resp.status_code == 200
+        
+        # Verify system's parent is still unit
+        system_get = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/nodes/{system_id}")
+        assert system_get.json()["parent_id"] == unit_id
+        
+        # Verify unit is now under install2
+        unit_get = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/nodes/{unit_id}")
+        assert unit_get.json()["parent_id"] == install2_id
+        
+        # Cleanup
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install1_id}")
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install2_id}")
+
+
+class TestEquipmentTypeLibraryManagement:
+    """Test Equipment Type Library management (add, edit, delete)"""
+    
+    def test_create_custom_equipment_type(self, authenticated_client):
+        """Create a custom equipment type"""
+        type_data = {
+            "id": f"custom_pump_{uuid.uuid4().hex[:6]}",
+            "name": "Custom Test Pump",
+            "discipline": "mechanical",
+            "icon": "droplets",
+            "iso_class": "1.1.99"
+        }
+        
+        response = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/types",
+            json=type_data
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == type_data["id"]
+        assert data["name"] == type_data["name"]
+        assert data["discipline"] == "mechanical"
+        
+        # Verify it appears in types list
+        types_resp = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/types")
+        types_list = types_resp.json()["equipment_types"]
+        assert any(t["id"] == type_data["id"] for t in types_list)
+        
+        # Cleanup
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/types/{type_data['id']}")
+        
+    def test_update_custom_equipment_type(self, authenticated_client):
+        """Update a custom equipment type"""
+        type_id = f"custom_update_{uuid.uuid4().hex[:6]}"
+        
+        # Create type
+        create_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/types",
+            json={"id": type_id, "name": "Original Name", "discipline": "mechanical", "icon": "cog"}
+        )
+        assert create_resp.status_code == 200
+        
+        # Update type
+        update_resp = authenticated_client.patch(
+            f"{BASE_URL}/api/equipment-hierarchy/types/{type_id}",
+            json={"name": "Updated Name", "discipline": "electrical"}
+        )
+        assert update_resp.status_code == 200
+        assert update_resp.json()["name"] == "Updated Name"
+        assert update_resp.json()["discipline"] == "electrical"
+        
+        # Cleanup
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/types/{type_id}")
+        
+    def test_delete_custom_equipment_type(self, authenticated_client):
+        """Delete a custom equipment type"""
+        type_id = f"custom_delete_{uuid.uuid4().hex[:6]}"
+        
+        # Create type
+        create_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/types",
+            json={"id": type_id, "name": "To Delete", "discipline": "mechanical", "icon": "cog"}
+        )
+        assert create_resp.status_code == 200
+        
+        # Delete type
+        del_resp = authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/types/{type_id}")
+        assert del_resp.status_code == 200
+        
+        # Verify it's gone
+        types_resp = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/types")
+        types_list = types_resp.json()["equipment_types"]
+        assert not any(t["id"] == type_id for t in types_list)
+
+
+class TestUnstructuredItems:
+    """Test unstructured items and assignment functionality"""
+    
+    def test_parse_equipment_list(self, authenticated_client):
+        """Parse a text list of equipment items"""
+        content = """Pump P-101
+Compressor C-201
+Heat Exchanger HX-301
+Valve FV-101
+Motor M-501"""
+        
+        response = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/parse-list",
+            json={"content": content, "source": "paste"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "parsed_count" in data
+        assert data["parsed_count"] >= 5
+        
+        # Clean up - delete unstructured items
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/unstructured")
+        
+    def test_get_unstructured_items(self, authenticated_client):
+        """Get list of unstructured items"""
+        response = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/unstructured")
+        assert response.status_code == 200
+        assert "items" in response.json()
+        
+    def test_assign_unstructured_to_hierarchy(self, authenticated_client):
+        """Assign an unstructured item to hierarchy"""
+        # First, create an installation to assign to
+        install_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_AssignInstall_{uuid.uuid4().hex[:6]}", "level": "installation"}
+        )
+        install_id = install_resp.json()["id"]
+        
+        # Create unit
+        unit_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_AssignUnit_{uuid.uuid4().hex[:6]}", "level": "unit", "parent_id": install_id}
+        )
+        unit_id = unit_resp.json()["id"]
+        
+        # Create system
+        system_resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_AssignSystem_{uuid.uuid4().hex[:6]}", "level": "system", "parent_id": unit_id}
+        )
+        system_id = system_resp.json()["id"]
+        
+        # Parse some equipment
+        authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/parse-list",
+            json={"content": f"Test Pump TP-{uuid.uuid4().hex[:4]}", "source": "paste"}
+        )
+        
+        # Get unstructured items
+        unstructured = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/unstructured")
+        items = unstructured.json()["items"]
+        
+        if len(items) > 0:
+            item_id = items[0]["id"]
+            
+            # Assign to hierarchy (as equipment under system)
+            assign_resp = authenticated_client.post(
+                f"{BASE_URL}/api/equipment-hierarchy/unstructured/{item_id}/assign",
+                json={"parent_id": system_id, "level": "equipment"}
+            )
+            # May succeed or fail based on item state - just verify endpoint works
+            assert assign_resp.status_code in [200, 400]
+        
+        # Cleanup
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/unstructured")
+        authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}")
+

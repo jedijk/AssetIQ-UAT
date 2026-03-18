@@ -1,6 +1,6 @@
 import { Page, expect } from '@playwright/test';
 
-export const BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://iso-asset-hub.preview.emergentagent.com';
+export const BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://hierarchy-move.preview.emergentagent.com';
 export const TEST_EMAIL = 'test@example.com';
 export const TEST_PASSWORD = 'test123';
 export const TEST_NAME = 'Test User';

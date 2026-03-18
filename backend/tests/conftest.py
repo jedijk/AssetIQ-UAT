@@ -13,8 +13,8 @@ def api_client():
 @pytest.fixture
 def auth_token(api_client):
     response = api_client.post(f"{BASE_URL}/api/auth/login", json={
-        "email": "test@example.com",
-        "password": "test123"
+        "email": "test@test.com",
+        "password": "test"
     })
     if response.status_code == 200:
         return response.json().get("token")

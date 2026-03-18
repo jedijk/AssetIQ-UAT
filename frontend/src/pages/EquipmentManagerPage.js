@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   ChevronRight, ChevronDown, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
-  Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, ArrowRight, Move,
+  Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, Move, ArrowRight,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -29,116 +29,15 @@ function getValidChildLevels(parentLevel) {
   return [LEVEL_ORDER[idx + 1]];
 }
 
-// Check if a node of childLevel can be placed under a node of parentLevel
 function canBeChildOf(childLevel, parentLevel) {
   const parentIdx = LEVEL_ORDER.indexOf(parentLevel);
   const childIdx = LEVEL_ORDER.indexOf(childLevel);
-  // Child must be exactly one level below parent
   return parentIdx >= 0 && childIdx === parentIdx + 1;
 }
 
 function buildTreeData(nodes, parentId = null, depth = 0) {
   if (depth > 10) return [];
   return nodes.filter(n => n.parent_id === parentId).map(node => ({ ...node, children: buildTreeData(nodes, node.id, depth + 1) }));
-}
-
-function FlatTreeRow({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, onDrop, onDragEnter, onDragLeave, isDragOver, onDragStart, isDragging, draggingNode }) {
-  const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
-  const LevelIcon = config.icon;
-  const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
-  
-  // Check if this node can accept the currently dragging node
-  const canAcceptCurrentDrag = draggingNode ? canBeChildOf(draggingNode.level, node.level) && draggingNode.id !== node.id : false;
-  
-  // Also allow drop of unstructured items
-  const canAcceptUnstructured = node.level !== "maintainable_item";
-  const canDrag = node.level !== "installation";
-
-  const handleDragOver = (e) => { 
-    e.preventDefault(); 
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "move"; 
-  };
-
-  const handleDragStart = (e) => {
-    if (!canDrag) {
-      e.preventDefault();
-      return;
-    }
-    console.log("FlatTreeRow dragStart:", node.name);
-    e.dataTransfer.setData("text/plain", node.id); // Fallback
-    e.dataTransfer.setData("application/json", JSON.stringify({ item: node, type: "hierarchy_node" }));
-    e.dataTransfer.effectAllowed = "move";
-    // Set drag image
-    if (e.target) {
-      e.dataTransfer.setDragImage(e.target, 20, 20);
-    }
-    onDragStart(node);
-  };
-
-  const handleDragEnter = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onDragEnter(node.id);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX;
-    const y = e.clientY;
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-      onDragLeave();
-    }
-  };
-
-  const showDropHighlight = isDragOver && (canAcceptCurrentDrag || (canAcceptUnstructured && !draggingNode));
-
-  return (
-    <div
-      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all select-none ${
-        isDragging ? "opacity-40 scale-95 bg-blue-200 border-2 border-blue-400" :
-        showDropHighlight ? "bg-green-100 border-2 border-green-500 shadow-md" :
-        draggingNode && !canAcceptCurrentDrag && node.id !== draggingNode.id ? "opacity-50" :
-        isSelected ? "bg-blue-50 border border-blue-200" : "hover:bg-slate-50 border border-transparent"
-      } ${canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
-      style={{ marginLeft: depth * 24 }}
-      onClick={() => !draggingNode && onSelect(node)}
-      onDragOver={handleDragOver}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(e, node); }}
-      draggable={canDrag}
-      onDragStart={handleDragStart}
-      onDragEnd={() => onDragStart(null)}
-      data-testid={`tree-node-${node.id}`}
-    >
-      {/* Drag handle for non-installation nodes */}
-      {node.level !== "installation" ? (
-        <div className="w-5 h-5 flex items-center justify-center cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
-          <GripVertical className="w-4 h-4" />
-        </div>
-      ) : (
-        <button className={`w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 ${!hasChildren ? "invisible" : ""}`} onClick={e => { e.stopPropagation(); onExpand(node.id); }}>
-          {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
-        </button>
-      )}
-      
-      {/* Expand button for draggable nodes */}
-      {node.level !== "installation" && hasChildren && (
-        <button className="w-4 h-4 flex items-center justify-center rounded hover:bg-slate-200 -ml-1" onClick={e => { e.stopPropagation(); onExpand(node.id); }}>
-          {isExpanded ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronRight className="w-3 h-3 text-slate-400" />}
-        </button>
-      )}
-      
-      <div className={`w-7 h-7 rounded-md flex items-center justify-center ${critColors?.bg || "bg-slate-100"}`}>
-        <LevelIcon className={`w-4 h-4 ${critColors?.text || "text-slate-600"}`} />
-      </div>
-      <span className="flex-1 text-sm font-medium text-slate-700 truncate">{node.name}</span>
-      <span className="text-xs text-slate-400 capitalize hidden sm:block">{node.level.replace("_", " ")}</span>
-      {node.criticality && <div className={`w-2 h-2 rounded-full ${CRIT_COLORS[node.criticality.level]?.dot}`} />}
-    </div>
-  );
 }
 
 function flattenTree(treeNodes, expandedIds, depth = 0) {
@@ -150,6 +49,75 @@ function flattenTree(treeNodes, expandedIds, depth = 0) {
     if (isExpanded && hasChildren) result.push(...flattenTree(node.children, expandedIds, depth + 1));
   }
   return result;
+}
+
+// Tree Node Component with Move Mode support
+function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, movingNode, onMoveTarget, allNodes }) {
+  const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
+  const LevelIcon = config.icon;
+  const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
+  
+  const isMoving = movingNode?.id === node.id;
+  const canAcceptMove = movingNode && canBeChildOf(movingNode.level, node.level) && movingNode.id !== node.id;
+  
+  // Check if this node is a descendant of movingNode (can't move parent under child)
+  const isDescendantOfMoving = movingNode ? (() => {
+    const checkDescendant = (parentId, checkId) => {
+      const children = allNodes.filter(n => n.parent_id === parentId);
+      for (const child of children) {
+        if (child.id === checkId) return true;
+        if (checkDescendant(child.id, checkId)) return true;
+      }
+      return false;
+    };
+    return checkDescendant(movingNode.id, node.id);
+  })() : false;
+  
+  const validTarget = canAcceptMove && !isDescendantOfMoving;
+
+  const handleClick = () => {
+    if (movingNode && validTarget) {
+      onMoveTarget(node);
+    } else if (!movingNode) {
+      onSelect(node);
+    }
+  };
+
+  return (
+    <div
+      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${
+        isMoving ? "bg-blue-100 border-2 border-blue-500 shadow-md" :
+        validTarget ? "bg-green-100 border-2 border-green-500 cursor-pointer hover:bg-green-200" :
+        movingNode && !validTarget ? "opacity-40" :
+        isSelected ? "bg-blue-50 border border-blue-200" : "hover:bg-slate-50 border border-transparent cursor-pointer"
+      }`}
+      style={{ marginLeft: depth * 24 }}
+      onClick={handleClick}
+      data-testid={`tree-node-${node.id}`}
+    >
+      <button 
+        className={`w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 ${!hasChildren ? "invisible" : ""}`} 
+        onClick={e => { e.stopPropagation(); onExpand(node.id); }}
+      >
+        {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
+      </button>
+      
+      <div className={`w-7 h-7 rounded-md flex items-center justify-center ${critColors?.bg || "bg-slate-100"}`}>
+        <LevelIcon className={`w-4 h-4 ${critColors?.text || "text-slate-600"}`} />
+      </div>
+      
+      <span className="flex-1 text-sm font-medium text-slate-700 truncate">{node.name}</span>
+      
+      {validTarget && (
+        <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+          <ArrowRight className="w-3 h-3" /> Drop here
+        </span>
+      )}
+      
+      <span className="text-xs text-slate-400 capitalize hidden sm:block">{node.level.replace("_", " ")}</span>
+      {node.criticality && <div className={`w-2 h-2 rounded-full ${CRIT_COLORS[node.criticality.level]?.dot}`} />}
+    </div>
+  );
 }
 
 function UnstructuredItem({ item, onDragStart, onDelete }) {
@@ -204,43 +172,113 @@ function CriticalityChart({ nodes }) {
   );
 }
 
-function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, disciplines, onUpdate, onAssignCriticality, onAssignDiscipline }) {
+function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, disciplines, onUpdate, onAssignCriticality, onAssignDiscipline, onStartMove, isMoving }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
-  if (!node) return (<div className="flex flex-col items-center justify-center h-full p-6 text-center"><Settings className="w-12 h-12 text-slate-300 mb-3" /><h3 className="text-lg font-semibold text-slate-600 mb-1">No Selection</h3><p className="text-sm text-slate-400">Select an item from the hierarchy</p></div>);
+  
+  if (!node) return (
+    <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+      <Settings className="w-12 h-12 text-slate-300 mb-3" />
+      <h3 className="text-lg font-semibold text-slate-600 mb-1">No Selection</h3>
+      <p className="text-sm text-slate-400">Select an item from the hierarchy</p>
+    </div>
+  );
+  
   const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
+  const canMove = node.level !== "installation";
+  
   const handleSave = () => { onUpdate(node.id, { name: editName, description: editDesc }); setIsEditing(false); };
   const startEdit = () => { setEditName(node.name); setEditDesc(node.description || ""); setIsEditing(true); };
+  
   return (
     <div className="h-full flex flex-col" data-testid="properties-panel">
       <div className={`p-4 border-b border-slate-200 ${critColors?.bg || "bg-slate-50"}`}>
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${critColors?.bg || "bg-white"} ${critColors?.border || "border-slate-200"} border`}><LevelIcon className={`w-5 h-5 ${critColors?.text || "text-slate-600"}`} /></div>
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${critColors?.bg || "bg-white"} ${critColors?.border || "border-slate-200"} border`}>
+            <LevelIcon className={`w-5 h-5 ${critColors?.text || "text-slate-600"}`} />
+          </div>
           <div className="flex-1 min-w-0">
-            {isEditing ? (<Input value={editName} onChange={e => setEditName(e.target.value)} className="h-8 text-sm font-semibold" autoFocus />) : (<h3 className="font-semibold text-slate-800 truncate">{node.name}</h3>)}
+            {isEditing ? (
+              <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-8 text-sm font-semibold" autoFocus />
+            ) : (
+              <h3 className="font-semibold text-slate-800 truncate">{node.name}</h3>
+            )}
             <p className="text-xs text-slate-500">{config.label}</p>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => isEditing ? handleSave() : startEdit()}>{isEditing ? <Check className="w-4 h-4" /> : <Edit className="w-4 h-4" />}</Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => isEditing ? handleSave() : startEdit()}>
+            {isEditing ? <Check className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
+          </Button>
         </div>
       </div>
+      
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
-          <div><Label className="text-xs text-slate-500 mb-1">Description</Label>{isEditing ? (<Input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Add description..." className="h-8 text-sm" />) : (<p className="text-sm text-slate-700">{node.description || <span className="text-slate-400 italic">No description</span>}</p>)}</div>
-          {node.level === "equipment" && (<div><Label className="text-xs text-slate-500 mb-1">Equipment Type</Label><Select value={node.equipment_type_id || ""} onValueChange={v => onUpdate(node.id, { equipment_type_id: v })}><SelectTrigger className="h-9"><SelectValue placeholder="Select type" /></SelectTrigger><SelectContent>{equipmentTypes?.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select></div>)}
-          <div><Label className="text-xs text-slate-500 mb-1">Discipline</Label><Select value={node.discipline || ""} onValueChange={v => onAssignDiscipline(node.id, v)}><SelectTrigger className="h-9"><SelectValue placeholder="Select discipline" /></SelectTrigger><SelectContent>{disciplines?.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}</SelectContent></Select></div>
-          <div><Label className="text-xs text-slate-500 mb-2">Criticality</Label><div className="grid grid-cols-2 gap-2">{criticalityProfiles?.map(p => { const isActive = node.criticality?.profile_id === p.id; const colors = CRIT_COLORS[p.level]; return (<button key={p.id} onClick={() => onAssignCriticality(node.id, { profile_id: p.id })} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${isActive ? `${colors?.bg} ${colors?.border} ring-2 ring-offset-1` : "bg-white border-slate-200 hover:border-slate-300"}`}><div className={`w-3 h-3 rounded-full ${colors?.dot}`} /><span className={`text-xs font-medium ${isActive ? colors?.text : "text-slate-600"}`}>{p.name}</span></button>); })}</div></div>
-          {node.criticality && (<div className="p-3 bg-slate-50 rounded-lg"><h4 className="text-xs font-semibold text-slate-600 mb-2">Risk Score: <span className="text-lg">{node.criticality.risk_score}</span></h4></div>)}
+          {/* Move Button */}
+          {canMove && (
+            <Button 
+              variant={isMoving ? "default" : "outline"} 
+              className={`w-full ${isMoving ? "bg-blue-600" : ""}`}
+              onClick={onStartMove}
+              data-testid="move-node-btn"
+            >
+              <Move className="w-4 h-4 mr-2" />
+              {isMoving ? "Click a valid parent to move" : "Move to different parent"}
+            </Button>
+          )}
           
-          {/* Move hint */}
-          {node.level !== "installation" && (
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-              <div className="flex items-center gap-2 text-blue-700">
-                <Move className="w-4 h-4" />
-                <span className="text-xs font-medium">Drag to reposition in hierarchy</span>
-              </div>
+          <div>
+            <Label className="text-xs text-slate-500 mb-1">Description</Label>
+            {isEditing ? (
+              <Input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Add description..." className="h-8 text-sm" />
+            ) : (
+              <p className="text-sm text-slate-700">{node.description || <span className="text-slate-400 italic">No description</span>}</p>
+            )}
+          </div>
+          
+          {node.level === "equipment" && (
+            <div>
+              <Label className="text-xs text-slate-500 mb-1">Equipment Type</Label>
+              <Select value={node.equipment_type_id || ""} onValueChange={v => onUpdate(node.id, { equipment_type_id: v })}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select type" /></SelectTrigger>
+                <SelectContent>{equipmentTypes?.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          )}
+          
+          <div>
+            <Label className="text-xs text-slate-500 mb-1">Discipline</Label>
+            <Select value={node.discipline || ""} onValueChange={v => onAssignDiscipline(node.id, v)}>
+              <SelectTrigger className="h-9"><SelectValue placeholder="Select discipline" /></SelectTrigger>
+              <SelectContent>{disciplines?.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <Label className="text-xs text-slate-500 mb-2">Criticality</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {criticalityProfiles?.map(p => { 
+                const isActive = node.criticality?.profile_id === p.id; 
+                const colors = CRIT_COLORS[p.level]; 
+                return (
+                  <button 
+                    key={p.id} 
+                    onClick={() => onAssignCriticality(node.id, { profile_id: p.id })} 
+                    className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${isActive ? `${colors?.bg} ${colors?.border} ring-2 ring-offset-1` : "bg-white border-slate-200 hover:border-slate-300"}`}
+                  >
+                    <div className={`w-3 h-3 rounded-full ${colors?.dot}`} />
+                    <span className={`text-xs font-medium ${isActive ? colors?.text : "text-slate-600"}`}>{p.name}</span>
+                  </button>
+                ); 
+              })}
+            </div>
+          </div>
+          
+          {node.criticality && (
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <h4 className="text-xs font-semibold text-slate-600 mb-2">Risk Score: <span className="text-lg">{node.criticality.risk_score}</span></h4>
             </div>
           )}
         </div>
@@ -260,8 +298,7 @@ export default function EquipmentManagerPage() {
   const [newNode, setNewNode] = useState({ name: "", level: "installation", parent_id: null });
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
-  const [dragOverNodeId, setDragOverNodeId] = useState(null);
-  const [draggingNode, setDraggingNode] = useState(null);
+  const [movingNode, setMovingNode] = useState(null);
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);
   const [newType, setNewType] = useState({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
@@ -298,11 +335,11 @@ export default function EquipmentManagerPage() {
     onSuccess: () => { 
       queryClient.invalidateQueries(["equipment-nodes"]); 
       toast.success("Node moved successfully"); 
-      setDraggingNode(null);
+      setMovingNode(null);
     }, 
     onError: e => { 
       toast.error(e.response?.data?.detail || "Failed to move node"); 
-      setDraggingNode(null);
+      setMovingNode(null);
     } 
   });
   
@@ -314,107 +351,40 @@ export default function EquipmentManagerPage() {
   const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
 
   const handleExpand = useCallback(id => setExpandedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }), []);
-  const handleDragStart = (e, item, type) => e.dataTransfer.setData("application/json", JSON.stringify({ item, type }));
-  const handleUnstructuredDragStart = (e, item) => { e.dataTransfer.setData("application/json", JSON.stringify({ item, type: "unstructured" })); e.dataTransfer.effectAllowed = "move"; };
-  const handleHierarchyNodeDragStart = (node) => { 
-    if (node) {
-      console.log("Drag started for:", node.name, node.level);
-    } else {
-      console.log("Drag ended");
+  
+  const handleStartMove = () => {
+    if (selectedNode && selectedNode.level !== "installation") {
+      setMovingNode(selectedNode);
+      toast.info("Click on a valid parent node to move");
     }
-    setDraggingNode(node); 
+  };
+  
+  const handleMoveTarget = (targetNode) => {
+    if (movingNode && targetNode) {
+      moveNodeMutation.mutate({ nodeId: movingNode.id, newParentId: targetNode.id });
+    }
+  };
+  
+  const handleCancelMove = () => {
+    setMovingNode(null);
   };
 
-  // Handle drops on hierarchy nodes - use draggingNode state as primary source
+  const handleDragStart = (e, item, type) => e.dataTransfer.setData("application/json", JSON.stringify({ item, type }));
+  const handleUnstructuredDragStart = (e, item) => { e.dataTransfer.setData("application/json", JSON.stringify({ item, type: "unstructured" })); e.dataTransfer.effectAllowed = "move"; };
+
   const handleTreeDrop = (e, targetNode) => {
     e.preventDefault();
-    e.stopPropagation();
-    setDragOverNodeId(null);
-    
-    console.log("Drop event triggered on:", targetNode.name, targetNode.level);
-    console.log("Dragging node from state:", draggingNode?.name);
-    
-    // Try to get data from dataTransfer first, fall back to state
-    let data = null;
     try {
-      const jsonStr = e.dataTransfer.getData("application/json");
-      if (jsonStr) {
-        data = JSON.parse(jsonStr);
-        console.log("Got data from dataTransfer:", data.type);
-      }
-    } catch (err) {
-      console.log("Could not parse dataTransfer");
-    }
-    
-    // If we're dragging a hierarchy node, use state (more reliable)
-    if (draggingNode) {
-      data = { item: draggingNode, type: "hierarchy_node" };
-      console.log("Using draggingNode from state");
-    }
-    
-    if (!data) {
-      console.log("No drag data available");
-      setDraggingNode(null);
-      return;
-    }
-      
-    if (data.type === "unstructured") {
-      const validLevels = getValidChildLevels(targetNode.level);
-      console.log("Unstructured drop, valid levels:", validLevels);
-      if (validLevels.length > 0) {
-        assignToHierarchyMutation.mutate({ itemId: data.item.id, parentId: targetNode.id, level: validLevels[0] });
-      } else {
-        toast.error(`Cannot add items under ${LEVEL_CONFIG[targetNode.level]?.label}`);
-      }
-    } else if (data.type === "hierarchy_node") {
-      const movingNode = data.item;
-      console.log("Moving node:", movingNode.name, "level:", movingNode.level, "to:", targetNode.name, "level:", targetNode.level);
-      
-      if (movingNode.id === targetNode.id) {
-        toast.error("Cannot move node to itself");
-        setDraggingNode(null);
-        return;
-      }
-      
-      if (movingNode.level === "installation") {
-        toast.error("Cannot move installations");
-        setDraggingNode(null);
-        return;
-      }
-      
-      const canAccept = canBeChildOf(movingNode.level, targetNode.level);
-      console.log("Can accept check:", canAccept);
-      
-      if (!canAccept) {
-        toast.error(`Cannot move ${LEVEL_CONFIG[movingNode.level]?.label} under ${LEVEL_CONFIG[targetNode.level]?.label}`);
-        setDraggingNode(null);
-        return;
-      }
-      
-      // Check for circular reference
-      const isDescendant = (parentId, checkId) => {
-        const children = nodes.filter(n => n.parent_id === parentId);
-        for (const child of children) {
-          if (child.id === checkId) return true;
-          if (isDescendant(child.id, checkId)) return true;
+      const data = JSON.parse(e.dataTransfer.getData("application/json"));
+      if (data.type === "unstructured") {
+        const validLevels = getValidChildLevels(targetNode.level);
+        if (validLevels.length > 0) {
+          assignToHierarchyMutation.mutate({ itemId: data.item.id, parentId: targetNode.id, level: validLevels[0] });
         }
-        return false;
-      };
-      
-      if (isDescendant(movingNode.id, targetNode.id)) {
-        toast.error("Cannot move node under its own descendant");
-        setDraggingNode(null);
-        return;
+      } else if (data.type === "criticality" && selectedNode) {
+        criticalityMutation.mutate({ nodeId: selectedNode.id, assignment: { profile_id: data.item.id } });
       }
-      
-      console.log("Executing move API call:", movingNode.id, "->", targetNode.id);
-      moveNodeMutation.mutate({ nodeId: movingNode.id, newParentId: targetNode.id });
-      
-    } else if (data.type === "criticality" && selectedNode) {
-      criticalityMutation.mutate({ nodeId: selectedNode.id, assignment: { profile_id: data.item.id } });
-    }
-    
-    setDraggingNode(null);
+    } catch (err) {}
   };
 
   const handleFileUpload = (e) => { const file = e.target.files?.[0]; if (file) { parseFileMutation.mutate(file); e.target.value = ""; } };
@@ -447,29 +417,46 @@ export default function EquipmentManagerPage() {
       </div>
 
       {/* Center Panel - Hierarchy */}
-      <div className="flex-1 flex flex-col min-w-0" onDragEnd={() => setDraggingNode(null)}>
+      <div className="flex-1 flex flex-col min-w-0">
         <div className="p-4 border-b border-slate-200 bg-white flex items-center gap-3">
           <div className="relative flex-1 max-w-xs"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 h-9" data-testid="hierarchy-search-input" /></div>
           <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />Import List</Button>
           <Button onClick={() => { setNewNode({ name: "", level: "installation", parent_id: null }); setIsCreateOpen(true); }} size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="add-installation-btn"><Plus className="w-4 h-4 mr-1" />Add Installation</Button>
-          {selectedNode && (<><Button onClick={handleAddChild} size="sm" variant="outline" disabled={selectedNode.level === "maintainable_item"} data-testid="add-child-btn"><Plus className="w-4 h-4 mr-1" />Add Child</Button><Button onClick={() => deleteMutation.mutate(selectedNode.id)} size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50" data-testid="delete-node-btn"><Trash2 className="w-4 h-4" /></Button></>)}
+          {selectedNode && !movingNode && (
+            <>
+              <Button onClick={handleAddChild} size="sm" variant="outline" disabled={selectedNode.level === "maintainable_item"} data-testid="add-child-btn"><Plus className="w-4 h-4 mr-1" />Add Child</Button>
+              <Button onClick={() => deleteMutation.mutate(selectedNode.id)} size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50" data-testid="delete-node-btn"><Trash2 className="w-4 h-4" /></Button>
+            </>
+          )}
         </div>
         
-        {/* Drag hint banner */}
-        {draggingNode && (
-          <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
-            <Move className="w-4 h-4 text-blue-600" />
-            <span className="text-sm text-blue-700">Moving: <strong>{draggingNode.name}</strong> - Drop on a valid parent node</span>
+        {/* Move Mode Banner */}
+        {movingNode && (
+          <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Move className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-medium text-blue-800">Moving: <strong>{movingNode.name}</strong></span>
+              <span className="text-sm text-blue-600">→ Click on a green highlighted target</span>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleCancelMove}>Cancel</Button>
           </div>
         )}
         
         <ScrollArea className="flex-1 p-4">
           {treeData.length === 0 && unstructuredItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center"><Building2 className="w-12 h-12 text-slate-300 mb-3" /><h3 className="text-lg font-semibold text-slate-600 mb-1">No Equipment Hierarchy</h3><p className="text-sm text-slate-400 mb-4">Start by adding an installation or importing a list</p><div className="flex gap-2"><Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline"><Upload className="w-4 h-4 mr-1" />Import List</Button><Button onClick={() => setIsCreateOpen(true)} size="sm" className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-1" />Add Installation</Button></div></div>
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <Building2 className="w-12 h-12 text-slate-300 mb-3" />
+              <h3 className="text-lg font-semibold text-slate-600 mb-1">No Equipment Hierarchy</h3>
+              <p className="text-sm text-slate-400 mb-4">Start by adding an installation or importing a list</p>
+              <div className="flex gap-2">
+                <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline"><Upload className="w-4 h-4 mr-1" />Import List</Button>
+                <Button onClick={() => setIsCreateOpen(true)} size="sm" className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-1" />Add Installation</Button>
+              </div>
+            </div>
           ) : (
             <div className="space-y-1" data-testid="hierarchy-tree">
               {filteredRows.map(({ node, depth, hasChildren, isExpanded }) => (
-                <FlatTreeRow 
+                <TreeNode 
                   key={node.id} 
                   node={node} 
                   depth={depth} 
@@ -477,44 +464,92 @@ export default function EquipmentManagerPage() {
                   isSelected={selectedNode?.id === node.id} 
                   isExpanded={isExpanded} 
                   onExpand={handleExpand} 
-                  hasChildren={hasChildren} 
-                  onDrop={handleTreeDrop}
-                  onDragEnter={(id) => setDragOverNodeId(id)}
-                  onDragLeave={() => setDragOverNodeId(null)}
-                  isDragOver={dragOverNodeId === node.id}
-                  onDragStart={handleHierarchyNodeDragStart}
-                  isDragging={draggingNode?.id === node.id}
-                  draggingNode={draggingNode}
+                  hasChildren={hasChildren}
+                  movingNode={movingNode}
+                  onMoveTarget={handleMoveTarget}
+                  allNodes={nodes}
                 />
               ))}
             </div>
           )}
+          
           {unstructuredItems.length > 0 && (
             <div className="mt-6 pt-4 border-t border-slate-200">
-              <div className="flex items-center gap-2 mb-3"><Package className="w-4 h-4 text-amber-500" /><h3 className="text-sm font-semibold text-slate-700">Unassigned Items ({unstructuredItems.length})</h3><span className="text-xs text-slate-400">Drag to hierarchy</span></div>
-              <div className="space-y-2" data-testid="unstructured-items-list">{unstructuredItems.map(item => (<UnstructuredItem key={item.id} item={item} onDragStart={handleUnstructuredDragStart} onDelete={(id) => deleteUnstructuredMutation.mutate(id)} />))}</div>
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-semibold text-slate-700">Unassigned Items ({unstructuredItems.length})</h3>
+                <span className="text-xs text-slate-400">Drag to hierarchy</span>
+              </div>
+              <div className="space-y-2" data-testid="unstructured-items-list">
+                {unstructuredItems.map(item => (
+                  <UnstructuredItem key={item.id} item={item} onDragStart={handleUnstructuredDragStart} onDelete={(id) => deleteUnstructuredMutation.mutate(id)} />
+                ))}
+              </div>
             </div>
           )}
         </ScrollArea>
       </div>
 
       {/* Right Panel - Properties */}
-      <div className="w-80 flex-shrink-0 border-l border-slate-200 bg-white"><PropertiesPanel node={selectedNode} equipmentTypes={equipmentTypes} criticalityProfiles={criticalityProfiles} disciplines={disciplines} onUpdate={(id, data) => updateMutation.mutate({ nodeId: id, data })} onAssignCriticality={(id, a) => criticalityMutation.mutate({ nodeId: id, assignment: a })} onAssignDiscipline={(id, d) => disciplineMutation.mutate({ nodeId: id, discipline: d })} /></div>
+      <div className="w-80 flex-shrink-0 border-l border-slate-200 bg-white">
+        <PropertiesPanel 
+          node={selectedNode} 
+          equipmentTypes={equipmentTypes} 
+          criticalityProfiles={criticalityProfiles} 
+          disciplines={disciplines} 
+          onUpdate={(id, data) => updateMutation.mutate({ nodeId: id, data })} 
+          onAssignCriticality={(id, a) => criticalityMutation.mutate({ nodeId: id, assignment: a })} 
+          onAssignDiscipline={(id, d) => disciplineMutation.mutate({ nodeId: id, discipline: d })}
+          onStartMove={handleStartMove}
+          isMoving={movingNode?.id === selectedNode?.id}
+        />
+      </div>
 
       {/* Create Node Dialog */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}><DialogContent><DialogHeader><DialogTitle>{newNode.parent_id ? `Add ${LEVEL_CONFIG[newNode.level]?.label}` : "Add Installation"}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div><Label htmlFor="node-name">Name</Label><Input id="node-name" value={newNode.name} onChange={e => setNewNode({ ...newNode, name: e.target.value })} placeholder="Enter name" data-testid="new-node-name-input" /></div>{!newNode.parent_id && (<div><Label>Level</Label><Select value={newNode.level} onValueChange={v => setNewNode({ ...newNode, level: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{LEVEL_ORDER.map(l => <SelectItem key={l} value={l}>{LEVEL_CONFIG[l]?.label}</SelectItem>)}</SelectContent></Select></div>)}</div><DialogFooter><Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button><Button onClick={() => createMutation.mutate(newNode)} disabled={!newNode.name.trim() || createMutation.isPending} data-testid="create-node-btn">{createMutation.isPending ? "Creating..." : "Create"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{newNode.parent_id ? `Add ${LEVEL_CONFIG[newNode.level]?.label}` : "Add Installation"}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div><Label htmlFor="node-name">Name</Label><Input id="node-name" value={newNode.name} onChange={e => setNewNode({ ...newNode, name: e.target.value })} placeholder="Enter name" data-testid="new-node-name-input" /></div>
+            {!newNode.parent_id && (<div><Label>Level</Label><Select value={newNode.level} onValueChange={v => setNewNode({ ...newNode, level: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{LEVEL_ORDER.map(l => <SelectItem key={l} value={l}>{LEVEL_CONFIG[l]?.label}</SelectItem>)}</SelectContent></Select></div>)}
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button><Button onClick={() => createMutation.mutate(newNode)} disabled={!newNode.name.trim() || createMutation.isPending} data-testid="create-node-btn">{createMutation.isPending ? "Creating..." : "Create"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Import List Dialog */}
-      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle>Import Equipment List</DialogTitle><DialogDescription>Paste a list or upload a file (Excel, PDF, CSV, TXT)</DialogDescription></DialogHeader><div className="space-y-4 py-4"><div><Label>Paste Equipment List</Label><Textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Pump P-101&#10;Compressor C-201&#10;Heat Exchanger HX-301&#10;..." className="h-32 mt-1" data-testid="import-text-area" /></div><div className="flex items-center gap-2 text-sm text-slate-500"><div className="flex-1 h-px bg-slate-200" /><span>or</span><div className="flex-1 h-px bg-slate-200" /></div><div><input ref={fileInputRef} type="file" accept=".txt,.csv,.xlsx,.xls,.pdf" onChange={handleFileUpload} className="hidden" /><Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full" disabled={parseFileMutation.isPending}><FileText className="w-4 h-4 mr-2" />{parseFileMutation.isPending ? "Uploading..." : "Upload File"}</Button><p className="text-xs text-slate-400 mt-1 text-center">Supported: .txt, .csv, .xlsx, .xls, .pdf</p></div></div><DialogFooter><Button variant="outline" onClick={() => setIsImportOpen(false)}>Cancel</Button><Button onClick={() => parseListMutation.mutate({ content: importText, source: "paste" })} disabled={!importText.trim() || parseListMutation.isPending} data-testid="parse-list-btn">{parseListMutation.isPending ? "Parsing..." : "Parse List"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Import Equipment List</DialogTitle><DialogDescription>Paste a list or upload a file (Excel, PDF, CSV, TXT)</DialogDescription></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div><Label>Paste Equipment List</Label><Textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Pump P-101&#10;Compressor C-201&#10;Heat Exchanger HX-301&#10;..." className="h-32 mt-1" data-testid="import-text-area" /></div>
+            <div className="flex items-center gap-2 text-sm text-slate-500"><div className="flex-1 h-px bg-slate-200" /><span>or</span><div className="flex-1 h-px bg-slate-200" /></div>
+            <div>
+              <input ref={fileInputRef} type="file" accept=".txt,.csv,.xlsx,.xls,.pdf" onChange={handleFileUpload} className="hidden" />
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full" disabled={parseFileMutation.isPending}>
+                <FileText className="w-4 h-4 mr-2" />{parseFileMutation.isPending ? "Uploading..." : "Upload File"}
+              </Button>
+              <p className="text-xs text-slate-400 mt-1 text-center">Supported: .txt, .csv, .xlsx, .xls, .pdf</p>
+            </div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setIsImportOpen(false)}>Cancel</Button><Button onClick={() => parseListMutation.mutate({ content: importText, source: "paste" })} disabled={!importText.trim() || parseListMutation.isPending} data-testid="parse-list-btn">{parseListMutation.isPending ? "Parsing..." : "Parse List"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Equipment Type Dialog */}
-      <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}><DialogContent><DialogHeader><DialogTitle>{editingType ? "Edit Equipment Type" : "Add Equipment Type"}</DialogTitle></DialogHeader><div className="space-y-4 py-4">
-        {!editingType && <div><Label>ID (unique)</Label><Input value={newType.id} onChange={e => setNewType({ ...newType, id: e.target.value.toLowerCase().replace(/\s+/g, '_') })} placeholder="pump_custom" data-testid="type-id-input" /></div>}
-        <div><Label>Name</Label><Input value={newType.name} onChange={e => setNewType({ ...newType, name: e.target.value })} placeholder="Custom Pump" data-testid="type-name-input" /></div>
-        <div><Label>ISO Class (optional)</Label><Input value={newType.iso_class} onChange={e => setNewType({ ...newType, iso_class: e.target.value })} placeholder="1.1.99" /></div>
-        <div><Label>Discipline</Label><Select value={newType.discipline} onValueChange={v => setNewType({ ...newType, discipline: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{DISCIPLINES.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}</SelectContent></Select></div>
-        <div><Label>Icon</Label><div className="flex flex-wrap gap-2 mt-1">{ICON_OPTIONS.map(icon => { const Icon = EQUIPMENT_ICONS[icon] || Cog; return (<button key={icon} onClick={() => setNewType({ ...newType, icon })} className={`p-2 rounded-lg border ${newType.icon === icon ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}><Icon className="w-5 h-5" /></button>); })}</div></div>
-      </div><DialogFooter><Button variant="outline" onClick={() => { setIsTypeDialogOpen(false); setEditingType(null); resetTypeForm(); }}>Cancel</Button><Button onClick={handleSaveType} disabled={(!editingType && !newType.id.trim()) || !newType.name.trim()} data-testid="save-type-btn">{editingType ? "Save" : "Create"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editingType ? "Edit Equipment Type" : "Add Equipment Type"}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            {!editingType && <div><Label>ID (unique)</Label><Input value={newType.id} onChange={e => setNewType({ ...newType, id: e.target.value.toLowerCase().replace(/\s+/g, '_') })} placeholder="pump_custom" data-testid="type-id-input" /></div>}
+            <div><Label>Name</Label><Input value={newType.name} onChange={e => setNewType({ ...newType, name: e.target.value })} placeholder="Custom Pump" data-testid="type-name-input" /></div>
+            <div><Label>ISO Class (optional)</Label><Input value={newType.iso_class} onChange={e => setNewType({ ...newType, iso_class: e.target.value })} placeholder="1.1.99" /></div>
+            <div><Label>Discipline</Label><Select value={newType.discipline} onValueChange={v => setNewType({ ...newType, discipline: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{DISCIPLINES.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>Icon</Label><div className="flex flex-wrap gap-2 mt-1">{ICON_OPTIONS.map(icon => { const Icon = EQUIPMENT_ICONS[icon] || Cog; return (<button key={icon} onClick={() => setNewType({ ...newType, icon })} className={`p-2 rounded-lg border ${newType.icon === icon ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}><Icon className="w-5 h-5" /></button>); })}</div></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => { setIsTypeDialogOpen(false); setEditingType(null); resetTypeForm(); }}>Cancel</Button><Button onClick={handleSaveType} disabled={(!editingType && !newType.id.trim()) || !newType.name.trim()} data-testid="save-type-btn">{editingType ? "Save" : "Create"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
