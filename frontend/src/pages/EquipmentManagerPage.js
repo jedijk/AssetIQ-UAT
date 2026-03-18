@@ -29,10 +29,12 @@ function getValidChildLevels(parentLevel) {
   return [LEVEL_ORDER[idx + 1]];
 }
 
+// Check if a node of childLevel can be placed under a node of parentLevel
 function canBeChildOf(childLevel, parentLevel) {
   const parentIdx = LEVEL_ORDER.indexOf(parentLevel);
   const childIdx = LEVEL_ORDER.indexOf(childLevel);
-  return parentIdx >= 0 && childIdx > parentIdx;
+  // Child must be exactly one level below parent
+  return parentIdx >= 0 && childIdx === parentIdx + 1;
 }
 
 function buildTreeData(nodes, parentId = null, depth = 0) {
@@ -40,35 +42,66 @@ function buildTreeData(nodes, parentId = null, depth = 0) {
   return nodes.filter(n => n.parent_id === parentId).map(node => ({ ...node, children: buildTreeData(nodes, node.id, depth + 1) }));
 }
 
-function FlatTreeRow({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, onDrop, isDragOver, onDragStart, isDragging }) {
+function FlatTreeRow({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, onDrop, onDragEnter, onDragLeave, isDragOver, onDragStart, isDragging, draggingNode }) {
   const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
-  const validChildren = getValidChildLevels(node.level);
-  const canAcceptDrop = validChildren.length > 0 || node.level !== "maintainable_item";
+  
+  // Check if this node can accept the currently dragging node
+  const canAcceptCurrentDrag = draggingNode ? canBeChildOf(draggingNode.level, node.level) && draggingNode.id !== node.id : false;
+  
+  // Also allow drop of unstructured items
+  const canAcceptUnstructured = node.level !== "maintainable_item";
 
   const handleDragOver = (e) => { 
     e.preventDefault(); 
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "move"; 
   };
 
   const handleDragStart = (e) => {
+    if (node.level === "installation") {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData("application/json", JSON.stringify({ item: node, type: "hierarchy_node" }));
     e.dataTransfer.effectAllowed = "move";
     onDragStart(node);
   };
 
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragEnter(node.id);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    // Only trigger leave if we're actually leaving this element
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      onDragLeave();
+    }
+  };
+
+  const showDropHighlight = isDragOver && (canAcceptCurrentDrag || (canAcceptUnstructured && !draggingNode));
+
   return (
     <div
       className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all ${
-        isDragging ? "opacity-50 scale-95" :
-        isDragOver ? "bg-blue-100 border-2 border-blue-400 border-dashed" :
+        isDragging ? "opacity-40 scale-95 bg-slate-200" :
+        showDropHighlight ? "bg-green-100 border-2 border-green-500 shadow-md" :
+        draggingNode && !canAcceptCurrentDrag && node.id !== draggingNode.id ? "opacity-60" :
         isSelected ? "bg-blue-50 border border-blue-200" : "hover:bg-slate-50 border border-transparent"
       }`}
       style={{ marginLeft: depth * 24 }}
       onClick={() => onSelect(node)}
       onDragOver={handleDragOver}
-      onDrop={(e) => { e.preventDefault(); onDrop(e, node); }}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(e, node); }}
       draggable={node.level !== "installation"}
       onDragStart={handleDragStart}
       data-testid={`tree-node-${node.id}`}
@@ -276,68 +309,98 @@ export default function EquipmentManagerPage() {
   const handleExpand = useCallback(id => setExpandedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }), []);
   const handleDragStart = (e, item, type) => e.dataTransfer.setData("application/json", JSON.stringify({ item, type }));
   const handleUnstructuredDragStart = (e, item) => { e.dataTransfer.setData("application/json", JSON.stringify({ item, type: "unstructured" })); e.dataTransfer.effectAllowed = "move"; };
-  const handleHierarchyNodeDragStart = (node) => { setDraggingNode(node); };
+  const handleHierarchyNodeDragStart = (node) => { 
+    console.log("Drag started for:", node.name, node.level);
+    setDraggingNode(node); 
+  };
 
-  // Handle drops on hierarchy nodes
+  // Handle drops on hierarchy nodes - use draggingNode state as primary source
   const handleTreeDrop = (e, targetNode) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragOverNodeId(null);
     
+    console.log("Drop event triggered on:", targetNode.name, targetNode.level);
+    console.log("Dragging node from state:", draggingNode?.name);
+    
+    // Try to get data from dataTransfer first, fall back to state
+    let data = null;
     try {
-      const data = JSON.parse(e.dataTransfer.getData("application/json"));
-      
-      if (data.type === "unstructured") {
-        // Unstructured item drop - assign to next valid level
-        const validLevels = getValidChildLevels(targetNode.level);
-        if (validLevels.length > 0) {
-          assignToHierarchyMutation.mutate({ itemId: data.item.id, parentId: targetNode.id, level: validLevels[0] });
-        } else {
-          toast.error(`Cannot add items under ${LEVEL_CONFIG[targetNode.level]?.label}`);
-        }
-      } else if (data.type === "hierarchy_node") {
-        // Moving existing hierarchy node
-        const movingNode = data.item;
-        
-        // Validation checks
-        if (movingNode.id === targetNode.id) {
-          toast.error("Cannot move node to itself");
-          return;
-        }
-        
-        if (movingNode.level === "installation") {
-          toast.error("Cannot move installations");
-          return;
-        }
-        
-        // Check if target can accept this node level
-        if (!canBeChildOf(movingNode.level, targetNode.level)) {
-          toast.error(`Cannot move ${LEVEL_CONFIG[movingNode.level]?.label} under ${LEVEL_CONFIG[targetNode.level]?.label}`);
-          return;
-        }
-        
-        // Check for circular reference (can't move parent under its own child)
-        const isDescendant = (parentId, checkId) => {
-          const children = nodes.filter(n => n.parent_id === parentId);
-          for (const child of children) {
-            if (child.id === checkId) return true;
-            if (isDescendant(child.id, checkId)) return true;
-          }
-          return false;
-        };
-        
-        if (isDescendant(movingNode.id, targetNode.id)) {
-          toast.error("Cannot move node under its own descendant");
-          return;
-        }
-        
-        // Perform the move
-        moveNodeMutation.mutate({ nodeId: movingNode.id, newParentId: targetNode.id });
-        
-      } else if (data.type === "criticality" && selectedNode) {
-        criticalityMutation.mutate({ nodeId: selectedNode.id, assignment: { profile_id: data.item.id } });
+      const jsonStr = e.dataTransfer.getData("application/json");
+      if (jsonStr) {
+        data = JSON.parse(jsonStr);
+        console.log("Got data from dataTransfer:", data.type);
       }
     } catch (err) {
-      console.error("Drop error:", err);
+      console.log("Could not parse dataTransfer");
+    }
+    
+    // If we're dragging a hierarchy node, use state (more reliable)
+    if (draggingNode) {
+      data = { item: draggingNode, type: "hierarchy_node" };
+      console.log("Using draggingNode from state");
+    }
+    
+    if (!data) {
+      console.log("No drag data available");
+      setDraggingNode(null);
+      return;
+    }
+      
+    if (data.type === "unstructured") {
+      const validLevels = getValidChildLevels(targetNode.level);
+      console.log("Unstructured drop, valid levels:", validLevels);
+      if (validLevels.length > 0) {
+        assignToHierarchyMutation.mutate({ itemId: data.item.id, parentId: targetNode.id, level: validLevels[0] });
+      } else {
+        toast.error(`Cannot add items under ${LEVEL_CONFIG[targetNode.level]?.label}`);
+      }
+    } else if (data.type === "hierarchy_node") {
+      const movingNode = data.item;
+      console.log("Moving node:", movingNode.name, "level:", movingNode.level, "to:", targetNode.name, "level:", targetNode.level);
+      
+      if (movingNode.id === targetNode.id) {
+        toast.error("Cannot move node to itself");
+        setDraggingNode(null);
+        return;
+      }
+      
+      if (movingNode.level === "installation") {
+        toast.error("Cannot move installations");
+        setDraggingNode(null);
+        return;
+      }
+      
+      const canAccept = canBeChildOf(movingNode.level, targetNode.level);
+      console.log("Can accept check:", canAccept);
+      
+      if (!canAccept) {
+        toast.error(`Cannot move ${LEVEL_CONFIG[movingNode.level]?.label} under ${LEVEL_CONFIG[targetNode.level]?.label}`);
+        setDraggingNode(null);
+        return;
+      }
+      
+      // Check for circular reference
+      const isDescendant = (parentId, checkId) => {
+        const children = nodes.filter(n => n.parent_id === parentId);
+        for (const child of children) {
+          if (child.id === checkId) return true;
+          if (isDescendant(child.id, checkId)) return true;
+        }
+        return false;
+      };
+      
+      if (isDescendant(movingNode.id, targetNode.id)) {
+        toast.error("Cannot move node under its own descendant");
+        setDraggingNode(null);
+        return;
+      }
+      
+      console.log("Executing move API call:", movingNode.id, "->", targetNode.id);
+      moveNodeMutation.mutate({ nodeId: movingNode.id, newParentId: targetNode.id });
+      
+    } else if (data.type === "criticality" && selectedNode) {
+      criticalityMutation.mutate({ nodeId: selectedNode.id, assignment: { profile_id: data.item.id } });
     }
     
     setDraggingNode(null);
@@ -404,10 +467,13 @@ export default function EquipmentManagerPage() {
                   isExpanded={isExpanded} 
                   onExpand={handleExpand} 
                   hasChildren={hasChildren} 
-                  onDrop={handleTreeDrop} 
+                  onDrop={handleTreeDrop}
+                  onDragEnter={(id) => setDragOverNodeId(id)}
+                  onDragLeave={() => setDragOverNodeId(null)}
                   isDragOver={dragOverNodeId === node.id}
                   onDragStart={handleHierarchyNodeDragStart}
                   isDragging={draggingNode?.id === node.id}
+                  draggingNode={draggingNode}
                 />
               ))}
             </div>
