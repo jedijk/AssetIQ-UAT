@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { threatsAPI, statsAPI } from "../lib/api";
 import { motion } from "framer-motion";
 import { 
@@ -79,8 +79,26 @@ const getEquipmentIcon = (equipmentType, asset) => {
 
 const ThreatsPage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [assetFilter, setAssetFilter] = useState("");
+
+  // Initialize filters from URL params
+  useEffect(() => {
+    const asset = searchParams.get("asset");
+    if (asset) {
+      setAssetFilter(asset);
+      setSearchQuery(asset);
+    }
+  }, [searchParams]);
+
+  // Clear asset filter
+  const clearAssetFilter = () => {
+    setAssetFilter("");
+    setSearchQuery("");
+    setSearchParams({});
+  };
 
   // Fetch stats
   const { data: stats } = useQuery({
@@ -157,6 +175,22 @@ const ThreatsPage = () => {
           </div>
         ))}
       </div>
+
+      {/* Asset Filter Banner */}
+      {assetFilter && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <AlertTriangle className="w-4 h-4 text-blue-600" />
+          <span className="text-sm text-blue-700">
+            Showing threats for: <strong>{assetFilter}</strong>
+          </span>
+          <button 
+            onClick={clearAssetFilter}
+            className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6" data-testid="threats-filters">

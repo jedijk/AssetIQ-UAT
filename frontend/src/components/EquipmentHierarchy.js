@@ -205,8 +205,8 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
 
   const handleNodeClick = (node) => {
     setSelectedNodeId(node.id);
-    // Navigate to equipment manager with this node selected
-    navigate(`/equipment-manager?selected=${node.id}`);
+    // Navigate to threats page filtered by this equipment/asset
+    navigate(`/threats?asset=${encodeURIComponent(node.name)}`);
     if (isMobile) onClose?.();
   };
 

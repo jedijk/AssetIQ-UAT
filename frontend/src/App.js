@@ -96,6 +96,7 @@ function App() {
               </ProtectedRoute>
             }>
               <Route index element={<ThreatsPage />} />
+              <Route path="threats" element={<ThreatsPage />} />
               <Route path="threats/:id" element={<ThreatDetailPage />} />
               <Route path="library" element={<FailureModesPage />} />
               <Route path="equipment-manager" element={<EquipmentManagerPage />} />
