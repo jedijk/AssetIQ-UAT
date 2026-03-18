@@ -109,6 +109,7 @@ EQUIPMENT_TYPES = [
     {"id": "compressor_reciprocating", "name": "Reciprocating Compressor", "iso_class": "1.2.2", "discipline": "mechanical", "icon": "wind"},
     {"id": "turbine_gas", "name": "Gas Turbine", "iso_class": "1.3.1", "discipline": "mechanical", "icon": "cog"},
     {"id": "turbine_steam", "name": "Steam Turbine", "iso_class": "1.3.2", "discipline": "mechanical", "icon": "cog"},
+    {"id": "extruder", "name": "Extruder", "iso_class": "1.4.1", "discipline": "mechanical", "icon": "cylinder"},
     {"id": "heat_exchanger", "name": "Heat Exchanger", "iso_class": "2.1.1", "discipline": "process", "icon": "thermometer"},
     {"id": "vessel_pressure", "name": "Pressure Vessel", "iso_class": "2.2.1", "discipline": "process", "icon": "box"},
     {"id": "vessel_storage", "name": "Storage Tank", "iso_class": "2.2.2", "discipline": "process", "icon": "box"},
