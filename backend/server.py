@@ -439,10 +439,10 @@ async def send_chat_message(
     threat_data = analysis.get("threat", {})
     asset_name = threat_data.get("asset", "Unknown")
     
-    # Get all equipment nodes for this user
+    # Get all equipment nodes for this user (including criticality)
     all_equipment_nodes = await db.equipment_nodes.find(
         {"created_by": current_user["id"]},
-        {"_id": 0, "name": 1, "level": 1, "id": 1}
+        {"_id": 0, "name": 1, "level": 1, "id": 1, "criticality": 1}
     ).to_list(200)
     
     # Try to resolve partial tag name to full equipment name
@@ -516,24 +516,53 @@ async def send_chat_message(
             question_type="asset"
         )
     
+    # Get equipment criticality from hierarchy node
+    equipment_criticality = hierarchy_node.get("criticality", {})
+    criticality_level = equipment_criticality.get("level") if equipment_criticality else None
+    
+    # Criticality multipliers for risk score adjustment
+    CRITICALITY_MULTIPLIERS = {
+        "safety_critical": 1.5,      # 50% increase
+        "production_critical": 1.3,  # 30% increase
+        "medium": 1.1,               # 10% increase
+        "low": 1.0                   # No adjustment
+    }
+    
     rank, total = await calculate_rank(threat_data.get("risk_score", 50), current_user["id"])
     
     threat_id = str(uuid.uuid4())
     risk_score_raw = threat_data.get("risk_score", 50)
-    risk_score = int(risk_score_raw) if isinstance(risk_score_raw, (int, float)) else 50
+    base_risk_score = int(risk_score_raw) if isinstance(risk_score_raw, (int, float)) else 50
+    
+    # Adjust risk score based on equipment criticality
+    criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
+    adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
+    
+    # Determine risk level based on adjusted score
+    if adjusted_risk_score >= 70:
+        adjusted_risk_level = "Critical"
+    elif adjusted_risk_score >= 50:
+        adjusted_risk_level = "High"
+    elif adjusted_risk_score >= 30:
+        adjusted_risk_level = "Medium"
+    else:
+        adjusted_risk_level = "Low"
+    
     threat_doc = {
         "id": threat_id,
         "title": threat_data.get("title", "Unknown Threat"),
         "asset": resolved_asset_name,  # Use resolved full name from hierarchy
         "equipment_type": threat_data.get("equipment_type", "Unknown"),
+        "equipment_criticality": criticality_level,  # Store equipment criticality
         "failure_mode": threat_data.get("failure_mode", "Unknown"),
         "cause": threat_data.get("cause"),
         "impact": threat_data.get("impact", "Equipment Damage"),
         "frequency": threat_data.get("frequency", "First Time"),
         "likelihood": threat_data.get("likelihood", "Medium"),
         "detectability": threat_data.get("detectability", "Moderate"),
-        "risk_level": threat_data.get("risk_level", "Medium"),
-        "risk_score": risk_score,
+        "risk_level": adjusted_risk_level,  # Use adjusted risk level
+        "risk_score": adjusted_risk_score,  # Use adjusted risk score
+        "base_risk_score": base_risk_score,  # Store original score for reference
         "rank": rank,
         "total_threats": total,
         "status": "Open",
@@ -567,6 +596,7 @@ async def send_chat_message(
         "threat_title": updated_threat["title"],
         "threat_asset": updated_threat["asset"],
         "threat_equipment_type": updated_threat["equipment_type"],
+        "threat_equipment_criticality": updated_threat.get("equipment_criticality"),
         "threat_failure_mode": updated_threat["failure_mode"],
         "threat_risk_level": updated_threat["risk_level"],
         "threat_risk_score": updated_threat["risk_score"],

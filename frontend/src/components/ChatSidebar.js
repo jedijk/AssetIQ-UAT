@@ -212,6 +212,20 @@ const ChatSidebar = ({ isOpen, onClose }) => {
                   <span><strong>Risk Score:</strong> {msg.threat_risk_score} • <strong>Rank:</strong> #{msg.threat_rank}</span>
                 </div>
               )}
+              {msg.threat_equipment_criticality && (
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                    msg.threat_equipment_criticality === "safety_critical" ? "bg-red-100 text-red-700" :
+                    msg.threat_equipment_criticality === "production_critical" ? "bg-orange-100 text-orange-700" :
+                    msg.threat_equipment_criticality === "medium" ? "bg-yellow-100 text-yellow-700" :
+                    "bg-slate-100 text-slate-600"
+                  }`}>
+                    {msg.threat_equipment_criticality === "safety_critical" ? "⚠️ Safety Critical Equipment" :
+                     msg.threat_equipment_criticality === "production_critical" ? "🏭 Production Critical" :
+                     msg.threat_equipment_criticality === "medium" ? "Medium Criticality" : "Low Criticality"}
+                  </span>
+                </div>
+              )}
             </div>
             
             <a 
