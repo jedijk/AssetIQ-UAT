@@ -1,13 +1,22 @@
 import { useState } from "react";
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2 } from "lucide-react";
 import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import ChatSidebar from "./ChatSidebar";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 
 const Layout = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [hierarchyOpen, setHierarchyOpen] = useState(true); // Open by default on desktop
@@ -87,6 +96,32 @@ const Layout = () => {
               Report Threat
             </Button>
 
+            {/* Settings Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-slate-600 hover:text-slate-900"
+                  data-testid="settings-menu-button"
+                >
+                  <Settings className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Settings</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => navigate("/equipment-manager")}
+                  className="cursor-pointer"
+                  data-testid="equipment-manager-menu-item"
+                >
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Equipment Manager
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <span className="hidden lg:block text-sm font-medium text-slate-600" data-testid="user-name">
               {user?.name}
             </span>
@@ -126,6 +161,15 @@ const Layout = () => {
             >
               <PanelLeftOpen className="w-5 h-5" />
               Equipment Hierarchy
+            </button>
+            {/* Equipment Manager for mobile */}
+            <button
+              onClick={() => { navigate("/equipment-manager"); setMobileMenuOpen(false); }}
+              className="flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-50 w-full"
+              data-testid="mobile-nav-equipment-manager"
+            >
+              <Building2 className="w-5 h-5" />
+              Equipment Manager (ISO 14224)
             </button>
             {navItems.map((item) => (
               <NavLink

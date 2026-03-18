@@ -21,6 +21,11 @@ from failure_modes import (
     get_all_categories,
     get_all_equipment_types
 )
+from iso14224_models import (
+    ISOLevel, ISO_LEVEL_ORDER, EQUIPMENT_TYPES, CRITICALITY_PROFILES, Discipline,
+    get_valid_parent_level, get_valid_child_levels, is_valid_parent_child,
+    EquipmentNodeCreate, EquipmentNodeUpdate, CriticalityAssignment, MoveNodeRequest
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -494,7 +499,7 @@ async def send_chat_message(
         updated_threat["risk_score"] = int(updated_threat["risk_score"])
     
     # Store AI response with threat summary details
-    response_text = f"Threat recorded successfully."
+    response_text = "Threat recorded successfully."
     
     ai_response = {
         "id": str(uuid.uuid4()),
@@ -711,6 +716,368 @@ async def get_failure_mode_by_id(mode_id: int):
         if fm["id"] == mode_id:
             return fm
     raise HTTPException(status_code=404, detail="Failure mode not found")
+
+# ============= ISO 14224 EQUIPMENT HIERARCHY ENDPOINTS =============
+
+@api_router.get("/equipment-hierarchy/types")
+async def get_iso_equipment_types():
+    """Get all equipment types from ISO 14224 library."""
+    return {"equipment_types": EQUIPMENT_TYPES}
+
+@api_router.get("/equipment-hierarchy/disciplines")
+async def get_disciplines():
+    """Get all disciplines."""
+    return {"disciplines": [d.value for d in Discipline]}
+
+@api_router.get("/equipment-hierarchy/criticality-profiles")
+async def get_criticality_profiles():
+    """Get all criticality profiles."""
+    return {"profiles": CRITICALITY_PROFILES}
+
+@api_router.get("/equipment-hierarchy/iso-levels")
+async def get_iso_levels():
+    """Get ISO 14224 hierarchy levels."""
+    return {
+        "levels": [level.value for level in ISO_LEVEL_ORDER],
+        "hierarchy": {
+            level.value: {
+                "parent": get_valid_parent_level(level).value if get_valid_parent_level(level) else None,
+                "children": [c.value for c in get_valid_child_levels(level)]
+            }
+            for level in ISO_LEVEL_ORDER
+        }
+    }
+
+@api_router.get("/equipment-hierarchy/nodes")
+async def get_equipment_nodes(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all equipment hierarchy nodes for the current user."""
+    nodes = await db.equipment_nodes.find(
+        {"created_by": current_user["id"]},
+        {"_id": 0}
+    ).to_list(1000)
+    return {"nodes": nodes}
+
+@api_router.get("/equipment-hierarchy/nodes/{node_id}")
+async def get_equipment_node(
+    node_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific equipment node."""
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    return node
+
+@api_router.post("/equipment-hierarchy/nodes")
+async def create_equipment_node(
+    node_data: EquipmentNodeCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new equipment hierarchy node with ISO 14224 validation."""
+    # Validate parent-child relationship if parent specified
+    if node_data.parent_id:
+        parent = await db.equipment_nodes.find_one(
+            {"id": node_data.parent_id, "created_by": current_user["id"]},
+            {"_id": 0}
+        )
+        if not parent:
+            raise HTTPException(status_code=400, detail="Parent node not found")
+        
+        parent_level = ISOLevel(parent["level"])
+        if not is_valid_parent_child(parent_level, node_data.level):
+            valid_children = get_valid_child_levels(parent_level)
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid parent-child relationship. {parent_level.value} can only have {[c.value for c in valid_children]} as children"
+            )
+    else:
+        # Root nodes must be installations
+        if node_data.level != ISOLevel.INSTALLATION:
+            raise HTTPException(
+                status_code=400, 
+                detail="Root nodes must be of level 'installation'"
+            )
+    
+    node_id = str(uuid.uuid4())
+    node_doc = {
+        "id": node_id,
+        "name": node_data.name,
+        "level": node_data.level.value,
+        "parent_id": node_data.parent_id,
+        "equipment_type_id": node_data.equipment_type_id,
+        "description": node_data.description,
+        "criticality": None,
+        "discipline": None,
+        "created_by": current_user["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.equipment_nodes.insert_one(node_doc)
+    
+    # Remove MongoDB's _id before returning
+    node_doc.pop("_id", None)
+    return node_doc
+
+@api_router.patch("/equipment-hierarchy/nodes/{node_id}")
+async def update_equipment_node(
+    node_id: str,
+    update: EquipmentNodeUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update an equipment hierarchy node."""
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    # Validate new parent if changing parent
+    if update.parent_id is not None and update.parent_id != node.get("parent_id"):
+        if update.parent_id:
+            new_parent = await db.equipment_nodes.find_one(
+                {"id": update.parent_id, "created_by": current_user["id"]},
+                {"_id": 0}
+            )
+            if not new_parent:
+                raise HTTPException(status_code=400, detail="New parent node not found")
+            
+            parent_level = ISOLevel(new_parent["level"])
+            child_level = ISOLevel(node["level"])
+            if not is_valid_parent_child(parent_level, child_level):
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Invalid parent-child relationship per ISO 14224"
+                )
+            
+            # Check for circular references
+            current_parent = update.parent_id
+            while current_parent:
+                if current_parent == node_id:
+                    raise HTTPException(status_code=400, detail="Circular reference detected")
+                parent_node = await db.equipment_nodes.find_one({"id": current_parent})
+                current_parent = parent_node.get("parent_id") if parent_node else None
+        else:
+            # Removing parent - node must be installation level
+            if node["level"] != ISOLevel.INSTALLATION.value:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Only installations can be root nodes"
+                )
+    
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.equipment_nodes.update_one(
+            {"id": node_id},
+            {"$set": update_data}
+        )
+    
+    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/equipment-hierarchy/nodes/{node_id}")
+async def delete_equipment_node(
+    node_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete an equipment node and optionally its children."""
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    # Get all children recursively
+    async def get_children_ids(parent_id):
+        children = await db.equipment_nodes.find(
+            {"parent_id": parent_id, "created_by": current_user["id"]},
+            {"_id": 0, "id": 1}
+        ).to_list(1000)
+        all_ids = [c["id"] for c in children]
+        for child in children:
+            all_ids.extend(await get_children_ids(child["id"]))
+        return all_ids
+    
+    children_ids = await get_children_ids(node_id)
+    all_ids = [node_id] + children_ids
+    
+    result = await db.equipment_nodes.delete_many(
+        {"id": {"$in": all_ids}, "created_by": current_user["id"]}
+    )
+    
+    return {"message": f"Deleted {result.deleted_count} nodes", "deleted_ids": all_ids}
+
+@api_router.post("/equipment-hierarchy/nodes/{node_id}/move")
+async def move_equipment_node(
+    node_id: str,
+    move_request: MoveNodeRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Move a node to a new parent with ISO 14224 validation."""
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    new_parent = await db.equipment_nodes.find_one(
+        {"id": move_request.new_parent_id, "created_by": current_user["id"]}
+    )
+    if not new_parent:
+        raise HTTPException(status_code=400, detail="New parent node not found")
+    
+    # Validate the move per ISO 14224
+    parent_level = ISOLevel(new_parent["level"])
+    child_level = ISOLevel(node["level"])
+    
+    if not is_valid_parent_child(parent_level, child_level):
+        valid_children = get_valid_child_levels(parent_level)
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot move {child_level.value} under {parent_level.value}. Valid children: {[c.value for c in valid_children]}"
+        )
+    
+    # Update the node
+    await db.equipment_nodes.update_one(
+        {"id": node_id},
+        {"$set": {
+            "parent_id": move_request.new_parent_id,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    return updated
+
+@api_router.post("/equipment-hierarchy/nodes/{node_id}/criticality")
+async def assign_criticality(
+    node_id: str,
+    assignment: CriticalityAssignment,
+    current_user: dict = Depends(get_current_user)
+):
+    """Assign criticality to an equipment node."""
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    # Find profile
+    profile = next((p for p in CRITICALITY_PROFILES if p["id"] == assignment.profile_id), None)
+    if not profile:
+        raise HTTPException(status_code=400, detail="Criticality profile not found")
+    
+    # Merge defaults with custom values
+    criticality_data = {
+        "profile_id": assignment.profile_id,
+        "level": profile["level"],
+        "color": profile["color"],
+        "fatality_risk": assignment.fatality_risk or profile["defaults"]["fatality_risk"],
+        "production_loss_per_day": assignment.production_loss_per_day or profile["defaults"]["production_loss_per_day"],
+        "failure_probability": assignment.failure_probability or profile["defaults"]["failure_probability"],
+        "downtime_days": assignment.downtime_days or profile["defaults"]["downtime_days"],
+        "environmental_impact": assignment.environmental_impact or 0
+    }
+    
+    # Calculate risk score
+    risk_score = (
+        criticality_data["fatality_risk"] * 1000 +
+        (criticality_data["production_loss_per_day"] * criticality_data["downtime_days"]) / 10000 +
+        criticality_data["failure_probability"] * 100
+    )
+    criticality_data["risk_score"] = round(risk_score, 2)
+    
+    await db.equipment_nodes.update_one(
+        {"id": node_id},
+        {"$set": {
+            "criticality": criticality_data,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    return updated
+
+@api_router.post("/equipment-hierarchy/nodes/{node_id}/discipline")
+async def assign_discipline(
+    node_id: str,
+    discipline: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Assign discipline to an equipment node."""
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    # Validate discipline
+    try:
+        Discipline(discipline)  # Validate discipline enum
+    except ValueError:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid discipline. Valid options: {[d.value for d in Discipline]}"
+        )
+    
+    await db.equipment_nodes.update_one(
+        {"id": node_id},
+        {"$set": {
+            "discipline": discipline,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    return updated
+
+@api_router.get("/equipment-hierarchy/stats")
+async def get_hierarchy_stats(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get statistics about the equipment hierarchy."""
+    user_id = current_user["id"]
+    
+    total_nodes = await db.equipment_nodes.count_documents({"created_by": user_id})
+    
+    # Count by level
+    level_counts = {}
+    for level in ISO_LEVEL_ORDER:
+        count = await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "level": level.value}
+        )
+        level_counts[level.value] = count
+    
+    # Count by criticality
+    criticality_counts = {
+        "safety_critical": await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "criticality.level": "safety_critical"}
+        ),
+        "production_critical": await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "criticality.level": "production_critical"}
+        ),
+        "medium": await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "criticality.level": "medium"}
+        ),
+        "low": await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "criticality.level": "low"}
+        ),
+        "unassigned": await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "criticality": None}
+        )
+    }
+    
+    return {
+        "total_nodes": total_nodes,
+        "by_level": level_counts,
+        "by_criticality": criticality_counts
+    }
 
 # Include router and middleware
 app.include_router(api_router)

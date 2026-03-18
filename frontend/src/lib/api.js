@@ -79,4 +79,78 @@ export const statsAPI = {
   },
 };
 
+// Equipment Hierarchy API (ISO 14224)
+export const equipmentHierarchyAPI = {
+  // Get library data
+  getEquipmentTypes: async () => {
+    const response = await api.get("/equipment-hierarchy/types");
+    return response.data;
+  },
+  
+  getDisciplines: async () => {
+    const response = await api.get("/equipment-hierarchy/disciplines");
+    return response.data;
+  },
+  
+  getCriticalityProfiles: async () => {
+    const response = await api.get("/equipment-hierarchy/criticality-profiles");
+    return response.data;
+  },
+  
+  getISOLevels: async () => {
+    const response = await api.get("/equipment-hierarchy/iso-levels");
+    return response.data;
+  },
+  
+  // Node operations
+  getNodes: async () => {
+    const response = await api.get("/equipment-hierarchy/nodes");
+    return response.data;
+  },
+  
+  getNode: async (nodeId) => {
+    const response = await api.get(`/equipment-hierarchy/nodes/${nodeId}`);
+    return response.data;
+  },
+  
+  createNode: async (nodeData) => {
+    const response = await api.post("/equipment-hierarchy/nodes", nodeData);
+    return response.data;
+  },
+  
+  updateNode: async (nodeId, updateData) => {
+    const response = await api.patch(`/equipment-hierarchy/nodes/${nodeId}`, updateData);
+    return response.data;
+  },
+  
+  deleteNode: async (nodeId) => {
+    const response = await api.delete(`/equipment-hierarchy/nodes/${nodeId}`);
+    return response.data;
+  },
+  
+  moveNode: async (nodeId, newParentId, recalculateCriticality = true) => {
+    const response = await api.post(`/equipment-hierarchy/nodes/${nodeId}/move`, {
+      node_id: nodeId,
+      new_parent_id: newParentId,
+      recalculate_criticality: recalculateCriticality
+    });
+    return response.data;
+  },
+  
+  assignCriticality: async (nodeId, assignment) => {
+    const response = await api.post(`/equipment-hierarchy/nodes/${nodeId}/criticality`, assignment);
+    return response.data;
+  },
+  
+  assignDiscipline: async (nodeId, discipline) => {
+    const response = await api.post(`/equipment-hierarchy/nodes/${nodeId}/discipline?discipline=${discipline}`);
+    return response.data;
+  },
+  
+  getStats: async () => {
+    const response = await api.get("/equipment-hierarchy/stats");
+    return response.data;
+  },
+};
+
 export default api;

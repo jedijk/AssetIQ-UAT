@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://risk-ranker.preview.emergentagent.com';
+const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://iso-asset-hub.preview.emergentagent.com';
 
 test.describe('Authentication Flows', () => {
   test.beforeEach(async ({ page }) => {
@@ -38,12 +38,12 @@ test.describe('Authentication Flows', () => {
     await expect(page.getByTestId('login-link')).toBeVisible();
   });
 
-  test('login with valid credentials navigates to chat', async ({ page }) => {
+  test('login with valid credentials navigates to threats page', async ({ page }) => {
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
     await page.getByTestId('login-email-input').fill('test@example.com');
     await page.getByTestId('login-password-input').fill('test123');
     await page.getByTestId('login-submit-button').click();
-    await expect(page.getByTestId('chat-page')).toBeVisible();
+    await expect(page.getByTestId('threats-page')).toBeVisible();
   });
 
   test('login with invalid credentials shows error', async ({ page }) => {
@@ -85,7 +85,7 @@ test.describe('Authentication Flows', () => {
     await page.getByTestId('login-email-input').fill('test@example.com');
     await page.getByTestId('login-password-input').fill('test123');
     await page.getByTestId('login-submit-button').click();
-    await expect(page.getByTestId('chat-page')).toBeVisible();
+    await expect(page.getByTestId('threats-page')).toBeVisible();
     await page.getByTestId('logout-button').click({ force: true });
     await expect(page).toHaveURL(/\/login/);
   });

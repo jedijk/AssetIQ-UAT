@@ -1,87 +1,61 @@
 import { test, expect } from '@playwright/test';
 import { loginUser, dismissToasts } from '../fixtures/helpers';
 
-test.describe('Chat Interface', () => {
+test.describe('Chat Sidebar Interface', () => {
   test.beforeEach(async ({ page }) => {
     await dismissToasts(page);
     await loginUser(page);
   });
 
-  test('chat page renders correctly', async ({ page }) => {
-    await expect(page.getByTestId('chat-page')).toBeVisible();
-    await expect(page.getByTestId('chat-input-area')).toBeVisible();
-    await expect(page.getByTestId('chat-message-input')).toBeVisible();
-    await expect(page.getByTestId('send-message-button')).toBeVisible();
-    await expect(page.getByTestId('upload-image-button')).toBeVisible();
-    await expect(page.getByTestId('voice-record-button')).toBeVisible();
+  test('report threat button opens chat sidebar', async ({ page }) => {
+    await expect(page.getByTestId('threats-page')).toBeVisible();
+    
+    // Click Report Threat button
+    await page.getByTestId('report-threat-button').click();
+    
+    // Chat sidebar should open
+    await expect(page.getByTestId('chat-sidebar')).toBeVisible();
+    await expect(page.getByTestId('sidebar-chat-message-input')).toBeVisible();
+    await expect(page.getByTestId('sidebar-send-message-button')).toBeVisible();
+  });
+
+  test('chat sidebar has close button', async ({ page }) => {
+    await page.getByTestId('report-threat-button').click();
+    await expect(page.getByTestId('chat-sidebar')).toBeVisible();
+    
+    // Close button should exist
+    const closeBtn = page.getByTestId('close-chat-sidebar');
+    await expect(closeBtn).toBeVisible();
+    await closeBtn.click();
+    
+    // Sidebar should close
+    await expect(page.getByTestId('chat-sidebar')).not.toBeVisible();
   });
 
   test('send button disabled when message is empty', async ({ page }) => {
-    const sendBtn = page.getByTestId('send-message-button');
+    await page.getByTestId('report-threat-button').click();
+    await expect(page.getByTestId('chat-sidebar')).toBeVisible();
+    
+    const sendBtn = page.getByTestId('sidebar-send-message-button');
     await expect(sendBtn).toBeDisabled();
   });
 
   test('send button enabled when message is typed', async ({ page }) => {
-    await page.getByTestId('chat-message-input').fill('Test message');
-    const sendBtn = page.getByTestId('send-message-button');
+    await page.getByTestId('report-threat-button').click();
+    await expect(page.getByTestId('chat-sidebar')).toBeVisible();
+    
+    await page.getByTestId('sidebar-chat-message-input').fill('Test message');
+    const sendBtn = page.getByTestId('sidebar-send-message-button');
     await expect(sendBtn).toBeEnabled();
   });
 
   test('typing in chat input works', async ({ page }) => {
-    const input = page.getByTestId('chat-message-input');
+    await page.getByTestId('report-threat-button').click();
+    await expect(page.getByTestId('chat-sidebar')).toBeVisible();
+    
+    const input = page.getByTestId('sidebar-chat-message-input');
     await input.fill('Pump P-104 is leaking from the mechanical seal');
     await expect(input).toHaveValue('Pump P-104 is leaking from the mechanical seal');
-  });
-
-  test('chat history is loaded on page', async ({ page }) => {
-    // Either shows messages or empty state
-    const hasMessages = await page.locator('[data-testid^="chat-message-"]').first().isVisible().catch(() => false);
-    const hasEmpty = await page.locator('.empty-state').isVisible().catch(() => false);
-    expect(hasMessages || hasEmpty).toBeTruthy();
-  });
-
-  test('sending a message shows loading state', async ({ page }) => {
-    // Remove the Emergent badge that can block the send button
-    await page.evaluate(() => { const badge = document.querySelector('[class*="emergent"], [id*="emergent"]'); if (badge) (badge as HTMLElement).style.display = 'none'; });
-    await page.getByTestId('chat-message-input').fill('Pump P-200 bearing failure');
-    // Start waiting for the API response
-    const responsePromise = page.waitForResponse(
-      resp => resp.url().includes('/api/chat/send'),
-      { timeout: 30000 }
-    );
-    await page.getByTestId('send-message-button').click({ force: true });
-    
-    // Wait for the AI response
-    await responsePromise;
-    
-    // Input should be cleared after successful send
-    const input = page.getByTestId('chat-message-input');
-    await expect(input).toHaveValue('');
-  });
-
-  test('AI response appears after sending message', async ({ page }) => {
-    // Remove the Emergent badge that can block the send button
-    await page.evaluate(() => { const badge = document.querySelector('[class*="emergent"], [id*="emergent"]'); if (badge) (badge as HTMLElement).style.display = 'none'; });
-    const initialMsgCount = await page.locator('[data-testid^="chat-message-assistant-"]').count();
-    
-    await page.getByTestId('chat-message-input').fill('Heat exchanger HX-301 showing reduced efficiency due to fouling');
-    await page.getByTestId('send-message-button').click({ force: true });
-    
-    // Wait for AI response to appear (AI calls may take time)
-    await page.waitForResponse(resp => resp.url().includes('/api/chat/send'), { timeout: 30000 });
-    
-    // There should be at least one more assistant message
-    await expect(page.locator('[data-testid^="chat-message-assistant-"]').nth(initialMsgCount)).toBeVisible();
-  });
-
-  test('empty state shows prompt suggestions when no messages', async ({ page }) => {
-    // Check if there are no messages (fresh user scenario or empty history)
-    const msgCount = await page.locator('[data-testid^="chat-message-user-"]').count();
-    if (msgCount === 0) {
-      // Should show empty state
-      await expect(page.locator('.empty-state')).toBeVisible();
-    }
-    // If there are messages, test passes trivially (chat is working)
   });
 });
 
@@ -99,20 +73,24 @@ test.describe('Navigation and Layout', () => {
 
   test('desktop nav items exist in DOM', async ({ page }) => {
     await expect(page.getByTestId('desktop-nav')).toBeVisible();
-    await expect(page.getByTestId('nav-chat')).toBeVisible();
     await expect(page.getByTestId('nav-threats')).toBeVisible();
+    await expect(page.getByTestId('nav-library')).toBeVisible();
   });
 
-  test('navigate to threats via direct URL', async ({ page }) => {
-    await page.goto('/threats', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('threats-page')).toBeVisible();
+  test('settings menu is accessible', async ({ page }) => {
+    await expect(page.getByTestId('settings-menu-button')).toBeVisible();
+    await page.getByTestId('settings-menu-button').click();
+    await expect(page.getByTestId('equipment-manager-menu-item')).toBeVisible();
   });
 
-  test('navigate back to chat from threats', async ({ page }) => {
-    await page.goto('/threats', { waitUntil: 'domcontentloaded' });
+  test('navigate to threats page via nav', async ({ page }) => {
+    // Go to library first
+    await page.getByTestId('nav-library').click();
+    await expect(page.getByTestId('failure-modes-page')).toBeVisible();
+    
+    // Navigate back to threats
+    await page.getByTestId('nav-threats').click();
     await expect(page.getByTestId('threats-page')).toBeVisible();
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('chat-page')).toBeVisible();
   });
 
   test('mobile menu toggle works at small viewport', async ({ page }) => {
@@ -123,7 +101,11 @@ test.describe('Navigation and Layout', () => {
     await expect(page.getByTestId('mobile-menu-toggle')).toBeVisible();
     await page.getByTestId('mobile-menu-toggle').click({ force: true });
     await expect(page.getByTestId('mobile-nav')).toBeVisible();
-    await expect(page.getByTestId('mobile-nav-chat')).toBeVisible();
     await expect(page.getByTestId('mobile-nav-threats')).toBeVisible();
+    await expect(page.getByTestId('mobile-nav-library')).toBeVisible();
+  });
+
+  test('hierarchy toggle button exists in header', async ({ page }) => {
+    await expect(page.getByTestId('hierarchy-toggle')).toBeVisible();
   });
 });

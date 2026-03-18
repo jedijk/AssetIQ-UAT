@@ -116,8 +116,8 @@ test.describe('Library Navigation', () => {
   });
 
   test('nav-library link navigates to library page', async ({ page }) => {
-    // Start from chat page, wait for toast to disappear before clicking nav
-    await expect(page.getByTestId('chat-page')).toBeVisible();
+    // Start from threats page, wait for toast to disappear before clicking nav
+    await expect(page.getByTestId('threats-page')).toBeVisible();
     // Wait for any welcome toast to clear
     await page.locator('[data-sonner-toast]').waitFor({ state: 'hidden' }).catch(() => {});
     await page.waitForTimeout(500);
@@ -126,9 +126,8 @@ test.describe('Library Navigation', () => {
     await expect(page.getByTestId('failure-modes-page')).toBeVisible();
   });
 
-  test('all three nav tabs visible: Chat, Threats, Library', async ({ page }) => {
+  test('nav tabs visible: Threats and Library', async ({ page }) => {
     await expect(page.getByTestId('desktop-nav')).toBeVisible();
-    await expect(page.getByTestId('nav-chat')).toBeVisible();
     await expect(page.getByTestId('nav-threats')).toBeVisible();
     await expect(page.getByTestId('nav-library')).toBeVisible();
   });

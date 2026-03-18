@@ -1,6 +1,6 @@
 import { Page, expect } from '@playwright/test';
 
-export const BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://risk-ranker.preview.emergentagent.com';
+export const BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://iso-asset-hub.preview.emergentagent.com';
 export const TEST_EMAIL = 'test@example.com';
 export const TEST_PASSWORD = 'test123';
 export const TEST_NAME = 'Test User';
@@ -25,7 +25,7 @@ export async function loginUser(page: Page, email = TEST_EMAIL, password = TEST_
   await page.getByTestId('login-email-input').fill(email);
   await page.getByTestId('login-password-input').fill(password);
   await page.getByTestId('login-submit-button').click();
-  await expect(page.getByTestId('chat-page')).toBeVisible();
+  await expect(page.getByTestId('threats-page')).toBeVisible();
 }
 
 export async function registerAndLogin(page: Page, email: string, name: string, password: string) {
@@ -34,7 +34,7 @@ export async function registerAndLogin(page: Page, email: string, name: string, 
   await page.getByTestId('register-email-input').fill(email);
   await page.getByTestId('register-password-input').fill(password);
   await page.getByTestId('register-submit-button').click();
-  await expect(page.getByTestId('chat-page')).toBeVisible();
+  await expect(page.getByTestId('threats-page')).toBeVisible();
 }
 
 export async function checkForErrors(page: Page): Promise<string[]> {
