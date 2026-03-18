@@ -87,8 +87,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
   
   const validTarget = canAcceptMove && !isDescendantOfMoving;
   
-  // Check if this node can accept dropped unstructured items
-  const canAcceptDrop = getValidChildLevels(node.level).length > 0;
+  // Any node can accept dropped unstructured items (level will be selected in dialog)
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleClick = () => {
@@ -100,7 +99,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
   };
   
   const handleDragOver = (e) => {
-    if (canAcceptDrop && !movingNode) {
+    if (!movingNode) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       setIsDragOver(true);
@@ -114,7 +113,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
   const handleDropOnNode = (e) => {
     e.preventDefault();
     setIsDragOver(false);
-    if (onDrop && canAcceptDrop) {
+    if (onDrop) {
       onDrop(e, node);
     }
   };
@@ -363,6 +362,8 @@ export default function EquipmentManagerPage() {
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);
   const [newType, setNewType] = useState({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
+  // State for assigning unstructured items with level selection
+  const [assignDialog, setAssignDialog] = useState({ open: false, item: null, parentNode: null, selectedLevel: "" });
 
   const { data: nodesData, isLoading } = useQuery({ queryKey: ["equipment-nodes"], queryFn: equipmentHierarchyAPI.getNodes });
   const { data: typesData } = useQuery({ queryKey: ["equipment-types"], queryFn: equipmentHierarchyAPI.getEquipmentTypes });
@@ -438,14 +439,28 @@ export default function EquipmentManagerPage() {
     try {
       const data = JSON.parse(e.dataTransfer.getData("application/json"));
       if (data.type === "unstructured") {
-        const validLevels = getValidChildLevels(targetNode.level);
-        if (validLevels.length > 0) {
-          assignToHierarchyMutation.mutate({ itemId: data.item.id, parentId: targetNode.id, level: validLevels[0] });
-        }
+        // Open dialog to select level for assignment
+        setAssignDialog({ 
+          open: true, 
+          item: data.item, 
+          parentNode: targetNode, 
+          selectedLevel: getValidChildLevels(targetNode.level)[0] || "plant_unit"
+        });
       } else if (data.type === "criticality" && selectedNode) {
         criticalityMutation.mutate({ nodeId: selectedNode.id, assignment: { profile_id: data.item.id } });
       }
     } catch (err) {}
+  };
+  
+  const handleAssignToHierarchy = () => {
+    if (assignDialog.item && assignDialog.parentNode && assignDialog.selectedLevel) {
+      assignToHierarchyMutation.mutate({ 
+        itemId: assignDialog.item.id, 
+        parentId: assignDialog.parentNode.id, 
+        level: assignDialog.selectedLevel 
+      });
+      setAssignDialog({ open: false, item: null, parentNode: null, selectedLevel: "" });
+    }
   };
 
   const handleFileUpload = (e) => { const file = e.target.files?.[0]; if (file) { parseFileMutation.mutate(file); e.target.value = ""; } };
@@ -610,6 +625,53 @@ export default function EquipmentManagerPage() {
             <div><Label>Icon</Label><div className="flex flex-wrap gap-2 mt-1">{ICON_OPTIONS.map(icon => { const Icon = EQUIPMENT_ICONS[icon] || Cog; return (<button key={icon} onClick={() => setNewType({ ...newType, icon })} className={`p-2 rounded-lg border ${newType.icon === icon ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}><Icon className="w-5 h-5" /></button>); })}</div></div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => { setIsTypeDialogOpen(false); setEditingType(null); resetTypeForm(); }}>Cancel</Button><Button onClick={handleSaveType} disabled={(!editingType && !newType.id.trim()) || !newType.name.trim()} data-testid="save-type-btn">{editingType ? "Save" : "Create"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign to Hierarchy Dialog - Level Selection */}
+      <Dialog open={assignDialog.open} onOpenChange={(open) => !open && setAssignDialog({ open: false, item: null, parentNode: null, selectedLevel: "" })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign to Hierarchy</DialogTitle>
+            <DialogDescription>
+              Assign "{assignDialog.item?.name}" under "{assignDialog.parentNode?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Select Level</Label>
+              <Select value={assignDialog.selectedLevel} onValueChange={v => setAssignDialog({ ...assignDialog, selectedLevel: v })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select level" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEVEL_ORDER.filter(l => l !== "installation").map(level => {
+                    const config = LEVEL_CONFIG[level];
+                    const LevelIcon = config?.icon || Cog;
+                    return (
+                      <SelectItem key={level} value={level}>
+                        <div className="flex items-center gap-2">
+                          <LevelIcon className="w-4 h-4" />
+                          <span>{config?.label || level}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500 mt-2">
+                {assignDialog.selectedLevel && LEVEL_CONFIG[assignDialog.selectedLevel]?.description}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignDialog({ open: false, item: null, parentNode: null, selectedLevel: "" })}>
+              Cancel
+            </Button>
+            <Button onClick={handleAssignToHierarchy} disabled={!assignDialog.selectedLevel || assignToHierarchyMutation.isPending}>
+              {assignToHierarchyMutation.isPending ? "Assigning..." : "Assign"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
