@@ -240,7 +240,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
       <div className="flex items-center justify-between p-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
           <Layers className="w-5 h-5 text-blue-600" />
-          <h2 className="font-semibold text-slate-900">ISO 14224</h2>
+          <h2 className="font-semibold text-slate-900">Hierarchy</h2>
         </div>
         <div className="flex items-center gap-1">
           {/* View mode toggle */}
@@ -287,7 +287,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
             // ISO Levels View
             <div className="space-y-1">
               <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                ISO 14224 Taxonomy
+                Hierarchy Levels
               </div>
               {ISO_LEVEL_ORDER.map(level => (
                 <LevelSummaryItem
