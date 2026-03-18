@@ -220,7 +220,7 @@ function CriticalityChart({ nodes }) {
   );
 }
 
-function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, disciplines, onUpdate, onAssignCriticality, onAssignDiscipline, onStartMove, isMoving, onPromote, onDemote, nodes }) {
+function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, disciplines, onUpdate, onAssignCriticality, onAssignDiscipline, onStartMove, isMoving, onPromote, onDemote, onMoveUp, onMoveDown, canMoveUp, canMoveDown, nodes }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -307,6 +307,30 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
                 Demote
               </Button>
             )}
+          </div>
+          
+          {/* Reorder Buttons (Move Up/Down) */}
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              className="flex-1"
+              onClick={onMoveUp}
+              disabled={!canMoveUp}
+              data-testid="move-up-btn"
+            >
+              <ArrowUp className="w-4 h-4 mr-1" />
+              Move Up
+            </Button>
+            <Button 
+              variant="outline" 
+              className="flex-1"
+              onClick={onMoveDown}
+              disabled={!canMoveDown}
+              data-testid="move-down-btn"
+            >
+              <ArrowDown className="w-4 h-4 mr-1" />
+              Move Down
+            </Button>
           </div>
           
           <div>
@@ -509,6 +533,40 @@ export default function EquipmentManagerPage() {
   const updateTypeMutation = useMutation({ mutationFn: ({ typeId, data }) => equipmentHierarchyAPI.updateEquipmentType(typeId, data), onSuccess: () => { queryClient.invalidateQueries(["equipment-types"]); toast.success("Equipment type updated"); setIsTypeDialogOpen(false); setEditingType(null); resetTypeForm(); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
   const deleteTypeMutation = useMutation({ mutationFn: equipmentHierarchyAPI.deleteEquipmentType, onSuccess: () => { queryClient.invalidateQueries(["equipment-types"]); toast.success("Equipment type deleted"); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
 
+  // Reorder mutation
+  const reorderMutation = useMutation({
+    mutationFn: ({ nodeId, direction }) => equipmentHierarchyAPI.reorderNode(nodeId, direction),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["equipment-nodes"]);
+      toast.success(data.message || "Reordered");
+    },
+    onError: e => toast.error(e.response?.data?.detail || "Failed to reorder")
+  });
+
+  const handleMoveUp = () => {
+    if (selectedNode) {
+      reorderMutation.mutate({ nodeId: selectedNode.id, direction: "up" });
+    }
+  };
+
+  const handleMoveDown = () => {
+    if (selectedNode) {
+      reorderMutation.mutate({ nodeId: selectedNode.id, direction: "down" });
+    }
+  };
+
+  // Check if node can move up/down among siblings
+  const getSiblingInfo = (node) => {
+    if (!node) return { canMoveUp: false, canMoveDown: false };
+    const siblings = nodes.filter(n => n.parent_id === node.parent_id);
+    const sortedSiblings = siblings.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    const idx = sortedSiblings.findIndex(s => s.id === node.id);
+    return {
+      canMoveUp: idx > 0,
+      canMoveDown: idx < sortedSiblings.length - 1 && idx >= 0
+    };
+  };
+
   const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
 
   const handleExpand = useCallback(id => setExpandedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }), []);
@@ -680,6 +738,10 @@ export default function EquipmentManagerPage() {
           isMoving={movingNode?.id === selectedNode?.id}
           onPromote={handlePromote}
           onDemote={handleDemote}
+          onMoveUp={handleMoveUp}
+          onMoveDown={handleMoveDown}
+          canMoveUp={getSiblingInfo(selectedNode).canMoveUp}
+          canMoveDown={getSiblingInfo(selectedNode).canMoveDown}
           nodes={nodes}
         />
       </div>

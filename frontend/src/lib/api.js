@@ -145,6 +145,13 @@ export const equipmentHierarchyAPI = {
     return response.data;
   },
   
+  reorderNode: async (nodeId, direction) => {
+    const response = await api.post(`/equipment-hierarchy/nodes/${nodeId}/reorder`, {
+      direction
+    });
+    return response.data;
+  },
+  
   assignCriticality: async (nodeId, assignment) => {
     const response = await api.post(`/equipment-hierarchy/nodes/${nodeId}/criticality`, assignment);
     return response.data;

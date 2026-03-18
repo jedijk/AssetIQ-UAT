@@ -944,11 +944,11 @@ async def get_iso_levels():
 async def get_equipment_nodes(
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all equipment hierarchy nodes for the current user."""
+    """Get all equipment hierarchy nodes for the current user, sorted by sort_order."""
     nodes = await db.equipment_nodes.find(
         {"created_by": current_user["id"]},
         {"_id": 0}
-    ).to_list(1000)
+    ).sort("sort_order", 1).to_list(1000)
     return {"nodes": nodes}
 
 @api_router.get("/equipment-hierarchy/nodes/{node_id}")
@@ -1009,6 +1009,15 @@ async def create_equipment_node(
             )
     
     node_id = str(uuid.uuid4())
+    
+    # Calculate sort_order - get max sort_order for siblings and add 1
+    max_sort = await db.equipment_nodes.find_one(
+        {"parent_id": node_data.parent_id, "created_by": current_user["id"]},
+        sort=[("sort_order", -1)],
+        projection={"sort_order": 1}
+    )
+    next_sort_order = (max_sort.get("sort_order", 0) if max_sort else 0) + 1
+    
     node_doc = {
         "id": node_id,
         "name": node_data.name,
@@ -1018,6 +1027,7 @@ async def create_equipment_node(
         "description": node_data.description,
         "criticality": None,
         "discipline": None,
+        "sort_order": next_sort_order,
         "created_by": current_user["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -1234,6 +1244,69 @@ async def change_node_level(
         "message": f"Node {action} to {new_level.value}",
         "node": updated
     }
+
+
+class ReorderRequest(BaseModel):
+    direction: str  # "up" or "down"
+
+
+@api_router.post("/equipment-hierarchy/nodes/{node_id}/reorder")
+async def reorder_equipment_node(
+    node_id: str,
+    request: ReorderRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Reorder a node among its siblings (move up or down in the list)."""
+    if request.direction not in ["up", "down"]:
+        raise HTTPException(status_code=400, detail="Direction must be 'up' or 'down'")
+    
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    current_sort = node.get("sort_order", 0)
+    
+    # Get all siblings (same parent)
+    siblings = await db.equipment_nodes.find(
+        {"parent_id": node["parent_id"], "created_by": current_user["id"]},
+        {"_id": 0}
+    ).sort("sort_order", 1).to_list(1000)
+    
+    if len(siblings) <= 1:
+        raise HTTPException(status_code=400, detail="No siblings to reorder with")
+    
+    # Find current index
+    current_idx = next((i for i, s in enumerate(siblings) if s["id"] == node_id), -1)
+    if current_idx == -1:
+        raise HTTPException(status_code=400, detail="Node not found in siblings")
+    
+    # Calculate target index
+    if request.direction == "up":
+        if current_idx == 0:
+            raise HTTPException(status_code=400, detail="Already at the top")
+        target_idx = current_idx - 1
+    else:  # down
+        if current_idx == len(siblings) - 1:
+            raise HTTPException(status_code=400, detail="Already at the bottom")
+        target_idx = current_idx + 1
+    
+    # Swap sort_order values
+    target_node = siblings[target_idx]
+    target_sort = target_node.get("sort_order", target_idx)
+    
+    # Update both nodes
+    await db.equipment_nodes.update_one(
+        {"id": node_id},
+        {"$set": {"sort_order": target_sort, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    await db.equipment_nodes.update_one(
+        {"id": target_node["id"]},
+        {"$set": {"sort_order": current_sort, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"message": f"Node moved {request.direction}", "new_sort_order": target_sort}
 
 
 @api_router.post("/equipment-hierarchy/nodes/{node_id}/move")
