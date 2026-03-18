@@ -52,6 +52,7 @@ function FlatTreeRow({ node, depth, onSelect, isSelected, isExpanded, onExpand, 
   
   // Also allow drop of unstructured items
   const canAcceptUnstructured = node.level !== "maintainable_item";
+  const canDrag = node.level !== "installation";
 
   const handleDragOver = (e) => { 
     e.preventDefault(); 
@@ -60,12 +61,18 @@ function FlatTreeRow({ node, depth, onSelect, isSelected, isExpanded, onExpand, 
   };
 
   const handleDragStart = (e) => {
-    if (node.level === "installation") {
+    if (!canDrag) {
       e.preventDefault();
       return;
     }
+    console.log("FlatTreeRow dragStart:", node.name);
+    e.dataTransfer.setData("text/plain", node.id); // Fallback
     e.dataTransfer.setData("application/json", JSON.stringify({ item: node, type: "hierarchy_node" }));
     e.dataTransfer.effectAllowed = "move";
+    // Set drag image
+    if (e.target) {
+      e.dataTransfer.setDragImage(e.target, 20, 20);
+    }
     onDragStart(node);
   };
 
@@ -77,7 +84,6 @@ function FlatTreeRow({ node, depth, onSelect, isSelected, isExpanded, onExpand, 
 
   const handleDragLeave = (e) => {
     e.preventDefault();
-    // Only trigger leave if we're actually leaving this element
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX;
     const y = e.clientY;
@@ -90,20 +96,21 @@ function FlatTreeRow({ node, depth, onSelect, isSelected, isExpanded, onExpand, 
 
   return (
     <div
-      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all ${
-        isDragging ? "opacity-40 scale-95 bg-slate-200" :
+      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all select-none ${
+        isDragging ? "opacity-40 scale-95 bg-blue-200 border-2 border-blue-400" :
         showDropHighlight ? "bg-green-100 border-2 border-green-500 shadow-md" :
-        draggingNode && !canAcceptCurrentDrag && node.id !== draggingNode.id ? "opacity-60" :
+        draggingNode && !canAcceptCurrentDrag && node.id !== draggingNode.id ? "opacity-50" :
         isSelected ? "bg-blue-50 border border-blue-200" : "hover:bg-slate-50 border border-transparent"
-      }`}
+      } ${canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
       style={{ marginLeft: depth * 24 }}
-      onClick={() => onSelect(node)}
+      onClick={() => !draggingNode && onSelect(node)}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(e, node); }}
-      draggable={node.level !== "installation"}
+      draggable={canDrag}
       onDragStart={handleDragStart}
+      onDragEnd={() => onDragStart(null)}
       data-testid={`tree-node-${node.id}`}
     >
       {/* Drag handle for non-installation nodes */}
@@ -310,7 +317,11 @@ export default function EquipmentManagerPage() {
   const handleDragStart = (e, item, type) => e.dataTransfer.setData("application/json", JSON.stringify({ item, type }));
   const handleUnstructuredDragStart = (e, item) => { e.dataTransfer.setData("application/json", JSON.stringify({ item, type: "unstructured" })); e.dataTransfer.effectAllowed = "move"; };
   const handleHierarchyNodeDragStart = (node) => { 
-    console.log("Drag started for:", node.name, node.level);
+    if (node) {
+      console.log("Drag started for:", node.name, node.level);
+    } else {
+      console.log("Drag ended");
+    }
     setDraggingNode(node); 
   };
 
