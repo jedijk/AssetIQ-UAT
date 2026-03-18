@@ -278,23 +278,44 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
             )}
           </div>
           
-          {node.level === "equipment_unit" && (
+          {(node.level === "equipment_unit" || node.level === "equipment") && (
             <div>
               <Label className="text-xs text-slate-500 mb-1">Equipment Type</Label>
-              <Select value={node.equipment_type_id || ""} onValueChange={v => onUpdate(node.id, { equipment_type_id: v })}>
+              <Select value={node.equipment_type_id || ""} onValueChange={v => {
+                // Find the equipment type to get its discipline
+                const eqType = equipmentTypes?.find(t => t.id === v);
+                // Update both equipment_type_id and discipline together
+                onUpdate(node.id, { 
+                  equipment_type_id: v,
+                  discipline: eqType?.discipline || node.discipline
+                });
+              }}>
                 <SelectTrigger className="h-9"><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent>{equipmentTypes?.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           )}
           
-          <div>
-            <Label className="text-xs text-slate-500 mb-1">Discipline</Label>
-            <Select value={node.discipline || ""} onValueChange={v => onAssignDiscipline(node.id, v)}>
-              <SelectTrigger className="h-9"><SelectValue placeholder="Select discipline" /></SelectTrigger>
-              <SelectContent>{disciplines?.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
+          {/* Show discipline - derived from equipment type for equipment_unit, manual for others */}
+          {(node.level === "equipment_unit" || node.level === "equipment") ? (
+            node.equipment_type_id && (
+              <div>
+                <Label className="text-xs text-slate-500 mb-1">Discipline</Label>
+                <div className="h-9 px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600 capitalize">
+                  {equipmentTypes?.find(t => t.id === node.equipment_type_id)?.discipline || node.discipline || "Not set"}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Auto-assigned from equipment type</p>
+              </div>
+            )
+          ) : (
+            <div>
+              <Label className="text-xs text-slate-500 mb-1">Discipline</Label>
+              <Select value={node.discipline || ""} onValueChange={v => onAssignDiscipline(node.id, v)}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select discipline" /></SelectTrigger>
+                <SelectContent>{disciplines?.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          )}
           
           <div>
             <Label className="text-xs text-slate-500 mb-2">Criticality</Label>
