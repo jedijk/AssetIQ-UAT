@@ -439,21 +439,57 @@ async def send_chat_message(
     threat_data = analysis.get("threat", {})
     asset_name = threat_data.get("asset", "Unknown")
     
-    # Validate that asset exists in hierarchy
-    hierarchy_node = await db.equipment_nodes.find_one({
-        "name": asset_name,
-        "created_by": current_user["id"]
-    })
+    # Get all equipment nodes for this user
+    all_equipment_nodes = await db.equipment_nodes.find(
+        {"created_by": current_user["id"]},
+        {"_id": 0, "name": 1, "level": 1, "id": 1}
+    ).to_list(200)
+    
+    # Try to resolve partial tag name to full equipment name
+    hierarchy_node = None
+    resolved_asset_name = asset_name
+    
+    # First try exact match
+    for node in all_equipment_nodes:
+        if node["name"].lower() == asset_name.lower():
+            hierarchy_node = node
+            resolved_asset_name = node["name"]
+            break
+    
+    # If no exact match, try partial match (tag number like P-101, C-201, HX-301)
+    if not hierarchy_node:
+        asset_lower = asset_name.lower()
+        matches = []
+        
+        for node in all_equipment_nodes:
+            node_name_lower = node["name"].lower()
+            # Check if asset name is contained in node name or vice versa
+            if asset_lower in node_name_lower or node_name_lower in asset_lower:
+                matches.append(node)
+            # Check for tag pattern match (e.g., "P-101" matches "Cooling Water Pump P-101")
+            elif any(part.lower() == asset_lower for part in node["name"].split()):
+                matches.append(node)
+            # Check if tag number appears anywhere in the name
+            elif asset_lower.replace(" ", "").replace("-", "") in node_name_lower.replace(" ", "").replace("-", ""):
+                matches.append(node)
+        
+        if len(matches) == 1:
+            # Single match found - use it
+            hierarchy_node = matches[0]
+            resolved_asset_name = matches[0]["name"]
+        elif len(matches) > 1:
+            # Multiple matches - pick equipment-level nodes first, or the shortest name
+            equipment_matches = [m for m in matches if m.get("level") in ["equipment_unit", "equipment", "subunit", "maintainable_item"]]
+            if equipment_matches:
+                matches = equipment_matches
+            # Sort by name length and pick shortest (most specific match)
+            matches.sort(key=lambda x: len(x["name"]))
+            hierarchy_node = matches[0]
+            resolved_asset_name = matches[0]["name"]
     
     if not hierarchy_node:
         # Asset not found in hierarchy - ask user to select from hierarchy or add it first
-        # Get available equipment from hierarchy to suggest
-        equipment_nodes = await db.equipment_nodes.find(
-            {"created_by": current_user["id"]},
-            {"_id": 0, "name": 1, "level": 1}
-        ).to_list(50)
-        
-        equipment_list = [n["name"] for n in equipment_nodes if n.get("level") in ["equipment_unit", "equipment", "subunit", "maintainable_item"]]
+        equipment_list = [n["name"] for n in all_equipment_nodes if n.get("level") in ["equipment_unit", "equipment", "subunit", "maintainable_item"]]
         
         if equipment_list:
             suggestion = f"\n\nAvailable equipment: {', '.join(equipment_list[:10])}"
@@ -488,7 +524,7 @@ async def send_chat_message(
     threat_doc = {
         "id": threat_id,
         "title": threat_data.get("title", "Unknown Threat"),
-        "asset": threat_data.get("asset", "Unknown"),
+        "asset": resolved_asset_name,  # Use resolved full name from hierarchy
         "equipment_type": threat_data.get("equipment_type", "Unknown"),
         "failure_mode": threat_data.get("failure_mode", "Unknown"),
         "cause": threat_data.get("cause"),
