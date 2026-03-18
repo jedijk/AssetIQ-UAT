@@ -23,7 +23,7 @@ from failure_modes import (
 )
 from iso14224_models import (
     ISOLevel, ISO_LEVEL_ORDER, EQUIPMENT_TYPES, CRITICALITY_PROFILES, Discipline,
-    get_valid_parent_level, get_valid_child_levels, is_valid_parent_child,
+    get_valid_parent_level, get_valid_child_levels, is_valid_parent_child, normalize_level,
     EquipmentNodeCreate, EquipmentNodeUpdate, CriticalityAssignment, MoveNodeRequest,
     UnstructuredItemCreate, ParseEquipmentListRequest, AssignToHierarchyRequest,
     detect_equipment_type, EquipmentTypeCreate, EquipmentTypeUpdate
