@@ -63,8 +63,8 @@ function flattenTree(treeNodes, expandedIds, depth = 0) {
   return result;
 }
 
-// Tree Node Component with Move Mode support
-function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, movingNode, onMoveTarget, allNodes }) {
+// Tree Node Component with Move Mode support and Drag-Drop for unassigned items
+function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, movingNode, onMoveTarget, allNodes, onDrop }) {
   const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
@@ -86,6 +86,10 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
   })() : false;
   
   const validTarget = canAcceptMove && !isDescendantOfMoving;
+  
+  // Check if this node can accept dropped unstructured items
+  const canAcceptDrop = getValidChildLevels(node.level).length > 0;
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const handleClick = () => {
     if (movingNode && validTarget) {
@@ -94,17 +98,41 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
       onSelect(node);
     }
   };
+  
+  const handleDragOver = (e) => {
+    if (canAcceptDrop && !movingNode) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      setIsDragOver(true);
+    }
+  };
+  
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+  
+  const handleDropOnNode = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (onDrop && canAcceptDrop) {
+      onDrop(e, node);
+    }
+  };
 
   return (
     <div
       className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${
         isMoving ? "bg-blue-100 border-2 border-blue-500 shadow-md" :
+        isDragOver ? "bg-green-100 border-2 border-dashed border-green-500" :
         validTarget ? "bg-green-100 border-2 border-green-500 cursor-pointer hover:bg-green-200" :
         movingNode && !validTarget ? "opacity-40" :
         isSelected ? "bg-blue-50 border border-blue-200" : "hover:bg-slate-50 border border-transparent cursor-pointer"
       }`}
       style={{ marginLeft: depth * 24 }}
       onClick={handleClick}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDropOnNode}
       data-testid={`tree-node-${node.id}`}
     >
       <button 
@@ -120,7 +148,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
       
       <span className="flex-1 text-sm font-medium text-slate-700 truncate">{node.name}</span>
       
-      {validTarget && (
+      {(validTarget || isDragOver) && (
         <span className="text-xs text-green-600 font-medium flex items-center gap-1">
           <ArrowRight className="w-3 h-3" /> Drop here
         </span>
@@ -480,6 +508,7 @@ export default function EquipmentManagerPage() {
                   movingNode={movingNode}
                   onMoveTarget={handleMoveTarget}
                   allNodes={nodes}
+                  onDrop={handleTreeDrop}
                 />
               ))}
             </div>
