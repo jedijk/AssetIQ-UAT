@@ -40,6 +40,7 @@ const categoryIcons = {
   Process: Activity,
   Safety: Shield,
   Environment: Leaf,
+  Extruder: Cog,
 };
 
 const categoryColors = {
@@ -51,6 +52,7 @@ const categoryColors = {
   Process: "bg-slate-100 text-slate-700 border-slate-200",
   Safety: "bg-red-100 text-red-700 border-red-200",
   Environment: "bg-green-100 text-green-700 border-green-200",
+  Extruder: "bg-indigo-100 text-indigo-700 border-indigo-200",
 };
 
 const getRpnColor = (rpn) => {
@@ -92,6 +94,10 @@ const FailureModesPage = () => {
 
   const categories = categoriesData?.categories || [];
   const failureModes = modesData?.failure_modes || [];
+  
+  // Calculate dynamic stats
+  const totalModes = failureModes.length;
+  const totalCategories = categories.length;
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-6xl" data-testid="failure-modes-page">
@@ -99,18 +105,18 @@ const FailureModesPage = () => {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900 mb-2">Failure Mode Library</h1>
         <p className="text-slate-500">
-          FMEA-based reference library with 100 common failure modes across industrial equipment
+          FMEA-based reference library with {totalModes} failure modes across industrial equipment
         </p>
       </div>
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="card p-4">
-          <div className="text-2xl font-bold text-slate-900">100</div>
+          <div className="text-2xl font-bold text-slate-900">{totalModes}</div>
           <div className="text-sm text-slate-500">Failure Modes</div>
         </div>
         <div className="card p-4">
-          <div className="text-2xl font-bold text-slate-900">8</div>
+          <div className="text-2xl font-bold text-slate-900">{totalCategories}</div>
           <div className="text-sm text-slate-500">Categories</div>
         </div>
         <div className="card p-4">
