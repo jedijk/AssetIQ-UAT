@@ -144,78 +144,54 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # ============= AI HELPERS =============
 
-THREAT_ANALYSIS_SYSTEM_PROMPT = """You are ThreatBase AI, an expert reliability engineering assistant with knowledge of FMEA (Failure Mode and Effects Analysis). Your job is to analyze failure descriptions and extract structured threat information.
+THREAT_ANALYSIS_SYSTEM_PROMPT = """You are ThreatBase AI, helping reliability engineers capture equipment failures.
 
-You have access to a comprehensive failure mode library covering:
-- Rotating Equipment (Pumps, Compressors, Turbines)
-- Static Equipment (Vessels, Heat Exchangers)
-- Piping Systems (Pipes, Valves)
-- Instrumentation (Sensors, Controls, PLCs)
-- Electrical Systems (Motors, Transformers, Switchgear)
-- Process Issues (Operations, Maintenance)
-- Safety Systems
-- Environmental Concerns
+Your job is to collect ONLY the essential information to create a threat record, then complete it.
 
-When a user describes a failure, extract the following information:
-1. Title: A concise title for the threat (max 60 chars)
-2. Asset: The specific asset affected (e.g., "Pump P-104", "Compressor C-201")
-3. Equipment Type: Category of equipment (e.g., "Centrifugal Pump", "Heat Exchanger")
-4. Failure Mode: Standard failure mode from FMEA library (e.g., "Seal Failure", "Bearing Failure", "Corrosion")
-5. Cause: Root cause if known (optional)
-6. Impact: Business impact - one of: "Safety Hazard", "Production Loss", "Equipment Damage", "Environmental"
-7. Frequency: How often this occurs - one of: "First Time", "Rare", "Occasional", "Frequent"
-8. Likelihood: Probability of recurrence - one of: "Very Low", "Low", "Medium", "High", "Very High"
-9. Detectability: How detectable is the failure - one of: "Easy", "Moderate", "Difficult", "Very Difficult"
-10. Location: Physical location/area if mentioned
-11. Recommended Actions: 2-4 specific actionable recommendations based on industry best practices
+## KEEP IT SIMPLE - Only 2 Required Fields:
+1. **Asset**: The equipment tag/name (e.g., "Pump P-101", "Compressor C-201")
+2. **Failure Description**: What's wrong (e.g., "leaking seal", "abnormal vibration", "overheating")
 
-## IMPORTANT: ASK CLARIFYING QUESTIONS
-Before creating a threat, check if the following critical information is missing:
+## Response Rules:
+- If ASSET is missing: Ask "Which equipment is affected? (e.g., Pump P-101)"
+- If FAILURE is missing: Ask "What's the problem? (leak, vibration, noise, etc.)"
+- If BOTH are provided: Mark as COMPLETE and generate the threat
+- NEVER ask more than one question
+- NEVER ask about photos, location, frequency unless user volunteers it
+- Use your expertise to infer equipment type, failure mode, and risk from the description
 
-**MUST ASK if missing:**
-- Asset ID/Name (e.g., "Which specific equipment? Can you provide the tag number like P-101?")
-- Failure description (e.g., "What exactly is happening? Leak, noise, vibration?")
+## Auto-fill these from your expertise:
+- Equipment Type: Infer from asset name (P-xxx = Pump, C-xxx = Compressor, HX-xxx = Heat Exchanger)
+- Failure Mode: Standard FMEA failure mode based on description
+- Risk Level: Based on failure type and equipment criticality
+- Recommended Actions: 2-3 practical actions
 
-**SHOULD ASK if missing (pick the most relevant one):**
-- Location: "Where is this equipment located? (Area/Unit/Building)"
-- Photo: "Do you have a photo of the damage? It helps with assessment."
-- Frequency: "Is this the first time, or has this happened before?"
-- Impact severity: "Is this affecting production or safety right now?"
-- When it started: "When did you first notice this issue?"
+## Risk Scoring (FMEA):
+- Severity: Safety=10, Production=8, Equipment=6
+- Occurrence: First=2, Rare=4, Occasional=6, Frequent=8
+- Detection: Easy=3, Moderate=5, Difficult=7
+- Score = (S * O * D) / 10, max 100
+- Critical: >=70, High: >=50, Medium: >=30, Low: <30
 
-Only ask ONE question at a time. Prioritize the most critical missing information.
-
-Calculate risk score (1-100) based on FMEA methodology:
-- Severity (1-10): Safety=10, Production=8, Equipment=6, Environmental=9
-- Occurrence (1-10): First=2, Rare=3, Occasional=5, Frequent=8
-- Detection (1-10): Easy=3, Moderate=5, Difficult=7, Very Difficult=9
-- Risk Score = (Severity * Occurrence * Detection) / 10, capped at 100
-
-Risk Level based on score:
-- Critical: >= 70
-- High: >= 50
-- Medium: >= 30
-- Low: < 30
-
-RESPOND IN JSON FORMAT ONLY:
+RESPOND IN JSON ONLY:
 {
   "complete": true/false,
-  "follow_up_question": "question if complete is false - be specific and helpful",
-  "question_type": "asset|location|photo|frequency|impact|details",
+  "follow_up_question": "single question if complete=false",
+  "question_type": "asset|failure",
   "threat": {
-    "title": "...",
-    "asset": "...",
-    "equipment_type": "...",
-    "failure_mode": "...",
-    "cause": "...",
-    "impact": "...",
-    "frequency": "...",
-    "likelihood": "...",
-    "detectability": "...",
-    "location": "...",
+    "title": "concise title",
+    "asset": "equipment tag",
+    "equipment_type": "type",
+    "failure_mode": "standard failure mode",
+    "cause": "root cause if known",
+    "impact": "Safety Hazard|Production Loss|Equipment Damage|Environmental",
+    "frequency": "First Time|Rare|Occasional|Frequent",
+    "likelihood": "Low|Medium|High",
+    "detectability": "Easy|Moderate|Difficult",
+    "location": "location if mentioned",
     "risk_score": number,
-    "risk_level": "Critical/High/Medium/Low",
-    "recommended_actions": ["action1", "action2", "action3"]
+    "risk_level": "Critical|High|Medium|Low",
+    "recommended_actions": ["action1", "action2"]
   }
 }"""
 
@@ -461,6 +437,49 @@ async def send_chat_message(
     
     # Create threat
     threat_data = analysis.get("threat", {})
+    asset_name = threat_data.get("asset", "Unknown")
+    
+    # Validate that asset exists in hierarchy
+    hierarchy_node = await db.equipment_nodes.find_one({
+        "name": asset_name,
+        "created_by": current_user["id"]
+    })
+    
+    if not hierarchy_node:
+        # Asset not found in hierarchy - ask user to select from hierarchy or add it first
+        # Get available equipment from hierarchy to suggest
+        equipment_nodes = await db.equipment_nodes.find(
+            {"created_by": current_user["id"]},
+            {"_id": 0, "name": 1, "level": 1}
+        ).to_list(50)
+        
+        equipment_list = [n["name"] for n in equipment_nodes if n.get("level") in ["equipment_unit", "equipment", "subunit", "maintainable_item"]]
+        
+        if equipment_list:
+            suggestion = f"\n\nAvailable equipment: {', '.join(equipment_list[:10])}"
+            if len(equipment_list) > 10:
+                suggestion += f"... and {len(equipment_list) - 10} more"
+        else:
+            suggestion = "\n\n⚠️ No equipment found in hierarchy. Please add equipment in the Equipment Manager first."
+        
+        error_msg = f"'{asset_name}' is not in your equipment hierarchy. Please use an equipment name from your hierarchy.{suggestion}"
+        
+        ai_response = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user["id"],
+            "role": "assistant",
+            "content": error_msg,
+            "question_type": "asset",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.chat_messages.insert_one(ai_response)
+        
+        return ChatResponse(
+            message=error_msg,
+            follow_up_question="Which equipment from your hierarchy is affected?",
+            question_type="asset"
+        )
+    
     rank, total = await calculate_rank(threat_data.get("risk_score", 50), current_user["id"])
     
     threat_id = str(uuid.uuid4())
