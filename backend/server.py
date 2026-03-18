@@ -886,6 +886,19 @@ async def create_equipment_node(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new equipment hierarchy node with ISO 14224 validation."""
+    # Check for duplicate name under the same parent
+    existing = await db.equipment_nodes.find_one({
+        "name": node_data.name,
+        "parent_id": node_data.parent_id,
+        "created_by": current_user["id"]
+    })
+    if existing:
+        parent_info = f"under parent '{node_data.parent_id}'" if node_data.parent_id else "at root level"
+        raise HTTPException(
+            status_code=400, 
+            detail=f"A node with name '{node_data.name}' already exists {parent_info}"
+        )
+    
     # Validate parent-child relationship if parent specified
     if node_data.parent_id:
         parent = await db.equipment_nodes.find_one(
@@ -1038,6 +1051,19 @@ async def move_equipment_node(
     )
     if not new_parent:
         raise HTTPException(status_code=400, detail="New parent node not found")
+    
+    # Check for duplicate name under the new parent
+    existing = await db.equipment_nodes.find_one({
+        "name": node["name"],
+        "parent_id": move_request.new_parent_id,
+        "created_by": current_user["id"],
+        "id": {"$ne": node_id}  # Exclude the node itself
+    })
+    if existing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"A node with name '{node['name']}' already exists under the target parent"
+        )
     
     # Validate the move per ISO 14224
     parent_level = ISOLevel(new_parent["level"])
@@ -1392,6 +1418,18 @@ async def assign_unstructured_to_hierarchy(
     )
     if not item:
         raise HTTPException(status_code=404, detail="Unstructured item not found")
+    
+    # Check for duplicate name under the same parent
+    existing = await db.equipment_nodes.find_one({
+        "name": item["name"],
+        "parent_id": assignment.parent_id,
+        "created_by": current_user["id"]
+    })
+    if existing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"A node with name '{item['name']}' already exists under this parent"
+        )
     
     # Validate parent exists
     parent = await db.equipment_nodes.find_one(
