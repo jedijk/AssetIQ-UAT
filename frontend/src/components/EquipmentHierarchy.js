@@ -1,54 +1,74 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { threatsAPI } from "../lib/api";
+import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
 import { 
   ChevronRight, 
   ChevronDown,
   Building2,
-  Layers,
+  Factory,
+  Settings,
   Cog,
-  Droplets,
-  Wind,
-  Thermometer,
   Box,
-  Gauge,
-  Zap,
-  CircleDot,
-  Pipette,
+  Wrench,
+  Layers,
   AlertTriangle,
   X
 } from "lucide-react";
 import { Button } from "./ui/button";
 
-// Equipment type icons
-const equipmentIcons = {
-  "Pump": Droplets,
-  "Centrifugal Pump": Droplets,
-  "Compressor": Wind,
-  "Heat Exchanger": Thermometer,
-  "Vessel": Box,
-  "Tank": Box,
-  "Valve": CircleDot,
-  "Pipe": Pipette,
-  "Sensor": Gauge,
-  "Motor": Zap,
-  "Electrical": Zap,
-  "default": Cog
+// ISO 14224 Level Configuration
+const ISO_LEVEL_CONFIG = {
+  installation: { icon: Building2, label: "Installation", color: "text-blue-600" },
+  plant_unit: { icon: Factory, label: "Plant/Unit", color: "text-indigo-600" },
+  section_system: { icon: Settings, label: "Section/System", color: "text-purple-600" },
+  equipment_unit: { icon: Cog, label: "Equipment Unit", color: "text-orange-600" },
+  subunit: { icon: Box, label: "Subunit", color: "text-teal-600" },
+  maintainable_item: { icon: Wrench, label: "Maintainable Item", color: "text-slate-600" },
+  // Legacy support
+  unit: { icon: Factory, label: "Plant/Unit", color: "text-indigo-600" },
+  system: { icon: Settings, label: "Section/System", color: "text-purple-600" },
+  equipment: { icon: Cog, label: "Equipment Unit", color: "text-orange-600" },
 };
 
-const getEquipmentIcon = (type) => {
-  for (const [key, Icon] of Object.entries(equipmentIcons)) {
-    if (type?.toLowerCase().includes(key.toLowerCase())) {
-      return Icon;
-    }
-  }
-  return equipmentIcons.default;
+const ISO_LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
+
+// Criticality colors
+const CRIT_COLORS = {
+  safety_critical: "text-red-500",
+  production_critical: "text-orange-500",
+  medium: "text-yellow-500",
+  low: "text-green-500"
 };
+
+// Build tree from flat nodes
+function buildTreeData(nodes, parentId = null) {
+  return nodes
+    .filter(n => n.parent_id === parentId)
+    .map(node => ({
+      ...node,
+      children: buildTreeData(nodes, node.id)
+    }));
+}
+
+// Get threat count per equipment node
+function getThreatCountByAsset(threats) {
+  const countMap = new Map();
+  threats.forEach(threat => {
+    const asset = threat.asset;
+    if (asset) {
+      countMap.set(asset, (countMap.get(asset) || 0) + 1);
+    }
+  });
+  return countMap;
+}
 
 // Tree node component
-const TreeNode = ({ label, icon: Icon, children, count, isOpen, onToggle, onClick, isActive, level = 0 }) => {
-  const hasChildren = children && children.length > 0;
+const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0 }) => {
+  const hasChildren = node.children && node.children.length > 0;
+  const config = ISO_LEVEL_CONFIG[node.level] || ISO_LEVEL_CONFIG.equipment_unit;
+  const Icon = config.icon;
+  const critColor = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   
   return (
     <div>
@@ -56,14 +76,18 @@ const TreeNode = ({ label, icon: Icon, children, count, isOpen, onToggle, onClic
         className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
           isActive ? "bg-blue-50 text-blue-700" : "hover:bg-slate-100 text-slate-700"
         }`}
-        style={{ paddingLeft: `${8 + level * 12}px` }}
+        style={{ paddingLeft: `${8 + level * 16}px` }}
         onClick={() => {
           if (hasChildren) onToggle?.();
           onClick?.();
         }}
+        data-testid={`hierarchy-node-${node.id}`}
       >
         {hasChildren ? (
-          <button className="p-0.5 hover:bg-slate-200 rounded" onClick={(e) => { e.stopPropagation(); onToggle?.(); }}>
+          <button 
+            className="p-0.5 hover:bg-slate-200 rounded" 
+            onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
+          >
             {isOpen ? (
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             ) : (
@@ -73,12 +97,20 @@ const TreeNode = ({ label, icon: Icon, children, count, isOpen, onToggle, onClic
         ) : (
           <span className="w-4.5" />
         )}
-        {Icon && <Icon className="w-4 h-4 text-slate-500 flex-shrink-0" />}
-        <span className="text-sm font-medium truncate flex-1">{label}</span>
-        {count !== undefined && (
-          <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full">
-            {count}
+        <Icon className={`w-4 h-4 ${critColor || config.color} flex-shrink-0`} />
+        <span className="text-sm font-medium truncate flex-1">{node.name}</span>
+        {threatCount > 0 && (
+          <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            {threatCount}
           </span>
+        )}
+        {node.criticality?.level && (
+          <span className={`w-2 h-2 rounded-full ${
+            node.criticality.level === 'safety_critical' ? 'bg-red-500' :
+            node.criticality.level === 'production_critical' ? 'bg-orange-500' :
+            node.criticality.level === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+          }`} />
         )}
       </div>
       {hasChildren && isOpen && (
@@ -90,51 +122,74 @@ const TreeNode = ({ label, icon: Icon, children, count, isOpen, onToggle, onClic
   );
 };
 
+// ISO Level Summary Item
+const LevelSummaryItem = ({ level, count, isActive, onClick }) => {
+  const config = ISO_LEVEL_CONFIG[level] || { icon: Cog, label: level, color: "text-slate-600" };
+  const Icon = config.icon;
+  
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors w-full text-left ${
+        isActive ? "bg-blue-50 text-blue-700" : "hover:bg-slate-100 text-slate-600"
+      }`}
+      data-testid={`iso-level-${level}`}
+    >
+      <Icon className={`w-4 h-4 ${config.color}`} />
+      <span className="text-sm font-medium flex-1">{config.label}</span>
+      <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full">
+        {count}
+      </span>
+    </button>
+  );
+};
+
 const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
   const navigate = useNavigate();
   const [expandedNodes, setExpandedNodes] = useState(new Set(["all"]));
-  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [viewMode, setViewMode] = useState("tree"); // "tree" or "levels"
+  const [filterLevel, setFilterLevel] = useState(null);
 
-  // Fetch threats to build hierarchy
+  // Fetch equipment hierarchy nodes
+  const { data: nodesData, isLoading: nodesLoading } = useQuery({
+    queryKey: ["equipment-nodes"],
+    queryFn: equipmentHierarchyAPI.getNodes,
+    staleTime: 30000,
+  });
+
+  // Fetch threats to show counts
   const { data: threats = [] } = useQuery({
     queryKey: ["threats"],
     queryFn: () => threatsAPI.getAll(),
   });
 
-  // Build hierarchy from threats
-  const hierarchy = useMemo(() => {
-    const locationMap = new Map();
-
-    threats.forEach((threat) => {
-      const location = threat.location || "Unknown Location";
-      const equipmentType = threat.equipment_type || "Other";
-      const asset = threat.asset;
-
-      if (!locationMap.has(location)) {
-        locationMap.set(location, { name: location, equipmentTypes: new Map(), count: 0 });
+  const nodes = nodesData?.nodes || [];
+  const threatCountByAsset = useMemo(() => getThreatCountByAsset(threats), [threats]);
+  
+  // Build tree structure
+  const treeData = useMemo(() => buildTreeData(nodes), [nodes]);
+  
+  // Legacy level mapping
+  const LEGACY_LEVEL_MAP = {
+    "unit": "plant_unit",
+    "system": "section_system",
+    "equipment": "equipment_unit"
+  };
+  
+  // Count by ISO level (including legacy levels mapped to their ISO equivalents)
+  const levelCounts = useMemo(() => {
+    const counts = {};
+    ISO_LEVEL_ORDER.forEach(level => { counts[level] = 0; });
+    nodes.forEach(node => {
+      // Normalize legacy levels to ISO 14224
+      const normalizedLevel = LEGACY_LEVEL_MAP[node.level] || node.level;
+      if (counts[normalizedLevel] !== undefined) {
+        counts[normalizedLevel]++;
       }
-      const loc = locationMap.get(location);
-      loc.count++;
-
-      if (!loc.equipmentTypes.has(equipmentType)) {
-        loc.equipmentTypes.set(equipmentType, { name: equipmentType, assets: new Map(), count: 0 });
-      }
-      const eqType = loc.equipmentTypes.get(equipmentType);
-      eqType.count++;
-
-      if (!eqType.assets.has(asset)) {
-        eqType.assets.set(asset, { 
-          name: asset, 
-          threats: [], 
-          riskLevel: threat.risk_level,
-          equipmentType: equipmentType 
-        });
-      }
-      eqType.assets.get(asset).threats.push(threat);
     });
-
-    return { locations: locationMap, total: threats.length };
-  }, [threats]);
+    return counts;
+  }, [nodes]);
 
   const toggleNode = (nodeId) => {
     setExpandedNodes((prev) => {
@@ -148,12 +203,34 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
     });
   };
 
-  const handleAssetClick = (asset, assetData) => {
-    setSelectedAsset(asset);
-    if (assetData.threats.length === 1) {
-      navigate(`/threats/${assetData.threats[0].id}`);
-      if (isMobile) onClose?.();
-    }
+  const handleNodeClick = (node) => {
+    setSelectedNodeId(node.id);
+    // Navigate to equipment manager with this node selected
+    navigate(`/equipment-manager?selected=${node.id}`);
+    if (isMobile) onClose?.();
+  };
+
+  // Render tree recursively
+  const renderTree = (treeNodes, level = 0) => {
+    return treeNodes
+      .filter(node => !filterLevel || node.level === filterLevel)
+      .map(node => {
+        const threatCount = threatCountByAsset.get(node.name) || 0;
+        return (
+          <TreeNode
+            key={node.id}
+            node={node}
+            level={level}
+            isOpen={expandedNodes.has(node.id)}
+            onToggle={() => toggleNode(node.id)}
+            onClick={() => handleNodeClick(node)}
+            isActive={selectedNodeId === node.id}
+            threatCount={threatCount}
+          >
+            {node.children && node.children.length > 0 && renderTree(node.children, level + 1)}
+          </TreeNode>
+        );
+      });
   };
 
   // Content component
@@ -163,101 +240,123 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
       <div className="flex items-center justify-between p-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
           <Layers className="w-5 h-5 text-blue-600" />
-          <h2 className="font-semibold text-slate-900">Equipment</h2>
+          <h2 className="font-semibold text-slate-900">ISO 14224</h2>
         </div>
-        {isMobile && (
+        <div className="flex items-center gap-1">
+          {/* View mode toggle */}
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="h-8 w-8 text-slate-400"
+            variant={viewMode === "tree" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => { setViewMode("tree"); setFilterLevel(null); }}
           >
-            <X className="w-4 h-4" />
+            Tree
           </Button>
-        )}
-      </div>
-
-      {/* Tree */}
-      <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-        <TreeNode
-          label="All Equipment"
-          icon={Building2}
-          count={hierarchy.total}
-          isOpen={expandedNodes.has("all")}
-          onToggle={() => toggleNode("all")}
-          onClick={() => navigate("/")}
-          level={0}
-        >
-          {Array.from(hierarchy.locations.entries()).map(([locationName, locationData]) => (
-            <TreeNode
-              key={locationName}
-              label={locationName}
-              icon={Building2}
-              count={locationData.count}
-              isOpen={expandedNodes.has(`loc-${locationName}`)}
-              onToggle={() => toggleNode(`loc-${locationName}`)}
-              level={1}
+          <Button
+            variant={viewMode === "levels" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => setViewMode("levels")}
+          >
+            Levels
+          </Button>
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="h-7 w-7 text-slate-400 ml-1"
             >
-              {Array.from(locationData.equipmentTypes.entries()).map(([typeName, typeData]) => {
-                const TypeIcon = getEquipmentIcon(typeName);
-                return (
-                  <TreeNode
-                    key={`${locationName}-${typeName}`}
-                    label={typeName}
-                    icon={TypeIcon}
-                    count={typeData.count}
-                    isOpen={expandedNodes.has(`type-${locationName}-${typeName}`)}
-                    onToggle={() => toggleNode(`type-${locationName}-${typeName}`)}
-                    level={2}
-                  >
-                    {Array.from(typeData.assets.entries()).map(([assetName, assetData]) => {
-                      const AssetIcon = getEquipmentIcon(assetData.equipmentType);
-                      const riskColor = 
-                        assetData.riskLevel === "Critical" ? "text-red-500" :
-                        assetData.riskLevel === "High" ? "text-orange-500" :
-                        assetData.riskLevel === "Medium" ? "text-yellow-500" :
-                        "text-green-500";
-                      
-                      return (
-                        <div
-                          key={assetName}
-                          className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                            selectedAsset === assetName ? "bg-blue-50 text-blue-700" : "hover:bg-slate-100 text-slate-700"
-                          }`}
-                          style={{ paddingLeft: "56px" }}
-                          onClick={() => handleAssetClick(assetName, assetData)}
-                        >
-                          <AssetIcon className={`w-4 h-4 ${riskColor} flex-shrink-0`} />
-                          <span className="text-sm truncate flex-1">{assetName}</span>
-                          {assetData.threats.length > 1 && (
-                            <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full">
-                              {assetData.threats.length}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </TreeNode>
-                );
-              })}
-            </TreeNode>
-          ))}
-        </TreeNode>
-
-        {hierarchy.total === 0 && (
-          <div className="text-center py-8 text-slate-500">
-            <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-            <p className="text-sm">No equipment data</p>
-            <p className="text-xs">Report a threat to see equipment here</p>
-          </div>
-        )}
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Loading state */}
+      {nodesLoading && (
+        <div className="flex items-center justify-center py-8">
+          <div className="loading-dots"><span></span><span></span><span></span></div>
+        </div>
+      )}
+
+      {/* Content */}
+      {!nodesLoading && (
+        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+          {viewMode === "levels" ? (
+            // ISO Levels View
+            <div className="space-y-1">
+              <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                ISO 14224 Taxonomy
+              </div>
+              {ISO_LEVEL_ORDER.map(level => (
+                <LevelSummaryItem
+                  key={level}
+                  level={level}
+                  count={levelCounts[level] || 0}
+                  isActive={filterLevel === level}
+                  onClick={() => {
+                    setFilterLevel(filterLevel === level ? null : level);
+                    setViewMode("tree");
+                  }}
+                />
+              ))}
+            </div>
+          ) : (
+            // Tree View
+            <>
+              {filterLevel && (
+                <div className="mb-2 px-2">
+                  <div className="flex items-center justify-between bg-blue-50 rounded-lg px-2 py-1">
+                    <span className="text-xs text-blue-700">
+                      Showing: {ISO_LEVEL_CONFIG[filterLevel]?.label || filterLevel}
+                    </span>
+                    <button 
+                      onClick={() => setFilterLevel(null)}
+                      className="text-blue-500 hover:text-blue-700"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {treeData.length > 0 ? (
+                <div className="space-y-0.5">
+                  {renderTree(treeData)}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm font-medium">No equipment hierarchy</p>
+                  <p className="text-xs mt-1">Go to Equipment Manager to create hierarchy</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => navigate("/equipment-manager")}
+                  >
+                    Open Equipment Manager
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Footer */}
       <div className="p-3 border-t border-slate-200 bg-slate-50">
-        <div className="text-xs text-slate-500">
-          <span className="font-medium">{hierarchy.total}</span> threats across{" "}
-          <span className="font-medium">{hierarchy.locations.size}</span> locations
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span>
+            <span className="font-medium">{nodes.length}</span> items
+          </span>
+          <button
+            onClick={() => navigate("/equipment-manager")}
+            className="text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Manage
+          </button>
         </div>
       </div>
     </>

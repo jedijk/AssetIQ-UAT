@@ -18,8 +18,20 @@ import { ScrollArea } from "../components/ui/scroll-area";
 
 const EQUIPMENT_ICONS = { droplets: Droplets, wind: Wind, cog: Cog, thermometer: Thermometer, box: Box, "circle-dot": CircleDot, zap: Zap, gauge: Gauge, cpu: Cpu, pipette: Pipette, flame: Flame };
 const ICON_OPTIONS = ["droplets", "wind", "cog", "thermometer", "box", "circle-dot", "zap", "gauge", "cpu", "pipette", "flame"];
-const LEVEL_CONFIG = { installation: { icon: Building2, label: "Installation" }, unit: { icon: Factory, label: "Unit" }, system: { icon: Settings, label: "System" }, equipment: { icon: Cog, label: "Equipment" }, maintainable_item: { icon: Wrench, label: "Maintainable Item" } };
-const LEVEL_ORDER = ["installation", "unit", "system", "equipment", "maintainable_item"];
+// ISO 14224 Taxonomy Levels - aligned with standard terminology
+const LEVEL_CONFIG = { 
+  installation: { icon: Building2, label: "Installation", description: "Offshore platform, Onshore plant" }, 
+  plant_unit: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" }, 
+  section_system: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" }, 
+  equipment_unit: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" }, 
+  subunit: { icon: Box, label: "Subunit", description: "Driver, Driven unit, Control system" },
+  maintainable_item: { icon: Wrench, label: "Maintainable Item", description: "Bearing, Seal, Impeller" },
+  // Legacy level support for backward compatibility
+  unit: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" },
+  system: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" },
+  equipment: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" }
+};
+const LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
 const CRIT_COLORS = { safety_critical: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", dot: "bg-red-500" }, production_critical: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", dot: "bg-orange-500" }, medium: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", dot: "bg-yellow-500" }, low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } };
 const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process"];
 
@@ -114,7 +126,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
         </span>
       )}
       
-      <span className="text-xs text-slate-400 capitalize hidden sm:block">{node.level.replace("_", " ")}</span>
+      <span className="text-xs text-slate-400 hidden sm:block">{config.label}</span>
       {node.criticality && <div className={`w-2 h-2 rounded-full ${CRIT_COLORS[node.criticality.level]?.dot}`} />}
     </div>
   );
@@ -238,7 +250,7 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
             )}
           </div>
           
-          {node.level === "equipment" && (
+          {node.level === "equipment_unit" && (
             <div>
               <Label className="text-xs text-slate-500 mb-1">Equipment Type</Label>
               <Select value={node.equipment_type_id || ""} onValueChange={v => onUpdate(node.id, { equipment_type_id: v })}>

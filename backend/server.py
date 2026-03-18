@@ -840,11 +840,14 @@ async def get_criticality_profiles():
 
 @api_router.get("/equipment-hierarchy/iso-levels")
 async def get_iso_levels():
-    """Get ISO 14224 hierarchy levels."""
+    """Get ISO 14224 hierarchy levels with labels."""
+    from iso14224_models import ISO_LEVEL_LABELS
     return {
         "levels": [level.value for level in ISO_LEVEL_ORDER],
+        "labels": {level.value: ISO_LEVEL_LABELS.get(level, level.value) for level in ISO_LEVEL_ORDER},
         "hierarchy": {
             level.value: {
+                "label": ISO_LEVEL_LABELS.get(level, level.value),
                 "parent": get_valid_parent_level(level).value if get_valid_parent_level(level) else None,
                 "children": [c.value for c in get_valid_child_levels(level)]
             }

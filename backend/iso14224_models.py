@@ -5,39 +5,87 @@ from typing import List, Optional
 from enum import Enum
 
 class ISOLevel(str, Enum):
-    INSTALLATION = "installation"
-    UNIT = "unit"
-    SYSTEM = "system"
-    EQUIPMENT = "equipment"
-    MAINTAINABLE_ITEM = "maintainable_item"
+    """ISO 14224 Taxonomy Levels"""
+    INSTALLATION = "installation"       # Level 1: Offshore platform, Onshore plant
+    PLANT_UNIT = "plant_unit"          # Level 2: Production unit, Utility unit
+    SECTION_SYSTEM = "section_system"  # Level 3: Gas compression, Water injection
+    EQUIPMENT_UNIT = "equipment_unit"  # Level 4: Compressor, Pump, Heat exchanger
+    SUBUNIT = "subunit"                # Level 5: Driver, Driven unit, Control system
+    MAINTAINABLE_ITEM = "maintainable_item"  # Level 6: Bearing, Seal, Impeller
+    # Legacy levels for backward compatibility
+    UNIT = "unit"                      # Maps to PLANT_UNIT
+    SYSTEM = "system"                  # Maps to SECTION_SYSTEM
+    EQUIPMENT = "equipment"            # Maps to EQUIPMENT_UNIT
 
-# ISO Level hierarchy order (parent -> child relationships)
+# ISO 14224 Level hierarchy order (parent -> child relationships)
 ISO_LEVEL_ORDER = [
     ISOLevel.INSTALLATION,
-    ISOLevel.UNIT,
-    ISOLevel.SYSTEM,
-    ISOLevel.EQUIPMENT,
+    ISOLevel.PLANT_UNIT,
+    ISOLevel.SECTION_SYSTEM,
+    ISOLevel.EQUIPMENT_UNIT,
+    ISOLevel.SUBUNIT,
     ISOLevel.MAINTAINABLE_ITEM
 ]
 
+# Legacy level mapping to ISO 14224 standard
+LEGACY_LEVEL_MAP = {
+    "unit": "plant_unit",
+    "system": "section_system",
+    "equipment": "equipment_unit"
+}
+
+# Display labels for ISO 14224 levels
+ISO_LEVEL_LABELS = {
+    ISOLevel.INSTALLATION: "Installation",
+    ISOLevel.PLANT_UNIT: "Plant/Unit",
+    ISOLevel.SECTION_SYSTEM: "Section/System",
+    ISOLevel.EQUIPMENT_UNIT: "Equipment Unit",
+    ISOLevel.SUBUNIT: "Subunit",
+    ISOLevel.MAINTAINABLE_ITEM: "Maintainable Item",
+    # Legacy level labels
+    ISOLevel.UNIT: "Plant/Unit",
+    ISOLevel.SYSTEM: "Section/System",
+    ISOLevel.EQUIPMENT: "Equipment Unit"
+}
+
+def normalize_level(level: ISOLevel) -> ISOLevel:
+    """Normalize legacy levels to ISO 14224 standard."""
+    if level == ISOLevel.UNIT:
+        return ISOLevel.PLANT_UNIT
+    if level == ISOLevel.SYSTEM:
+        return ISOLevel.SECTION_SYSTEM
+    if level == ISOLevel.EQUIPMENT:
+        return ISOLevel.EQUIPMENT_UNIT
+    return level
+
 def get_valid_parent_level(level: ISOLevel) -> Optional[ISOLevel]:
     """Get the valid parent level for a given ISO level."""
-    idx = ISO_LEVEL_ORDER.index(level)
+    norm_level = normalize_level(level)
+    try:
+        idx = ISO_LEVEL_ORDER.index(norm_level)
+    except ValueError:
+        return None
     if idx == 0:
         return None  # Installation has no parent
     return ISO_LEVEL_ORDER[idx - 1]
 
 def get_valid_child_levels(level: ISOLevel) -> List[ISOLevel]:
     """Get valid child levels for a given ISO level."""
-    idx = ISO_LEVEL_ORDER.index(level)
+    norm_level = normalize_level(level)
+    try:
+        idx = ISO_LEVEL_ORDER.index(norm_level)
+    except ValueError:
+        return []
     if idx == len(ISO_LEVEL_ORDER) - 1:
         return []  # Maintainable item has no children
     return [ISO_LEVEL_ORDER[idx + 1]]
 
 def is_valid_parent_child(parent_level: ISOLevel, child_level: ISOLevel) -> bool:
     """Check if parent-child relationship is valid per ISO 14224."""
-    valid_parent = get_valid_parent_level(child_level)
-    return valid_parent == parent_level
+    norm_parent = normalize_level(parent_level)
+    norm_child = normalize_level(child_level)
+    valid_parent = get_valid_parent_level(norm_child)
+    return valid_parent == norm_parent
 
 # Discipline categories
 class Discipline(str, Enum):

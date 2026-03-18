@@ -30,7 +30,13 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 
 #### 5. Equipment Hierarchy & Criticality Manager - ISO 14224 (Completed - Mar 18, 2026)
 - **Three-panel UI**: Libraries (left), Hierarchy Canvas (center), Properties (right)
-- **ISO 14224 Hierarchy Levels**: Installation → Unit → System → Equipment → Maintainable Item
+- **ISO 14224 Hierarchy Levels** (Updated Mar 18, 2026):
+  - Installation (Level 1: Offshore platform, Onshore plant)
+  - Plant/Unit (Level 2: Production unit, Utility unit)
+  - Section/System (Level 3: Gas compression, Water injection)
+  - Equipment Unit (Level 4: Compressor, Pump, Heat exchanger)
+  - Subunit (Level 5: Driver, Driven unit, Control system) - NEW
+  - Maintainable Item (Level 6: Bearing, Seal, Impeller)
 - **Criticality Assignment**: Safety Critical, Production Critical, Medium, Low
 - **Discipline Mapping**: Mechanical, Electrical, Instrumentation, Process
 - **Equipment Type Library**: 20+ ISO-compliant equipment types with icons
@@ -39,7 +45,14 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
   - Parse equipment lists from text (paste)
   - Upload files (Excel, PDF, CSV, TXT)
   - Auto-detect equipment types from names/tags
-- **Drag & Drop**: Direct assignment from unassigned items to hierarchy (no confirmation needed)
+- **Move Mode**: Click-based node repositioning (select node → click "Move" → click valid parent)
+
+#### 6. Equipment Navigation Sidebar - ISO 14224 (Updated Mar 18, 2026)
+- **Tree View**: Hierarchical tree showing equipment structure from DB
+- **Levels View**: ISO 14224 taxonomy summary with counts per level
+- **Legacy Support**: Maps old level names (unit, system, equipment) to ISO 14224 equivalents
+- **Threat Counts**: Shows number of threats per equipment node
+- **Quick Navigation**: Click to navigate to Equipment Manager with node selected
 
 ### Technical Architecture
 
@@ -54,18 +67,34 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── Layout.js       # Main layout with Settings menu
-│   │   │   ├── ChatSidebar.jsx # AI chat interface
-│   │   │   └── EquipmentHierarchy.jsx
+│   │   │   ├── Layout.js               # Main layout with Settings menu
+│   │   │   ├── ChatSidebar.jsx         # AI chat interface
+│   │   │   └── EquipmentHierarchy.js   # ISO 14224 navigation sidebar
 │   │   ├── pages/
 │   │   │   ├── ThreatsPage.js
-│   │   │   ├── EquipmentManagerPage.js  # ISO 14224 module
+│   │   │   ├── EquipmentManagerPage.js # ISO 14224 module
 │   │   │   └── FailureModesPage.js
 │   │   └── lib/
 │   │       └── api.js      # API client
 └── memory/
     └── PRD.md
 ```
+
+### ISO 14224 Level Configuration
+
+| Level Key | ISO 14224 Label | Description | Icon |
+|-----------|-----------------|-------------|------|
+| installation | Installation | Offshore platform, Onshore plant | Building2 |
+| plant_unit | Plant/Unit | Production unit, Utility unit | Factory |
+| section_system | Section/System | Gas compression, Water injection | Settings |
+| equipment_unit | Equipment Unit | Compressor, Pump, Heat exchanger | Cog |
+| subunit | Subunit | Driver, Driven unit, Control system | Box |
+| maintainable_item | Maintainable Item | Bearing, Seal, Impeller | Wrench |
+
+**Legacy Level Mapping:**
+- `unit` → `plant_unit`
+- `system` → `section_system`
+- `equipment` → `equipment_unit`
 
 ### Key API Endpoints
 
@@ -80,6 +109,7 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - `POST /api/chat/send` - Send chat message (creates threats)
 
 #### Equipment Hierarchy (ISO 14224)
+- `GET /api/equipment-hierarchy/iso-levels` - Get ISO 14224 levels with labels and hierarchy
 - `GET /api/equipment-hierarchy/types` - Get equipment types (merged default + custom)
 - `POST /api/equipment-hierarchy/types` - Create custom type
 - `PATCH /api/equipment-hierarchy/types/{id}` - Update type
@@ -88,6 +118,7 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - `POST /api/equipment-hierarchy/nodes` - Create node
 - `PATCH /api/equipment-hierarchy/nodes/{id}` - Update node
 - `DELETE /api/equipment-hierarchy/nodes/{id}` - Delete node (cascades)
+- `POST /api/equipment-hierarchy/nodes/{id}/move` - Move node to new parent
 - `POST /api/equipment-hierarchy/nodes/{id}/criticality` - Assign criticality
 - `POST /api/equipment-hierarchy/nodes/{id}/discipline` - Assign discipline
 
@@ -116,7 +147,12 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - [x] Auto-detection of equipment types
 - [x] Editable ISO 14224 equipment type library
 - [x] Direct drag-drop assignment (no confirmation)
-- [x] **Drag-drop repositioning of hierarchy nodes** - Move existing nodes between valid parents
+- [x] Click-based "Move Mode" for hierarchy repositioning
+- [x] **ISO 14224 Aligned Hierarchy** (Mar 18, 2026):
+  - Added "Subunit" level between Equipment Unit and Maintainable Item
+  - Updated terminology to match ISO 14224 standard
+  - Left sidebar now shows ISO 14224 taxonomy levels with counts
+  - Legacy level support for backward compatibility
 
 ### Future Tasks (Backlog)
 - [ ] P2: Voice input for chat interface
@@ -125,3 +161,4 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - [ ] P3: Export hierarchy to PDF/Excel
 - [ ] P3: Bulk criticality assignment
 - [ ] P3: Equipment template library
+- [ ] P3: Data migration utility (convert legacy levels to ISO 14224)
