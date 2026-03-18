@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   ChevronRight, ChevronDown, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
-  Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, ArrowRight,
+  Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, ArrowRight, Move,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -29,38 +29,73 @@ function getValidChildLevels(parentLevel) {
   return [LEVEL_ORDER[idx + 1]];
 }
 
+function canBeChildOf(childLevel, parentLevel) {
+  const parentIdx = LEVEL_ORDER.indexOf(parentLevel);
+  const childIdx = LEVEL_ORDER.indexOf(childLevel);
+  return parentIdx >= 0 && childIdx > parentIdx;
+}
+
 function buildTreeData(nodes, parentId = null, depth = 0) {
   if (depth > 10) return [];
   return nodes.filter(n => n.parent_id === parentId).map(node => ({ ...node, children: buildTreeData(nodes, node.id, depth + 1) }));
 }
 
-function FlatTreeRow({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, onDrop, isDragOver }) {
+function FlatTreeRow({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, onDrop, isDragOver, onDragStart, isDragging }) {
   const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   const validChildren = getValidChildLevels(node.level);
-  const canAcceptDrop = validChildren.length > 0;
+  const canAcceptDrop = validChildren.length > 0 || node.level !== "maintainable_item";
 
-  const handleDragOver = (e) => { if (canAcceptDrop) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } };
+  const handleDragOver = (e) => { 
+    e.preventDefault(); 
+    e.dataTransfer.dropEffect = "move"; 
+  };
+
+  const handleDragStart = (e) => {
+    e.dataTransfer.setData("application/json", JSON.stringify({ item: node, type: "hierarchy_node" }));
+    e.dataTransfer.effectAllowed = "move";
+    onDragStart(node);
+  };
 
   return (
     <div
-      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
+      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all ${
+        isDragging ? "opacity-50 scale-95" :
         isDragOver ? "bg-blue-100 border-2 border-blue-400 border-dashed" :
         isSelected ? "bg-blue-50 border border-blue-200" : "hover:bg-slate-50 border border-transparent"
       }`}
       style={{ marginLeft: depth * 24 }}
       onClick={() => onSelect(node)}
       onDragOver={handleDragOver}
-      onDrop={(e) => { e.preventDefault(); if (canAcceptDrop) onDrop(e, node); }}
+      onDrop={(e) => { e.preventDefault(); onDrop(e, node); }}
+      draggable={node.level !== "installation"}
+      onDragStart={handleDragStart}
       data-testid={`tree-node-${node.id}`}
     >
-      <button className={`w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 ${!hasChildren ? "invisible" : ""}`} onClick={e => { e.stopPropagation(); onExpand(node.id); }}>
-        {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
-      </button>
-      <div className={`w-7 h-7 rounded-md flex items-center justify-center ${critColors?.bg || "bg-slate-100"}`}><LevelIcon className={`w-4 h-4 ${critColors?.text || "text-slate-600"}`} /></div>
+      {/* Drag handle for non-installation nodes */}
+      {node.level !== "installation" ? (
+        <div className="w-5 h-5 flex items-center justify-center cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
+          <GripVertical className="w-4 h-4" />
+        </div>
+      ) : (
+        <button className={`w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 ${!hasChildren ? "invisible" : ""}`} onClick={e => { e.stopPropagation(); onExpand(node.id); }}>
+          {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
+        </button>
+      )}
+      
+      {/* Expand button for draggable nodes */}
+      {node.level !== "installation" && hasChildren && (
+        <button className="w-4 h-4 flex items-center justify-center rounded hover:bg-slate-200 -ml-1" onClick={e => { e.stopPropagation(); onExpand(node.id); }}>
+          {isExpanded ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronRight className="w-3 h-3 text-slate-400" />}
+        </button>
+      )}
+      
+      <div className={`w-7 h-7 rounded-md flex items-center justify-center ${critColors?.bg || "bg-slate-100"}`}>
+        <LevelIcon className={`w-4 h-4 ${critColors?.text || "text-slate-600"}`} />
+      </div>
       <span className="flex-1 text-sm font-medium text-slate-700 truncate">{node.name}</span>
-      {canAcceptDrop && <ArrowRight className="w-3 h-3 text-slate-300" />}
+      <span className="text-xs text-slate-400 capitalize hidden sm:block">{node.level.replace("_", " ")}</span>
       {node.criticality && <div className={`w-2 h-2 rounded-full ${CRIT_COLORS[node.criticality.level]?.dot}`} />}
     </div>
   );
@@ -158,6 +193,16 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
           <div><Label className="text-xs text-slate-500 mb-1">Discipline</Label><Select value={node.discipline || ""} onValueChange={v => onAssignDiscipline(node.id, v)}><SelectTrigger className="h-9"><SelectValue placeholder="Select discipline" /></SelectTrigger><SelectContent>{disciplines?.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}</SelectContent></Select></div>
           <div><Label className="text-xs text-slate-500 mb-2">Criticality</Label><div className="grid grid-cols-2 gap-2">{criticalityProfiles?.map(p => { const isActive = node.criticality?.profile_id === p.id; const colors = CRIT_COLORS[p.level]; return (<button key={p.id} onClick={() => onAssignCriticality(node.id, { profile_id: p.id })} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${isActive ? `${colors?.bg} ${colors?.border} ring-2 ring-offset-1` : "bg-white border-slate-200 hover:border-slate-300"}`}><div className={`w-3 h-3 rounded-full ${colors?.dot}`} /><span className={`text-xs font-medium ${isActive ? colors?.text : "text-slate-600"}`}>{p.name}</span></button>); })}</div></div>
           {node.criticality && (<div className="p-3 bg-slate-50 rounded-lg"><h4 className="text-xs font-semibold text-slate-600 mb-2">Risk Score: <span className="text-lg">{node.criticality.risk_score}</span></h4></div>)}
+          
+          {/* Move hint */}
+          {node.level !== "installation" && (
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <div className="flex items-center gap-2 text-blue-700">
+                <Move className="w-4 h-4" />
+                <span className="text-xs font-medium">Drag to reposition in hierarchy</span>
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
     </div>
@@ -176,6 +221,7 @@ export default function EquipmentManagerPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [dragOverNodeId, setDragOverNodeId] = useState(null);
+  const [draggingNode, setDraggingNode] = useState(null);
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);
   const [newType, setNewType] = useState({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
@@ -206,6 +252,20 @@ export default function EquipmentManagerPage() {
   const deleteUnstructuredMutation = useMutation({ mutationFn: equipmentHierarchyAPI.deleteUnstructuredItem, onSuccess: () => { queryClient.invalidateQueries(["unstructured-items"]); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
   const assignToHierarchyMutation = useMutation({ mutationFn: ({ itemId, parentId, level }) => equipmentHierarchyAPI.assignUnstructuredToHierarchy(itemId, parentId, level), onSuccess: () => { queryClient.invalidateQueries(["equipment-nodes"]); queryClient.invalidateQueries(["unstructured-items"]); toast.success("Item added to hierarchy"); }, onError: e => toast.error(e.response?.data?.detail || "Failed to assign") });
   
+  // Move node mutation
+  const moveNodeMutation = useMutation({ 
+    mutationFn: ({ nodeId, newParentId }) => equipmentHierarchyAPI.moveNode(nodeId, newParentId), 
+    onSuccess: () => { 
+      queryClient.invalidateQueries(["equipment-nodes"]); 
+      toast.success("Node moved successfully"); 
+      setDraggingNode(null);
+    }, 
+    onError: e => { 
+      toast.error(e.response?.data?.detail || "Failed to move node"); 
+      setDraggingNode(null);
+    } 
+  });
+  
   // Equipment type mutations
   const createTypeMutation = useMutation({ mutationFn: equipmentHierarchyAPI.createEquipmentType, onSuccess: () => { queryClient.invalidateQueries(["equipment-types"]); toast.success("Equipment type created"); setIsTypeDialogOpen(false); resetTypeForm(); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
   const updateTypeMutation = useMutation({ mutationFn: ({ typeId, data }) => equipmentHierarchyAPI.updateEquipmentType(typeId, data), onSuccess: () => { queryClient.invalidateQueries(["equipment-types"]); toast.success("Equipment type updated"); setIsTypeDialogOpen(false); setEditingType(null); resetTypeForm(); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
@@ -216,23 +276,71 @@ export default function EquipmentManagerPage() {
   const handleExpand = useCallback(id => setExpandedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }), []);
   const handleDragStart = (e, item, type) => e.dataTransfer.setData("application/json", JSON.stringify({ item, type }));
   const handleUnstructuredDragStart = (e, item) => { e.dataTransfer.setData("application/json", JSON.stringify({ item, type: "unstructured" })); e.dataTransfer.effectAllowed = "move"; };
+  const handleHierarchyNodeDragStart = (node) => { setDraggingNode(node); };
 
-  // Direct drop without confirmation
+  // Handle drops on hierarchy nodes
   const handleTreeDrop = (e, targetNode) => {
     e.preventDefault();
     setDragOverNodeId(null);
+    
     try {
       const data = JSON.parse(e.dataTransfer.getData("application/json"));
+      
       if (data.type === "unstructured") {
+        // Unstructured item drop - assign to next valid level
         const validLevels = getValidChildLevels(targetNode.level);
         if (validLevels.length > 0) {
-          // Direct assignment without dialog
           assignToHierarchyMutation.mutate({ itemId: data.item.id, parentId: targetNode.id, level: validLevels[0] });
+        } else {
+          toast.error(`Cannot add items under ${LEVEL_CONFIG[targetNode.level]?.label}`);
         }
+      } else if (data.type === "hierarchy_node") {
+        // Moving existing hierarchy node
+        const movingNode = data.item;
+        
+        // Validation checks
+        if (movingNode.id === targetNode.id) {
+          toast.error("Cannot move node to itself");
+          return;
+        }
+        
+        if (movingNode.level === "installation") {
+          toast.error("Cannot move installations");
+          return;
+        }
+        
+        // Check if target can accept this node level
+        if (!canBeChildOf(movingNode.level, targetNode.level)) {
+          toast.error(`Cannot move ${LEVEL_CONFIG[movingNode.level]?.label} under ${LEVEL_CONFIG[targetNode.level]?.label}`);
+          return;
+        }
+        
+        // Check for circular reference (can't move parent under its own child)
+        const isDescendant = (parentId, checkId) => {
+          const children = nodes.filter(n => n.parent_id === parentId);
+          for (const child of children) {
+            if (child.id === checkId) return true;
+            if (isDescendant(child.id, checkId)) return true;
+          }
+          return false;
+        };
+        
+        if (isDescendant(movingNode.id, targetNode.id)) {
+          toast.error("Cannot move node under its own descendant");
+          return;
+        }
+        
+        // Perform the move
+        moveNodeMutation.mutate({ nodeId: movingNode.id, newParentId: targetNode.id });
+        
       } else if (data.type === "criticality" && selectedNode) {
         criticalityMutation.mutate({ nodeId: selectedNode.id, assignment: { profile_id: data.item.id } });
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error("Drop error:", err);
+    }
+    
+    setDraggingNode(null);
   };
 
   const handleFileUpload = (e) => { const file = e.target.files?.[0]; if (file) { parseFileMutation.mutate(file); e.target.value = ""; } };
@@ -265,18 +373,44 @@ export default function EquipmentManagerPage() {
       </div>
 
       {/* Center Panel - Hierarchy */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0" onDragEnd={() => setDraggingNode(null)}>
         <div className="p-4 border-b border-slate-200 bg-white flex items-center gap-3">
           <div className="relative flex-1 max-w-xs"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 h-9" data-testid="hierarchy-search-input" /></div>
           <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />Import List</Button>
           <Button onClick={() => { setNewNode({ name: "", level: "installation", parent_id: null }); setIsCreateOpen(true); }} size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="add-installation-btn"><Plus className="w-4 h-4 mr-1" />Add Installation</Button>
           {selectedNode && (<><Button onClick={handleAddChild} size="sm" variant="outline" disabled={selectedNode.level === "maintainable_item"} data-testid="add-child-btn"><Plus className="w-4 h-4 mr-1" />Add Child</Button><Button onClick={() => deleteMutation.mutate(selectedNode.id)} size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50" data-testid="delete-node-btn"><Trash2 className="w-4 h-4" /></Button></>)}
         </div>
+        
+        {/* Drag hint banner */}
+        {draggingNode && (
+          <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+            <Move className="w-4 h-4 text-blue-600" />
+            <span className="text-sm text-blue-700">Moving: <strong>{draggingNode.name}</strong> - Drop on a valid parent node</span>
+          </div>
+        )}
+        
         <ScrollArea className="flex-1 p-4">
           {treeData.length === 0 && unstructuredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center"><Building2 className="w-12 h-12 text-slate-300 mb-3" /><h3 className="text-lg font-semibold text-slate-600 mb-1">No Equipment Hierarchy</h3><p className="text-sm text-slate-400 mb-4">Start by adding an installation or importing a list</p><div className="flex gap-2"><Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline"><Upload className="w-4 h-4 mr-1" />Import List</Button><Button onClick={() => setIsCreateOpen(true)} size="sm" className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-1" />Add Installation</Button></div></div>
           ) : (
-            <div className="space-y-1" data-testid="hierarchy-tree">{filteredRows.map(({ node, depth, hasChildren, isExpanded }) => (<FlatTreeRow key={node.id} node={node} depth={depth} onSelect={setSelectedNode} isSelected={selectedNode?.id === node.id} isExpanded={isExpanded} onExpand={handleExpand} hasChildren={hasChildren} onDrop={handleTreeDrop} isDragOver={dragOverNodeId === node.id} />))}</div>
+            <div className="space-y-1" data-testid="hierarchy-tree">
+              {filteredRows.map(({ node, depth, hasChildren, isExpanded }) => (
+                <FlatTreeRow 
+                  key={node.id} 
+                  node={node} 
+                  depth={depth} 
+                  onSelect={setSelectedNode} 
+                  isSelected={selectedNode?.id === node.id} 
+                  isExpanded={isExpanded} 
+                  onExpand={handleExpand} 
+                  hasChildren={hasChildren} 
+                  onDrop={handleTreeDrop} 
+                  isDragOver={dragOverNodeId === node.id}
+                  onDragStart={handleHierarchyNodeDragStart}
+                  isDragging={draggingNode?.id === node.id}
+                />
+              ))}
+            </div>
           )}
           {unstructuredItems.length > 0 && (
             <div className="mt-6 pt-4 border-t border-slate-200">

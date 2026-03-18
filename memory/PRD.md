@@ -116,6 +116,7 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - [x] Auto-detection of equipment types
 - [x] Editable ISO 14224 equipment type library
 - [x] Direct drag-drop assignment (no confirmation)
+- [x] **Drag-drop repositioning of hierarchy nodes** - Move existing nodes between valid parents
 
 ### Future Tasks (Backlog)
 - [ ] P2: Voice input for chat interface
