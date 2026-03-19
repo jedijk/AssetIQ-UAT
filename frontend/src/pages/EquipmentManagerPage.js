@@ -245,12 +245,11 @@ function UnstructuredItem({ item, onDragStart, onDelete }) {
   );
 }
 
-function LibraryItem({ item, type, onDragStart, onEdit, onDelete }) {
+function LibraryItem({ item, type, onEdit, onDelete }) {
   const Icon = type === "equipment" ? (EQUIPMENT_ICONS[item.icon] || Cog) : ShieldCheck;
   const colors = type === "criticality" ? CRIT_COLORS[item.level] : null;
   return (
-    <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 cursor-grab hover:border-blue-300 hover:shadow-sm transition-all group" draggable onDragStart={e => onDragStart(e, item, type)} data-testid={`library-item-${item.id}`}>
-      <GripVertical className="w-4 h-4 text-slate-300" />
+    <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-all group" data-testid={`library-item-${item.id}`}>
       <div className={`w-7 h-7 rounded-md flex items-center justify-center ${colors?.bg || "bg-slate-100"}`}><Icon className={`w-4 h-4 ${colors?.text || "text-slate-600"}`} /></div>
       <span className="flex-1 text-sm font-medium text-slate-700 truncate">{item.name}</span>
       {type === "equipment" && onEdit && (
@@ -660,7 +659,6 @@ export default function EquipmentManagerPage() {
 
   const handleExpand = useCallback(id => setExpandedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }), []);
 
-  const handleDragStart = (e, item, type) => e.dataTransfer.setData("application/json", JSON.stringify({ item, type }));
   const handleUnstructuredDragStart = (e, item) => { e.dataTransfer.setData("application/json", JSON.stringify({ item, type: "unstructured" })); e.dataTransfer.effectAllowed = "move"; };
 
   const handleTreeDrop = (e, targetNode) => {
@@ -675,8 +673,6 @@ export default function EquipmentManagerPage() {
           parentNode: targetNode, 
           selectedLevel: getValidChildLevels(targetNode.level)[0] || "plant_unit"
         });
-      } else if (data.type === "criticality" && selectedNode) {
-        criticalityMutation.mutate({ nodeId: selectedNode.id, assignment: { profile_id: data.item.id } });
       }
     } catch (err) {}
   };
@@ -714,9 +710,9 @@ export default function EquipmentManagerPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
           <TabsList className="mx-4 mt-2 grid w-auto grid-cols-2"><TabsTrigger value="equipment" className="text-xs">Equipment</TabsTrigger><TabsTrigger value="criticality" className="text-xs">Criticality</TabsTrigger></TabsList>
           <TabsContent value="equipment" className="flex-1 m-0 p-4 overflow-auto">
-            <div className="space-y-2">{equipmentTypes.map(t => <LibraryItem key={t.id} item={t} type="equipment" onDragStart={handleDragStart} onEdit={handleEditType} onDelete={(id) => deleteTypeMutation.mutate(id)} />)}</div>
+            <div className="space-y-2">{equipmentTypes.map(t => <LibraryItem key={t.id} item={t} type="equipment" onEdit={handleEditType} onDelete={(id) => deleteTypeMutation.mutate(id)} />)}</div>
           </TabsContent>
-          <TabsContent value="criticality" className="flex-1 m-0 p-4 overflow-auto"><p className="text-xs text-slate-500 mb-3">Drag to assign</p><div className="space-y-2">{criticalityProfiles.map(p => <LibraryItem key={p.id} item={p} type="criticality" onDragStart={handleDragStart} />)}</div></TabsContent>
+          <TabsContent value="criticality" className="flex-1 m-0 p-4 overflow-auto"><p className="text-xs text-slate-500 mb-3">Assign in properties panel</p><div className="space-y-2">{criticalityProfiles.map(p => <LibraryItem key={p.id} item={p} type="criticality" />)}</div></TabsContent>
         </Tabs>
         <div className="p-3 border-t border-slate-200 bg-slate-50"><CriticalityChart nodes={nodes} /></div>
       </div>
