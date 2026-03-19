@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { 
   Search, 
@@ -13,9 +13,22 @@ import {
   Leaf,
   ChevronDown,
   ChevronUp,
-  Info
+  Info,
+  Plus,
+  Edit,
+  Trash2,
+  Droplets,
+  Wind,
+  Box,
+  CircleDot,
+  Gauge,
+  Cpu,
+  Pipette,
+  Flame,
+  ShieldCheck
 } from "lucide-react";
 import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import {
   Select,
   SelectContent,
@@ -29,7 +42,11 @@ import {
   CollapsibleTrigger,
 } from "../components/ui/collapsible";
 import { Badge } from "../components/ui/badge";
-import api from "../lib/api";
+import { Button } from "../components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
+import { toast } from "sonner";
+import api, { equipmentHierarchyAPI } from "../lib/api";
 
 const categoryIcons = {
   Rotating: Cog,
@@ -55,6 +72,23 @@ const categoryColors = {
   Extruder: "bg-indigo-100 text-indigo-700 border-indigo-200",
 };
 
+// Equipment type icons
+const EQUIPMENT_ICONS = { 
+  droplets: Droplets, wind: Wind, cog: Cog, thermometer: Thermometer, 
+  box: Box, "circle-dot": CircleDot, zap: Zap, gauge: Gauge, 
+  cpu: Cpu, pipette: Pipette, flame: Flame 
+};
+const ICON_OPTIONS = ["droplets", "wind", "cog", "thermometer", "box", "circle-dot", "zap", "gauge", "cpu", "pipette", "flame"];
+const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process"];
+
+// Criticality colors
+const CRIT_COLORS = { 
+  safety_critical: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", dot: "bg-red-500" }, 
+  production_critical: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", dot: "bg-orange-500" }, 
+  medium: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", dot: "bg-yellow-500" }, 
+  low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } 
+};
+
 const getRpnColor = (rpn) => {
   if (rpn >= 300) return "bg-red-500";
   if (rpn >= 200) return "bg-orange-500";
@@ -62,10 +96,52 @@ const getRpnColor = (rpn) => {
   return "bg-green-500";
 };
 
+// Equipment Type Library Item
+function EquipmentTypeItem({ item, onEdit, onDelete }) {
+  const Icon = EQUIPMENT_ICONS[item.icon] || Cog;
+  return (
+    <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-all group" data-testid={`equipment-type-${item.id}`}>
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-slate-100">
+        <Icon className="w-5 h-5 text-slate-600" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <span className="text-sm font-medium text-slate-700 block truncate">{item.name}</span>
+        <span className="text-xs text-slate-400 capitalize">{item.discipline}</span>
+      </div>
+      <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+        <button onClick={() => onEdit(item)} className="p-1.5 hover:bg-blue-50 rounded"><Edit className="w-3.5 h-3.5 text-blue-500" /></button>
+        {item.is_custom && <button onClick={() => onDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
+      </div>
+    </div>
+  );
+}
+
+// Criticality Profile Item
+function CriticalityItem({ item }) {
+  const colors = CRIT_COLORS[item.level];
+  return (
+    <div className={`flex items-center gap-3 p-3 rounded-lg border ${colors?.bg} ${colors?.border}`} data-testid={`criticality-${item.id}`}>
+      <div className={`w-3 h-3 rounded-full ${colors?.dot}`} />
+      <span className={`text-sm font-medium ${colors?.text}`}>{item.name}</span>
+      <span className={`text-xs ${colors?.text} opacity-70 ml-auto`}>Score: {item.risk_score}</span>
+    </div>
+  );
+}
+
 const FailureModesPage = () => {
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [expandedId, setExpandedId] = useState(null);
+  const [mainTab, setMainTab] = useState("failure-modes");
+  const [libraryTab, setLibraryTab] = useState("equipment");
+  
+  // Equipment type dialog state
+  const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
+  const [editingType, setEditingType] = useState(null);
+  const [newType, setNewType] = useState({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
+  
+  const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
 
   // Fetch categories
   const { data: categoriesData } = useQuery({
@@ -92,46 +168,116 @@ const FailureModesPage = () => {
     },
   });
 
+  // Fetch equipment types
+  const { data: typesData } = useQuery({ 
+    queryKey: ["equipment-types"], 
+    queryFn: equipmentHierarchyAPI.getEquipmentTypes 
+  });
+  
+  // Fetch criticality profiles
+  const { data: profilesData } = useQuery({ 
+    queryKey: ["criticality-profiles"], 
+    queryFn: equipmentHierarchyAPI.getCriticalityProfiles 
+  });
+
   const categories = categoriesData?.categories || [];
   const failureModes = modesData?.failure_modes || [];
+  const equipmentTypes = typesData?.equipment_types || [];
+  const criticalityProfiles = profilesData?.profiles || [];
   
   // Calculate dynamic stats
   const totalModes = failureModes.length;
   const totalCategories = categories.length;
+  
+  // Equipment type mutations
+  const createTypeMutation = useMutation({ 
+    mutationFn: equipmentHierarchyAPI.createEquipmentType, 
+    onSuccess: () => { 
+      queryClient.invalidateQueries(["equipment-types"]); 
+      toast.success("Equipment type created"); 
+      setIsTypeDialogOpen(false); 
+      resetTypeForm(); 
+    }, 
+    onError: e => toast.error(e.response?.data?.detail || "Failed") 
+  });
+  
+  const updateTypeMutation = useMutation({ 
+    mutationFn: ({ typeId, data }) => equipmentHierarchyAPI.updateEquipmentType(typeId, data), 
+    onSuccess: () => { 
+      queryClient.invalidateQueries(["equipment-types"]); 
+      toast.success("Equipment type updated"); 
+      setIsTypeDialogOpen(false); 
+      setEditingType(null); 
+      resetTypeForm(); 
+    }, 
+    onError: e => toast.error(e.response?.data?.detail || "Failed") 
+  });
+  
+  const deleteTypeMutation = useMutation({ 
+    mutationFn: equipmentHierarchyAPI.deleteEquipmentType, 
+    onSuccess: () => { 
+      queryClient.invalidateQueries(["equipment-types"]); 
+      toast.success("Equipment type deleted"); 
+    }, 
+    onError: e => toast.error(e.response?.data?.detail || "Failed") 
+  });
+
+  const handleEditType = (type) => { 
+    setEditingType(type); 
+    setNewType({ id: type.id, name: type.name, discipline: type.discipline || "mechanical", icon: type.icon || "cog", iso_class: type.iso_class || "" }); 
+    setIsTypeDialogOpen(true); 
+  };
+  
+  const handleSaveType = () => { 
+    if (editingType) { 
+      updateTypeMutation.mutate({ typeId: editingType.id, data: { name: newType.name, discipline: newType.discipline, icon: newType.icon, iso_class: newType.iso_class } }); 
+    } else { 
+      createTypeMutation.mutate(newType); 
+    } 
+  };
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-6xl" data-testid="failure-modes-page">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Failure Mode Library</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-900 mb-2">FMEA Library</h1>
         <p className="text-slate-500">
-          FMEA-based reference library with {totalModes} failure modes across industrial equipment
+          Failure modes, equipment types, and criticality profiles
         </p>
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="card p-4">
-          <div className="text-2xl font-bold text-slate-900">{totalModes}</div>
-          <div className="text-sm text-slate-500">Failure Modes</div>
-        </div>
-        <div className="card p-4">
-          <div className="text-2xl font-bold text-slate-900">{totalCategories}</div>
-          <div className="text-sm text-slate-500">Categories</div>
-        </div>
-        <div className="card p-4">
-          <div className="text-2xl font-bold text-red-600">
-            {failureModes.filter(fm => fm.rpn >= 300).length}
+      {/* Main Tabs */}
+      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="failure-modes">Failure Modes</TabsTrigger>
+          <TabsTrigger value="libraries">Equipment & Criticality</TabsTrigger>
+        </TabsList>
+
+        {/* Failure Modes Tab */}
+        <TabsContent value="failure-modes" className="space-y-6">
+          {/* Stats Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="card p-4">
+              <div className="text-2xl font-bold text-slate-900">{totalModes}</div>
+              <div className="text-sm text-slate-500">Failure Modes</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-2xl font-bold text-slate-900">{totalCategories}</div>
+              <div className="text-sm text-slate-500">Categories</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-2xl font-bold text-red-600">
+                {failureModes.filter(fm => fm.rpn >= 300).length}
+              </div>
+              <div className="text-sm text-slate-500">High Risk (RPN≥300)</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-2xl font-bold text-orange-600">
+                {failureModes.filter(fm => fm.rpn >= 200 && fm.rpn < 300).length}
+              </div>
+              <div className="text-sm text-slate-500">Medium Risk</div>
+            </div>
           </div>
-          <div className="text-sm text-slate-500">High Risk (RPN≥300)</div>
-        </div>
-        <div className="card p-4">
-          <div className="text-2xl font-bold text-orange-600">
-            {failureModes.filter(fm => fm.rpn >= 200 && fm.rpn < 300).length}
-          </div>
-          <div className="text-sm text-slate-500">Medium Risk</div>
-        </div>
-      </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6" data-testid="filters">
@@ -327,6 +473,131 @@ const FailureModesPage = () => {
           })}
         </div>
       )}
+        </TabsContent>
+
+        {/* Equipment & Criticality Libraries Tab */}
+        <TabsContent value="libraries" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Equipment Types */}
+            <div className="card">
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-slate-800">Equipment Types</h3>
+                  <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} types defined</p>
+                </div>
+                <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
+                  <Plus className="w-4 h-4 mr-1" /> Add Type
+                </Button>
+              </div>
+              <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+                {equipmentTypes.map(t => (
+                  <EquipmentTypeItem 
+                    key={t.id} 
+                    item={t} 
+                    onEdit={handleEditType} 
+                    onDelete={(id) => deleteTypeMutation.mutate(id)} 
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Criticality Profiles */}
+            <div className="card">
+              <div className="p-4 border-b border-slate-200">
+                <h3 className="font-semibold text-slate-800">Criticality Profiles</h3>
+                <p className="text-xs text-slate-500 mt-1">Standard risk levels for equipment classification</p>
+              </div>
+              <div className="p-4 space-y-2">
+                {criticalityProfiles.map(p => (
+                  <CriticalityItem key={p.id} item={p} />
+                ))}
+              </div>
+              <div className="p-4 border-t border-slate-200 bg-slate-50">
+                <p className="text-xs text-slate-500">
+                  Assign criticality to equipment nodes in the Equipment Manager properties panel.
+                </p>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Equipment Type Dialog */}
+      <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingType ? "Edit Equipment Type" : "Add Equipment Type"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {!editingType && (
+              <div>
+                <Label>ID (unique)</Label>
+                <Input 
+                  value={newType.id} 
+                  onChange={e => setNewType({ ...newType, id: e.target.value.toLowerCase().replace(/\s+/g, '_') })} 
+                  placeholder="pump_custom" 
+                  data-testid="type-id-input" 
+                />
+              </div>
+            )}
+            <div>
+              <Label>Name</Label>
+              <Input 
+                value={newType.name} 
+                onChange={e => setNewType({ ...newType, name: e.target.value })} 
+                placeholder="Custom Pump" 
+                data-testid="type-name-input" 
+              />
+            </div>
+            <div>
+              <Label>ISO Class (optional)</Label>
+              <Input 
+                value={newType.iso_class} 
+                onChange={e => setNewType({ ...newType, iso_class: e.target.value })} 
+                placeholder="1.1.99" 
+              />
+            </div>
+            <div>
+              <Label>Discipline</Label>
+              <Select value={newType.discipline} onValueChange={v => setNewType({ ...newType, discipline: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DISCIPLINES.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Icon</Label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {ICON_OPTIONS.map(icon => { 
+                  const IconComp = EQUIPMENT_ICONS[icon] || Cog; 
+                  return (
+                    <button 
+                      key={icon} 
+                      onClick={() => setNewType({ ...newType, icon })} 
+                      className={`p-2 rounded-lg border ${newType.icon === icon ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}
+                    >
+                      <IconComp className="w-5 h-5" />
+                    </button>
+                  ); 
+                })}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsTypeDialogOpen(false); setEditingType(null); resetTypeForm(); }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveType} 
+              disabled={(!editingType && !newType.id.trim()) || !newType.name.trim()} 
+              data-testid="save-type-btn"
+            >
+              {editingType ? "Save" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

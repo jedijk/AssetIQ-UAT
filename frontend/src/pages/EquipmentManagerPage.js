@@ -245,42 +245,6 @@ function UnstructuredItem({ item, onDragStart, onDelete }) {
   );
 }
 
-function LibraryItem({ item, type, onEdit, onDelete }) {
-  const Icon = type === "equipment" ? (EQUIPMENT_ICONS[item.icon] || Cog) : ShieldCheck;
-  const colors = type === "criticality" ? CRIT_COLORS[item.level] : null;
-  return (
-    <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-all group" data-testid={`library-item-${item.id}`}>
-      <div className={`w-7 h-7 rounded-md flex items-center justify-center ${colors?.bg || "bg-slate-100"}`}><Icon className={`w-4 h-4 ${colors?.text || "text-slate-600"}`} /></div>
-      <span className="flex-1 text-sm font-medium text-slate-700 truncate">{item.name}</span>
-      {type === "equipment" && onEdit && (
-        <div className="opacity-0 group-hover:opacity-100 flex gap-1">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="p-1 hover:bg-blue-50 rounded"><Edit className="w-3 h-3 text-blue-400" /></button>
-          {item.is_custom && <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="p-1 hover:bg-red-50 rounded"><Trash2 className="w-3 h-3 text-red-400" /></button>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CriticalityChart({ nodes }) {
-  const data = useMemo(() => {
-    const result = { safety_critical: 0, production_critical: 0, medium: 0, low: 0 };
-    nodes.forEach(n => { if (n.criticality?.level) result[n.criticality.level]++; });
-    return result;
-  }, [nodes]);
-  return (
-    <div className="p-3 bg-white rounded-xl border border-slate-200">
-      <h3 className="text-xs font-semibold text-slate-700 mb-2">Criticality</h3>
-      <div className="grid grid-cols-2 gap-2">
-        {Object.entries(data).map(([level, count]) => {
-          const colors = CRIT_COLORS[level];
-          return (<div key={level} className={`p-2 rounded-lg ${colors?.bg} ${colors?.border} border`}><div className="flex items-center gap-1"><div className={`w-2 h-2 rounded-full ${colors?.dot}`} /><span className={`text-xs ${colors?.text} capitalize`}>{level.replace("_", " ")}</span></div><span className={`text-lg font-bold ${colors?.text}`}>{count}</span></div>);
-        })}
-      </div>
-    </div>
-  );
-}
-
 function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, disciplines, onUpdate, onAssignCriticality, onAssignDiscipline, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -455,14 +419,10 @@ export default function EquipmentManagerPage() {
   }, [expandedIds]);
   
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("equipment");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newNode, setNewNode] = useState({ name: "", level: "installation", parent_id: null });
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
-  const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
-  const [editingType, setEditingType] = useState(null);
-  const [newType, setNewType] = useState({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
   // State for assigning unstructured items with level selection
   const [assignDialog, setAssignDialog] = useState({ open: false, item: null, parentNode: null, selectedLevel: "" });
   // State for move mode (legacy - kept for compatibility but not actively used with drag-drop)
@@ -568,11 +528,6 @@ export default function EquipmentManagerPage() {
       return nodeLevel === parentLevel && n.id !== demoteDialog.node?.id;
     });
   };
-  
-  // Equipment type mutations
-  const createTypeMutation = useMutation({ mutationFn: equipmentHierarchyAPI.createEquipmentType, onSuccess: () => { queryClient.invalidateQueries(["equipment-types"]); toast.success("Equipment type created"); setIsTypeDialogOpen(false); resetTypeForm(); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
-  const updateTypeMutation = useMutation({ mutationFn: ({ typeId, data }) => equipmentHierarchyAPI.updateEquipmentType(typeId, data), onSuccess: () => { queryClient.invalidateQueries(["equipment-types"]); toast.success("Equipment type updated"); setIsTypeDialogOpen(false); setEditingType(null); resetTypeForm(); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
-  const deleteTypeMutation = useMutation({ mutationFn: equipmentHierarchyAPI.deleteEquipmentType, onSuccess: () => { queryClient.invalidateQueries(["equipment-types"]); toast.success("Equipment type deleted"); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
 
   // Reorder mutation
   const reorderMutation = useMutation({
@@ -655,8 +610,6 @@ export default function EquipmentManagerPage() {
     };
   };
 
-  const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
-
   const handleExpand = useCallback(id => setExpandedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }), []);
 
   const handleUnstructuredDragStart = (e, item) => { e.dataTransfer.setData("application/json", JSON.stringify({ item, type: "unstructured" })); e.dataTransfer.effectAllowed = "move"; };
@@ -691,9 +644,6 @@ export default function EquipmentManagerPage() {
   const handleFileUpload = (e) => { const file = e.target.files?.[0]; if (file) { parseFileMutation.mutate(file); e.target.value = ""; } };
   const getNextLevel = level => { const normalizedLevel = normalizeLevel(level); const idx = LEVEL_ORDER.indexOf(normalizedLevel); return idx >= 0 && idx < LEVEL_ORDER.length - 1 ? LEVEL_ORDER[idx + 1] : null; };
   const handleAddChild = () => { if (selectedNode) { const next = getNextLevel(selectedNode.level); if (next) { setNewNode({ name: "", level: next, parent_id: selectedNode.id }); setIsCreateOpen(true); } else toast.error("Cannot add children to maintainable items"); } };
-  
-  const handleEditType = (type) => { setEditingType(type); setNewType({ id: type.id, name: type.name, discipline: type.discipline || "mechanical", icon: type.icon || "cog", iso_class: type.iso_class || "" }); setIsTypeDialogOpen(true); };
-  const handleSaveType = () => { if (editingType) { updateTypeMutation.mutate({ typeId: editingType.id, data: { name: newType.name, discipline: newType.discipline, icon: newType.icon, iso_class: newType.iso_class } }); } else { createTypeMutation.mutate(newType); } };
 
   if (isLoading) return <div className="flex items-center justify-center h-[calc(100vh-64px)]"><div className="loading-dots"><span></span><span></span><span></span></div></div>;
 
@@ -701,23 +651,7 @@ export default function EquipmentManagerPage() {
 
   return (
     <div className="flex h-[calc(100vh-64px)] bg-slate-50" data-testid="equipment-manager-page">
-      {/* Left Panel - Libraries */}
-      <div className="w-72 flex-shrink-0 border-r border-slate-200 bg-white flex flex-col">
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">Libraries</h2>
-          <Button size="sm" variant="ghost" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn"><Plus className="w-4 h-4" /></Button>
-        </div>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <TabsList className="mx-4 mt-2 grid w-auto grid-cols-2"><TabsTrigger value="equipment" className="text-xs">Equipment</TabsTrigger><TabsTrigger value="criticality" className="text-xs">Criticality</TabsTrigger></TabsList>
-          <TabsContent value="equipment" className="flex-1 m-0 p-4 overflow-auto">
-            <div className="space-y-2">{equipmentTypes.map(t => <LibraryItem key={t.id} item={t} type="equipment" onEdit={handleEditType} onDelete={(id) => deleteTypeMutation.mutate(id)} />)}</div>
-          </TabsContent>
-          <TabsContent value="criticality" className="flex-1 m-0 p-4 overflow-auto"><p className="text-xs text-slate-500 mb-3">Assign in properties panel</p><div className="space-y-2">{criticalityProfiles.map(p => <LibraryItem key={p.id} item={p} type="criticality" />)}</div></TabsContent>
-        </Tabs>
-        <div className="p-3 border-t border-slate-200 bg-slate-50"><CriticalityChart nodes={nodes} /></div>
-      </div>
-
-      {/* Center Panel - Hierarchy */}
+      {/* Main Panel - Hierarchy */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="p-4 border-b border-slate-200 bg-white flex items-center gap-3">
           <div className="relative flex-1 max-w-xs"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 h-9" data-testid="hierarchy-search-input" /></div>
@@ -840,21 +774,6 @@ export default function EquipmentManagerPage() {
             </div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setIsImportOpen(false)}>Cancel</Button><Button onClick={() => parseListMutation.mutate({ content: importText, source: "paste" })} disabled={!importText.trim() || parseListMutation.isPending} data-testid="parse-list-btn">{parseListMutation.isPending ? "Parsing..." : "Parse List"}</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Equipment Type Dialog */}
-      <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editingType ? "Edit Equipment Type" : "Add Equipment Type"}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            {!editingType && <div><Label>ID (unique)</Label><Input value={newType.id} onChange={e => setNewType({ ...newType, id: e.target.value.toLowerCase().replace(/\s+/g, '_') })} placeholder="pump_custom" data-testid="type-id-input" /></div>}
-            <div><Label>Name</Label><Input value={newType.name} onChange={e => setNewType({ ...newType, name: e.target.value })} placeholder="Custom Pump" data-testid="type-name-input" /></div>
-            <div><Label>ISO Class (optional)</Label><Input value={newType.iso_class} onChange={e => setNewType({ ...newType, iso_class: e.target.value })} placeholder="1.1.99" /></div>
-            <div><Label>Discipline</Label><Select value={newType.discipline} onValueChange={v => setNewType({ ...newType, discipline: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{DISCIPLINES.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}</SelectContent></Select></div>
-            <div><Label>Icon</Label><div className="flex flex-wrap gap-2 mt-1">{ICON_OPTIONS.map(icon => { const Icon = EQUIPMENT_ICONS[icon] || Cog; return (<button key={icon} onClick={() => setNewType({ ...newType, icon })} className={`p-2 rounded-lg border ${newType.icon === icon ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}><Icon className="w-5 h-5" /></button>); })}</div></div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => { setIsTypeDialogOpen(false); setEditingType(null); resetTypeForm(); }}>Cancel</Button><Button onClick={handleSaveType} disabled={(!editingType && !newType.id.trim()) || !newType.name.trim()} data-testid="save-type-btn">{editingType ? "Save" : "Create"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
