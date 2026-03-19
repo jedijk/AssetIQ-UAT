@@ -197,6 +197,12 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
   - Keywords and Recommended Actions editable with add/remove
   - Live RPN calculation in dialog
   - Built-in modes can be edited but not deleted
+- [x] **Custom FMEA Data Integration** (Mar 19, 2026):
+  - Integrated failure modes from user-provided FMEA 2022-2023.xlsx (rubber recycling plant)
+  - Library expanded from original ~100 modes to **200 failure modes**
+  - **8 new categories added**: Extruder (38 modes), Material Handling (10), Quality Control (12), Dosing (6), Ventilation (6), Cutting (5), Packaging (11), Cooling (6)
+  - New modes include: Screw Wear, Material Out of Spec, Metal Detector issues, Hopper Bridging, Knife Wear, CO2 dosing, etc.
+  - All data searchable and properly categorized with RPN values
 
 ### Future Tasks (Backlog)
 - [ ] P2: Voice input for chat interface
@@ -207,3 +213,5 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - [ ] P3: Equipment template library
 - [ ] P3: Data migration utility (convert legacy levels to ISO 14224)
 - [ ] P3: Automated causal hypothesis generation for Causal Engine
+- [ ] P3: Migrate FMEA library from Python file to MongoDB for better scalability
+- [ ] P3: Break down FailureModesPage.js into smaller components

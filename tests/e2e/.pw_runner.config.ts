@@ -11,7 +11,7 @@ export default defineConfig({
     ['json', { outputFile: '/root/.emergent/automation_output/20260319_094442/results.json' }],
   ],
   use: {
-    baseURL: 'https://equipment-dnd.preview.emergentagent.com',
+    baseURL: 'https://failure-modes-test.preview.emergentagent.com',
     screenshot: 'only-on-failure',
     trace: 'off',
     headless: true,
