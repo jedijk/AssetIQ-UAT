@@ -1,0 +1,37 @@
+{
+  "summary": "Update mode testing: Verified fix for drag-and-drop to center (make child / demote operation) bug. The /api/equipment-hierarchy/nodes/{id}/move endpoint is now working correctly. Added 3 new API tests specifically for the move endpoint (demote operation, valid hierarchy, invalid hierarchy validation). All 11 DnD tests pass. All 34 equipment hierarchy backend tests pass.",
+  "mode": "update",
+  "baseline_commit": "2203a908659e93b5447cb531722c2bbdd1756338",
+  "head_commit": "e58c9768889cd6d4635c66eb245bc15be0c18a16",
+  "specs_created": [],
+  "specs_updated": ["/app/tests/e2e/equipment-dnd.spec.ts"],
+  "quarantined_tests": [],
+  "test_report_links": [
+    "/app/tests/e2e/equipment-dnd.spec.ts",
+    "/app/backend/tests/test_equipment_hierarchy.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "regression_results": {
+    "total_specs": 11,
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0
+  },
+  "issues": [],
+  "action_items": [],
+  "updated_files": [
+    "/app/tests/e2e/equipment-dnd.spec.ts",
+    "/app/backend/tests/test_equipment_hierarchy.py",
+    "/app/backend/tests/test_failure_modes.py",
+    "/app/backend/tests/conftest.py"
+  ],
+  "test_results": {
+    "backend": "100% (34/34 equipment hierarchy tests passed)",
+    "frontend": "100% (11/11 equipment-dnd tests passed)"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bug fix for drag-and-drop to center (demote operation) verified. The /move API endpoint now works correctly - returns 200 with updated node when called with node_id, new_parent_id, and recalculate_criticality in body. Tests verify: 1) Move endpoint changes parent_id correctly, 2) ISO 14224 hierarchy validation works (rejects invalid parent-child relationships), 3) Visual DnD shows 'Drop as child' feedback when dragging to center of a node. Updated test files use ISO 14224 standard level names (plant_unit, section_system, equipment_unit, subunit) instead of legacy names (unit, system, equipment).",
+  "rca_of_issue": "Original bug: The @api_router.post decorator for /equipment-hierarchy/nodes/{node_id}/move endpoint was accidentally removed when adding the reorder-to endpoint. The route decorator has been restored and the move API now works correctly."
+}

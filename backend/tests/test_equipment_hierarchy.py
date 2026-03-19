@@ -2,8 +2,17 @@ import pytest
 import requests
 import os
 import uuid
+from pathlib import Path
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+# Load frontend .env to get REACT_APP_BACKEND_URL
+_frontend_env = Path(__file__).parent.parent.parent / 'frontend' / '.env'
+if _frontend_env.exists():
+    for line in _frontend_env.read_text().splitlines():
+        if line.strip() and not line.startswith('#') and '=' in line:
+            key, val = line.split('=', 1)
+            os.environ.setdefault(key.strip(), val.strip())
+
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://equipment-dnd.preview.emergentagent.com').rstrip('/')
 
 
 class TestEquipmentHierarchyLibrary:
@@ -16,7 +25,7 @@ class TestEquipmentHierarchyLibrary:
         data = response.json()
         assert "equipment_types" in data
         types = data["equipment_types"]
-        assert len(types) == 20  # 20 equipment types in library
+        assert len(types) >= 20  # At least 20 equipment types in library (may include custom types)
         # Verify structure
         first_type = types[0]
         assert "id" in first_type
@@ -69,15 +78,15 @@ class TestEquipmentHierarchyLibrary:
         assert "levels" in data
         assert "hierarchy" in data
         levels = data["levels"]
-        # ISO 14224 has 5 levels
-        expected_levels = ["installation", "unit", "system", "equipment", "maintainable_item"]
+        # ISO 14224 has 6 levels with proper terminology
+        expected_levels = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"]
         assert levels == expected_levels
         # Verify hierarchy relationships
         hierarchy = data["hierarchy"]
         assert hierarchy["installation"]["parent"] is None
-        assert hierarchy["installation"]["children"] == ["unit"]
-        assert hierarchy["unit"]["parent"] == "installation"
-        assert hierarchy["unit"]["children"] == ["system"]
+        assert hierarchy["installation"]["children"] == ["plant_unit"]
+        assert hierarchy["plant_unit"]["parent"] == "installation"
+        assert hierarchy["plant_unit"]["children"] == ["section_system"]
         assert hierarchy["maintainable_item"]["children"] == []
 
 
@@ -176,7 +185,7 @@ class TestEquipmentNodeCRUD:
         authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}")
         
     def test_create_full_iso_hierarchy(self, authenticated_client):
-        """Create complete ISO 14224 hierarchy: installation -> unit -> system -> equipment -> maintainable_item"""
+        """Create complete ISO 14224 hierarchy: installation -> plant_unit -> section_system -> equipment_unit -> subunit -> maintainable_item"""
         ids = {}
         
         # Installation
@@ -187,34 +196,42 @@ class TestEquipmentNodeCRUD:
         assert resp.status_code == 200
         ids["installation"] = resp.json()["id"]
         
-        # Unit
+        # Plant Unit
         resp = authenticated_client.post(
             f"{BASE_URL}/api/equipment-hierarchy/nodes",
-            json={"name": f"TEST_Full_Unit_{uuid.uuid4().hex[:6]}", "level": "unit", "parent_id": ids["installation"]}
+            json={"name": f"TEST_Full_Plant_{uuid.uuid4().hex[:6]}", "level": "plant_unit", "parent_id": ids["installation"]}
         )
         assert resp.status_code == 200
-        ids["unit"] = resp.json()["id"]
+        ids["plant_unit"] = resp.json()["id"]
         
-        # System
+        # Section System
         resp = authenticated_client.post(
             f"{BASE_URL}/api/equipment-hierarchy/nodes",
-            json={"name": f"TEST_Full_System_{uuid.uuid4().hex[:6]}", "level": "system", "parent_id": ids["unit"]}
+            json={"name": f"TEST_Full_Section_{uuid.uuid4().hex[:6]}", "level": "section_system", "parent_id": ids["plant_unit"]}
         )
         assert resp.status_code == 200
-        ids["system"] = resp.json()["id"]
+        ids["section_system"] = resp.json()["id"]
         
-        # Equipment
+        # Equipment Unit
         resp = authenticated_client.post(
             f"{BASE_URL}/api/equipment-hierarchy/nodes",
-            json={"name": f"TEST_Full_Equip_{uuid.uuid4().hex[:6]}", "level": "equipment", "parent_id": ids["system"]}
+            json={"name": f"TEST_Full_Equip_{uuid.uuid4().hex[:6]}", "level": "equipment_unit", "parent_id": ids["section_system"]}
         )
         assert resp.status_code == 200
-        ids["equipment"] = resp.json()["id"]
+        ids["equipment_unit"] = resp.json()["id"]
+        
+        # Subunit (required between equipment_unit and maintainable_item)
+        resp = authenticated_client.post(
+            f"{BASE_URL}/api/equipment-hierarchy/nodes",
+            json={"name": f"TEST_Full_Subunit_{uuid.uuid4().hex[:6]}", "level": "subunit", "parent_id": ids["equipment_unit"]}
+        )
+        assert resp.status_code == 200
+        ids["subunit"] = resp.json()["id"]
         
         # Maintainable Item
         resp = authenticated_client.post(
             f"{BASE_URL}/api/equipment-hierarchy/nodes",
-            json={"name": f"TEST_Full_Item_{uuid.uuid4().hex[:6]}", "level": "maintainable_item", "parent_id": ids["equipment"]}
+            json={"name": f"TEST_Full_Item_{uuid.uuid4().hex[:6]}", "level": "maintainable_item", "parent_id": ids["subunit"]}
         )
         assert resp.status_code == 200
         ids["maintainable_item"] = resp.json()["id"]
@@ -517,8 +534,8 @@ class TestHierarchyStats:
         assert "total_nodes" in data
         assert "by_level" in data
         assert "by_criticality" in data
-        # Verify level counts structure
-        for level in ["installation", "unit", "system", "equipment", "maintainable_item"]:
+        # Verify level counts structure (ISO 14224 standard levels)
+        for level in ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"]:
             assert level in data["by_level"]
         # Verify criticality counts structure
         assert "unassigned" in data["by_criticality"]

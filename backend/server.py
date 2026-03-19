@@ -1415,7 +1415,7 @@ async def reorder_node_to_position(
     }
 
 
-
+@api_router.post("/equipment-hierarchy/nodes/{node_id}/move")
 async def move_equipment_node(
     node_id: str,
     move_request: MoveNodeRequest,

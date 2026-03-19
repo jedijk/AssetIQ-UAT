@@ -1,8 +1,17 @@
 import pytest
 import requests
 import os
+from pathlib import Path
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+# Load frontend .env to get REACT_APP_BACKEND_URL
+_frontend_env = Path(__file__).parent.parent.parent / 'frontend' / '.env'
+if _frontend_env.exists():
+    for line in _frontend_env.read_text().splitlines():
+        if line.strip() and not line.startswith('#') and '=' in line:
+            key, val = line.split('=', 1)
+            os.environ.setdefault(key.strip(), val.strip())
+
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://equipment-dnd.preview.emergentagent.com').rstrip('/')
 
 @pytest.fixture
 def api_client():

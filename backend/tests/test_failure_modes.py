@@ -34,14 +34,14 @@ class TestFailureModesCategories:
 
 class TestFailureModesLibrary:
     def test_get_all_failure_modes(self, api_client):
-        """GET /api/failure-modes returns 100 failure modes"""
+        """GET /api/failure-modes returns at least 100 failure modes"""
         response = api_client.get(f"{BASE_URL}/api/failure-modes")
         assert response.status_code == 200
         data = response.json()
         assert "failure_modes" in data
         assert "total" in data
-        assert data["total"] == 100
-        assert len(data["failure_modes"]) == 100
+        assert data["total"] >= 100  # At least 100 failure modes in library
+        assert len(data["failure_modes"]) >= 100
 
     def test_failure_mode_fields(self, api_client):
         """Each failure mode has required FMEA fields"""

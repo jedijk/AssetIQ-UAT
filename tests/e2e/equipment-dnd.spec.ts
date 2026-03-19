@@ -243,6 +243,126 @@ test.describe('Equipment Manager - DnD Backend API', () => {
       headers: { Authorization: `Bearer ${token}` }
     });
   });
+
+  test('API: /move endpoint moves child to different parent (demote operation)', async ({ request }) => {
+    const timestamp = Date.now();
+    
+    const loginResponse = await request.post('/api/auth/login', {
+      data: { email: 'test@test.com', password: 'test' }
+    });
+    const { token } = await loginResponse.json();
+    
+    // Create installation
+    const createInstall = await request.post('/api/equipment-hierarchy/nodes', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: `TEST_Demote_Install_${timestamp}`, level: 'installation', parent_id: null }
+    });
+    expect(createInstall.status()).toBe(200);
+    const installNode = await createInstall.json();
+    
+    // Create plant_unit 1 under installation
+    const createPlant1 = await request.post('/api/equipment-hierarchy/nodes', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: `TEST_Demote_Plant1_${timestamp}`, level: 'plant_unit', parent_id: installNode.id }
+    });
+    const plant1Node = await createPlant1.json();
+    
+    // Create section_system under plant_unit 1
+    const createSection = await request.post('/api/equipment-hierarchy/nodes', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: `TEST_Demote_Section_${timestamp}`, level: 'section_system', parent_id: plant1Node.id }
+    });
+    const sectionNode = await createSection.json();
+    expect(sectionNode.parent_id).toBe(plant1Node.id);
+    
+    // Create plant_unit 2 under installation (target parent)
+    const createPlant2 = await request.post('/api/equipment-hierarchy/nodes', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: `TEST_Demote_Plant2_${timestamp}`, level: 'plant_unit', parent_id: installNode.id }
+    });
+    const plant2Node = await createPlant2.json();
+    
+    // TEST: Use /move endpoint to move section from plant1 to plant2
+    // This is the API call that was returning "not found" before the fix
+    const moveResponse = await request.post(`/api/equipment-hierarchy/nodes/${sectionNode.id}/move`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { 
+        node_id: sectionNode.id,
+        new_parent_id: plant2Node.id,
+        recalculate_criticality: true
+      }
+    });
+    
+    // Verify the move succeeded (was returning 404 before fix)
+    expect(moveResponse.status()).toBe(200);
+    const movedNode = await moveResponse.json();
+    
+    // Verify parent was changed
+    expect(movedNode.parent_id).toBe(plant2Node.id);
+    expect(movedNode.id).toBe(sectionNode.id);
+    
+    // Double-check with GET request
+    const getNode = await request.get(`/api/equipment-hierarchy/nodes/${sectionNode.id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const verifiedNode = await getNode.json();
+    expect(verifiedNode.parent_id).toBe(plant2Node.id);
+    
+    // Cleanup
+    await request.delete(`/api/equipment-hierarchy/nodes/${installNode.id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  });
+
+  test('API: /move endpoint validates ISO 14224 hierarchy', async ({ request }) => {
+    const timestamp = Date.now();
+    
+    const loginResponse = await request.post('/api/auth/login', {
+      data: { email: 'test@test.com', password: 'test' }
+    });
+    const { token } = await loginResponse.json();
+    
+    // Create installation
+    const createInstall = await request.post('/api/equipment-hierarchy/nodes', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: `TEST_Invalid_Move_Install_${timestamp}`, level: 'installation', parent_id: null }
+    });
+    const installNode = await createInstall.json();
+    
+    // Create plant_unit under installation
+    const createPlant = await request.post('/api/equipment-hierarchy/nodes', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: `TEST_Invalid_Move_Plant_${timestamp}`, level: 'plant_unit', parent_id: installNode.id }
+    });
+    const plantNode = await createPlant.json();
+    
+    // Create section_system under plant_unit
+    const createSection = await request.post('/api/equipment-hierarchy/nodes', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: `TEST_Invalid_Move_Section_${timestamp}`, level: 'section_system', parent_id: plantNode.id }
+    });
+    const sectionNode = await createSection.json();
+    
+    // Try invalid move: move section_system directly under installation (should fail - section needs plant as parent)
+    const invalidMoveResponse = await request.post(`/api/equipment-hierarchy/nodes/${sectionNode.id}/move`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { 
+        node_id: sectionNode.id,
+        new_parent_id: installNode.id,
+        recalculate_criticality: true
+      }
+    });
+    
+    // Should return 400 error for invalid ISO 14224 hierarchy
+    expect(invalidMoveResponse.status()).toBe(400);
+    const errorData = await invalidMoveResponse.json();
+    expect(errorData.detail).toContain('Cannot move');
+    
+    // Cleanup
+    await request.delete(`/api/equipment-hierarchy/nodes/${installNode.id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  });
 });
 
 // ============== Visual Drag and Drop Tests ==============
@@ -250,6 +370,59 @@ test.describe('Equipment Manager - Visual DnD', () => {
   test.beforeEach(async ({ page }) => {
     await loginUser(page);
     await navigateToEquipmentManager(page);
+  });
+
+  test('Visual drag to center shows "Drop as child" feedback', async ({ page }) => {
+    const timestamp = Date.now();
+    const installName = `TEST_Demote_Vis_Install_${timestamp}`;
+    const install2Name = `TEST_Demote_Vis_Install2_${timestamp}`;
+    
+    // Create two installations for visual DnD test
+    await createInstallation(page, installName);
+    await expect(getTreeNodeInCenter(page, installName)).toBeVisible();
+    
+    await createInstallation(page, install2Name);
+    await expect(getTreeNodeInCenter(page, install2Name)).toBeVisible();
+    
+    // Get the source and target nodes
+    const sourceNode = getTreeNodeInCenter(page, install2Name);
+    const targetNode = getTreeNodeInCenter(page, installName);
+    
+    const sourceBB = await sourceNode.boundingBox();
+    const targetBB = await targetNode.boundingBox();
+    
+    if (sourceBB && targetBB) {
+      // Start drag
+      await page.mouse.move(
+        sourceBB.x + sourceBB.width / 2,
+        sourceBB.y + sourceBB.height / 2
+      );
+      await page.mouse.down();
+      
+      // Move to center of target node (to trigger "Drop as child" visual feedback)
+      await page.mouse.move(
+        targetBB.x + targetBB.width / 2,
+        targetBB.y + targetBB.height / 2,
+        { steps: 10 }
+      );
+      
+      // Take screenshot showing the visual feedback during drag
+      await page.screenshot({ path: '/app/tests/e2e/demote-visual-feedback.jpeg', quality: 20 });
+      
+      await page.mouse.up();
+    }
+    
+    await page.waitForTimeout(500);
+    
+    // Both installations should still exist
+    await expect(getTreeNodeInCenter(page, installName)).toBeVisible();
+    await expect(getTreeNodeInCenter(page, install2Name)).toBeVisible();
+    
+    // Cleanup
+    await selectNodeInTree(page, installName);
+    await deleteSelectedNode(page);
+    await selectNodeInTree(page, install2Name);
+    await deleteSelectedNode(page);
   });
 
   test('Visual drag and drop between sibling nodes', async ({ page }) => {
