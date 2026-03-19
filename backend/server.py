@@ -111,7 +111,18 @@ class ThreatResponse(BaseModel):
     location: Optional[str] = None
 
 class ThreatUpdate(BaseModel):
+    title: Optional[str] = None
+    asset: Optional[str] = None
+    equipment_type: Optional[str] = None
+    failure_mode: Optional[str] = None
+    cause: Optional[str] = None
+    impact: Optional[str] = None
+    frequency: Optional[str] = None
+    likelihood: Optional[str] = None
+    detectability: Optional[str] = None
+    location: Optional[str] = None
     status: Optional[str] = None
+    recommended_actions: Optional[List[str]] = None
 
 class ChatResponse(BaseModel):
     message: str
@@ -702,7 +713,37 @@ async def update_threat(
         raise HTTPException(status_code=404, detail="Threat not found")
     
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    
+    # Recalculate risk if relevant fields changed
+    risk_fields = ["likelihood", "detectability", "impact", "frequency"]
+    if any(f in update_data for f in risk_fields):
+        # Get current values and override with updates
+        likelihood = update_data.get("likelihood", threat.get("likelihood", "Possible"))
+        detectability = update_data.get("detectability", threat.get("detectability", "Moderate"))
+        
+        # Calculate new risk score
+        likelihood_scores = {"Rare": 1, "Unlikely": 2, "Possible": 3, "Likely": 4, "Almost Certain": 5}
+        detectability_scores = {"Easy": 1, "Moderate": 2, "Difficult": 3, "Very Difficult": 4, "Almost Impossible": 5}
+        
+        l_score = likelihood_scores.get(likelihood, 3)
+        d_score = detectability_scores.get(detectability, 2)
+        risk_score = l_score * d_score * 10  # Scale to 10-250
+        
+        # Determine risk level
+        if risk_score >= 150:
+            risk_level = "Critical"
+        elif risk_score >= 100:
+            risk_level = "High"
+        elif risk_score >= 50:
+            risk_level = "Medium"
+        else:
+            risk_level = "Low"
+        
+        update_data["risk_score"] = risk_score
+        update_data["risk_level"] = risk_level
+    
     if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         await db.threats.update_one({"id": threat_id}, {"$set": update_data})
         
         # Recalculate ranks if status changed
