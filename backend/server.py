@@ -824,6 +824,159 @@ async def get_failure_mode_by_id(mode_id: int):
             return fm
     raise HTTPException(status_code=404, detail="Failure mode not found")
 
+
+# Failure Mode CRUD Models
+class FailureModeCreate(BaseModel):
+    category: str
+    equipment: str
+    failure_mode: str
+    keywords: List[str] = []
+    severity: int = Field(ge=1, le=10)
+    occurrence: int = Field(ge=1, le=10)
+    detectability: int = Field(ge=1, le=10)
+    recommended_actions: List[str] = []
+    equipment_type_id: Optional[str] = None  # Link to equipment type
+
+
+class FailureModeUpdate(BaseModel):
+    category: Optional[str] = None
+    equipment: Optional[str] = None
+    failure_mode: Optional[str] = None
+    keywords: Optional[List[str]] = None
+    severity: Optional[int] = Field(None, ge=1, le=10)
+    occurrence: Optional[int] = Field(None, ge=1, le=10)
+    detectability: Optional[int] = Field(None, ge=1, le=10)
+    recommended_actions: Optional[List[str]] = None
+    equipment_type_id: Optional[str] = None
+
+
+def auto_link_equipment_type(equipment_name: str) -> Optional[str]:
+    """Auto-detect equipment type based on equipment name."""
+    equipment_lower = equipment_name.lower()
+    
+    # Map common equipment names to equipment type IDs
+    equipment_mapping = {
+        "pump": "centrifugal_pump",
+        "compressor": "centrifugal_compressor", 
+        "turbine": "gas_turbine",
+        "motor": "electric_motor",
+        "vessel": "pressure_vessel",
+        "heat exchanger": "shell_tube_heat_exchanger",
+        "exchanger": "shell_tube_heat_exchanger",
+        "pipe": "piping",
+        "valve": "valve",
+        "control valve": "control_valve",
+        "sensor": "sensor",
+        "transmitter": "transmitter",
+        "generator": "generator",
+        "transformer": "transformer",
+        "filter": "filter",
+        "tank": "storage_tank",
+        "boiler": "boiler",
+        "furnace": "fired_heater",
+        "heater": "fired_heater",
+        "cooler": "air_cooler",
+        "fan": "fan",
+        "blower": "fan",
+    }
+    
+    for keyword, type_id in equipment_mapping.items():
+        if keyword in equipment_lower:
+            return type_id
+    return None
+
+
+@api_router.post("/failure-modes")
+async def create_failure_mode(
+    data: FailureModeCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new failure mode."""
+    # Generate new ID
+    max_id = max((fm["id"] for fm in FAILURE_MODES_LIBRARY), default=0)
+    new_id = max_id + 1
+    
+    # Auto-link equipment type if not provided
+    equipment_type_id = data.equipment_type_id or auto_link_equipment_type(data.equipment)
+    
+    new_fm = {
+        "id": new_id,
+        "category": data.category,
+        "equipment": data.equipment,
+        "failure_mode": data.failure_mode,
+        "keywords": data.keywords,
+        "severity": data.severity,
+        "occurrence": data.occurrence,
+        "detectability": data.detectability,
+        "rpn": data.severity * data.occurrence * data.detectability,
+        "recommended_actions": data.recommended_actions,
+        "equipment_type_id": equipment_type_id,
+        "is_custom": True,
+        "created_by": current_user["id"]
+    }
+    
+    FAILURE_MODES_LIBRARY.append(new_fm)
+    return new_fm
+
+
+@api_router.patch("/failure-modes/{mode_id}")
+async def update_failure_mode(
+    mode_id: int,
+    data: FailureModeUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a failure mode."""
+    for i, fm in enumerate(FAILURE_MODES_LIBRARY):
+        if fm["id"] == mode_id:
+            # Update fields
+            if data.category is not None:
+                fm["category"] = data.category
+            if data.equipment is not None:
+                fm["equipment"] = data.equipment
+                # Auto-link if equipment changed and no explicit type provided
+                if data.equipment_type_id is None:
+                    auto_type = auto_link_equipment_type(data.equipment)
+                    if auto_type:
+                        fm["equipment_type_id"] = auto_type
+            if data.failure_mode is not None:
+                fm["failure_mode"] = data.failure_mode
+            if data.keywords is not None:
+                fm["keywords"] = data.keywords
+            if data.severity is not None:
+                fm["severity"] = data.severity
+            if data.occurrence is not None:
+                fm["occurrence"] = data.occurrence
+            if data.detectability is not None:
+                fm["detectability"] = data.detectability
+            if data.recommended_actions is not None:
+                fm["recommended_actions"] = data.recommended_actions
+            if data.equipment_type_id is not None:
+                fm["equipment_type_id"] = data.equipment_type_id
+            
+            # Recalculate RPN
+            fm["rpn"] = fm["severity"] * fm["occurrence"] * fm["detectability"]
+            
+            return fm
+    
+    raise HTTPException(status_code=404, detail="Failure mode not found")
+
+
+@api_router.delete("/failure-modes/{mode_id}")
+async def delete_failure_mode(
+    mode_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a custom failure mode."""
+    for i, fm in enumerate(FAILURE_MODES_LIBRARY):
+        if fm["id"] == mode_id:
+            if not fm.get("is_custom"):
+                raise HTTPException(status_code=400, detail="Cannot delete built-in failure modes")
+            FAILURE_MODES_LIBRARY.pop(i)
+            return {"message": "Failure mode deleted"}
+    
+    raise HTTPException(status_code=404, detail="Failure mode not found")
+
+
 # ============= ISO 14224 EQUIPMENT HIERARCHY ENDPOINTS =============
 
 @api_router.get("/equipment-hierarchy/types")

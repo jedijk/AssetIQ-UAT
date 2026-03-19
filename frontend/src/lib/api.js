@@ -79,6 +79,42 @@ export const statsAPI = {
   },
 };
 
+// Failure Modes API
+export const failureModesAPI = {
+  getAll: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.search) searchParams.append("search", params.search);
+    if (params.category && params.category !== "all") searchParams.append("category", params.category);
+    const response = await api.get(`/failure-modes?${searchParams.toString()}`);
+    return response.data;
+  },
+  
+  getById: async (id) => {
+    const response = await api.get(`/failure-modes/${id}`);
+    return response.data;
+  },
+  
+  getCategories: async () => {
+    const response = await api.get("/failure-modes/categories");
+    return response.data;
+  },
+  
+  create: async (data) => {
+    const response = await api.post("/failure-modes", data);
+    return response.data;
+  },
+  
+  update: async (id, data) => {
+    const response = await api.patch(`/failure-modes/${id}`, data);
+    return response.data;
+  },
+  
+  delete: async (id) => {
+    const response = await api.delete(`/failure-modes/${id}`);
+    return response.data;
+  },
+};
+
 // Equipment Hierarchy API (ISO 14224)
 export const equipmentHierarchyAPI = {
   // Get library data

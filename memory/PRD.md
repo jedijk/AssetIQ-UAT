@@ -186,6 +186,17 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
   - Equipment Manager page remembers expanded nodes via localStorage
   - Sidebar hierarchy remembers expanded nodes separately
   - Expansion state persists across page navigation and refreshes
+- [x] **Libraries Moved to FMEA Page** (Mar 19, 2026):
+  - Equipment Types and Criticality now in Library page under "Equipment & Criticality" tab
+  - Equipment Manager simplified to two-panel layout
+- [x] **FMEA Library Enhancements** (Mar 19, 2026):
+  - Search functionality fixed (searches across all fields)
+  - CRUD operations for Failure Modes (Create, Read, Update, Delete)
+  - Auto-link to Equipment Types based on equipment name
+  - Manual equipment type linking via dropdown
+  - Keywords and Recommended Actions editable with add/remove
+  - Live RPN calculation in dialog
+  - Built-in modes can be edited but not deleted
 
 ### Future Tasks (Backlog)
 - [ ] P2: Voice input for chat interface

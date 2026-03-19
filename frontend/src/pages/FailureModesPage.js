@@ -25,10 +25,13 @@ import {
   Cpu,
   Pipette,
   Flame,
-  ShieldCheck
+  ShieldCheck,
+  Link,
+  X
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -44,9 +47,9 @@ import {
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { toast } from "sonner";
-import api, { equipmentHierarchyAPI } from "../lib/api";
+import api, { equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
 
 const categoryIcons = {
   Rotating: Cog,
@@ -141,7 +144,39 @@ const FailureModesPage = () => {
   const [editingType, setEditingType] = useState(null);
   const [newType, setNewType] = useState({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
   
+  // Failure mode dialog state
+  const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
+  const [editingFm, setEditingFm] = useState(null);
+  const [newFm, setNewFm] = useState({
+    category: "Rotating",
+    equipment: "",
+    failure_mode: "",
+    keywords: [],
+    severity: 5,
+    occurrence: 5,
+    detectability: 5,
+    recommended_actions: [],
+    equipment_type_id: ""
+  });
+  const [keywordInput, setKeywordInput] = useState("");
+  const [actionInput, setActionInput] = useState("");
+  
   const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
+  const resetFmForm = () => {
+    setNewFm({
+      category: "Rotating",
+      equipment: "",
+      failure_mode: "",
+      keywords: [],
+      severity: 5,
+      occurrence: 5,
+      detectability: 5,
+      recommended_actions: [],
+      equipment_type_id: ""
+    });
+    setKeywordInput("");
+    setActionInput("");
+  };
 
   // Fetch categories
   const { data: categoriesData } = useQuery({
@@ -222,6 +257,39 @@ const FailureModesPage = () => {
     onError: e => toast.error(e.response?.data?.detail || "Failed") 
   });
 
+  // Failure mode mutations
+  const createFmMutation = useMutation({
+    mutationFn: failureModesAPI.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries(["failureModes"]);
+      toast.success("Failure mode created");
+      setIsFmDialogOpen(false);
+      resetFmForm();
+    },
+    onError: e => toast.error(e.response?.data?.detail || "Failed to create")
+  });
+
+  const updateFmMutation = useMutation({
+    mutationFn: ({ id, data }) => failureModesAPI.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["failureModes"]);
+      toast.success("Failure mode updated");
+      setIsFmDialogOpen(false);
+      setEditingFm(null);
+      resetFmForm();
+    },
+    onError: e => toast.error(e.response?.data?.detail || "Failed to update")
+  });
+
+  const deleteFmMutation = useMutation({
+    mutationFn: failureModesAPI.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries(["failureModes"]);
+      toast.success("Failure mode deleted");
+    },
+    onError: e => toast.error(e.response?.data?.detail || "Cannot delete built-in failure modes")
+  });
+
   const handleEditType = (type) => { 
     setEditingType(type); 
     setNewType({ id: type.id, name: type.name, discipline: type.discipline || "mechanical", icon: type.icon || "cog", iso_class: type.iso_class || "" }); 
@@ -234,6 +302,71 @@ const FailureModesPage = () => {
     } else { 
       createTypeMutation.mutate(newType); 
     } 
+  };
+
+  const handleEditFm = (fm) => {
+    setEditingFm(fm);
+    setNewFm({
+      category: fm.category,
+      equipment: fm.equipment,
+      failure_mode: fm.failure_mode,
+      keywords: fm.keywords || [],
+      severity: fm.severity,
+      occurrence: fm.occurrence,
+      detectability: fm.detectability,
+      recommended_actions: fm.recommended_actions || [],
+      equipment_type_id: fm.equipment_type_id || ""
+    });
+    setIsFmDialogOpen(true);
+  };
+
+  const handleSaveFm = () => {
+    if (editingFm) {
+      updateFmMutation.mutate({ id: editingFm.id, data: newFm });
+    } else {
+      createFmMutation.mutate(newFm);
+    }
+  };
+
+  const addKeyword = () => {
+    if (keywordInput.trim() && !newFm.keywords.includes(keywordInput.trim())) {
+      setNewFm({ ...newFm, keywords: [...newFm.keywords, keywordInput.trim()] });
+      setKeywordInput("");
+    }
+  };
+
+  const removeKeyword = (kw) => {
+    setNewFm({ ...newFm, keywords: newFm.keywords.filter(k => k !== kw) });
+  };
+
+  const addAction = () => {
+    if (actionInput.trim()) {
+      setNewFm({ ...newFm, recommended_actions: [...newFm.recommended_actions, actionInput.trim()] });
+      setActionInput("");
+    }
+  };
+
+  const removeAction = (idx) => {
+    setNewFm({ ...newFm, recommended_actions: newFm.recommended_actions.filter((_, i) => i !== idx) });
+  };
+
+  // Auto-link equipment type when equipment name changes
+  const handleEquipmentChange = (value) => {
+    setNewFm(prev => {
+      const updated = { ...prev, equipment: value };
+      // Auto-detect equipment type if not already set
+      if (!prev.equipment_type_id) {
+        const equipLower = value.toLowerCase();
+        const autoType = equipmentTypes.find(t => 
+          equipLower.includes(t.name.toLowerCase()) || 
+          t.name.toLowerCase().includes(equipLower)
+        );
+        if (autoType) {
+          updated.equipment_type_id = autoType.id;
+        }
+      }
+      return updated;
+    });
   };
 
   return (
@@ -287,13 +420,13 @@ const FailureModesPage = () => {
             placeholder="Search by keyword..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-11"
+            className="pl-10"
             data-testid="search-input"
           />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-full sm:w-48 h-11" data-testid="category-filter">
-            <Filter className="w-4 h-4 mr-2 text-slate-400" />
+          <SelectTrigger className="w-full sm:w-48" data-testid="category-filter">
+            <Filter className="w-4 h-4 mr-2" />
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>
           <SelectContent>
@@ -303,6 +436,9 @@ const FailureModesPage = () => {
             ))}
           </SelectContent>
         </Select>
+        <Button onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700" data-testid="add-failure-mode-btn">
+          <Plus className="w-4 h-4 mr-1" /> Add Failure Mode
+        </Button>
       </div>
 
       {/* Category Legend */}
@@ -464,6 +600,34 @@ const FailureModesPage = () => {
                             ))}
                           </div>
                         </div>
+
+                        {/* Linked Equipment Type & Actions */}
+                        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {fm.equipment_type_id && (
+                              <div className="flex items-center gap-2 text-sm text-slate-600">
+                                <Link className="w-4 h-4 text-blue-500" />
+                                <span>Linked to: </span>
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                  {equipmentTypes.find(t => t.id === fm.equipment_type_id)?.name || fm.equipment_type_id}
+                                </Badge>
+                              </div>
+                            )}
+                            {!fm.equipment_type_id && (
+                              <span className="text-xs text-slate-400">No equipment type linked</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleEditFm(fm); }} data-testid={`edit-fm-${fm.id}`}>
+                              <Edit className="w-4 h-4 mr-1" /> Edit
+                            </Button>
+                            {fm.is_custom && (
+                              <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); deleteFmMutation.mutate(fm.id); }} data-testid={`delete-fm-${fm.id}`}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </CollapsibleContent>
                   </div>
@@ -594,6 +758,165 @@ const FailureModesPage = () => {
               data-testid="save-type-btn"
             >
               {editingType ? "Save" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Failure Mode Dialog */}
+      <Dialog open={isFmDialogOpen} onOpenChange={setIsFmDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingFm ? "Edit Failure Mode" : "Add Failure Mode"}</DialogTitle>
+            <DialogDescription>
+              {editingFm ? "Update the failure mode details below." : "Create a new failure mode entry."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Row 1: Category & Equipment */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Category *</Label>
+                <Select value={newFm.category} onValueChange={v => setNewFm({ ...newFm, category: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Equipment *</Label>
+                <Input 
+                  value={newFm.equipment} 
+                  onChange={e => handleEquipmentChange(e.target.value)} 
+                  placeholder="e.g., Pump, Compressor, Valve" 
+                  data-testid="fm-equipment-input"
+                />
+              </div>
+            </div>
+
+            {/* Failure Mode Name */}
+            <div>
+              <Label>Failure Mode Name *</Label>
+              <Input 
+                value={newFm.failure_mode} 
+                onChange={e => setNewFm({ ...newFm, failure_mode: e.target.value })} 
+                placeholder="e.g., Seal Failure, Bearing Damage" 
+                data-testid="fm-name-input"
+              />
+            </div>
+
+            {/* Linked Equipment Type */}
+            <div>
+              <Label className="flex items-center gap-2">
+                <Link className="w-4 h-4 text-blue-500" />
+                Linked Equipment Type
+              </Label>
+              <Select value={newFm.equipment_type_id || "none"} onValueChange={v => setNewFm({ ...newFm, equipment_type_id: v === "none" ? "" : v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Auto-detected or select manually" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- No Link --</SelectItem>
+                  {equipmentTypes.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500 mt-1">Links this failure mode to equipment in your hierarchy</p>
+            </div>
+
+            {/* FMEA Scores Row */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Severity (1-10) *</Label>
+                <Input 
+                  type="number" 
+                  min={1} max={10} 
+                  value={newFm.severity} 
+                  onChange={e => setNewFm({ ...newFm, severity: parseInt(e.target.value) || 5 })} 
+                />
+              </div>
+              <div>
+                <Label>Occurrence (1-10) *</Label>
+                <Input 
+                  type="number" 
+                  min={1} max={10} 
+                  value={newFm.occurrence} 
+                  onChange={e => setNewFm({ ...newFm, occurrence: parseInt(e.target.value) || 5 })} 
+                />
+              </div>
+              <div>
+                <Label>Detectability (1-10) *</Label>
+                <Input 
+                  type="number" 
+                  min={1} max={10} 
+                  value={newFm.detectability} 
+                  onChange={e => setNewFm({ ...newFm, detectability: parseInt(e.target.value) || 5 })} 
+                />
+              </div>
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg text-center">
+              <span className="text-sm text-slate-600">RPN = {newFm.severity} × {newFm.occurrence} × {newFm.detectability} = </span>
+              <span className={`text-lg font-bold ${newFm.severity * newFm.occurrence * newFm.detectability >= 300 ? "text-red-600" : newFm.severity * newFm.occurrence * newFm.detectability >= 200 ? "text-orange-600" : "text-green-600"}`}>
+                {newFm.severity * newFm.occurrence * newFm.detectability}
+              </span>
+            </div>
+
+            {/* Keywords */}
+            <div>
+              <Label>Keywords</Label>
+              <div className="flex gap-2">
+                <Input 
+                  value={keywordInput} 
+                  onChange={e => setKeywordInput(e.target.value)} 
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addKeyword())}
+                  placeholder="Add keyword and press Enter" 
+                />
+                <Button type="button" variant="outline" onClick={addKeyword}>Add</Button>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {newFm.keywords.map((kw, i) => (
+                  <Badge key={i} variant="secondary" className="flex items-center gap-1">
+                    {kw}
+                    <button onClick={() => removeKeyword(kw)} className="ml-1 hover:text-red-500"><X className="w-3 h-3" /></button>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Recommended Actions */}
+            <div>
+              <Label>Recommended Actions</Label>
+              <div className="flex gap-2">
+                <Input 
+                  value={actionInput} 
+                  onChange={e => setActionInput(e.target.value)} 
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addAction())}
+                  placeholder="Add action and press Enter" 
+                />
+                <Button type="button" variant="outline" onClick={addAction}>Add</Button>
+              </div>
+              <ul className="space-y-1 mt-2">
+                {newFm.recommended_actions.map((action, i) => (
+                  <li key={i} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
+                    <span>{i + 1}. {action}</span>
+                    <button onClick={() => removeAction(i)} className="text-red-500 hover:text-red-700"><X className="w-4 h-4" /></button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsFmDialogOpen(false); setEditingFm(null); resetFmForm(); }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveFm} 
+              disabled={!newFm.failure_mode.trim() || !newFm.equipment.trim()} 
+              data-testid="save-fm-btn"
+            >
+              {editingFm ? "Save Changes" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
