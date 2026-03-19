@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { UndoProvider } from "./contexts/UndoContext";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -69,43 +70,45 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <Toaster 
-            position="top-center" 
-            richColors 
-            closeButton
-            toastOptions={{
-              style: {
-                fontFamily: 'Inter, sans-serif',
-              },
-            }}
-          />
-          <Routes>
-            <Route path="/login" element={
-              <PublicRoute>
-                <LoginPage />
-              </PublicRoute>
-            } />
-            <Route path="/register" element={
-              <PublicRoute>
-                <RegisterPage />
-              </PublicRoute>
-            } />
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<ThreatsPage />} />
-              <Route path="threats" element={<ThreatsPage />} />
-              <Route path="threats/:id" element={<ThreatDetailPage />} />
-              <Route path="library" element={<FailureModesPage />} />
-              <Route path="equipment-manager" element={<EquipmentManagerPage />} />
-              <Route path="causal-engine" element={<CausalEnginePage />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
+        <UndoProvider>
+          <BrowserRouter>
+            <Toaster 
+              position="top-center" 
+              richColors 
+              closeButton
+              toastOptions={{
+                style: {
+                  fontFamily: 'Inter, sans-serif',
+                },
+              }}
+            />
+            <Routes>
+              <Route path="/login" element={
+                <PublicRoute>
+                  <LoginPage />
+                </PublicRoute>
+              } />
+              <Route path="/register" element={
+                <PublicRoute>
+                  <RegisterPage />
+                </PublicRoute>
+              } />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<ThreatsPage />} />
+                <Route path="threats" element={<ThreatsPage />} />
+                <Route path="threats/:id" element={<ThreatDetailPage />} />
+                <Route path="library" element={<FailureModesPage />} />
+                <Route path="equipment-manager" element={<EquipmentManagerPage />} />
+                <Route path="causal-engine" element={<CausalEnginePage />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </UndoProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

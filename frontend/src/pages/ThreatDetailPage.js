@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { threatsAPI, investigationAPI } from "../lib/api";
+import { useUndo } from "../contexts/UndoContext";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -56,6 +57,7 @@ const ThreatDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { pushUndo } = useUndo();
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
 
@@ -68,7 +70,20 @@ const ThreatDetailPage = () => {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: (data) => threatsAPI.update(id, data),
-    onSuccess: () => {
+    onSuccess: (updatedThreat, variables) => {
+      // Store old data for undo
+      const oldData = { ...threat };
+      pushUndo({
+        type: "UPDATE_THREAT",
+        label: `Edit threat "${threat.title}"`,
+        data: { oldData, newData: variables },
+        undo: async () => {
+          await threatsAPI.update(id, oldData);
+          queryClient.invalidateQueries({ queryKey: ["threat", id] });
+          queryClient.invalidateQueries({ queryKey: ["threats"] });
+          queryClient.invalidateQueries({ queryKey: ["stats"] });
+        },
+      });
       queryClient.invalidateQueries({ queryKey: ["threat", id] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });

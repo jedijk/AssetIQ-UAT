@@ -1,0 +1,43 @@
+{
+  "summary": "Generated test suite for new Undo feature. All 8 undo feature tests pass. Verified: undo button visibility on all pages (Threats, Causal Engine, Library, Equipment Manager), disabled state when no actions, enabled state with badge after threat edit, and successful undo of threat edit.",
+  "mode": "generate",
+  "baseline_commit": "e58c9768889cd6d4635c66eb245bc15be0c18a16",
+  "head_commit": "9efbbb673f31ffe4ecd00f868cf51fe2d60f5c20",
+  "specs_created": ["/app/tests/e2e/undo-feature.spec.ts"],
+  "specs_updated": [],
+  "quarantined_tests": [],
+  "test_report_links": ["/app/tests/e2e/undo-feature.spec.ts"],
+  "regression_results": {
+    "total_specs": 8,
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+  },
+  "issues": [
+    {
+      "id": "IMP-001",
+      "issue_type": "improvement",
+      "severity": "LOW",
+      "description": "First threat title has accumulated test strings from multiple test runs (UNDO_TEST_xxx). Consider adding cleanup in test teardown or resetting test data between runs.",
+      "endpoint_or_component": "Threats Page - first threat title"
+    },
+    {
+      "id": "IMP-002",
+      "issue_type": "improvement",
+      "severity": "LOW",
+      "description": "Existing causal-engine.spec.ts tests have toast handler timing issues causing intermittent failures. These are pre-existing issues not related to the undo feature.",
+      "endpoint_or_component": "Causal Engine tests"
+    }
+  ],
+  "action_items": [],
+  "updated_files": ["/app/tests/e2e/undo-feature.spec.ts"],
+  "test_results": {
+    "backend": "Not tested (no backend changes for undo feature - it's frontend only)",
+    "frontend": "100% (8/8 undo feature tests passed)"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Undo feature tested successfully. Tests cover: 1) undo button visibility on all pages, 2) disabled state when no actions available, 3) enabled state with badge counter after performing an action, 4) successful undo of threat edit reverting title. The undo feature uses UndoContext.js which provides pushUndo, undo, canUndo functions. Layout.js has undo button with data-testid='undo-button'. Pages push undo actions on: edit threat (ThreatDetailPage), delete failure mode (FailureModesPage), delete equipment node (EquipmentManagerPage), delete investigation (CausalEnginePage).",
+  "rca_of_issue": "N/A - No bugs found"
+}

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch } from "lucide-react";
+import { useUndo } from "../contexts/UndoContext";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -11,15 +12,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 import ChatSidebar from "./ChatSidebar";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 
 const Layout = () => {
   const { user, logout } = useAuth();
+  const { canUndo, undo, isUndoing, getLastAction, undoCount } = useUndo();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [hierarchyOpen, setHierarchyOpen] = useState(true); // Open by default on desktop
+
+  const lastAction = getLastAction();
 
   const navItems = [
     { path: "/", label: "Threats", icon: AlertTriangle },
@@ -87,6 +97,40 @@ const Layout = () => {
 
           {/* Right Side */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Undo Button */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={undo}
+                    disabled={!canUndo || isUndoing}
+                    className={`h-9 w-9 transition-all duration-200 ${
+                      canUndo 
+                        ? "text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700" 
+                        : "text-slate-300 border-slate-200"
+                    }`}
+                    data-testid="undo-button"
+                  >
+                    <Undo2 className="w-4 h-4" />
+                    {undoCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-4 w-4 text-[10px] font-bold bg-amber-500 text-white rounded-full flex items-center justify-center">
+                        {undoCount}
+                      </span>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {canUndo ? (
+                    <p>Undo: {lastAction?.label} <span className="text-slate-400">({undoCount} actions)</span></p>
+                  ) : (
+                    <p>No actions to undo</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {/* Report Threat Button - Desktop */}
             <Button
               onClick={() => setChatOpen(true)}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { useUndo } from "../contexts/UndoContext";
 import { 
   Search, 
   Filter, 
@@ -133,6 +134,7 @@ function CriticalityItem({ item }) {
 
 const FailureModesPage = () => {
   const queryClient = useQueryClient();
+  const { pushUndo } = useUndo();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [expandedId, setExpandedId] = useState(null);
@@ -270,8 +272,29 @@ const FailureModesPage = () => {
   });
 
   const updateFmMutation = useMutation({
-    mutationFn: ({ id, data }) => failureModesAPI.update(id, data),
-    onSuccess: () => {
+    mutationFn: ({ id, data, oldData }) => failureModesAPI.update(id, data).then(result => ({ result, id, data, oldData })),
+    onSuccess: ({ id, data, oldData }) => {
+      if (oldData) {
+        pushUndo({
+          type: "UPDATE_FAILURE_MODE",
+          label: `Edit "${oldData.failure_mode}"`,
+          data: { oldData, newData: data },
+          undo: async () => {
+            await failureModesAPI.update(id, {
+              category: oldData.category,
+              equipment: oldData.equipment,
+              failure_mode: oldData.failure_mode,
+              keywords: oldData.keywords || [],
+              severity: oldData.severity,
+              occurrence: oldData.occurrence,
+              detectability: oldData.detectability,
+              recommended_actions: oldData.recommended_actions || [],
+              equipment_type_ids: oldData.equipment_type_ids || []
+            });
+            queryClient.invalidateQueries(["failureModes"]);
+          },
+        });
+      }
       queryClient.invalidateQueries(["failureModes"]);
       toast.success("Failure mode updated");
       setIsFmDialogOpen(false);
@@ -282,8 +305,34 @@ const FailureModesPage = () => {
   });
 
   const deleteFmMutation = useMutation({
-    mutationFn: failureModesAPI.delete,
-    onSuccess: () => {
+    mutationFn: async (id) => {
+      // Find the failure mode to delete before actually deleting
+      const fmToDelete = failureModes.find(fm => fm.id === id);
+      const result = await failureModesAPI.delete(id);
+      return { result, deletedFm: fmToDelete };
+    },
+    onSuccess: ({ deletedFm }) => {
+      if (deletedFm) {
+        pushUndo({
+          type: "DELETE_FAILURE_MODE",
+          label: `Delete "${deletedFm.failure_mode}"`,
+          data: deletedFm,
+          undo: async () => {
+            await failureModesAPI.create({
+              category: deletedFm.category,
+              equipment: deletedFm.equipment,
+              failure_mode: deletedFm.failure_mode,
+              keywords: deletedFm.keywords || [],
+              severity: deletedFm.severity,
+              occurrence: deletedFm.occurrence,
+              detectability: deletedFm.detectability,
+              recommended_actions: deletedFm.recommended_actions || [],
+              equipment_type_ids: deletedFm.equipment_type_ids || []
+            });
+            queryClient.invalidateQueries(["failureModes"]);
+          },
+        });
+      }
       queryClient.invalidateQueries(["failureModes"]);
       toast.success("Failure mode deleted");
     },
@@ -322,7 +371,7 @@ const FailureModesPage = () => {
 
   const handleSaveFm = () => {
     if (editingFm) {
-      updateFmMutation.mutate({ id: editingFm.id, data: newFm });
+      updateFmMutation.mutate({ id: editingFm.id, data: newFm, oldData: editingFm });
     } else {
       createFmMutation.mutate(newFm);
     }

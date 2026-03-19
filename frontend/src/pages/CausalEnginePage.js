@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { investigationAPI } from "../lib/api";
+import { useUndo } from "../contexts/UndoContext";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -49,6 +50,7 @@ const INVESTIGATION_STATUSES = [
 
 export default function CausalEnginePage() {
   const queryClient = useQueryClient();
+  const { pushUndo } = useUndo();
   
   const [selectedInvId, setSelectedInvId] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
@@ -125,8 +127,31 @@ export default function CausalEnginePage() {
   });
   
   const deleteInvMutation = useMutation({
-    mutationFn: investigationAPI.delete,
-    onSuccess: () => {
+    mutationFn: async (id) => {
+      // Get the investigation to delete before actually deleting
+      const invToDelete = investigations.find(inv => inv.id === id);
+      const result = await investigationAPI.delete(id);
+      return { result, deletedInv: invToDelete };
+    },
+    onSuccess: ({ deletedInv }) => {
+      if (deletedInv) {
+        pushUndo({
+          type: "DELETE_INVESTIGATION",
+          label: `Delete investigation "${deletedInv.title}"`,
+          data: deletedInv,
+          undo: async () => {
+            await investigationAPI.create({
+              title: deletedInv.title,
+              description: deletedInv.description,
+              asset_name: deletedInv.asset_name,
+              location: deletedInv.location,
+              incident_date: deletedInv.incident_date,
+              investigation_leader: deletedInv.investigation_leader
+            });
+            queryClient.invalidateQueries({ queryKey: ["investigations"] });
+          },
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["investigations"] });
       setSelectedInvId(null);
       toast.success("Deleted");

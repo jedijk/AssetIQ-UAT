@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { equipmentHierarchyAPI } from "../lib/api";
+import { useUndo } from "../contexts/UndoContext";
 import { toast } from "sonner";
 import {
   ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
@@ -396,6 +397,7 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
 
 export default function EquipmentManagerPage() {
   const queryClient = useQueryClient();
+  const { pushUndo } = useUndo();
   const fileInputRef = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
   
@@ -446,7 +448,38 @@ export default function EquipmentManagerPage() {
   // Mutations
   const createMutation = useMutation({ mutationFn: equipmentHierarchyAPI.createNode, onSuccess: () => { queryClient.invalidateQueries(["equipment-nodes"]); toast.success("Node created"); setIsCreateOpen(false); setNewNode({ name: "", level: "installation", parent_id: null }); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
   const updateMutation = useMutation({ mutationFn: ({ nodeId, data }) => equipmentHierarchyAPI.updateNode(nodeId, data), onSuccess: data => { queryClient.invalidateQueries(["equipment-nodes"]); setSelectedNode(data); toast.success("Updated"); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
-  const deleteMutation = useMutation({ mutationFn: equipmentHierarchyAPI.deleteNode, onSuccess: () => { queryClient.invalidateQueries(["equipment-nodes"]); setSelectedNode(null); toast.success("Deleted"); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
+  const deleteMutation = useMutation({ 
+    mutationFn: async (nodeId) => {
+      // Find the node to delete before actually deleting
+      const nodeToDelete = nodes.find(n => n.id === nodeId);
+      const result = await equipmentHierarchyAPI.deleteNode(nodeId);
+      return { result, deletedNode: nodeToDelete };
+    }, 
+    onSuccess: ({ deletedNode }) => { 
+      if (deletedNode) {
+        pushUndo({
+          type: "DELETE_NODE",
+          label: `Delete "${deletedNode.name}"`,
+          data: deletedNode,
+          undo: async () => {
+            await equipmentHierarchyAPI.createNode({
+              name: deletedNode.name,
+              level: deletedNode.level,
+              parent_id: deletedNode.parent_id,
+              description: deletedNode.description,
+              equipment_type_id: deletedNode.equipment_type_id,
+              discipline: deletedNode.discipline
+            });
+            queryClient.invalidateQueries(["equipment-nodes"]);
+          },
+        });
+      }
+      queryClient.invalidateQueries(["equipment-nodes"]); 
+      setSelectedNode(null); 
+      toast.success("Deleted"); 
+    }, 
+    onError: e => toast.error(e.response?.data?.detail || "Failed") 
+  });
   const criticalityMutation = useMutation({ mutationFn: ({ nodeId, assignment }) => equipmentHierarchyAPI.assignCriticality(nodeId, assignment), onSuccess: data => { queryClient.invalidateQueries(["equipment-nodes"]); setSelectedNode(data); toast.success("Criticality assigned"); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
   const disciplineMutation = useMutation({ mutationFn: ({ nodeId, discipline }) => equipmentHierarchyAPI.assignDiscipline(nodeId, discipline), onSuccess: data => { queryClient.invalidateQueries(["equipment-nodes"]); setSelectedNode(data); toast.success("Discipline assigned"); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
   const parseListMutation = useMutation({ mutationFn: ({ content, source }) => equipmentHierarchyAPI.parseEquipmentList(content, source), onSuccess: (data) => { queryClient.invalidateQueries(["unstructured-items"]); toast.success(`Parsed ${data.parsed_count} items`); setIsImportOpen(false); setImportText(""); }, onError: e => toast.error(e.response?.data?.detail || "Failed to parse") });
