@@ -63,6 +63,17 @@ function getThreatCountByAsset(threats) {
   return countMap;
 }
 
+// Get cumulative threat count for a node and all its descendants
+function getCumulativeThreatCount(node, threatCountMap) {
+  let count = threatCountMap.get(node.name) || 0;
+  if (node.children && node.children.length > 0) {
+    node.children.forEach(child => {
+      count += getCumulativeThreatCount(child, threatCountMap);
+    });
+  }
+  return count;
+}
+
 // Tree node component
 const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0 }) => {
   const hasChildren = node.children && node.children.length > 0;
@@ -222,10 +233,23 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
     });
   };
 
+  // Helper function to collect all descendant names (including the node itself)
+  const collectAllDescendantNames = (node) => {
+    const names = [node.name];
+    if (node.children && node.children.length > 0) {
+      node.children.forEach(child => {
+        names.push(...collectAllDescendantNames(child));
+      });
+    }
+    return names;
+  };
+
   const handleNodeClick = (node) => {
     setSelectedNodeId(node.id);
-    // Navigate to threats page filtered by this equipment/asset
-    navigate(`/threats?asset=${encodeURIComponent(node.name)}`);
+    // Collect all asset names from this node and its descendants
+    const allAssetNames = collectAllDescendantNames(node);
+    // Navigate to threats page filtered by all these assets
+    navigate(`/threats?assets=${encodeURIComponent(allAssetNames.join(','))}&assetName=${encodeURIComponent(node.name)}`);
     if (isMobile) onClose?.();
   };
 
@@ -234,7 +258,8 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
     return treeNodes
       .filter(node => !filterLevel || node.level === filterLevel)
       .map(node => {
-        const threatCount = threatCountByAsset.get(node.name) || 0;
+        // Use cumulative threat count (this node + all descendants)
+        const threatCount = getCumulativeThreatCount(node, threatCountByAsset);
         return (
           <TreeNode
             key={node.id}

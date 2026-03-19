@@ -82,20 +82,32 @@ const ThreatsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [assetFilter, setAssetFilter] = useState("");
+  const [assetFilter, setAssetFilter] = useState(""); // Display name for the filter
+  const [assetsToFilter, setAssetsToFilter] = useState([]); // Array of asset names to filter by
 
   // Initialize filters from URL params
   useEffect(() => {
-    const asset = searchParams.get("asset");
-    if (asset) {
-      setAssetFilter(asset);
-      setSearchQuery(asset);
+    // Support both old 'asset' param (single) and new 'assets' param (multiple)
+    const singleAsset = searchParams.get("asset");
+    const multipleAssets = searchParams.get("assets");
+    const displayName = searchParams.get("assetName");
+    
+    if (multipleAssets) {
+      const assetList = multipleAssets.split(',').map(a => a.trim()).filter(Boolean);
+      setAssetsToFilter(assetList);
+      setAssetFilter(displayName || assetList[0] || "");
+      // Don't set search query - let the filter handle it
+    } else if (singleAsset) {
+      setAssetsToFilter([singleAsset]);
+      setAssetFilter(singleAsset);
+      setSearchQuery(singleAsset);
     }
   }, [searchParams]);
 
   // Clear asset filter
   const clearAssetFilter = () => {
     setAssetFilter("");
+    setAssetsToFilter([]);
     setSearchQuery("");
     setSearchParams({});
   };
@@ -112,8 +124,19 @@ const ThreatsPage = () => {
     queryFn: () => threatsAPI.getAll(statusFilter === "all" ? null : statusFilter),
   });
 
-  // Filter threats by search query
+  // Filter threats by search query and/or asset hierarchy
   const filteredThreats = threats.filter((threat) => {
+    // First check if we have a hierarchical asset filter
+    if (assetsToFilter.length > 0) {
+      // Check if threat's asset matches any of the assets in the hierarchy
+      const assetMatches = assetsToFilter.some(filterAsset => 
+        threat.asset.toLowerCase() === filterAsset.toLowerCase() ||
+        threat.asset.toLowerCase().includes(filterAsset.toLowerCase())
+      );
+      if (!assetMatches) return false;
+    }
+    
+    // Then apply search query filter if present
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -182,6 +205,11 @@ const ThreatsPage = () => {
           <AlertTriangle className="w-4 h-4 text-blue-600" />
           <span className="text-sm text-blue-700">
             Showing threats for: <strong>{assetFilter}</strong>
+            {assetsToFilter.length > 1 && (
+              <span className="ml-1 text-blue-500">
+                (including {assetsToFilter.length - 1} item{assetsToFilter.length > 2 ? 's' : ''} below)
+              </span>
+            )}
           </span>
           <button 
             onClick={clearAssetFilter}
