@@ -835,7 +835,7 @@ class FailureModeCreate(BaseModel):
     occurrence: int = Field(ge=1, le=10)
     detectability: int = Field(ge=1, le=10)
     recommended_actions: List[str] = []
-    equipment_type_id: Optional[str] = None  # Link to equipment type
+    equipment_type_ids: List[str] = []  # Link to multiple equipment types
 
 
 class FailureModeUpdate(BaseModel):
@@ -847,43 +847,61 @@ class FailureModeUpdate(BaseModel):
     occurrence: Optional[int] = Field(None, ge=1, le=10)
     detectability: Optional[int] = Field(None, ge=1, le=10)
     recommended_actions: Optional[List[str]] = None
-    equipment_type_id: Optional[str] = None
+    equipment_type_ids: Optional[List[str]] = None
 
 
-def auto_link_equipment_type(equipment_name: str) -> Optional[str]:
-    """Auto-detect equipment type based on equipment name."""
+def auto_link_equipment_types(equipment_name: str) -> List[str]:
+    """Auto-detect equipment types based on equipment name. Returns list of matching type IDs."""
     equipment_lower = equipment_name.lower()
     
     # Map common equipment names to equipment type IDs
     equipment_mapping = {
-        "pump": "centrifugal_pump",
-        "compressor": "centrifugal_compressor", 
-        "turbine": "gas_turbine",
-        "motor": "electric_motor",
-        "vessel": "pressure_vessel",
-        "heat exchanger": "shell_tube_heat_exchanger",
-        "exchanger": "shell_tube_heat_exchanger",
-        "pipe": "piping",
-        "valve": "valve",
-        "control valve": "control_valve",
-        "sensor": "sensor",
-        "transmitter": "transmitter",
-        "generator": "generator",
-        "transformer": "transformer",
-        "filter": "filter",
-        "tank": "storage_tank",
-        "boiler": "boiler",
-        "furnace": "fired_heater",
-        "heater": "fired_heater",
-        "cooler": "air_cooler",
-        "fan": "fan",
-        "blower": "fan",
+        "pump": ["pump_centrifugal", "pump_reciprocating"],
+        "centrifugal pump": ["pump_centrifugal"],
+        "reciprocating pump": ["pump_reciprocating"],
+        "compressor": ["compressor_centrifugal", "compressor_reciprocating"],
+        "centrifugal compressor": ["compressor_centrifugal"],
+        "reciprocating compressor": ["compressor_reciprocating"], 
+        "turbine": ["turbine_gas", "turbine_steam"],
+        "gas turbine": ["turbine_gas"],
+        "steam turbine": ["turbine_steam"],
+        "motor": ["motor_electric"],
+        "vessel": ["vessel_pressure", "vessel_storage"],
+        "pressure vessel": ["vessel_pressure"],
+        "storage tank": ["vessel_storage"],
+        "tank": ["vessel_storage"],
+        "heat exchanger": ["heat_exchanger"],
+        "exchanger": ["heat_exchanger"],
+        "pipe": ["pipe"],
+        "piping": ["pipe"],
+        "valve": ["valve_control", "valve_safety", "valve_manual"],
+        "control valve": ["valve_control"],
+        "safety valve": ["valve_safety"],
+        "manual valve": ["valve_manual"],
+        "sensor": ["sensor_pressure", "sensor_temperature", "sensor_flow"],
+        "pressure sensor": ["sensor_pressure"],
+        "temperature sensor": ["sensor_temperature"],
+        "flow sensor": ["sensor_flow"],
+        "transmitter": ["sensor_pressure", "sensor_temperature", "sensor_flow"],
+        "plc": ["plc"],
+        "controller": ["plc"],
+        "generator": ["turbine_gas", "turbine_steam"],
+        "transformer": ["transformer"],
+        "switchgear": ["switchgear"],
+        "extruder": ["extruder"],
+        "filter": ["pipe"],
+        "boiler": ["heat_exchanger"],
+        "furnace": ["heat_exchanger"],
+        "heater": ["heat_exchanger"],
+        "cooler": ["heat_exchanger"],
+        "fan": ["motor_electric"],
+        "blower": ["compressor_centrifugal"],
     }
     
-    for keyword, type_id in equipment_mapping.items():
+    for keyword, type_ids in equipment_mapping.items():
         if keyword in equipment_lower:
-            return type_id
-    return None
+            return type_ids
+    return []
 
 
 @api_router.post("/failure-modes")
@@ -896,8 +914,8 @@ async def create_failure_mode(
     max_id = max((fm["id"] for fm in FAILURE_MODES_LIBRARY), default=0)
     new_id = max_id + 1
     
-    # Auto-link equipment type if not provided
-    equipment_type_id = data.equipment_type_id or auto_link_equipment_type(data.equipment)
+    # Auto-link equipment types if not provided
+    equipment_type_ids = data.equipment_type_ids if data.equipment_type_ids else auto_link_equipment_types(data.equipment)
     
     new_fm = {
         "id": new_id,
@@ -910,7 +928,7 @@ async def create_failure_mode(
         "detectability": data.detectability,
         "rpn": data.severity * data.occurrence * data.detectability,
         "recommended_actions": data.recommended_actions,
-        "equipment_type_id": equipment_type_id,
+        "equipment_type_ids": equipment_type_ids,
         "is_custom": True,
         "created_by": current_user["id"]
     }
@@ -933,11 +951,11 @@ async def update_failure_mode(
                 fm["category"] = data.category
             if data.equipment is not None:
                 fm["equipment"] = data.equipment
-                # Auto-link if equipment changed and no explicit type provided
-                if data.equipment_type_id is None:
-                    auto_type = auto_link_equipment_type(data.equipment)
-                    if auto_type:
-                        fm["equipment_type_id"] = auto_type
+                # Auto-link if equipment changed and no explicit types provided
+                if data.equipment_type_ids is None:
+                    auto_types = auto_link_equipment_types(data.equipment)
+                    if auto_types:
+                        fm["equipment_type_ids"] = auto_types
             if data.failure_mode is not None:
                 fm["failure_mode"] = data.failure_mode
             if data.keywords is not None:
@@ -950,8 +968,8 @@ async def update_failure_mode(
                 fm["detectability"] = data.detectability
             if data.recommended_actions is not None:
                 fm["recommended_actions"] = data.recommended_actions
-            if data.equipment_type_id is not None:
-                fm["equipment_type_id"] = data.equipment_type_id
+            if data.equipment_type_ids is not None:
+                fm["equipment_type_ids"] = data.equipment_type_ids
             
             # Recalculate RPN
             fm["rpn"] = fm["severity"] * fm["occurrence"] * fm["detectability"]

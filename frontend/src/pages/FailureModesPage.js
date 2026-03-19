@@ -156,7 +156,7 @@ const FailureModesPage = () => {
     occurrence: 5,
     detectability: 5,
     recommended_actions: [],
-    equipment_type_id: ""
+    equipment_type_ids: []
   });
   const [keywordInput, setKeywordInput] = useState("");
   const [actionInput, setActionInput] = useState("");
@@ -172,7 +172,7 @@ const FailureModesPage = () => {
       occurrence: 5,
       detectability: 5,
       recommended_actions: [],
-      equipment_type_id: ""
+      equipment_type_ids: []
     });
     setKeywordInput("");
     setActionInput("");
@@ -315,7 +315,7 @@ const FailureModesPage = () => {
       occurrence: fm.occurrence,
       detectability: fm.detectability,
       recommended_actions: fm.recommended_actions || [],
-      equipment_type_id: fm.equipment_type_id || ""
+      equipment_type_ids: fm.equipment_type_ids || []
     });
     setIsFmDialogOpen(true);
   };
@@ -350,19 +350,30 @@ const FailureModesPage = () => {
     setNewFm({ ...newFm, recommended_actions: newFm.recommended_actions.filter((_, i) => i !== idx) });
   };
 
-  // Auto-link equipment type when equipment name changes
+  const toggleEquipmentType = (typeId) => {
+    setNewFm(prev => {
+      const current = prev.equipment_type_ids || [];
+      if (current.includes(typeId)) {
+        return { ...prev, equipment_type_ids: current.filter(id => id !== typeId) };
+      } else {
+        return { ...prev, equipment_type_ids: [...current, typeId] };
+      }
+    });
+  };
+
+  // Auto-link equipment types when equipment name changes
   const handleEquipmentChange = (value) => {
     setNewFm(prev => {
       const updated = { ...prev, equipment: value };
-      // Auto-detect equipment type if not already set
-      if (!prev.equipment_type_id) {
+      // Auto-detect equipment types if not already set
+      if (!prev.equipment_type_ids || prev.equipment_type_ids.length === 0) {
         const equipLower = value.toLowerCase();
-        const autoType = equipmentTypes.find(t => 
+        const autoTypes = equipmentTypes.filter(t => 
           equipLower.includes(t.name.toLowerCase()) || 
           t.name.toLowerCase().includes(equipLower)
-        );
-        if (autoType) {
-          updated.equipment_type_id = autoType.id;
+        ).map(t => t.id);
+        if (autoTypes.length > 0) {
+          updated.equipment_type_ids = autoTypes;
         }
       }
       return updated;
@@ -601,20 +612,21 @@ const FailureModesPage = () => {
                           </div>
                         </div>
 
-                        {/* Linked Equipment Type & Actions */}
+                        {/* Linked Equipment Types & Actions */}
                         <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {fm.equipment_type_id && (
-                              <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {fm.equipment_type_ids && fm.equipment_type_ids.length > 0 ? (
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <Link className="w-4 h-4 text-blue-500" />
-                                <span>Linked to: </span>
-                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                  {equipmentTypes.find(t => t.id === fm.equipment_type_id)?.name || fm.equipment_type_id}
-                                </Badge>
+                                <span className="text-sm text-slate-600">Linked to:</span>
+                                {fm.equipment_type_ids.map(typeId => (
+                                  <Badge key={typeId} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                    {equipmentTypes.find(t => t.id === typeId)?.name || typeId}
+                                  </Badge>
+                                ))}
                               </div>
-                            )}
-                            {!fm.equipment_type_id && (
-                              <span className="text-xs text-slate-400">No equipment type linked</span>
+                            ) : (
+                              <span className="text-xs text-slate-400">No equipment types linked</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
@@ -806,24 +818,34 @@ const FailureModesPage = () => {
               />
             </div>
 
-            {/* Linked Equipment Type */}
+            {/* Linked Equipment Types - Multi-select */}
             <div>
               <Label className="flex items-center gap-2">
                 <Link className="w-4 h-4 text-blue-500" />
-                Linked Equipment Type
+                Linked Equipment Types
               </Label>
-              <Select value={newFm.equipment_type_id || "none"} onValueChange={v => setNewFm({ ...newFm, equipment_type_id: v === "none" ? "" : v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Auto-detected or select manually" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">-- No Link --</SelectItem>
-                  {equipmentTypes.map(t => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-slate-500 mt-1">Links this failure mode to equipment in your hierarchy</p>
+              <p className="text-xs text-slate-500 mb-2">Click to select/deselect (multiple allowed)</p>
+              <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg max-h-40 overflow-y-auto">
+                {equipmentTypes.map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleEquipmentType(t.id)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      (newFm.equipment_type_ids || []).includes(t.id)
+                        ? "bg-blue-500 text-white"
+                        : "bg-white border border-slate-200 text-slate-600 hover:border-blue-300"
+                    }`}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+              {(newFm.equipment_type_ids || []).length > 0 && (
+                <p className="text-xs text-blue-600 mt-1">
+                  Selected: {(newFm.equipment_type_ids || []).length} type(s)
+                </p>
+              )}
             </div>
 
             {/* FMEA Scores Row */}
