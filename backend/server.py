@@ -763,14 +763,26 @@ async def get_failure_modes(
     """Get failure modes from the library with optional filters."""
     results = FAILURE_MODES_LIBRARY.copy()
     
-    if category:
+    # Apply search filter first (searches across keywords, equipment, failure_mode, category)
+    if search:
+        search_lower = search.lower()
+        filtered = []
+        for fm in results:
+            # Check if search term appears in any searchable field
+            if (search_lower in fm["failure_mode"].lower() or
+                search_lower in fm["equipment"].lower() or
+                search_lower in fm["category"].lower() or
+                any(search_lower in kw.lower() for kw in fm["keywords"]) or
+                any(search_lower in action.lower() for action in fm["recommended_actions"])):
+                filtered.append(fm)
+        results = filtered
+    
+    # Then apply category filter
+    if category and category.lower() != "all":
         results = [fm for fm in results if fm["category"].lower() == category.lower()]
     
     if equipment:
         results = [fm for fm in results if fm["equipment"].lower() == equipment.lower()]
-    
-    if search:
-        results = find_matching_failure_modes(search, limit=100)
     
     if min_rpn:
         results = [fm for fm in results if fm["rpn"] >= min_rpn]
