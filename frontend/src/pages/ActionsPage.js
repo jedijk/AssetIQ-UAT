@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { actionsAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { toast } from "sonner";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   CheckCircle2,
   Clock,
@@ -16,11 +16,10 @@ import {
   MoreVertical,
   Edit2,
   Trash2,
-  ExternalLink,
-  ChevronDown,
   Target,
   FileText,
   GitBranch,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -63,10 +62,10 @@ const statusConfig = {
 };
 
 const priorityConfig = {
-  critical: { label: "Critical", color: "bg-red-100 text-red-700" },
-  high: { label: "High", color: "bg-orange-100 text-orange-700" },
-  medium: { label: "Medium", color: "bg-yellow-100 text-yellow-700" },
-  low: { label: "Low", color: "bg-slate-100 text-slate-600" },
+  critical: { label: "Critical", color: "bg-red-100 text-red-700", iconBg: "bg-red-50", iconColor: "text-red-600" },
+  high: { label: "High", color: "bg-orange-100 text-orange-700", iconBg: "bg-orange-50", iconColor: "text-orange-600" },
+  medium: { label: "Medium", color: "bg-yellow-100 text-yellow-700", iconBg: "bg-yellow-50", iconColor: "text-yellow-600" },
+  low: { label: "Low", color: "bg-slate-100 text-slate-600", iconBg: "bg-slate-50", iconColor: "text-slate-600" },
 };
 
 const sourceConfig = {
@@ -236,91 +235,51 @@ export default function ActionsPage() {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
+  // Stats cards matching ThreatsPage style
+  const statCards = [
+    { label: "Total Actions", value: stats.total, icon: FileText, color: "text-slate-600", bg: "bg-slate-100" },
+    { label: "Open", value: stats.open, icon: Clock, color: "text-blue-600", bg: "bg-blue-50" },
+    { label: "In Progress", value: stats.in_progress, icon: AlertCircle, color: "text-amber-600", bg: "bg-amber-50" },
+    { label: "Completed", value: stats.completed, icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
+    { label: "Overdue", value: stats.overdue, icon: AlertCircle, color: "text-red-600", bg: "bg-red-50" },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Actions</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage all actions from threats and investigations
-          </p>
-        </div>
+    <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="actions-page">
+      {/* Compact Stats Row - matching ThreatsPage */}
+      <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+        {statCards.map((stat) => (
+          <div
+            key={stat.label}
+            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200"
+            data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
+          >
+            <div className={`p-1.5 rounded-md ${stat.bg}`}>
+              <stat.icon className={`w-4 h-4 ${stat.color}`} />
+            </div>
+            <div>
+              <span className="text-lg font-bold text-slate-900">{stat.value}</span>
+              <span className="text-xs text-slate-500 ml-1">{stat.label}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-slate-100 rounded-lg">
-              <FileText className="w-5 h-5 text-slate-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
-              <p className="text-xs text-slate-500">Total Actions</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Clock className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-blue-600">{stats.open}</p>
-              <p className="text-xs text-slate-500">Open</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-amber-600">{stats.in_progress}</p>
-              <p className="text-xs text-slate-500">In Progress</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-              <p className="text-xs text-slate-500">Completed</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
-              <p className="text-xs text-slate-500">Overdue</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      {/* Filters - matching ThreatsPage */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-6" data-testid="actions-filters">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input
             placeholder="Search actions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-11"
             data-testid="actions-search"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px]" data-testid="status-filter">
+          <SelectTrigger className="w-full sm:w-48 h-11" data-testid="status-filter">
+            <Filter className="w-4 h-4 mr-2 text-slate-400" />
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -331,7 +290,7 @@ export default function ActionsPage() {
           </SelectContent>
         </Select>
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-          <SelectTrigger className="w-[140px]" data-testid="priority-filter">
+          <SelectTrigger className="w-full sm:w-40 h-11" data-testid="priority-filter">
             <SelectValue placeholder="Priority" />
           </SelectTrigger>
           <SelectContent>
@@ -343,7 +302,7 @@ export default function ActionsPage() {
           </SelectContent>
         </Select>
         <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-[160px]" data-testid="source-filter">
+          <SelectTrigger className="w-full sm:w-44 h-11" data-testid="source-filter">
             <SelectValue placeholder="Source" />
           </SelectTrigger>
           <SelectContent>
@@ -354,120 +313,129 @@ export default function ActionsPage() {
         </Select>
       </div>
 
-      {/* Actions List */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="p-8 text-center text-slate-500">Loading actions...</div>
-        ) : filteredActions.length === 0 ? (
-          <div className="p-12 text-center">
-            <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-slate-700 mb-2">No actions yet</h3>
-            <p className="text-sm text-slate-500">
-              Promote recommendations from threats or investigation actions to manage them here.
-            </p>
+      {/* Actions List - matching ThreatsPage priority-list style */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="loading-dots">
+            <span></span>
+            <span></span>
+            <span></span>
           </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            <AnimatePresence>
-              {filteredActions.map((action, index) => {
-                const StatusIcon = statusConfig[action.status]?.icon || Clock;
-                const SourceIcon = sourceConfig[action.source_type]?.icon || FileText;
-                const overdue = isOverdue(action);
+        </div>
+      ) : filteredActions.length === 0 ? (
+        <div className="empty-state py-16" data-testid="no-actions-message">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+            <CheckCircle className="w-8 h-8 text-slate-400" />
+          </div>
+          <h3 className="text-xl font-semibold text-slate-700 mb-2">No actions yet</h3>
+          <p className="text-slate-500">
+            Click "Act" on threat recommendations or investigation actions to track them here.
+          </p>
+        </div>
+      ) : (
+        <div className="priority-list" data-testid="actions-list">
+          {filteredActions.map((action, idx) => {
+            const StatusIcon = statusConfig[action.status]?.icon || Clock;
+            const SourceIcon = sourceConfig[action.source_type]?.icon || FileText;
+            const priority = priorityConfig[action.priority] || priorityConfig.medium;
+            const overdue = isOverdue(action);
 
-                return (
-                  <motion.div
-                    key={action.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ delay: index * 0.03 }}
-                    className={`p-4 hover:bg-slate-50 transition-colors ${overdue ? "bg-red-50/50" : ""}`}
-                    data-testid={`action-row-${action.id}`}
-                  >
-                    <div className="flex items-start gap-4">
-                      {/* Status indicator */}
-                      <button
-                        onClick={() => {
-                          const nextStatus = action.status === "open" ? "in_progress" : 
-                            action.status === "in_progress" ? "completed" : "open";
-                          quickStatusUpdate(action, nextStatus);
-                        }}
-                        className={`mt-1 p-1.5 rounded-full transition-colors ${statusConfig[action.status]?.color}`}
-                        title={`Status: ${statusConfig[action.status]?.label}. Click to change.`}
-                      >
-                        <StatusIcon className="w-4 h-4" />
-                      </button>
+            return (
+              <motion.div
+                key={action.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className={`priority-item group ${overdue ? "border-l-4 border-l-red-400" : ""}`}
+                data-testid={`action-row-${action.id}`}
+              >
+                {/* Status Icon */}
+                <button
+                  onClick={() => {
+                    const nextStatus = action.status === "open" ? "in_progress" : 
+                      action.status === "in_progress" ? "completed" : "open";
+                    quickStatusUpdate(action, nextStatus);
+                  }}
+                  className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${priority.iconBg}`}
+                  title={`Status: ${statusConfig[action.status]?.label}. Click to change.`}
+                >
+                  <StatusIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${priority.iconColor}`} />
+                </button>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-mono text-slate-400">{action.action_number}</span>
-                              <Badge className={priorityConfig[action.priority]?.color || "bg-slate-100"}>
-                                {priorityConfig[action.priority]?.label || action.priority}
-                              </Badge>
-                              {overdue && (
-                                <Badge className="bg-red-100 text-red-700">Overdue</Badge>
-                              )}
-                            </div>
-                            <h3 className="font-medium text-slate-900">{action.title}</h3>
-                            <p className="text-sm text-slate-500 line-clamp-2 mt-1">{action.description}</p>
-                          </div>
+                {/* Action Number */}
+                <div className="priority-rank text-sm sm:text-base" data-testid={`action-number-${action.id}`}>
+                  {action.action_number}
+                </div>
 
-                          {/* Actions menu */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openEditDialog(action)}>
-                                <Edit2 className="w-4 h-4 mr-2" /> Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => setDeleteConfirm(action)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
+                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-1">
+                      {action.title}
+                    </h3>
+                    <Badge className={priority.color}>
+                      {priority.label}
+                    </Badge>
+                    {overdue && (
+                      <Badge className="bg-red-100 text-red-700">Overdue</Badge>
+                    )}
+                  </div>
+                  <div className="text-xs sm:text-sm text-slate-500 line-clamp-1 flex items-center gap-2">
+                    <SourceIcon className={`w-3.5 h-3.5 ${sourceConfig[action.source_type]?.color}`} />
+                    <span>{action.source_name}</span>
+                    {action.assignee && (
+                      <>
+                        <span className="mx-1">•</span>
+                        <User className="w-3 h-3" />
+                        <span>{action.assignee}</span>
+                      </>
+                    )}
+                    {action.discipline && (
+                      <>
+                        <span className="mx-1">•</span>
+                        <span>{action.discipline}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
 
-                        {/* Meta info */}
-                        <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500">
-                          <div className="flex items-center gap-1">
-                            <SourceIcon className={`w-3.5 h-3.5 ${sourceConfig[action.source_type]?.color}`} />
-                            <span>{action.source_name}</span>
-                          </div>
-                          {action.assignee && (
-                            <div className="flex items-center gap-1">
-                              <User className="w-3.5 h-3.5" />
-                              <span>{action.assignee}</span>
-                            </div>
-                          )}
-                          {action.discipline && (
-                            <div className="flex items-center gap-1">
-                              <Briefcase className="w-3.5 h-3.5" />
-                              <span>{action.discipline}</span>
-                            </div>
-                          )}
-                          <div className={`flex items-center gap-1 ${overdue ? "text-red-600 font-medium" : ""}`}>
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>{formatDate(action.due_date)}</span>
-                          </div>
-                        </div>
-                      </div>
+                {/* Right side - Due date & actions */}
+                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                  <div className="text-right">
+                    <div className={`text-xs sm:text-sm font-medium ${overdue ? "text-red-600" : "text-slate-700"}`}>
+                      <Calendar className="w-3 h-3 inline mr-1" />
+                      {formatDate(action.due_date)}
                     </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-        )}
-      </div>
+                    <div className="text-xs text-slate-400 hidden sm:block">
+                      {statusConfig[action.status]?.label}
+                    </div>
+                  </div>
+                  
+                  {/* Actions menu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEditDialog(action)}>
+                        <Edit2 className="w-4 h-4 mr-2" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setDeleteConfirm(action)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
