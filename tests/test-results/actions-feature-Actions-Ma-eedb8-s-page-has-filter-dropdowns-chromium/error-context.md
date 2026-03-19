@@ -1,0 +1,293 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - button "Hide Equipment Panel" [ref=e7] [cursor=pointer]:
+            - img
+          - generic [ref=e8]:
+            - img "ThreatBase" [ref=e9]
+            - generic [ref=e10]: ThreatBase
+          - navigation [ref=e11]:
+            - link "Threats" [ref=e12] [cursor=pointer]:
+              - /url: /
+              - img [ref=e13]
+              - text: Threats
+            - link "Actions" [ref=e15] [cursor=pointer]:
+              - /url: /actions
+              - img [ref=e16]
+              - text: Actions
+            - link "Causal Engine" [ref=e19] [cursor=pointer]:
+              - /url: /causal-engine
+              - img [ref=e20]
+              - text: Causal Engine
+            - link "Library" [ref=e24] [cursor=pointer]:
+              - /url: /library
+              - img [ref=e25]
+              - text: Library
+        - generic [ref=e27]:
+          - button [disabled]:
+            - img
+          - button "Report Threat" [ref=e28] [cursor=pointer]:
+            - img
+            - text: Report Threat
+          - button [ref=e29] [cursor=pointer]:
+            - img
+          - generic [ref=e30]: Test User
+          - button "Logout" [ref=e31] [cursor=pointer]:
+            - img
+            - generic [ref=e32]: Logout
+    - generic [ref=e33]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - generic [ref=e38]:
+            - img [ref=e39]
+            - heading "Hierarchy" [level=2] [ref=e43]
+          - generic [ref=e44]:
+            - button "Tree" [ref=e45] [cursor=pointer]
+            - button "Levels" [ref=e46] [cursor=pointer]
+        - generic [ref=e48]:
+          - generic [ref=e50] [cursor=pointer]:
+            - button [ref=e51]:
+              - img [ref=e52]
+            - img [ref=e54]
+            - generic [ref=e58]: Oil Platform Alpha
+          - generic [ref=e60] [cursor=pointer]:
+            - img [ref=e61]
+            - generic [ref=e65]: Oil Platform Alpha
+          - generic [ref=e67] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e72]: TEST_DnD_Drag_1773912050054
+          - generic [ref=e74] [cursor=pointer]:
+            - img [ref=e75]
+            - generic [ref=e79]: TEST_DnD_Props_1773912056155
+          - generic [ref=e81] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e86]: TEST_Visual_B_1773912063954
+          - generic [ref=e88] [cursor=pointer]:
+            - img [ref=e89]
+            - generic [ref=e93]: TEST_Visual_A_1773912063954
+          - generic [ref=e95] [cursor=pointer]:
+            - img [ref=e96]
+            - generic [ref=e100]: TEST_Self_DnD_1773912073865
+          - generic [ref=e102] [cursor=pointer]:
+            - img [ref=e103]
+            - generic [ref=e107]: TEST_Installation_1773912157959
+          - generic [ref=e109] [cursor=pointer]:
+            - img [ref=e110]
+            - generic [ref=e114]: TEST_Parent_1773912219086
+          - generic [ref=e116] [cursor=pointer]:
+            - img [ref=e117]
+            - generic [ref=e121]: TEST_Props_1773912280654
+          - generic [ref=e123] [cursor=pointer]:
+            - img [ref=e124]
+            - generic [ref=e128]: TEST_Edit_1773912301071
+          - generic [ref=e130] [cursor=pointer]:
+            - img [ref=e131]
+            - generic [ref=e135]: TEST_Crit_1773912362260
+          - generic [ref=e138] [cursor=pointer]:
+            - img [ref=e139]
+            - generic [ref=e143]: TEST_Disc_1773912383274
+          - generic [ref=e145] [cursor=pointer]:
+            - img [ref=e146]
+            - generic [ref=e150]: UNIQUE_SEARCH_1773912444754
+          - generic [ref=e152] [cursor=pointer]:
+            - img [ref=e153]
+            - generic [ref=e157]: TEST_Delete_1773912506153
+          - generic [ref=e159] [cursor=pointer]:
+            - img [ref=e160]
+            - generic [ref=e164]: TEST_ISO_Install_1773912567731
+          - generic [ref=e166] [cursor=pointer]:
+            - img [ref=e167]
+            - generic [ref=e171]: TEST_DnD_Drag_1773913180855
+          - generic [ref=e173] [cursor=pointer]:
+            - img [ref=e174]
+            - generic [ref=e178]: TEST_DnD_Props_1773913187279
+          - generic [ref=e180] [cursor=pointer]:
+            - img [ref=e181]
+            - generic [ref=e185]: TEST_Visual_A_1773913196050
+          - generic [ref=e187] [cursor=pointer]:
+            - img [ref=e188]
+            - generic [ref=e192]: TEST_Visual_B_1773913196050
+          - generic [ref=e194] [cursor=pointer]:
+            - img [ref=e195]
+            - generic [ref=e199]: TEST_Self_DnD_1773913206730
+          - generic [ref=e201] [cursor=pointer]:
+            - img [ref=e202]
+            - generic [ref=e206]: TEST_DnD_Drag_1773913245578
+          - generic [ref=e208] [cursor=pointer]:
+            - img [ref=e209]
+            - generic [ref=e213]: TEST_DnD_Props_1773913252262
+          - generic [ref=e215] [cursor=pointer]:
+            - img [ref=e216]
+            - generic [ref=e220]: TEST_Visual_A_1773913261853
+          - generic [ref=e222] [cursor=pointer]:
+            - img [ref=e223]
+            - generic [ref=e227]: TEST_Visual_B_1773913261853
+          - generic [ref=e229] [cursor=pointer]:
+            - img [ref=e230]
+            - generic [ref=e234]: TEST_Self_DnD_1773913272241
+          - generic [ref=e236] [cursor=pointer]:
+            - img [ref=e237]
+            - generic [ref=e241]: TEST_DnD_Drag_1773913312238
+          - generic [ref=e243] [cursor=pointer]:
+            - img [ref=e244]
+            - generic [ref=e248]: TEST_DnD_Props_1773913318806
+          - generic [ref=e250] [cursor=pointer]:
+            - img [ref=e251]
+            - generic [ref=e255]: TEST_Demote_Vis_Install_1773913328376
+          - generic [ref=e257] [cursor=pointer]:
+            - img [ref=e258]
+            - generic [ref=e262]: TEST_Visual_A_1773913390060
+          - generic [ref=e264] [cursor=pointer]:
+            - img [ref=e265]
+            - generic [ref=e269]: TEST_Visual_B_1773913390060
+          - generic [ref=e271] [cursor=pointer]:
+            - img [ref=e272]
+            - generic [ref=e276]: TEST_Self_DnD_1773913400372
+          - generic [ref=e278] [cursor=pointer]:
+            - img [ref=e279]
+            - generic [ref=e283]: TEST_DnD_Drag_1773913437304
+          - generic [ref=e285] [cursor=pointer]:
+            - img [ref=e286]
+            - generic [ref=e290]: TEST_DnD_Props_1773913443773
+          - generic [ref=e292] [cursor=pointer]:
+            - img [ref=e293]
+            - generic [ref=e297]: TEST_Demote_Vis_Install_1773913453835
+          - generic [ref=e299] [cursor=pointer]:
+            - img [ref=e300]
+            - generic [ref=e304]: TEST_Demote_Vis_Install2_1773913453835
+          - generic [ref=e306] [cursor=pointer]:
+            - img [ref=e307]
+            - generic [ref=e311]: TEST_Visual_A_1773913463543
+          - generic [ref=e313] [cursor=pointer]:
+            - img [ref=e314]
+            - generic [ref=e318]: TEST_Visual_B_1773913463543
+          - generic [ref=e320] [cursor=pointer]:
+            - img [ref=e321]
+            - generic [ref=e325]: TEST_Self_DnD_1773913473920
+          - generic [ref=e327] [cursor=pointer]:
+            - img [ref=e328]
+            - generic [ref=e332]: TEST_Installation_1773913560466
+          - generic [ref=e334] [cursor=pointer]:
+            - img [ref=e335]
+            - generic [ref=e339]: TEST_Parent_1773913622260
+          - generic [ref=e341] [cursor=pointer]:
+            - img [ref=e342]
+            - generic [ref=e346]: TEST_Props_1773913685663
+          - generic [ref=e348] [cursor=pointer]:
+            - img [ref=e349]
+            - generic [ref=e353]: TEST_Installation_78d23b14
+          - generic [ref=e355] [cursor=pointer]:
+            - button [ref=e356]:
+              - img [ref=e357]
+            - img [ref=e359]
+            - generic [ref=e363]: TEST_Full_Install_00f034
+          - generic [ref=e365] [cursor=pointer]:
+            - img [ref=e366]
+            - generic [ref=e370]: TEST_Edit_1773913707555
+          - generic [ref=e372] [cursor=pointer]:
+            - img [ref=e373]
+            - generic [ref=e377]: TEST_Installation_f4814332
+          - generic [ref=e379] [cursor=pointer]:
+            - button [ref=e380]:
+              - img [ref=e381]
+            - img [ref=e383]
+            - generic [ref=e387]: TEST_Full_Install_0b13aa
+          - generic [ref=e389] [cursor=pointer]:
+            - img [ref=e390]
+            - generic [ref=e394]: TEST_Crit_1773913770058
+          - generic [ref=e397] [cursor=pointer]:
+            - img [ref=e398]
+            - generic [ref=e402]: TEST_Disc_1773913792234
+          - generic [ref=e404] [cursor=pointer]:
+            - img [ref=e405]
+            - generic [ref=e409]: TEST_Installation_4e031d37
+          - generic [ref=e411] [cursor=pointer]:
+            - img [ref=e412]
+            - generic [ref=e416]: TEST_Installation_38522e0c
+          - generic [ref=e418] [cursor=pointer]:
+            - img [ref=e419]
+            - generic [ref=e423]: UNIQUE_SEARCH_1773913854265
+          - generic [ref=e425] [cursor=pointer]:
+            - img [ref=e426]
+            - generic [ref=e430]: TEST_Delete_1773913915566
+          - generic [ref=e432] [cursor=pointer]:
+            - img [ref=e433]
+            - generic [ref=e437]: TEST_ISO_Install_1773913977054
+        - generic [ref=e439]:
+          - generic [ref=e440]: 64 items
+          - button "Manage" [ref=e441] [cursor=pointer]
+      - main [ref=e442]:
+        - generic [ref=e443]:
+          - generic [ref=e444]:
+            - generic [ref=e445]:
+              - img [ref=e447]
+              - generic [ref=e449]: 4Total Threats
+            - generic [ref=e450]:
+              - img [ref=e452]
+              - generic [ref=e455]: 4Open Threats
+            - generic [ref=e456]:
+              - img [ref=e458]
+              - generic [ref=e461]: 0Critical
+            - generic [ref=e462]:
+              - img [ref=e464]
+              - generic [ref=e466]: 0High Priority
+          - generic [ref=e467]:
+            - generic [ref=e468]:
+              - img [ref=e469]
+              - textbox "Search threats..." [ref=e472]
+            - combobox [ref=e473] [cursor=pointer]:
+              - img [ref=e474]
+              - generic: All Status
+              - img [ref=e476]
+          - generic [ref=e478]:
+            - generic [ref=e479] [cursor=pointer]:
+              - img [ref=e481]
+              - generic [ref=e484]: "# 1"
+              - generic [ref=e485]:
+                - generic [ref=e486]:
+                  - heading "P-101 grinding noise (possible bearing/impeller damage) - UNDO_TEST_1773920856742 - UNDO_TEST_1773920972236 - UNDO_TEST_1773921084536" [level=3] [ref=e487]
+                  - generic [ref=e488]: Medium
+                - generic [ref=e489]: Cooling Water Pump P-101•Pump
+              - generic [ref=e491]:
+                - generic [ref=e492]: "60"
+                - generic [ref=e493]: Open
+            - generic [ref=e494] [cursor=pointer]:
+              - img [ref=e496]
+              - generic [ref=e499]: "# 2"
+              - generic [ref=e500]:
+                - generic [ref=e501]:
+                  - heading "P-101 high vibration" [level=3] [ref=e502]
+                  - generic [ref=e503]: Medium
+                - generic [ref=e504]: Pump P-101•Pump
+              - generic [ref=e506]:
+                - generic [ref=e507]: "48"
+                - generic [ref=e508]: Open
+            - generic [ref=e509] [cursor=pointer]:
+              - img [ref=e511]
+              - generic [ref=e514]: "# 3"
+              - generic [ref=e515]:
+                - generic [ref=e516]:
+                  - heading "Cooling Water Pump P-101 overheating" [level=3] [ref=e517]
+                  - generic [ref=e518]: Medium
+                - generic [ref=e519]: Cooling Water Pump P-101•Pump
+              - generic [ref=e521]:
+                - generic [ref=e522]: "42"
+                - generic [ref=e523]: Open
+            - generic [ref=e524] [cursor=pointer]:
+              - img [ref=e526]
+              - generic [ref=e529]: "# 4"
+              - generic [ref=e530]:
+                - generic [ref=e531]:
+                  - heading "Cooling Water Pump P-101 mechanical seal leak" [level=3] [ref=e532]
+                  - generic [ref=e533]: Medium
+                - generic [ref=e534]: Cooling Water Pump P-101•Pump
+              - generic [ref=e536]:
+                - generic [ref=e537]: "30"
+                - generic [ref=e538]: Open
+```

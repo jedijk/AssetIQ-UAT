@@ -470,11 +470,11 @@ const ThreatDetailPage = () => {
                 onClick={() => promoteToActionMutation.mutate(action)}
                 disabled={promoteToActionMutation.isPending}
                 className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                title="Promote to tracked action"
+                title="Add to action tracker"
                 data-testid={`promote-action-${idx}`}
               >
                 <ClipboardList className="w-4 h-4 mr-1" />
-                Promote
+                Act
               </Button>
             </div>
           ))}

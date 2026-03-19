@@ -215,6 +215,22 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
     - Delete investigation (recreates the deleted investigation)
   - UndoContext.js provides pushUndo, undo, canUndo functions
   - Tests: 8/8 undo feature tests passed
+- [x] **Hierarchical Threat Filtering** (Mar 19, 2026):
+  - Clicking parent node in hierarchy filters threats from that node AND all descendants
+  - Filter banner shows "(including X items below)" when filtering by parent
+  - URL params: assets (comma-separated), assetName (display name)
+- [x] **Centralized Actions Management** (Mar 19, 2026):
+  - New "Actions" tab in navigation between Threats and Causal Engine
+  - Dedicated ActionsPage.js with stats cards (Total, Open, In Progress, Completed, Overdue)
+  - Filters: Status, Priority, Source Type (Threat/Investigation)
+  - Search by title, description, assignee, action number
+  - "Act" button on threat recommended actions (hover to reveal)
+  - "Act" button on investigation corrective actions
+  - Actions store: title, description, source_type, source_id, source_name, priority, status
+  - Edit dialog: title, description, status, priority, assignee, discipline, due date, completion notes
+  - Quick status toggle by clicking status icon
+  - Backend: /api/actions CRUD endpoints with filtering
+  - Backend tests: 20/20 passed
 
 ### Future Tasks (Backlog)
 - [ ] P2: Voice input for chat interface

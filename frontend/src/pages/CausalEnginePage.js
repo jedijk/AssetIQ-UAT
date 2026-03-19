@@ -512,10 +512,10 @@ export default function CausalEnginePage() {
                                 className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
                                 onClick={() => promoteToCentralActionMutation.mutate(action)}
                                 disabled={promoteToCentralActionMutation.isPending}
-                                title="Promote to central action tracker"
+                                title="Add to action tracker"
                                 data-testid={`promote-action-${action.id}`}
                               >
-                                <ClipboardList className="w-4 h-4 mr-1" />Promote
+                                <ClipboardList className="w-4 h-4 mr-1" />Act
                               </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => deleteActionMutation.mutate(action.id)}><Trash2 className="w-4 h-4" /></Button>
                             </div>
