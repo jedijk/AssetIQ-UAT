@@ -134,7 +134,7 @@ const Layout = () => {
             {/* Report Threat Button - Desktop */}
             <Button
               onClick={() => setChatOpen(true)}
-              className="hidden sm:flex items-center gap-2 bg-red-600 hover:bg-red-700"
+              className="hidden sm:flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
               data-testid="report-threat-button"
             >
               <Plus className="w-4 h-4" />
@@ -272,7 +272,7 @@ const Layout = () => {
       {/* Floating Action Button - Mobile */}
       <button
         onClick={() => setChatOpen(true)}
-        className="sm:hidden fixed bottom-20 right-6 h-14 w-14 rounded-full shadow-lg bg-red-600 text-white flex items-center justify-center hover:bg-red-700 hover:shadow-xl active:scale-95 transition-all duration-200 z-30"
+        className="sm:hidden fixed bottom-20 right-6 h-14 w-14 rounded-full shadow-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 hover:shadow-xl active:scale-95 transition-all duration-200 z-30"
         data-testid="fab-report-threat"
       >
         <MessageSquare className="w-6 h-6" />
