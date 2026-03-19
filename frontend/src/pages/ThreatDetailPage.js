@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { threatsAPI } from "../lib/api";
+import { threatsAPI, investigationAPI } from "../lib/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -16,6 +16,7 @@ import {
   XCircle,
   Loader2,
   Trash2,
+  GitBranch,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import {
@@ -74,6 +75,19 @@ const ThreatDetailPage = () => {
     },
     onError: () => {
       toast.error("Failed to delete threat");
+    },
+  });
+
+  // Start investigation mutation
+  const investigateMutation = useMutation({
+    mutationFn: () => investigationAPI.createFromThreat(id),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["investigations"] });
+      toast.success("Investigation created");
+      navigate(`/causal-engine?inv=${data.investigation.id}`);
+    },
+    onError: () => {
+      toast.error("Failed to create investigation");
     },
   });
 
@@ -146,6 +160,21 @@ const ThreatDetailPage = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => investigateMutation.mutate()}
+              disabled={investigateMutation.isPending}
+              className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              data-testid="investigate-threat-button"
+            >
+              {investigateMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <GitBranch className="w-4 h-4 mr-2" />
+              )}
+              Investigate
+            </Button>
+            
             <Select
               value={threat.status}
               onValueChange={(value) => updateMutation.mutate({ status: value })}

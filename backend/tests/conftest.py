@@ -24,3 +24,8 @@ def auth_token(api_client):
 def authenticated_client(api_client, auth_token):
     api_client.headers.update({"Authorization": f"Bearer {auth_token}"})
     return api_client
+
+@pytest.fixture
+def auth_headers(auth_token):
+    """Return headers dict with auth token"""
+    return {"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}

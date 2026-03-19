@@ -28,6 +28,14 @@ from iso14224_models import (
     UnstructuredItemCreate, ParseEquipmentListRequest, AssignToHierarchyRequest,
     detect_equipment_type, EquipmentTypeCreate, EquipmentTypeUpdate
 )
+from investigation_models import (
+    InvestigationCreate, InvestigationUpdate, InvestigationStatus,
+    TimelineEventCreate, TimelineEventUpdate, EventCategory, ConfidenceLevel,
+    FailureIdentificationCreate, FailureIdentificationUpdate,
+    CauseNodeCreate, CauseNodeUpdate, CauseCategory,
+    ActionItemCreate, ActionItemUpdate, ActionPriority, ActionStatus,
+    EvidenceCreate
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1777,6 +1785,609 @@ async def clear_unstructured_items(
     return {"message": f"Deleted {result.deleted_count} items"}
 
 # Include router and middleware
+# ============= CAUSAL INVESTIGATION ENDPOINTS =============
+
+async def generate_case_number(user_id: str) -> str:
+    """Generate a unique case number for investigation."""
+    count = await db.investigations.count_documents({"created_by": user_id})
+    year = datetime.now(timezone.utc).strftime("%Y")
+    return f"INV-{year}-{count + 1:04d}"
+
+
+async def generate_action_number(investigation_id: str) -> str:
+    """Generate a unique action number."""
+    count = await db.action_items.count_documents({"investigation_id": investigation_id})
+    return f"ACT-{count + 1:03d}"
+
+
+@api_router.post("/investigations")
+async def create_investigation(
+    data: InvestigationCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new investigation case."""
+    inv_id = str(uuid.uuid4())
+    case_number = await generate_case_number(current_user["id"])
+    
+    inv_doc = {
+        "id": inv_id,
+        "case_number": case_number,
+        "title": data.title,
+        "description": data.description,
+        "asset_id": data.asset_id,
+        "asset_name": data.asset_name,
+        "location": data.location,
+        "incident_date": data.incident_date,
+        "investigation_leader": data.investigation_leader or current_user["name"],
+        "team_members": data.team_members,
+        "threat_id": data.threat_id,
+        "status": InvestigationStatus.DRAFT.value,
+        "created_by": current_user["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.investigations.insert_one(inv_doc)
+    inv_doc.pop("_id", None)
+    return inv_doc
+
+
+@api_router.get("/investigations")
+async def get_investigations(
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all investigations for the current user."""
+    query = {"created_by": current_user["id"]}
+    if status:
+        query["status"] = status
+    
+    investigations = await db.investigations.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return {"investigations": investigations}
+
+
+@api_router.get("/investigations/{inv_id}")
+async def get_investigation(
+    inv_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific investigation with all related data."""
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    # Get related data
+    events = await db.timeline_events.find(
+        {"investigation_id": inv_id}, {"_id": 0}
+    ).sort("event_time", 1).to_list(500)
+    
+    failures = await db.failure_identifications.find(
+        {"investigation_id": inv_id}, {"_id": 0}
+    ).to_list(100)
+    
+    causes = await db.cause_nodes.find(
+        {"investigation_id": inv_id}, {"_id": 0}
+    ).to_list(500)
+    
+    actions = await db.action_items.find(
+        {"investigation_id": inv_id}, {"_id": 0}
+    ).sort("created_at", 1).to_list(100)
+    
+    evidence = await db.evidence_items.find(
+        {"investigation_id": inv_id}, {"_id": 0}
+    ).to_list(100)
+    
+    return {
+        "investigation": inv,
+        "timeline_events": events,
+        "failure_identifications": failures,
+        "cause_nodes": causes,
+        "action_items": actions,
+        "evidence": evidence
+    }
+
+
+@api_router.patch("/investigations/{inv_id}")
+async def update_investigation(
+    inv_id: str,
+    update: InvestigationUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update an investigation."""
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    if "status" in update_data and isinstance(update_data["status"], InvestigationStatus):
+        update_data["status"] = update_data["status"].value
+    
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.investigations.update_one({"id": inv_id}, {"$set": update_data})
+    
+    updated = await db.investigations.find_one({"id": inv_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/investigations/{inv_id}")
+async def delete_investigation(
+    inv_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete an investigation and all related data."""
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    # Delete all related data
+    await db.timeline_events.delete_many({"investigation_id": inv_id})
+    await db.failure_identifications.delete_many({"investigation_id": inv_id})
+    await db.cause_nodes.delete_many({"investigation_id": inv_id})
+    await db.action_items.delete_many({"investigation_id": inv_id})
+    await db.evidence_items.delete_many({"investigation_id": inv_id})
+    await db.investigations.delete_one({"id": inv_id})
+    
+    return {"message": "Investigation deleted"}
+
+
+# ============= TIMELINE EVENTS =============
+
+@api_router.post("/investigations/{inv_id}/events")
+async def create_timeline_event(
+    inv_id: str,
+    data: TimelineEventCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a timeline event to an investigation."""
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    event_id = str(uuid.uuid4())
+    event_doc = {
+        "id": event_id,
+        "investigation_id": inv_id,
+        "event_time": data.event_time,
+        "description": data.description,
+        "category": data.category.value,
+        "evidence_source": data.evidence_source,
+        "confidence": data.confidence.value,
+        "notes": data.notes,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.timeline_events.insert_one(event_doc)
+    event_doc.pop("_id", None)
+    return event_doc
+
+
+@api_router.patch("/investigations/{inv_id}/events/{event_id}")
+async def update_timeline_event(
+    inv_id: str,
+    event_id: str,
+    update: TimelineEventUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a timeline event."""
+    event = await db.timeline_events.find_one({"id": event_id, "investigation_id": inv_id})
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    if "category" in update_data and isinstance(update_data["category"], EventCategory):
+        update_data["category"] = update_data["category"].value
+    if "confidence" in update_data and isinstance(update_data["confidence"], ConfidenceLevel):
+        update_data["confidence"] = update_data["confidence"].value
+    
+    if update_data:
+        await db.timeline_events.update_one({"id": event_id}, {"$set": update_data})
+    
+    updated = await db.timeline_events.find_one({"id": event_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/investigations/{inv_id}/events/{event_id}")
+async def delete_timeline_event(
+    inv_id: str,
+    event_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a timeline event."""
+    result = await db.timeline_events.delete_one({"id": event_id, "investigation_id": inv_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {"message": "Event deleted"}
+
+
+# ============= FAILURE IDENTIFICATIONS =============
+
+@api_router.post("/investigations/{inv_id}/failures")
+async def create_failure_identification(
+    inv_id: str,
+    data: FailureIdentificationCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a failure identification to an investigation."""
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    failure_id = str(uuid.uuid4())
+    failure_doc = {
+        "id": failure_id,
+        "investigation_id": inv_id,
+        "asset_name": data.asset_name,
+        "subsystem": data.subsystem,
+        "component": data.component,
+        "failure_mode": data.failure_mode,
+        "degradation_mechanism": data.degradation_mechanism,
+        "evidence": data.evidence,
+        "failure_mode_id": data.failure_mode_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.failure_identifications.insert_one(failure_doc)
+    failure_doc.pop("_id", None)
+    return failure_doc
+
+
+@api_router.patch("/investigations/{inv_id}/failures/{failure_id}")
+async def update_failure_identification(
+    inv_id: str,
+    failure_id: str,
+    update: FailureIdentificationUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a failure identification."""
+    failure = await db.failure_identifications.find_one({"id": failure_id, "investigation_id": inv_id})
+    if not failure:
+        raise HTTPException(status_code=404, detail="Failure identification not found")
+    
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    if update_data:
+        await db.failure_identifications.update_one({"id": failure_id}, {"$set": update_data})
+    
+    updated = await db.failure_identifications.find_one({"id": failure_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/investigations/{inv_id}/failures/{failure_id}")
+async def delete_failure_identification(
+    inv_id: str,
+    failure_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a failure identification."""
+    result = await db.failure_identifications.delete_one({"id": failure_id, "investigation_id": inv_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Failure identification not found")
+    return {"message": "Failure identification deleted"}
+
+
+# ============= CAUSE NODES (CAUSAL TREE) =============
+
+@api_router.post("/investigations/{inv_id}/causes")
+async def create_cause_node(
+    inv_id: str,
+    data: CauseNodeCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a cause node to the causal tree."""
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    # Validate parent exists if specified
+    if data.parent_id:
+        parent = await db.cause_nodes.find_one({"id": data.parent_id, "investigation_id": inv_id})
+        if not parent:
+            raise HTTPException(status_code=400, detail="Parent cause node not found")
+    
+    cause_id = str(uuid.uuid4())
+    cause_doc = {
+        "id": cause_id,
+        "investigation_id": inv_id,
+        "description": data.description,
+        "category": data.category.value,
+        "parent_id": data.parent_id,
+        "is_root_cause": data.is_root_cause,
+        "evidence": data.evidence,
+        "linked_event_id": data.linked_event_id,
+        "linked_failure_id": data.linked_failure_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.cause_nodes.insert_one(cause_doc)
+    cause_doc.pop("_id", None)
+    return cause_doc
+
+
+@api_router.patch("/investigations/{inv_id}/causes/{cause_id}")
+async def update_cause_node(
+    inv_id: str,
+    cause_id: str,
+    update: CauseNodeUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a cause node."""
+    cause = await db.cause_nodes.find_one({"id": cause_id, "investigation_id": inv_id})
+    if not cause:
+        raise HTTPException(status_code=404, detail="Cause node not found")
+    
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    if "category" in update_data and isinstance(update_data["category"], CauseCategory):
+        update_data["category"] = update_data["category"].value
+    
+    if update_data:
+        await db.cause_nodes.update_one({"id": cause_id}, {"$set": update_data})
+    
+    updated = await db.cause_nodes.find_one({"id": cause_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/investigations/{inv_id}/causes/{cause_id}")
+async def delete_cause_node(
+    inv_id: str,
+    cause_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a cause node and its children."""
+    # Get all children recursively
+    async def get_children_ids(parent_id):
+        children = await db.cause_nodes.find(
+            {"parent_id": parent_id, "investigation_id": inv_id},
+            {"_id": 0, "id": 1}
+        ).to_list(100)
+        all_ids = [c["id"] for c in children]
+        for child in children:
+            all_ids.extend(await get_children_ids(child["id"]))
+        return all_ids
+    
+    children_ids = await get_children_ids(cause_id)
+    all_ids = [cause_id] + children_ids
+    
+    result = await db.cause_nodes.delete_many({"id": {"$in": all_ids}})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Cause node not found")
+    
+    return {"message": f"Deleted {result.deleted_count} cause nodes"}
+
+
+# ============= ACTION ITEMS =============
+
+@api_router.post("/investigations/{inv_id}/actions")
+async def create_action_item(
+    inv_id: str,
+    data: ActionItemCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add an action item to an investigation."""
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    action_id = str(uuid.uuid4())
+    action_number = await generate_action_number(inv_id)
+    
+    action_doc = {
+        "id": action_id,
+        "investigation_id": inv_id,
+        "action_number": action_number,
+        "description": data.description,
+        "owner": data.owner,
+        "priority": data.priority.value,
+        "due_date": data.due_date,
+        "status": ActionStatus.OPEN.value,
+        "linked_cause_id": data.linked_cause_id,
+        "completion_notes": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.action_items.insert_one(action_doc)
+    action_doc.pop("_id", None)
+    return action_doc
+
+
+@api_router.patch("/investigations/{inv_id}/actions/{action_id}")
+async def update_action_item(
+    inv_id: str,
+    action_id: str,
+    update: ActionItemUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update an action item."""
+    action = await db.action_items.find_one({"id": action_id, "investigation_id": inv_id})
+    if not action:
+        raise HTTPException(status_code=404, detail="Action item not found")
+    
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    if "priority" in update_data and isinstance(update_data["priority"], ActionPriority):
+        update_data["priority"] = update_data["priority"].value
+    if "status" in update_data and isinstance(update_data["status"], ActionStatus):
+        update_data["status"] = update_data["status"].value
+    
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.action_items.update_one({"id": action_id}, {"$set": update_data})
+    
+    updated = await db.action_items.find_one({"id": action_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/investigations/{inv_id}/actions/{action_id}")
+async def delete_action_item(
+    inv_id: str,
+    action_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete an action item."""
+    result = await db.action_items.delete_one({"id": action_id, "investigation_id": inv_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Action item not found")
+    return {"message": "Action item deleted"}
+
+
+# ============= EVIDENCE =============
+
+@api_router.post("/investigations/{inv_id}/evidence")
+async def add_evidence(
+    inv_id: str,
+    data: EvidenceCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add evidence to an investigation."""
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    evidence_id = str(uuid.uuid4())
+    evidence_doc = {
+        "id": evidence_id,
+        "investigation_id": inv_id,
+        "name": data.name,
+        "evidence_type": data.evidence_type,
+        "description": data.description,
+        "file_url": data.file_url,
+        "linked_event_id": data.linked_event_id,
+        "linked_cause_id": data.linked_cause_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.evidence_items.insert_one(evidence_doc)
+    evidence_doc.pop("_id", None)
+    return evidence_doc
+
+
+@api_router.delete("/investigations/{inv_id}/evidence/{evidence_id}")
+async def delete_evidence(
+    inv_id: str,
+    evidence_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete evidence."""
+    result = await db.evidence_items.delete_one({"id": evidence_id, "investigation_id": inv_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+    return {"message": "Evidence deleted"}
+
+
+# ============= INVESTIGATION STATS =============
+
+@api_router.get("/investigations/{inv_id}/stats")
+async def get_investigation_stats(
+    inv_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get statistics for an investigation."""
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    events_count = await db.timeline_events.count_documents({"investigation_id": inv_id})
+    failures_count = await db.failure_identifications.count_documents({"investigation_id": inv_id})
+    causes_count = await db.cause_nodes.count_documents({"investigation_id": inv_id})
+    root_causes_count = await db.cause_nodes.count_documents({"investigation_id": inv_id, "is_root_cause": True})
+    actions_count = await db.action_items.count_documents({"investigation_id": inv_id})
+    open_actions = await db.action_items.count_documents({"investigation_id": inv_id, "status": {"$in": ["open", "in_progress"]}})
+    evidence_count = await db.evidence_items.count_documents({"investigation_id": inv_id})
+    
+    return {
+        "timeline_events": events_count,
+        "failure_identifications": failures_count,
+        "total_causes": causes_count,
+        "root_causes": root_causes_count,
+        "total_actions": actions_count,
+        "open_actions": open_actions,
+        "evidence_items": evidence_count
+    }
+
+
+# ============= CREATE INVESTIGATION FROM THREAT =============
+
+@api_router.post("/threats/{threat_id}/investigate")
+async def create_investigation_from_threat(
+    threat_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new investigation from an existing threat."""
+    threat = await db.threats.find_one(
+        {"id": threat_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    )
+    if not threat:
+        raise HTTPException(status_code=404, detail="Threat not found")
+    
+    # Check if investigation already exists for this threat
+    existing = await db.investigations.find_one({"threat_id": threat_id})
+    if existing:
+        return {"investigation": existing, "message": "Investigation already exists for this threat"}
+    
+    inv_id = str(uuid.uuid4())
+    case_number = await generate_case_number(current_user["id"])
+    
+    inv_doc = {
+        "id": inv_id,
+        "case_number": case_number,
+        "title": f"Investigation: {threat['title']}",
+        "description": f"Investigation initiated from threat report.\n\nAsset: {threat['asset']}\nFailure Mode: {threat['failure_mode']}\nRisk Level: {threat['risk_level']}\nRisk Score: {threat['risk_score']}",
+        "asset_id": None,
+        "asset_name": threat.get("asset"),
+        "location": threat.get("location"),
+        "incident_date": threat.get("created_at"),
+        "investigation_leader": current_user["name"],
+        "team_members": [],
+        "threat_id": threat_id,
+        "status": InvestigationStatus.DRAFT.value,
+        "created_by": current_user["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.investigations.insert_one(inv_doc)
+    inv_doc.pop("_id", None)
+    
+    # Create initial failure identification from threat data
+    if threat.get("failure_mode"):
+        failure_doc = {
+            "id": str(uuid.uuid4()),
+            "investigation_id": inv_id,
+            "asset_name": threat.get("asset", "Unknown"),
+            "subsystem": None,
+            "component": threat.get("equipment_type", "Unknown"),
+            "failure_mode": threat.get("failure_mode"),
+            "degradation_mechanism": threat.get("cause"),
+            "evidence": f"From threat report: {threat.get('title')}",
+            "failure_mode_id": None,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.failure_identifications.insert_one(failure_doc)
+    
+    return {"investigation": inv_doc, "message": "Investigation created from threat"}
+
+
 app.include_router(api_router)
 
 app.add_middleware(
