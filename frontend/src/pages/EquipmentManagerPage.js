@@ -282,7 +282,7 @@ function CriticalityChart({ nodes }) {
   );
 }
 
-function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, disciplines, onUpdate, onAssignCriticality, onAssignDiscipline, onStartMove, isMoving, onPromote, onDemote, onMoveUp, onMoveDown, canMoveUp, canMoveDown, nodes }) {
+function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, disciplines, onUpdate, onAssignCriticality, onAssignDiscipline, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -291,20 +291,21 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
       <Settings className="w-12 h-12 text-slate-300 mb-3" />
       <h3 className="text-lg font-semibold text-slate-600 mb-1">No Selection</h3>
-      <p className="text-sm text-slate-400">Select an item from the hierarchy</p>
+      <p className="text-sm text-slate-400">Select an item from the hierarchy to view properties</p>
+      <div className="mt-4 p-3 bg-blue-50 rounded-lg text-left">
+        <h4 className="text-xs font-semibold text-blue-800 mb-1">Drag & Drop Tips</h4>
+        <ul className="text-xs text-blue-700 space-y-1">
+          <li>• Drag items to reorder within siblings</li>
+          <li>• Drop on top/bottom edge to reorder</li>
+          <li>• Drop in center to make child</li>
+        </ul>
+      </div>
     </div>
   );
   
   const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
-  const canMove = node.level !== "installation";
-  
-  // Calculate if node can be promoted or demoted
-  const normalizedLevel = normalizeLevel(node.level);
-  const levelIdx = LEVEL_ORDER.indexOf(normalizedLevel);
-  const canPromote = levelIdx > 0 && node.parent_id; // Can't promote root or installation
-  const canDemote = levelIdx < LEVEL_ORDER.length - 1 && levelIdx >= 0; // Can't demote maintainable items
   
   const handleSave = () => { onUpdate(node.id, { name: editName, description: editDesc }); setIsEditing(false); };
   const startEdit = () => { setEditName(node.name); setEditDesc(node.description || ""); setIsEditing(true); };
@@ -332,67 +333,12 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
       
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
-          {/* Move Button */}
-          {canMove && (
-            <Button 
-              variant={isMoving ? "default" : "outline"} 
-              className={`w-full ${isMoving ? "bg-blue-600" : ""}`}
-              onClick={onStartMove}
-              data-testid="move-node-btn"
-            >
-              <Move className="w-4 h-4 mr-2" />
-              {isMoving ? "Click a valid parent to move" : "Move to different parent"}
-            </Button>
-          )}
-          
-          {/* Promote/Demote Buttons */}
-          <div className="flex gap-2">
-            {canPromote && (
-              <Button 
-                variant="outline" 
-                className="flex-1"
-                onClick={onPromote}
-                data-testid="promote-node-btn"
-              >
-                <ChevronUp className="w-4 h-4 mr-1" />
-                Promote
-              </Button>
-            )}
-            {canDemote && (
-              <Button 
-                variant="outline" 
-                className="flex-1"
-                onClick={onDemote}
-                data-testid="demote-node-btn"
-              >
-                <ChevronDown className="w-4 h-4 mr-1" />
-                Demote
-              </Button>
-            )}
-          </div>
-          
-          {/* Reorder Buttons (Move Up/Down) */}
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              className="flex-1"
-              onClick={onMoveUp}
-              disabled={!canMoveUp}
-              data-testid="move-up-btn"
-            >
-              <ArrowUp className="w-4 h-4 mr-1" />
-              Move Up
-            </Button>
-            <Button 
-              variant="outline" 
-              className="flex-1"
-              onClick={onMoveDown}
-              disabled={!canMoveDown}
-              data-testid="move-down-btn"
-            >
-              <ArrowDown className="w-4 h-4 mr-1" />
-              Move Down
-            </Button>
+          {/* Drag hint */}
+          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex items-center gap-2 text-slate-600">
+              <GripVertical className="w-4 h-4" />
+              <span className="text-xs font-medium">Drag to reorder or move</span>
+            </div>
           </div>
           
           <div>
@@ -408,9 +354,7 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
             <div>
               <Label className="text-xs text-slate-500 mb-1">Equipment Type</Label>
               <Select value={node.equipment_type_id || ""} onValueChange={v => {
-                // Find the equipment type to get its discipline
                 const eqType = equipmentTypes?.find(t => t.id === v);
-                // Update both equipment_type_id and discipline together
                 onUpdate(node.id, { 
                   equipment_type_id: v,
                   discipline: eqType?.discipline || node.discipline
@@ -422,7 +366,6 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
             </div>
           )}
           
-          {/* Show discipline - derived from equipment type for equipment_unit, manual for others */}
           {(node.level === "equipment_unit" || node.level === "equipment") ? (
             node.equipment_type_id && (
               <div>
@@ -468,6 +411,20 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
               <h4 className="text-xs font-semibold text-slate-600 mb-2">Risk Score: <span className="text-lg">{node.criticality.risk_score}</span></h4>
             </div>
           )}
+          
+          {/* Delete button at the bottom */}
+          {node.level !== "installation" && (
+            <div className="pt-4 border-t border-slate-200">
+              <Button 
+                variant="outline" 
+                className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => onDelete(node.id)}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete {config.label}
+              </Button>
+            </div>
+          )}
         </div>
       </ScrollArea>
     </div>
@@ -485,12 +442,13 @@ export default function EquipmentManagerPage() {
   const [newNode, setNewNode] = useState({ name: "", level: "installation", parent_id: null });
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
-  const [movingNode, setMovingNode] = useState(null);
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);
   const [newType, setNewType] = useState({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
   // State for assigning unstructured items with level selection
   const [assignDialog, setAssignDialog] = useState({ open: false, item: null, parentNode: null, selectedLevel: "" });
+  // State for move mode (legacy - kept for compatibility but not actively used with drag-drop)
+  const [movingNode, setMovingNode] = useState(null);
 
   const { data: nodesData, isLoading } = useQuery({ queryKey: ["equipment-nodes"], queryFn: equipmentHierarchyAPI.getNodes });
   const { data: typesData } = useQuery({ queryKey: ["equipment-types"], queryFn: equipmentHierarchyAPI.getEquipmentTypes });
@@ -545,6 +503,9 @@ export default function EquipmentManagerPage() {
   
   // State for demote dialog (need to select new parent)
   const [demoteDialog, setDemoteDialog] = useState({ open: false, node: null, newLevel: null });
+  
+  // Cancel move mode handler
+  const handleCancelMove = () => setMovingNode(null);
   
   const handlePromote = () => {
     if (!selectedNode) return;
@@ -605,6 +566,53 @@ export default function EquipmentManagerPage() {
     onError: e => toast.error(e.response?.data?.detail || "Failed to reorder")
   });
 
+  // Reorder to position mutation (for drag-drop)
+  const reorderToPositionMutation = useMutation({
+    mutationFn: ({ nodeId, targetNodeId, position, newParentId }) => 
+      equipmentHierarchyAPI.reorderNodeToPosition(nodeId, targetNodeId, position, newParentId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["equipment-nodes"]);
+      toast.success(data.message || "Moved");
+    },
+    onError: e => toast.error(e.response?.data?.detail || "Failed to move")
+  });
+
+  // Handle reorder via drag-drop
+  const handleDragReorder = useCallback((draggedId, targetId, position, newParentId) => {
+    // Use the position-based reorder API
+    reorderToPositionMutation.mutate({ 
+      nodeId: draggedId, 
+      targetNodeId: targetId, 
+      position, 
+      newParentId 
+    });
+  }, [reorderToPositionMutation]);
+
+  // Handle level change via drag-drop (promote/demote)
+  const handleDragChangeLevel = useCallback((draggedId, targetId, dropType) => {
+    const draggedNode = nodes.find(n => n.id === draggedId);
+    const targetNode = nodes.find(n => n.id === targetId);
+    if (!draggedNode || !targetNode) return;
+    
+    if (dropType === "child") {
+      // Dropping as a child - this could be a demote or move to new parent
+      const validChildLevels = getValidChildLevels(targetNode.level);
+      const draggedLevel = normalizeLevel(draggedNode.level);
+      
+      if (validChildLevels.includes(draggedLevel)) {
+        // Valid level - just move to new parent
+        moveNodeMutation.mutate({ nodeId: draggedId, newParentId: targetId });
+      } else {
+        // Need to change level (demote)
+        const targetLevelIdx = LEVEL_ORDER.indexOf(normalizeLevel(targetNode.level));
+        const newLevel = LEVEL_ORDER[targetLevelIdx + 1];
+        if (newLevel) {
+          changeLevelMutation.mutate({ nodeId: draggedId, newLevel, newParentId: targetId });
+        }
+      }
+    }
+  }, [nodes, moveNodeMutation, changeLevelMutation]);
+
   const handleMoveUp = () => {
     if (selectedNode) {
       reorderMutation.mutate({ nodeId: selectedNode.id, direction: "up" });
@@ -632,23 +640,6 @@ export default function EquipmentManagerPage() {
   const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
 
   const handleExpand = useCallback(id => setExpandedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }), []);
-  
-  const handleStartMove = () => {
-    if (selectedNode && selectedNode.level !== "installation") {
-      setMovingNode(selectedNode);
-      toast.info("Click on a valid parent node to move");
-    }
-  };
-  
-  const handleMoveTarget = (targetNode) => {
-    if (movingNode && targetNode) {
-      moveNodeMutation.mutate({ nodeId: movingNode.id, newParentId: targetNode.id });
-    }
-  };
-  
-  const handleCancelMove = () => {
-    setMovingNode(null);
-  };
 
   const handleDragStart = (e, item, type) => e.dataTransfer.setData("application/json", JSON.stringify({ item, type }));
   const handleUnstructuredDragStart = (e, item) => { e.dataTransfer.setData("application/json", JSON.stringify({ item, type: "unstructured" })); e.dataTransfer.effectAllowed = "move"; };
@@ -750,22 +741,28 @@ export default function EquipmentManagerPage() {
             </div>
           ) : (
             <div className="space-y-1" data-testid="hierarchy-tree">
-              {filteredRows.map(({ node, depth, hasChildren, isExpanded }) => (
-                <TreeNode 
-                  key={node.id} 
-                  node={node} 
-                  depth={depth} 
-                  onSelect={setSelectedNode} 
-                  isSelected={selectedNode?.id === node.id} 
-                  isExpanded={isExpanded} 
-                  onExpand={handleExpand} 
-                  hasChildren={hasChildren}
-                  movingNode={movingNode}
-                  onMoveTarget={handleMoveTarget}
-                  allNodes={nodes}
-                  onDrop={handleTreeDrop}
-                />
-              ))}
+              {filteredRows.map(({ node, depth, hasChildren, isExpanded }) => {
+                const siblings = nodes.filter(n => n.parent_id === node.parent_id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+                const siblingIndex = siblings.findIndex(s => s.id === node.id);
+                return (
+                  <TreeNode 
+                    key={node.id} 
+                    node={node} 
+                    depth={depth} 
+                    onSelect={setSelectedNode} 
+                    isSelected={selectedNode?.id === node.id} 
+                    isExpanded={isExpanded} 
+                    onExpand={handleExpand} 
+                    hasChildren={hasChildren}
+                    allNodes={nodes}
+                    onDrop={handleTreeDrop}
+                    onReorder={handleDragReorder}
+                    onChangeLevel={handleDragChangeLevel}
+                    siblings={siblings}
+                    siblingIndex={siblingIndex}
+                  />
+                );
+              })}
             </div>
           )}
           
@@ -796,15 +793,7 @@ export default function EquipmentManagerPage() {
           onUpdate={(id, data) => updateMutation.mutate({ nodeId: id, data })} 
           onAssignCriticality={(id, a) => criticalityMutation.mutate({ nodeId: id, assignment: a })} 
           onAssignDiscipline={(id, d) => disciplineMutation.mutate({ nodeId: id, discipline: d })}
-          onStartMove={handleStartMove}
-          isMoving={movingNode?.id === selectedNode?.id}
-          onPromote={handlePromote}
-          onDemote={handleDemote}
-          onMoveUp={handleMoveUp}
-          onMoveDown={handleMoveDown}
-          canMoveUp={getSiblingInfo(selectedNode).canMoveUp}
-          canMoveDown={getSiblingInfo(selectedNode).canMoveDown}
-          nodes={nodes}
+          onDelete={(id) => deleteMutation.mutate(id)}
         />
       </div>
 

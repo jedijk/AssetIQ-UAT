@@ -1317,7 +1317,105 @@ async def reorder_equipment_node(
     return {"message": f"Node moved {request.direction}", "new_sort_order": target_sort}
 
 
-@api_router.post("/equipment-hierarchy/nodes/{node_id}/move")
+class ReorderToPositionRequest(BaseModel):
+    target_node_id: str  # The node to position relative to
+    position: str  # "before" or "after"
+    new_parent_id: Optional[str] = None  # If moving to a different parent
+
+
+@api_router.post("/equipment-hierarchy/nodes/{node_id}/reorder-to")
+async def reorder_node_to_position(
+    node_id: str,
+    request: ReorderToPositionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Reorder a node to a specific position relative to another node via drag-and-drop."""
+    if request.position not in ["before", "after"]:
+        raise HTTPException(status_code=400, detail="Position must be 'before' or 'after'")
+    
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    
+    target = await db.equipment_nodes.find_one(
+        {"id": request.target_node_id, "created_by": current_user["id"]}
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Target node not found")
+    
+    # Determine the new parent - use target's parent if not specified
+    new_parent_id = request.new_parent_id if request.new_parent_id is not None else target.get("parent_id")
+    
+    # If moving to a different parent, validate the level relationship
+    if new_parent_id != node.get("parent_id"):
+        if new_parent_id:
+            new_parent = await db.equipment_nodes.find_one(
+                {"id": new_parent_id, "created_by": current_user["id"]}
+            )
+            if not new_parent:
+                raise HTTPException(status_code=400, detail="New parent not found")
+            
+            parent_level = ISOLevel(new_parent["level"])
+            child_level = ISOLevel(node["level"])
+            if not is_valid_parent_child(parent_level, child_level):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot place {child_level.value} under {parent_level.value}"
+                )
+        else:
+            # Moving to root level - must be installation
+            if node["level"] != "installation":
+                raise HTTPException(status_code=400, detail="Only installations can be at root level")
+    
+    # Get all siblings at the target location (same parent as target)
+    siblings = await db.equipment_nodes.find(
+        {"parent_id": new_parent_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    ).sort("sort_order", 1).to_list(1000)
+    
+    # Remove the dragged node from siblings if it's in the same parent
+    siblings = [s for s in siblings if s["id"] != node_id]
+    
+    # Find target's position
+    target_idx = next((i for i, s in enumerate(siblings) if s["id"] == request.target_node_id), -1)
+    
+    if target_idx == -1:
+        # Target not in siblings (was the dragged node itself), just append
+        insert_idx = len(siblings)
+    elif request.position == "before":
+        insert_idx = target_idx
+    else:  # after
+        insert_idx = target_idx + 1
+    
+    # Reassign sort_order for all siblings
+    for i, sibling in enumerate(siblings):
+        new_sort = i if i < insert_idx else i + 1
+        if sibling.get("sort_order", 0) != new_sort:
+            await db.equipment_nodes.update_one(
+                {"id": sibling["id"]},
+                {"$set": {"sort_order": new_sort, "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+    
+    # Update the moved node with new sort_order and possibly new parent
+    await db.equipment_nodes.update_one(
+        {"id": node_id},
+        {"$set": {
+            "sort_order": insert_idx,
+            "parent_id": new_parent_id,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    return {
+        "message": f"Node moved {request.position} target",
+        "node": updated
+    }
+
+
+
 async def move_equipment_node(
     node_id: str,
     move_request: MoveNodeRequest,

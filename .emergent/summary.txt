@@ -7,88 +7,66 @@ The scope has since expanded significantly to include:
 - A comprehensive **Equipment Hierarchy & Criticality Manager** aligned with the ISO 14224 standard.
 - Detailed management of equipment types and their associated failure modes.
 - Integration between the hierarchy and the threat capture system.
-- Numerous UI/UX enhancements for managing the equipment hierarchy, including drag-and-drop, reordering, promoting, and demoting nodes.
-- A new request to build a **Causal Engine** module for root cause analysis.
+- Numerous UI/UX enhancements for managing the equipment hierarchy, including drag-and-drop reordering.
+- A new **Causal Engine** module for root cause analysis, for which the user provided a detailed functional specification.
 
 **User's preferred language**: English
 
 **what currently exists?**
 The ThreatBase application is functional with a robust set of features.
 -   **Core MVP:** User authentication, chat-based threat capture, and a prioritized threat dashboard are working.
--   **Equipment Hierarchy Manager:** A dedicated page () allows users to manage a full equipment hierarchy.
-    -   **ISO 14224 Aligned:** The hierarchy structure (Installation, Plant/Unit, Section/System, Equipment Unit, Subunit, Maintainable Item) and terminology are aligned with the ISO 14224 standard.
-    -   **Hierarchy Management:**
-        -   Users can create/edit/delete nodes.
-        -   Drag-and-drop is implemented to move Unassigned Items into the hierarchy, with a dialog to select the correct level.
-        -   A click-based Move Mode allows repositioning nodes between different parents.
-        -   Buttons are present to **Promote** (move up a level), **Demote** (move down a level), and **Reorder** (move up/down among siblings).
-    -   **Data Integrity:** Backend validation prevents creating nodes with duplicate names under the same parent.
--   **Chatbot Integration:** The chat interface is now tightly integrated with the hierarchy.
-    -   It validates that a reported asset exists in the hierarchy before creating a threat.
-    -   It can resolve partial tag names (e.g., P-101) to the full equipment name (Pump P-101).
-    -   It incorporates the equipment's assigned criticality (e.g., Safety Critical) into the threat's risk score calculation.
--   **Data Libraries:**
-    -   The system includes an editable library of equipment types.
-    -   A comprehensive Failure Modes Library () is available, containing 138 modes, including a detailed breakdown for Extruders.
--   **Threats Page Integration:** Clicking on an asset in the hierarchy sidebar (visible on the threats page) filters the list to show threats for only that asset.
+-   **Equipment Hierarchy Manager:** A dedicated page () allows users to manage a full equipment hierarchy aligned with the ISO 14224 standard.
+-   **Chatbot Integration:** The chatbot validates equipment against the hierarchy, resolves partial tag names, and incorporates equipment criticality into risk scores.
+-   **Causal Engine Module (NEW):** A comprehensive new module for root cause analysis has been built and verified.
+    -   A new page () allows users to create and manage investigation cases.
+    -   It includes functionalities for building an event timeline, identifying failure modes, constructing a causal tree, and managing corrective actions, based on the user's detailed specification.
+    -   Backend models and a full suite of CRUD APIs have been implemented.
+    -   Integration is complete: a button on the  allows creating an investigation directly from a threat.
+    -   The feature was successfully debugged (resolving a React/Babel stack overflow and a React Query data-fetching bug) and tested with .
 
 **Last working item**:
--   **Last item agent was working:** The user made two back-to-back requests: 1) Replace the reorder/promote/demote buttons with a full drag-and-drop experience, and 2) Add a new Causal Engine module. The agent started implementing the drag-and-drop reordering in  but was interrupted by the Causal Engine request, which it had just begun to investigate by viewing  and .
+-   **Last item agent was working:** After completing the Causal Engine, the user requested to fix the drag-and-drop functionality for reordering, promoting, and demoting nodes in the Equipment Manager page. The agent has implemented the necessary code changes in  by removing the old button-based controls and wiring up the drag-and-drop event handlers.
 -   **Status:** IN PROGRESS
 -   **Agent Testing Done:** N
--   **Which testing method agent to use?** Frontend testing agent
+-   **Which testing method agent to use?** Frontend testing agent (to verify drag-and-drop interactions) or manual testing with the screenshot tool.
 -   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
-There are no outstanding bugs; the current work is feature development.
+There are no outstanding bugs. The current work is feature completion and verification.
 
 **In progress Task List**:
--   **Task 1: Implement Causal Engine Module (P0)**
-    -   This was the user's most recent request. A new tab and page should be created for a Causal Engine to perform root cause analysis, with visuals that match the rest of the application.
--   **Task 2: Implement Drag-and-Drop for Hierarchy Reordering (P1)**
-    -   The user wants to replace the existing Promote, Demote, and Reorder buttons with a seamless drag-and-drop interface within the main hierarchy tree to handle all reordering and level-changing operations.
+-   **Task 1: Verify Drag-and-Drop for Hierarchy Reordering (P0)**
+    -   The agent has modified  to replace the Promote, Demote, and Reorder buttons with a unified drag-and-drop system. This is the highest priority task.
 
 **Task Detail:**
--   **Task 1: Implement Causal Engine Module**
-    -   **Where to resume:** Create a new page component (e.g., ), add a new route for it in , and add a navigation link to it in the main sidebar in .
-    -   **What will be achieved with this?** A new top-level feature for root cause analysis will be added to the application.
-    -   **Status:** NOT STARTED
-    -   **Should Test frontend/backend/both after fix?** both
-    -   **Blocked on something:** User requirements for the Causal Engine's functionality need to be gathered.
-
--   **Task 2: Implement Drag-and-Drop for Hierarchy Reordering**
-    -   **Where to resume:** The agent was in the process of rewriting the  component inside . The goal is to add , , , and  handlers that can differentiate between reordering (dropping on a sibling), promoting (dropping on a parent's parent), and demoting (dropping on a valid child target).
-    -   **What will be achieved with this?** A more intuitive and fluid user experience for managing the equipment hierarchy, replacing the multiple buttons with a single interaction model.
+-   **Task 1: Verify Drag-and-Drop for Hierarchy Reordering**
+    -   **Where to resume:** The code changes in  are complete. The next step is to start the application and thoroughly test the new drag-and-drop functionality to ensure nodes can be reordered among siblings, promoted to a higher level, and demoted to become a child of another node.
+    -   **What will be achieved with this?** A more intuitive and fluid user experience for managing the equipment hierarchy, replacing multiple buttons with a single interaction model.
     -   **Status:** IN PROGRESS
-    -   **Should Test frontend/backend/both after fix?** frontend
+    -   **Should Test frontend/backend/both after fix?** Frontend
     -   **Blocked on something:** None.
 
 **Upcoming and Future Tasks**
 **Upcoming Tasks:**
--   P2: Implement Voice input for the chat interface.
--   P2: Implement Image analysis for damage detection.
+- P2: Implement Voice input for the chat interface.
+- P2: Implement Image analysis for damage detection.
+- P2: Implement report generation (PowerPoint/PDF) for Causal Investigations.
 
 **Future Tasks:**
--   P3: Export hierarchy to PDF/Excel.
--   P3: Bulk criticality assignment.
--   P3: Implement a data migration tool to convert legacy data to the new ISO 14224 levels.
+- P3: Export hierarchy to PDF/Excel.
+- P3: Bulk criticality assignment.
+- P3: Implement a data migration tool to convert legacy data to the new ISO 14224 levels.
+- P3: Automated causal hypothesis generation for the Causal Engine.
 
 **Completed work in this session**
--   **Hierarchy Functionality Verified & Enhanced:**
-    -   Confirmed the click-based Move Mode for repositioning nodes is working.
-    -   Fully aligned the hierarchy structure and terminology with the ISO 14224 standard, including adding a Subunit level.
-    -   Fixed drag-and-drop for assigning Unassigned Items and added a dialog to allow assigning them to any level.
-    -   Added backend validation to prevent duplicate node names.
-    -   Fixed a bug where Add Child created the wrong level type.
-    -   Implemented button-based Promote, Demote, and Reorder (Move Up/Down) functionality.
--   **Chatbot Intelligence Added:**
-    -   The chatbot now validates equipment against the hierarchy, resolves partial tag names, and incorporates equipment criticality into the final risk score.
--   **Data & Library Expansion:**
-    -   Added Extruder equipment type and 38 associated failure modes to the libraries.
-    -   Fixed a UI bug preventing the new failure modes from being displayed.
--   **UI & Navigation Improvements:**
-    -   Renamed the ISO 14224 module to Hierarchy.
-    -   Integrated the hierarchy sidebar with the Threats page, enabling filtering by asset.
+-   **Causal Engine Module (v1 MVP Implemented & Verified):**
+    -   Built and delivered a new Causal Engine feature based on a detailed user specification.
+    -   Created backend models () and a full suite of APIs ().
+    -   Developed a comprehensive frontend page () with multiple tabs and functionalities.
+    -   Refactored the Causal Tree component () to resolve a critical Maximum call stack size exceeded build error.
+    -   Debugged and fixed a React Query data fetching issue that prevented the list of investigations from displaying.
+    -   Integrated the module with the  via a Start Investigation button.
+    -   Ran  to confirm the feature works as expected with no application bugs.
 
 **Earlier issues found/mentioned but not fixed**
 None.
@@ -100,75 +78,73 @@ None.
 
 
 **Key Technical Concepts**
--   **Frontend:** React, TailwindCSS, , , .
--   **Backend:** FastAPI, Pydantic,  (for async MongoDB).
+-   **Frontend:** React, TailwindCSS, , .
+-   **Backend:** FastAPI, Pydantic, .
 -   **Database:** MongoDB.
--   **State Management:** React Query for server state, / for local UI state. The agent is managing complex state for drag-and-drop, move mode, and dialogs.
--   **UI Interaction:** The session involved a significant evolution of UI interactions, from fixing simple drag-and-drop to implementing multi-step click-based modes (Move Mode), and now working towards a comprehensive drag-and-drop system for all hierarchy modifications.
+-   **Debugging Frontend Build Issues:** The agent successfully diagnosed and fixed a Maximum call stack size exceeded error during Babel transpilation. The issue was caused by a large, complex file with a recursive component, and the solution was to refactor the recursive logic into its own smaller component file ().
+-   **Debugging React Query:** The agent identified and fixed a subtle bug where a GET request was being sent with . The fix was to wrap the  in an arrow function () to prevent React Query's context object from being passed as a parameter to the API function.
 
 **key DB schema**
+-   **investigations:** (New) 
+-   **investigation_events:** (New) 
+-   **investigation_failures:** (New) 
+-   **investigation_causes:** (New) 
+-   **investigation_actions:** (New) 
 -   **equipment_nodes:** 
--   **threats:** 
--   **equipment_types:** 
--   **failure_modes:** A large array of objects in  with .
 
 **changes in tech stack**
 None.
 
 **All files of reference**
--   : The central file for this session. It contains the logic for the hierarchy tree, properties panel, and all related interactions (move, reorder, promote, demote, drag-and-drop).
--   : Modified extensively to add new endpoints (, ) and business logic (duplicate checks, partial tag resolution, risk score calculation).
--   : Rewritten to display an ISO-aligned hierarchy and handle navigation to the filtered threats page.
--   : Updated to include the full ISO level definitions and validation logic that handles both new and legacy level names.
--   : Expanded to include 38 new failure modes for the Extruder equipment type.
--   : Modified to accept and display an asset filter from a URL query parameter.
--   : Modified to correctly display dynamic category and mode counts from the backend.
--    and : Inspected in preparation for adding the new Causal Engine module.
+-   **New Files Created:**
+    -   : Pydantic models for the Causal Engine.
+    -   : The main UI for the Causal Engine.
+    -   : Refactored component to fix a build error.
+-   **Key Files Modified:**
+    -   : Heavily modified to remove button controls and implement drag-and-drop logic. **(Needs testing)**.
+    -   : Added all API endpoints for the Causal Engine.
+    -   : Added client-side API functions for investigations.
+    -   : Added the  route.
+    -   : Added Causal Engine to navigation.
+    -   : Added the Investigate button and its corresponding logic.
 
 **Areas that need refactoring**:
--    has grown exceedingly large and complex (now over 800 lines). It manages state and logic for the tree view, properties panel, multiple dialogs, and several different interaction modes (selection, move mode, drag-and-drop). This file should be broken down into smaller, more manageable components (, , , etc.) to improve maintainability and prevent future bugs.
+-    remains very large (over 900 lines). A future task should be to break it down into smaller, more manageable components (, , ).
+-   , while functional, is also large and could be broken down into sub-components for each of its tabs to improve maintainability.
 
 **key api endpoints**
--   : (New) Promotes or demotes a node to a new hierarchy level.
--   : (New) Reorders sibling nodes based on a  (up/down).
--   : Now returns nodes sorted by the  field.
--   : Logic was enhanced to resolve partial tags and include equipment criticality in risk calculations.
--    and : Endpoints used by the Failure Modes Library page.
+-   : Creates a new investigation case.
+-   : Fetches all investigation cases.
+-   : Creates a new investigation from a specific threat.
+-   (Existing) 
+-   (Existing) 
 
 **Critical Info for New Agent**
--   **Dual High-Priority Tasks:** The user's last two requests are the highest priority. You must clarify with the user which to tackle first:
-    1.  **Causal Engine (P0):** Build a new module for root cause analysis. This will involve creating a new page/route and gathering functional requirements.
-    2.  **Drag-and-Drop Reordering (P1):** Replace the existing hierarchy management buttons with a unified drag-and-drop interface. Work is already in progress in .
--   ** Complexity:** This file is the application's most complex component. Be extremely careful when modifying it. Consider proposing a refactor to break it into smaller components before adding more features.
--   **Backend Sorting:** The backend now includes a  field on  and the  endpoint sorts by it. This is crucial for the reordering features.
+-   **Immediate Priority:** Your first task is to **test and verify** the new drag-and-drop implementation in the . The code has been written to replace the old reordering buttons, but its functionality is unconfirmed.
+-   **Context on Last Task:** The agent just successfully built the entire Causal Engine module from a detailed spec, including significant debugging of frontend build and data-fetching issues. The user then immediately switched focus back to the pending drag-and-drop task.
+-   **Testing Plan:** Navigate to the  page. Attempt to drag nodes to reorder them with their siblings. Attempt to drag a node onto another to make it a child (demote). Attempt to drag a node onto a valid parent-level target to promote it. Verify the UI updates correctly and the changes persist on refresh.
 
 **documents and test reports created in this job**
--   : Has been regularly updated with completed work and backlog grooming.
+-   : Test report from the  for the Causal Engine feature.
 
 **Last 10 User Messages and any pending HUMAN messages**
-10. **Request:** Assure the hierarchy navigates to the threats page. (Completed)
-9.  **Request:** Improve chatbot to require equipment from hierarchy and ask fewer questions. (Completed)
-8.  **Request:** Make chatbot resolve partial tag names. (Completed)
-7.  **Request:** Include equipment criticality in the threat's risk score. (Completed)
-6.  **Request:** Add Extruder equipment type and a detailed list of failure modes. (Completed)
-5.  **Bug Report:** when i add child it adds an installation that is not correct. (Fixed)
-4.  **Request:** Allow moving items up and down in the hierarchy (promote/demote). (Completed with buttons)
-3.  **Request:** Allow repositioning items in order. (Completed with buttons)
-2.  **Request:** allow drag and drop to reorder promote and demote not the buttons. (In Progress)
-1.  **Request:** Include the causal engine part as another tab.... (Not Started)
+10. User provides detailed functional specification for Causal Engine.
+9. User asks to ensure threats can start an investigation. (Agent confirms and implements)
+... (User and Agent conversation during Causal Engine build and debug) ...
+1. **User:** Oke now fix the drag an drop issue for reordering in the equipment manager - This is the current directive and highest priority task.
 
 **Project Health Check:**
--   **Working:** All core features, including the expanded Hierarchy Manager and improved chatbot, are functional and have been manually tested.
--   **In Progress:** The drag-and-drop reordering feature is partially implemented.
--   **Broken:** Nothing is currently broken, but the  file is fragile due to its size.
+-   **Working:** All core features, including the newly built Causal Engine module, are functional.
+-   **In Progress:** The drag-and-drop reordering feature in  is implemented but requires testing and verification.
+-   **Broken:** Nothing is known to be broken, but the unverified changes in  are a potential risk.
 
 **3rd Party Integrations**
--   **OpenAI GPT:** Used for natural language processing in the chat for threat analysis and equipment type detection. The implementation uses the Emergent LLM Key.
+-   **OpenAI GPT:** Used for natural language processing in the chat module, via the Emergent LLM Key.
 
 **Testing status**
--   **Testing agent used after significant changes:** NO, the agent primarily used manual testing with the screenshot tool for this session's work.
+-   **Testing agent used after significant changes:** YES, for the Causal Engine feature.
 -   **Troubleshoot agent used after agent stuck in loop:** NO.
--   **Test files created:** None in this session.
+-   **Test files created:** None manually, but  generated a report.
 -   **Known regressions:** None.
 
 **Credentials to test flow:**
@@ -176,4 +152,4 @@ None.
 -   **Password:** 
 
 **What agent forgot to execute**
-The agent was interrupted mid-task. It started rewriting the  component in  to support drag-and-drop reordering but did not complete the implementation before being directed to the new Causal Engine task. The next agent will need to pick up this partially finished work.</analysis>
+The agent has written the code for the drag-and-drop feature but has not yet performed any testing or verification to see if it works as intended. This is the immediate next step.</analysis>

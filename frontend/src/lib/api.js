@@ -152,6 +152,15 @@ export const equipmentHierarchyAPI = {
     return response.data;
   },
   
+  reorderNodeToPosition: async (nodeId, targetNodeId, position, newParentId = null) => {
+    const response = await api.post(`/equipment-hierarchy/nodes/${nodeId}/reorder-to`, {
+      target_node_id: targetNodeId,
+      position: position,
+      new_parent_id: newParentId
+    });
+    return response.data;
+  },
+  
   assignCriticality: async (nodeId, assignment) => {
     const response = await api.post(`/equipment-hierarchy/nodes/${nodeId}/criticality`, assignment);
     return response.data;
