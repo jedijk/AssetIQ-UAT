@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
@@ -146,7 +146,26 @@ const LevelSummaryItem = ({ level, count, isActive, onClick }) => {
 
 const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
   const navigate = useNavigate();
-  const [expandedNodes, setExpandedNodes] = useState(new Set(["all"]));
+  
+  // Load expanded nodes from localStorage on initial render
+  const [expandedNodes, setExpandedNodes] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sidebar-hierarchy-expanded');
+      return saved ? new Set(JSON.parse(saved)) : new Set(["all"]);
+    } catch {
+      return new Set(["all"]);
+    }
+  });
+  
+  // Persist expanded nodes to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('sidebar-hierarchy-expanded', JSON.stringify([...expandedNodes]));
+    } catch (e) {
+      console.error('Failed to save expanded state:', e);
+    }
+  }, [expandedNodes]);
+  
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [viewMode, setViewMode] = useState("tree"); // "tree" or "levels"
   const [filterLevel, setFilterLevel] = useState(null);

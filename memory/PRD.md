@@ -107,6 +107,18 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - `GET /api/threats` - List all threats
 - `GET /api/threats/{id}` - Get threat details
 - `POST /api/chat/send` - Send chat message (creates threats)
+- `POST /api/threats/{id}/investigate` - Create investigation from threat
+
+#### Causal Investigations
+- `GET /api/investigations` - List all investigations
+- `POST /api/investigations` - Create investigation
+- `GET /api/investigations/{id}` - Get investigation details
+- `PATCH /api/investigations/{id}` - Update investigation
+- `DELETE /api/investigations/{id}` - Delete investigation
+- `POST /api/investigations/{id}/events` - Add timeline event
+- `POST /api/investigations/{id}/failures` - Add failure identification
+- `POST /api/investigations/{id}/causes` - Add causal node
+- `POST /api/investigations/{id}/actions` - Add corrective action
 
 #### Equipment Hierarchy (ISO 14224)
 - `GET /api/equipment-hierarchy/iso-levels` - Get ISO 14224 levels with labels and hierarchy
@@ -119,6 +131,9 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - `PATCH /api/equipment-hierarchy/nodes/{id}` - Update node
 - `DELETE /api/equipment-hierarchy/nodes/{id}` - Delete node (cascades)
 - `POST /api/equipment-hierarchy/nodes/{id}/move` - Move node to new parent
+- `POST /api/equipment-hierarchy/nodes/{id}/reorder` - Reorder node up/down among siblings
+- `POST /api/equipment-hierarchy/nodes/{id}/reorder-to` - Reorder node to specific position (for drag-drop)
+- `POST /api/equipment-hierarchy/nodes/{id}/change-level` - Promote/demote node level
 - `POST /api/equipment-hierarchy/nodes/{id}/criticality` - Assign criticality
 - `POST /api/equipment-hierarchy/nodes/{id}/discipline` - Assign discipline
 
@@ -133,7 +148,7 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - Email: test@test.com
 - Password: test
 
-### Completed Features (Mar 18, 2026)
+### Completed Features (Mar 19, 2026)
 - [x] Full-stack MVP with React, FastAPI, MongoDB
 - [x] JWT authentication
 - [x] AI chat interface with GPT-5.2
@@ -153,12 +168,31 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
   - Updated terminology to match ISO 14224 standard
   - Left sidebar now shows ISO 14224 taxonomy levels with counts
   - Legacy level support for backward compatibility
+- [x] **Causal Engine Module** (Mar 19, 2026):
+  - Investigation cases creation and management
+  - Event timeline with categories
+  - Failure mode identification
+  - Causal tree building with root cause flagging
+  - Corrective action tracking
+  - Integration with threat detail page ("Start Investigation" button)
+- [x] **Drag-and-Drop Hierarchy Reordering** (Mar 19, 2026):
+  - Fixed critical bug with undefined `movingNode` state
+  - New backend endpoint `POST /api/equipment-hierarchy/nodes/{id}/reorder-to` for position-based reordering
+  - Drag nodes to reorder among siblings (drop on top/bottom edge)
+  - Drag nodes to become children of other nodes (drop in center)
+  - Visual feedback during drag operations (blue highlight, drop indicators)
+  - Toast notifications for successful moves
+- [x] **Persistent Hierarchy Expansion State** (Mar 19, 2026):
+  - Equipment Manager page remembers expanded nodes via localStorage
+  - Sidebar hierarchy remembers expanded nodes separately
+  - Expansion state persists across page navigation and refreshes
 
 ### Future Tasks (Backlog)
 - [ ] P2: Voice input for chat interface
 - [ ] P2: Image analysis for damage detection
-- [ ] P2: Failure prediction and pattern recognition
+- [ ] P2: Report generation (PowerPoint/PDF) for Causal Investigations
 - [ ] P3: Export hierarchy to PDF/Excel
 - [ ] P3: Bulk criticality assignment
 - [ ] P3: Equipment template library
 - [ ] P3: Data migration utility (convert legacy levels to ISO 14224)
+- [ ] P3: Automated causal hypothesis generation for Causal Engine

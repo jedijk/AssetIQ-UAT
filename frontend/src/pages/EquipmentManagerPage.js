@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { equipmentHierarchyAPI } from "../lib/api";
 import { toast } from "sonner";
@@ -435,7 +435,26 @@ export default function EquipmentManagerPage() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
-  const [expandedIds, setExpandedIds] = useState(new Set());
+  
+  // Load expanded IDs from localStorage on initial render
+  const [expandedIds, setExpandedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('equipment-hierarchy-expanded');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  
+  // Persist expanded IDs to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('equipment-hierarchy-expanded', JSON.stringify([...expandedIds]));
+    } catch (e) {
+      console.error('Failed to save expanded state:', e);
+    }
+  }, [expandedIds]);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("equipment");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
