@@ -258,8 +258,8 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
     return treeNodes
       .filter(node => !filterLevel || node.level === filterLevel)
       .map(node => {
-        // Use cumulative threat count (this node + all descendants)
-        const threatCount = getCumulativeThreatCount(node, threatCountByAsset);
+        // Only show direct threat count for this specific node
+        const threatCount = threatCountByAsset.get(node.name) || 0;
         return (
           <TreeNode
             key={node.id}
