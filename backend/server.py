@@ -2649,12 +2649,32 @@ async def get_investigation_stats(
 
 # ============= CREATE INVESTIGATION FROM THREAT =============
 
+# Common causes by failure mode category
+FAILURE_MODE_CAUSES = {
+    "Seal Failure": ["Mechanical wear", "Improper installation", "Material incompatibility", "Excessive vibration", "Thermal cycling"],
+    "Bearing Failure": ["Inadequate lubrication", "Contamination", "Misalignment", "Overloading", "Fatigue"],
+    "Cavitation": ["Low suction pressure", "High fluid temperature", "Blocked suction line", "Incorrect pump sizing"],
+    "Misalignment": ["Foundation settlement", "Thermal expansion", "Improper installation", "Coupling wear"],
+    "Corrosion": ["Chemical attack", "Galvanic action", "Erosion-corrosion", "Microbiological activity", "Oxygen ingress"],
+    "Internal Corrosion": ["Inadequate corrosion allowance", "Chemical incompatibility", "High temperature", "Stagnant conditions"],
+    "External Corrosion": ["Coating failure", "Insulation damage", "Environmental exposure", "CUI"],
+    "CUI": ["Damaged insulation", "Water ingress", "Inadequate sealing", "Temperature cycling"],
+    "Fouling": ["Inadequate treatment", "Poor design", "Low velocity", "Chemical precipitation"],
+    "Leak": ["Seal failure", "Corrosion", "Mechanical damage", "Thermal stress", "Vibration fatigue"],
+    "Valve Stuck": ["Corrosion buildup", "Debris", "Inadequate lubrication", "Actuator failure"],
+    "Sensor Drift": ["Age degradation", "Environmental exposure", "Calibration error", "Electrical interference"],
+    "Motor Burnout": ["Overloading", "Poor ventilation", "Voltage imbalance", "Bearing failure", "Insulation breakdown"],
+    "Overpressure": ["Relief valve failure", "Blocked outlet", "Runaway reaction", "Control system failure"],
+    "default": ["Equipment degradation", "Maintenance gap", "Operating condition deviation", "Design limitation"]
+}
+
+
 @api_router.post("/threats/{threat_id}/investigate")
 async def create_investigation_from_threat(
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Create a new investigation from an existing threat."""
+    """Create a new investigation from an existing threat with auto-generated timeline and causal diagram."""
     threat = await db.threats.find_one(
         {"id": threat_id, "created_by": current_user["id"]},
         {"_id": 0}
@@ -2669,6 +2689,7 @@ async def create_investigation_from_threat(
     
     inv_id = str(uuid.uuid4())
     case_number = await generate_case_number(current_user["id"])
+    now = datetime.now(timezone.utc).isoformat()
     
     inv_doc = {
         "id": inv_id,
@@ -2684,15 +2705,89 @@ async def create_investigation_from_threat(
         "threat_id": threat_id,
         "status": InvestigationStatus.DRAFT.value,
         "created_by": current_user["id"],
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat()
+        "created_at": now,
+        "updated_at": now
     }
     
     await db.investigations.insert_one(inv_doc)
     inv_doc.pop("_id", None)
     
-    # Create initial failure identification from threat data
+    # ========== AUTO-CREATE TIMELINE EVENTS ==========
+    timeline_events = []
+    
+    # 1. Initial threat report event
+    timeline_events.append({
+        "id": str(uuid.uuid4()),
+        "investigation_id": inv_id,
+        "timestamp": threat.get("created_at", now),
+        "description": f"Threat reported: {threat['title']}",
+        "category": "discovery",
+        "source": "Threat Report System",
+        "confidence": "high",
+        "created_at": now
+    })
+    
+    # 2. Asset information event
+    if threat.get("asset"):
+        timeline_events.append({
+            "id": str(uuid.uuid4()),
+            "investigation_id": inv_id,
+            "timestamp": threat.get("created_at", now),
+            "description": f"Affected asset identified: {threat['asset']} ({threat.get('equipment_type', 'Unknown type')})",
+            "category": "observation",
+            "source": "Threat Report",
+            "confidence": "high",
+            "created_at": now
+        })
+    
+    # 3. Failure mode observation
     if threat.get("failure_mode"):
+        timeline_events.append({
+            "id": str(uuid.uuid4()),
+            "investigation_id": inv_id,
+            "timestamp": threat.get("created_at", now),
+            "description": f"Observed failure mode: {threat['failure_mode']}",
+            "category": "observation",
+            "source": "Threat Report",
+            "confidence": "medium",
+            "created_at": now
+        })
+    
+    # 4. Root cause hypothesis (if available)
+    if threat.get("cause"):
+        timeline_events.append({
+            "id": str(uuid.uuid4()),
+            "investigation_id": inv_id,
+            "timestamp": now,
+            "description": f"Initial hypothesis: {threat['cause']}",
+            "category": "analysis",
+            "source": "AI Analysis",
+            "confidence": "medium",
+            "created_at": now
+        })
+    
+    # Insert all timeline events
+    if timeline_events:
+        await db.timeline_events.insert_many(timeline_events)
+    
+    # ========== AUTO-CREATE FAILURE IDENTIFICATION ==========
+    failure_doc = None
+    matching_fm = None
+    if threat.get("failure_mode"):
+        # Try to find matching failure mode from library
+        failure_mode_text = threat["failure_mode"].lower()
+        for fm in FAILURE_MODES_LIBRARY:
+            if fm["failure_mode"].lower() in failure_mode_text or failure_mode_text in fm["failure_mode"].lower():
+                matching_fm = fm
+                break
+            # Also check keywords
+            for kw in fm.get("keywords", []):
+                if kw.lower() in failure_mode_text:
+                    matching_fm = fm
+                    break
+            if matching_fm:
+                break
+        
         failure_doc = {
             "id": str(uuid.uuid4()),
             "investigation_id": inv_id,
@@ -2702,12 +2797,120 @@ async def create_investigation_from_threat(
             "failure_mode": threat.get("failure_mode"),
             "degradation_mechanism": threat.get("cause"),
             "evidence": f"From threat report: {threat.get('title')}",
-            "failure_mode_id": None,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "failure_mode_id": matching_fm["id"] if matching_fm else None,
+            "created_at": now
         }
         await db.failure_identifications.insert_one(failure_doc)
     
-    return {"investigation": inv_doc, "message": "Investigation created from threat"}
+    # ========== AUTO-CREATE DRAFT CAUSAL DIAGRAM ==========
+    cause_nodes = []
+    
+    # Root node (the failure/problem)
+    root_cause_id = str(uuid.uuid4())
+    cause_nodes.append({
+        "id": root_cause_id,
+        "investigation_id": inv_id,
+        "description": f"Problem: {threat['title']}",
+        "category": "problem",
+        "parent_id": None,
+        "is_root_cause": False,
+        "verification_status": "unverified",
+        "created_at": now
+    })
+    
+    # Immediate cause node (failure mode)
+    immediate_cause_id = str(uuid.uuid4())
+    cause_nodes.append({
+        "id": immediate_cause_id,
+        "investigation_id": inv_id,
+        "description": f"Failure Mode: {threat.get('failure_mode', 'Unknown')}",
+        "category": "immediate",
+        "parent_id": root_cause_id,
+        "is_root_cause": False,
+        "verification_status": "unverified",
+        "created_at": now
+    })
+    
+    # Get potential root causes based on failure mode
+    failure_mode_key = None
+    failure_mode_text = threat.get("failure_mode", "").lower()
+    for key in FAILURE_MODE_CAUSES.keys():
+        if key.lower() in failure_mode_text or failure_mode_text in key.lower():
+            failure_mode_key = key
+            break
+    
+    potential_causes = FAILURE_MODE_CAUSES.get(failure_mode_key, FAILURE_MODE_CAUSES["default"])
+    
+    # Add potential root causes as child nodes
+    for i, cause in enumerate(potential_causes[:4]):  # Limit to 4 potential causes
+        cause_nodes.append({
+            "id": str(uuid.uuid4()),
+            "investigation_id": inv_id,
+            "description": f"Potential Cause {i+1}: {cause}",
+            "category": "contributing",
+            "parent_id": immediate_cause_id,
+            "is_root_cause": False,
+            "verification_status": "unverified",
+            "created_at": now
+        })
+    
+    # If we have a hypothesis from the threat, add it as a likely root cause
+    if threat.get("cause"):
+        cause_nodes.append({
+            "id": str(uuid.uuid4()),
+            "investigation_id": inv_id,
+            "description": f"Hypothesis: {threat['cause']}",
+            "category": "root",
+            "parent_id": immediate_cause_id,
+            "is_root_cause": True,
+            "verification_status": "unverified",
+            "created_at": now
+        })
+    
+    # Insert all cause nodes
+    if cause_nodes:
+        await db.cause_nodes.insert_many(cause_nodes)
+    
+    # ========== AUTO-CREATE RECOMMENDED ACTIONS ==========
+    action_items = []
+    
+    # Get recommended actions from matching failure mode or threat
+    recommended_actions = []
+    if matching_fm and matching_fm.get("recommended_actions"):
+        recommended_actions = matching_fm["recommended_actions"]
+    elif threat.get("recommended_actions"):
+        recommended_actions = threat["recommended_actions"]
+    
+    for i, action in enumerate(recommended_actions[:5]):  # Limit to 5 actions
+        action_number = f"ACT-{case_number}-{str(i+1).zfill(3)}"
+        action_items.append({
+            "id": str(uuid.uuid4()),
+            "investigation_id": inv_id,
+            "action_number": action_number,
+            "description": action,
+            "action_type": "corrective",
+            "priority": "medium" if i > 1 else "high",
+            "owner": current_user["name"],
+            "due_date": None,
+            "status": "open",
+            "completion_date": None,
+            "verification_method": None,
+            "created_at": now
+        })
+    
+    if action_items:
+        await db.action_items.insert_many(action_items)
+    
+    return {
+        "investigation": inv_doc, 
+        "message": "Investigation created from threat with auto-generated timeline and causal diagram",
+        "auto_generated": {
+            "timeline_events": len(timeline_events),
+            "failure_identifications": 1 if failure_doc else 0,
+            "cause_nodes": len(cause_nodes),
+            "action_items": len(action_items)
+        }
+    }
 
 
 app.include_router(api_router)
