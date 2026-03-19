@@ -72,77 +72,141 @@ function flattenTree(treeNodes, expandedIds, depth = 0) {
   return result;
 }
 
-// Tree Node Component with Move Mode support and Drag-Drop for unassigned items
-function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, movingNode, onMoveTarget, allNodes, onDrop }) {
+// Tree Node Component with Drag-Drop for reorder, promote, demote, and unassigned items
+function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, allNodes, onDrop, onReorder, onChangeLevel, siblings, siblingIndex }) {
   const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   
-  const isMoving = movingNode?.id === node.id;
-  const canAcceptMove = movingNode && canBeChildOf(movingNode.level, node.level) && movingNode.id !== node.id;
-  
-  // Check if this node is a descendant of movingNode (can't move parent under child)
-  const isDescendantOfMoving = movingNode ? (() => {
-    const checkDescendant = (parentId, checkId) => {
-      const children = allNodes.filter(n => n.parent_id === parentId);
-      for (const child of children) {
-        if (child.id === checkId) return true;
-        if (checkDescendant(child.id, checkId)) return true;
-      }
-      return false;
-    };
-    return checkDescendant(movingNode.id, node.id);
-  })() : false;
-  
-  const validTarget = canAcceptMove && !isDescendantOfMoving;
-  
-  // Any node can accept dropped unstructured items (level will be selected in dialog)
   const [isDragOver, setIsDragOver] = useState(false);
+  const [dropPosition, setDropPosition] = useState(null); // 'before', 'after', 'child'
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleClick = () => {
-    if (movingNode && validTarget) {
-      onMoveTarget(node);
-    } else if (!movingNode) {
-      onSelect(node);
-    }
+  const handleDragStart = (e) => {
+    e.dataTransfer.setData("application/json", JSON.stringify({ 
+      type: "hierarchy-node", 
+      nodeId: node.id,
+      nodeLevel: node.level,
+      parentId: node.parent_id,
+      sortOrder: node.sort_order || 0
+    }));
+    e.dataTransfer.effectAllowed = "move";
+    setIsDragging(true);
+    // Add a slight delay to show drag effect
+    setTimeout(() => {
+      e.target.style.opacity = "0.5";
+    }, 0);
   };
-  
+
+  const handleDragEnd = (e) => {
+    setIsDragging(false);
+    e.target.style.opacity = "1";
+  };
+
   const handleDragOver = (e) => {
-    if (!movingNode) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      setIsDragOver(true);
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const height = rect.height;
+    
+    // Determine drop position based on mouse position
+    if (y < height * 0.25) {
+      setDropPosition("before");
+    } else if (y > height * 0.75) {
+      setDropPosition("after");
+    } else {
+      setDropPosition("child");
     }
+    
+    setIsDragOver(true);
+    e.dataTransfer.dropEffect = "move";
   };
   
-  const handleDragLeave = () => {
-    setIsDragOver(false);
+  const handleDragLeave = (e) => {
+    // Only clear if we're actually leaving this element
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDragOver(false);
+      setDropPosition(null);
+    }
   };
   
   const handleDropOnNode = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
-    if (onDrop) {
-      onDrop(e, node);
+    setDropPosition(null);
+    
+    try {
+      const data = JSON.parse(e.dataTransfer.getData("application/json"));
+      
+      if (data.type === "hierarchy-node") {
+        // Don't drop on itself
+        if (data.nodeId === node.id) return;
+        
+        const draggedNode = allNodes.find(n => n.id === data.nodeId);
+        if (!draggedNode) return;
+        
+        // Prevent dropping parent onto its own child
+        const isDescendant = (parentId, checkId) => {
+          const children = allNodes.filter(n => n.parent_id === parentId);
+          for (const child of children) {
+            if (child.id === checkId) return true;
+            if (isDescendant(child.id, checkId)) return true;
+          }
+          return false;
+        };
+        if (isDescendant(data.nodeId, node.id)) return;
+        
+        if (dropPosition === "child") {
+          // Drop as child - this is a demote or move to new parent
+          onChangeLevel?.(data.nodeId, node.id, "child");
+        } else {
+          // Drop before or after - reorder or change parent
+          onReorder?.(data.nodeId, node.id, dropPosition, node.parent_id);
+        }
+      } else if (data.type === "unstructured") {
+        // Handle unstructured item drop
+        onDrop?.(e, node);
+      }
+    } catch (err) {
+      console.error("Drop error:", err);
     }
+  };
+
+  const handleClick = () => {
+    onSelect(node);
+  };
+
+  // Visual feedback classes
+  const getDropIndicatorClass = () => {
+    if (!isDragOver || !dropPosition) return "";
+    if (dropPosition === "before") return "border-t-2 border-t-blue-500";
+    if (dropPosition === "after") return "border-b-2 border-b-blue-500";
+    if (dropPosition === "child") return "bg-blue-100 border-2 border-dashed border-blue-500";
+    return "";
   };
 
   return (
     <div
-      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${
-        isMoving ? "bg-blue-100 border-2 border-blue-500 shadow-md" :
-        isDragOver ? "bg-green-100 border-2 border-dashed border-green-500" :
-        validTarget ? "bg-green-100 border-2 border-green-500 cursor-pointer hover:bg-green-200" :
-        movingNode && !validTarget ? "opacity-40" :
-        isSelected ? "bg-blue-50 border border-blue-200" : "hover:bg-slate-50 border border-transparent cursor-pointer"
-      }`}
-      style={{ marginLeft: depth * 24 }}
-      onClick={handleClick}
+      draggable={node.level !== "installation" || true}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDropOnNode}
+      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-grab active:cursor-grabbing ${
+        isDragging ? "opacity-50" :
+        isSelected ? "bg-blue-50 border border-blue-200" : 
+        "hover:bg-slate-50 border border-transparent"
+      } ${getDropIndicatorClass()}`}
+      style={{ marginLeft: depth * 24 }}
+      onClick={handleClick}
       data-testid={`tree-node-${node.id}`}
     >
+      <GripVertical className="w-4 h-4 text-slate-300 flex-shrink-0 cursor-grab" />
+      
       <button 
         className={`w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 ${!hasChildren ? "invisible" : ""}`} 
         onClick={e => { e.stopPropagation(); onExpand(node.id); }}
@@ -156,10 +220,8 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
       
       <span className="flex-1 text-sm font-medium text-slate-700 truncate">{node.name}</span>
       
-      {(validTarget || isDragOver) && (
-        <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-          <ArrowRight className="w-3 h-3" /> Drop here
-        </span>
+      {isDragOver && dropPosition === "child" && (
+        <span className="text-xs text-blue-600 font-medium">Drop as child</span>
       )}
       
       <span className="text-xs text-slate-400 hidden sm:block">{config.label}</span>

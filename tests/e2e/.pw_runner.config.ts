@@ -11,7 +11,7 @@ export default defineConfig({
     ['json', { outputFile: '/root/.emergent/automation_output/20260318_142134/results.json' }],
   ],
   use: {
-    baseURL: 'https://hierarchy-move.preview.emergentagent.com',
+    baseURL: 'https://threatbase-analysis.preview.emergentagent.com',
     screenshot: 'only-on-failure',
     trace: 'off',
     headless: true,
