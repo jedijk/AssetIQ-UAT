@@ -203,6 +203,18 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
   - **8 new categories added**: Extruder (38 modes), Material Handling (10), Quality Control (12), Dosing (6), Ventilation (6), Cutting (5), Packaging (11), Cooling (6)
   - New modes include: Screw Wear, Material Out of Spec, Metal Detector issues, Hopper Bridging, Knife Wear, CO2 dosing, etc.
   - All data searchable and properly categorized with RPN values
+- [x] **Global Undo System** (Mar 19, 2026):
+  - Undo button in header on every page (amber colored when active)
+  - Tracks up to 5 most recent actions
+  - Shows tooltip with action description and count
+  - Badge counter shows number of undoable actions
+  - Supported undo operations:
+    - Edit threat (reverts all field changes)
+    - Delete failure mode (recreates the deleted mode)
+    - Delete equipment node (recreates the deleted node)
+    - Delete investigation (recreates the deleted investigation)
+  - UndoContext.js provides pushUndo, undo, canUndo functions
+  - Tests: 8/8 undo feature tests passed
 
 ### Future Tasks (Backlog)
 - [ ] P2: Voice input for chat interface
