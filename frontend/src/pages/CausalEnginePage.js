@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { investigationAPI } from "../lib/api";
+import { investigationAPI, actionsAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -230,6 +230,27 @@ export default function CausalEnginePage() {
   const deleteActionMutation = useMutation({
     mutationFn: (actionId) => investigationAPI.deleteAction(selectedInvId, actionId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] }),
+  });
+
+  // Promote investigation action to centralized action
+  const promoteToCentralActionMutation = useMutation({
+    mutationFn: (action) => actionsAPI.create({
+      title: action.description.substring(0, 100),
+      description: action.description,
+      source_type: "investigation",
+      source_id: selectedInvId,
+      source_name: selectedInv?.title || "Unknown Investigation",
+      priority: action.priority || "medium",
+      assignee: action.owner || "",
+      due_date: action.due_date || null,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action promoted! View it in the Actions tab.");
+    },
+    onError: () => {
+      toast.error("Failed to promote action");
+    },
   });
 
   const handleEditCause = useCallback((node) => {
@@ -484,7 +505,20 @@ export default function CausalEnginePage() {
                                 {action.due_date && <div className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(action.due_date).toLocaleDateString()}</div>}
                               </div>
                             </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => deleteActionMutation.mutate(action.id)}><Trash2 className="w-4 h-4" /></Button>
+                            <div className="flex items-center gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
+                                onClick={() => promoteToCentralActionMutation.mutate(action)}
+                                disabled={promoteToCentralActionMutation.isPending}
+                                title="Promote to central action tracker"
+                                data-testid={`promote-action-${action.id}`}
+                              >
+                                <ClipboardList className="w-4 h-4 mr-1" />Promote
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => deleteActionMutation.mutate(action.id)}><Trash2 className="w-4 h-4" /></Button>
+                            </div>
                           </div>
                         </motion.div>
                       );

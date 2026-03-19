@@ -388,4 +388,37 @@ export const investigationAPI = {
   },
 };
 
+// Centralized Actions API
+export const actionsAPI = {
+  getAll: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.priority) params.append('priority', filters.priority);
+    if (filters.assignee) params.append('assignee', filters.assignee);
+    if (filters.source_type) params.append('source_type', filters.source_type);
+    const response = await api.get(`/actions?${params.toString()}`);
+    return response.data;
+  },
+  
+  get: async (actionId) => {
+    const response = await api.get(`/actions/${actionId}`);
+    return response.data;
+  },
+  
+  create: async (data) => {
+    const response = await api.post('/actions', data);
+    return response.data;
+  },
+  
+  update: async (actionId, data) => {
+    const response = await api.patch(`/actions/${actionId}`, data);
+    return response.data;
+  },
+  
+  delete: async (actionId) => {
+    const response = await api.delete(`/actions/${actionId}`);
+    return response.data;
+  },
+};
+
 export default api;

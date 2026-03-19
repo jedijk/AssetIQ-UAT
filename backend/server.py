@@ -2614,6 +2614,168 @@ async def delete_evidence(
     return {"message": "Evidence deleted"}
 
 
+# ============= CENTRALIZED ACTIONS MANAGEMENT =============
+
+class CentralActionCreate(BaseModel):
+    """Model for creating a centralized action."""
+    title: str
+    description: str
+    source_type: str  # 'threat' or 'investigation'
+    source_id: str
+    source_name: str  # threat title or investigation title for reference
+    priority: str = "medium"
+    assignee: Optional[str] = None
+    discipline: Optional[str] = None
+    due_date: Optional[str] = None
+
+
+class CentralActionUpdate(BaseModel):
+    """Model for updating a centralized action."""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    assignee: Optional[str] = None
+    discipline: Optional[str] = None
+    due_date: Optional[str] = None
+    status: Optional[str] = None
+    completion_notes: Optional[str] = None
+
+
+@api_router.get("/actions")
+async def get_all_actions(
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    assignee: Optional[str] = None,
+    source_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all centralized actions with optional filters."""
+    query = {"created_by": current_user["id"]}
+    
+    if status and status != "all":
+        query["status"] = status
+    if priority and priority != "all":
+        query["priority"] = priority
+    if assignee:
+        query["assignee"] = {"$regex": assignee, "$options": "i"}
+    if source_type and source_type != "all":
+        query["source_type"] = source_type
+    
+    actions = await db.central_actions.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    # Get stats
+    total = await db.central_actions.count_documents({"created_by": current_user["id"]})
+    open_count = await db.central_actions.count_documents({"created_by": current_user["id"], "status": "open"})
+    in_progress_count = await db.central_actions.count_documents({"created_by": current_user["id"], "status": "in_progress"})
+    completed_count = await db.central_actions.count_documents({"created_by": current_user["id"], "status": "completed"})
+    overdue_count = await db.central_actions.count_documents({
+        "created_by": current_user["id"],
+        "status": {"$in": ["open", "in_progress"]},
+        "due_date": {"$lt": datetime.now(timezone.utc).isoformat(), "$ne": None}
+    })
+    
+    return {
+        "actions": actions,
+        "stats": {
+            "total": total,
+            "open": open_count,
+            "in_progress": in_progress_count,
+            "completed": completed_count,
+            "overdue": overdue_count
+        }
+    }
+
+
+@api_router.post("/actions")
+async def create_central_action(
+    data: CentralActionCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new centralized action (promote from threat or investigation)."""
+    action_id = str(uuid.uuid4())
+    
+    # Generate action number
+    count = await db.central_actions.count_documents({"created_by": current_user["id"]})
+    action_number = f"ACT-{count + 1:04d}"
+    
+    action_doc = {
+        "id": action_id,
+        "action_number": action_number,
+        "title": data.title,
+        "description": data.description,
+        "source_type": data.source_type,
+        "source_id": data.source_id,
+        "source_name": data.source_name,
+        "priority": data.priority,
+        "assignee": data.assignee,
+        "discipline": data.discipline,
+        "due_date": data.due_date,
+        "status": "open",
+        "completion_notes": None,
+        "created_by": current_user["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.central_actions.insert_one(action_doc)
+    action_doc.pop("_id", None)
+    return action_doc
+
+
+@api_router.get("/actions/{action_id}")
+async def get_central_action(
+    action_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific centralized action."""
+    action = await db.central_actions.find_one(
+        {"id": action_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    )
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    return action
+
+
+@api_router.patch("/actions/{action_id}")
+async def update_central_action(
+    action_id: str,
+    data: CentralActionUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a centralized action."""
+    action = await db.central_actions.find_one(
+        {"id": action_id, "created_by": current_user["id"]}
+    )
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    
+    update_data = {k: v for k, v in data.dict().items() if v is not None}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.central_actions.update_one(
+        {"id": action_id},
+        {"$set": update_data}
+    )
+    
+    updated = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/actions/{action_id}")
+async def delete_central_action(
+    action_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a centralized action."""
+    result = await db.central_actions.delete_one(
+        {"id": action_id, "created_by": current_user["id"]}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Action not found")
+    return {"message": "Action deleted"}
+
+
 # ============= INVESTIGATION STATS =============
 
 @api_router.get("/investigations/{inv_id}/stats")

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { threatsAPI, investigationAPI } from "../lib/api";
+import { threatsAPI, investigationAPI, actionsAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -22,6 +22,7 @@ import {
   Edit,
   Save,
   X,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -119,6 +120,26 @@ const ThreatDetailPage = () => {
     },
     onError: () => {
       toast.error("Failed to create investigation");
+    },
+  });
+
+  // Promote to action mutation
+  const promoteToActionMutation = useMutation({
+    mutationFn: (actionText) => actionsAPI.create({
+      title: actionText.substring(0, 100),
+      description: actionText,
+      source_type: "threat",
+      source_id: id,
+      source_name: threat?.title || "Unknown Threat",
+      priority: threat?.risk_level === "Critical" ? "critical" : 
+               threat?.risk_level === "High" ? "high" : "medium",
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action created! View it in the Actions tab.");
+    },
+    onError: () => {
+      toast.error("Failed to create action");
     },
   });
 
@@ -436,13 +457,25 @@ const ThreatDetailPage = () => {
           {threat.recommended_actions.map((action, idx) => (
             <div
               key={idx}
-              className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg"
+              className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg group"
               data-testid={`action-item-${idx}`}
             >
               <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-medium">
                 {idx + 1}
               </div>
-              <p className="text-slate-700">{action}</p>
+              <p className="text-slate-700 flex-1">{action}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => promoteToActionMutation.mutate(action)}
+                disabled={promoteToActionMutation.isPending}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                title="Promote to tracked action"
+                data-testid={`promote-action-${idx}`}
+              >
+                <ClipboardList className="w-4 h-4 mr-1" />
+                Promote
+              </Button>
             </div>
           ))}
         </div>

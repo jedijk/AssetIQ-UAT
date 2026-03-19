@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2 } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -33,6 +33,7 @@ const Layout = () => {
 
   const navItems = [
     { path: "/", label: "Threats", icon: AlertTriangle },
+    { path: "/actions", label: "Actions", icon: ClipboardList },
     { path: "/causal-engine", label: "Causal Engine", icon: GitBranch },
     { path: "/library", label: "Library", icon: BookOpen },
   ];

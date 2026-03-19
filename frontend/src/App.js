@@ -11,6 +11,7 @@ import ThreatDetailPage from "./pages/ThreatDetailPage";
 import FailureModesPage from "./pages/FailureModesPage";
 import EquipmentManagerPage from "./pages/EquipmentManagerPage";
 import CausalEnginePage from "./pages/CausalEnginePage";
+import ActionsPage from "./pages/ActionsPage";
 import "@/App.css";
 
 const queryClient = new QueryClient({
@@ -101,6 +102,7 @@ function App() {
                 <Route index element={<ThreatsPage />} />
                 <Route path="threats" element={<ThreatsPage />} />
                 <Route path="threats/:id" element={<ThreatDetailPage />} />
+                <Route path="actions" element={<ActionsPage />} />
                 <Route path="library" element={<FailureModesPage />} />
                 <Route path="equipment-manager" element={<EquipmentManagerPage />} />
                 <Route path="causal-engine" element={<CausalEnginePage />} />
