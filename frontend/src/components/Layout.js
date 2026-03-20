@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -18,6 +18,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import ChatSidebar from "./ChatSidebar";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 
@@ -29,6 +35,7 @@ const Layout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [hierarchyOpen, setHierarchyOpen] = useState(true);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   // Auto-collapse hierarchy when on Equipment Manager page
   useEffect(() => {
@@ -106,6 +113,26 @@ const Layout = () => {
 
           {/* Right Side */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Info Button */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setInfoOpen(true)}
+                    className="h-9 w-9 text-slate-500 border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                    data-testid="info-button"
+                  >
+                    <Info className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Risk Methodology & Help</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {/* Undo Button */}
             <TooltipProvider>
               <Tooltip>
@@ -281,6 +308,97 @@ const Layout = () => {
 
       {/* Chat Sidebar */}
       <ChatSidebar isOpen={chatOpen} onClose={() => setChatOpen(false)} />
+
+      {/* Info Dialog */}
+      <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl">ThreatBase - Risk Methodology</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* FMEA Risk Scoring */}
+            <div>
+              <h3 className="font-semibold text-slate-800 mb-2">FMEA Risk Scoring</h3>
+              <p className="text-sm text-slate-600 mb-3">
+                Risk scores are calculated using Failure Mode and Effects Analysis (FMEA) methodology:
+              </p>
+              <div className="bg-slate-50 rounded-lg p-4 font-mono text-sm">
+                <p className="text-slate-700">Risk Score = (Severity × Occurrence × Detection) / 10</p>
+                <p className="text-slate-500 mt-1">Maximum score: 100</p>
+              </div>
+            </div>
+
+            {/* Severity */}
+            <div>
+              <h4 className="font-medium text-slate-700 mb-2">Severity (Impact)</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between p-2 bg-red-50 rounded"><span>Safety Hazard</span><span className="font-medium">10</span></div>
+                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>Production Loss</span><span className="font-medium">8</span></div>
+                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>Equipment Damage</span><span className="font-medium">6</span></div>
+                <div className="flex justify-between p-2 bg-green-50 rounded"><span>Environmental</span><span className="font-medium">4</span></div>
+              </div>
+            </div>
+
+            {/* Occurrence */}
+            <div>
+              <h4 className="font-medium text-slate-700 mb-2">Occurrence (Frequency)</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>First Time</span><span className="font-medium">2</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Rare</span><span className="font-medium">4</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Occasional</span><span className="font-medium">6</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Frequent</span><span className="font-medium">8</span></div>
+              </div>
+            </div>
+
+            {/* Detection */}
+            <div>
+              <h4 className="font-medium text-slate-700 mb-2">Detection (Difficulty)</h4>
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Easy</span><span className="font-medium">3</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Moderate</span><span className="font-medium">5</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Difficult</span><span className="font-medium">7</span></div>
+              </div>
+            </div>
+
+            {/* Risk Levels */}
+            <div>
+              <h4 className="font-medium text-slate-700 mb-2">Risk Levels</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between p-2 bg-red-100 text-red-800 rounded"><span>Critical</span><span className="font-medium">≥ 70</span></div>
+                <div className="flex justify-between p-2 bg-orange-100 text-orange-800 rounded"><span>High</span><span className="font-medium">50 - 69</span></div>
+                <div className="flex justify-between p-2 bg-yellow-100 text-yellow-800 rounded"><span>Medium</span><span className="font-medium">30 - 49</span></div>
+                <div className="flex justify-between p-2 bg-green-100 text-green-800 rounded"><span>Low</span><span className="font-medium">&lt; 30</span></div>
+              </div>
+            </div>
+
+            {/* Criticality Adjustment */}
+            <div>
+              <h4 className="font-medium text-slate-700 mb-2">Equipment Criticality Multipliers</h4>
+              <p className="text-sm text-slate-600 mb-2">
+                Risk scores are adjusted based on equipment criticality:
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between p-2 bg-red-50 rounded"><span>Safety Critical</span><span className="font-medium">×1.5</span></div>
+                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>Production Critical</span><span className="font-medium">×1.3</span></div>
+                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>Medium</span><span className="font-medium">×1.1</span></div>
+                <div className="flex justify-between p-2 bg-green-50 rounded"><span>Low</span><span className="font-medium">×1.0</span></div>
+              </div>
+            </div>
+
+            {/* Quick Tips */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium text-slate-700 mb-2">Quick Tips</h4>
+              <ul className="text-sm text-slate-600 space-y-1">
+                <li>• Use the <strong>+</strong> button to report new threats via chat</li>
+                <li>• Drag and drop equipment in the hierarchy to reorganize</li>
+                <li>• Click on a threat to view details and start investigations</li>
+                <li>• Use the Causal Engine to perform root cause analysis</li>
+                <li>• Promote recommendations to Actions for tracking</li>
+              </ul>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
