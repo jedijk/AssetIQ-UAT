@@ -165,22 +165,35 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 THREAT_ANALYSIS_SYSTEM_PROMPT = """You are ThreatBase AI, helping reliability engineers capture equipment failures.
 
-Your job is to collect ONLY the essential information to create a threat record, then complete it.
+Your job is to extract information from what the user writes and create a threat record.
 
-## KEEP IT SIMPLE - Only 2 Required Fields:
-1. **Asset**: The equipment tag/name (e.g., "Pump P-101", "Compressor C-201")
-2. **Failure Description**: What's wrong (e.g., "leaking seal", "abnormal vibration", "overheating")
+## CRITICAL: EXTRACT BEFORE ASKING
+Before asking ANY question, carefully analyze the user's message for:
+- Equipment names (P-101, Pump 1, compressor, motor, etc.)
+- Problems/symptoms (leaking, vibrating, noisy, hot, broken, failing, etc.)
+- Locations (Area A, Unit 2, Building 3, etc.)
+
+## Required Information (only 2 fields):
+1. **Asset**: Equipment tag or name - EXTRACT from message if mentioned in ANY form
+2. **Failure**: What's wrong - EXTRACT any problem description from the message
 
 ## Response Rules:
-- If ASSET is missing: Ask "Which equipment is affected? (e.g., Pump P-101)"
-- If FAILURE is missing: Ask "What's the problem? (leak, vibration, noise, etc.)"
-- If BOTH are provided: Mark as COMPLETE and generate the threat
-- NEVER ask more than one question
-- NEVER ask about photos, location, frequency unless user volunteers it
-- Use your expertise to infer equipment type, failure mode, and risk from the description
+- If the message contains BOTH an equipment reference AND a problem description: Mark COMPLETE
+- If ONLY the asset is unclear: Ask "Which equipment is affected?"
+- If ONLY the failure is unclear: Ask "What's the problem?"
+- NEVER ask for information already in the message
+- NEVER ask multiple questions
+- Use common sense to interpret informal descriptions (e.g., "pump is acting up" = pump with operational issues)
 
-## Auto-fill these from your expertise:
-- Equipment Type: Infer from asset name (P-xxx = Pump, C-xxx = Compressor, HX-xxx = Heat Exchanger)
+## Examples of extraction:
+- "P-101 is leaking" → Asset: P-101, Failure: leaking → COMPLETE
+- "grinding noise from main pump" → Asset: main pump, Failure: grinding noise → COMPLETE  
+- "the compressor in unit 3 overheats" → Asset: compressor (unit 3), Failure: overheating → COMPLETE
+- "something wrong with equipment" → Need to ask which equipment AND what's wrong
+- "pump has issues" → Asset: pump, but failure unclear → Ask what's wrong
+
+## Auto-fill from your expertise:
+- Equipment Type: Infer from asset name (P-xxx = Pump, C-xxx = Compressor, etc.)
 - Failure Mode: Standard FMEA failure mode based on description
 - Risk Level: Based on failure type and equipment criticality
 - Recommended Actions: 2-3 practical actions
@@ -197,6 +210,8 @@ RESPOND IN JSON ONLY:
   "complete": true/false,
   "follow_up_question": "single question if complete=false",
   "question_type": "asset|failure",
+  "extracted_asset": "what you found in message or null",
+  "extracted_failure": "what you found in message or null",
   "threat": {
     "title": "concise title",
     "asset": "equipment tag",
@@ -507,36 +522,13 @@ async def send_chat_message(
             resolved_asset_name = matches[0]["name"]
     
     if not hierarchy_node:
-        # Asset not found in hierarchy - ask user to select from hierarchy or add it first
-        equipment_list = [n["name"] for n in all_equipment_nodes if n.get("level") in ["equipment_unit", "equipment", "subunit", "maintainable_item"]]
-        
-        if equipment_list:
-            suggestion = f"\n\nAvailable equipment: {', '.join(equipment_list[:10])}"
-            if len(equipment_list) > 10:
-                suggestion += f"... and {len(equipment_list) - 10} more"
-        else:
-            suggestion = "\n\n⚠️ No equipment found in hierarchy. Please add equipment in the Equipment Manager first."
-        
-        error_msg = f"'{asset_name}' is not in your equipment hierarchy. Please use an equipment name from your hierarchy.{suggestion}"
-        
-        ai_response = {
-            "id": str(uuid.uuid4()),
-            "user_id": current_user["id"],
-            "role": "assistant",
-            "content": error_msg,
-            "question_type": "asset",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.chat_messages.insert_one(ai_response)
-        
-        return ChatResponse(
-            message=error_msg,
-            follow_up_question="Which equipment from your hierarchy is affected?",
-            question_type="asset"
-        )
+        # Asset not found in hierarchy - create threat anyway but flag it
+        # This allows users to report threats quickly without rigid hierarchy matching
+        resolved_asset_name = asset_name
+        hierarchy_node = {}  # Empty dict, threat created without hierarchy link
     
     # Get equipment criticality from hierarchy node
-    equipment_criticality = hierarchy_node.get("criticality", {})
+    equipment_criticality = hierarchy_node.get("criticality", {}) if hierarchy_node else {}
     criticality_level = equipment_criticality.get("level") if equipment_criticality else None
     
     # Criticality multipliers for risk score adjustment
