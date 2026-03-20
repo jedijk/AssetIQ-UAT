@@ -74,7 +74,7 @@ function flattenTree(treeNodes, expandedIds, depth = 0) {
 }
 
 // Tree Node Component with Drag-Drop for reorder, promote, demote, and unassigned items
-function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, allNodes, onDrop, onReorder, onChangeLevel, siblings, siblingIndex }) {
+function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, allNodes, onDrop, onReorder, onChangeLevel, siblings, siblingIndex, isSearchMatch }) {
   const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
@@ -200,6 +200,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
       className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-grab active:cursor-grabbing ${
         isDragging ? "opacity-50" :
         isSelected ? "bg-blue-50 border border-blue-200" : 
+        isSearchMatch ? "bg-yellow-50 border border-yellow-300" :
         "hover:bg-slate-50 border border-transparent"
       } ${getDropIndicatorClass()}`}
       style={{ marginLeft: depth * 24 }}
@@ -219,10 +220,14 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
         <LevelIcon className={`w-4 h-4 ${critColors?.text || "text-slate-600"}`} />
       </div>
       
-      <span className="flex-1 text-sm font-medium text-slate-700 truncate">{node.name}</span>
+      <span className={`flex-1 text-sm font-medium truncate ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>{node.name}</span>
       
       {isDragOver && dropPosition === "child" && (
         <span className="text-xs text-blue-600 font-medium">Drop as child</span>
+      )}
+      
+      {isSearchMatch && (
+        <span className="text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded">Match</span>
       )}
       
       <span className="text-xs text-slate-400 hidden sm:block">{config.label}</span>
@@ -431,6 +436,7 @@ export default function EquipmentManagerPage() {
   }, [expandedIds]);
   
   const [searchQuery, setSearchQuery] = useState("");
+  const [preSearchExpandedIds, setPreSearchExpandedIds] = useState(null); // Store expanded state before search
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newNode, setNewNode] = useState({ name: "", level: "installation", parent_id: null });
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -453,6 +459,66 @@ export default function EquipmentManagerPage() {
   const unstructuredItems = unstructuredData?.items || [];
 
   const treeData = useMemo(() => buildTreeData(nodes), [nodes]);
+  
+  // Search matching function - matches name, description, tag, and equipment type
+  const nodeMatchesSearch = useCallback((node, query) => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    const nameMatch = node.name?.toLowerCase().includes(q);
+    const descMatch = node.description?.toLowerCase().includes(q);
+    const tagMatch = node.tag?.toLowerCase().includes(q);
+    // Also check equipment type name if assigned
+    const eqType = equipmentTypes.find(t => t.id === node.equipment_type_id);
+    const typeMatch = eqType?.name?.toLowerCase().includes(q);
+    return nameMatch || descMatch || tagMatch || typeMatch;
+  }, [equipmentTypes]);
+  
+  // Find all parent IDs for a given node
+  const getParentChain = useCallback((nodeId, nodeList) => {
+    const parents = [];
+    let current = nodeList.find(n => n.id === nodeId);
+    while (current?.parent_id) {
+      parents.push(current.parent_id);
+      current = nodeList.find(n => n.id === current.parent_id);
+    }
+    return parents;
+  }, []);
+  
+  // Get all matching node IDs and their parents (for auto-expand)
+  const { matchingIds, expandForSearch } = useMemo(() => {
+    if (!searchQuery) return { matchingIds: new Set(), expandForSearch: new Set() };
+    const matching = new Set();
+    const toExpand = new Set();
+    nodes.forEach(node => {
+      if (nodeMatchesSearch(node, searchQuery)) {
+        matching.add(node.id);
+        // Add all parents to expand set
+        getParentChain(node.id, nodes).forEach(pid => toExpand.add(pid));
+      }
+    });
+    return { matchingIds: matching, expandForSearch: toExpand };
+  }, [nodes, searchQuery, nodeMatchesSearch, getParentChain]);
+  
+  // Auto-expand parents when searching
+  useEffect(() => {
+    if (searchQuery && expandForSearch.size > 0) {
+      // Save current expanded state before search (only once when starting to search)
+      if (preSearchExpandedIds === null) {
+        setPreSearchExpandedIds(new Set(expandedIds));
+      }
+      // Expand all parents of matching nodes
+      setExpandedIds(prev => {
+        const newSet = new Set(prev);
+        expandForSearch.forEach(id => newSet.add(id));
+        return newSet;
+      });
+    } else if (!searchQuery && preSearchExpandedIds !== null) {
+      // Restore original expanded state when search is cleared
+      setExpandedIds(preSearchExpandedIds);
+      setPreSearchExpandedIds(null);
+    }
+  }, [searchQuery, expandForSearch, preSearchExpandedIds]);
+  
   const flatRows = useMemo(() => flattenTree(treeData, expandedIds), [treeData, expandedIds]);
 
   // Mutations
@@ -702,14 +768,39 @@ export default function EquipmentManagerPage() {
 
   if (isLoading) return <div className="flex items-center justify-center h-[calc(100vh-64px)]"><div className="loading-dots"><span></span><span></span><span></span></div></div>;
 
-  const filteredRows = searchQuery ? flatRows.filter(r => r.node.name.toLowerCase().includes(searchQuery.toLowerCase())) : flatRows;
+  // Filter rows - show matching nodes and their parents (for tree structure)
+  const filteredRows = searchQuery 
+    ? flatRows.filter(r => matchingIds.has(r.node.id) || expandForSearch.has(r.node.id)) 
+    : flatRows;
 
   return (
     <div className="flex h-[calc(100vh-64px)] bg-slate-50" data-testid="equipment-manager-page">
       {/* Main Panel - Hierarchy */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="p-4 border-b border-slate-200 bg-white flex items-center gap-3">
-          <div className="relative flex-1 max-w-xs"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 h-9" data-testid="hierarchy-search-input" /></div>
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input 
+              placeholder="Search name, description, tag..." 
+              value={searchQuery} 
+              onChange={e => setSearchQuery(e.target.value)} 
+              className="pl-9 pr-8 h-9" 
+              data-testid="hierarchy-search-input" 
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full hover:bg-slate-200"
+              >
+                <X className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <span className="text-sm text-slate-500">
+              {matchingIds.size} {matchingIds.size === 1 ? "match" : "matches"}
+            </span>
+          )}
           <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />Import List</Button>
           <Button onClick={() => { setNewNode({ name: "", level: "installation", parent_id: null }); setIsCreateOpen(true); }} size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="add-installation-btn"><Plus className="w-4 h-4 mr-1" />Add Installation</Button>
           {selectedNode && !movingNode && (
@@ -748,6 +839,7 @@ export default function EquipmentManagerPage() {
               {filteredRows.map(({ node, depth, hasChildren, isExpanded }) => {
                 const siblings = nodes.filter(n => n.parent_id === node.parent_id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
                 const siblingIndex = siblings.findIndex(s => s.id === node.id);
+                const isSearchMatch = searchQuery && matchingIds.has(node.id);
                 return (
                   <TreeNode 
                     key={node.id} 
@@ -764,6 +856,7 @@ export default function EquipmentManagerPage() {
                     onChangeLevel={handleDragChangeLevel}
                     siblings={siblings}
                     siblingIndex={siblingIndex}
+                    isSearchMatch={isSearchMatch}
                   />
                 );
               })}
