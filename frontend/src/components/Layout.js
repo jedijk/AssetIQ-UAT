@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info } from "lucide-react";
+import { useLanguage } from "../contexts/LanguageContext";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -30,6 +31,7 @@ import EquipmentHierarchy from "./EquipmentHierarchy";
 const Layout = () => {
   const { user, logout } = useAuth();
   const { canUndo, undo, isUndoing, getLastAction, undoCount } = useUndo();
+  const { language, toggleLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -47,10 +49,10 @@ const Layout = () => {
   const lastAction = getLastAction();
 
   const navItems = [
-    { path: "/", label: "Threats", icon: AlertTriangle },
-    { path: "/causal-engine", label: "Causal Engine", icon: GitBranch },
-    { path: "/actions", label: "Actions", icon: ClipboardList },
-    { path: "/library", label: "Library", icon: BookOpen },
+    { path: "/", label: t("nav.threats"), icon: AlertTriangle },
+    { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch },
+    { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
+    { path: "/library", label: t("nav.library"), icon: BookOpen },
   ];
 
   return (
@@ -167,6 +169,27 @@ const Layout = () => {
               </Tooltip>
             </TooltipProvider>
 
+            {/* Language Switcher */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleLanguage}
+                    className="h-9 px-3 text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-800 font-medium"
+                    data-testid="language-switcher"
+                  >
+                    <Languages className="w-4 h-4 mr-1.5" />
+                    {language.toUpperCase()}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>{language === "en" ? "Switch to Dutch" : "Wissel naar Engels"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {/* Settings Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -180,7 +203,7 @@ const Layout = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Settings</DropdownMenuLabel>
+                <DropdownMenuLabel>{t("nav.settings")}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   onClick={() => navigate("/equipment-manager")}
@@ -188,7 +211,7 @@ const Layout = () => {
                   data-testid="equipment-manager-menu-item"
                 >
                   <Building2 className="w-4 h-4 mr-2" />
-                  Equipment Manager
+                  {t("nav.equipmentManager")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -204,7 +227,7 @@ const Layout = () => {
               data-testid="logout-button"
             >
               <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline ml-2">Logout</span>
+              <span className="hidden sm:inline ml-2">{t("nav.logout")}</span>
             </Button>
 
             {/* Mobile Menu Toggle */}
@@ -313,87 +336,83 @@ const Layout = () => {
       <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl">ThreatBase - Risk Methodology</DialogTitle>
+            <DialogTitle className="text-xl">{t("info.title")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-6 py-4">
             {/* FMEA Risk Scoring */}
             <div>
-              <h3 className="font-semibold text-slate-800 mb-2">FMEA Risk Scoring</h3>
-              <p className="text-sm text-slate-600 mb-3">
-                Risk scores are calculated using Failure Mode and Effects Analysis (FMEA) methodology:
-              </p>
+              <h3 className="font-semibold text-slate-800 mb-2">{t("info.fmeaScoring")}</h3>
+              <p className="text-sm text-slate-600 mb-3">{t("info.fmeaDescription")}</p>
               <div className="bg-slate-50 rounded-lg p-4 font-mono text-sm">
-                <p className="text-slate-700">Risk Score = (Severity × Occurrence × Detection) / 10</p>
-                <p className="text-slate-500 mt-1">Maximum score: 100</p>
+                <p className="text-slate-700">{t("info.formula")}</p>
+                <p className="text-slate-500 mt-1">{t("info.maxScore")}</p>
               </div>
             </div>
 
             {/* Severity */}
             <div>
-              <h4 className="font-medium text-slate-700 mb-2">Severity (Impact)</h4>
+              <h4 className="font-medium text-slate-700 mb-2">{t("info.severity")}</h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between p-2 bg-red-50 rounded"><span>Safety Hazard</span><span className="font-medium">10</span></div>
-                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>Production Loss</span><span className="font-medium">8</span></div>
-                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>Equipment Damage</span><span className="font-medium">6</span></div>
-                <div className="flex justify-between p-2 bg-green-50 rounded"><span>Environmental</span><span className="font-medium">4</span></div>
+                <div className="flex justify-between p-2 bg-red-50 rounded"><span>{t("info.safetyHazard")}</span><span className="font-medium">10</span></div>
+                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>{t("info.productionLoss")}</span><span className="font-medium">8</span></div>
+                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>{t("info.equipmentDamage")}</span><span className="font-medium">6</span></div>
+                <div className="flex justify-between p-2 bg-green-50 rounded"><span>{t("info.environmental")}</span><span className="font-medium">4</span></div>
               </div>
             </div>
 
             {/* Occurrence */}
             <div>
-              <h4 className="font-medium text-slate-700 mb-2">Occurrence (Frequency)</h4>
+              <h4 className="font-medium text-slate-700 mb-2">{t("info.occurrence")}</h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>First Time</span><span className="font-medium">2</span></div>
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Rare</span><span className="font-medium">4</span></div>
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Occasional</span><span className="font-medium">6</span></div>
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Frequent</span><span className="font-medium">8</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.firstTime")}</span><span className="font-medium">2</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.rare")}</span><span className="font-medium">4</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.occasional")}</span><span className="font-medium">6</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.frequent")}</span><span className="font-medium">8</span></div>
               </div>
             </div>
 
             {/* Detection */}
             <div>
-              <h4 className="font-medium text-slate-700 mb-2">Detection (Difficulty)</h4>
+              <h4 className="font-medium text-slate-700 mb-2">{t("info.detection")}</h4>
               <div className="grid grid-cols-3 gap-2 text-sm">
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Easy</span><span className="font-medium">3</span></div>
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Moderate</span><span className="font-medium">5</span></div>
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Difficult</span><span className="font-medium">7</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.easy")}</span><span className="font-medium">3</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.moderate")}</span><span className="font-medium">5</span></div>
+                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.difficult")}</span><span className="font-medium">7</span></div>
               </div>
             </div>
 
             {/* Risk Levels */}
             <div>
-              <h4 className="font-medium text-slate-700 mb-2">Risk Levels</h4>
+              <h4 className="font-medium text-slate-700 mb-2">{t("info.riskLevels")}</h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between p-2 bg-red-100 text-red-800 rounded"><span>Critical</span><span className="font-medium">≥ 70</span></div>
-                <div className="flex justify-between p-2 bg-orange-100 text-orange-800 rounded"><span>High</span><span className="font-medium">50 - 69</span></div>
-                <div className="flex justify-between p-2 bg-yellow-100 text-yellow-800 rounded"><span>Medium</span><span className="font-medium">30 - 49</span></div>
-                <div className="flex justify-between p-2 bg-green-100 text-green-800 rounded"><span>Low</span><span className="font-medium">&lt; 30</span></div>
+                <div className="flex justify-between p-2 bg-red-100 text-red-800 rounded"><span>{t("common.critical")}</span><span className="font-medium">≥ 70</span></div>
+                <div className="flex justify-between p-2 bg-orange-100 text-orange-800 rounded"><span>{t("common.high")}</span><span className="font-medium">50 - 69</span></div>
+                <div className="flex justify-between p-2 bg-yellow-100 text-yellow-800 rounded"><span>{t("common.medium")}</span><span className="font-medium">30 - 49</span></div>
+                <div className="flex justify-between p-2 bg-green-100 text-green-800 rounded"><span>{t("common.low")}</span><span className="font-medium">&lt; 30</span></div>
               </div>
             </div>
 
             {/* Criticality Adjustment */}
             <div>
-              <h4 className="font-medium text-slate-700 mb-2">Equipment Criticality Multipliers</h4>
-              <p className="text-sm text-slate-600 mb-2">
-                Risk scores are adjusted based on equipment criticality:
-              </p>
+              <h4 className="font-medium text-slate-700 mb-2">{t("info.criticalityMultipliers")}</h4>
+              <p className="text-sm text-slate-600 mb-2">{t("info.criticalityDescription")}</p>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between p-2 bg-red-50 rounded"><span>Safety Critical</span><span className="font-medium">×1.5</span></div>
-                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>Production Critical</span><span className="font-medium">×1.3</span></div>
-                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>Medium</span><span className="font-medium">×1.1</span></div>
-                <div className="flex justify-between p-2 bg-green-50 rounded"><span>Low</span><span className="font-medium">×1.0</span></div>
+                <div className="flex justify-between p-2 bg-red-50 rounded"><span>{t("equipment.safetyCritical")}</span><span className="font-medium">×1.5</span></div>
+                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>{t("equipment.productionCritical")}</span><span className="font-medium">×1.3</span></div>
+                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>{t("common.medium")}</span><span className="font-medium">×1.1</span></div>
+                <div className="flex justify-between p-2 bg-green-50 rounded"><span>{t("common.low")}</span><span className="font-medium">×1.0</span></div>
               </div>
             </div>
 
             {/* Quick Tips */}
             <div className="border-t pt-4">
-              <h4 className="font-medium text-slate-700 mb-2">Quick Tips</h4>
+              <h4 className="font-medium text-slate-700 mb-2">{t("info.quickTips")}</h4>
               <ul className="text-sm text-slate-600 space-y-1">
-                <li>• Use the <strong>+</strong> button to report new threats via chat</li>
-                <li>• Drag and drop equipment in the hierarchy to reorganize</li>
-                <li>• Click on a threat to view details and start investigations</li>
-                <li>• Use the Causal Engine to perform root cause analysis</li>
-                <li>• Promote recommendations to Actions for tracking</li>
+                <li>• {t("info.tip1")}</li>
+                <li>• {t("info.tip2")}</li>
+                <li>• {t("info.tip3")}</li>
+                <li>• {t("info.tip4")}</li>
+                <li>• {t("info.tip5")}</li>
               </ul>
             </div>
           </div>

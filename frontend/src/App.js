@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { UndoProvider } from "./contexts/UndoContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -70,14 +71,15 @@ const PublicRoute = ({ children }) => {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <UndoProvider>
-          <BrowserRouter>
-            <Toaster 
-              position="top-center" 
-              richColors 
-              closeButton
-              toastOptions={{
+      <LanguageProvider>
+        <AuthProvider>
+          <UndoProvider>
+            <BrowserRouter>
+              <Toaster 
+                position="top-center" 
+                richColors 
+                closeButton
+                toastOptions={{
                 style: {
                   fontFamily: 'Inter, sans-serif',
                 },
@@ -112,7 +114,8 @@ function App() {
           </BrowserRouter>
         </UndoProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </LanguageProvider>
+  </QueryClientProvider>
   );
 }
 
