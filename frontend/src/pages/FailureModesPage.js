@@ -12,8 +12,6 @@ import {
   Activity,
   Shield,
   Leaf,
-  ChevronDown,
-  ChevronUp,
   Info,
   Plus,
   Edit,
@@ -40,11 +38,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../components/ui/collapsible";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -93,13 +86,6 @@ const CRIT_COLORS = {
   low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } 
 };
 
-const getRpnColor = (rpn) => {
-  if (rpn >= 300) return "bg-red-500";
-  if (rpn >= 200) return "bg-orange-500";
-  if (rpn >= 150) return "bg-yellow-500";
-  return "bg-green-500";
-};
-
 // Equipment Type Library Item
 function EquipmentTypeItem({ item, onEdit, onDelete }) {
   const Icon = EQUIPMENT_ICONS[item.icon] || Cog;
@@ -137,7 +123,6 @@ const FailureModesPage = () => {
   const { pushUndo } = useUndo();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [expandedId, setExpandedId] = useState(null);
   const [mainTab, setMainTab] = useState("failure-modes");
   const [libraryTab, setLibraryTab] = useState("equipment");
   
@@ -430,274 +415,180 @@ const FailureModesPage = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-6xl" data-testid="failure-modes-page">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">FMEA Library</h1>
-        <p className="text-slate-500">
-          Failure modes, equipment types, and criticality profiles
-        </p>
-      </div>
-
+    <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="failure-modes-page">
       {/* Main Tabs */}
-      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
+      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="failure-modes">Failure Modes</TabsTrigger>
           <TabsTrigger value="libraries">Equipment & Criticality</TabsTrigger>
         </TabsList>
 
         {/* Failure Modes Tab */}
-        <TabsContent value="failure-modes" className="space-y-6">
-          {/* Stats Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="card p-4">
-              <div className="text-2xl font-bold text-slate-900">{totalModes}</div>
-              <div className="text-sm text-slate-500">Failure Modes</div>
-            </div>
-            <div className="card p-4">
-              <div className="text-2xl font-bold text-slate-900">{totalCategories}</div>
-              <div className="text-sm text-slate-500">Categories</div>
-            </div>
-            <div className="card p-4">
-              <div className="text-2xl font-bold text-red-600">
-                {failureModes.filter(fm => fm.rpn >= 300).length}
+        <TabsContent value="failure-modes" className="space-y-4">
+          {/* Compact Stats Row - matching ThreatsPage */}
+          <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
+              <div className="p-1.5 rounded-md bg-slate-100">
+                <AlertTriangle className="w-4 h-4 text-slate-600" />
               </div>
-              <div className="text-sm text-slate-500">High Risk (RPN≥300)</div>
-            </div>
-            <div className="card p-4">
-              <div className="text-2xl font-bold text-orange-600">
-                {failureModes.filter(fm => fm.rpn >= 200 && fm.rpn < 300).length}
+              <div>
+                <span className="text-lg font-bold text-slate-900">{totalModes}</span>
+                <span className="text-xs text-slate-500 ml-1">Failure Modes</span>
               </div>
-              <div className="text-sm text-slate-500">Medium Risk</div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
+              <div className="p-1.5 rounded-md bg-blue-50">
+                <Filter className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <span className="text-lg font-bold text-blue-600">{totalCategories}</span>
+                <span className="text-xs text-slate-500 ml-1">Categories</span>
+              </div>
             </div>
           </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6" data-testid="filters">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <Input
-            placeholder="Search by keyword..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="search-input"
-          />
-        </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-full sm:w-48" data-testid="category-filter">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="All Categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.map((cat) => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700" data-testid="add-failure-mode-btn">
-          <Plus className="w-4 h-4 mr-1" /> Add Failure Mode
-        </Button>
-      </div>
-
-      {/* Category Legend */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {Object.entries(categoryColors).map(([cat, colors]) => {
-          const Icon = categoryIcons[cat] || AlertTriangle;
-          return (
-            <button
-              key={cat}
-              onClick={() => setCategoryFilter(categoryFilter === cat ? "all" : cat)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm font-medium transition-all ${
-                categoryFilter === cat 
-                  ? colors + " ring-2 ring-offset-2 ring-blue-500" 
-                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-              }`}
-              data-testid={`category-badge-${cat.toLowerCase()}`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {cat}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Failure Modes List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="loading-dots">
-            <span></span>
-            <span></span>
-            <span></span>
+          {/* Filters - matching ThreatsPage */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6" data-testid="filters">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Input
+                placeholder="Search failure modes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-11"
+                data-testid="search-input"
+              />
+            </div>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full sm:w-48 h-11" data-testid="category-filter">
+                <Filter className="w-4 h-4 mr-2 text-slate-400" />
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-mode-btn">
+              <Plus className="w-4 h-4 mr-1" /> Add Failure Mode
+            </Button>
           </div>
-        </div>
-      ) : failureModes.length === 0 ? (
-        <div className="text-center py-16">
-          <Info className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-slate-700 mb-2">No matches found</h3>
-          <p className="text-slate-500">Try adjusting your search or filters</p>
-        </div>
-      ) : (
-        <div className="space-y-3" data-testid="failure-modes-list">
-          {failureModes.map((fm, idx) => {
-            const Icon = categoryIcons[fm.category] || AlertTriangle;
-            const isExpanded = expandedId === fm.id;
-            
-            return (
-              <motion.div
-                key={fm.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.02 }}
-              >
-                <Collapsible open={isExpanded} onOpenChange={() => setExpandedId(isExpanded ? null : fm.id)}>
-                  <div className="card overflow-hidden" data-testid={`failure-mode-${fm.id}`}>
-                    <CollapsibleTrigger className="w-full">
-                      <div className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                        {/* RPN Indicator */}
-                        <div className="flex-shrink-0 relative">
-                          <div className={`w-12 h-12 rounded-lg ${getRpnColor(fm.rpn)} bg-opacity-10 flex items-center justify-center`}>
-                            <span className="text-lg font-bold">{fm.rpn}</span>
-                          </div>
-                          <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${getRpnColor(fm.rpn)}`} />
-                        </div>
 
-                        {/* Main Content */}
-                        <div className="flex-1 text-left min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-slate-900 truncate">
-                              {fm.failure_mode}
-                            </h3>
-                            <Badge variant="outline" className={categoryColors[fm.category]}>
-                              <Icon className="w-3 h-3 mr-1" />
-                              {fm.category}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-slate-500">
-                            {fm.equipment} • Keywords: {fm.keywords.slice(0, 3).join(", ")}
-                          </p>
-                        </div>
+          {/* Category Legend */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {Object.entries(categoryColors).map(([cat, colors]) => {
+              const Icon = categoryIcons[cat] || AlertTriangle;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setCategoryFilter(categoryFilter === cat ? "all" : cat)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm font-medium transition-all ${
+                    categoryFilter === cat 
+                      ? colors + " ring-2 ring-offset-2 ring-blue-500" 
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  }`}
+                  data-testid={`category-badge-${cat.toLowerCase()}`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
 
-                        {/* FMEA Scores */}
-                        <div className="hidden md:flex items-center gap-4 text-sm">
-                          <div className="text-center">
-                            <div className="font-semibold text-slate-700">{fm.severity}</div>
-                            <div className="text-xs text-slate-400">SEV</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-semibold text-slate-700">{fm.occurrence}</div>
-                            <div className="text-xs text-slate-400">OCC</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-semibold text-slate-700">{fm.detectability}</div>
-                            <div className="text-xs text-slate-400">DET</div>
-                          </div>
-                        </div>
+          {/* Failure Modes List - matching ThreatsPage priority-list style */}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          ) : failureModes.length === 0 ? (
+            <div className="empty-state py-16">
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                <Info className="w-8 h-8 text-slate-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-700 mb-2">No matches found</h3>
+              <p className="text-slate-500">Try adjusting your search or filters</p>
+            </div>
+          ) : (
+            <div className="priority-list" data-testid="failure-modes-list">
+              {failureModes.map((fm, idx) => {
+                const Icon = categoryIcons[fm.category] || AlertTriangle;
+                const colors = categoryColors[fm.category] || "bg-slate-100 text-slate-700";
+                
+                return (
+                  <motion.div
+                    key={fm.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.02 }}
+                    className="priority-item group"
+                    data-testid={`failure-mode-${fm.id}`}
+                  >
+                    {/* Category Icon */}
+                    <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${colors.split(' ')[0]}`}>
+                      <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${colors.split(' ')[1]}`} />
+                    </div>
 
-                        {/* Expand Icon */}
-                        <div className="flex-shrink-0 text-slate-400">
-                          {isExpanded ? (
-                            <ChevronUp className="w-5 h-5" />
-                          ) : (
-                            <ChevronDown className="w-5 h-5" />
-                          )}
-                        </div>
+                    {/* ID/Number placeholder */}
+                    <div className="priority-rank text-sm sm:text-base">
+                      #{fm.id}
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
+                        <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-1">
+                          {fm.failure_mode}
+                        </h3>
+                        <Badge className={colors}>
+                          {fm.category}
+                        </Badge>
                       </div>
-                    </CollapsibleTrigger>
-
-                    <CollapsibleContent>
-                      <div className="px-4 pb-4 pt-0 border-t border-slate-100">
-                        <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* FMEA Details */}
-                          <div className="bg-slate-50 rounded-lg p-4">
-                            <h4 className="font-medium text-slate-700 mb-3">FMEA Scores</h4>
-                            <div className="grid grid-cols-3 gap-3">
-                              <div>
-                                <div className="text-2xl font-bold text-slate-900">{fm.severity}</div>
-                                <div className="text-xs text-slate-500">Severity</div>
-                              </div>
-                              <div>
-                                <div className="text-2xl font-bold text-slate-900">{fm.occurrence}</div>
-                                <div className="text-xs text-slate-500">Occurrence</div>
-                              </div>
-                              <div>
-                                <div className="text-2xl font-bold text-slate-900">{fm.detectability}</div>
-                                <div className="text-xs text-slate-500">Detectability</div>
-                              </div>
-                            </div>
-                            <div className="mt-3 pt-3 border-t border-slate-200">
-                              <div className="text-xs text-slate-500">
-                                RPN = {fm.severity} × {fm.occurrence} × {fm.detectability} = <strong className="text-slate-700">{fm.rpn}</strong>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Recommended Actions */}
-                          <div>
-                            <h4 className="font-medium text-slate-700 mb-3">Recommended Actions</h4>
-                            <ul className="space-y-2">
-                              {fm.recommended_actions.map((action, i) => (
-                                <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
-                                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-medium">
-                                    {i + 1}
-                                  </span>
-                                  {action}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-
-                        {/* Keywords */}
-                        <div className="mt-4 pt-4 border-t border-slate-100">
-                          <h4 className="text-xs font-medium text-slate-500 mb-2">Detection Keywords</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {fm.keywords.map((kw, i) => (
-                              <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">
-                                {kw}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Linked Equipment Types & Actions */}
-                        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {fm.equipment_type_ids && fm.equipment_type_ids.length > 0 ? (
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Link className="w-4 h-4 text-blue-500" />
-                                <span className="text-sm text-slate-600">Linked to:</span>
-                                {fm.equipment_type_ids.map(typeId => (
-                                  <Badge key={typeId} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                    {equipmentTypes.find(t => t.id === typeId)?.name || typeId}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-slate-400">No equipment types linked</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleEditFm(fm); }} data-testid={`edit-fm-${fm.id}`}>
-                              <Edit className="w-4 h-4 mr-1" /> Edit
-                            </Button>
-                            {fm.is_custom && (
-                              <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); deleteFmMutation.mutate(fm.id); }} data-testid={`delete-fm-${fm.id}`}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
+                      <div className="text-xs sm:text-sm text-slate-500 line-clamp-1">
+                        {fm.equipment} • {fm.keywords.slice(0, 3).join(", ")}
                       </div>
-                    </CollapsibleContent>
-                  </div>
-                </Collapsible>
-              </motion.div>
-            );
-          })}
-        </div>
-      )}
+                    </div>
+
+                    {/* Right side - Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {fm.equipment_type_ids && fm.equipment_type_ids.length > 0 && (
+                        <div className="hidden md:flex items-center gap-1 text-xs text-blue-600">
+                          <Link className="w-3 h-3" />
+                          <span>{fm.equipment_type_ids.length} linked</span>
+                        </div>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => handleEditFm(fm)} 
+                        className="h-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                        data-testid={`edit-fm-${fm.id}`}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      {fm.is_custom && (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => deleteFmMutation.mutate(fm.id)} 
+                          data-testid={`delete-fm-${fm.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         {/* Equipment & Criticality Libraries Tab */}
