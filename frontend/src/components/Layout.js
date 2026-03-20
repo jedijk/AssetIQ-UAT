@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList } from "lucide-react";
@@ -25,9 +25,17 @@ const Layout = () => {
   const { user, logout } = useAuth();
   const { canUndo, undo, isUndoing, getLastAction, undoCount } = useUndo();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [hierarchyOpen, setHierarchyOpen] = useState(true); // Open by default on desktop
+  const [hierarchyOpen, setHierarchyOpen] = useState(true);
+
+  // Auto-collapse hierarchy when on Equipment Manager page
+  useEffect(() => {
+    if (location.pathname === "/equipment-manager") {
+      setHierarchyOpen(false);
+    }
+  }, [location.pathname]);
 
   const lastAction = getLastAction();
 
