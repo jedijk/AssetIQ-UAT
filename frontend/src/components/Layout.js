@@ -271,7 +271,8 @@ const Layout = () => {
       {/* Floating Action Button - Report Threat */}
       <button
         onClick={() => setChatOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 hover:shadow-xl active:scale-95 transition-all duration-200 z-30"
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all duration-200 z-30"
+        style={{ boxShadow: '0 8px 24px -4px rgba(37, 99, 235, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.25)' }}
         data-testid="fab-report-threat"
         title="Report Threat"
       >
