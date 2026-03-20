@@ -144,7 +144,7 @@ const Layout = () => {
                     size="icon"
                     onClick={undo}
                     disabled={!canUndo || isUndoing}
-                    className={`h-9 w-9 transition-all duration-200 ${
+                    className={`h-9 w-9 relative transition-all duration-200 ${
                       canUndo 
                         ? "text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700" 
                         : "text-slate-300 border-slate-200"
@@ -153,7 +153,7 @@ const Layout = () => {
                   >
                     <Undo2 className="w-4 h-4" />
                     {undoCount > 0 && (
-                      <span className="absolute -top-1 -right-1 h-4 w-4 text-[10px] font-bold bg-amber-500 text-white rounded-full flex items-center justify-center">
+                      <span className="absolute -top-1.5 -right-1.5 h-4 w-4 text-[10px] font-bold bg-amber-500 text-white rounded-full flex items-center justify-center">
                         {undoCount}
                       </span>
                     )}
