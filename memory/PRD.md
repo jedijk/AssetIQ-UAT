@@ -231,6 +231,18 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
   - Quick status toggle by clicking status icon
   - Backend: /api/actions CRUD endpoints with filtering
   - Backend tests: 20/20 passed
+- [x] **UI/UX Consistency Redesign** (Mar 20, 2026):
+  - ActionsPage.js redesigned to match ThreatsPage.js layout
+  - FailureModesPage.js (Library) redesigned with consistent style
+  - CausalEnginePage.js redesigned with:
+    - Compact stats row at top (Events, Failures, Causes, Root Causes, Actions)
+    - Tab navigation matching other pages
+    - Card-based metadata display (Asset, Date, Lead)
+    - Section tabs for Timeline, Failures, Causes, Actions
+    - priority-list component styling for all item lists
+  - Floating Action Button (+) for threat reporting (replaces header button)
+  - Equipment Manager sidebar auto-collapses when navigating to page
+  - Equipment Manager only shows Equipment Type/Discipline for lower hierarchy levels
 
 ### Future Tasks (Backlog)
 - [ ] P2: Voice input for chat interface

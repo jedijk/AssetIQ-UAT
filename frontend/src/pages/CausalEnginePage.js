@@ -565,30 +565,6 @@ export default function CausalEnginePage() {
                 )}
               </div>
             )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
-                                onClick={() => promoteToCentralActionMutation.mutate(action)}
-                                disabled={promoteToCentralActionMutation.isPending}
-                                title="Add to action tracker"
-                                data-testid={`promote-action-${action.id}`}
-                              >
-                                <ClipboardList className="w-4 h-4 mr-1" />Act
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => deleteActionMutation.mutate(action.id)}><Trash2 className="w-4 h-4" /></Button>
-                            </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       ) : <div className="flex-1 flex items-center justify-center"><p>Not found</p></div>}
