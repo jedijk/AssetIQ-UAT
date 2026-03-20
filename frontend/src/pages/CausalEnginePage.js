@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import {
   Search, Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
   ChevronRight, Trash2, Calendar, User, MapPin,
-  Target, Loader2, ClipboardList,
+  Target, Loader2, ClipboardList, Edit, MessageSquare,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -64,10 +64,10 @@ export default function CausalEnginePage() {
   const [editingItem, setEditingItem] = useState(null);
   
   const [newInvForm, setNewInvForm] = useState({ title: "", description: "", asset_name: "", location: "", incident_date: "", investigation_leader: "" });
-  const [eventForm, setEventForm] = useState({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "" });
-  const [failureForm, setFailureForm] = useState({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "" });
-  const [causeForm, setCauseForm] = useState({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "" });
-  const [actionForm, setActionForm] = useState({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null });
+  const [eventForm, setEventForm] = useState({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" });
+  const [failureForm, setFailureForm] = useState({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" });
+  const [causeForm, setCauseForm] = useState({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" });
+  const [actionForm, setActionForm] = useState({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" });
 
   const { data: investigationsData, isLoading: loadingInvestigations } = useQuery({
     queryKey: ["investigations"],
@@ -163,8 +163,20 @@ export default function CausalEnginePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
       setShowEventDialog(false);
-      setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "" });
+      setEditingItem(null);
+      setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" });
       toast.success("Event added");
+    },
+  });
+  
+  const updateEventMutation = useMutation({
+    mutationFn: ({ eventId, data }) => investigationAPI.updateEvent(selectedInvId, eventId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      setShowEventDialog(false);
+      setEditingItem(null);
+      setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" });
+      toast.success("Event updated");
     },
   });
   
@@ -178,8 +190,20 @@ export default function CausalEnginePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
       setShowFailureDialog(false);
-      setFailureForm({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "" });
+      setEditingItem(null);
+      setFailureForm({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" });
       toast.success("Failure added");
+    },
+  });
+  
+  const updateFailureMutation = useMutation({
+    mutationFn: ({ failureId, data }) => investigationAPI.updateFailure(selectedInvId, failureId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      setShowFailureDialog(false);
+      setEditingItem(null);
+      setFailureForm({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" });
+      toast.success("Failure updated");
     },
   });
   
@@ -193,7 +217,8 @@ export default function CausalEnginePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
       setShowCauseDialog(false);
-      setCauseForm({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "" });
+      setEditingItem(null);
+      setCauseForm({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" });
       toast.success("Cause added");
     },
   });
@@ -204,6 +229,8 @@ export default function CausalEnginePage() {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
       setShowCauseDialog(false);
       setEditingItem(null);
+      setCauseForm({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" });
+      toast.success("Cause updated");
     },
   });
   
@@ -217,14 +244,21 @@ export default function CausalEnginePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
       setShowActionDialog(false);
-      setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null });
+      setEditingItem(null);
+      setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" });
       toast.success("Action added");
     },
   });
   
   const updateActionMutation = useMutation({
     mutationFn: ({ actionId, data }) => investigationAPI.updateAction(selectedInvId, actionId, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      setShowActionDialog(false);
+      setEditingItem(null);
+      setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" });
+      toast.success("Action updated");
+    },
   });
   
   const deleteActionMutation = useMutation({
@@ -255,12 +289,12 @@ export default function CausalEnginePage() {
 
   const handleEditCause = useCallback((node) => {
     setEditingItem({ type: "cause", data: node });
-    setCauseForm({ description: node.description, category: node.category, parent_id: node.parent_id, is_root_cause: node.is_root_cause, evidence: node.evidence || "" });
+    setCauseForm({ description: node.description, category: node.category, parent_id: node.parent_id, is_root_cause: node.is_root_cause, evidence: node.evidence || "", comment: node.comment || "" });
     setShowCauseDialog(true);
   }, []);
 
   const handleDeleteCause = useCallback((causeId) => deleteCauseMutation.mutate(causeId), [deleteCauseMutation]);
-  const handleAddChildCause = useCallback((parentId) => { setCauseForm({ description: "", category: "technical_cause", parent_id: parentId, is_root_cause: false, evidence: "" }); setShowCauseDialog(true); }, []);
+  const handleAddChildCause = useCallback((parentId) => { setEditingItem(null); setCauseForm({ description: "", category: "technical_cause", parent_id: parentId, is_root_cause: false, evidence: "", comment: "" }); setShowCauseDialog(true); }, []);
   const handleToggleRootCause = useCallback((node) => updateCauseMutation.mutate({ causeId: node.id, data: { is_root_cause: !node.is_root_cause } }), [updateCauseMutation]);
 
   const tabs = [
@@ -414,7 +448,7 @@ export default function CausalEnginePage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div><h2 className="text-lg font-semibold">Sequence of Events</h2><p className="text-sm text-slate-500">Reconstruct the timeline</p></div>
-                  <Button onClick={() => { setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "" }); setShowEventDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-event-btn"><Plus className="w-4 h-4 mr-2" />Add Event</Button>
+                  <Button onClick={() => { setEditingItem(null); setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" }); setShowEventDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-event-btn"><Plus className="w-4 h-4 mr-2" />Add Event</Button>
                 </div>
                 
                 {timelineEvents.length === 0 ? (
@@ -439,11 +473,15 @@ export default function CausalEnginePage() {
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <span className={`text-xs px-2 py-0.5 rounded-full ${category?.bgClass || "bg-slate-100 text-slate-700"}`}>{category?.label || event.category}</span>
                               <span className={`text-xs px-2 py-0.5 rounded-full ${event.confidence === "high" ? "bg-green-100 text-green-700" : event.confidence === "low" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>{event.confidence}</span>
+                              {event.comment && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1"><MessageSquare className="w-3 h-3" />Has comment</span>}
                             </div>
                             <p className="text-sm text-slate-900 line-clamp-2">{event.description}</p>
                             {event.evidence_source && <p className="text-xs text-slate-500 mt-1">Source: {event.evidence_source}</p>}
                           </div>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteEventMutation.mutate(event.id)}><Trash2 className="w-4 h-4" /></Button>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditingItem({ type: "event", data: event }); setEventForm({ event_time: event.event_time || "", description: event.description, category: event.category, evidence_source: event.evidence_source || "", confidence: event.confidence, notes: event.notes || "", comment: event.comment || "" }); setShowEventDialog(true); }}><Edit className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteEventMutation.mutate(event.id)}><Trash2 className="w-4 h-4" /></Button>
+                          </div>
                         </motion.div>
                       );
                     })}
@@ -456,7 +494,7 @@ export default function CausalEnginePage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div><h2 className="text-lg font-semibold">Failure Identification</h2><p className="text-sm text-slate-500">Define what technically failed</p></div>
-                  <Button onClick={() => { setFailureForm({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "" }); setShowFailureDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-btn"><Plus className="w-4 h-4 mr-2" />Add Failure</Button>
+                  <Button onClick={() => { setEditingItem(null); setFailureForm({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" }); setShowFailureDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-btn"><Plus className="w-4 h-4 mr-2" />Add Failure</Button>
                 </div>
                 
                 {failureIdentifications.length === 0 ? (
@@ -480,13 +518,17 @@ export default function CausalEnginePage() {
                             <span className="font-semibold text-sm">{failure.asset_name}</span>
                             {failure.subsystem && <><ChevronRight className="w-3 h-3 text-slate-400" /><span className="text-sm text-slate-600">{failure.subsystem}</span></>}
                             {failure.component && <><ChevronRight className="w-3 h-3 text-slate-400" /><span className="text-sm text-slate-600">{failure.component}</span></>}
+                            {failure.comment && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1"><MessageSquare className="w-3 h-3" />Has comment</span>}
                           </div>
                           <div className="text-xs sm:text-sm text-slate-500">
                             <span className="text-red-600 font-medium">{failure.failure_mode}</span>
                             {failure.degradation_mechanism && <span className="ml-2">• {failure.degradation_mechanism}</span>}
                           </div>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteFailureMutation.mutate(failure.id)}><Trash2 className="w-4 h-4" /></Button>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditingItem({ type: "failure", data: failure }); setFailureForm({ asset_name: failure.asset_name, subsystem: failure.subsystem || "", component: failure.component, failure_mode: failure.failure_mode, degradation_mechanism: failure.degradation_mechanism || "", evidence: failure.evidence || "", comment: failure.comment || "" }); setShowFailureDialog(true); }}><Edit className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteFailureMutation.mutate(failure.id)}><Trash2 className="w-4 h-4" /></Button>
+                        </div>
                       </motion.div>
                     ))}
                   </div>
@@ -498,7 +540,7 @@ export default function CausalEnginePage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div><h2 className="text-lg font-semibold">Causal Tree</h2><p className="text-sm text-slate-500">Build cause-and-effect relationships</p></div>
-                  <Button onClick={() => { setCauseForm({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "" }); setShowCauseDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-cause-btn"><Plus className="w-4 h-4 mr-2" />Add Cause</Button>
+                  <Button onClick={() => { setEditingItem(null); setCauseForm({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" }); setShowCauseDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-cause-btn"><Plus className="w-4 h-4 mr-2" />Add Cause</Button>
                 </div>
                 
                 {causeNodes.length === 0 ? (
@@ -519,7 +561,7 @@ export default function CausalEnginePage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div><h2 className="text-lg font-semibold">Corrective Actions</h2><p className="text-sm text-slate-500">Track actions to prevent recurrence</p></div>
-                  <Button onClick={() => { setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null }); setShowActionDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-action-btn"><Plus className="w-4 h-4 mr-2" />Add Action</Button>
+                  <Button onClick={() => { setEditingItem(null); setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" }); setShowActionDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-action-btn"><Plus className="w-4 h-4 mr-2" />Add Action</Button>
                 </div>
                 
                 {actionItems.length === 0 ? (
@@ -547,6 +589,7 @@ export default function CausalEnginePage() {
                                 <SelectTrigger className="h-6 w-24 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>{ACTION_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
                               </Select>
+                              {action.comment && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1"><MessageSquare className="w-3 h-3" />Has comment</span>}
                             </div>
                             <p className="text-sm text-slate-900 line-clamp-2">{action.description}</p>
                             <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
@@ -556,6 +599,7 @@ export default function CausalEnginePage() {
                           </div>
                           <div className="flex items-center gap-1">
                             <Button variant="ghost" size="sm" className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => promoteToCentralActionMutation.mutate(action)} disabled={promoteToCentralActionMutation.isPending} title="Add to action tracker" data-testid={`promote-action-${action.id}`}><ClipboardList className="w-4 h-4 mr-1" />Act</Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditingItem({ type: "action", data: action }); setActionForm({ description: action.description, owner: action.owner || "", priority: action.priority, due_date: action.due_date || "", linked_cause_id: action.linked_cause_id || null, comment: action.comment || "" }); setShowActionDialog(true); }}><Edit className="w-4 h-4" /></Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteActionMutation.mutate(action.id)}><Trash2 className="w-4 h-4" /></Button>
                           </div>
                         </motion.div>
@@ -592,9 +636,9 @@ export default function CausalEnginePage() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
+      <Dialog open={showEventDialog} onOpenChange={(open) => { setShowEventDialog(open); if (!open) setEditingItem(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add Event</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem?.type === "event" ? "Edit Event" : "Add Event"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div><label className="text-sm font-medium">Time *</label><Input value={eventForm.event_time} onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })} placeholder="2024-03-15 14:30" /></div>
             <div><label className="text-sm font-medium">Description *</label><Textarea value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} placeholder="What happened?" rows={2} /></div>
@@ -603,14 +647,18 @@ export default function CausalEnginePage() {
               <div><label className="text-sm font-medium">Confidence</label><Select value={eventForm.confidence} onValueChange={(v) => setEventForm({ ...eventForm, confidence: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="high">High</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="low">Low</SelectItem><SelectItem value="uncertain">Uncertain</SelectItem></SelectContent></Select></div>
             </div>
             <div><label className="text-sm font-medium">Evidence Source</label><Input value={eventForm.evidence_source} onChange={(e) => setEventForm({ ...eventForm, evidence_source: e.target.value })} placeholder="Log file, witness..." /></div>
+            <div><label className="text-sm font-medium">Comment</label><Textarea value={eventForm.comment} onChange={(e) => setEventForm({ ...eventForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setShowEventDialog(false)}>Cancel</Button><Button onClick={() => createEventMutation.mutate(eventForm)} disabled={!eventForm.event_time || !eventForm.description}>Add</Button></DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowEventDialog(false); setEditingItem(null); }}>Cancel</Button>
+            <Button onClick={() => { if (editingItem?.type === "event") updateEventMutation.mutate({ eventId: editingItem.data.id, data: eventForm }); else createEventMutation.mutate(eventForm); }} disabled={!eventForm.event_time || !eventForm.description}>{editingItem?.type === "event" ? "Update" : "Add"}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       
-      <Dialog open={showFailureDialog} onOpenChange={setShowFailureDialog}>
+      <Dialog open={showFailureDialog} onOpenChange={(open) => { setShowFailureDialog(open); if (!open) setEditingItem(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add Failure</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem?.type === "failure" ? "Edit Failure" : "Add Failure"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div><label className="text-sm font-medium">Asset *</label><Input value={failureForm.asset_name} onChange={(e) => setFailureForm({ ...failureForm, asset_name: e.target.value })} placeholder="Equipment" /></div>
             <div className="grid grid-cols-2 gap-4">
@@ -619,8 +667,12 @@ export default function CausalEnginePage() {
             </div>
             <div><label className="text-sm font-medium">Failure Mode *</label><Input value={failureForm.failure_mode} onChange={(e) => setFailureForm({ ...failureForm, failure_mode: e.target.value })} placeholder="e.g., Leakage" /></div>
             <div><label className="text-sm font-medium">Mechanism</label><Input value={failureForm.degradation_mechanism} onChange={(e) => setFailureForm({ ...failureForm, degradation_mechanism: e.target.value })} placeholder="e.g., Fatigue" /></div>
+            <div><label className="text-sm font-medium">Comment</label><Textarea value={failureForm.comment} onChange={(e) => setFailureForm({ ...failureForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setShowFailureDialog(false)}>Cancel</Button><Button onClick={() => createFailureMutation.mutate(failureForm)} disabled={!failureForm.asset_name || !failureForm.component || !failureForm.failure_mode}>Add</Button></DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowFailureDialog(false); setEditingItem(null); }}>Cancel</Button>
+            <Button onClick={() => { if (editingItem?.type === "failure") updateFailureMutation.mutate({ failureId: editingItem.data.id, data: failureForm }); else createFailureMutation.mutate(failureForm); }} disabled={!failureForm.asset_name || !failureForm.component || !failureForm.failure_mode}>{editingItem?.type === "failure" ? "Update" : "Add"}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       
@@ -635,14 +687,15 @@ export default function CausalEnginePage() {
             </div>
             <div className="flex items-center gap-2"><input type="checkbox" id="root" checked={causeForm.is_root_cause} onChange={(e) => setCauseForm({ ...causeForm, is_root_cause: e.target.checked })} className="rounded" /><label htmlFor="root" className="text-sm font-medium">Mark as Root Cause</label></div>
             <div><label className="text-sm font-medium">Evidence</label><Textarea value={causeForm.evidence} onChange={(e) => setCauseForm({ ...causeForm, evidence: e.target.value })} placeholder="Supporting evidence..." rows={2} /></div>
+            <div><label className="text-sm font-medium">Comment</label><Textarea value={causeForm.comment} onChange={(e) => setCauseForm({ ...causeForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => { setShowCauseDialog(false); setEditingItem(null); }}>Cancel</Button><Button onClick={() => { if (editingItem?.type === "cause") updateCauseMutation.mutate({ causeId: editingItem.data.id, data: causeForm }); else createCauseMutation.mutate(causeForm); }} disabled={!causeForm.description}>{editingItem?.type === "cause" ? "Update" : "Add"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       
-      <Dialog open={showActionDialog} onOpenChange={setShowActionDialog}>
+      <Dialog open={showActionDialog} onOpenChange={(open) => { setShowActionDialog(open); if (!open) setEditingItem(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add Action</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem?.type === "action" ? "Edit Action" : "Add Action"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div><label className="text-sm font-medium">Description *</label><Textarea value={actionForm.description} onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })} placeholder="What to do?" rows={2} /></div>
             <div className="grid grid-cols-2 gap-4">
@@ -653,8 +706,12 @@ export default function CausalEnginePage() {
               <div><label className="text-sm font-medium">Due Date</label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm({ ...actionForm, due_date: e.target.value })} /></div>
               <div><label className="text-sm font-medium">Linked Root Cause</label><Select value={actionForm.linked_cause_id || "none"} onValueChange={(v) => setActionForm({ ...actionForm, linked_cause_id: v === "none" ? null : v })}><SelectTrigger><SelectValue placeholder="None" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{causeNodes.filter(c => c.is_root_cause).map(c => <SelectItem key={c.id} value={c.id}>{c.description.substring(0, 30)}...</SelectItem>)}</SelectContent></Select></div>
             </div>
+            <div><label className="text-sm font-medium">Comment</label><Textarea value={actionForm.comment} onChange={(e) => setActionForm({ ...actionForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setShowActionDialog(false)}>Cancel</Button><Button onClick={() => createActionMutation.mutate(actionForm)} disabled={!actionForm.description}>Add</Button></DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowActionDialog(false); setEditingItem(null); }}>Cancel</Button>
+            <Button onClick={() => { if (editingItem?.type === "action") updateActionMutation.mutate({ actionId: editingItem.data.id, data: actionForm }); else createActionMutation.mutate(actionForm); }} disabled={!actionForm.description}>{editingItem?.type === "action" ? "Update" : "Add"}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

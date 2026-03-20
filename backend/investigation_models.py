@@ -90,6 +90,7 @@ class TimelineEventCreate(BaseModel):
     evidence_source: Optional[str] = None
     confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
     notes: Optional[str] = None
+    comment: Optional[str] = None
 
 
 class TimelineEventUpdate(BaseModel):
@@ -99,6 +100,7 @@ class TimelineEventUpdate(BaseModel):
     evidence_source: Optional[str] = None
     confidence: Optional[ConfidenceLevel] = None
     notes: Optional[str] = None
+    comment: Optional[str] = None
 
 
 class FailureIdentificationCreate(BaseModel):
@@ -110,6 +112,7 @@ class FailureIdentificationCreate(BaseModel):
     degradation_mechanism: Optional[str] = None
     evidence: Optional[str] = None
     failure_mode_id: Optional[int] = None  # Link to failure modes library
+    comment: Optional[str] = None
 
 
 class FailureIdentificationUpdate(BaseModel):
@@ -119,6 +122,7 @@ class FailureIdentificationUpdate(BaseModel):
     failure_mode: Optional[str] = None
     degradation_mechanism: Optional[str] = None
     evidence: Optional[str] = None
+    comment: Optional[str] = None
 
 
 class CauseNodeCreate(BaseModel):
@@ -130,6 +134,7 @@ class CauseNodeCreate(BaseModel):
     evidence: Optional[str] = None
     linked_event_id: Optional[str] = None  # Link to timeline event
     linked_failure_id: Optional[str] = None  # Link to failure identification
+    comment: Optional[str] = None
 
 
 class CauseNodeUpdate(BaseModel):
@@ -138,6 +143,7 @@ class CauseNodeUpdate(BaseModel):
     parent_id: Optional[str] = None
     is_root_cause: Optional[bool] = None
     evidence: Optional[str] = None
+    comment: Optional[str] = None
 
 
 class ActionItemCreate(BaseModel):
@@ -147,6 +153,7 @@ class ActionItemCreate(BaseModel):
     priority: ActionPriority = ActionPriority.MEDIUM
     due_date: Optional[str] = None
     linked_cause_id: Optional[str] = None  # Link to root cause
+    comment: Optional[str] = None
 
 
 class ActionItemUpdate(BaseModel):
@@ -156,6 +163,7 @@ class ActionItemUpdate(BaseModel):
     due_date: Optional[str] = None
     status: Optional[ActionStatus] = None
     completion_notes: Optional[str] = None
+    comment: Optional[str] = None
 
 
 class EvidenceCreate(BaseModel):
@@ -197,6 +205,7 @@ class TimelineEventResponse(BaseModel):
     evidence_source: Optional[str] = None
     confidence: str
     notes: Optional[str] = None
+    comment: Optional[str] = None
     created_at: str
 
 
@@ -210,6 +219,7 @@ class FailureIdentificationResponse(BaseModel):
     degradation_mechanism: Optional[str] = None
     evidence: Optional[str] = None
     failure_mode_id: Optional[int] = None
+    comment: Optional[str] = None
     created_at: str
 
 
@@ -223,6 +233,7 @@ class CauseNodeResponse(BaseModel):
     evidence: Optional[str] = None
     linked_event_id: Optional[str] = None
     linked_failure_id: Optional[str] = None
+    comment: Optional[str] = None
     created_at: str
 
 
@@ -237,5 +248,6 @@ class ActionItemResponse(BaseModel):
     status: str
     linked_cause_id: Optional[str] = None
     completion_notes: Optional[str] = None
+    comment: Optional[str] = None
     created_at: str
     updated_at: str
