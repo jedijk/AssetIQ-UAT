@@ -548,28 +548,25 @@ const FailureModesPage = () => {
 
         {/* Equipment Types Tab */}
         <TabsContent value="libraries" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Equipment Types */}
-            <div className="card">
-              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-slate-800">Equipment Types</h3>
-                  <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} types defined</p>
-                </div>
-                <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
-                  <Plus className="w-4 h-4 mr-1" /> Add Type
-                </Button>
+          <div className="card">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-slate-800">Equipment Types</h3>
+                <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} types defined</p>
               </div>
-              <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
-                {equipmentTypes.map(t => (
-                  <EquipmentTypeItem 
-                    key={t.id} 
-                    item={t} 
-                    onEdit={handleEditType} 
-                    onDelete={(id) => deleteTypeMutation.mutate(id)} 
-                  />
-                ))}
-              </div>
+              <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
+                <Plus className="w-4 h-4 mr-1" /> Add Type
+              </Button>
+            </div>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[calc(100vh-320px)] overflow-y-auto">
+              {equipmentTypes.map(t => (
+                <EquipmentTypeItem 
+                  key={t.id} 
+                  item={t} 
+                  onEdit={handleEditType} 
+                  onDelete={(id) => deleteTypeMutation.mutate(id)} 
+                />
+              ))}
             </div>
           </div>
         </TabsContent>
