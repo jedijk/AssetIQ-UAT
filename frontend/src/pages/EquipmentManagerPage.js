@@ -314,40 +314,42 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
             )}
           </div>
           
-          {(node.level === "equipment_unit" || node.level === "equipment") && (
-            <div>
-              <Label className="text-xs text-slate-500 mb-1">Equipment Type</Label>
-              <Select value={node.equipment_type_id || ""} onValueChange={v => {
-                const eqType = equipmentTypes?.find(t => t.id === v);
-                onUpdate(node.id, { 
-                  equipment_type_id: v,
-                  discipline: eqType?.discipline || node.discipline
-                });
-              }}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Select type" /></SelectTrigger>
-                <SelectContent>{equipmentTypes?.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          )}
-          
-          {(node.level === "equipment_unit" || node.level === "equipment") ? (
-            node.equipment_type_id && (
+          {/* Equipment Type & Discipline - Only for Equipment Unit level and below */}
+          {(node.level === "equipment_unit" || node.level === "equipment" || node.level === "subunit" || node.level === "maintainable_item") && (
+            <>
               <div>
-                <Label className="text-xs text-slate-500 mb-1">Discipline</Label>
-                <div className="h-9 px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600 capitalize">
-                  {equipmentTypes?.find(t => t.id === node.equipment_type_id)?.discipline || node.discipline || "Not set"}
-                </div>
-                <p className="text-xs text-slate-400 mt-1">Auto-assigned from equipment type</p>
+                <Label className="text-xs text-slate-500 mb-1">Equipment Type</Label>
+                <Select 
+                  value={node.equipment_type_id || "__none__"} 
+                  onValueChange={v => {
+                    const actualValue = v === "__none__" ? null : v;
+                    const eqType = actualValue ? equipmentTypes?.find(t => t.id === actualValue) : null;
+                    onUpdate(node.id, { 
+                      equipment_type_id: actualValue,
+                      discipline: eqType?.discipline || null
+                    });
+                  }}
+                >
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">
+                      <span className="text-slate-400">None</span>
+                    </SelectItem>
+                    {equipmentTypes?.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-            )
-          ) : (
-            <div>
-              <Label className="text-xs text-slate-500 mb-1">Discipline</Label>
-              <Select value={node.discipline || ""} onValueChange={v => onAssignDiscipline(node.id, v)}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Select discipline" /></SelectTrigger>
-                <SelectContent>{disciplines?.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+              
+              {node.equipment_type_id && (
+                <div>
+                  <Label className="text-xs text-slate-500 mb-1">Discipline</Label>
+                  <div className="h-9 px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600 capitalize">
+                    {equipmentTypes?.find(t => t.id === node.equipment_type_id)?.discipline || "Not set"}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">Auto-assigned from equipment type</p>
+                </div>
+              )}
+            </>
           )}
           
           <div>
@@ -359,11 +361,19 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
                 return (
                   <button 
                     key={p.id} 
-                    onClick={() => onAssignCriticality(node.id, { profile_id: p.id })} 
+                    onClick={() => {
+                      // Toggle: if already active, clear it; otherwise assign
+                      if (isActive) {
+                        onAssignCriticality(node.id, { profile_id: null });
+                      } else {
+                        onAssignCriticality(node.id, { profile_id: p.id });
+                      }
+                    }} 
                     className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${isActive ? `${colors?.bg} ${colors?.border} ring-2 ring-offset-1` : "bg-white border-slate-200 hover:border-slate-300"}`}
                   >
                     <div className={`w-3 h-3 rounded-full ${colors?.dot}`} />
                     <span className={`text-xs font-medium ${isActive ? colors?.text : "text-slate-600"}`}>{p.name}</span>
+                    {isActive && <X className="w-3 h-3 ml-auto text-slate-400" />}
                   </button>
                 ); 
               })}
@@ -480,7 +490,19 @@ export default function EquipmentManagerPage() {
     }, 
     onError: e => toast.error(e.response?.data?.detail || "Failed") 
   });
-  const criticalityMutation = useMutation({ mutationFn: ({ nodeId, assignment }) => equipmentHierarchyAPI.assignCriticality(nodeId, assignment), onSuccess: data => { queryClient.invalidateQueries(["equipment-nodes"]); setSelectedNode(data); toast.success("Criticality assigned"); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
+  const criticalityMutation = useMutation({ 
+    mutationFn: ({ nodeId, assignment }) => equipmentHierarchyAPI.assignCriticality(nodeId, assignment), 
+    onSuccess: (data, variables) => { 
+      queryClient.invalidateQueries(["equipment-nodes"]); 
+      setSelectedNode(data); 
+      if (variables.assignment.profile_id === null) {
+        toast.success("Criticality cleared");
+      } else {
+        toast.success("Criticality assigned");
+      }
+    }, 
+    onError: e => toast.error(e.response?.data?.detail || "Failed") 
+  });
   const disciplineMutation = useMutation({ mutationFn: ({ nodeId, discipline }) => equipmentHierarchyAPI.assignDiscipline(nodeId, discipline), onSuccess: data => { queryClient.invalidateQueries(["equipment-nodes"]); setSelectedNode(data); toast.success("Discipline assigned"); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
   const parseListMutation = useMutation({ mutationFn: ({ content, source }) => equipmentHierarchyAPI.parseEquipmentList(content, source), onSuccess: (data) => { queryClient.invalidateQueries(["unstructured-items"]); toast.success(`Parsed ${data.parsed_count} items`); setIsImportOpen(false); setImportText(""); }, onError: e => toast.error(e.response?.data?.detail || "Failed to parse") });
   const parseFileMutation = useMutation({ mutationFn: (file) => equipmentHierarchyAPI.parseEquipmentFile(file), onSuccess: (data) => { queryClient.invalidateQueries(["unstructured-items"]); toast.success(`Parsed ${data.parsed_count} items from ${data.filename}`); }, onError: e => toast.error(e.response?.data?.detail || "Failed to parse file") });

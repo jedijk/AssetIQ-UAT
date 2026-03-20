@@ -1707,6 +1707,18 @@ async def assign_criticality(
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
+    # If profile_id is None, clear the criticality
+    if assignment.profile_id is None:
+        await db.equipment_nodes.update_one(
+            {"id": node_id},
+            {"$set": {
+                "criticality": None,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+        return updated
+    
     # Find profile
     profile = next((p for p in CRITICALITY_PROFILES if p["id"] == assignment.profile_id), None)
     if not profile:

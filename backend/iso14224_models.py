@@ -194,7 +194,7 @@ class EquipmentNodeUpdate(BaseModel):
     description: Optional[str] = None
 
 class CriticalityAssignment(BaseModel):
-    profile_id: str
+    profile_id: Optional[str] = None
     fatality_risk: Optional[float] = None
     production_loss_per_day: Optional[float] = None
     environmental_impact: Optional[float] = None
