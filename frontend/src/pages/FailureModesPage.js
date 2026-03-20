@@ -78,14 +78,6 @@ const EQUIPMENT_ICONS = {
 const ICON_OPTIONS = ["droplets", "wind", "cog", "thermometer", "box", "circle-dot", "zap", "gauge", "cpu", "pipette", "flame"];
 const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process"];
 
-// Criticality colors
-const CRIT_COLORS = { 
-  safety_critical: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", dot: "bg-red-500" }, 
-  production_critical: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", dot: "bg-orange-500" }, 
-  medium: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", dot: "bg-yellow-500" }, 
-  low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } 
-};
-
 // Equipment Type Library Item
 function EquipmentTypeItem({ item, onEdit, onDelete }) {
   const Icon = EQUIPMENT_ICONS[item.icon] || Cog;
@@ -102,18 +94,6 @@ function EquipmentTypeItem({ item, onEdit, onDelete }) {
         <button onClick={() => onEdit(item)} className="p-1.5 hover:bg-blue-50 rounded"><Edit className="w-3.5 h-3.5 text-blue-500" /></button>
         {item.is_custom && <button onClick={() => onDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
       </div>
-    </div>
-  );
-}
-
-// Criticality Profile Item
-function CriticalityItem({ item }) {
-  const colors = CRIT_COLORS[item.level];
-  return (
-    <div className={`flex items-center gap-3 p-3 rounded-lg border ${colors?.bg} ${colors?.border}`} data-testid={`criticality-${item.id}`}>
-      <div className={`w-3 h-3 rounded-full ${colors?.dot}`} />
-      <span className={`text-sm font-medium ${colors?.text}`}>{item.name}</span>
-      <span className={`text-xs ${colors?.text} opacity-70 ml-auto`}>Score: {item.risk_score}</span>
     </div>
   );
 }
@@ -195,17 +175,10 @@ const FailureModesPage = () => {
     queryKey: ["equipment-types"], 
     queryFn: equipmentHierarchyAPI.getEquipmentTypes 
   });
-  
-  // Fetch criticality profiles
-  const { data: profilesData } = useQuery({ 
-    queryKey: ["criticality-profiles"], 
-    queryFn: equipmentHierarchyAPI.getCriticalityProfiles 
-  });
 
   const categories = categoriesData?.categories || [];
   const failureModes = modesData?.failure_modes || [];
   const equipmentTypes = typesData?.equipment_types || [];
-  const criticalityProfiles = profilesData?.profiles || [];
   
   // Calculate dynamic stats
   const totalModes = failureModes.length;
@@ -420,7 +393,7 @@ const FailureModesPage = () => {
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="failure-modes">Failure Modes</TabsTrigger>
-          <TabsTrigger value="libraries">Equipment & Criticality</TabsTrigger>
+          <TabsTrigger value="libraries">Equipment Types</TabsTrigger>
         </TabsList>
 
         {/* Failure Modes Tab */}
@@ -573,7 +546,7 @@ const FailureModesPage = () => {
           )}
         </TabsContent>
 
-        {/* Equipment & Criticality Libraries Tab */}
+        {/* Equipment Types Tab */}
         <TabsContent value="libraries" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Equipment Types */}
@@ -596,24 +569,6 @@ const FailureModesPage = () => {
                     onDelete={(id) => deleteTypeMutation.mutate(id)} 
                   />
                 ))}
-              </div>
-            </div>
-
-            {/* Criticality Profiles */}
-            <div className="card">
-              <div className="p-4 border-b border-slate-200">
-                <h3 className="font-semibold text-slate-800">Criticality Profiles</h3>
-                <p className="text-xs text-slate-500 mt-1">Standard risk levels for equipment classification</p>
-              </div>
-              <div className="p-4 space-y-2">
-                {criticalityProfiles.map(p => (
-                  <CriticalityItem key={p.id} item={p} />
-                ))}
-              </div>
-              <div className="p-4 border-t border-slate-200 bg-slate-50">
-                <p className="text-xs text-slate-500">
-                  Assign criticality to equipment nodes in the Equipment Manager properties panel.
-                </p>
               </div>
             </div>
           </div>
