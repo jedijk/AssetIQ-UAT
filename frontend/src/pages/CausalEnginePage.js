@@ -573,34 +573,111 @@ export default function CausalEnginePage() {
                     <p className="text-sm text-slate-500">Add corrective actions</p>
                   </div>
                 ) : (
-                  <div className="priority-list">
+                  <div className="space-y-3">
                     {actionItems.map((action, idx) => {
                       const priority = ACTION_PRIORITIES.find(p => p.value === action.priority);
+                      const statusInfo = ACTION_STATUSES.find(s => s.value === action.status);
+                      const isOverdue = action.due_date && new Date(action.due_date) < new Date() && action.status !== "completed";
                       return (
-                        <motion.div key={action.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }} className="priority-item group" data-testid={`action-item-${action.id}`}>
-                          <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${priority?.bgClass?.split(' ')[0] || 'bg-slate-100'}`}>
-                            <CheckSquare className={`w-5 h-5 sm:w-6 sm:h-6 ${priority?.bgClass?.split(' ')[1] || 'text-slate-600'}`} />
-                          </div>
-                          <div className="priority-rank text-sm">{action.action_number}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${priority?.bgClass || "bg-slate-100 text-slate-700"}`}>{priority?.label || action.priority}</span>
-                              <Select value={action.status} onValueChange={(v) => updateActionMutation.mutate({ actionId: action.id, data: { status: v } })}>
-                                <SelectTrigger className="h-6 w-24 text-xs"><SelectValue /></SelectTrigger>
-                                <SelectContent>{ACTION_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-                              </Select>
-                              {action.comment && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1"><MessageSquare className="w-3 h-3" />Has comment</span>}
+                        <motion.div 
+                          key={action.id} 
+                          initial={{ opacity: 0, y: 10 }} 
+                          animate={{ opacity: 1, y: 0 }} 
+                          transition={{ delay: idx * 0.03 }} 
+                          className={`bg-white rounded-xl border p-4 group hover:shadow-md transition-all ${isOverdue ? 'border-red-200 bg-red-50/30' : 'border-slate-200'}`}
+                          data-testid={`action-item-${action.id}`}
+                        >
+                          <div className="flex items-start gap-4">
+                            {/* Action Number & Priority Icon */}
+                            <div className="flex flex-col items-center gap-1">
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${priority?.bgClass?.split(' ')[0] || 'bg-slate-100'}`}>
+                                <CheckSquare className={`w-6 h-6 ${priority?.bgClass?.split(' ')[1] || 'text-slate-600'}`} />
+                              </div>
+                              <span className="text-xs font-medium text-slate-500">{action.action_number}</span>
                             </div>
-                            <p className="text-sm text-slate-900 line-clamp-2">{action.description}</p>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                              {action.owner && <span className="flex items-center gap-1"><User className="w-3 h-3" />{action.owner}</span>}
-                              {action.due_date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(action.due_date).toLocaleDateString()}</span>}
+                            
+                            {/* Main Content */}
+                            <div className="flex-1 min-w-0">
+                              {/* Description */}
+                              <p className="text-sm font-medium text-slate-900 mb-2 leading-relaxed">{action.description}</p>
+                              
+                              {/* Meta Row */}
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${priority?.bgClass || "bg-slate-100 text-slate-700"}`}>
+                                  {priority?.label || action.priority}
+                                </span>
+                                <Select value={action.status} onValueChange={(v) => updateActionMutation.mutate({ actionId: action.id, data: { status: v } })}>
+                                  <SelectTrigger className={`h-7 w-28 text-xs border-0 ${
+                                    action.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                    action.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-slate-100 text-slate-700'
+                                  }`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>{ACTION_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                                </Select>
+                                {isOverdue && (
+                                  <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium">Overdue</span>
+                                )}
+                              </div>
+                              
+                              {/* Details Row */}
+                              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                                {action.owner && (
+                                  <span className="flex items-center gap-1.5">
+                                    <User className="w-3.5 h-3.5" />
+                                    <span className="font-medium text-slate-700">{action.owner}</span>
+                                  </span>
+                                )}
+                                {action.due_date && (
+                                  <span className={`flex items-center gap-1.5 ${isOverdue ? 'text-red-600' : ''}`}>
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    <span className={isOverdue ? 'font-medium' : ''}>{new Date(action.due_date).toLocaleDateString()}</span>
+                                  </span>
+                                )}
+                                {action.comment && (
+                                  <span className="flex items-center gap-1.5 text-slate-400">
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                    Comment
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm" className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => promoteToCentralActionMutation.mutate(action)} disabled={promoteToCentralActionMutation.isPending} title="Add to action tracker" data-testid={`promote-action-${action.id}`}><ClipboardList className="w-4 h-4 mr-1" />Act</Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditingItem({ type: "action", data: action }); setActionForm({ description: action.description, owner: action.owner || "", priority: action.priority, due_date: action.due_date || "", linked_cause_id: action.linked_cause_id || null, comment: action.comment || "" }); setShowActionDialog(true); }}><Edit className="w-4 h-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteActionMutation.mutate(action.id)}><Trash2 className="w-4 h-4" /></Button>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
+                                onClick={() => promoteToCentralActionMutation.mutate(action)} 
+                                disabled={promoteToCentralActionMutation.isPending} 
+                                title="Add to action tracker" 
+                                data-testid={`promote-action-${action.id}`}
+                              >
+                                <ClipboardList className="w-4 h-4 mr-1" />Act
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-slate-500 hover:text-slate-700" 
+                                onClick={() => { 
+                                  setEditingItem({ type: "action", data: action }); 
+                                  setActionForm({ description: action.description, owner: action.owner || "", priority: action.priority, due_date: action.due_date || "", linked_cause_id: action.linked_cause_id || null, comment: action.comment || "" }); 
+                                  setShowActionDialog(true); 
+                                }}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50" 
+                                onClick={() => deleteActionMutation.mutate(action.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         </motion.div>
                       );
