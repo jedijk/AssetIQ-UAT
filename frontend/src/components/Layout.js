@@ -41,8 +41,8 @@ const Layout = () => {
 
   const navItems = [
     { path: "/", label: "Threats", icon: AlertTriangle },
-    { path: "/actions", label: "Actions", icon: ClipboardList },
     { path: "/causal-engine", label: "Causal Engine", icon: GitBranch },
+    { path: "/actions", label: "Actions", icon: ClipboardList },
     { path: "/library", label: "Library", icon: BookOpen },
   ];
 
