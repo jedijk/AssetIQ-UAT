@@ -243,15 +243,75 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
   - Floating Action Button (+) for threat reporting (replaces header button)
   - Equipment Manager sidebar auto-collapses when navigating to page
   - Equipment Manager only shows Equipment Type/Discipline for lower hierarchy levels
+- [x] **ThreatBase v2 - AI Risk Engine (Phase 1)** (Mar 21, 2026):
+  - Dynamic Risk Scoring (0-100) replacing static labels
+  - Failure Probability calculation (0-100%)
+  - Time-to-Failure prediction with confidence scores
+  - Risk Trend Tracking with visual indicators (↑ ↓ →)
+  - Risk Forecast for 7/14/30 days ahead
+  - Key Risk Factors identification
+  - AI Recommendations generation
+  - AIInsightsPanel component with circular risk gauge
+  - Backend: /api/ai/analyze-risk/{threat_id}, /api/ai/risk-insights/{threat_id}, /api/ai/top-risks
+  - MongoDB caching in ai_risk_insights collection
+  - All tests passed: 17/17
+- [x] **ThreatBase v2 - Causal Intelligence Engine (Phase 2)** (Mar 21, 2026):
+  - Auto-generate Top 3-5 probable causes per threat
+  - "Why is this happening?" explainability feature
+  - Cause categories: technical, human_factor, maintenance, design, organizational, external
+  - Probability ranking with supporting evidence
+  - Recommended mitigations per cause
+  - Fault Tree generation (auto-generated hierarchical structure)
+  - Bow-Tie model generation with preventive/mitigative barriers
+  - Action Optimization with ROI analysis (risk reduction per EUR)
+  - CausalIntelligencePanel component with expandable cause cards
+  - Backend: /api/ai/generate-causes, /api/ai/explain, /api/ai/fault-tree, /api/ai/bow-tie, /api/ai/optimize-actions
+  - MongoDB caching in ai_causal_analysis, ai_fault_trees, ai_bow_ties, ai_action_optimization collections
+  - GPT-5.2 LLM integration via emergentintegrations
+
+### ThreatBase v2 Architecture Update
+
+```
+/app/
+├── backend/
+│   ├── server.py               # Main API with AI endpoints
+│   ├── ai_risk_engine.py       # NEW: AI Risk Engine service (GPT-5.2)
+│   ├── ai_risk_models.py       # NEW: Pydantic models for AI features
+│   ├── iso14224_models.py
+│   ├── investigation_models.py
+│   └── failure_modes.py        
+├── frontend/
+│   └── src/
+│       ├── components/
+│       │   ├── AIInsightsPanel.jsx        # NEW: AI Risk Analysis UI
+│       │   ├── CausalIntelligencePanel.jsx # NEW: Causal Intelligence UI
+│       │   └── ...existing components
+│       ├── pages/
+│       │   ├── ThreatDetailPage.js  # Updated with AI panels
+│       │   └── ...existing pages
+│       └── lib/
+│           └── api.js              # NEW: aiRiskAPI methods
+```
+
+### New AI Collections (MongoDB)
+- `ai_risk_insights` - Cached risk analysis results
+- `ai_causal_analysis` - Cached causal analysis
+- `ai_fault_trees` - Cached fault tree structures
+- `ai_bow_ties` - Cached bow-tie models
+- `ai_action_optimization` - Cached action recommendations
 
 ### Future Tasks (Backlog)
+- [ ] P1: Complete Multi-Language (EN/NL) translations for all pages
 - [ ] P2: Voice input for chat interface
 - [ ] P2: Image analysis for damage detection
 - [ ] P2: Report generation (PowerPoint/PDF) for Causal Investigations
+- [ ] P2: AI Alerting System (proactive alerts when risk crosses thresholds)
+- [ ] P2: Risk Timeline Graph visualization
+- [ ] P2: Data Integration Layer (SCADA/CMMS/IoT)
+- [ ] P3: Cross-Asset Learning Engine (pattern detection)
 - [ ] P3: Export hierarchy to PDF/Excel
 - [ ] P3: Bulk criticality assignment
 - [ ] P3: Equipment template library
-- [ ] P3: Data migration utility (convert legacy levels to ISO 14224)
-- [ ] P3: Automated causal hypothesis generation for Causal Engine
 - [ ] P3: Migrate FMEA library from Python file to MongoDB for better scalability
 - [ ] P3: Break down FailureModesPage.js into smaller components
+
