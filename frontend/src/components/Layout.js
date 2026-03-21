@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -49,7 +49,8 @@ const Layout = () => {
   const lastAction = getLastAction();
 
   const navItems = [
-    { path: "/", label: t("nav.threats"), icon: AlertTriangle },
+    { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
+    { path: "/threats", label: t("nav.threats"), icon: AlertTriangle },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
     { path: "/library", label: t("nav.library"), icon: BookOpen },

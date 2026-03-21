@@ -7,6 +7,7 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import DashboardPage from "./pages/DashboardPage";
 import ThreatsPage from "./pages/ThreatsPage";
 import ThreatDetailPage from "./pages/ThreatDetailPage";
 import FailureModesPage from "./pages/FailureModesPage";
@@ -101,7 +102,8 @@ function App() {
                   <Layout />
                 </ProtectedRoute>
               }>
-                <Route index element={<ThreatsPage />} />
+                <Route index element={<DashboardPage />} />
+                <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="threats" element={<ThreatsPage />} />
                 <Route path="threats/:id" element={<ThreatDetailPage />} />
                 <Route path="actions" element={<ActionsPage />} />

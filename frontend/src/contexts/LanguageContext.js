@@ -6,6 +6,7 @@ const LanguageContext = createContext();
 const en = {
   // Navigation
   nav: {
+    dashboard: "Dashboard",
     threats: "Threats",
     causalEngine: "Causal Engine",
     actions: "Actions",
@@ -13,6 +14,39 @@ const en = {
     equipmentManager: "Equipment Manager",
     settings: "Settings",
     logout: "Logout",
+  },
+  
+  // Dashboard
+  dashboard: {
+    title: "Dashboard",
+    subtitle: "Overview of your risk management status",
+    overallHealth: "Overall System Health",
+    excellent: "Excellent",
+    good: "Good",
+    needsAttention: "Needs Attention",
+    critical: "Critical",
+    openThreats: "Open Threats",
+    criticalHighRisk: "Critical/High Risk",
+    overdueActions: "Overdue Actions",
+    totalThreats: "Total Threats",
+    totalActions: "Total Actions",
+    investigations: "Investigations",
+    equipment: "Equipment",
+    totalAssets: "total assets",
+    threatResolution: "Threat Resolution",
+    actionCompletion: "Action Completion",
+    investigationProgress: "Investigation Progress",
+    threatsByStatus: "Threats by Status",
+    threatsByRisk: "Threats by Risk Level",
+    actionsByStatus: "Actions by Status",
+    actionsByPriority: "Actions by Priority",
+    recentThreats: "Recent Threats",
+    recentActions: "Recent Actions",
+    recentInvestigations: "Recent Investigations",
+    noThreats: "No threats recorded",
+    noActions: "No actions recorded",
+    noInvestigations: "No investigations started",
+    threatsByEquipment: "Threats by Equipment Type",
   },
   
   // Common
@@ -339,6 +373,7 @@ const en = {
 const nl = {
   // Navigation
   nav: {
+    dashboard: "Dashboard",
     threats: "Dreigingen",
     causalEngine: "Oorzaakanalyse",
     actions: "Acties",
@@ -346,6 +381,39 @@ const nl = {
     equipmentManager: "Apparatuurbeheer",
     settings: "Instellingen",
     logout: "Uitloggen",
+  },
+  
+  // Dashboard
+  dashboard: {
+    title: "Dashboard",
+    subtitle: "Overzicht van uw risicobeheer status",
+    overallHealth: "Algemene Systeemgezondheid",
+    excellent: "Uitstekend",
+    good: "Goed",
+    needsAttention: "Aandacht nodig",
+    critical: "Kritiek",
+    openThreats: "Open dreigingen",
+    criticalHighRisk: "Kritiek/Hoog risico",
+    overdueActions: "Achterstallige acties",
+    totalThreats: "Totaal dreigingen",
+    totalActions: "Totaal acties",
+    investigations: "Onderzoeken",
+    equipment: "Apparatuur",
+    totalAssets: "totale assets",
+    threatResolution: "Dreigingsoplossing",
+    actionCompletion: "Actie-afronding",
+    investigationProgress: "Onderzoeksvoortgang",
+    threatsByStatus: "Dreigingen per status",
+    threatsByRisk: "Dreigingen per risiconiveau",
+    actionsByStatus: "Acties per status",
+    actionsByPriority: "Acties per prioriteit",
+    recentThreats: "Recente dreigingen",
+    recentActions: "Recente acties",
+    recentInvestigations: "Recente onderzoeken",
+    noThreats: "Geen dreigingen geregistreerd",
+    noActions: "Geen acties geregistreerd",
+    noInvestigations: "Geen onderzoeken gestart",
+    threatsByEquipment: "Dreigingen per apparaattype",
   },
   
   // Common
