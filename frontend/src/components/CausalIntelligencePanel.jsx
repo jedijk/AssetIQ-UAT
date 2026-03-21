@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { aiRiskAPI } from "../lib/api";
+import { useNavigate } from "react-router-dom";
+import { aiRiskAPI, investigationAPI } from "../lib/api";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   GitBranch,
@@ -18,6 +20,7 @@ import {
   Cog,
   Network,
   Shield,
+  FileSearch,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
@@ -145,8 +148,9 @@ const CauseCard = ({ cause, index }) => {
   );
 };
 
-export default function CausalIntelligencePanel({ threatId }) {
+export default function CausalIntelligencePanel({ threatId, threatData }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(true);
   
   // Fetch existing causal analysis
@@ -164,9 +168,59 @@ export default function CausalIntelligencePanel({ threatId }) {
       queryClient.invalidateQueries({ queryKey: ["ai-causal", threatId] });
     },
   });
+
+  // Mutation to create investigation with AI insights
+  const createInvestigationMutation = useMutation({
+    mutationFn: async (causalAnalysis) => {
+      // Create the investigation first
+      const investigation = await investigationAPI.create({
+        title: `Investigation: ${threatData?.title || 'Unknown Threat'}`,
+        description: causalAnalysis?.summary || `AI-powered investigation for ${threatData?.title || 'threat'}. ${causalAnalysis?.probable_causes?.length || 0} probable causes identified.`,
+        threat_id: threatId,
+        asset_name: threatData?.asset || "",
+        incident_date: new Date().toISOString().split('T')[0],
+        investigation_leader: "",
+      });
+      
+      // Add AI-generated causes as CauseNodes
+      if (causalAnalysis?.probable_causes?.length > 0) {
+        for (const cause of causalAnalysis.probable_causes) {
+          await investigationAPI.createCause(investigation.id, {
+            description: cause.description,
+            category: cause.category || "technical_cause",
+            is_root_cause: cause.probability >= 60,
+            comment: `AI-identified cause (${cause.probability}% probability). Evidence: ${cause.evidence?.join('; ') || 'N/A'}`,
+          });
+        }
+      }
+      
+      // Add a timeline event for the AI analysis
+      await investigationAPI.createEvent(investigation.id, {
+        event_time: new Date().toISOString(),
+        description: `AI Causal Analysis completed: ${causalAnalysis?.summary || 'Analysis performed'}`,
+        category: "operational_event",
+      });
+      
+      return investigation;
+    },
+    onSuccess: (investigation) => {
+      queryClient.invalidateQueries({ queryKey: ["investigations"] });
+      toast.success("Investigation created with AI insights!");
+      navigate(`/causal-engine?inv=${investigation.id}`);
+    },
+    onError: (error) => {
+      console.error("Failed to create investigation:", error);
+      toast.error("Failed to create investigation");
+    },
+  });
   
   const handleGenerate = () => {
     generateMutation.mutate();
+  };
+
+  const handleStartInvestigation = () => {
+    const displayData = generateMutation.data || causalData;
+    createInvestigationMutation.mutate(displayData);
   };
   
   // No analysis yet - show generate button
@@ -314,6 +368,28 @@ export default function CausalIntelligencePanel({ threatId }) {
                   </div>
                 </div>
               )}
+
+              {/* Start Investigation Button */}
+              <div className="pt-2 border-t border-purple-100">
+                <Button
+                  onClick={handleStartInvestigation}
+                  disabled={createInvestigationMutation.isPending}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                  data-testid="start-investigation-btn"
+                >
+                  {createInvestigationMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating Investigation...
+                    </>
+                  ) : (
+                    <>
+                      <FileSearch className="w-4 h-4 mr-2" />
+                      Start Investigation with AI Insights
+                    </>
+                  )}
+                </Button>
+              </div>
               
               {/* Confidence */}
               <div className="text-xs text-slate-400 text-right">
