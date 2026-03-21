@@ -24,6 +24,7 @@ import {
   X,
   ClipboardList,
   Brain,
+  Plus,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -47,6 +48,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 import RiskBadge from "../components/RiskBadge";
 import AIInsightsPanel from "../components/AIInsightsPanel";
 import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
@@ -56,6 +65,7 @@ const DETECTABILITY_OPTIONS = ["Easy", "Moderate", "Difficult", "Very Difficult"
 const FREQUENCY_OPTIONS = ["Once", "Rarely", "Occasionally", "Frequently", "Constantly"];
 const IMPACT_OPTIONS = ["Minor", "Moderate", "Significant", "Major", "Catastrophic"];
 const STATUS_OPTIONS = ["Open", "In Progress", "Mitigated", "Closed"];
+const PRIORITY_OPTIONS = ["critical", "high", "medium", "low"];
 
 const ThreatDetailPage = () => {
   const { id } = useParams();
@@ -64,6 +74,14 @@ const ThreatDetailPage = () => {
   const { pushUndo } = useUndo();
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [showAddActionDialog, setShowAddActionDialog] = useState(false);
+  const [newActionForm, setNewActionForm] = useState({
+    title: "",
+    description: "",
+    priority: "medium",
+    assignee: "",
+    due_date: "",
+  });
 
   // Fetch threat
   const { data: threat, isLoading, error } = useQuery({
@@ -145,6 +163,44 @@ const ThreatDetailPage = () => {
       toast.error("Failed to create action");
     },
   });
+
+  // Create custom action mutation
+  const createActionMutation = useMutation({
+    mutationFn: (actionData) => actionsAPI.create({
+      title: actionData.title,
+      description: actionData.description,
+      source_type: "threat",
+      source_id: id,
+      source_name: threat?.title || "Unknown Threat",
+      priority: actionData.priority,
+      assignee: actionData.assignee || null,
+      due_date: actionData.due_date || null,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: ["threat-actions", id] });
+      toast.success("Action created successfully!");
+      setShowAddActionDialog(false);
+      setNewActionForm({
+        title: "",
+        description: "",
+        priority: "medium",
+        assignee: "",
+        due_date: "",
+      });
+    },
+    onError: () => {
+      toast.error("Failed to create action");
+    },
+  });
+
+  const handleCreateAction = () => {
+    if (!newActionForm.title.trim()) {
+      toast.error("Please enter an action title");
+      return;
+    }
+    createActionMutation.mutate(newActionForm);
+  };
 
   if (isLoading) {
     return (
@@ -469,7 +525,19 @@ const ThreatDetailPage = () => {
         className="card p-6"
         data-testid="recommended-actions-section"
       >
-        <h3 className="font-semibold text-slate-900 mb-4">Recommended Actions</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAddActionDialog(true)}
+            className="text-blue-600 border-blue-200 hover:bg-blue-50"
+            data-testid="add-action-button"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Add Action
+          </Button>
+        </div>
         <div className="space-y-3">
           {threat.recommended_actions.map((action, idx) => (
             <div
@@ -497,6 +565,101 @@ const ThreatDetailPage = () => {
           ))}
         </div>
       </motion.div>
+
+      {/* Add Action Dialog */}
+      <Dialog open={showAddActionDialog} onOpenChange={setShowAddActionDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Action</DialogTitle>
+            <DialogDescription>
+              Create a new action for this threat. It will be tracked in the Actions tab.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="action-title">Title *</Label>
+              <Input
+                id="action-title"
+                value={newActionForm.title}
+                onChange={(e) => setNewActionForm({ ...newActionForm, title: e.target.value })}
+                placeholder="e.g., Replace pump bearings"
+                data-testid="action-title-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="action-description">Description</Label>
+              <Textarea
+                id="action-description"
+                value={newActionForm.description}
+                onChange={(e) => setNewActionForm({ ...newActionForm, description: e.target.value })}
+                placeholder="Detailed description of the action..."
+                rows={3}
+                data-testid="action-description-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="action-priority">Priority</Label>
+                <Select
+                  value={newActionForm.priority}
+                  onValueChange={(v) => setNewActionForm({ ...newActionForm, priority: v })}
+                >
+                  <SelectTrigger data-testid="action-priority-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITY_OPTIONS.map(p => (
+                      <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="action-assignee">Assignee</Label>
+                <Input
+                  id="action-assignee"
+                  value={newActionForm.assignee}
+                  onChange={(e) => setNewActionForm({ ...newActionForm, assignee: e.target.value })}
+                  placeholder="Name"
+                  data-testid="action-assignee-input"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="action-due-date">Due Date</Label>
+              <Input
+                id="action-due-date"
+                type="date"
+                value={newActionForm.due_date}
+                onChange={(e) => setNewActionForm({ ...newActionForm, due_date: e.target.value })}
+                data-testid="action-due-date-input"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowAddActionDialog(false)}
+              data-testid="cancel-action-button"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateAction}
+              disabled={createActionMutation.isPending || !newActionForm.title.trim()}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="save-action-button"
+            >
+              {createActionMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}
+              Create Action
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Metadata */}
       <motion.div
