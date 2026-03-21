@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { aiRiskAPI, investigationAPI } from "../lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -25,16 +26,23 @@ import {
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 
-const CATEGORY_CONFIG = {
-  technical_cause: { icon: Cog, label: "Technical", color: "text-blue-600", bg: "bg-blue-100" },
-  human_factor: { icon: Users, label: "Human Factor", color: "text-purple-600", bg: "bg-purple-100" },
-  maintenance_issue: { icon: Wrench, label: "Maintenance", color: "text-orange-600", bg: "bg-orange-100" },
-  design_issue: { icon: Building, label: "Design Issue", color: "text-red-600", bg: "bg-red-100" },
-  organizational_factor: { icon: Network, label: "Organizational", color: "text-indigo-600", bg: "bg-indigo-100" },
-  external_condition: { icon: Cloud, label: "External", color: "text-cyan-600", bg: "bg-cyan-100" },
-};
+const getCategoryConfig = (t) => ({
+  technical_cause: { icon: Cog, label: t("ai.technicalCause"), color: "text-blue-600", bg: "bg-blue-100" },
+  human_factor: { icon: Users, label: t("ai.humanFactor"), color: "text-purple-600", bg: "bg-purple-100" },
+  maintenance_issue: { icon: Wrench, label: t("ai.maintenanceIssue"), color: "text-orange-600", bg: "bg-orange-100" },
+  design_issue: { icon: Building, label: t("ai.designIssue"), color: "text-red-600", bg: "bg-red-100" },
+  organizational_factor: { icon: Network, label: t("ai.organizationalFactor"), color: "text-indigo-600", bg: "bg-indigo-100" },
+  external_condition: { icon: Cloud, label: t("ai.externalCondition"), color: "text-cyan-600", bg: "bg-cyan-100" },
+});
 
-const ProbabilityBadge = ({ level, probability }) => {
+const getProbabilityLabels = (t) => ({
+  very_likely: t("ai.veryLikely"),
+  likely: t("ai.likely"),
+  possible: t("ai.possible"),
+  unlikely: t("ai.unlikely"),
+});
+
+const ProbabilityBadge = ({ level, probability, t }) => {
   const colors = {
     very_likely: "bg-red-100 text-red-700 border-red-200",
     likely: "bg-orange-100 text-orange-700 border-orange-200",
@@ -42,7 +50,7 @@ const ProbabilityBadge = ({ level, probability }) => {
     unlikely: "bg-green-100 text-green-700 border-green-200",
   };
   
-  const labels = {
+  const labels = t ? getProbabilityLabels(t) : {
     very_likely: "Very Likely",
     likely: "Likely",
     possible: "Possible",
@@ -56,8 +64,9 @@ const ProbabilityBadge = ({ level, probability }) => {
   );
 };
 
-const CauseCard = ({ cause, index }) => {
+const CauseCard = ({ cause, index, t }) => {
   const [expanded, setExpanded] = useState(index === 0);
+  const CATEGORY_CONFIG = getCategoryConfig(t);
   const config = CATEGORY_CONFIG[cause.category] || CATEGORY_CONFIG.technical_cause;
   const CategoryIcon = config.icon;
   
@@ -82,7 +91,7 @@ const CauseCard = ({ cause, index }) => {
             <span className={`text-xs px-1.5 py-0.5 rounded ${config.bg} ${config.color}`}>
               {config.label}
             </span>
-            <ProbabilityBadge level={cause.probability_level} probability={cause.probability} />
+            <ProbabilityBadge level={cause.probability_level} probability={cause.probability} t={t} />
           </div>
           
           <p className="text-sm text-slate-800 font-medium line-clamp-2">{cause.description}</p>
@@ -114,7 +123,7 @@ const CauseCard = ({ cause, index }) => {
               {/* Evidence */}
               {cause.evidence && cause.evidence.length > 0 && (
                 <div>
-                  <h6 className="text-xs font-medium text-slate-500 mb-1">Supporting Evidence</h6>
+                  <h6 className="text-xs font-medium text-slate-500 mb-1">{t("ai.supportingEvidence")}</h6>
                   <ul className="space-y-1">
                     {cause.evidence.map((ev, idx) => (
                       <li key={idx} className="text-xs text-slate-600 flex items-start gap-1.5">
@@ -129,7 +138,7 @@ const CauseCard = ({ cause, index }) => {
               {/* Mitigation Actions */}
               {cause.mitigation_actions && cause.mitigation_actions.length > 0 && (
                 <div>
-                  <h6 className="text-xs font-medium text-slate-500 mb-1">Recommended Mitigations</h6>
+                  <h6 className="text-xs font-medium text-slate-500 mb-1">{t("ai.recommendedMitigations")}</h6>
                   <ul className="space-y-1">
                     {cause.mitigation_actions.map((action, idx) => (
                       <li key={idx} className="text-xs text-slate-600 flex items-start gap-1.5">
@@ -151,6 +160,7 @@ const CauseCard = ({ cause, index }) => {
 export default function CausalIntelligencePanel({ threatId, threatData }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(true);
   
   // Fetch existing causal analysis
@@ -205,7 +215,7 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
     },
     onSuccess: (investigation) => {
       queryClient.invalidateQueries({ queryKey: ["investigations"] });
-      toast.success("Investigation created with AI insights!");
+      toast.success(t("ai.investigationCreated"));
       navigate(`/causal-engine?inv=${investigation.id}`);
     },
     onError: (error) => {
@@ -230,11 +240,11 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <GitBranch className="w-5 h-5 text-purple-600" />
-            <h4 className="font-semibold text-slate-900">Causal Intelligence</h4>
+            <h4 className="font-semibold text-slate-900">{t("ai.causalIntelligence")}</h4>
           </div>
         </div>
         <p className="text-sm text-slate-600 mb-4">
-          AI-powered root cause analysis to understand why this is happening.
+          {t("ai.causalIntelligence")}
         </p>
         <Button 
           onClick={handleGenerate}
@@ -245,12 +255,12 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
           {generateMutation.isPending ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Analyzing causes...
+              {t("ai.analyzingCauses")}
             </>
           ) : (
             <>
               <HelpCircle className="w-4 h-4 mr-2" />
-              Why is this happening?
+              {t("ai.whyIsThisHappening")}
             </>
           )}
         </Button>
@@ -297,9 +307,9 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
             <GitBranch className="w-5 h-5 text-purple-600" />
           </div>
           <div>
-            <h4 className="font-semibold text-slate-900">Causal Intelligence</h4>
+            <h4 className="font-semibold text-slate-900">{t("ai.causalIntelligence")}</h4>
             <p className="text-xs text-slate-500">
-              {probableCauses.length} probable cause{probableCauses.length !== 1 ? 's' : ''} identified
+              {probableCauses.length} {t("ai.causesIdentified")}
             </p>
           </div>
         </div>
@@ -345,17 +355,17 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
               <div className="space-y-2">
                 <h5 className="text-xs font-medium text-slate-500 flex items-center gap-1">
                   <Target className="w-3 h-3" />
-                  Probable Causes (ranked by likelihood)
+                  {t("ai.probableCauses")} ({t("ai.rankedByLikelihood")})
                 </h5>
                 {probableCauses.map((cause, idx) => (
-                  <CauseCard key={cause.id || idx} cause={cause} index={idx} />
+                  <CauseCard key={cause.id || idx} cause={cause} index={idx} t={t} />
                 ))}
               </div>
               
               {/* Contributing Factors */}
               {contributingFactors.length > 0 && (
                 <div>
-                  <h5 className="text-xs font-medium text-slate-500 mb-2">Contributing Factors</h5>
+                  <h5 className="text-xs font-medium text-slate-500 mb-2">{t("ai.contributingFactors")}</h5>
                   <div className="flex flex-wrap gap-2">
                     {contributingFactors.map((factor, idx) => (
                       <span 
@@ -380,12 +390,12 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
                   {createInvestigationMutation.isPending ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating Investigation...
+                      {t("ai.creatingInvestigation")}
                     </>
                   ) : (
                     <>
                       <FileSearch className="w-4 h-4 mr-2" />
-                      Start Investigation with AI Insights
+                      {t("ai.startInvestigationWithAi")}
                     </>
                   )}
                 </Button>
@@ -393,7 +403,7 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
               
               {/* Confidence */}
               <div className="text-xs text-slate-400 text-right">
-                Analysis confidence: <span className="capitalize font-medium">{displayData.confidence}</span>
+                {t("ai.analysisConfidence")}: <span className="capitalize font-medium">{displayData.confidence}</span>
               </div>
             </div>
           </motion.div>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { actionsAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -20,6 +21,7 @@ import {
   FileText,
   GitBranch,
   CheckCircle,
+  Brain,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -71,11 +73,13 @@ const priorityConfig = {
 const sourceConfig = {
   threat: { label: "Threat", icon: Target, color: "text-amber-600" },
   investigation: { label: "Investigation", icon: GitBranch, color: "text-blue-600" },
+  ai_recommendation: { label: "AI", icon: Brain, color: "text-purple-600" },
 };
 
 export default function ActionsPage() {
   const queryClient = useQueryClient();
   const { pushUndo } = useUndo();
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -237,11 +241,11 @@ export default function ActionsPage() {
 
   // Stats cards matching ThreatsPage style
   const statCards = [
-    { label: "Total Actions", value: stats.total, icon: FileText, color: "text-slate-600", bg: "bg-slate-100" },
-    { label: "Open", value: stats.open, icon: Clock, color: "text-blue-600", bg: "bg-blue-50" },
-    { label: "In Progress", value: stats.in_progress, icon: AlertCircle, color: "text-amber-600", bg: "bg-amber-50" },
-    { label: "Completed", value: stats.completed, icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
-    { label: "Overdue", value: stats.overdue, icon: AlertCircle, color: "text-red-600", bg: "bg-red-50" },
+    { label: t("actionsPage.totalActions"), value: stats.total, icon: FileText, color: "text-slate-600", bg: "bg-slate-100" },
+    { label: t("common.open"), value: stats.open, icon: Clock, color: "text-blue-600", bg: "bg-blue-50" },
+    { label: t("common.inProgress"), value: stats.in_progress, icon: AlertCircle, color: "text-amber-600", bg: "bg-amber-50" },
+    { label: t("actionsPage.completedActions"), value: stats.completed, icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
+    { label: t("actionsPage.overdueActions"), value: stats.overdue, icon: AlertCircle, color: "text-red-600", bg: "bg-red-50" },
   ];
 
   return (
@@ -270,7 +274,7 @@ export default function ActionsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input
-            placeholder="Search actions..."
+            placeholder={t("actionsPage.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 h-11"
@@ -280,18 +284,18 @@ export default function ActionsPage() {
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48 h-11" data-testid="status-filter">
             <Filter className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder={t("common.status")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="open">Open</SelectItem>
-            <SelectItem value="in_progress">In Progress</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="all">{t("actionsPage.allStatus")}</SelectItem>
+            <SelectItem value="open">{t("common.open")}</SelectItem>
+            <SelectItem value="in_progress">{t("common.inProgress")}</SelectItem>
+            <SelectItem value="completed">{t("actionsPage.completed")}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
           <SelectTrigger className="w-full sm:w-40 h-11" data-testid="priority-filter">
-            <SelectValue placeholder="Priority" />
+            <SelectValue placeholder={t("common.priority")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Priority</SelectItem>

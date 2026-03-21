@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { aiRiskAPI, actionsAPI } from "../lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -25,7 +26,7 @@ import {
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
-const TrendIcon = ({ trend }) => {
+const TrendIcon = ({ trend, t }) => {
   switch (trend) {
     case "increasing":
       return <TrendingUp className="w-4 h-4 text-red-500" />;
@@ -36,15 +37,28 @@ const TrendIcon = ({ trend }) => {
   }
 };
 
-const ConfidenceBadge = ({ confidence }) => {
+const getTrendLabel = (trend, t) => {
+  switch (trend) {
+    case "increasing": return t("ai.increasing");
+    case "decreasing": return t("ai.decreasing");
+    default: return t("ai.stable");
+  }
+};
+
+const ConfidenceBadge = ({ confidence, t }) => {
   const colors = {
     high: "bg-green-100 text-green-700",
     medium: "bg-yellow-100 text-yellow-700",
     low: "bg-red-100 text-red-700",
   };
+  const labels = {
+    high: t ? t("ai.highConfidence") : "High confidence",
+    medium: t ? t("ai.mediumConfidence") : "Medium confidence",
+    low: t ? t("ai.lowConfidence") : "Low confidence",
+  };
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors[confidence] || colors.medium}`}>
-      {confidence?.charAt(0).toUpperCase() + confidence?.slice(1)} confidence
+      {labels[confidence] || labels.medium}
     </span>
   );
 };
@@ -97,14 +111,14 @@ const RiskGauge = ({ score, size = "md" }) => {
   );
 };
 
-const ForecastChart = ({ forecasts }) => {
+const ForecastChart = ({ forecasts, t }) => {
   if (!forecasts || forecasts.length === 0) return null;
   
   const maxScore = Math.max(...forecasts.map(f => f.predicted_risk_score), 100);
   
   return (
     <div className="mt-3">
-      <h5 className="text-xs font-medium text-slate-500 mb-2">Risk Forecast</h5>
+      <h5 className="text-xs font-medium text-slate-500 mb-2">{t("ai.riskForecast")}</h5>
       <div className="flex items-end gap-2 h-16">
         {forecasts.map((forecast, idx) => (
           <TooltipProvider key={idx}>
@@ -137,6 +151,7 @@ const ForecastChart = ({ forecasts }) => {
 
 export default function AIInsightsPanel({ threatId, threatData, compact = false }) {
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(!compact);
   const [addedRecommendations, setAddedRecommendations] = useState(new Set());
   
@@ -171,7 +186,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
     onSuccess: (_, recommendation) => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       setAddedRecommendations(prev => new Set([...prev, recommendation]));
-      toast.success("Action created from AI recommendation!");
+      toast.success(t("ai.actionCreated"));
     },
     onError: () => {
       toast.error("Failed to create action");
@@ -198,11 +213,11 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Brain className="w-5 h-5 text-indigo-600" />
-            <h4 className="font-semibold text-slate-900">AI Risk Analysis</h4>
+            <h4 className="font-semibold text-slate-900">{t("ai.riskAnalysis")}</h4>
           </div>
         </div>
         <p className="text-sm text-slate-600 mb-4">
-          Get AI-powered risk scoring, failure predictions, and actionable insights.
+          {t("ai.riskAnalysis")}
         </p>
         <Button 
           onClick={handleAnalyze}
@@ -213,12 +228,12 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
           {analyzeMutation.isPending ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Analyzing...
+              {t("ai.analyzing")}
             </>
           ) : (
             <>
               <Zap className="w-4 h-4 mr-2" />
-              Analyze with AI
+              {t("ai.analyzeWithAi")}
             </>
           )}
         </Button>
@@ -265,12 +280,12 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
             <Brain className="w-5 h-5 text-indigo-600" />
           </div>
           <div>
-            <h4 className="font-semibold text-slate-900">AI Risk Analysis</h4>
+            <h4 className="font-semibold text-slate-900">{t("ai.riskAnalysis")}</h4>
             <div className="flex items-center gap-2 text-xs text-slate-500">
-              <TrendIcon trend={displayData.trend} />
-              <span className="capitalize">{displayData.trend}</span>
+              <TrendIcon trend={displayData.trend} t={t} />
+              <span className="capitalize">{getTrendLabel(displayData.trend, t)}</span>
               <span className="text-slate-300">|</span>
-              <ConfidenceBadge confidence={displayData.confidence} />
+              <ConfidenceBadge confidence={displayData.confidence} t={t} />
             </div>
           </div>
         </div>
@@ -308,7 +323,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                 <div className="bg-white rounded-lg p-3 border border-slate-200">
                   <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
                     <Target className="w-3 h-3" />
-                    Failure Probability
+                    {t("ai.failureProbability")}
                   </div>
                   <div className="text-lg font-bold text-slate-900">
                     {displayData.failure_probability?.toFixed(0)}%
@@ -318,17 +333,17 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                 <div className="bg-white rounded-lg p-3 border border-slate-200">
                   <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
                     <Clock className="w-3 h-3" />
-                    Time to Failure
+                    {t("ai.timeToFailure")}
                   </div>
                   <div className="text-lg font-bold text-slate-900">
-                    {displayData.time_to_failure_display || "Unknown"}
+                    {displayData.time_to_failure_display || t("ai.unknown")}
                   </div>
                 </div>
                 
                 <div className="bg-white rounded-lg p-3 border border-slate-200">
                   <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
                     <BarChart3 className="w-3 h-3" />
-                    Trend Change
+                    {t("ai.trendChange")}
                   </div>
                   <div className={`text-lg font-bold ${displayData.trend_delta > 0 ? 'text-red-600' : displayData.trend_delta < 0 ? 'text-green-600' : 'text-slate-600'}`}>
                     {displayData.trend_delta > 0 ? '+' : ''}{displayData.trend_delta || 0}
@@ -341,7 +356,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                 <div>
                   <h5 className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
-                    Key Risk Factors
+                    {t("ai.keyRiskFactors")}
                   </h5>
                   <ul className="space-y-1">
                     {displayData.factors.map((factor, idx) => (
@@ -355,14 +370,14 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
               )}
               
               {/* Forecasts */}
-              <ForecastChart forecasts={displayForecasts} />
+              <ForecastChart forecasts={displayForecasts} t={t} />
               
               {/* Key Insights */}
               {displayInsights.length > 0 && (
                 <div>
                   <h5 className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1">
                     <Lightbulb className="w-3 h-3" />
-                    Key Insights
+                    {t("ai.keyInsights")}
                   </h5>
                   <ul className="space-y-1">
                     {displayInsights.map((insight, idx) => (
@@ -380,7 +395,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                 <div>
                   <h5 className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1">
                     <Zap className="w-3 h-3" />
-                    AI Recommendations
+                    {t("ai.aiRecommendations")}
                   </h5>
                   <div className="space-y-2">
                     {displayRecommendations.map((rec, idx) => {
@@ -417,7 +432,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p className="text-xs">{isAdded ? "Added as action" : "Add as action"}</p>
+                                <p className="text-xs">{isAdded ? t("ai.addedAsAction") : t("ai.addAsAction")}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -430,7 +445,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
               
               {/* Last Updated */}
               <div className="text-xs text-slate-400 text-right">
-                Last analyzed: {new Date(displayData.last_updated || insights?.updated_at).toLocaleString()}
+                {t("ai.lastAnalyzed")}: {new Date(displayData.last_updated || insights?.updated_at).toLocaleString()}
               </div>
             </div>
           </motion.div>

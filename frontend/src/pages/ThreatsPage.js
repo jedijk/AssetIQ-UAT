@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { threatsAPI, statsAPI } from "../lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 import { motion } from "framer-motion";
 import { 
   AlertTriangle, 
@@ -79,6 +80,7 @@ const getEquipmentIcon = (equipmentType, asset) => {
 
 const ThreatsPage = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -149,28 +151,28 @@ const ThreatsPage = () => {
 
   const statCards = [
     {
-      label: "Total Threats",
+      label: t("threats.totalThreats"),
       value: stats?.total_threats || 0,
       icon: AlertTriangle,
       color: "text-slate-600",
       bg: "bg-slate-100",
     },
     {
-      label: "Open Threats",
+      label: t("threats.openThreats"),
       value: stats?.open_threats || 0,
       icon: Clock,
       color: "text-blue-600",
       bg: "bg-blue-50",
     },
     {
-      label: "Critical",
+      label: t("common.critical"),
       value: stats?.critical_count || 0,
       icon: TrendingUp,
       color: "text-red-600",
       bg: "bg-red-50",
     },
     {
-      label: "High Priority",
+      label: t("threats.highPriority"),
       value: stats?.high_count || 0,
       icon: AlertTriangle,
       color: "text-orange-600",
@@ -225,7 +227,7 @@ const ThreatsPage = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input
-            placeholder="Search threats..."
+            placeholder={t("threats.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 h-11"
@@ -235,13 +237,13 @@ const ThreatsPage = () => {
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48 h-11" data-testid="status-filter-select">
             <Filter className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder="Filter by status" />
+            <SelectValue placeholder={t("actionsPage.filterByStatus")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="Open">Open</SelectItem>
-            <SelectItem value="Mitigated">Mitigated</SelectItem>
-            <SelectItem value="Closed">Closed</SelectItem>
+            <SelectItem value="all">{t("actionsPage.allStatus")}</SelectItem>
+            <SelectItem value="Open">{t("common.open")}</SelectItem>
+            <SelectItem value="Mitigated">{t("threatDetail.mitigated")}</SelectItem>
+            <SelectItem value="Closed">{t("common.closed")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -260,11 +262,11 @@ const ThreatsPage = () => {
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
             <CheckCircle className="w-8 h-8 text-slate-400" />
           </div>
-          <h3 className="text-xl font-semibold text-slate-700 mb-2">No threats found</h3>
+          <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("threats.noThreats")}</h3>
           <p className="text-slate-500">
             {searchQuery
-              ? "Try adjusting your search query"
-              : "Click 'Report Threat' to start capturing failures"}
+              ? t("common.noResults")
+              : t("threats.noThreatsDesc")}
           </p>
         </div>
       ) : (
