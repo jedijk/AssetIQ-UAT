@@ -5,6 +5,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import json
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
@@ -238,6 +239,236 @@ Describe what you see in the image, identifying:
 
 Be concise and technical. Focus on observable facts that would help a reliability engineer assess the threat."""
 
+DATA_QUERY_SYSTEM_PROMPT = """You are ThreatBase AI, a helpful assistant for reliability engineers. 
+The user is asking a question about their threat data, equipment, or system information.
+
+You have access to the following data context:
+{data_context}
+
+Based on this data, answer the user's question in a clear, concise, and helpful manner.
+- If they ask about counts, give specific numbers
+- If they ask about specific threats or equipment, provide details
+- If they ask for summaries or trends, analyze the data and provide insights
+- Be conversational but professional
+- Use bullet points for lists
+- Include relevant statistics when helpful
+
+If the data doesn't contain the answer, politely explain what information is available.
+
+RESPOND IN JSON:
+{{
+  "answer": "your helpful response to the user's question",
+  "is_data_query": true,
+  "query_type": "count|list|summary|detail|comparison",
+  "data_used": ["threats", "equipment", "actions", "investigations"]
+}}"""
+
+QUERY_CLASSIFIER_PROMPT = """Classify if the user message is:
+1. A DATA QUERY - asking about existing data (counts, lists, summaries, statistics, questions about threats/equipment/actions)
+2. A THREAT REPORT - reporting a new equipment failure or problem
+
+DATA QUERY examples:
+- "How many threats are there?"
+- "What pump failures do we have?"
+- "Show me critical threats"
+- "List all open actions"
+- "What equipment has the most issues?"
+- "Summary of threats this month"
+- "How many high priority items?"
+
+THREAT REPORT examples:
+- "Pump P-101 is leaking"
+- "There's a strange noise from the compressor"
+- "Motor overheating in unit 3"
+- "Found damage on heat exchanger"
+
+RESPOND IN JSON ONLY:
+{
+  "is_data_query": true/false,
+  "confidence": 0.0-1.0,
+  "query_type": "count|list|summary|detail|comparison|null",
+  "entities": ["equipment_type", "status", "priority", "time_period"] // what they're asking about
+}"""
+
+
+async def classify_user_intent(message: str, session_id: str) -> dict:
+    """Classify if the user is asking a data query or reporting a threat"""
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"{session_id}_classifier",
+            system_message=QUERY_CLASSIFIER_PROMPT
+        ).with_model("openai", "gpt-5.2")
+        
+        user_message = UserMessage(text=message)
+        response = await chat.send_message(user_message)
+        
+        # Parse JSON response
+        clean_response = response.strip()
+        if clean_response.startswith("```"):
+            clean_response = clean_response.split("```")[1]
+            if clean_response.startswith("json"):
+                clean_response = clean_response[4:]
+        clean_response = clean_response.strip()
+        
+        return json.loads(clean_response)
+    except Exception as e:
+        logger.error(f"Intent classification failed: {e}")
+        return {"is_data_query": False, "confidence": 0.5}
+
+
+async def get_data_context(user_id: str, query_entities: list = None) -> str:
+    """Gather relevant data context for answering data queries"""
+    context_parts = []
+    
+    # Get threats summary
+    threats = await db.threats.find(
+        {"created_by": user_id},
+        {"_id": 0}
+    ).to_list(500)
+    
+    if threats:
+        # Count by status
+        status_counts = {}
+        risk_counts = {}
+        equipment_type_counts = {}
+        failure_mode_counts = {}
+        asset_counts = {}
+        
+        for t in threats:
+            status = t.get("status", "Unknown")
+            status_counts[status] = status_counts.get(status, 0) + 1
+            
+            risk = t.get("risk_level", "Unknown")
+            risk_counts[risk] = risk_counts.get(risk, 0) + 1
+            
+            eq_type = t.get("equipment_type", "Unknown")
+            equipment_type_counts[eq_type] = equipment_type_counts.get(eq_type, 0) + 1
+            
+            failure = t.get("failure_mode", "Unknown")
+            failure_mode_counts[failure] = failure_mode_counts.get(failure, 0) + 1
+            
+            asset = t.get("asset", "Unknown")
+            asset_counts[asset] = asset_counts.get(asset, 0) + 1
+        
+        context_parts.append(f"""
+THREATS DATA:
+- Total threats: {len(threats)}
+- By Status: {json.dumps(status_counts)}
+- By Risk Level: {json.dumps(risk_counts)}
+- By Equipment Type: {json.dumps(equipment_type_counts)}
+- By Failure Mode: {json.dumps(failure_mode_counts)}
+- By Asset: {json.dumps(asset_counts)}
+
+Recent Threats (last 10):
+""")
+        for t in threats[:10]:
+            context_parts.append(f"  - {t.get('title', 'Untitled')} | Asset: {t.get('asset', 'N/A')} | Status: {t.get('status', 'N/A')} | Risk: {t.get('risk_level', 'N/A')} | Type: {t.get('equipment_type', 'N/A')}")
+    else:
+        context_parts.append("THREATS DATA: No threats registered yet.")
+    
+    # Get actions summary
+    actions = await db.actions.find(
+        {"created_by": user_id},
+        {"_id": 0}
+    ).to_list(200)
+    
+    if actions:
+        action_status_counts = {}
+        action_priority_counts = {}
+        
+        for a in actions:
+            status = a.get("status", "Unknown")
+            action_status_counts[status] = action_status_counts.get(status, 0) + 1
+            
+            priority = a.get("priority", "Unknown")
+            action_priority_counts[priority] = action_priority_counts.get(priority, 0) + 1
+        
+        context_parts.append(f"""
+
+ACTIONS DATA:
+- Total actions: {len(actions)}
+- By Status: {json.dumps(action_status_counts)}
+- By Priority: {json.dumps(action_priority_counts)}
+""")
+    else:
+        context_parts.append("\nACTIONS DATA: No actions registered yet.")
+    
+    # Get equipment summary
+    equipment = await db.equipment_nodes.find(
+        {"created_by": user_id},
+        {"_id": 0}
+    ).to_list(500)
+    
+    if equipment:
+        level_counts = {}
+        for e in equipment:
+            level = e.get("level", "Unknown")
+            level_counts[level] = level_counts.get(level, 0) + 1
+        
+        context_parts.append(f"""
+
+EQUIPMENT DATA:
+- Total equipment nodes: {len(equipment)}
+- By Hierarchy Level: {json.dumps(level_counts)}
+""")
+    else:
+        context_parts.append("\nEQUIPMENT DATA: No equipment registered yet.")
+    
+    # Get investigations summary
+    investigations = await db.investigations.find(
+        {"created_by": user_id},
+        {"_id": 0}
+    ).to_list(100)
+    
+    if investigations:
+        inv_status_counts = {}
+        for inv in investigations:
+            status = inv.get("status", "Unknown")
+            inv_status_counts[status] = inv_status_counts.get(status, 0) + 1
+        
+        context_parts.append(f"""
+
+INVESTIGATIONS DATA:
+- Total investigations: {len(investigations)}
+- By Status: {json.dumps(inv_status_counts)}
+""")
+    else:
+        context_parts.append("\nINVESTIGATIONS DATA: No investigations yet.")
+    
+    return "\n".join(context_parts)
+
+
+async def answer_data_query(message: str, session_id: str, data_context: str) -> dict:
+    """Answer a data query using the provided context"""
+    try:
+        prompt = DATA_QUERY_SYSTEM_PROMPT.format(data_context=data_context)
+        
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"{session_id}_data",
+            system_message=prompt
+        ).with_model("openai", "gpt-5.2")
+        
+        user_message = UserMessage(text=message)
+        response = await chat.send_message(user_message)
+        
+        # Parse JSON response
+        clean_response = response.strip()
+        if clean_response.startswith("```"):
+            clean_response = clean_response.split("```")[1]
+            if clean_response.startswith("json"):
+                clean_response = clean_response[4:]
+        clean_response = clean_response.strip()
+        
+        return json.loads(clean_response)
+    except Exception as e:
+        logger.error(f"Data query answer failed: {e}")
+        return {
+            "answer": "I'm sorry, I couldn't process your question. Please try rephrasing it.",
+            "is_data_query": True
+        }
+
 async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Optional[str] = None) -> dict:
     """Analyze failure description using GPT-5.2"""
     try:
@@ -421,6 +652,35 @@ async def send_chat_message(
     }
     await db.chat_messages.insert_one(chat_msg)
     
+    # First, classify the user's intent (data query vs threat report)
+    # Skip classification if there's an image (likely a threat report)
+    if not message.image_base64:
+        intent = await classify_user_intent(message.content, session_id)
+        
+        if intent.get("is_data_query", False) and intent.get("confidence", 0) > 0.6:
+            # Handle as a data query
+            data_context = await get_data_context(current_user["id"], intent.get("entities"))
+            query_response = await answer_data_query(message.content, session_id, data_context)
+            
+            answer = query_response.get("answer", "I couldn't find the information you're looking for.")
+            
+            # Store AI response
+            ai_response = {
+                "id": str(uuid.uuid4()),
+                "user_id": current_user["id"],
+                "role": "assistant",
+                "content": answer,
+                "is_data_query": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.chat_messages.insert_one(ai_response)
+            
+            return ChatResponse(
+                message=answer,
+                follow_up_question=None,
+                question_type="data_query"
+            )
+    
     # Get recent conversation context for follow-up questions
     recent_messages = await db.chat_messages.find(
         {"user_id": current_user["id"]},
@@ -435,7 +695,7 @@ async def send_chat_message(
             role = "User" if msg["role"] == "user" else "Assistant"
             context += f"{role}: {msg['content'][:200]}\n"
     
-    # Analyze with AI
+    # Analyze with AI for threat reporting
     analysis = await analyze_threat_with_ai(
         message.content + context, 
         session_id, 
