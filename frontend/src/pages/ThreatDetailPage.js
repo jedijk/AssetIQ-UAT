@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { threatsAPI, actionsAPI } from "../lib/api";
+import { threatsAPI, actionsAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
+import SearchableCombobox from "../components/SearchableCombobox";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -87,6 +88,67 @@ const ThreatDetailPage = () => {
     queryKey: ["threat", id],
     queryFn: () => threatsAPI.getById(id),
   });
+
+  // Fetch equipment hierarchy nodes for Asset dropdown
+  const { data: equipmentNodesData } = useQuery({
+    queryKey: ["equipment-nodes"],
+    queryFn: equipmentHierarchyAPI.getNodes,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+  const equipmentNodes = equipmentNodesData?.nodes || [];
+
+  // Fetch equipment types for Equipment Type dropdown
+  const { data: equipmentTypesData } = useQuery({
+    queryKey: ["equipment-types"],
+    queryFn: equipmentHierarchyAPI.getEquipmentTypes,
+    staleTime: 5 * 60 * 1000,
+  });
+  const equipmentTypes = equipmentTypesData?.equipment_types || [];
+
+  // Fetch failure modes for Failure Mode dropdown
+  const { data: failureModesData } = useQuery({
+    queryKey: ["failure-modes-all"],
+    queryFn: () => failureModesAPI.getAll({}),
+    staleTime: 5 * 60 * 1000,
+  });
+  const failureModes = failureModesData?.failure_modes || [];
+
+  // Transform data for searchable comboboxes
+  const assetOptions = useMemo(() => {
+    // Flatten hierarchy nodes into a flat list with path info
+    const flattenNodes = (nodes, parentPath = "") => {
+      const result = [];
+      nodes.forEach((node) => {
+        const currentPath = parentPath ? `${parentPath} > ${node.name}` : node.name;
+        result.push({
+          value: node.name,
+          label: node.name,
+          description: node.tag_number ? `${node.tag_number} - ${node.level}` : node.level,
+        });
+        if (node.children && node.children.length > 0) {
+          result.push(...flattenNodes(node.children, currentPath));
+        }
+      });
+      return result;
+    };
+    return flattenNodes(equipmentNodes);
+  }, [equipmentNodes]);
+
+  const equipmentTypeOptions = useMemo(() => {
+    return equipmentTypes.map((type) => ({
+      value: type.name,
+      label: type.name,
+      description: type.category || type.discipline,
+    }));
+  }, [equipmentTypes]);
+
+  const failureModeOptions = useMemo(() => {
+    return failureModes.map((mode) => ({
+      value: mode.failure_mode,
+      label: mode.failure_mode,
+      description: mode.equipment || mode.category,
+    }));
+  }, [failureModes]);
 
   // Update mutation
   const updateMutation = useMutation({
@@ -215,9 +277,9 @@ const ThreatDetailPage = () => {
   }
 
   const infoItems = [
-    { label: "Asset", value: threat.asset, icon: Wrench, field: "asset", type: "text" },
-    { label: "Equipment Type", value: threat.equipment_type, icon: Target, field: "equipment_type", type: "text" },
-    { label: "Failure Mode", value: threat.failure_mode, icon: AlertTriangle, field: "failure_mode", type: "text" },
+    { label: "Asset", value: threat.asset, icon: Wrench, field: "asset", type: "searchable", options: assetOptions },
+    { label: "Equipment Type", value: threat.equipment_type, icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
+    { label: "Failure Mode", value: threat.failure_mode, icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
     { label: "Impact", value: threat.impact, icon: Activity, field: "impact", type: "select", options: IMPACT_OPTIONS },
     { label: "Frequency", value: threat.frequency, icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
     { label: "Likelihood", value: threat.likelihood, icon: Activity, field: "likelihood", type: "select", options: LIKELIHOOD_OPTIONS },
@@ -440,7 +502,18 @@ const ThreatDetailPage = () => {
               {item.label}
             </div>
             {isEditing ? (
-              item.type === "select" ? (
+              item.type === "searchable" ? (
+                <SearchableCombobox
+                  options={item.options}
+                  value={editForm[item.field] || ""}
+                  onValueChange={(v) => setEditForm({ ...editForm, [item.field]: v })}
+                  placeholder={`Select ${item.label}...`}
+                  searchPlaceholder={`Search ${item.label.toLowerCase()}...`}
+                  emptyText={`No ${item.label.toLowerCase()} found.`}
+                  allowCustom={true}
+                  data-testid={`edit-${item.field}`}
+                />
+              ) : item.type === "select" ? (
                 <Select
                   value={editForm[item.field] || ""}
                   onValueChange={(v) => setEditForm({ ...editForm, [item.field]: v })}

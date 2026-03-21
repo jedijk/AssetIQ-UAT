@@ -315,3 +315,21 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - [ ] P3: Migrate FMEA library from Python file to MongoDB for better scalability
 - [ ] P3: Break down FailureModesPage.js into smaller components
 
+### Changelog
+
+#### Mar 21, 2026 - Searchable Dropdowns for Threat Editing
+- [x] **Searchable Combobox for Asset, Equipment Type, Failure Mode** (Mar 21, 2026):
+  - Created reusable `SearchableCombobox.jsx` component using Radix UI Command + Popover primitives
+  - When editing a threat, Asset, Equipment Type, and Failure Mode fields now show searchable dropdowns
+  - Asset dropdown populated from Equipment Hierarchy nodes (flattened tree with level descriptions)
+  - Equipment Type dropdown populated from Equipment Types library (shows discipline as description)
+  - Failure Mode dropdown populated from FMEA library (shows equipment category as description)
+  - All dropdowns support:
+    - Real-time search/filter functionality
+    - Custom value entry (users can type a value not in the list)
+    - Descriptions under each option for context
+    - Checkmark indicating currently selected value
+  - Fixed API response handling for nested data structures ({nodes: [...]}, {equipment_types: [...]}, {failure_modes: [...]})
+  - Component located at: `/app/frontend/src/components/SearchableCombobox.jsx`
+  - Updated file: `/app/frontend/src/pages/ThreatDetailPage.js`
+
