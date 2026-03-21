@@ -23,6 +23,7 @@ import {
   Save,
   X,
   ClipboardList,
+  Brain,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -47,6 +48,8 @@ import {
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
 import RiskBadge from "../components/RiskBadge";
+import AIInsightsPanel from "../components/AIInsightsPanel";
+import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
 
 const LIKELIHOOD_OPTIONS = ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"];
 const DETECTABILITY_OPTIONS = ["Easy", "Moderate", "Difficult", "Very Difficult", "Almost Impossible"];
@@ -378,6 +381,20 @@ const ThreatDetailPage = () => {
             }`} />
           </div>
         </div>
+      </motion.div>
+
+      {/* AI Intelligence Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6"
+      >
+        {/* AI Risk Analysis Panel */}
+        <AIInsightsPanel threatId={id} />
+        
+        {/* Causal Intelligence Panel */}
+        <CausalIntelligencePanel threatId={id} />
       </motion.div>
 
       {/* Info Grid */}
