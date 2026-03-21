@@ -419,7 +419,7 @@ const ThreatDetailPage = () => {
         className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6"
       >
         {/* AI Risk Analysis Panel */}
-        <AIInsightsPanel threatId={id} />
+        <AIInsightsPanel threatId={id} threatData={threat} />
         
         {/* Causal Intelligence Panel */}
         <CausalIntelligencePanel threatId={id} threatData={threat} />

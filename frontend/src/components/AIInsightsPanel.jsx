@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { aiRiskAPI } from "../lib/api";
+import { aiRiskAPI, actionsAPI } from "../lib/api";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Brain,
@@ -18,6 +19,8 @@ import {
   Zap,
   BarChart3,
   HelpCircle,
+  Plus,
+  Check,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
@@ -132,9 +135,10 @@ const ForecastChart = ({ forecasts }) => {
   );
 };
 
-export default function AIInsightsPanel({ threatId, compact = false }) {
+export default function AIInsightsPanel({ threatId, threatData, compact = false }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(!compact);
+  const [addedRecommendations, setAddedRecommendations] = useState(new Set());
   
   // Fetch existing insights
   const { data: insights, isLoading: loadingInsights, error: insightsError } = useQuery({
@@ -149,8 +153,34 @@ export default function AIInsightsPanel({ threatId, compact = false }) {
     mutationFn: () => aiRiskAPI.analyzeRisk(threatId, { includeForecast: true, includeSimilarIncidents: true }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ai-insights", threatId] });
+      setAddedRecommendations(new Set()); // Reset added state on new analysis
     },
   });
+
+  // Mutation to create action from recommendation
+  const createActionMutation = useMutation({
+    mutationFn: (recommendation) => actionsAPI.create({
+      title: recommendation.substring(0, 100),
+      description: recommendation,
+      source_type: "ai_recommendation",
+      source_id: threatId,
+      source_name: threatData?.title || "AI Risk Analysis",
+      priority: threatData?.risk_level === "Critical" ? "critical" : 
+               threatData?.risk_level === "High" ? "high" : "medium",
+    }),
+    onSuccess: (_, recommendation) => {
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      setAddedRecommendations(prev => new Set([...prev, recommendation]));
+      toast.success("Action created from AI recommendation!");
+    },
+    onError: () => {
+      toast.error("Failed to create action");
+    },
+  });
+
+  const handleAddAsAction = (recommendation) => {
+    createActionMutation.mutate(recommendation);
+  };
   
   const riskData = insights?.dynamic_risk;
   const forecasts = insights?.forecasts || [];
@@ -352,14 +382,49 @@ export default function AIInsightsPanel({ threatId, compact = false }) {
                     <Zap className="w-3 h-3" />
                     AI Recommendations
                   </h5>
-                  <ul className="space-y-1">
-                    {displayRecommendations.map((rec, idx) => (
-                      <li key={idx} className="text-sm text-slate-700 flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 mt-1.5 flex-shrink-0" />
-                        {rec}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="space-y-2">
+                    {displayRecommendations.map((rec, idx) => {
+                      const isAdded = addedRecommendations.has(rec);
+                      return (
+                        <div 
+                          key={idx} 
+                          className="flex items-start gap-2 p-2 bg-white rounded-lg border border-slate-100 group hover:border-green-200 transition-colors"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-400 mt-2 flex-shrink-0" />
+                          <p className="text-sm text-slate-700 flex-1">{rec}</p>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleAddAsAction(rec)}
+                                  disabled={createActionMutation.isPending || isAdded}
+                                  className={`flex-shrink-0 h-7 px-2 ${
+                                    isAdded 
+                                      ? "text-green-600 bg-green-50" 
+                                      : "text-slate-400 hover:text-green-600 hover:bg-green-50 opacity-0 group-hover:opacity-100"
+                                  } transition-all`}
+                                  data-testid={`add-recommendation-${idx}`}
+                                >
+                                  {createActionMutation.isPending ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : isAdded ? (
+                                    <Check className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <Plus className="w-3.5 h-3.5" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">{isAdded ? "Added as action" : "Add as action"}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
               
