@@ -159,6 +159,8 @@ class ThreatResponse(BaseModel):
     asset: str
     equipment_type: str
     failure_mode: str
+    failure_mode_id: Optional[int] = None
+    failure_mode_data: Optional[dict] = None
     cause: Optional[str] = None
     impact: str
     frequency: str
@@ -166,6 +168,7 @@ class ThreatResponse(BaseModel):
     detectability: str
     risk_level: str
     risk_score: int
+    base_risk_score: Optional[int] = None
     rank: int
     total_threats: int
     status: str
@@ -175,12 +178,16 @@ class ThreatResponse(BaseModel):
     occurrence_count: int
     image_url: Optional[str] = None
     location: Optional[str] = None
+    linked_equipment_id: Optional[str] = None
+    equipment_criticality: Optional[str] = None
+    equipment_criticality_data: Optional[dict] = None
 
 class ThreatUpdate(BaseModel):
     title: Optional[str] = None
     asset: Optional[str] = None
     equipment_type: Optional[str] = None
     failure_mode: Optional[str] = None
+    failure_mode_id: Optional[int] = None
     cause: Optional[str] = None
     impact: Optional[str] = None
     frequency: Optional[str] = None
@@ -189,6 +196,7 @@ class ThreatUpdate(BaseModel):
     location: Optional[str] = None
     status: Optional[str] = None
     recommended_actions: Optional[List[str]] = None
+    linked_equipment_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
     message: str
@@ -237,11 +245,24 @@ Your job is to extract information from what the user writes and create a threat
 Before asking ANY question, carefully analyze the user's message for:
 - Equipment names (P-101, Pump 1, compressor, motor, etc.)
 - Problems/symptoms (leaking, vibrating, noisy, hot, broken, failing, etc.)
+- Failure modes (overheating, seal failure, bearing failure, cavitation, corrosion, fouling, etc.)
 - Locations (Area A, Unit 2, Building 3, etc.)
 
 ## Required Information (only 2 fields):
 1. **Asset**: Equipment tag or name - EXTRACT from message if mentioned in ANY form
 2. **Failure**: What's wrong - EXTRACT any problem description from the message
+
+## IMPORTANT: Failure Mode Extraction
+Extract the standard FMEA failure mode from the user's description. Map common terms to failure modes:
+- "overheating/hot/high temp" → "Overheating"
+- "leaking/leak/drip" → "Seal Failure" or "Tube Leak" depending on equipment
+- "vibrating/vibration/shaking" → "Bearing Failure" or "Misalignment"
+- "noisy/noise/grinding" → "Bearing Failure"
+- "stuck/won't move" → "Valve Stuck"
+- "corrosion/rust/corroded" → "Internal Corrosion" or "External Corrosion"
+- "fouling/dirty/scaling" → "Fouling"
+- "cavitation/bubbles" → "Cavitation"
+- "surge/unstable flow" → "Surge"
 
 ## Response Rules:
 - If the message contains BOTH an equipment reference AND a problem description: Mark COMPLETE
@@ -252,11 +273,12 @@ Before asking ANY question, carefully analyze the user's message for:
 - Use common sense to interpret informal descriptions (e.g., "pump is acting up" = pump with operational issues)
 
 ## Examples of extraction:
-- "P-101 is leaking" → Asset: P-101, Failure: leaking → COMPLETE
-- "grinding noise from main pump" → Asset: main pump, Failure: grinding noise → COMPLETE  
-- "the compressor in unit 3 overheats" → Asset: compressor (unit 3), Failure: overheating → COMPLETE
-- 'Reporting issue for equipment "Production Unit A": vibration detected' → Asset: Production Unit A, Failure: vibration → COMPLETE
-- 'Reporting issue for equipment "Pump P-101": seal leak' → Asset: Pump P-101, Failure: seal leak → COMPLETE
+- "P-101 is leaking" → Asset: P-101, Failure: leaking, failure_mode: "Seal Failure" → COMPLETE
+- "grinding noise from main pump" → Asset: main pump, Failure: grinding noise, failure_mode: "Bearing Failure" → COMPLETE  
+- "the compressor in unit 3 overheats" → Asset: compressor (unit 3), Failure: overheating, failure_mode: "Overheating" → COMPLETE
+- "heat exchanger has fouling issues" → Asset: heat exchanger, Failure: fouling, failure_mode: "Fouling" → COMPLETE
+- 'Reporting issue for equipment "Production Unit A": vibration detected' → Asset: Production Unit A, Failure: vibration, failure_mode: "Bearing Failure" → COMPLETE
+- 'Reporting issue for equipment "Pump P-101": seal leak' → Asset: Pump P-101, Failure: seal leak, failure_mode: "Seal Failure" → COMPLETE
 - "something wrong with equipment" → Need to ask which equipment AND what's wrong
 - "pump has issues" → Asset: pump, but failure unclear → Ask what's wrong
 
@@ -1034,6 +1056,94 @@ async def send_chat_message(
     risk_score_raw = threat_data.get("risk_score", 50)
     base_risk_score = int(risk_score_raw) if isinstance(risk_score_raw, (int, float)) else 50
     
+    # ============= FAILURE MODE MATCHING =============
+    # Extract failure mode from AI response and match against FMEA library
+    failure_mode_name = threat_data.get("failure_mode", "Unknown")
+    matched_failure_mode = None
+    failure_mode_id = None
+    failure_mode_data = None
+    
+    if failure_mode_name and failure_mode_name != "Unknown":
+        # Get equipment type for better matching
+        equipment_type = threat_data.get("equipment_type", "")
+        
+        # First, do a direct search against the FMEA library for exact/close matches
+        failure_mode_lower = failure_mode_name.lower()
+        
+        # Priority 1: Exact failure mode name match in library
+        for fm in FAILURE_MODES_LIBRARY:
+            if fm["failure_mode"].lower() == failure_mode_lower:
+                matched_failure_mode = fm
+                break
+        
+        # Priority 2: Failure mode name contains our search term or vice versa
+        if not matched_failure_mode:
+            for fm in FAILURE_MODES_LIBRARY:
+                fm_name_lower = fm["failure_mode"].lower()
+                # Check both directions for containment
+                if failure_mode_lower in fm_name_lower or fm_name_lower in failure_mode_lower:
+                    matched_failure_mode = fm
+                    break
+        
+        # Priority 3: Keyword match in the failure mode's keywords
+        if not matched_failure_mode:
+            for fm in FAILURE_MODES_LIBRARY:
+                for keyword in fm.get("keywords", []):
+                    if failure_mode_lower in keyword.lower() or keyword.lower() in failure_mode_lower:
+                        matched_failure_mode = fm
+                        break
+                if matched_failure_mode:
+                    break
+        
+        # Priority 4: Use fuzzy matching with equipment context
+        if not matched_failure_mode:
+            search_text = f"{failure_mode_name} {threat_data.get('title', '')} {equipment_type}"
+            matching_modes = find_matching_failure_modes(search_text, limit=5)
+            
+            if matching_modes:
+                # Filter to only include modes where failure mode words significantly overlap
+                failure_words = set(w for w in failure_mode_lower.split() if len(w) >= 4)
+                
+                for fm in matching_modes:
+                    fm_words = set(w.lower() for w in fm["failure_mode"].split() if len(w) >= 4)
+                    # Check if there's meaningful word overlap
+                    overlap = failure_words & fm_words
+                    if overlap:
+                        matched_failure_mode = fm
+                        break
+                
+                # If still no match with word overlap, check keywords
+                if not matched_failure_mode:
+                    for fm in matching_modes:
+                        for keyword in fm.get("keywords", []):
+                            if any(fw in keyword.lower() for fw in failure_words):
+                                matched_failure_mode = fm
+                                break
+                        if matched_failure_mode:
+                            break
+        
+        # If we found a match, extract the data
+        if matched_failure_mode:
+            failure_mode_id = matched_failure_mode["id"]
+            failure_mode_data = {
+                "id": matched_failure_mode["id"],
+                "failure_mode": matched_failure_mode["failure_mode"],
+                "category": matched_failure_mode["category"],
+                "equipment": matched_failure_mode["equipment"],
+                "severity": matched_failure_mode["severity"],
+                "occurrence": matched_failure_mode["occurrence"],
+                "detectability": matched_failure_mode["detectability"],
+                "rpn": matched_failure_mode["rpn"],
+                "recommended_actions": matched_failure_mode.get("recommended_actions", [])
+            }
+            # Use matched failure mode name for consistency
+            failure_mode_name = matched_failure_mode["failure_mode"]
+            
+            # Recalculate base risk score using FMEA RPN if matched
+            # RPN is on scale 0-1000, normalize to 0-100
+            fmea_rpn = matched_failure_mode["rpn"]
+            base_risk_score = min(100, int(fmea_rpn / 10))
+    
     # Adjust risk score based on equipment criticality
     criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
     adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
@@ -1063,7 +1173,9 @@ async def send_chat_message(
             "level": criticality_level,
             "multiplier": criticality_multiplier
         } if equipment_criticality else None,
-        "failure_mode": threat_data.get("failure_mode", "Unknown"),
+        "failure_mode": failure_mode_name,  # Use matched failure mode name
+        "failure_mode_id": failure_mode_id,  # Link to FMEA library
+        "failure_mode_data": failure_mode_data,  # Store FMEA data snapshot
         "cause": threat_data.get("cause"),
         "impact": threat_data.get("impact", "Equipment Damage"),
         "frequency": threat_data.get("frequency", "First Time"),
@@ -1477,6 +1589,102 @@ async def link_threat_to_equipment(
         "message": f"Threat linked to {node['name']}",
         "threat": updated_threat,
         "score_calculation": {
+            "base_score": base_risk_score,
+            "criticality_multiplier": criticality_multiplier,
+            "criticality_level": criticality_level,
+            "final_score": adjusted_risk_score,
+            "risk_level": risk_level
+        }
+    }
+
+@api_router.post("/threats/{threat_id}/link-failure-mode")
+async def link_threat_to_failure_mode(
+    threat_id: str,
+    failure_mode_id: int = Body(..., embed=True),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Link a threat to a failure mode from the FMEA library and recalculate the risk score.
+    """
+    # Get the threat
+    threat = await db.threats.find_one({"id": threat_id, "created_by": current_user["id"]})
+    if not threat:
+        raise HTTPException(status_code=404, detail="Threat not found")
+    
+    # Find the failure mode in the library
+    matched_fm = None
+    for fm in FAILURE_MODES_LIBRARY:
+        if fm["id"] == failure_mode_id:
+            matched_fm = fm
+            break
+    
+    if not matched_fm:
+        raise HTTPException(status_code=404, detail="Failure mode not found in library")
+    
+    # Create failure mode data snapshot
+    failure_mode_data = {
+        "id": matched_fm["id"],
+        "failure_mode": matched_fm["failure_mode"],
+        "category": matched_fm["category"],
+        "equipment": matched_fm["equipment"],
+        "severity": matched_fm["severity"],
+        "occurrence": matched_fm["occurrence"],
+        "detectability": matched_fm["detectability"],
+        "rpn": matched_fm["rpn"],
+        "recommended_actions": matched_fm.get("recommended_actions", [])
+    }
+    
+    # Calculate base risk score from RPN
+    base_risk_score = min(100, int(matched_fm["rpn"] / 10))
+    
+    # Get equipment criticality multiplier
+    CRITICALITY_MULTIPLIERS = {
+        "safety_critical": 1.5,
+        "production_critical": 1.4,
+        "medium": 1.2,
+        "low": 1.0
+    }
+    
+    criticality_level = threat.get("equipment_criticality", "low")
+    criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
+    
+    # Calculate adjusted score
+    adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
+    
+    # Determine risk level
+    if adjusted_risk_score >= 70:
+        risk_level = "Critical"
+    elif adjusted_risk_score >= 50:
+        risk_level = "High"
+    elif adjusted_risk_score >= 30:
+        risk_level = "Medium"
+    else:
+        risk_level = "Low"
+    
+    # Update threat with new failure mode link and recalculated score
+    update_data = {
+        "failure_mode": matched_fm["failure_mode"],
+        "failure_mode_id": matched_fm["id"],
+        "failure_mode_data": failure_mode_data,
+        "base_risk_score": base_risk_score,
+        "risk_score": adjusted_risk_score,
+        "risk_level": risk_level,
+        "recommended_actions": matched_fm.get("recommended_actions", threat.get("recommended_actions", [])),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.threats.update_one({"id": threat_id}, {"$set": update_data})
+    
+    # Update ranks
+    await update_all_ranks(current_user["id"])
+    
+    updated_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+    
+    return {
+        "message": f"Threat linked to failure mode: {matched_fm['failure_mode']}",
+        "threat": updated_threat,
+        "score_calculation": {
+            "fmea_rpn": matched_fm["rpn"],
             "base_score": base_risk_score,
             "criticality_multiplier": criticality_multiplier,
             "criticality_level": criticality_level,

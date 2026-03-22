@@ -5,7 +5,16 @@
 ### Original Problem Statement
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
-### Latest Update (Dec 2025)
+### Latest Update (Mar 22, 2026)
+- **Better Failure Mode Linking during Threat Creation** (Mar 22, 2026):
+  - Updated AI system prompt to explicitly extract failure mode names from chat text (e.g., "overheating", "seal leak")
+  - Implemented multi-priority fuzzy matching against the FMEA library (exact → contains → keyword → word overlap)
+  - Auto-assigns `failure_mode_id` and `failure_mode_data` to new threats when matches are found
+  - Added new API endpoint: `POST /api/threats/{threat_id}/link-failure-mode` for manual relinking
+  - Added "Link Failure Mode" dialog in Threat Detail page with searchable FMEA list
+  - Risk Score Calculation now uses FMEA RPN values when a failure mode is linked
+  - Full EN/NL translations for all new UI elements
+  - ThreatResponse model extended with `failure_mode_id`, `failure_mode_data`, `base_risk_score`, `linked_equipment_id`
 - **4-Dimension Criticality System** (Mar 22, 2026): Changed from single-tier criticality to 4 dimensions:
   - Safety Impact (1-5)
   - Production Impact (1-5)

@@ -33,6 +33,7 @@ import {
   Star,
   Link,
   Unlink,
+  Search,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -182,10 +183,16 @@ const ThreatDetailPage = () => {
 
   // Get FMEA data for the linked failure mode
   const linkedFmData = useMemo(() => {
+    // First priority: use stored failure_mode_data from the threat itself (from DB link)
+    if (threat?.failure_mode_data) {
+      return threat.failure_mode_data;
+    }
+    
+    // Second priority: look up from failure modes list by name match
     if (!threat?.failure_mode) return null;
     const fm = failureModes.find(m => m.failure_mode.toLowerCase() === threat.failure_mode.toLowerCase());
     return fm || null;
-  }, [threat?.failure_mode, failureModes]);
+  }, [threat?.failure_mode, threat?.failure_mode_data, failureModes]);
 
   // Get criticality data for the linked asset
   // First check if threat has stored criticality data, otherwise look up from equipment nodes
@@ -347,6 +354,39 @@ const ThreatDetailPage = () => {
   // State for link equipment dialog
   const [showLinkEquipmentDialog, setShowLinkEquipmentDialog] = useState(false);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState("");
+
+  // State for link failure mode dialog
+  const [showLinkFailureModeDialog, setShowLinkFailureModeDialog] = useState(false);
+  const [selectedFailureModeId, setSelectedFailureModeId] = useState(null);
+  const [failureModeSearch, setFailureModeSearch] = useState("");
+
+  // Link failure mode mutation
+  const linkFailureModeMutation = useMutation({
+    mutationFn: ({ threatId, failureModeId }) => threatsAPI.linkToFailureMode(threatId, failureModeId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["threat", id] });
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      toast.success(`Linked to ${data.threat.failure_mode}. Score: ${data.score_calculation.final_score} (${data.score_calculation.risk_level})`);
+      setShowLinkFailureModeDialog(false);
+      setSelectedFailureModeId(null);
+      setFailureModeSearch("");
+    },
+    onError: () => {
+      toast.error("Failed to link failure mode");
+    },
+  });
+
+  // Filter failure modes based on search
+  const filteredFailureModes = useMemo(() => {
+    if (!failureModeSearch.trim()) return failureModes;
+    const search = failureModeSearch.toLowerCase();
+    return failureModes.filter(fm => 
+      fm.failure_mode.toLowerCase().includes(search) ||
+      fm.category.toLowerCase().includes(search) ||
+      fm.equipment.toLowerCase().includes(search) ||
+      (fm.keywords && fm.keywords.some(k => k.toLowerCase().includes(search)))
+    );
+  }, [failureModes, failureModeSearch]);
 
   // Build flat list of equipment nodes for selection
   const flatEquipmentList = useMemo(() => {
@@ -679,9 +719,19 @@ const ThreatDetailPage = () => {
               <div className="space-y-3">
                 {/* Step 1: FMEA */}
                 <div className="bg-slate-50 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</div>
-                    <span className="text-xs font-medium text-slate-700">{t("threats.fmeaScores")}</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</div>
+                      <span className="text-xs font-medium text-slate-700">{t("threats.fmeaScores")}</span>
+                    </div>
+                    <button
+                      onClick={() => setShowLinkFailureModeDialog(true)}
+                      className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                      data-testid="link-failure-mode-btn"
+                    >
+                      <Link className="w-3 h-3" />
+                      {linkedFmData ? t("threats.relink") : t("threats.linkFailureMode")}
+                    </button>
                   </div>
                   {linkedFmData ? (
                     <>
@@ -939,6 +989,92 @@ const ThreatDetailPage = () => {
               className="bg-purple-600 hover:bg-purple-700"
             >
               {linkEquipmentMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <Link className="w-4 h-4 mr-1" />
+              )}
+              {t("threats.linkAndRecalculate")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Failure Mode Dialog */}
+      <Dialog open={showLinkFailureModeDialog} onOpenChange={setShowLinkFailureModeDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              {t("threats.linkToFailureMode")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-600">{t("threats.linkFailureModeDesc")}</p>
+            
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder={t("threats.searchFailureModes")}
+                value={failureModeSearch}
+                onChange={(e) => setFailureModeSearch(e.target.value)}
+                className="pl-9"
+                data-testid="failure-mode-search"
+              />
+            </div>
+            
+            {/* Failure Modes List */}
+            <div className="max-h-72 overflow-y-auto space-y-1 border rounded-lg p-2">
+              {filteredFailureModes.map((fm) => (
+                <button
+                  key={fm.id}
+                  onClick={() => setSelectedFailureModeId(fm.id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                    selectedFailureModeId === fm.id 
+                      ? 'bg-amber-100 border-amber-300 border' 
+                      : 'hover:bg-slate-50 border border-transparent'
+                  }`}
+                  data-testid={`failure-mode-option-${fm.id}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-slate-800">{fm.failure_mode}</div>
+                    <div className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      fm.rpn >= 300 ? "bg-red-100 text-red-700" :
+                      fm.rpn >= 200 ? "bg-orange-100 text-orange-700" :
+                      fm.rpn >= 100 ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
+                    }`}>
+                      RPN: {fm.rpn}
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {fm.category} • {fm.equipment}
+                  </div>
+                  <div className="flex gap-3 mt-1 text-[10px] text-slate-400">
+                    <span>S: {fm.severity}</span>
+                    <span>O: {fm.occurrence}</span>
+                    <span>D: {fm.detectability}</span>
+                  </div>
+                </button>
+              ))}
+              {filteredFailureModes.length === 0 && (
+                <div className="text-center py-4 text-slate-400">{t("threats.noFailureModesFound")}</div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowLinkFailureModeDialog(false);
+              setSelectedFailureModeId(null);
+              setFailureModeSearch("");
+            }}>
+              {t("common.cancel")}
+            </Button>
+            <Button 
+              onClick={() => linkFailureModeMutation.mutate({ threatId: id, failureModeId: selectedFailureModeId })}
+              disabled={!selectedFailureModeId || linkFailureModeMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {linkFailureModeMutation.isPending ? (
                 <Loader2 className="w-4 h-4 mr-1 animate-spin" />
               ) : (
                 <Link className="w-4 h-4 mr-1" />

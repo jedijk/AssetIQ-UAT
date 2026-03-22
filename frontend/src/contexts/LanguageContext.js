@@ -153,6 +153,12 @@ const en = {
     linkEquipmentDesc: "Select an equipment node to apply its criticality to this threat's risk score.",
     noEquipmentFound: "No equipment nodes found",
     linkAndRecalculate: "Link & Recalculate",
+    linkFailureMode: "Link Failure Mode",
+    linkToFailureMode: "Link to Failure Mode",
+    linkFailureModeDesc: "Select a failure mode from the FMEA library to apply its severity, occurrence, and detectability scores.",
+    searchFailureModes: "Search failure modes...",
+    noFailureModesFound: "No failure modes found",
+    relink: "Relink",
   },
   
   // Causal Engine
@@ -798,6 +804,12 @@ const nl = {
     linkEquipmentDesc: "Selecteer een apparatuur om de kriticiteit toe te passen op de risicoscore van deze dreiging.",
     noEquipmentFound: "Geen apparatuur gevonden",
     linkAndRecalculate: "Koppel & Herbereken",
+    linkFailureMode: "Koppel Faalmodus",
+    linkToFailureMode: "Koppelen aan Faalmodus",
+    linkFailureModeDesc: "Selecteer een faalmodus uit de FMEA bibliotheek om de ernst, frequentie en detecteerbaarheidsscores toe te passen.",
+    searchFailureModes: "Zoek faalmodi...",
+    noFailureModesFound: "Geen faalmodi gevonden",
+    relink: "Herkoppelen",
   },
   
   // Causal Engine

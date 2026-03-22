@@ -75,6 +75,11 @@ export const threatsAPI = {
     return response.data;
   },
   
+  linkToFailureMode: async (threatId, failureModeId) => {
+    const response = await api.post(`/threats/${threatId}/link-failure-mode`, { failure_mode_id: failureModeId });
+    return response.data;
+  },
+  
   recalculateScores: async () => {
     const response = await api.post("/threats/recalculate-scores");
     return response.data;
