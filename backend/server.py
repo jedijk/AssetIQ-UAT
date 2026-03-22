@@ -4422,6 +4422,18 @@ async def download_documentation():
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
 
+@api_router.get("/download/functional-spec")
+async def download_functional_spec():
+    """Download the ReliabilityOS Functional Specification Document"""
+    file_path = Path(__file__).parent.parent / "ReliabilityOS_Functional_Specification.docx"
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Functional specification file not found")
+    return FileResponse(
+        path=str(file_path),
+        filename="ReliabilityOS_Functional_Specification.docx",
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+
 
 app.include_router(api_router)
 
