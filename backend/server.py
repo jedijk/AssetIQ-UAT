@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Query, Header, Response
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
@@ -15,6 +15,7 @@ from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
 import base64
+import requests
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 from failure_modes import (
     FAILURE_MODES_LIBRARY, 
@@ -60,6 +61,62 @@ JWT_EXPIRATION_HOURS = 24
 
 # LLM Config
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+
+# Object Storage Config
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+APP_NAME = "reliabilityos"
+storage_key = None
+
+def init_storage():
+    """Initialize storage and get session key."""
+    global storage_key
+    if storage_key:
+        return storage_key
+    if not EMERGENT_LLM_KEY:
+        logger.warning("EMERGENT_LLM_KEY not set, storage disabled")
+        return None
+    try:
+        resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_LLM_KEY}, timeout=30)
+        resp.raise_for_status()
+        storage_key = resp.json()["storage_key"]
+        logger.info("Object storage initialized successfully")
+        return storage_key
+    except Exception as e:
+        logger.error(f"Failed to initialize storage: {e}")
+        return None
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    """Upload file to object storage."""
+    key = init_storage()
+    if not key:
+        raise HTTPException(status_code=503, detail="Storage service unavailable")
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=120
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+def get_object(path: str) -> tuple:
+    """Download file from object storage."""
+    key = init_storage()
+    if not key:
+        raise HTTPException(status_code=503, detail="Storage service unavailable")
+    resp = requests.get(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key}, timeout=60
+    )
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
+MIME_TYPES = {
+    "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+    "gif": "image/gif", "webp": "image/webp", "pdf": "application/pdf",
+    "doc": "application/msword", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xls": "application/vnd.ms-excel", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "json": "application/json", "csv": "text/csv", "txt": "text/plain"
+}
 
 # Create the main app
 app = FastAPI(title="ThreatBase API")
@@ -3148,6 +3205,107 @@ async def delete_evidence(
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Evidence not found")
     return {"message": "Evidence deleted"}
+
+
+@api_router.post("/investigations/{inv_id}/upload")
+async def upload_investigation_file(
+    inv_id: str,
+    file: UploadFile = File(...),
+    description: str = Form(None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload a file to an investigation."""
+    # Verify investigation exists
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    # Validate file
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+    
+    # Get file extension and content type
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
+    content_type = file.content_type or MIME_TYPES.get(ext, "application/octet-stream")
+    
+    # Determine evidence type based on file extension
+    image_exts = ["jpg", "jpeg", "png", "gif", "webp"]
+    doc_exts = ["pdf", "doc", "docx", "xls", "xlsx", "txt", "csv"]
+    if ext in image_exts:
+        evidence_type = "photo"
+    elif ext in doc_exts:
+        evidence_type = "document"
+    else:
+        evidence_type = "file"
+    
+    # Read file data
+    file_data = await file.read()
+    file_size = len(file_data)
+    
+    # Check file size (max 10MB)
+    if file_size > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB")
+    
+    # Generate storage path
+    file_id = str(uuid.uuid4())
+    storage_path = f"{APP_NAME}/investigations/{inv_id}/{file_id}.{ext}"
+    
+    try:
+        # Upload to object storage
+        result = put_object(storage_path, file_data, content_type)
+        
+        # Create evidence record
+        evidence_doc = {
+            "id": file_id,
+            "investigation_id": inv_id,
+            "name": file.filename,
+            "evidence_type": evidence_type,
+            "description": description,
+            "storage_path": result["path"],
+            "content_type": content_type,
+            "file_size": file_size,
+            "original_filename": file.filename,
+            "is_deleted": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.evidence_items.insert_one(evidence_doc)
+        evidence_doc.pop("_id", None)
+        
+        return evidence_doc
+        
+    except Exception as e:
+        logger.error(f"File upload failed: {e}")
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
+
+
+@api_router.get("/files/{path:path}")
+async def download_file(
+    path: str,
+    authorization: str = Header(None),
+    auth: str = Query(None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Download a file from storage."""
+    # Find file record
+    record = await db.evidence_items.find_one({"storage_path": path, "is_deleted": {"$ne": True}})
+    if not record:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    try:
+        data, content_type = get_object(path)
+        return Response(
+            content=data, 
+            media_type=record.get("content_type", content_type),
+            headers={
+                "Content-Disposition": f'inline; filename="{record.get("original_filename", "download")}"'
+            }
+        )
+    except Exception as e:
+        logger.error(f"File download failed: {e}")
+        raise HTTPException(status_code=500, detail="File download failed")
 
 
 # ============= CENTRALIZED ACTIONS MANAGEMENT =============

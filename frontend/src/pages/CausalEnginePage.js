@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { investigationAPI, actionsAPI } from "../lib/api";
@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 import {
   Search, Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
   ChevronRight, Trash2, Calendar, User, MapPin,
-  Target, Loader2, ClipboardList, Edit, MessageSquare,
+  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -75,6 +75,8 @@ export default function CausalEnginePage() {
   const [causeForm, setCauseForm] = useState({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" });
   const [actionForm, setActionForm] = useState({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" });
   const [localNotes, setLocalNotes] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Handle inv query parameter - auto-select investigation from URL
   useEffect(() => {
@@ -114,6 +116,7 @@ export default function CausalEnginePage() {
   const failureIdentifications = investigationData?.failure_identifications || [];
   const causeNodes = investigationData?.cause_nodes || [];
   const actionItems = investigationData?.action_items || [];
+  const evidenceItems = investigationData?.evidence || [];
 
   const filteredInvestigations = useMemo(() => {
     if (!searchQuery) return investigations;
@@ -168,6 +171,57 @@ export default function CausalEnginePage() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [localNotes, selectedInvId, investigationData, updateInvMutation]);
+
+  // File upload handler
+  const handleFileUpload = async (event) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !selectedInvId) return;
+    
+    setIsUploading(true);
+    try {
+      for (const file of files) {
+        await investigationAPI.uploadFile(selectedInvId, file);
+      }
+      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      toast.success(t("causal.filesUploaded") || `${files.length} file(s) uploaded successfully`);
+    } catch (error) {
+      console.error("Upload failed:", error);
+      toast.error(t("causal.uploadFailed") || "Failed to upload file(s)");
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // File download handler
+  const handleFileDownload = async (evidence) => {
+    try {
+      const blob = await investigationAPI.downloadFile(evidence.storage_path);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = evidence.original_filename || evidence.name;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Download failed:", error);
+      toast.error(t("causal.downloadFailed") || "Failed to download file");
+    }
+  };
+
+  // Delete evidence mutation
+  const deleteEvidenceMutation = useMutation({
+    mutationFn: ({ invId, evidenceId }) => investigationAPI.deleteEvidence(invId, evidenceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      toast.success(t("causal.fileDeleted") || "File deleted");
+    },
+  });
   
   const deleteInvMutation = useMutation({
     mutationFn: async (id) => {
@@ -506,6 +560,94 @@ export default function CausalEnginePage() {
                     className="min-h-[120px] resize-y text-sm"
                     data-testid="investigation-notes"
                   />
+                </div>
+
+                {/* Attached Files */}
+                <div className="bg-white rounded-lg border p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <Upload className="w-4 h-4" />
+                      <span className="font-medium text-sm">{t("causal.attachedFiles") || "Attached Files"}</span>
+                      {evidenceItems.length > 0 && (
+                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-full">{evidenceItems.length}</span>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="h-8"
+                      data-testid="upload-file-btn"
+                    >
+                      {isUploading ? (
+                        <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />{t("common.uploading") || "Uploading..."}</>
+                      ) : (
+                        <><Plus className="w-3.5 h-3.5 mr-2" />{t("causal.addFile") || "Add File"}</>
+                      )}
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp"
+                    />
+                  </div>
+                  
+                  {evidenceItems.length === 0 ? (
+                    <div className="text-center py-8 border-2 border-dashed rounded-lg bg-slate-50">
+                      <Upload className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">{t("causal.noFilesYet") || "No files attached yet"}</p>
+                      <p className="text-xs text-slate-400 mt-1">{t("causal.dropFilesHint") || "Click 'Add File' to upload documents, images, or reports"}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {evidenceItems.map((evidence) => {
+                        const isImage = evidence.evidence_type === "photo" || evidence.content_type?.startsWith("image/");
+                        const FileIcon = isImage ? Image : File;
+                        const fileSize = evidence.file_size ? (evidence.file_size / 1024).toFixed(1) + " KB" : "";
+                        
+                        return (
+                          <div 
+                            key={evidence.id}
+                            className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg group hover:bg-slate-100 transition-colors"
+                          >
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isImage ? "bg-purple-100" : "bg-blue-100"}`}>
+                              <FileIcon className={`w-5 h-5 ${isImage ? "text-purple-600" : "text-blue-600"}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{evidence.original_filename || evidence.name}</p>
+                              <p className="text-xs text-slate-500">
+                                {evidence.evidence_type} {fileSize && `• ${fileSize}`}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleFileDownload(evidence)}
+                                className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600"
+                                data-testid={`download-file-${evidence.id}`}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteEvidenceMutation.mutate({ invId: selectedInvId, evidenceId: evidence.id })}
+                                className="h-8 w-8 p-0 text-slate-500 hover:text-red-600"
+                                data-testid={`delete-file-${evidence.id}`}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

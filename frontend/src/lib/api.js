@@ -397,6 +397,29 @@ export const investigationAPI = {
     const response = await api.delete(`/investigations/${invId}/evidence/${evidenceId}`);
     return response.data;
   },
+  
+  // File upload
+  uploadFile: async (invId, file, description = null) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (description) {
+      formData.append('description', description);
+    }
+    const response = await api.post(`/investigations/${invId}/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  
+  // File download
+  downloadFile: async (storagePath) => {
+    const response = await api.get(`/files/${storagePath}`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
 };
 
 // Centralized Actions API
