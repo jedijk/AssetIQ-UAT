@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { maintenanceStrategyAPI, equipmentHierarchyAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -30,7 +31,9 @@ import {
   Plus,
   X,
   Save,
-  GripVertical,
+  Link2,
+  ExternalLink,
+  FileWarning,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -114,6 +117,34 @@ const PRIORITY_OPTIONS = [
   { value: "high", label: "High" },
   { value: "critical", label: "Critical" },
 ];
+
+// Clickable Failure Mode Link Component
+const FailureModeLink = ({ mode, onClick }) => {
+  return (
+    <button
+      onClick={() => onClick(mode)}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-amber-50 text-amber-700 rounded hover:bg-amber-100 transition-colors border border-amber-200"
+      title={`Click to view "${mode}" in FMEA Library`}
+    >
+      <Link2 className="w-2.5 h-2.5" />
+      {mode}
+    </button>
+  );
+};
+
+// Failure Modes Display Component
+const FailureModesDisplay = ({ modes = [], onModeClick, label = "Addresses" }) => {
+  if (!modes || modes.length === 0) return null;
+  
+  return (
+    <div className="flex flex-wrap items-center gap-1 mt-1">
+      <span className="text-[10px] text-slate-400">{label}:</span>
+      {modes.map((mode, idx) => (
+        <FailureModeLink key={idx} mode={mode} onClick={onModeClick} />
+      ))}
+    </div>
+  );
+};
 
 // Generic Edit Dialog Component
 const EditItemDialog = ({ open, onClose, title, children, onSave, isSaving }) => {
@@ -534,7 +565,7 @@ const EditableItem = ({ children, onEdit, onDelete }) => {
 };
 
 // Criticality Tab Content with Editing
-const CriticalityContent = ({ strategy, criticalityLevel, onUpdate }) => {
+const CriticalityContent = ({ strategy, criticalityLevel, onUpdate, onFailureModeClick }) => {
   const [editDialog, setEditDialog] = useState({ open: false, type: null, index: null, data: null });
 
   const handleSave = () => {
@@ -649,17 +680,24 @@ const CriticalityContent = ({ strategy, criticalityLevel, onUpdate }) => {
           defaultOpen
           onAdd={() => openAdd("operator_round")}
         >
-          {(strategy.operator_rounds || []).map((round, idx) => (
-            <EditableItem key={idx} onEdit={() => openEdit("operator_round", idx, round)} onDelete={() => handleDelete("operator_round", idx)}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-medium text-xs">{round.name}</span>
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                  {FREQUENCY_OPTIONS.find(f => f.value === round.frequency)?.label || round.frequency}
-                </Badge>
-              </div>
-              <div className="text-[11px] text-slate-500">{round.duration_minutes} min • {round.checklist?.length || 0} checks</div>
-            </EditableItem>
-          ))}
+          {(strategy.operator_rounds || []).map((round, idx) => {
+            // Collect all failure modes from checklist items
+            const allFailureModes = (round.checklist || []).flatMap(c => c.failure_modes_addressed || []);
+            const uniqueFailureModes = [...new Set(allFailureModes)];
+            
+            return (
+              <EditableItem key={idx} onEdit={() => openEdit("operator_round", idx, round)} onDelete={() => handleDelete("operator_round", idx)}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-xs">{round.name}</span>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {FREQUENCY_OPTIONS.find(f => f.value === round.frequency)?.label || round.frequency}
+                  </Badge>
+                </div>
+                <div className="text-[11px] text-slate-500">{round.duration_minutes} min • {round.checklist?.length || 0} checks</div>
+                <FailureModesDisplay modes={uniqueFailureModes} onModeClick={onFailureModeClick} label="Checks for" />
+              </EditableItem>
+            );
+          })}
           {(!strategy.operator_rounds || strategy.operator_rounds.length === 0) && (
             <div className="text-xs text-slate-400 italic">No operator rounds defined</div>
           )}
@@ -681,6 +719,7 @@ const CriticalityContent = ({ strategy, criticalityLevel, onUpdate }) => {
                 </Badge>
               </div>
               <div className="text-[11px] text-slate-600 line-clamp-1">{system.description}</div>
+              <FailureModesDisplay modes={system.failure_modes_detected} onModeClick={onFailureModeClick} label="Detects" />
             </EditableItem>
           ))}
           {(!strategy.detection_systems || strategy.detection_systems.length === 0) && (
@@ -704,6 +743,7 @@ const CriticalityContent = ({ strategy, criticalityLevel, onUpdate }) => {
                 </Badge>
               </div>
               <div className="text-[11px] text-slate-600 line-clamp-1">{task.description}</div>
+              <FailureModesDisplay modes={task.failure_modes_addressed} onModeClick={onFailureModeClick} label="Prevents" />
             </EditableItem>
           ))}
           {(!strategy.scheduled_maintenance || strategy.scheduled_maintenance.length === 0) && (
@@ -729,6 +769,7 @@ const CriticalityContent = ({ strategy, criticalityLevel, onUpdate }) => {
                   {action.priority} • {action.response_time_hours}h
                 </Badge>
               </div>
+              <FailureModesDisplay modes={action.failure_modes} onModeClick={onFailureModeClick} label="Addresses" />
             </EditableItem>
           ))}
           {(!strategy.corrective_actions || strategy.corrective_actions.length === 0) && (
@@ -789,7 +830,7 @@ const CriticalityContent = ({ strategy, criticalityLevel, onUpdate }) => {
 };
 
 // Strategy Card Component
-const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating }) => {
+const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating, onFailureModeClick }) => {
   const [activeTab, setActiveTab] = useState("safety_critical");
   const [sparePartDialog, setSparePartDialog] = useState({ open: false, index: null, data: null });
   
@@ -885,10 +926,51 @@ const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating }) 
                 strategy={critStrategy} 
                 criticalityLevel={critStrategy.criticality_level}
                 onUpdate={handleCriticalityUpdate}
+                onFailureModeClick={onFailureModeClick}
               />
             </TabsContent>
           ))}
         </Tabs>
+        
+        {/* Failure Mode Mappings */}
+        {strategy.failure_mode_mappings && strategy.failure_mode_mappings.length > 0 && (
+          <div className="mt-3 pt-3 border-t">
+            <CollapsibleSection 
+              title="FMEA Linkages" 
+              icon={Link2} 
+              count={strategy.failure_mode_mappings.length} 
+              color="amber"
+            >
+              <div className="space-y-2">
+                {strategy.failure_mode_mappings.map((mapping, idx) => (
+                  <div key={idx} className="p-2 bg-amber-50 border border-amber-200 rounded">
+                    <button
+                      onClick={() => onFailureModeClick(mapping.failure_mode_name)}
+                      className="font-medium text-xs text-amber-800 hover:text-amber-900 flex items-center gap-1"
+                    >
+                      <FileWarning className="w-3 h-3" />
+                      {mapping.failure_mode_name}
+                      <ExternalLink className="w-2.5 h-2.5 ml-1" />
+                    </button>
+                    <div className="text-[10px] text-amber-700 mt-1">
+                      {mapping.recommended_interval && (
+                        <span className="mr-2">Interval: {FREQUENCY_OPTIONS.find(f => f.value === mapping.recommended_interval)?.label || mapping.recommended_interval}</span>
+                      )}
+                      <span className={`px-1 py-0.5 rounded ${
+                        mapping.risk_if_unaddressed === 'critical' ? 'bg-red-100 text-red-700' :
+                        mapping.risk_if_unaddressed === 'high' ? 'bg-orange-100 text-orange-700' :
+                        mapping.risk_if_unaddressed === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-green-100 text-green-700'
+                      }`}>
+                        Risk: {mapping.risk_if_unaddressed}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
         
         {/* Spare Parts Summary */}
         <div className="mt-3 pt-3 border-t">
@@ -908,6 +990,7 @@ const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating }) 
                 >
                   <div className="font-medium text-xs">{part.part_name}</div>
                   <div className="text-[10px] text-slate-500">Qty: {part.quantity_recommended}</div>
+                  <FailureModesDisplay modes={part.failure_modes_addressed} onModeClick={onFailureModeClick} label="For" />
                 </EditableItem>
               ))}
             </div>
@@ -944,8 +1027,16 @@ const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating }) 
 export default function MaintenanceStrategiesPanel() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEquipmentType, setSelectedEquipmentType] = useState(null);
+  
+  // Handle click on failure mode link - navigate to Library with search
+  const handleFailureModeClick = (failureModeName) => {
+    // Navigate to library page and set the failure modes tab active with search
+    navigate(`/library?tab=failure-modes&search=${encodeURIComponent(failureModeName)}`);
+    toast.info(`Searching for "${failureModeName}" in FMEA Library`);
+  };
   
   // Fetch equipment types
   const { data: equipmentTypesData } = useQuery({
