@@ -190,20 +190,44 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
     staleTime: 5 * 60 * 1000,
   });
 
-  // Check if equipment type exists in library
+  // Check if equipment type exists in library - use fuzzy matching
   const equipmentTypes = equipmentTypesData?.equipment_types || [];
   const equipmentTypeExists = threatData?.equipment_type 
-    ? equipmentTypes.some(et => 
-        et.name.toLowerCase() === threatData.equipment_type.toLowerCase()
-      )
+    ? equipmentTypes.some(et => {
+        const threatET = threatData.equipment_type.toLowerCase();
+        const libraryET = et.name.toLowerCase();
+        // Exact match
+        if (libraryET === threatET) return true;
+        // Partial match - library contains threat ET or vice versa
+        if (libraryET.includes(threatET) || threatET.includes(libraryET)) return true;
+        // Word-level match
+        const threatWords = threatET.split(/[\s\-_]+/).filter(w => w.length > 3);
+        const libraryWords = libraryET.split(/[\s\-_]+/).filter(w => w.length > 3);
+        const matchingWords = threatWords.filter(tw => 
+          libraryWords.some(lw => lw.includes(tw) || tw.includes(lw))
+        );
+        return matchingWords.length >= 1;
+      })
     : true; // If no equipment type specified, don't show warning
 
-  // Check if failure mode exists in library
+  // Check if failure mode exists in library - use fuzzy matching
   const failureModes = failureModesData?.failure_modes || [];
   const failureModeExists = threatData?.failure_mode
-    ? failureModes.some(fm => 
-        fm.failure_mode.toLowerCase() === threatData.failure_mode.toLowerCase()
-      )
+    ? failureModes.some(fm => {
+        const threatFM = threatData.failure_mode.toLowerCase();
+        const libraryFM = fm.failure_mode.toLowerCase();
+        // Exact match
+        if (libraryFM === threatFM) return true;
+        // Partial match - library contains threat FM or vice versa
+        if (libraryFM.includes(threatFM) || threatFM.includes(libraryFM)) return true;
+        // Word-level match - check if key words match
+        const threatWords = threatFM.split(/[\s\-_]+/).filter(w => w.length > 3);
+        const libraryWords = libraryFM.split(/[\s\-_]+/).filter(w => w.length > 3);
+        const matchingWords = threatWords.filter(tw => 
+          libraryWords.some(lw => lw.includes(tw) || tw.includes(lw))
+        );
+        return matchingWords.length >= Math.min(2, threatWords.length);
+      })
     : true; // If no failure mode specified, don't show warning
 
   const hasMissingLibraryData = !equipmentTypeExists || !failureModeExists;

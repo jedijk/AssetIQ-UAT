@@ -292,26 +292,78 @@ FAILURE_MODES_LIBRARY = [
   {"id":215,"category":"Rotating","equipment":"Grinder","failure_mode":"Dust Extraction Failure","keywords":["dust extraction","dust collector","grinding dust","exhaust failure","ventilation"],"severity":8,"occurrence":4,"detectability":5,"rpn":160,"recommended_actions":["Check filter condition","Clean extraction system","Verify airflow","Maintain ductwork"],"equipment_type_ids":["grinder"]}
 ]
 
-def find_matching_failure_modes(text: str, limit: int = 5) -> list:
-    """Find failure modes that match keywords in the input text."""
+def find_matching_failure_modes(text: str, limit: int = 5, equipment_type_id: str = None) -> list:
+    """Find failure modes that match keywords in the input text using fuzzy matching.
+    
+    Args:
+        text: The text to search for matches (threat title, description, asset name, etc.)
+        limit: Maximum number of results to return
+        equipment_type_id: Optional equipment type ID to prioritize matches
+    
+    Returns:
+        List of matching failure modes sorted by relevance score
+    """
     text_lower = text.lower()
+    words = set(text_lower.split())
     matches = []
     
     for fm in FAILURE_MODES_LIBRARY:
         score = 0
-        # Check keywords
+        
+        # Check keywords - fuzzy partial matching
         for keyword in fm["keywords"]:
-            if keyword.lower() in text_lower:
-                score += 1
-        # Also check equipment type
-        if fm["equipment"].lower() in text_lower:
-            score += 2
-        # Also check failure mode name
-        if fm["failure_mode"].lower() in text_lower:
-            score += 2
-        # Check category
+            keyword_lower = keyword.lower()
+            # Exact keyword in text
+            if keyword_lower in text_lower:
+                score += 3
+            # Partial word match (keyword contains word or word contains keyword)
+            else:
+                keyword_words = keyword_lower.split()
+                for kw in keyword_words:
+                    if len(kw) >= 3:  # Only match words with 3+ chars
+                        if kw in text_lower:
+                            score += 2
+                        elif any(kw in w or w in kw for w in words if len(w) >= 3):
+                            score += 1
+        
+        # Check equipment type - fuzzy matching
+        equipment_lower = fm["equipment"].lower()
+        equipment_words = equipment_lower.split()
+        if equipment_lower in text_lower:
+            score += 4
+        else:
+            # Partial equipment name match
+            for eq_word in equipment_words:
+                if len(eq_word) >= 3 and eq_word in text_lower:
+                    score += 2
+        
+        # Check failure mode name - fuzzy matching
+        failure_mode_lower = fm["failure_mode"].lower()
+        failure_words = failure_mode_lower.split()
+        if failure_mode_lower in text_lower:
+            score += 4
+        else:
+            # Partial failure mode name match
+            for fw in failure_words:
+                if len(fw) >= 3 and fw in text_lower:
+                    score += 1.5
+        
+        # Check category - less strict
         if fm["category"].lower() in text_lower:
-            score += 1
+            score += 2
+        
+        # Boost if equipment type ID matches
+        if equipment_type_id and fm.get("equipment_type_ids"):
+            if equipment_type_id in fm["equipment_type_ids"]:
+                score += 5
+        
+        # Common industrial terms boost
+        common_terms = ["pump", "motor", "valve", "bearing", "seal", "leak", "vibration", 
+                       "noise", "temperature", "pressure", "flow", "failure", "wear",
+                       "corrosion", "crack", "damage", "overload", "overheat"]
+        for term in common_terms:
+            if term in text_lower and term in (equipment_lower + " " + failure_mode_lower).lower():
+                score += 1
         
         if score > 0:
             matches.append((score, fm))
@@ -319,6 +371,80 @@ def find_matching_failure_modes(text: str, limit: int = 5) -> list:
     # Sort by score descending, then by RPN descending
     matches.sort(key=lambda x: (-x[0], -x[1]["rpn"]))
     return [m[1] for m in matches[:limit]]
+
+
+def find_failure_modes_flexible(text: str, equipment_type: str = None, limit: int = 10) -> list:
+    """More flexible failure mode matching - returns matches even with partial relevance.
+    
+    This function is less strict and will return failure modes even if there's only
+    a loose connection to the input text. Good for providing suggestions.
+    """
+    text_lower = text.lower()
+    matches = []
+    
+    for fm in FAILURE_MODES_LIBRARY:
+        score = 0
+        relevance_reasons = []
+        
+        # Direct equipment type match (highest priority)
+        if equipment_type:
+            eq_type_lower = equipment_type.lower()
+            if fm["equipment"].lower() == eq_type_lower:
+                score += 10
+                relevance_reasons.append("exact_equipment")
+            elif eq_type_lower in fm["equipment"].lower() or fm["equipment"].lower() in eq_type_lower:
+                score += 6
+                relevance_reasons.append("partial_equipment")
+            # Check equipment type IDs
+            if fm.get("equipment_type_ids"):
+                for type_id in fm["equipment_type_ids"]:
+                    if eq_type_lower in type_id or type_id in eq_type_lower:
+                        score += 5
+                        relevance_reasons.append("type_id_match")
+                        break
+        
+        # Keyword matching
+        for keyword in fm["keywords"]:
+            if keyword.lower() in text_lower:
+                score += 3
+                relevance_reasons.append(f"keyword:{keyword}")
+        
+        # Failure mode name matching (partial)
+        fm_words = fm["failure_mode"].lower().split()
+        for word in fm_words:
+            if len(word) >= 4 and word in text_lower:
+                score += 2
+                relevance_reasons.append(f"fm_word:{word}")
+        
+        # Category matching
+        if fm["category"].lower() in text_lower:
+            score += 2
+            relevance_reasons.append("category")
+        
+        # If we have any relevance, include it
+        if score > 0:
+            matches.append({
+                "score": score,
+                "failure_mode": fm,
+                "reasons": relevance_reasons
+            })
+    
+    # Sort by score, then RPN
+    matches.sort(key=lambda x: (-x["score"], -x["failure_mode"]["rpn"]))
+    
+    # Return top matches, but always return at least some if we have any
+    result = [m["failure_mode"] for m in matches[:limit]]
+    
+    # If we have very few matches, add some high-RPN generic ones
+    if len(result) < 3:
+        high_rpn = sorted(FAILURE_MODES_LIBRARY, key=lambda x: -x["rpn"])
+        for fm in high_rpn:
+            if fm not in result:
+                result.append(fm)
+                if len(result) >= 5:
+                    break
+    
+    return result
 
 def get_failure_modes_by_category(category: str) -> list:
     """Get all failure modes for a specific category."""

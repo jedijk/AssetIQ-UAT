@@ -19,7 +19,8 @@ import requests
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 from failure_modes import (
     FAILURE_MODES_LIBRARY, 
-    find_matching_failure_modes, 
+    find_matching_failure_modes,
+    find_failure_modes_flexible,
     get_failure_modes_by_category,
     get_all_categories,
     get_all_equipment_types
@@ -4281,17 +4282,22 @@ async def generate_maintenance_strategy(
             detail=f"Strategy already exists for {request.equipment_type_name}. Delete it first to regenerate."
         )
     
-    # Get failure modes for this equipment type
+    # Get failure modes for this equipment type - use flexible matching
     failure_modes = [
         fm for fm in FAILURE_MODES_LIBRARY 
         if fm.get("equipment", "").lower() == request.equipment_type_name.lower()
         or request.equipment_type_name.lower() in fm.get("equipment", "").lower()
+        or fm.get("equipment", "").lower() in request.equipment_type_name.lower()
         or (fm.get("equipment_type_ids") and request.equipment_type_id in fm.get("equipment_type_ids", []))
     ]
     
-    # If no specific failure modes, get general ones based on category
+    # If no specific failure modes found, try flexible matching
     if not failure_modes:
-        failure_modes = FAILURE_MODES_LIBRARY[:15]
+        failure_modes = find_failure_modes_flexible(
+            request.equipment_type_name, 
+            equipment_type=request.equipment_type_name,
+            limit=15
+        )
     
     # Generate strategy using AI
     api_key = os.environ.get("EMERGENT_LLM_KEY")
@@ -4367,16 +4373,22 @@ async def generate_all_maintenance_strategies(
             continue
         
         try:
-            # Get failure modes for this equipment type
+            # Get failure modes for this equipment type - use flexible matching
             failure_modes = [
                 fm for fm in FAILURE_MODES_LIBRARY 
                 if fm.get("equipment", "").lower() == eq_name.lower()
                 or eq_name.lower() in fm.get("equipment", "").lower()
+                or fm.get("equipment", "").lower() in eq_name.lower()
                 or (fm.get("equipment_type_ids") and eq_id in fm.get("equipment_type_ids", []))
             ]
             
+            # If no specific failure modes found, try flexible matching
             if not failure_modes:
-                failure_modes = FAILURE_MODES_LIBRARY[:10]
+                failure_modes = find_failure_modes_flexible(
+                    eq_name, 
+                    equipment_type=eq_name,
+                    limit=10
+                )
             
             strategy = await generator.generate_strategy(
                 equipment_type_id=eq_id,
