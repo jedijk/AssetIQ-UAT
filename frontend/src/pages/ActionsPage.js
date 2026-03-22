@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { actionsAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -56,6 +57,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
+import BackButton from "../components/BackButton";
 
 const statusConfig = {
   open: { label: "Open", color: "bg-blue-100 text-blue-700", icon: Clock },
@@ -78,6 +80,7 @@ const sourceConfig = {
 
 export default function ActionsPage() {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
@@ -250,6 +253,13 @@ export default function ActionsPage() {
 
   return (
     <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="actions-page">
+      {/* Back Button - shown when navigated from another page */}
+      {location.state?.from && (
+        <div className="mb-3">
+          <BackButton />
+        </div>
+      )}
+      
       {/* Compact Stats Row - matching ThreatsPage */}
       <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
         {statCards.map((stat) => (

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { equipmentHierarchyAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -17,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { ScrollArea } from "../components/ui/scroll-area";
+import BackButton from "../components/BackButton";
 
 const EQUIPMENT_ICONS = { droplets: Droplets, wind: Wind, cog: Cog, thermometer: Thermometer, box: Box, "circle-dot": CircleDot, zap: Zap, gauge: Gauge, cpu: Cpu, pipette: Pipette, flame: Flame };
 const ICON_OPTIONS = ["droplets", "wind", "cog", "thermometer", "box", "circle-dot", "zap", "gauge", "cpu", "pipette", "flame"];
@@ -413,6 +415,7 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
 
 export default function EquipmentManagerPage() {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
   const fileInputRef = useRef(null);
@@ -776,7 +779,15 @@ export default function EquipmentManagerPage() {
     : flatRows;
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-slate-50" data-testid="equipment-manager-page">
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50" data-testid="equipment-manager-page">
+      {/* Back Button - shown when navigated from another page */}
+      {location.state?.from && (
+        <div className="px-4 py-2 bg-white border-b border-slate-200">
+          <BackButton />
+        </div>
+      )}
+      
+      <div className="flex flex-1 overflow-hidden">
       {/* Main Panel - Hierarchy */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="p-4 border-b border-slate-200 bg-white flex items-center gap-3">
@@ -1020,6 +1031,7 @@ export default function EquipmentManagerPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

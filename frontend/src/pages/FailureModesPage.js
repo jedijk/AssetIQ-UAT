@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -47,6 +47,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { toast } from "sonner";
 import api, { equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
 import MaintenanceStrategiesPanel from "../components/MaintenanceStrategiesPanel";
+import BackButton from "../components/BackButton";
 
 const categoryIcons = {
   Rotating: Cog,
@@ -103,6 +104,7 @@ function EquipmentTypeItem({ item, onEdit, onDelete }) {
 
 const FailureModesPage = () => {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -408,6 +410,13 @@ const FailureModesPage = () => {
 
   return (
     <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="failure-modes-page">
+      {/* Back Button - shown when navigated from another page */}
+      {location.state?.from && (
+        <div className="mb-3">
+          <BackButton />
+        </div>
+      )}
+      
       {/* Main Tabs */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
         <TabsList className="grid w-full max-w-lg grid-cols-3">

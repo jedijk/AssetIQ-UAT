@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { threatsAPI, statsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { motion } from "framer-motion";
@@ -36,6 +36,7 @@ import {
 } from "../components/ui/select";
 import ThreatCard from "../components/ThreatCard";
 import RiskBadge from "../components/RiskBadge";
+import BackButton from "../components/BackButton";
 
 // Equipment type to icon mapping
 const getEquipmentIcon = (equipmentType, asset) => {
@@ -80,6 +81,7 @@ const getEquipmentIcon = (equipmentType, asset) => {
 
 const ThreatsPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState("all");
@@ -182,6 +184,13 @@ const ThreatsPage = () => {
 
   return (
     <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="threats-page">
+      {/* Back Button - shown when navigated from another page */}
+      {location.state?.from && (
+        <div className="mb-3">
+          <BackButton />
+        </div>
+      )}
+      
       {/* Compact Stats Row */}
       <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
         {statCards.map((stat, idx) => (

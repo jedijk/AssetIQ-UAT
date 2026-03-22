@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { investigationAPI, actionsAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -17,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
 import { CauseTree, CAUSE_CATEGORIES } from "../components/CauseNodeItem";
+import BackButton from "../components/BackButton";
 
 const EVENT_CATEGORIES = [
   { value: "operational_event", label: "Operational Event", bgClass: "bg-blue-100 text-blue-700", dotClass: "bg-blue-500" },
@@ -51,6 +53,7 @@ const INVESTIGATION_STATUSES = [
 
 export default function CausalEnginePage() {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
   
@@ -308,7 +311,15 @@ export default function CausalEnginePage() {
   ];
 
   return (
-    <div className="h-[calc(100vh-64px)] flex" data-testid="causal-engine-page">
+    <div className="h-[calc(100vh-64px)] flex flex-col" data-testid="causal-engine-page">
+      {/* Back Button - shown when navigated from another page */}
+      {location.state?.from && (
+        <div className="px-4 py-2 bg-white border-b border-slate-200">
+          <BackButton />
+        </div>
+      )}
+      
+      <div className="flex-1 flex overflow-hidden">
       {/* Sidebar - Investigation List */}
       <div className="w-80 flex-shrink-0 h-full flex flex-col bg-white border-r border-slate-200">
         <div className="p-4 border-b border-slate-200">
@@ -793,6 +804,7 @@ export default function CausalEnginePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

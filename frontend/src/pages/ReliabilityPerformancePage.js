@@ -610,27 +610,30 @@ export default function ReliabilityPerformancePage() {
     // If item is provided, filter by that specific asset
     const assetParam = item ? `?assets=${encodeURIComponent(item.node_id)}&assetName=${encodeURIComponent(item.node_name)}` : '';
     
+    // Navigation state to enable back button
+    const navState = { from: "reliability", fromPage: "Reliability Performance" };
+    
     switch (dimensionKey) {
       case "criticality":
         // Navigate to Equipment Manager to manage criticality
-        navigate("/equipment-manager");
+        navigate("/equipment-manager", { state: navState });
         break;
       case "incidents":
       case "threats":
         // Navigate to Threats page, optionally filtered by asset
-        navigate(`/threats${assetParam}`);
+        navigate(`/threats${assetParam}`, { state: navState });
         break;
       case "investigations":
         // Navigate to Causal Engine for investigations
-        navigate("/causal-engine");
+        navigate("/causal-engine", { state: navState });
         break;
       case "maintenance":
         // Navigate to Library with Maintenance tab
-        navigate("/library?tab=maintenance");
+        navigate("/library?tab=maintenance", { state: navState });
         break;
       case "reactions":
         // Navigate to Actions page
-        navigate("/actions");
+        navigate("/actions", { state: navState });
         break;
       default:
         break;
@@ -836,7 +839,7 @@ export default function ReliabilityPerformancePage() {
                 </div>
                 <div 
                   className="p-2 bg-amber-50 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors"
-                  onClick={() => navigate("/threats?status=open")}
+                  onClick={() => navigate("/threats?status=open", { state: { from: "reliability", fromPage: "Reliability Performance" } })}
                   role="button"
                 >
                   <p className="text-xs text-slate-500 flex items-center gap-1">
@@ -847,7 +850,7 @@ export default function ReliabilityPerformancePage() {
                 </div>
                 <div 
                   className="p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"
-                  onClick={() => navigate("/causal-engine")}
+                  onClick={() => navigate("/causal-engine", { state: { from: "reliability", fromPage: "Reliability Performance" } })}
                   role="button"
                 >
                   <p className="text-xs text-slate-500 flex items-center gap-1">
@@ -858,7 +861,7 @@ export default function ReliabilityPerformancePage() {
                 </div>
                 <div 
                   className="p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"
-                  onClick={() => navigate("/actions")}
+                  onClick={() => navigate("/actions", { state: { from: "reliability", fromPage: "Reliability Performance" } })}
                   role="button"
                 >
                   <p className="text-xs text-slate-500 flex items-center gap-1">
