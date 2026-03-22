@@ -639,19 +639,24 @@ const ThreatDetailPage = () => {
 
         {/* Score Calculation Popup */}
         {scoreCalcPopup.show && (() => {
-          // Calculate the actual values
-          const baseScore = threat.base_risk_score || threat.risk_score || 50;
+          // Calculate the actual values using NEW METHODOLOGY
+          // FMEA Score = (S × O × D) / 10
           const fmBaseScore = linkedFmData 
             ? Math.round((linkedFmData.severity * linkedFmData.occurrence * linkedFmData.detectability) / 10)
-            : null;
+            : (threat.fmea_score || threat.base_risk_score || 50);
           
-          const critMultiplier = linkedCriticalityData
-            ? (linkedCriticalityData.level === "safety_critical" ? 1.5 :
-               linkedCriticalityData.level === "production_critical" ? 1.4 :
-               linkedCriticalityData.level === "medium" ? 1.2 : 1.0)
-            : 1.0;
+          // Criticality Score = (Safety×25 + Production×20 + Environmental×15 + Reputation×10) / 3.5
+          const criticalityScore = linkedCriticalityData
+            ? Math.round((
+                (linkedCriticalityData.safety_impact || 0) * 25 +
+                (linkedCriticalityData.production_impact || 0) * 20 +
+                (linkedCriticalityData.environmental_impact || 0) * 15 +
+                (linkedCriticalityData.reputation_impact || 0) * 10
+              ) / 3.5)
+            : (threat.criticality_score || 0);
           
-          const calculatedScore = Math.min(100, Math.round((fmBaseScore || baseScore) * critMultiplier));
+          // Final Score = (Criticality Score + FMEA Score) / 2
+          const calculatedScore = Math.round((criticalityScore + fmBaseScore) / 2);
           
           return (
             <div 
@@ -676,29 +681,20 @@ const ThreatDetailPage = () => {
                 </button>
               </div>
 
-              {/* Exact Calculation Box */}
+              {/* Exact Calculation Box - NEW METHODOLOGY */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 mb-4 border border-blue-100">
                 <div className="text-xs text-blue-600 font-medium mb-2">{t("threats.exactCalculation")}</div>
                 <div className="font-mono text-lg text-slate-800 text-center py-2">
-                  {linkedFmData ? (
-                    <>
-                      <span className="text-red-600">{linkedFmData.severity}</span>
-                      <span className="text-slate-400 mx-1">×</span>
-                      <span className="text-amber-600">{linkedFmData.occurrence}</span>
-                      <span className="text-slate-400 mx-1">×</span>
-                      <span className="text-blue-600">{linkedFmData.detectability}</span>
-                      <span className="text-slate-400 mx-1">÷</span>
-                      <span className="text-slate-500">10</span>
-                      <span className="text-slate-400 mx-1">×</span>
-                      <span className="text-purple-600">{critMultiplier}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-slate-600">{baseScore}</span>
-                      <span className="text-slate-400 mx-1">×</span>
-                      <span className="text-purple-600">{critMultiplier}</span>
-                    </>
-                  )}
+                  <span className="text-slate-500">(</span>
+                  <span className="text-purple-600">{criticalityScore}</span>
+                  <span className="text-slate-400 mx-1">+</span>
+                  <span className="text-blue-600">{fmBaseScore}</span>
+                  <span className="text-slate-500">)</span>
+                  <span className="text-slate-400 mx-1">÷</span>
+                  <span className="text-slate-500">2</span>
+                </div>
+                <div className="text-center text-[10px] text-slate-500 mt-1">
+                  ({t("threats.criticalityScoreLabel")} + {t("threats.fmeaScoreLabel")}) ÷ 2
                 </div>
                 <div className="text-center mt-2 pt-2 border-t border-blue-200">
                   <span className="text-slate-500 text-sm">=</span>
@@ -750,13 +746,13 @@ const ThreatDetailPage = () => {
                         </div>
                       </div>
                       <div className="text-xs text-slate-600 bg-white rounded px-2 py-1.5 font-mono">
-                        ({linkedFmData.severity} × {linkedFmData.occurrence} × {linkedFmData.detectability}) ÷ 10 = <span className="font-bold text-slate-800">{fmBaseScore}</span>
+                        ({linkedFmData.severity} × {linkedFmData.occurrence} × {linkedFmData.detectability}) ÷ 10 = <span className="font-bold text-blue-600">{fmBaseScore}</span>
                       </div>
                       <div className="text-[10px] text-slate-400 mt-1">{t("threats.linkedTo")}: {threat.failure_mode}</div>
                     </>
                   ) : (
                     <div className="text-sm text-slate-400 italic bg-white rounded px-3 py-2">
-                      {t("threats.noFmeaLinked")} — {t("threats.usingDefaultScore")}: <span className="font-bold text-slate-600">{baseScore}</span>
+                      {t("threats.noFmeaLinked")} — {t("threats.fmeaScoreLabel")}: <span className="font-bold text-slate-600">{fmBaseScore}</span>
                     </div>
                   )}
                 </div>
@@ -792,9 +788,9 @@ const ThreatDetailPage = () => {
                         </div>
                       </div>
                       <div className="flex items-center justify-between bg-white rounded px-2 py-1.5">
-                        <span className="text-xs text-slate-500">{t("threats.criticalityMultiplier")}:</span>
+                        <span className="text-xs text-slate-500">{t("threats.criticalityScoreLabel")}:</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-purple-600">×{critMultiplier}</span>
+                          <span className="text-lg font-bold text-purple-600">{criticalityScore}</span>
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                             linkedCriticalityData.level === "safety_critical" ? "bg-red-100 text-red-700" :
                             linkedCriticalityData.level === "production_critical" ? "bg-orange-100 text-orange-700" :
@@ -804,11 +800,14 @@ const ThreatDetailPage = () => {
                           </span>
                         </div>
                       </div>
+                      <div className="text-xs text-slate-600 bg-white rounded px-2 py-1.5 font-mono mt-2">
+                        ({linkedCriticalityData.safety_impact || 0}×25 + {linkedCriticalityData.production_impact || 0}×20 + {linkedCriticalityData.environmental_impact || 0}×15 + {linkedCriticalityData.reputation_impact || 0}×10) ÷ 3.5 = <span className="font-bold text-purple-600">{criticalityScore}</span>
+                      </div>
                       <div className="text-[10px] text-slate-400 mt-1">{t("threats.linkedTo")}: {threat.asset}</div>
                     </>
                   ) : (
                     <div className="text-sm text-slate-400 italic bg-white rounded px-3 py-2">
-                      {t("threats.noCriticalityLinked")} — {t("threats.multiplier")}: <span className="font-bold text-slate-600">×1.0</span>
+                      {t("threats.noCriticalityLinked")} — {t("threats.criticalityScoreLabel")}: <span className="font-bold text-slate-600">0</span>
                     </div>
                   )}
                 </div>
@@ -820,10 +819,12 @@ const ThreatDetailPage = () => {
                     <span className="text-xs font-medium text-slate-700">{t("threats.finalCalculation")}</span>
                   </div>
                   <div className="bg-white rounded px-3 py-2 font-mono text-sm">
-                    <span className="text-slate-600">{fmBaseScore || baseScore}</span>
-                    <span className="text-slate-400 mx-1">×</span>
-                    <span className="text-purple-600">{critMultiplier}</span>
-                    <span className="text-slate-400 mx-1">=</span>
+                    <span className="text-slate-500">(</span>
+                    <span className="text-purple-600">{criticalityScore}</span>
+                    <span className="text-slate-400 mx-1">+</span>
+                    <span className="text-blue-600">{fmBaseScore}</span>
+                    <span className="text-slate-500">)</span>
+                    <span className="text-slate-400 mx-1">÷ 2 =</span>
                     <span className={`font-bold ${
                       threat.risk_level === "Critical" ? "text-red-600" :
                       threat.risk_level === "High" ? "text-orange-600" :

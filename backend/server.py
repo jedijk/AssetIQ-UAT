@@ -168,6 +168,8 @@ class ThreatResponse(BaseModel):
     detectability: str
     risk_level: str
     risk_score: int
+    fmea_score: Optional[int] = None
+    criticality_score: Optional[int] = None
     base_risk_score: Optional[int] = None
     rank: int
     total_threats: int
@@ -777,33 +779,41 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
     if not threats:
         return 0
     
-    # Calculate new base risk score from FMEA: (S × O × D) / 10
-    new_base_score = min(100, int((new_severity * new_occurrence * new_detectability) / 10))
-    
-    CRITICALITY_MULTIPLIERS = {
-        "safety_critical": 1.5,
-        "production_critical": 1.4,
-        "medium": 1.2,
-        "low": 1.0
-    }
+    # Calculate new FMEA score from RPN: (S × O × D) / 10
+    new_fmea_score = min(100, int((new_severity * new_occurrence * new_detectability) / 10))
     
     updated_count = 0
     users_updated = set()
     
     for threat in threats:
-        # Get criticality multiplier
-        criticality_level = threat.get("equipment_criticality", "low")
-        multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
+        # Get criticality score from threat or calculate from criticality data
+        criticality_score = threat.get("criticality_score", 0)
+        criticality_data = threat.get("equipment_criticality_data")
         
-        # Calculate adjusted score
-        adjusted_risk_score = min(100, int(new_base_score * multiplier))
+        if criticality_data and criticality_score == 0:
+            safety_impact = criticality_data.get("safety_impact", 0) or 0
+            production_impact = criticality_data.get("production_impact", 0) or 0
+            environmental_impact = criticality_data.get("environmental_impact", 0) or 0
+            reputation_impact = criticality_data.get("reputation_impact", 0) or 0
+            
+            criticality_score = (
+                (safety_impact * 25) + 
+                (production_impact * 20) + 
+                (environmental_impact * 15) + 
+                (reputation_impact * 10)
+            ) / 3.5
+            criticality_score = min(100, int(criticality_score))
+        
+        # NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
+        final_risk_score = int((criticality_score + new_fmea_score) / 2)
+        final_risk_score = min(100, max(0, final_risk_score))
         
         # Determine risk level
-        if adjusted_risk_score >= 70:
+        if final_risk_score >= 70:
             risk_level = "Critical"
-        elif adjusted_risk_score >= 50:
+        elif final_risk_score >= 50:
             risk_level = "High"
-        elif adjusted_risk_score >= 30:
+        elif final_risk_score >= 30:
             risk_level = "Medium"
         else:
             risk_level = "Low"
@@ -812,8 +822,10 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
         await db.threats.update_one(
             {"id": threat["id"]},
             {"$set": {
-                "risk_score": adjusted_risk_score,
-                "base_risk_score": new_base_score,
+                "risk_score": final_risk_score,
+                "fmea_score": new_fmea_score,
+                "criticality_score": criticality_score,
+                "base_risk_score": new_fmea_score,
                 "risk_level": risk_level
             }}
         )
@@ -1042,19 +1054,29 @@ async def send_chat_message(
     equipment_criticality = hierarchy_node.get("criticality", {}) if hierarchy_node else {}
     criticality_level = equipment_criticality.get("level") if equipment_criticality else None
     
-    # Criticality multipliers for risk score adjustment
-    CRITICALITY_MULTIPLIERS = {
-        "safety_critical": 1.5,      # 50% increase
-        "production_critical": 1.3,  # 30% increase
-        "medium": 1.1,               # 10% increase
-        "low": 1.0                   # No adjustment
-    }
+    # Calculate 4-Dimension Criticality Score using weighted formula
+    # Formula: (Safety×25 + Production×20 + Environmental×15 + Reputation×10) / 3.5
+    # Max = (5×25 + 5×20 + 5×15 + 5×10) / 3.5 = 350 / 3.5 = 100
+    safety_impact = equipment_criticality.get("safety_impact", 0) or 0
+    production_impact = equipment_criticality.get("production_impact", 0) or 0
+    environmental_impact = equipment_criticality.get("environmental_impact", 0) or 0
+    reputation_impact = equipment_criticality.get("reputation_impact", 0) or 0
+    
+    criticality_score = (
+        (safety_impact * 25) + 
+        (production_impact * 20) + 
+        (environmental_impact * 15) + 
+        (reputation_impact * 10)
+    ) / 3.5
+    criticality_score = min(100, int(criticality_score))  # Normalize to 0-100
     
     rank, total = await calculate_rank(threat_data.get("risk_score", 50), current_user["id"])
     
     threat_id = str(uuid.uuid4())
-    risk_score_raw = threat_data.get("risk_score", 50)
-    base_risk_score = int(risk_score_raw) if isinstance(risk_score_raw, (int, float)) else 50
+    
+    # Default FMEA score from AI estimation
+    fmea_score = threat_data.get("risk_score", 50)
+    fmea_score = int(fmea_score) if isinstance(fmea_score, (int, float)) else 50
     
     # ============= FAILURE MODE MATCHING =============
     # Extract failure mode from AI response and match against FMEA library
@@ -1139,24 +1161,24 @@ async def send_chat_message(
             # Use matched failure mode name for consistency
             failure_mode_name = matched_failure_mode["failure_mode"]
             
-            # Recalculate base risk score using FMEA RPN if matched
-            # RPN is on scale 0-1000, normalize to 0-100
-            fmea_rpn = matched_failure_mode["rpn"]
-            base_risk_score = min(100, int(fmea_rpn / 10))
+            # Calculate FMEA score from RPN (Severity × Occurrence × Detectability) / 10
+            # RPN is already S×O×D, so divide by 10 to normalize to 0-100
+            fmea_score = min(100, int(matched_failure_mode["rpn"] / 10))
     
-    # Adjust risk score based on equipment criticality
-    criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
-    adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
+    # NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
+    # This averages the equipment criticality contribution with the failure mode severity
+    final_risk_score = int((criticality_score + fmea_score) / 2)
+    final_risk_score = min(100, max(0, final_risk_score))  # Clamp to 0-100
     
-    # Determine risk level based on adjusted score
-    if adjusted_risk_score >= 70:
-        adjusted_risk_level = "Critical"
-    elif adjusted_risk_score >= 50:
-        adjusted_risk_level = "High"
-    elif adjusted_risk_score >= 30:
-        adjusted_risk_level = "Medium"
+    # Determine risk level based on final score
+    if final_risk_score >= 70:
+        risk_level = "Critical"
+    elif final_risk_score >= 50:
+        risk_level = "High"
+    elif final_risk_score >= 30:
+        risk_level = "Medium"
     else:
-        adjusted_risk_level = "Low"
+        risk_level = "Low"
     
     threat_doc = {
         "id": threat_id,
@@ -1166,24 +1188,26 @@ async def send_chat_message(
         "equipment_type": threat_data.get("equipment_type", "Unknown"),
         "equipment_criticality": criticality_level,  # Store equipment criticality
         "equipment_criticality_data": {
-            "safety_impact": equipment_criticality.get("safety_impact", 0),
-            "production_impact": equipment_criticality.get("production_impact", 0),
-            "environmental_impact": equipment_criticality.get("environmental_impact", 0),
-            "reputation_impact": equipment_criticality.get("reputation_impact", 0),
+            "safety_impact": safety_impact,
+            "production_impact": production_impact,
+            "environmental_impact": environmental_impact,
+            "reputation_impact": reputation_impact,
             "level": criticality_level,
-            "multiplier": criticality_multiplier
+            "criticality_score": criticality_score  # Store calculated criticality score
         } if equipment_criticality else None,
         "failure_mode": failure_mode_name,  # Use matched failure mode name
         "failure_mode_id": failure_mode_id,  # Link to FMEA library
         "failure_mode_data": failure_mode_data,  # Store FMEA data snapshot
+        "fmea_score": fmea_score,  # Store FMEA score component
+        "criticality_score": criticality_score,  # Store criticality score component
         "cause": threat_data.get("cause"),
         "impact": threat_data.get("impact", "Equipment Damage"),
         "frequency": threat_data.get("frequency", "First Time"),
         "likelihood": threat_data.get("likelihood", "Medium"),
         "detectability": threat_data.get("detectability", "Moderate"),
-        "risk_level": adjusted_risk_level,  # Use adjusted risk level
-        "risk_score": adjusted_risk_score,  # Use adjusted risk score
-        "base_risk_score": base_risk_score,  # Store original score for reference
+        "risk_level": risk_level,  # Use calculated risk level
+        "risk_score": final_risk_score,  # Use averaged risk score
+        "base_risk_score": fmea_score,  # Store FMEA score for reference
         "rank": rank,
         "total_threats": total,
         "status": "Open",
@@ -1295,7 +1319,7 @@ async def recalculate_all_threat_scores(
 ):
     """
     Recalculate risk scores for all threats based on current criticality and FMEA data.
-    This performs a full resync of all threat scores.
+    Uses NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
     """
     # Get all threats for this user
     threats = await db.threats.find({"created_by": current_user["id"]}).to_list(1000)
@@ -1322,27 +1346,19 @@ async def recalculate_all_threat_scores(
     
     logger.info(f"Found {len(asset_data)} equipment nodes for matching")
     
-    CRITICALITY_MULTIPLIERS = {
-        "safety_critical": 1.5,
-        "production_critical": 1.4,
-        "medium": 1.2,
-        "low": 1.0
-    }
-    
     updated_count = 0
     linked_count = 0
     
     for threat in threats:
-        # Get base score from FMEA if failure mode is linked
+        # Get FMEA score from linked failure mode
         failure_mode_name = threat.get("failure_mode")
-        base_risk_score = threat.get("base_risk_score", threat.get("risk_score", 50))
+        fmea_score = threat.get("fmea_score", threat.get("base_risk_score", 50))
         
         if failure_mode_name and failure_mode_name != "Unknown":
             for fm in FAILURE_MODES_LIBRARY:
                 if fm["failure_mode"].lower() == failure_mode_name.lower():
-                    # Calculate RPN-based score
-                    rpn_score = (fm["severity"] * fm["occurrence"] * fm["detectability"]) / 10
-                    base_risk_score = min(100, int(rpn_score))
+                    # Calculate FMEA score from RPN
+                    fmea_score = min(100, int(fm["rpn"] / 10))
                     break
         
         # Get criticality data from asset (case-insensitive match)
@@ -1351,7 +1367,7 @@ async def recalculate_all_threat_scores(
         
         linked_equipment_id = threat.get("linked_equipment_id")  # Preserve existing link
         criticality_level = "low"
-        criticality_multiplier = 1.0
+        criticality_score = 0
         criticality_data = None
         
         # Look up equipment by name
@@ -1362,33 +1378,50 @@ async def recalculate_all_threat_scores(
             crit = node_info.get("criticality")
             if crit:
                 criticality_level = crit.get("level", "low")
-                criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
+                
+                # Calculate 4-Dimension Criticality Score
+                safety_impact = crit.get("safety_impact", 0) or 0
+                production_impact = crit.get("production_impact", 0) or 0
+                environmental_impact = crit.get("environmental_impact", 0) or 0
+                reputation_impact = crit.get("reputation_impact", 0) or 0
+                
+                criticality_score = (
+                    (safety_impact * 25) + 
+                    (production_impact * 20) + 
+                    (environmental_impact * 15) + 
+                    (reputation_impact * 10)
+                ) / 3.5
+                criticality_score = min(100, int(criticality_score))
+                
                 criticality_data = {
-                    "safety_impact": crit.get("safety_impact", 0),
-                    "production_impact": crit.get("production_impact", 0),
-                    "environmental_impact": crit.get("environmental_impact", 0),
-                    "reputation_impact": crit.get("reputation_impact", 0),
+                    "safety_impact": safety_impact,
+                    "production_impact": production_impact,
+                    "environmental_impact": environmental_impact,
+                    "reputation_impact": reputation_impact,
                     "level": criticality_level,
-                    "multiplier": criticality_multiplier
+                    "criticality_score": criticality_score
                 }
         
-        # Calculate adjusted score
-        adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
+        # NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
+        final_risk_score = int((criticality_score + fmea_score) / 2)
+        final_risk_score = min(100, max(0, final_risk_score))
         
         # Determine risk level
-        if adjusted_risk_score >= 70:
+        if final_risk_score >= 70:
             risk_level = "Critical"
-        elif adjusted_risk_score >= 50:
+        elif final_risk_score >= 50:
             risk_level = "High"
-        elif adjusted_risk_score >= 30:
+        elif final_risk_score >= 30:
             risk_level = "Medium"
         else:
             risk_level = "Low"
         
         # Update threat with full criticality data
         update_fields = {
-            "risk_score": adjusted_risk_score,
-            "base_risk_score": base_risk_score,
+            "risk_score": final_risk_score,
+            "fmea_score": fmea_score,
+            "criticality_score": criticality_score,
+            "base_risk_score": fmea_score,
             "risk_level": risk_level,
             "equipment_criticality": criticality_level
         }
@@ -1516,52 +1549,52 @@ async def link_threat_to_equipment(
     # Get criticality data from the node
     criticality = node.get("criticality")
     
-    # Calculate multiplier from 4-dimension criticality
-    CRITICALITY_MULTIPLIERS = {
-        "safety_critical": 1.5,
-        "production_critical": 1.4,
-        "medium": 1.2,
-        "low": 1.0
+    # Calculate 4-Dimension Criticality Score using weighted formula
+    # Formula: (Safety×25 + Production×20 + Environmental×15 + Reputation×10) / 3.5
+    safety_impact = criticality.get("safety_impact", 0) or 0 if criticality else 0
+    production_impact = criticality.get("production_impact", 0) or 0 if criticality else 0
+    environmental_impact = criticality.get("environmental_impact", 0) or 0 if criticality else 0
+    reputation_impact = criticality.get("reputation_impact", 0) or 0 if criticality else 0
+    
+    criticality_score = (
+        (safety_impact * 25) + 
+        (production_impact * 20) + 
+        (environmental_impact * 15) + 
+        (reputation_impact * 10)
+    ) / 3.5
+    criticality_score = min(100, int(criticality_score))
+    
+    criticality_level = criticality.get("level", "low") if criticality else "low"
+    criticality_data = {
+        "safety_impact": safety_impact,
+        "production_impact": production_impact,
+        "environmental_impact": environmental_impact,
+        "reputation_impact": reputation_impact,
+        "level": criticality_level,
+        "criticality_score": criticality_score
     }
     
-    criticality_level = "low"
-    criticality_multiplier = 1.0
-    criticality_data = None
+    # Get FMEA score (from linked failure mode or stored score)
+    fmea_score = threat.get("fmea_score", threat.get("base_risk_score", 50))
     
-    if criticality:
-        criticality_level = criticality.get("level", "low")
-        criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
-        criticality_data = {
-            "safety_impact": criticality.get("safety_impact", 0),
-            "production_impact": criticality.get("production_impact", 0),
-            "environmental_impact": criticality.get("environmental_impact", 0),
-            "reputation_impact": criticality.get("reputation_impact", 0),
-            "level": criticality_level,
-            "multiplier": criticality_multiplier
-        }
-    
-    # Get base risk score (from FMEA if linked, otherwise current score)
-    base_risk_score = threat.get("base_risk_score", threat.get("risk_score", 50))
-    
-    # Check if threat has linked failure mode
+    # Check if threat has linked failure mode - recalculate FMEA score
     failure_mode_name = threat.get("failure_mode")
     if failure_mode_name and failure_mode_name != "Unknown":
         for fm in FAILURE_MODES_LIBRARY:
             if fm["failure_mode"].lower() == failure_mode_name.lower():
-                # Calculate RPN-based score
-                rpn_score = (fm["severity"] * fm["occurrence"] * fm["detectability"]) / 10
-                base_risk_score = min(100, int(rpn_score))
+                fmea_score = min(100, int(fm["rpn"] / 10))
                 break
     
-    # Calculate adjusted score
-    adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
+    # NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
+    final_risk_score = int((criticality_score + fmea_score) / 2)
+    final_risk_score = min(100, max(0, final_risk_score))
     
     # Determine risk level
-    if adjusted_risk_score >= 70:
+    if final_risk_score >= 70:
         risk_level = "Critical"
-    elif adjusted_risk_score >= 50:
+    elif final_risk_score >= 50:
         risk_level = "High"
-    elif adjusted_risk_score >= 30:
+    elif final_risk_score >= 30:
         risk_level = "Medium"
     else:
         risk_level = "Low"
@@ -1572,8 +1605,10 @@ async def link_threat_to_equipment(
         "linked_equipment_id": equipment_node_id,
         "equipment_criticality": criticality_level,
         "equipment_criticality_data": criticality_data,
-        "base_risk_score": base_risk_score,
-        "risk_score": adjusted_risk_score,
+        "criticality_score": criticality_score,
+        "fmea_score": fmea_score,
+        "base_risk_score": fmea_score,
+        "risk_score": final_risk_score,
         "risk_level": risk_level,
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
@@ -1589,10 +1624,10 @@ async def link_threat_to_equipment(
         "message": f"Threat linked to {node['name']}",
         "threat": updated_threat,
         "score_calculation": {
-            "base_score": base_risk_score,
-            "criticality_multiplier": criticality_multiplier,
-            "criticality_level": criticality_level,
-            "final_score": adjusted_risk_score,
+            "criticality_score": criticality_score,
+            "fmea_score": fmea_score,
+            "formula": "(Criticality + FMEA) / 2",
+            "final_score": final_risk_score,
             "risk_level": risk_level
         }
     }
@@ -1634,29 +1669,38 @@ async def link_threat_to_failure_mode(
         "recommended_actions": matched_fm.get("recommended_actions", [])
     }
     
-    # Calculate base risk score from RPN
-    base_risk_score = min(100, int(matched_fm["rpn"] / 10))
+    # Calculate FMEA score from RPN
+    fmea_score = min(100, int(matched_fm["rpn"] / 10))
     
-    # Get equipment criticality multiplier
-    CRITICALITY_MULTIPLIERS = {
-        "safety_critical": 1.5,
-        "production_critical": 1.4,
-        "medium": 1.2,
-        "low": 1.0
-    }
+    # Get criticality score from threat (or calculate from stored criticality data)
+    criticality_score = threat.get("criticality_score", 0)
+    criticality_data = threat.get("equipment_criticality_data")
     
-    criticality_level = threat.get("equipment_criticality", "low")
-    criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
+    if criticality_data and criticality_score == 0:
+        # Recalculate from stored data
+        safety_impact = criticality_data.get("safety_impact", 0) or 0
+        production_impact = criticality_data.get("production_impact", 0) or 0
+        environmental_impact = criticality_data.get("environmental_impact", 0) or 0
+        reputation_impact = criticality_data.get("reputation_impact", 0) or 0
+        
+        criticality_score = (
+            (safety_impact * 25) + 
+            (production_impact * 20) + 
+            (environmental_impact * 15) + 
+            (reputation_impact * 10)
+        ) / 3.5
+        criticality_score = min(100, int(criticality_score))
     
-    # Calculate adjusted score
-    adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
+    # NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
+    final_risk_score = int((criticality_score + fmea_score) / 2)
+    final_risk_score = min(100, max(0, final_risk_score))
     
     # Determine risk level
-    if adjusted_risk_score >= 70:
+    if final_risk_score >= 70:
         risk_level = "Critical"
-    elif adjusted_risk_score >= 50:
+    elif final_risk_score >= 50:
         risk_level = "High"
-    elif adjusted_risk_score >= 30:
+    elif final_risk_score >= 30:
         risk_level = "Medium"
     else:
         risk_level = "Low"
@@ -1666,8 +1710,10 @@ async def link_threat_to_failure_mode(
         "failure_mode": matched_fm["failure_mode"],
         "failure_mode_id": matched_fm["id"],
         "failure_mode_data": failure_mode_data,
-        "base_risk_score": base_risk_score,
-        "risk_score": adjusted_risk_score,
+        "fmea_score": fmea_score,
+        "criticality_score": criticality_score,
+        "base_risk_score": fmea_score,
+        "risk_score": final_risk_score,
         "risk_level": risk_level,
         "recommended_actions": matched_fm.get("recommended_actions", threat.get("recommended_actions", [])),
         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -1684,11 +1730,10 @@ async def link_threat_to_failure_mode(
         "message": f"Threat linked to failure mode: {matched_fm['failure_mode']}",
         "threat": updated_threat,
         "score_calculation": {
-            "fmea_rpn": matched_fm["rpn"],
-            "base_score": base_risk_score,
-            "criticality_multiplier": criticality_multiplier,
-            "criticality_level": criticality_level,
-            "final_score": adjusted_risk_score,
+            "fmea_score": fmea_score,
+            "criticality_score": criticality_score,
+            "formula": "(Criticality + FMEA) / 2",
+            "final_score": final_risk_score,
             "risk_level": risk_level
         }
     }

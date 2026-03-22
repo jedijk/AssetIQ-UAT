@@ -6,33 +6,36 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 22, 2026)
+- **NEW Risk Score Methodology** (Mar 22, 2026):
+  - Changed formula from multiplier-based to averaging: **Risk Score = (Criticality Score + FMEA Score) / 2**
+  - Criticality Score = (Safety×25 + Production×20 + Environmental×15 + Reputation×10) / 3.5 (0-100)
+  - FMEA Score = (Severity × Occurrence × Detectability) / 10 (0-100)
+  - Updated all backend endpoints: link-equipment, link-failure-mode, recalculate-scores
+  - Updated frontend Score Calculation popup to display the new formula
+  - Updated Risk Methodology Info Dialog with new documentation
+  - Full EN/NL translations for all new labels
 - **Better Failure Mode Linking during Threat Creation** (Mar 22, 2026):
-  - Updated AI system prompt to explicitly extract failure mode names from chat text (e.g., "overheating", "seal leak")
-  - Implemented multi-priority fuzzy matching against the FMEA library (exact → contains → keyword → word overlap)
-  - Auto-assigns `failure_mode_id` and `failure_mode_data` to new threats when matches are found
-  - Added new API endpoint: `POST /api/threats/{threat_id}/link-failure-mode` for manual relinking
+  - Updated AI system prompt to explicitly extract failure mode names from chat text
+  - Implemented multi-priority fuzzy matching against the FMEA library
+  - Auto-assigns `failure_mode_id` and `failure_mode_data` to new threats
+  - Added new API endpoint: `POST /api/threats/{threat_id}/link-failure-mode`
   - Added "Link Failure Mode" dialog in Threat Detail page with searchable FMEA list
-  - Risk Score Calculation now uses FMEA RPN values when a failure mode is linked
-  - Full EN/NL translations for all new UI elements
-  - ThreatResponse model extended with `failure_mode_id`, `failure_mode_data`, `base_risk_score`, `linked_equipment_id`
-- **4-Dimension Criticality System** (Mar 22, 2026): Changed from single-tier criticality to 4 dimensions:
-  - Safety Impact (1-5)
-  - Production Impact (1-5)
-  - Environmental Impact (1-5)
-  - Reputation Impact (1-5)
-  - Overall Criticality calculated as max of all dimensions
-  - Full EN/NL translation support for all criticality labels
+- **4-Dimension Criticality System** (Mar 22, 2026): Safety, Production, Environmental, Reputation impacts
 - Added Reliability Performance Dashboard with snowflake/radar chart visualization
 - Implemented deep linking from dashboard numbers to related app sections
-- Added Back button navigation for improved UX
-- Removed Overall System Health banner from Operational Dashboard
-- Added collapsible maintenance strategy cards
-- **Codebase cleanup initiated**: Created modular route structure and extracted reusable components
-- **Added Grinder Equipment Type** (ISO class 1.5.1, Mechanical discipline)
-- **Added 15 Grinder Failure Modes** (IDs 201-215) including:
-  - Grinding Wheel Wear/Breakage, Spindle issues, Motor Overload
-  - Thermal Damage, Surface Finish Deviation, Dimensional Inaccuracy
-  - Wheel Glazing, Workholding Failure, Guard Interlock Failure, etc.
+
+### Risk Score Calculation (Current Methodology)
+```
+Criticality Score = (Safety×25 + Production×20 + Environmental×15 + Reputation×10) / 3.5
+FMEA Score = (Severity × Occurrence × Detectability) / 10
+Final Risk Score = (Criticality Score + FMEA Score) / 2
+
+Risk Levels:
+- Critical: ≥70
+- High: 50-69
+- Medium: 30-49
+- Low: <30
+```
 
 ### Codebase Architecture (Dec 2025 Cleanup)
 
