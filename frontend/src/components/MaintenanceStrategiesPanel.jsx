@@ -1221,6 +1221,7 @@ export default function MaintenanceStrategiesPanel() {
                   onUpdate={handleUpdate}
                   isDeleting={deleteMutation.isPending}
                   isUpdating={updateMutation.isPending}
+                  onFailureModeClick={handleFailureModeClick}
                 />
               ))}
             </div>

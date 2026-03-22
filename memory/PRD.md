@@ -410,6 +410,20 @@ Added Reliability Performance Dashboard with snowflake/radar chart visualization
   - All pages now support seamless EN/NL language toggle
 
 
+#### Dec 2025 - FMEA Linkage Bug Fix
+- [x] **Fixed Missing FMEA Linkages in Maintenance Strategies** (Dec 2025):
+  - Bug: Clickable FMEA failure mode badges were not visible in Maintenance Strategy cards
+  - Root cause: `onFailureModeClick` handler was not being passed to `StrategyCard` component in the strategies mapping loop
+  - Fix: Added `onFailureModeClick={handleFailureModeClick}` prop to `StrategyCard` in `MaintenanceStrategiesPanel.jsx` (line 1220)
+  - The FMEA linkages now properly display as amber-colored clickable badges showing:
+    - "Checks for:" (Operator Rounds - from checklist failure_modes_addressed)
+    - "Detects:" (Detection Systems - from failure_modes_detected)
+    - "Prevents:" (Scheduled Maintenance - from failure_modes_addressed)
+    - "Addresses:" (Corrective Actions - from failure_modes)
+  - Clicking a badge navigates to Library → Failure Modes with pre-filled search
+  - Toast notification confirms the navigation action
+  - File updated: `/app/frontend/src/components/MaintenanceStrategiesPanel.jsx`
+
 #### Dec 2025 - Reliability Performance Dashboard
 - [x] **Reliability Snowflake Dashboard** (Dec 2025):
   - Created `ReliabilitySnowflake.jsx` component with SVG radar/snowflake chart
