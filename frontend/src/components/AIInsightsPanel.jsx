@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { aiRiskAPI, actionsAPI } from "../lib/api";
+import { useNavigate } from "react-router-dom";
+import { aiRiskAPI, actionsAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,6 +23,8 @@ import {
   HelpCircle,
   Plus,
   Check,
+  AlertCircle,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
@@ -151,6 +154,7 @@ const ForecastChart = ({ forecasts, t }) => {
 
 export default function AIInsightsPanel({ threatId, threatData, compact = false }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(!compact);
   const [addedRecommendations, setAddedRecommendations] = useState(new Set());
@@ -162,6 +166,38 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Fetch equipment types to check if threat's equipment type exists
+  const { data: equipmentTypesData } = useQuery({
+    queryKey: ["equipment-types"],
+    queryFn: equipmentHierarchyAPI.getEquipmentTypes,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch failure modes to check if threat's failure mode exists
+  const { data: failureModesData } = useQuery({
+    queryKey: ["failure-modes-all"],
+    queryFn: () => failureModesAPI.getAll({}),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Check if equipment type exists in library
+  const equipmentTypes = equipmentTypesData?.equipment_types || [];
+  const equipmentTypeExists = threatData?.equipment_type 
+    ? equipmentTypes.some(et => 
+        et.name.toLowerCase() === threatData.equipment_type.toLowerCase()
+      )
+    : true; // If no equipment type specified, don't show warning
+
+  // Check if failure mode exists in library
+  const failureModes = failureModesData?.failure_modes || [];
+  const failureModeExists = threatData?.failure_mode
+    ? failureModes.some(fm => 
+        fm.failure_mode.toLowerCase() === threatData.failure_mode.toLowerCase()
+      )
+    : true; // If no failure mode specified, don't show warning
+
+  const hasMissingLibraryData = !equipmentTypeExists || !failureModeExists;
   
   // Mutation to analyze risk
   const analyzeMutation = useMutation({
@@ -318,6 +354,51 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
             className="border-t border-indigo-100"
           >
             <div className="p-4 space-y-4">
+              {/* Missing Library Data Warning */}
+              {hasMissingLibraryData && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3" data-testid="missing-library-warning">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h5 className="text-sm font-medium text-amber-800 mb-1">
+                        {t("ai.missingLibraryData") || "Missing Library Data"}
+                      </h5>
+                      <p className="text-xs text-amber-700 mb-2">
+                        {t("ai.missingLibraryDataDesc") || "The following items are not in your library. Add them for better AI analysis accuracy:"}
+                      </p>
+                      <ul className="space-y-1 mb-3">
+                        {!equipmentTypeExists && (
+                          <li className="text-xs text-amber-700 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            <span>
+                              <strong>{t("common.equipmentType") || "Equipment Type"}:</strong> "{threatData?.equipment_type}"
+                            </span>
+                          </li>
+                        )}
+                        {!failureModeExists && (
+                          <li className="text-xs text-amber-700 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            <span>
+                              <strong>{t("common.failureMode") || "Failure Mode"}:</strong> "{threatData?.failure_mode}"
+                            </span>
+                          </li>
+                        )}
+                      </ul>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate("/library")}
+                        className="bg-white text-amber-700 border-amber-300 hover:bg-amber-100 hover:text-amber-800"
+                        data-testid="go-to-library-btn"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                        {t("ai.goToLibrary") || "Go to Library"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Key Metrics */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white rounded-lg p-3 border border-slate-200">

@@ -317,6 +317,15 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 
 ### Changelog
 
+#### Mar 21, 2026 - Missing Library Data Warning
+- [x] **Missing Library Data Warning in AI Risk Analysis** (Mar 21, 2026):
+  - Added automatic detection of missing Equipment Types and Failure Modes from the FMEA library
+  - When a threat's equipment type or failure mode is not found in the library, a prominent amber warning box appears
+  - Warning shows exactly which items are missing with their values
+  - "Go to Library" button navigates directly to the Library page for easy addition
+  - Full EN/NL translation support for warning messages
+  - Updated files: `/app/frontend/src/components/AIInsightsPanel.jsx`, `/app/frontend/src/contexts/LanguageContext.js`
+
 #### Mar 21, 2026 - Searchable Dropdowns for Threat Editing
 - [x] **Searchable Combobox for Asset, Equipment Type, Failure Mode** (Mar 21, 2026):
   - Created reusable `SearchableCombobox.jsx` component using Radix UI Command + Popover primitives

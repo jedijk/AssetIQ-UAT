@@ -88,6 +88,8 @@ const en = {
     type: "Type",
     asset: "Asset",
     location: "Location",
+    equipmentType: "Equipment Type",
+    failureMode: "Failure Mode",
   },
   
   // Threats page
@@ -344,6 +346,9 @@ const en = {
     externalCondition: "External",
     causesIdentified: "probable causes identified",
     unknown: "Unknown",
+    missingLibraryData: "Missing Library Data",
+    missingLibraryDataDesc: "The following items are not in your library. Add them for better AI analysis accuracy:",
+    goToLibrary: "Go to Library",
   },
 
   // Threat Detail
@@ -455,6 +460,8 @@ const nl = {
     type: "Type",
     asset: "Asset",
     location: "Locatie",
+    equipmentType: "Apparatuurtype",
+    failureMode: "Faalmodus",
   },
   
   // Threats page
@@ -711,6 +718,9 @@ const nl = {
     externalCondition: "Extern",
     causesIdentified: "waarschijnlijke oorzaken geïdentificeerd",
     unknown: "Onbekend",
+    missingLibraryData: "Ontbrekende bibliotheekgegevens",
+    missingLibraryDataDesc: "De volgende items ontbreken in uw bibliotheek. Voeg ze toe voor betere AI-analyse nauwkeurigheid:",
+    goToLibrary: "Ga naar bibliotheek",
   },
 
   // Threat Detail
