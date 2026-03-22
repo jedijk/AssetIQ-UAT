@@ -641,6 +641,163 @@ async def update_all_ranks(user_id: str):
             {"$set": {"rank": idx + 1, "total_threats": total}}
         )
 
+
+async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new_criticality: dict = None):
+    """
+    Recalculate risk scores for all threats linked to a specific asset when criticality changes.
+    Uses the 4-dimension criticality model (safety, production, environmental, reputation).
+    """
+    # Find all threats for this asset
+    threats = await db.threats.find(
+        {"asset": asset_name, "created_by": user_id}
+    ).to_list(1000)
+    
+    if not threats:
+        return 0
+    
+    # Get criticality multiplier from 4-dimension model
+    if new_criticality:
+        # Calculate multiplier based on max dimension impact
+        max_impact = max(
+            new_criticality.get("safety_impact", 0) or 0,
+            new_criticality.get("production_impact", 0) or 0,
+            new_criticality.get("environmental_impact", 0) or 0,
+            new_criticality.get("reputation_impact", 0) or 0
+        )
+        
+        # Map max impact (1-5) to multiplier (1.0-1.5)
+        if max_impact >= 5:
+            criticality_multiplier = 1.5
+            criticality_level = "safety_critical"
+        elif max_impact >= 4:
+            criticality_multiplier = 1.4
+            criticality_level = "production_critical"
+        elif max_impact >= 3:
+            criticality_multiplier = 1.2
+            criticality_level = "medium"
+        elif max_impact >= 2:
+            criticality_multiplier = 1.1
+            criticality_level = "low"
+        else:
+            criticality_multiplier = 1.0
+            criticality_level = "low"
+    else:
+        criticality_multiplier = 1.0
+        criticality_level = "low"
+    
+    updated_count = 0
+    for threat in threats:
+        # Get base risk score (or calculate from FMEA if stored failure mode matches)
+        base_risk_score = threat.get("base_risk_score", threat.get("risk_score", 50))
+        
+        # Look up FMEA scores if failure mode is linked
+        failure_mode_name = threat.get("failure_mode")
+        if failure_mode_name and failure_mode_name != "Unknown":
+            # Search for matching failure mode in library
+            fm_match = None
+            for fm in FAILURE_MODES_LIBRARY:
+                if fm["failure_mode"].lower() == failure_mode_name.lower():
+                    fm_match = fm
+                    break
+            
+            if fm_match:
+                # Calculate RPN-based score: (S × O × D) / 10, capped at 100
+                rpn_score = (fm_match["severity"] * fm_match["occurrence"] * fm_match["detectability"]) / 10
+                base_risk_score = min(100, int(rpn_score))
+        
+        # Apply criticality multiplier
+        adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
+        
+        # Determine risk level
+        if adjusted_risk_score >= 70:
+            risk_level = "Critical"
+        elif adjusted_risk_score >= 50:
+            risk_level = "High"
+        elif adjusted_risk_score >= 30:
+            risk_level = "Medium"
+        else:
+            risk_level = "Low"
+        
+        # Update threat
+        await db.threats.update_one(
+            {"id": threat["id"]},
+            {"$set": {
+                "risk_score": adjusted_risk_score,
+                "base_risk_score": base_risk_score,
+                "risk_level": risk_level,
+                "equipment_criticality": criticality_level
+            }}
+        )
+        updated_count += 1
+    
+    # Update all ranks after score changes
+    await update_all_ranks(user_id)
+    
+    return updated_count
+
+
+async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new_severity: int, new_occurrence: int, new_detectability: int):
+    """
+    Recalculate risk scores for all threats linked to a specific failure mode when FMEA scores change.
+    """
+    # Find all threats with this failure mode
+    threats = await db.threats.find(
+        {"failure_mode": {"$regex": f"^{failure_mode_name}$", "$options": "i"}}
+    ).to_list(1000)
+    
+    if not threats:
+        return 0
+    
+    # Calculate new base risk score from FMEA: (S × O × D) / 10
+    new_base_score = min(100, int((new_severity * new_occurrence * new_detectability) / 10))
+    
+    CRITICALITY_MULTIPLIERS = {
+        "safety_critical": 1.5,
+        "production_critical": 1.4,
+        "medium": 1.2,
+        "low": 1.0
+    }
+    
+    updated_count = 0
+    users_updated = set()
+    
+    for threat in threats:
+        # Get criticality multiplier
+        criticality_level = threat.get("equipment_criticality", "low")
+        multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
+        
+        # Calculate adjusted score
+        adjusted_risk_score = min(100, int(new_base_score * multiplier))
+        
+        # Determine risk level
+        if adjusted_risk_score >= 70:
+            risk_level = "Critical"
+        elif adjusted_risk_score >= 50:
+            risk_level = "High"
+        elif adjusted_risk_score >= 30:
+            risk_level = "Medium"
+        else:
+            risk_level = "Low"
+        
+        # Update threat
+        await db.threats.update_one(
+            {"id": threat["id"]},
+            {"$set": {
+                "risk_score": adjusted_risk_score,
+                "base_risk_score": new_base_score,
+                "risk_level": risk_level
+            }}
+        )
+        updated_count += 1
+        users_updated.add(threat.get("created_by"))
+    
+    # Update ranks for all affected users
+    for user_id in users_updated:
+        if user_id:
+            await update_all_ranks(user_id)
+    
+    return updated_count
+
 # ============= AUTH ENDPOINTS =============
 
 @api_router.post("/auth/register", response_model=TokenResponse)
@@ -1002,6 +1159,98 @@ async def get_top_threats(
         if isinstance(t.get("risk_score"), float):
             t["risk_score"] = int(t["risk_score"])
     return threats
+
+
+@api_router.post("/threats/recalculate-scores")
+async def recalculate_all_threat_scores(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Recalculate risk scores for all threats based on current criticality and FMEA data.
+    This performs a full resync of all threat scores.
+    """
+    # Get all threats for this user
+    threats = await db.threats.find({"created_by": current_user["id"]}).to_list(1000)
+    
+    if not threats:
+        return {"message": "No threats found", "updated_count": 0}
+    
+    # Get all equipment nodes with criticality
+    equipment_nodes = await db.equipment_nodes.find(
+        {"created_by": current_user["id"]},
+        {"_id": 0, "name": 1, "criticality": 1}
+    ).to_list(1000)
+    
+    # Build asset -> criticality lookup
+    asset_criticality = {}
+    for node in equipment_nodes:
+        if node.get("criticality"):
+            asset_criticality[node["name"]] = node["criticality"]
+    
+    CRITICALITY_MULTIPLIERS = {
+        "safety_critical": 1.5,
+        "production_critical": 1.4,
+        "medium": 1.2,
+        "low": 1.0
+    }
+    
+    updated_count = 0
+    
+    for threat in threats:
+        # Get base score from FMEA if failure mode is linked
+        failure_mode_name = threat.get("failure_mode")
+        base_risk_score = threat.get("base_risk_score", threat.get("risk_score", 50))
+        
+        if failure_mode_name and failure_mode_name != "Unknown":
+            for fm in FAILURE_MODES_LIBRARY:
+                if fm["failure_mode"].lower() == failure_mode_name.lower():
+                    # Calculate RPN-based score
+                    rpn_score = (fm["severity"] * fm["occurrence"] * fm["detectability"]) / 10
+                    base_risk_score = min(100, int(rpn_score))
+                    break
+        
+        # Get criticality multiplier from asset
+        asset_name = threat.get("asset")
+        criticality_level = "low"
+        criticality_multiplier = 1.0
+        
+        if asset_name and asset_name in asset_criticality:
+            crit = asset_criticality[asset_name]
+            criticality_level = crit.get("level", "low")
+            criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
+        
+        # Calculate adjusted score
+        adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
+        
+        # Determine risk level
+        if adjusted_risk_score >= 70:
+            risk_level = "Critical"
+        elif adjusted_risk_score >= 50:
+            risk_level = "High"
+        elif adjusted_risk_score >= 30:
+            risk_level = "Medium"
+        else:
+            risk_level = "Low"
+        
+        # Update threat
+        await db.threats.update_one(
+            {"id": threat["id"]},
+            {"$set": {
+                "risk_score": adjusted_risk_score,
+                "base_risk_score": base_risk_score,
+                "risk_level": risk_level,
+                "equipment_criticality": criticality_level
+            }}
+        )
+        updated_count += 1
+    
+    # Update all ranks
+    await update_all_ranks(current_user["id"])
+    
+    return {
+        "message": f"Successfully recalculated {updated_count} threat scores",
+        "updated_count": updated_count
+    }
 
 @api_router.get("/threats/{threat_id}", response_model=ThreatResponse)
 async def get_threat(
@@ -1569,6 +1818,10 @@ async def update_failure_mode(
     """Update a failure mode."""
     for i, fm in enumerate(FAILURE_MODES_LIBRARY):
         if fm["id"] == mode_id:
+            # Track if FMEA scores changed
+            fmea_changed = False
+            old_failure_mode_name = fm["failure_mode"]
+            
             # Update fields
             if data.category is not None:
                 fm["category"] = data.category
@@ -1584,10 +1837,13 @@ async def update_failure_mode(
             if data.keywords is not None:
                 fm["keywords"] = data.keywords
             if data.severity is not None:
+                fmea_changed = True
                 fm["severity"] = data.severity
             if data.occurrence is not None:
+                fmea_changed = True
                 fm["occurrence"] = data.occurrence
             if data.detectability is not None:
+                fmea_changed = True
                 fm["detectability"] = data.detectability
             if data.recommended_actions is not None:
                 fm["recommended_actions"] = data.recommended_actions
@@ -1596,6 +1852,17 @@ async def update_failure_mode(
             
             # Recalculate RPN
             fm["rpn"] = fm["severity"] * fm["occurrence"] * fm["detectability"]
+            
+            # If FMEA scores changed, recalculate all linked threat scores
+            if fmea_changed:
+                updated_threats = await recalculate_threat_scores_for_failure_mode(
+                    old_failure_mode_name,
+                    fm["severity"],
+                    fm["occurrence"],
+                    fm["detectability"]
+                )
+                logger.info(f"Updated {updated_threats} threat scores after FMEA change for '{old_failure_mode_name}'")
+                fm["threats_updated"] = updated_threats
             
             return fm
     
@@ -2366,7 +2633,19 @@ async def assign_criticality(
         }}
     )
     
+    # Recalculate risk scores for all threats linked to this asset
+    asset_name = node.get("name")
+    if asset_name:
+        updated_threats = await recalculate_threat_scores_for_asset(
+            asset_name, 
+            current_user["id"], 
+            criticality_data
+        )
+        logger.info(f"Updated {updated_threats} threat scores after criticality change for {asset_name}")
+    
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    # Include count of updated threats in response
+    updated["threats_updated"] = updated_threats if asset_name else 0
     return updated
 
 @api_router.post("/equipment-hierarchy/nodes/{node_id}/discipline")
