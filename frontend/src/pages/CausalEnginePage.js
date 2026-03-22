@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { investigationAPI, actionsAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -54,6 +54,7 @@ const INVESTIGATION_STATUSES = [
 export default function CausalEnginePage() {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
   
@@ -73,6 +74,17 @@ export default function CausalEnginePage() {
   const [failureForm, setFailureForm] = useState({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" });
   const [causeForm, setCauseForm] = useState({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" });
   const [actionForm, setActionForm] = useState({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" });
+
+  // Handle inv query parameter - auto-select investigation from URL
+  useEffect(() => {
+    const invId = searchParams.get('inv');
+    if (invId && invId !== selectedInvId) {
+      setSelectedInvId(invId);
+      // Clear the URL parameter after using it
+      searchParams.delete('inv');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, selectedInvId]);
 
   const { data: investigationsData, isLoading: loadingInvestigations } = useQuery({
     queryKey: ["investigations"],
