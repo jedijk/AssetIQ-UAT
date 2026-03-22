@@ -73,10 +73,73 @@ const getRadarPoints = (scores, centerX, centerY, radius) => {
   });
 };
 
-// Create SVG path
-const createRadarPath = (points) => {
-  if (points.length === 0) return "";
-  return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z';
+// Create smooth curved SVG path using cardinal spline
+const createSmoothRadarPath = (points, tension = 0.4) => {
+  if (points.length < 3) return "";
+  
+  // Close the loop by adding first points at the end
+  const closedPoints = [...points, points[0], points[1]];
+  
+  let path = `M ${points[0].x} ${points[0].y}`;
+  
+  for (let i = 0; i < points.length; i++) {
+    const p0 = closedPoints[i];
+    const p1 = closedPoints[i + 1];
+    const p2 = closedPoints[i + 2];
+    
+    // Calculate control points for smooth curve
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    
+    // Use quadratic curve for smoother appearance
+    path += ` Q ${cp1x} ${cp1y} ${p1.x} ${p1.y}`;
+  }
+  
+  return path;
+};
+
+// Alternative: Create smooth blob-like path using bezier curves
+const createBlobPath = (points, smoothing = 0.2) => {
+  if (points.length < 3) return "";
+  
+  // Helper to calculate control point
+  const line = (a, b) => {
+    const lenX = b.x - a.x;
+    const lenY = b.y - a.y;
+    return {
+      length: Math.sqrt(lenX * lenX + lenY * lenY),
+      angle: Math.atan2(lenY, lenX)
+    };
+  };
+  
+  const controlPoint = (current, previous, next, reverse) => {
+    const p = previous || current;
+    const n = next || current;
+    const o = line(p, n);
+    const angle = o.angle + (reverse ? Math.PI : 0);
+    const length = o.length * smoothing;
+    return {
+      x: current.x + Math.cos(angle) * length,
+      y: current.y + Math.sin(angle) * length
+    };
+  };
+  
+  // Build the path
+  let d = `M ${points[0].x},${points[0].y}`;
+  
+  for (let i = 0; i < points.length; i++) {
+    const current = points[i];
+    const next = points[(i + 1) % points.length];
+    const prev = points[(i - 1 + points.length) % points.length];
+    const nextNext = points[(i + 2) % points.length];
+    
+    const cp1 = controlPoint(current, prev, next, false);
+    const cp2 = controlPoint(next, current, nextNext, true);
+    
+    d += ` C ${cp1.x},${cp1.y} ${cp2.x},${cp2.y} ${next.x},${next.y}`;
+  }
+  
+  return d;
 };
 
 // Snowflake component - Light theme
@@ -150,12 +213,12 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
             );
           })}
           
-          {/* Filled area */}
-          <path d={createRadarPath(points)} fill="#EAB308" fillOpacity={0.5} stroke="#EAB308" strokeWidth={2} />
+          {/* Filled area - Smooth curved shape */}
+          <path d={createBlobPath(points, 0.25)} fill="#EAB308" fillOpacity={0.5} stroke="#EAB308" strokeWidth={2.5} strokeLinejoin="round" />
           
           {/* Data points */}
           {points.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r={4} fill="#EAB308" stroke="#fff" strokeWidth={2} />
+            <circle key={i} cx={p.x} cy={p.y} r={5} fill="#EAB308" stroke="#fff" strokeWidth={2} />
           ))}
           
           {/* Labels - Full text, proper positioning */}
