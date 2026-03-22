@@ -6,7 +6,49 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Dec 2025)
-Added Reliability Performance Dashboard with snowflake/radar chart visualization showing holistic performance against a 6-dimension reliability management framework (Criticality, Incidents, Investigations, Maintenance, Reactions, Threats). Supports per-equipment and aggregated hierarchy-level scoring.
+- Added Reliability Performance Dashboard with snowflake/radar chart visualization
+- Implemented deep linking from dashboard numbers to related app sections
+- Added Back button navigation for improved UX
+- Removed Overall System Health banner from Operational Dashboard
+- Added collapsible maintenance strategy cards
+- **Codebase cleanup initiated**: Created modular route structure and extracted reusable components
+
+### Codebase Architecture (Dec 2025 Cleanup)
+
+#### Backend Structure
+```
+/app/backend/
+├── server.py              # Main API server (4,364 lines - to be further split)
+├── routes/                # NEW: Modular API routes
+│   ├── __init__.py
+│   ├── deps.py           # Shared dependencies (db, auth, utils)
+│   ├── auth.py           # Authentication endpoints
+│   ├── threats.py        # Threat management endpoints  
+│   └── stats.py          # Statistics & reliability scores
+├── ai_risk_engine.py
+├── maintenance_strategy_generator.py
+├── maintenance_strategy_models.py
+├── investigation_models.py
+├── iso14224_models.py
+└── failure_modes.py
+```
+
+#### Frontend Structure  
+```
+/app/frontend/src/
+├── components/
+│   ├── maintenance/       # NEW: Extracted maintenance components
+│   │   ├── index.js
+│   │   ├── constants.js
+│   │   ├── CollapsibleSection.jsx
+│   │   ├── EditableItem.jsx
+│   │   └── FailureModesDisplay.jsx
+│   ├── MaintenanceStrategiesPanel.jsx
+│   ├── BackButton.jsx     # NEW: Navigation back button
+│   └── ...
+├── pages/
+└── contexts/
+```
 
 ### Core Modules
 
