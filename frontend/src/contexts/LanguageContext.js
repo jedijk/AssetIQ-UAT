@@ -47,6 +47,13 @@ const en = {
     noActions: "No actions recorded",
     noInvestigations: "No investigations started",
     threatsByEquipment: "Threats by Equipment Type",
+    operational: "Operational",
+    reliabilityPerformance: "Reliability Performance",
+    reliabilitySubtitle: "Holistic view of reliability management across your asset hierarchy",
+    items: "items",
+    dimensionDetails: "Dimension Details",
+    quickStats: "Quick Stats",
+    addEquipmentFirst: "Add equipment to your hierarchy to see reliability scores",
   },
   
   // Common
@@ -513,6 +520,13 @@ const nl = {
     noActions: "Geen acties geregistreerd",
     noInvestigations: "Geen onderzoeken gestart",
     threatsByEquipment: "Dreigingen per apparaattype",
+    operational: "Operationeel",
+    reliabilityPerformance: "Betrouwbaarheidsprestaties",
+    reliabilitySubtitle: "Holistisch overzicht van betrouwbaarheidsbeheer over uw assethiërarchie",
+    items: "items",
+    dimensionDetails: "Dimensie details",
+    quickStats: "Snelle statistieken",
+    addEquipmentFirst: "Voeg apparatuur toe aan uw hiërarchie om betrouwbaarheidsscores te zien",
   },
   
   // Common

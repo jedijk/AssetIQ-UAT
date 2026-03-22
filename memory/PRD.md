@@ -5,6 +5,9 @@
 ### Original Problem Statement
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
+### Latest Update (Dec 2025)
+Added Reliability Performance Dashboard with snowflake/radar chart visualization showing holistic performance against a 6-dimension reliability management framework (Criticality, Incidents, Investigations, Maintenance, Reactions, Threats). Supports per-equipment and aggregated hierarchy-level scoring.
+
 ### Core Modules
 
 #### 1. Chat Interface (Completed)
@@ -405,3 +408,25 @@ Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (for
     - Form labels and button text
   - Added URL parameter handling in `FailureModesPage.js` for FMEA linkage from Maintenance Strategies
   - All pages now support seamless EN/NL language toggle
+
+
+#### Dec 2025 - Reliability Performance Dashboard
+- [x] **Reliability Snowflake Dashboard** (Dec 2025):
+  - Created `ReliabilitySnowflake.jsx` component with SVG radar/snowflake chart
+  - 6 reliability dimensions: Criticality, Incidents, Investigations, Maintenance, Reactions, Threats
+  - Visual profile with yellow filled area and dimension labels
+  - Dynamic scoring based on actual equipment data
+  - Created `ReliabilityPerformancePage.js` with:
+    - Equipment hierarchy tree with mini score bars
+    - Per-item and aggregated scoring
+    - Level summary cards (Plant, Installation, Unit, System, etc.)
+    - Dimension details panel with progress bars
+    - Quick stats panel (dark theme)
+  - Added backend API `/api/reliability-scores`:
+    - Calculates scores for each of 6 dimensions per equipment
+    - Aggregates scores up the hierarchy tree
+    - Supports filtering by node_id or level
+    - Returns global scores and summary statistics
+  - Integrated into Dashboard page with tabs: "Operational" | "Reliability Performance"
+  - Added Dutch (NL) translations for all new dashboard features
+  - Files: `/app/frontend/src/components/ReliabilitySnowflake.jsx`, `/app/frontend/src/pages/ReliabilityPerformancePage.js`

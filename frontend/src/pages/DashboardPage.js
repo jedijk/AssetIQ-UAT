@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -21,8 +22,11 @@ import {
   Shield,
   Calendar,
   Users,
+  Gauge,
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import ReliabilityPerformancePage from "./ReliabilityPerformancePage";
 
 // Mini chart component for trends
 const MiniBarChart = ({ data, maxValue }) => {
@@ -127,6 +131,7 @@ const RecentItemCard = ({ items, title, icon: Icon, emptyMessage, renderItem }) 
 
 export default function DashboardPage() {
   const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState("operational");
 
   // Fetch all data
   const { data: stats } = useQuery({
@@ -223,45 +228,63 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto" data-testid="dashboard-page">
-      {/* Header */}
+      {/* Header with Tabs */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
-        <p className="text-slate-500">{t("dashboard.subtitle") || "Overview of your risk management status"}</p>
-      </div>
-
-      {/* Health Score Banner */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 mb-6 text-white"
-      >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-slate-400 text-sm mb-1">{t("dashboard.overallHealth") || "Overall System Health"}</p>
-            <div className="flex items-baseline gap-3">
-              <span className={`text-5xl font-bold ${getHealthColor(healthScore)}`}>{healthScore}</span>
-              <span className="text-slate-400">/100</span>
-              <span className={`text-lg font-medium ${getHealthColor(healthScore)}`}>
-                {getHealthLabel(healthScore)}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold">{openThreats}</p>
-              <p className="text-xs text-slate-400">{t("dashboard.openThreats") || "Open Threats"}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-red-400">{criticalThreats}</p>
-              <p className="text-xs text-slate-400">{t("dashboard.criticalHighRisk") || "Critical/High Risk"}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-amber-400">{overdueActions}</p>
-              <p className="text-xs text-slate-400">{t("dashboard.overdueActions") || "Overdue Actions"}</p>
-            </div>
+            <h1 className="text-2xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
+            <p className="text-slate-500">{t("dashboard.subtitle") || "Overview of your risk management status"}</p>
           </div>
         </div>
-      </motion.div>
+        
+        {/* Dashboard Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="operational" className="flex items-center gap-2" data-testid="operational-tab">
+              <Activity className="w-4 h-4" />
+              {t("dashboard.operational") || "Operational"}
+            </TabsTrigger>
+            <TabsTrigger value="reliability" className="flex items-center gap-2" data-testid="reliability-tab">
+              <Gauge className="w-4 h-4" />
+              {t("dashboard.reliabilityPerformance") || "Reliability Performance"}
+            </TabsTrigger>
+          </TabsList>
+          
+          {/* Operational Dashboard Tab */}
+          <TabsContent value="operational" className="mt-6">
+            {/* Health Score Banner */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 mb-6 text-white"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-400 text-sm mb-1">{t("dashboard.overallHealth") || "Overall System Health"}</p>
+                  <div className="flex items-baseline gap-3">
+                    <span className={`text-5xl font-bold ${getHealthColor(healthScore)}`}>{healthScore}</span>
+                    <span className="text-slate-400">/100</span>
+                    <span className={`text-lg font-medium ${getHealthColor(healthScore)}`}>
+                      {getHealthLabel(healthScore)}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold">{openThreats}</p>
+                    <p className="text-xs text-slate-400">{t("dashboard.openThreats") || "Open Threats"}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-red-400">{criticalThreats}</p>
+                    <p className="text-xs text-slate-400">{t("dashboard.criticalHighRisk") || "Critical/High Risk"}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-amber-400">{overdueActions}</p>
+                    <p className="text-xs text-slate-400">{t("dashboard.overdueActions") || "Overdue Actions"}</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
 
       {/* Key Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -443,6 +466,14 @@ export default function DashboardPage() {
           </div>
         </motion.div>
       )}
+          </TabsContent>
+          
+          {/* Reliability Performance Tab */}
+          <TabsContent value="reliability" className="mt-0 -mx-6 -mb-6">
+            <ReliabilityPerformancePage />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
