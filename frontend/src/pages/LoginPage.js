@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -9,6 +10,7 @@ import { Loader2 } from "lucide-react";
 
 const LoginPage = () => {
   const { login } = useAuth();
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,7 +21,7 @@ const LoginPage = () => {
 
     try {
       await login(email, password);
-      toast.success("Welcome back!");
+      toast.success(t("chat.welcomeMessage").split("!")[0] + "!");
     } catch (error) {
       const message = error.response?.data?.detail || "Login failed. Please try again.";
       toast.error(message);
@@ -43,12 +45,12 @@ const LoginPage = () => {
           </span>
         </div>
 
-        <h1 className="auth-title" data-testid="login-title">Welcome back</h1>
-        <p className="auth-subtitle">Sign in to continue capturing threats</p>
+        <h1 className="auth-title" data-testid="login-title">{t("auth.loginTitle")}</h1>
+        <p className="auth-subtitle">{t("auth.loginSubtitle")}</p>
 
         <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("auth.email")}</Label>
             <Input
               id="email"
               type="email"
@@ -62,11 +64,11 @@ const LoginPage = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth.password")}</Label>
             <Input
               id="password"
               type="password"
-              placeholder="Enter your password"
+              placeholder={t("auth.password")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -84,22 +86,22 @@ const LoginPage = () => {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Signing in...
+                {t("common.loading")}
               </>
             ) : (
-              "Sign in"
+              t("auth.signIn")
             )}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-sm text-slate-500">
-          Don't have an account?{" "}
+          {t("auth.noAccount")}{" "}
           <Link 
             to="/register" 
             className="text-blue-600 font-medium hover:underline"
             data-testid="register-link"
           >
-            Create one
+            {t("auth.signUp")}
           </Link>
         </p>
       </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -9,6 +10,7 @@ import { Loader2 } from "lucide-react";
 
 const RegisterPage = () => {
   const { register } = useAuth();
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,12 +52,12 @@ const RegisterPage = () => {
           </span>
         </div>
 
-        <h1 className="auth-title" data-testid="register-title">Create account</h1>
-        <p className="auth-subtitle">Start capturing and prioritizing threats</p>
+        <h1 className="auth-title" data-testid="register-title">{t("auth.registerTitle")}</h1>
+        <p className="auth-subtitle">{t("auth.registerSubtitle")}</p>
 
         <form onSubmit={handleSubmit} className="space-y-5" data-testid="register-form">
           <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
+            <Label htmlFor="name">{t("auth.name")}</Label>
             <Input
               id="name"
               type="text"
@@ -69,7 +71,7 @@ const RegisterPage = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("auth.email")}</Label>
             <Input
               id="email"
               type="email"
@@ -83,7 +85,7 @@ const RegisterPage = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth.password")}</Label>
             <Input
               id="password"
               type="password"
@@ -106,22 +108,22 @@ const RegisterPage = () => {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating account...
+                {t("common.creating")}
               </>
             ) : (
-              "Create account"
+              t("auth.register")
             )}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-sm text-slate-500">
-          Already have an account?{" "}
+          {t("auth.hasAccount")}{" "}
           <Link 
             to="/login" 
             className="text-blue-600 font-medium hover:underline"
             data-testid="login-link"
           >
-            Sign in
+            {t("auth.signIn")}
           </Link>
         </p>
       </div>

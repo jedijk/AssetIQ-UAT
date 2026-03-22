@@ -1172,12 +1172,12 @@ export default function MaintenanceStrategiesPanel() {
             {generateMutation.isPending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating...
+                {t("maintenance.generating")}
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-2" />
-                Generate
+                {t("maintenance.generateStrategy")}
               </>
             )}
           </Button>
@@ -1192,19 +1192,19 @@ export default function MaintenanceStrategiesPanel() {
             {generateAllMutation.isPending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating All...
+                {t("maintenance.generating")}
               </>
             ) : (
               <>
                 <PlayCircle className="w-4 h-4 mr-2" />
-                Generate All
+                {t("maintenance.generateAll")}
               </>
             )}
           </Button>
         </div>
         
         <p className="text-xs text-slate-500 mt-2">
-          Each strategy includes all 4 criticality levels. Click on items to edit, or use the + button to add new items.
+          {t("maintenance.noStrategiesDesc")}
         </p>
       </div>
       
@@ -1218,8 +1218,8 @@ export default function MaintenanceStrategiesPanel() {
           ) : strategies.length === 0 ? (
             <div className="text-center py-12 text-slate-500">
               <Settings className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p className="font-medium">No maintenance strategies yet</p>
-              <p className="text-sm">Select an equipment type and click Generate, or use "Generate All" to create strategies for all equipment types.</p>
+              <p className="font-medium">{t("maintenance.noStrategies")}</p>
+              <p className="text-sm">{t("maintenance.noStrategiesDesc")}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
