@@ -21,10 +21,15 @@ import {
   Settings,
   Filter,
   Search,
+  X,
+  CheckCircle2,
+  HelpCircle,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Input } from "../components/ui/input";
 import { Progress } from "../components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
+import { ScrollArea } from "../components/ui/scroll-area";
 
 // Level icons map
 const LEVEL_ICONS = {
@@ -76,6 +81,7 @@ const createRadarPath = (points) => {
 
 // Snowflake component - Light theme
 const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts = 0, stars = 0 }) => {
+  const [showInfoDialog, setShowInfoDialog] = useState(false);
   const size = 320;
   const centerX = size / 2;
   const centerY = size / 2;
@@ -116,81 +122,275 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6">
-      <svg width={size} height={size} className="mx-auto" style={{ overflow: 'visible' }}>
-        {/* Background */}
-        <circle cx={centerX} cy={centerY} r={radius + 10} fill="#f8fafc" />
+    <>
+      <div className="bg-white rounded-xl border border-slate-200 p-6 relative">
+        {/* Info Button - Top Right */}
+        <button
+          onClick={() => setShowInfoDialog(true)}
+          className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 transition-colors"
+          title="View framework methodology"
+        >
+          <HelpCircle className="w-5 h-5 text-slate-400 hover:text-slate-600" />
+        </button>
         
-        {/* Grid circles */}
-        {gridCircles.map((r, i) => (
-          <circle key={i} cx={centerX} cy={centerY} r={r} fill="none" stroke="#e2e8f0" strokeWidth={1} strokeDasharray={i < 3 ? "3,3" : "0"} />
-        ))}
-        
-        {/* Spokes */}
-        {DIMENSIONS.map((_, i) => {
-          const angle = -Math.PI / 2 + i * (2 * Math.PI / DIMENSIONS.length);
-          return (
-            <line key={i} x1={centerX} y1={centerY} x2={centerX + radius * Math.cos(angle)} y2={centerY + radius * Math.sin(angle)} stroke="#e2e8f0" strokeWidth={1} />
-          );
-        })}
-        
-        {/* Filled area */}
-        <path d={createRadarPath(points)} fill="#EAB308" fillOpacity={0.5} stroke="#EAB308" strokeWidth={2} />
-        
-        {/* Data points */}
-        {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={4} fill="#EAB308" stroke="#fff" strokeWidth={2} />
-        ))}
-        
-        {/* Labels - Full text, proper positioning */}
-        {points.map((p, i) => {
-          const dim = DIMENSIONS[i];
-          const isLeft = Math.abs(p.angle) > Math.PI / 2;
-          const isTop = p.angle < -Math.PI / 4 && p.angle > -3 * Math.PI / 4;
-          const isBottom = p.angle > Math.PI / 4 && p.angle < 3 * Math.PI / 4;
-          let anchor = "middle";
-          if (!isTop && !isBottom) anchor = isLeft ? "end" : "start";
+        <svg width={size} height={size} className="mx-auto" style={{ overflow: 'visible' }}>
+          {/* Background */}
+          <circle cx={centerX} cy={centerY} r={radius + 10} fill="#f8fafc" />
           
-          return (
-            <text 
-              key={i} 
-              x={p.labelX} 
-              y={p.labelY} 
-              textAnchor={anchor} 
-              dominantBaseline="middle" 
-              fontSize="11"
-              fontWeight="600"
-              fill="#475569"
-            >
-              {dim.shortLabel}
-            </text>
-          );
-        })}
+          {/* Grid circles */}
+          {gridCircles.map((r, i) => (
+            <circle key={i} cx={centerX} cy={centerY} r={r} fill="none" stroke="#e2e8f0" strokeWidth={1} strokeDasharray={i < 3 ? "3,3" : "0"} />
+          ))}
+          
+          {/* Spokes */}
+          {DIMENSIONS.map((_, i) => {
+            const angle = -Math.PI / 2 + i * (2 * Math.PI / DIMENSIONS.length);
+            return (
+              <line key={i} x1={centerX} y1={centerY} x2={centerX + radius * Math.cos(angle)} y2={centerY + radius * Math.sin(angle)} stroke="#e2e8f0" strokeWidth={1} />
+            );
+          })}
+          
+          {/* Filled area */}
+          <path d={createRadarPath(points)} fill="#EAB308" fillOpacity={0.5} stroke="#EAB308" strokeWidth={2} />
+          
+          {/* Data points */}
+          {points.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r={4} fill="#EAB308" stroke="#fff" strokeWidth={2} />
+          ))}
+          
+          {/* Labels - Full text, proper positioning */}
+          {points.map((p, i) => {
+            const dim = DIMENSIONS[i];
+            const isLeft = Math.abs(p.angle) > Math.PI / 2;
+            const isTop = p.angle < -Math.PI / 4 && p.angle > -3 * Math.PI / 4;
+            const isBottom = p.angle > Math.PI / 4 && p.angle < 3 * Math.PI / 4;
+            let anchor = "middle";
+            if (!isTop && !isBottom) anchor = isLeft ? "end" : "start";
+            
+            return (
+              <text 
+                key={i} 
+                x={p.labelX} 
+                y={p.labelY} 
+                textAnchor={anchor} 
+                dominantBaseline="middle" 
+                fontSize="11"
+                fontWeight="600"
+                fill="#475569"
+              >
+                {dim.shortLabel}
+              </text>
+            );
+          })}
+          
+          {/* Center score */}
+          <text x={centerX} y={centerY - 8} textAnchor="middle" fontSize="28" fontWeight="bold" fill="#EAB308">{overall}</text>
+          <text x={centerX} y={centerY + 14} textAnchor="middle" fontSize="10" fill="#94a3b8">SCORE</text>
+        </svg>
         
-        {/* Center score */}
-        <text x={centerX} y={centerY - 8} textAnchor="middle" fontSize="28" fontWeight="bold" fill="#EAB308">{overall}</text>
-        <text x={centerX} y={centerY + 14} textAnchor="middle" fontSize="10" fill="#94a3b8">SCORE</text>
-      </svg>
-      
-      <p className="text-center mt-3 text-sm text-slate-600">{getAssessment(overall)}</p>
-      
-      {/* Bottom stats */}
-      <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-slate-100">
-        <span className="text-sm text-slate-500">{itemCount} equipment</span>
-        {alerts > 0 && (
-          <span className="flex items-center gap-1 px-2 py-0.5 bg-red-50 rounded-full">
-            <AlertTriangle className="w-3 h-3 text-red-500" />
-            <span className="text-xs font-medium text-red-600">{alerts} alerts</span>
-          </span>
-        )}
-        {stars > 0 && (
-          <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 rounded-full">
-            <span className="text-xs text-emerald-500">★</span>
-            <span className="text-xs font-medium text-emerald-600">{stars} excellent</span>
-          </span>
-        )}
+        <p className="text-center mt-3 text-sm text-slate-600">{getAssessment(overall)}</p>
+        
+        {/* Bottom stats */}
+        <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-slate-100">
+          <span className="text-sm text-slate-500">{itemCount} equipment</span>
+          {alerts > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 bg-red-50 rounded-full">
+              <AlertTriangle className="w-3 h-3 text-red-500" />
+              <span className="text-xs font-medium text-red-600">{alerts} alerts</span>
+            </span>
+          )}
+          {stars > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 rounded-full">
+              <span className="text-xs text-emerald-500">★</span>
+              <span className="text-xs font-medium text-emerald-600">{stars} excellent</span>
+            </span>
+          )}
+        </div>
       </div>
-    </div>
+      
+      {/* Framework Info Dialog */}
+      <Dialog open={showInfoDialog} onOpenChange={setShowInfoDialog}>
+        <DialogContent className="max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-amber-500" />
+              Reliability Management Framework
+            </DialogTitle>
+            <DialogDescription>
+              How reliability scores are calculated across the six dimensions
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-6 py-4">
+              {/* Framework Overview */}
+              <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                <h4 className="font-semibold text-amber-800 mb-2">Framework Overview</h4>
+                <p className="text-sm text-amber-700">
+                  The Reliability Snowflake measures performance across six key dimensions that together 
+                  determine your organization's ability to achieve and sustain reliable operations. 
+                  Each dimension is scored 0-100%, and the overall score is the average of all dimensions.
+                </p>
+              </div>
+              
+              {/* Dimension Details */}
+              <div className="space-y-4">
+                {/* Criticality */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 rounded-md bg-amber-50">
+                      <Shield className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <h4 className="font-semibold text-slate-800">Criticality</h4>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Measures how well equipment hierarchy is defined with ownership and criticality assignments.
+                  </p>
+                  <div className="bg-slate-50 rounded p-3 text-xs text-slate-600">
+                    <p className="font-medium mb-1">Calculation:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>+50% if criticality level is assigned (Safety/Production Critical)</li>
+                      <li>+30% if equipment type is assigned</li>
+                      <li>+20% if description is provided</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                {/* Incidents */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 rounded-md bg-orange-50">
+                      <AlertTriangle className="w-4 h-4 text-orange-600" />
+                    </div>
+                    <h4 className="font-semibold text-slate-800">Incidents</h4>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Tracks incident records and their resolution status for each equipment.
+                  </p>
+                  <div className="bg-slate-50 rounded p-3 text-xs text-slate-600">
+                    <p className="font-medium mb-1">Calculation:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Base score: 50% + (Closed Threats / Total Threats) × 50%</li>
+                      <li>60% baseline if no incidents recorded (neutral)</li>
+                      <li>Higher closure rate = higher score</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                {/* Investigations */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 rounded-md bg-teal-50">
+                      <FileSearch className="w-4 h-4 text-teal-600" />
+                    </div>
+                    <h4 className="font-semibold text-slate-800">Investigations</h4>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Evaluates cross-asset analysis and root cause investigation coverage.
+                  </p>
+                  <div className="bg-slate-50 rounded p-3 text-xs text-slate-600">
+                    <p className="font-medium mb-1">Calculation:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Base score: 40% + (Completed / Total Investigations) × 60%</li>
+                      <li>50% baseline if no investigations (neutral)</li>
+                      <li>Linked investigations boost the score</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                {/* Maintenance */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 rounded-md bg-red-50">
+                      <Wrench className="w-4 h-4 text-red-600" />
+                    </div>
+                    <h4 className="font-semibold text-slate-800">Maintenance</h4>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Assesses active maintenance strategies, plans, and spare parts availability.
+                  </p>
+                  <div className="bg-slate-50 rounded p-3 text-xs text-slate-600">
+                    <p className="font-medium mb-1">Calculation:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>70% base if maintenance strategy exists for equipment type</li>
+                      <li>+5% for each: Operator Rounds, Detection Systems, Tasks, Spares</li>
+                      <li>30% if equipment type exists but no strategy</li>
+                      <li>20% if no equipment type assigned</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                {/* Reactions */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 rounded-md bg-purple-50">
+                      <Activity className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <h4 className="font-semibold text-slate-800">Reactions</h4>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Measures clear reaction plans including resources, support, and response procedures.
+                  </p>
+                  <div className="bg-slate-50 rounded p-3 text-xs text-slate-600">
+                    <p className="font-medium mb-1">Calculation:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Base score: 40% + (Completed Actions / Total Actions) × 60%</li>
+                      <li>50% baseline if no actions defined (neutral)</li>
+                      <li>Action completion drives the score up</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                {/* Threats */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 rounded-md bg-emerald-50">
+                      <Target className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <h4 className="font-semibold text-slate-800">Threats</h4>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Inverse measure of unmitigated threats - fewer open threats means higher score.
+                  </p>
+                  <div className="bg-slate-50 rounded p-3 text-xs text-slate-600">
+                    <p className="font-medium mb-1">Calculation:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Starts at 100%</li>
+                      <li>-10% for each open threat</li>
+                      <li>-15% additional penalty for Critical/High risk threats</li>
+                      <li>Minimum score: 0%</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Score Interpretation */}
+              <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                <h4 className="font-semibold text-slate-800 mb-3">Score Interpretation</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                    <span><strong>80-100%</strong> - Excellent</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                    <span><strong>60-79%</strong> - Good</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                    <span><strong>40-59%</strong> - Needs Attention</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <span><strong>0-39%</strong> - Critical</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
