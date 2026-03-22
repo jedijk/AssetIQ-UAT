@@ -227,37 +227,40 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto" data-testid="dashboard-page">
-      {/* Header with Tabs */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
-            <p className="text-slate-500">{t("dashboard.subtitle") || "Overview of your risk management status"}</p>
+    <div className={`${activeTab === 'reliability' ? 'p-0' : 'p-6 max-w-7xl mx-auto'}`} data-testid="dashboard-page">
+      {/* Header with Tabs - Only show in operational view */}
+      {activeTab === 'operational' && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
+              <p className="text-slate-500">{t("dashboard.subtitle") || "Overview of your risk management status"}</p>
+            </div>
           </div>
         </div>
+      )}
+      
+      {/* Dashboard Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className={`grid w-full max-w-md grid-cols-2 ${activeTab === 'reliability' ? 'fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-slate-800/90 backdrop-blur-sm border border-slate-700' : ''}`}>
+          <TabsTrigger value="operational" className={`flex items-center gap-2 ${activeTab === 'reliability' ? 'text-slate-300 data-[state=active]:text-white data-[state=active]:bg-slate-700' : ''}`} data-testid="operational-tab">
+            <Activity className="w-4 h-4" />
+            {t("dashboard.operational") || "Operational"}
+          </TabsTrigger>
+          <TabsTrigger value="reliability" className={`flex items-center gap-2 ${activeTab === 'reliability' ? 'text-slate-300 data-[state=active]:text-white data-[state=active]:bg-slate-700' : ''}`} data-testid="reliability-tab">
+            <Gauge className="w-4 h-4" />
+            {t("dashboard.reliabilityPerformance") || "Reliability Performance"}
+          </TabsTrigger>
+        </TabsList>
         
-        {/* Dashboard Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="operational" className="flex items-center gap-2" data-testid="operational-tab">
-              <Activity className="w-4 h-4" />
-              {t("dashboard.operational") || "Operational"}
-            </TabsTrigger>
-            <TabsTrigger value="reliability" className="flex items-center gap-2" data-testid="reliability-tab">
-              <Gauge className="w-4 h-4" />
-              {t("dashboard.reliabilityPerformance") || "Reliability Performance"}
-            </TabsTrigger>
-          </TabsList>
-          
-          {/* Operational Dashboard Tab */}
-          <TabsContent value="operational" className="mt-6">
-            {/* Health Score Banner */}
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 mb-6 text-white"
-            >
+        {/* Operational Dashboard Tab */}
+        <TabsContent value="operational" className="mt-6">
+          {/* Health Score Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 mb-6 text-white"
+          >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-slate-400 text-sm mb-1">{t("dashboard.overallHealth") || "Overall System Health"}</p>
@@ -469,11 +472,10 @@ export default function DashboardPage() {
           </TabsContent>
           
           {/* Reliability Performance Tab */}
-          <TabsContent value="reliability" className="mt-0 -mx-6 -mb-6">
+          <TabsContent value="reliability" className="mt-0">
             <ReliabilityPerformancePage />
           </TabsContent>
         </Tabs>
-      </div>
     </div>
   );
 }
