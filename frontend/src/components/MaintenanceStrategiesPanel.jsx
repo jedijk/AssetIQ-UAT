@@ -833,6 +833,7 @@ const CriticalityContent = ({ strategy, criticalityLevel, onUpdate, onFailureMod
 const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating, onFailureModeClick }) => {
   const [activeTab, setActiveTab] = useState("safety_critical");
   const [sparePartDialog, setSparePartDialog] = useState({ open: false, index: null, data: null });
+  const [isCollapsed, setIsCollapsed] = useState(false);
   
   const strategiesByCrit = strategy.strategies_by_criticality || [];
   
@@ -862,7 +863,14 @@ const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating, on
     <Card className="overflow-hidden">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1 cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
+            <Button variant="ghost" size="icon" className="h-6 w-6 p-0 hover:bg-transparent">
+              {isCollapsed ? (
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-slate-400" />
+              )}
+            </Button>
             <div className="p-1.5 rounded-lg bg-indigo-100">
               <Wrench className="w-4 h-4 text-indigo-600" />
             </div>
@@ -897,6 +905,7 @@ const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating, on
           </AlertDialog>
         </div>
       </CardHeader>
+      {!isCollapsed && (
       <CardContent className="pt-0">
         {/* Criticality Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -1008,6 +1017,7 @@ const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating, on
           </div>
         )}
       </CardContent>
+      )}
 
       {/* Spare Part Edit Dialog */}
       <EditItemDialog
