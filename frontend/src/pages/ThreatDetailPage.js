@@ -31,6 +31,8 @@ import {
   Cog,
   Leaf,
   Star,
+  Link,
+  Unlink,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -301,6 +303,47 @@ const ThreatDetailPage = () => {
     }
     createActionMutation.mutate(newActionForm);
   };
+
+  // Link equipment mutation
+  const linkEquipmentMutation = useMutation({
+    mutationFn: ({ threatId, equipmentNodeId }) => threatsAPI.linkToEquipment(threatId, equipmentNodeId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["threat", id] });
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      toast.success(`Linked to ${data.threat.asset}. Score recalculated: ${data.score_calculation.final_score} (${data.score_calculation.risk_level})`);
+      setShowLinkEquipmentDialog(false);
+    },
+    onError: () => {
+      toast.error("Failed to link equipment");
+    },
+  });
+
+  // State for link equipment dialog
+  const [showLinkEquipmentDialog, setShowLinkEquipmentDialog] = useState(false);
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState("");
+
+  // Build flat list of equipment nodes for selection
+  const flatEquipmentList = useMemo(() => {
+    const result = [];
+    const flatten = (nodes, parentPath = "") => {
+      for (const node of nodes) {
+        const path = parentPath ? `${parentPath} > ${node.name}` : node.name;
+        result.push({
+          id: node.id,
+          name: node.name,
+          path: path,
+          level: node.level,
+          hasCriticality: !!node.criticality,
+          criticalityLevel: node.criticality?.level
+        });
+        if (node.children) {
+          flatten(node.children, path);
+        }
+      }
+    };
+    flatten(equipmentNodes);
+    return result;
+  }, [equipmentNodes]);
 
   if (isLoading) {
     return (
@@ -731,6 +774,154 @@ const ThreatDetailPage = () => {
           );
         })()}
       </motion.div>
+
+      {/* Equipment Criticality Linkage Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+        className="card p-4 mb-6"
+        data-testid="equipment-criticality-card"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+              linkedCriticalityData ? 'bg-purple-50' : 'bg-slate-100'
+            }`}>
+              {linkedCriticalityData ? (
+                <Link className="w-5 h-5 text-purple-600" />
+              ) : (
+                <Unlink className="w-5 h-5 text-slate-400" />
+              )}
+            </div>
+            <div>
+              <div className="text-sm font-medium text-slate-900">
+                {t("threats.equipmentCriticality")}
+              </div>
+              {linkedCriticalityData ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm text-slate-600">{threat.asset}</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                    linkedCriticalityData.level === "safety_critical" ? "bg-red-100 text-red-700" :
+                    linkedCriticalityData.level === "production_critical" ? "bg-orange-100 text-orange-700" :
+                    linkedCriticalityData.level === "medium" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
+                  }`}>
+                    {linkedCriticalityData.level?.replace("_", " ") || "low"} × {
+                      linkedCriticalityData.level === "safety_critical" ? "1.5" :
+                      linkedCriticalityData.level === "production_critical" ? "1.4" :
+                      linkedCriticalityData.level === "medium" ? "1.2" : "1.0"
+                    }
+                  </span>
+                </div>
+              ) : (
+                <div className="text-sm text-slate-400 italic">{t("threats.noCriticalityLinked")}</div>
+              )}
+            </div>
+          </div>
+          
+          {/* 4-Dimension Display or Link Button */}
+          {linkedCriticalityData ? (
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1">
+                <div className="flex flex-col items-center px-2">
+                  <Shield className="w-3 h-3 text-red-500 mb-0.5" />
+                  <span className="text-sm font-bold text-red-600">{linkedCriticalityData.safety_impact || 0}</span>
+                </div>
+                <div className="flex flex-col items-center px-2">
+                  <Cog className="w-3 h-3 text-orange-500 mb-0.5" />
+                  <span className="text-sm font-bold text-orange-600">{linkedCriticalityData.production_impact || 0}</span>
+                </div>
+                <div className="flex flex-col items-center px-2">
+                  <Leaf className="w-3 h-3 text-green-500 mb-0.5" />
+                  <span className="text-sm font-bold text-green-600">{linkedCriticalityData.environmental_impact || 0}</span>
+                </div>
+                <div className="flex flex-col items-center px-2">
+                  <Star className="w-3 h-3 text-purple-500 mb-0.5" />
+                  <span className="text-sm font-bold text-purple-600">{linkedCriticalityData.reputation_impact || 0}</span>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => setShowLinkEquipmentDialog(true)}
+                data-testid="change-equipment-link-btn"
+              >
+                {t("threats.changeLink")}
+              </Button>
+            </div>
+          ) : (
+            <Button 
+              size="sm" 
+              onClick={() => setShowLinkEquipmentDialog(true)}
+              className="bg-purple-600 hover:bg-purple-700"
+              data-testid="link-equipment-btn"
+            >
+              <Link className="w-4 h-4 mr-1" />
+              {t("threats.linkEquipment")}
+            </Button>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Link Equipment Dialog */}
+      <Dialog open={showLinkEquipmentDialog} onOpenChange={setShowLinkEquipmentDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link className="w-5 h-5 text-purple-600" />
+              {t("threats.linkToEquipment")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-600">{t("threats.linkEquipmentDesc")}</p>
+            <div className="max-h-64 overflow-y-auto space-y-1 border rounded-lg p-2">
+              {flatEquipmentList.map((eq) => (
+                <button
+                  key={eq.id}
+                  onClick={() => setSelectedEquipmentId(eq.id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                    selectedEquipmentId === eq.id 
+                      ? 'bg-purple-100 border-purple-300 border' 
+                      : 'hover:bg-slate-50 border border-transparent'
+                  }`}
+                >
+                  <div className="font-medium text-slate-800">{eq.name}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{eq.path}</div>
+                  {eq.hasCriticality && (
+                    <div className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] ${
+                      eq.criticalityLevel === "safety_critical" ? "bg-red-100 text-red-700" :
+                      eq.criticalityLevel === "production_critical" ? "bg-orange-100 text-orange-700" :
+                      eq.criticalityLevel === "medium" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
+                    }`}>
+                      {eq.criticalityLevel?.replace("_", " ")}
+                    </div>
+                  )}
+                </button>
+              ))}
+              {flatEquipmentList.length === 0 && (
+                <div className="text-center py-4 text-slate-400">{t("threats.noEquipmentFound")}</div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLinkEquipmentDialog(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button 
+              onClick={() => linkEquipmentMutation.mutate({ threatId: id, equipmentNodeId: selectedEquipmentId })}
+              disabled={!selectedEquipmentId || linkEquipmentMutation.isPending}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {linkEquipmentMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <Link className="w-4 h-4 mr-1" />
+              )}
+              {t("threats.linkAndRecalculate")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* AI Intelligence Section */}
       <motion.div

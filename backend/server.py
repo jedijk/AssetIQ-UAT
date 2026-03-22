@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Query, Header, Response
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Query, Header, Response, Body
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
@@ -1333,6 +1333,111 @@ async def delete_threat(
     
     await update_all_ranks(current_user["id"])
     return {"message": "Threat deleted"}
+
+
+@api_router.post("/threats/{threat_id}/link-equipment")
+async def link_threat_to_equipment(
+    threat_id: str,
+    equipment_node_id: str = Body(..., embed=True),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Link a threat to an equipment node and apply its criticality to the threat score.
+    This updates the threat's asset field and recalculates the risk score.
+    """
+    # Get the threat
+    threat = await db.threats.find_one({"id": threat_id, "created_by": current_user["id"]})
+    if not threat:
+        raise HTTPException(status_code=404, detail="Threat not found")
+    
+    # Get the equipment node
+    node = await db.equipment_nodes.find_one({"id": equipment_node_id, "created_by": current_user["id"]})
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    # Get criticality data from the node
+    criticality = node.get("criticality")
+    
+    # Calculate multiplier from 4-dimension criticality
+    CRITICALITY_MULTIPLIERS = {
+        "safety_critical": 1.5,
+        "production_critical": 1.4,
+        "medium": 1.2,
+        "low": 1.0
+    }
+    
+    criticality_level = "low"
+    criticality_multiplier = 1.0
+    criticality_data = None
+    
+    if criticality:
+        criticality_level = criticality.get("level", "low")
+        criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
+        criticality_data = {
+            "safety_impact": criticality.get("safety_impact", 0),
+            "production_impact": criticality.get("production_impact", 0),
+            "environmental_impact": criticality.get("environmental_impact", 0),
+            "reputation_impact": criticality.get("reputation_impact", 0),
+            "level": criticality_level,
+            "multiplier": criticality_multiplier
+        }
+    
+    # Get base risk score (from FMEA if linked, otherwise current score)
+    base_risk_score = threat.get("base_risk_score", threat.get("risk_score", 50))
+    
+    # Check if threat has linked failure mode
+    failure_mode_name = threat.get("failure_mode")
+    if failure_mode_name and failure_mode_name != "Unknown":
+        for fm in FAILURE_MODES_LIBRARY:
+            if fm["failure_mode"].lower() == failure_mode_name.lower():
+                # Calculate RPN-based score
+                rpn_score = (fm["severity"] * fm["occurrence"] * fm["detectability"]) / 10
+                base_risk_score = min(100, int(rpn_score))
+                break
+    
+    # Calculate adjusted score
+    adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
+    
+    # Determine risk level
+    if adjusted_risk_score >= 70:
+        risk_level = "Critical"
+    elif adjusted_risk_score >= 50:
+        risk_level = "High"
+    elif adjusted_risk_score >= 30:
+        risk_level = "Medium"
+    else:
+        risk_level = "Low"
+    
+    # Update threat with new asset link and recalculated score
+    update_data = {
+        "asset": node["name"],
+        "linked_equipment_id": equipment_node_id,
+        "equipment_criticality": criticality_level,
+        "equipment_criticality_data": criticality_data,
+        "base_risk_score": base_risk_score,
+        "risk_score": adjusted_risk_score,
+        "risk_level": risk_level,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.threats.update_one({"id": threat_id}, {"$set": update_data})
+    
+    # Update ranks
+    await update_all_ranks(current_user["id"])
+    
+    updated_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+    
+    return {
+        "message": f"Threat linked to {node['name']}",
+        "threat": updated_threat,
+        "score_calculation": {
+            "base_score": base_risk_score,
+            "criticality_multiplier": criticality_multiplier,
+            "criticality_level": criticality_level,
+            "final_score": adjusted_risk_score,
+            "risk_level": risk_level
+        }
+    }
 
 # ============= STATS ENDPOINT =============
 

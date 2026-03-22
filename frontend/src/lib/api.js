@@ -69,6 +69,16 @@ export const threatsAPI = {
     const response = await api.delete(`/threats/${id}`);
     return response.data;
   },
+  
+  linkToEquipment: async (threatId, equipmentNodeId) => {
+    const response = await api.post(`/threats/${threatId}/link-equipment`, { equipment_node_id: equipmentNodeId });
+    return response.data;
+  },
+  
+  recalculateScores: async () => {
+    const response = await api.post("/threats/recalculate-scores");
+    return response.data;
+  },
 };
 
 // Stats API

@@ -147,6 +147,12 @@ const en = {
     multiplier: "Multiplier",
     finalCalculation: "Final Calculation",
     riskLevelThresholds: "Risk Level Thresholds",
+    linkEquipment: "Link Equipment",
+    changeLink: "Change",
+    linkToEquipment: "Link to Equipment",
+    linkEquipmentDesc: "Select an equipment node to apply its criticality to this threat's risk score.",
+    noEquipmentFound: "No equipment nodes found",
+    linkAndRecalculate: "Link & Recalculate",
   },
   
   // Causal Engine
@@ -786,6 +792,12 @@ const nl = {
     multiplier: "Vermenigvuldiger",
     finalCalculation: "Eindberekening",
     riskLevelThresholds: "Risiconiveau Drempels",
+    linkEquipment: "Koppel Apparatuur",
+    changeLink: "Wijzig",
+    linkToEquipment: "Koppelen aan Apparatuur",
+    linkEquipmentDesc: "Selecteer een apparatuur om de kriticiteit toe te passen op de risicoscore van deze dreiging.",
+    noEquipmentFound: "Geen apparatuur gevonden",
+    linkAndRecalculate: "Koppel & Herbereken",
   },
   
   // Causal Engine
