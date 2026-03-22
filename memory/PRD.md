@@ -28,7 +28,10 @@ Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (for
 ```
 Criticality Score = (Safety×25 + Production×20 + Environmental×15 + Reputation×10) / 3.5
 FMEA Score = (Severity × Occurrence × Detectability) / 10
-Final Risk Score = (Criticality Score + FMEA Score) / 2
+
+Final Risk Score = (Criticality × 0.7) + (FMEA × 0.3)
+  - Criticality weighted at 70%
+  - FMEA weighted at 30%
 
 Risk Levels:
 - Critical: ≥70

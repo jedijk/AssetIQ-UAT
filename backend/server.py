@@ -804,7 +804,7 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
             ) / 3.5
             criticality_score = min(100, int(criticality_score))
         
-        # NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
+        # NEW METHODOLOGY: Risk Score = (Criticality × 0.7) + (FMEA × 0.3)
         final_risk_score = int((criticality_score + new_fmea_score) / 2)
         final_risk_score = min(100, max(0, final_risk_score))
         
@@ -1165,9 +1165,9 @@ async def send_chat_message(
             # RPN is already S×O×D, so divide by 10 to normalize to 0-100
             fmea_score = min(100, int(matched_failure_mode["rpn"] / 10))
     
-    # NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
+    # NEW METHODOLOGY: Risk Score = (Criticality × 0.7) + (FMEA × 0.3)
     # This averages the equipment criticality contribution with the failure mode severity
-    final_risk_score = int((criticality_score + fmea_score) / 2)
+    final_risk_score = int((criticality_score * 0.7) + (fmea_score * 0.3))
     final_risk_score = min(100, max(0, final_risk_score))  # Clamp to 0-100
     
     # Determine risk level based on final score
@@ -1319,7 +1319,7 @@ async def recalculate_all_threat_scores(
 ):
     """
     Recalculate risk scores for all threats based on current criticality and FMEA data.
-    Uses NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
+    Uses NEW METHODOLOGY: Risk Score = (Criticality × 0.7) + (FMEA × 0.3)
     """
     # Get all threats for this user
     threats = await db.threats.find({"created_by": current_user["id"]}).to_list(1000)
@@ -1402,8 +1402,8 @@ async def recalculate_all_threat_scores(
                     "criticality_score": criticality_score
                 }
         
-        # NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
-        final_risk_score = int((criticality_score + fmea_score) / 2)
+        # NEW METHODOLOGY: Risk Score = (Criticality × 0.7) + (FMEA × 0.3)
+        final_risk_score = int((criticality_score * 0.7) + (fmea_score * 0.3))
         final_risk_score = min(100, max(0, final_risk_score))
         
         # Determine risk level
@@ -1585,8 +1585,8 @@ async def link_threat_to_equipment(
                 fmea_score = min(100, int(fm["rpn"] / 10))
                 break
     
-    # NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
-    final_risk_score = int((criticality_score + fmea_score) / 2)
+    # NEW METHODOLOGY: Risk Score = (Criticality × 0.7) + (FMEA × 0.3)
+    final_risk_score = int((criticality_score * 0.7) + (fmea_score * 0.3))
     final_risk_score = min(100, max(0, final_risk_score))
     
     # Determine risk level
@@ -1691,8 +1691,8 @@ async def link_threat_to_failure_mode(
         ) / 3.5
         criticality_score = min(100, int(criticality_score))
     
-    # NEW METHODOLOGY: Risk Score = (Criticality Score + FMEA Score) / 2
-    final_risk_score = int((criticality_score + fmea_score) / 2)
+    # NEW METHODOLOGY: Risk Score = (Criticality × 0.7) + (FMEA × 0.3)
+    final_risk_score = int((criticality_score * 0.7) + (fmea_score * 0.3))
     final_risk_score = min(100, max(0, final_risk_score))
     
     # Determine risk level

@@ -655,8 +655,8 @@ const ThreatDetailPage = () => {
               ) / 3.5)
             : (threat.criticality_score || 0);
           
-          // Final Score = (Criticality Score + FMEA Score) / 2
-          const calculatedScore = Math.round((criticalityScore + fmBaseScore) / 2);
+          // Final Score = (Criticality × 0.7) + (FMEA × 0.3)
+          const calculatedScore = Math.round((criticalityScore * 0.7) + (fmBaseScore * 0.3));
           
           return (
             <div 
@@ -681,20 +681,24 @@ const ThreatDetailPage = () => {
                 </button>
               </div>
 
-              {/* Exact Calculation Box - NEW METHODOLOGY */}
+              {/* Exact Calculation Box - WEIGHTED METHODOLOGY */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 mb-4 border border-blue-100">
                 <div className="text-xs text-blue-600 font-medium mb-2">{t("threats.exactCalculation")}</div>
                 <div className="font-mono text-lg text-slate-800 text-center py-2">
                   <span className="text-slate-500">(</span>
                   <span className="text-purple-600">{criticalityScore}</span>
-                  <span className="text-slate-400 mx-1">+</span>
-                  <span className="text-blue-600">{fmBaseScore}</span>
+                  <span className="text-slate-400 mx-1">×</span>
+                  <span className="text-purple-400">0.7</span>
                   <span className="text-slate-500">)</span>
-                  <span className="text-slate-400 mx-1">÷</span>
-                  <span className="text-slate-500">2</span>
+                  <span className="text-slate-400 mx-1">+</span>
+                  <span className="text-slate-500">(</span>
+                  <span className="text-blue-600">{fmBaseScore}</span>
+                  <span className="text-slate-400 mx-1">×</span>
+                  <span className="text-blue-400">0.3</span>
+                  <span className="text-slate-500">)</span>
                 </div>
                 <div className="text-center text-[10px] text-slate-500 mt-1">
-                  ({t("threats.criticalityScoreLabel")} + {t("threats.fmeaScoreLabel")}) ÷ 2
+                  ({t("threats.criticalityScoreLabel")} × 70%) + ({t("threats.fmeaScoreLabel")} × 30%)
                 </div>
                 <div className="text-center mt-2 pt-2 border-t border-blue-200">
                   <span className="text-slate-500 text-sm">=</span>
@@ -821,10 +825,14 @@ const ThreatDetailPage = () => {
                   <div className="bg-white rounded px-3 py-2 font-mono text-sm">
                     <span className="text-slate-500">(</span>
                     <span className="text-purple-600">{criticalityScore}</span>
-                    <span className="text-slate-400 mx-1">+</span>
-                    <span className="text-blue-600">{fmBaseScore}</span>
+                    <span className="text-slate-400">×0.7</span>
                     <span className="text-slate-500">)</span>
-                    <span className="text-slate-400 mx-1">÷ 2 =</span>
+                    <span className="text-slate-400 mx-1">+</span>
+                    <span className="text-slate-500">(</span>
+                    <span className="text-blue-600">{fmBaseScore}</span>
+                    <span className="text-slate-400">×0.3</span>
+                    <span className="text-slate-500">)</span>
+                    <span className="text-slate-400 mx-1">=</span>
                     <span className={`font-bold ${
                       threat.risk_level === "Critical" ? "text-red-600" :
                       threat.risk_level === "High" ? "text-orange-600" :
