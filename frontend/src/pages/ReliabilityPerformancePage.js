@@ -39,14 +39,14 @@ const LEVEL_ICONS = {
   maintainable_item: Shield,
 };
 
-// Reliability dimensions with colors
+// Reliability dimensions with colors - shorter labels for chart
 const DIMENSIONS = [
-  { key: "criticality", label: "Criticality", icon: Shield, color: "text-amber-600", bg: "bg-amber-50" },
-  { key: "incidents", label: "Incidents", icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50" },
-  { key: "investigations", label: "Investigations", icon: FileSearch, color: "text-teal-600", bg: "bg-teal-50" },
-  { key: "maintenance", label: "Maintenance", icon: Wrench, color: "text-red-600", bg: "bg-red-50" },
-  { key: "reactions", label: "Reactions", icon: Activity, color: "text-purple-600", bg: "bg-purple-50" },
-  { key: "threats", label: "Threats", icon: Target, color: "text-emerald-600", bg: "bg-emerald-50" },
+  { key: "criticality", label: "Criticality", shortLabel: "Criticality", icon: Shield, color: "text-amber-600", bg: "bg-amber-50" },
+  { key: "incidents", label: "Incidents", shortLabel: "Incidents", icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50" },
+  { key: "investigations", label: "Investigations", shortLabel: "Investig.", icon: FileSearch, color: "text-teal-600", bg: "bg-teal-50" },
+  { key: "maintenance", label: "Maintenance", shortLabel: "Mainten.", icon: Wrench, color: "text-red-600", bg: "bg-red-50" },
+  { key: "reactions", label: "Reactions", shortLabel: "Reactions", icon: Activity, color: "text-purple-600", bg: "bg-purple-50" },
+  { key: "threats", label: "Threats", shortLabel: "Threats", icon: Target, color: "text-emerald-600", bg: "bg-emerald-50" },
 ];
 
 // Calculate radar points
@@ -76,17 +76,36 @@ const createRadarPath = (points) => {
 
 // Snowflake component - Light theme
 const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts = 0, stars = 0 }) => {
-  const size = 240;
+  const size = 320;
   const centerX = size / 2;
   const centerY = size / 2;
-  const radius = size / 2 - 45;
+  const radius = size / 2 - 75;
 
   const normalizedScores = DIMENSIONS.map(dim => {
     const score = scores[dim.key];
     return typeof score === "number" ? Math.min(100, Math.max(0, score)) : 0;
   });
 
-  const points = getRadarPoints(normalizedScores, centerX, centerY, radius);
+  // Calculate points with more space for labels
+  const getPoints = () => {
+    const angleStep = (2 * Math.PI) / DIMENSIONS.length;
+    const startAngle = -Math.PI / 2;
+    
+    return normalizedScores.map((score, i) => {
+      const angle = startAngle + i * angleStep;
+      const r = (score / 100) * radius;
+      return {
+        x: centerX + r * Math.cos(angle),
+        y: centerY + r * Math.sin(angle),
+        labelX: centerX + (radius + 55) * Math.cos(angle),
+        labelY: centerY + (radius + 55) * Math.sin(angle),
+        score,
+        angle,
+      };
+    });
+  };
+  
+  const points = getPoints();
   const gridCircles = [0.25, 0.5, 0.75, 1].map(f => radius * f);
 
   const getAssessment = (score) => {
@@ -97,8 +116,8 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5">
-      <svg width={size} height={size} className="mx-auto">
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
+      <svg width={size} height={size} className="mx-auto" style={{ overflow: 'visible' }}>
         {/* Background */}
         <circle cx={centerX} cy={centerY} r={radius + 10} fill="#f8fafc" />
         
@@ -123,7 +142,7 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
           <circle key={i} cx={p.x} cy={p.y} r={4} fill="#EAB308" stroke="#fff" strokeWidth={2} />
         ))}
         
-        {/* Labels */}
+        {/* Labels - Full text, proper positioning */}
         {points.map((p, i) => {
           const dim = DIMENSIONS[i];
           const isLeft = Math.abs(p.angle) > Math.PI / 2;
@@ -133,15 +152,24 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
           if (!isTop && !isBottom) anchor = isLeft ? "end" : "start";
           
           return (
-            <text key={i} x={p.labelX} y={p.labelY} textAnchor={anchor} dominantBaseline="middle" className="text-[9px] font-semibold uppercase tracking-wide" fill="#64748b">
-              {dim.label.slice(0, 6).toUpperCase()}
+            <text 
+              key={i} 
+              x={p.labelX} 
+              y={p.labelY} 
+              textAnchor={anchor} 
+              dominantBaseline="middle" 
+              fontSize="11"
+              fontWeight="600"
+              fill="#475569"
+            >
+              {dim.shortLabel}
             </text>
           );
         })}
         
         {/* Center score */}
-        <text x={centerX} y={centerY - 5} textAnchor="middle" className="text-2xl font-bold" fill="#EAB308">{overall}</text>
-        <text x={centerX} y={centerY + 12} textAnchor="middle" className="text-[9px] uppercase tracking-wider" fill="#94a3b8">Score</text>
+        <text x={centerX} y={centerY - 8} textAnchor="middle" fontSize="28" fontWeight="bold" fill="#EAB308">{overall}</text>
+        <text x={centerX} y={centerY + 14} textAnchor="middle" fontSize="10" fill="#94a3b8">SCORE</text>
       </svg>
       
       <p className="text-center mt-3 text-sm text-slate-600">{getAssessment(overall)}</p>
