@@ -4002,13 +4002,35 @@ async def update_maintenance_strategy(
     if not strategy:
         raise HTTPException(status_code=404, detail="Maintenance strategy not found")
     
-    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    update_data = {}
+    
+    # Handle strategies_by_criticality updates
+    if data.strategies_by_criticality is not None:
+        update_data["strategies_by_criticality"] = [s.model_dump() if hasattr(s, 'model_dump') else s for s in data.strategies_by_criticality]
+    
+    # Handle spare_parts updates
+    if data.spare_parts is not None:
+        update_data["spare_parts"] = [s.model_dump() if hasattr(s, 'model_dump') else s for s in data.spare_parts]
+    
+    # Handle failure_mode_mappings updates
+    if data.failure_mode_mappings is not None:
+        update_data["failure_mode_mappings"] = [m.model_dump() if hasattr(m, 'model_dump') else m for m in data.failure_mode_mappings]
+    
+    # Handle other fields
+    if data.description is not None:
+        update_data["description"] = data.description
+    if data.strategy_version is not None:
+        update_data["strategy_version"] = data.strategy_version
+    
     if update_data:
-        # Update version if significant changes
-        if any(k in update_data for k in ['operator_rounds', 'detection_systems', 'scheduled_maintenance']):
+        # Auto-increment version on significant changes
+        if any(k in update_data for k in ['strategies_by_criticality', 'spare_parts', 'failure_mode_mappings']):
             current_version = strategy.get("strategy_version", "1.0")
-            major, minor = map(int, current_version.split("."))
-            update_data["strategy_version"] = f"{major}.{minor + 1}"
+            try:
+                major, minor = map(int, current_version.split("."))
+                update_data["strategy_version"] = f"{major}.{minor + 1}"
+            except ValueError:
+                update_data["strategy_version"] = "1.1"
         
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         await db.maintenance_strategies.update_one(

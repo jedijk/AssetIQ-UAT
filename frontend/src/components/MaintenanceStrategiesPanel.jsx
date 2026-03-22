@@ -10,7 +10,6 @@ import {
   AlertTriangle,
   Clock,
   Users,
-  Eye,
   Gauge,
   Settings,
   ChevronDown,
@@ -18,7 +17,6 @@ import {
   Loader2,
   Sparkles,
   Trash2,
-  RefreshCw,
   Package,
   Zap,
   Bell,
@@ -28,9 +26,15 @@ import {
   Activity,
   Search,
   PlayCircle,
+  Edit2,
+  Plus,
+  X,
+  Save,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { ScrollArea } from "./ui/scroll-area";
@@ -43,6 +47,14 @@ import {
   SelectValue,
 } from "./ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -53,6 +65,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
+import { Label } from "./ui/label";
 
 const CRITICALITY_CONFIG = {
   safety_critical: { label: "Safety Critical", color: "bg-red-500", textColor: "text-red-700", bgColor: "bg-red-50", borderColor: "border-red-200", icon: Shield },
@@ -61,20 +74,406 @@ const CRITICALITY_CONFIG = {
   low: { label: "Low", color: "bg-green-500", textColor: "text-green-700", bgColor: "bg-green-50", borderColor: "border-green-200", icon: CheckCircle2 },
 };
 
-const FREQUENCY_LABELS = {
-  continuous: "Continuous",
-  hourly: "Hourly",
-  shift: "Per Shift",
-  daily: "Daily",
-  weekly: "Weekly",
-  monthly: "Monthly",
-  quarterly: "Quarterly",
-  semi_annual: "Semi-Annual",
-  annual: "Annual",
+const FREQUENCY_OPTIONS = [
+  { value: "continuous", label: "Continuous" },
+  { value: "hourly", label: "Hourly" },
+  { value: "shift", label: "Per Shift" },
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "semi_annual", label: "Semi-Annual" },
+  { value: "annual", label: "Annual" },
+];
+
+const DETECTION_TYPES = [
+  { value: "vibration", label: "Vibration" },
+  { value: "temperature", label: "Temperature" },
+  { value: "pressure", label: "Pressure" },
+  { value: "flow", label: "Flow" },
+  { value: "level", label: "Level" },
+  { value: "acoustic", label: "Acoustic" },
+  { value: "oil_analysis", label: "Oil Analysis" },
+  { value: "thermography", label: "Thermography" },
+  { value: "ultrasonic", label: "Ultrasonic" },
+  { value: "visual", label: "Visual" },
+  { value: "electrical", label: "Electrical" },
+  { value: "process", label: "Process" },
+];
+
+const MAINTENANCE_TYPES = [
+  { value: "preventive", label: "Preventive" },
+  { value: "predictive", label: "Predictive" },
+  { value: "condition_based", label: "Condition-Based" },
+  { value: "corrective", label: "Corrective" },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "critical", label: "Critical" },
+];
+
+// Generic Edit Dialog Component
+const EditItemDialog = ({ open, onClose, title, children, onSave, isSaving }) => {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          {children}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onClose(false)}>Cancel</Button>
+          <Button onClick={onSave} disabled={isSaving}>
+            {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Operator Round Edit Form
+const OperatorRoundForm = ({ round, onChange }) => {
+  const updateField = (field, value) => {
+    onChange({ ...round, [field]: value });
+  };
+
+  const addCheck = () => {
+    const newCheck = {
+      id: `check_${Date.now()}`,
+      description: "",
+      check_type: "visual",
+      acceptable_range: null,
+      failure_modes_addressed: []
+    };
+    onChange({ ...round, checklist: [...(round.checklist || []), newCheck] });
+  };
+
+  const updateCheck = (idx, field, value) => {
+    const newChecklist = [...(round.checklist || [])];
+    newChecklist[idx] = { ...newChecklist[idx], [field]: value };
+    onChange({ ...round, checklist: newChecklist });
+  };
+
+  const removeCheck = (idx) => {
+    onChange({ ...round, checklist: round.checklist.filter((_, i) => i !== idx) });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Round Name</Label>
+          <Input value={round.name || ""} onChange={(e) => updateField("name", e.target.value)} />
+        </div>
+        <div>
+          <Label>Frequency</Label>
+          <Select value={round.frequency || "daily"} onValueChange={(v) => updateField("frequency", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {FREQUENCY_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Duration (minutes)</Label>
+          <Input type="number" value={round.duration_minutes || 15} onChange={(e) => updateField("duration_minutes", parseInt(e.target.value))} />
+        </div>
+        <div>
+          <Label>Skills Required (comma-separated)</Label>
+          <Input value={(round.skills_required || []).join(", ")} onChange={(e) => updateField("skills_required", e.target.value.split(",").map(s => s.trim()).filter(Boolean))} />
+        </div>
+      </div>
+      <div>
+        <Label>PPE Required (comma-separated)</Label>
+        <Input value={(round.ppe_required || []).join(", ")} onChange={(e) => updateField("ppe_required", e.target.value.split(",").map(s => s.trim()).filter(Boolean))} />
+      </div>
+      
+      <div className="border-t pt-4">
+        <div className="flex items-center justify-between mb-2">
+          <Label>Checklist Items</Label>
+          <Button size="sm" variant="outline" onClick={addCheck}><Plus className="w-3 h-3 mr-1" />Add Check</Button>
+        </div>
+        <div className="space-y-2">
+          {(round.checklist || []).map((check, idx) => (
+            <div key={idx} className="flex gap-2 items-start p-2 border rounded bg-slate-50">
+              <div className="flex-1 space-y-2">
+                <Input placeholder="Description" value={check.description || ""} onChange={(e) => updateCheck(idx, "description", e.target.value)} />
+                <div className="flex gap-2">
+                  <Select value={check.check_type || "visual"} onValueChange={(v) => updateCheck(idx, "check_type", v)}>
+                    <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="visual">Visual</SelectItem>
+                      <SelectItem value="measurement">Measurement</SelectItem>
+                      <SelectItem value="functional">Functional</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input className="flex-1" placeholder="Acceptable range" value={check.acceptable_range || ""} onChange={(e) => updateCheck(idx, "acceptable_range", e.target.value)} />
+                </div>
+              </div>
+              <Button size="icon" variant="ghost" onClick={() => removeCheck(idx)}><X className="w-4 h-4" /></Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Detection System Edit Form
+const DetectionSystemForm = ({ system, onChange }) => {
+  const updateField = (field, value) => {
+    onChange({ ...system, [field]: value });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>System Name</Label>
+          <Input value={system.name || ""} onChange={(e) => updateField("name", e.target.value)} />
+        </div>
+        <div>
+          <Label>System Type</Label>
+          <Select value={system.system_type || "visual"} onValueChange={(v) => updateField("system_type", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {DETECTION_TYPES.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label>Description</Label>
+        <Textarea value={system.description || ""} onChange={(e) => updateField("description", e.target.value)} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Monitoring Interval</Label>
+          <Select value={system.monitoring_interval || "daily"} onValueChange={(v) => updateField("monitoring_interval", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {FREQUENCY_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Installation Cost (€)</Label>
+          <Input type="number" value={system.installation_cost_eur || ""} onChange={(e) => updateField("installation_cost_eur", e.target.value ? parseFloat(e.target.value) : null)} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Warning Threshold</Label>
+          <Input type="number" step="0.1" value={system.alarm_thresholds?.warning || ""} onChange={(e) => updateField("alarm_thresholds", { ...system.alarm_thresholds, warning: e.target.value ? parseFloat(e.target.value) : null })} />
+        </div>
+        <div>
+          <Label>Critical Threshold</Label>
+          <Input type="number" step="0.1" value={system.alarm_thresholds?.critical || ""} onChange={(e) => updateField("alarm_thresholds", { ...system.alarm_thresholds, critical: e.target.value ? parseFloat(e.target.value) : null })} />
+        </div>
+      </div>
+      <div>
+        <Label>Failure Modes Detected (comma-separated)</Label>
+        <Input value={(system.failure_modes_detected || []).join(", ")} onChange={(e) => updateField("failure_modes_detected", e.target.value.split(",").map(s => s.trim()).filter(Boolean))} />
+      </div>
+    </div>
+  );
+};
+
+// Maintenance Task Edit Form
+const MaintenanceTaskForm = ({ task, onChange }) => {
+  const updateField = (field, value) => {
+    onChange({ ...task, [field]: value });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Task Name</Label>
+          <Input value={task.name || ""} onChange={(e) => updateField("name", e.target.value)} />
+        </div>
+        <div>
+          <Label>Maintenance Type</Label>
+          <Select value={task.maintenance_type || "preventive"} onValueChange={(v) => updateField("maintenance_type", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {MAINTENANCE_TYPES.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label>Description</Label>
+        <Textarea value={task.description || ""} onChange={(e) => updateField("description", e.target.value)} />
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <Label>Interval</Label>
+          <Select value={task.interval || "monthly"} onValueChange={(v) => updateField("interval", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {FREQUENCY_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Duration (hours)</Label>
+          <Input type="number" step="0.5" value={task.duration_hours || 2} onChange={(e) => updateField("duration_hours", parseFloat(e.target.value))} />
+        </div>
+        <div>
+          <Label>Est. Cost (€)</Label>
+          <Input type="number" value={task.estimated_cost_eur || ""} onChange={(e) => updateField("estimated_cost_eur", e.target.value ? parseFloat(e.target.value) : null)} />
+        </div>
+      </div>
+      <div>
+        <Label>Skills Required (comma-separated)</Label>
+        <Input value={(task.skills_required || []).join(", ")} onChange={(e) => updateField("skills_required", e.target.value.split(",").map(s => s.trim()).filter(Boolean))} />
+      </div>
+      <div>
+        <Label>Tools Required (comma-separated)</Label>
+        <Input value={(task.tools_required || []).join(", ")} onChange={(e) => updateField("tools_required", e.target.value.split(",").map(s => s.trim()).filter(Boolean))} />
+      </div>
+      <div>
+        <Label>Spare Parts (comma-separated)</Label>
+        <Input value={(task.spare_parts || []).join(", ")} onChange={(e) => updateField("spare_parts", e.target.value.split(",").map(s => s.trim()).filter(Boolean))} />
+      </div>
+    </div>
+  );
+};
+
+// Corrective Action Edit Form
+const CorrectiveActionForm = ({ action, onChange }) => {
+  const updateField = (field, value) => {
+    onChange({ ...action, [field]: value });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label>Trigger Condition</Label>
+        <Input value={action.trigger_condition || ""} onChange={(e) => updateField("trigger_condition", e.target.value)} />
+      </div>
+      <div>
+        <Label>Action Description</Label>
+        <Textarea value={action.action_description || ""} onChange={(e) => updateField("action_description", e.target.value)} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Response Time (hours)</Label>
+          <Input type="number" value={action.response_time_hours || 24} onChange={(e) => updateField("response_time_hours", parseFloat(e.target.value))} />
+        </div>
+        <div>
+          <Label>Priority</Label>
+          <Select value={action.priority || "medium"} onValueChange={(v) => updateField("priority", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {PRIORITY_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label>Escalation Path</Label>
+        <Input value={action.escalation_path || ""} onChange={(e) => updateField("escalation_path", e.target.value)} />
+      </div>
+    </div>
+  );
+};
+
+// Emergency Procedure Edit Form
+const EmergencyProcedureForm = ({ procedure, onChange }) => {
+  const updateField = (field, value) => {
+    onChange({ ...procedure, [field]: value });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label>Condition</Label>
+        <Input value={procedure.condition || ""} onChange={(e) => updateField("condition", e.target.value)} />
+      </div>
+      <div>
+        <Label>Immediate Actions (one per line)</Label>
+        <Textarea rows={3} value={(procedure.immediate_actions || []).join("\n")} onChange={(e) => updateField("immediate_actions", e.target.value.split("\n").filter(Boolean))} />
+      </div>
+      <div>
+        <Label>Safety Precautions (one per line)</Label>
+        <Textarea rows={3} value={(procedure.safety_precautions || []).join("\n")} onChange={(e) => updateField("safety_precautions", e.target.value.split("\n").filter(Boolean))} />
+      </div>
+      <div>
+        <Label>Recovery Steps (one per line)</Label>
+        <Textarea rows={3} value={(procedure.recovery_steps || []).join("\n")} onChange={(e) => updateField("recovery_steps", e.target.value.split("\n").filter(Boolean))} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Notification List (comma-separated)</Label>
+          <Input value={(procedure.notification_list || []).join(", ")} onChange={(e) => updateField("notification_list", e.target.value.split(",").map(s => s.trim()).filter(Boolean))} />
+        </div>
+        <div>
+          <Label>Est. Downtime (hours)</Label>
+          <Input type="number" value={procedure.estimated_downtime_hours || ""} onChange={(e) => updateField("estimated_downtime_hours", e.target.value ? parseFloat(e.target.value) : null)} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Spare Part Edit Form
+const SparePartForm = ({ part, onChange }) => {
+  const updateField = (field, value) => {
+    onChange({ ...part, [field]: value });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Part Name</Label>
+          <Input value={part.part_name || ""} onChange={(e) => updateField("part_name", e.target.value)} />
+        </div>
+        <div>
+          <Label>Part Number</Label>
+          <Input value={part.part_number || ""} onChange={(e) => updateField("part_number", e.target.value)} />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <Label>Quantity</Label>
+          <Input type="number" value={part.quantity_recommended || 1} onChange={(e) => updateField("quantity_recommended", parseInt(e.target.value))} />
+        </div>
+        <div>
+          <Label>Lead Time (days)</Label>
+          <Input type="number" value={part.lead_time_days || ""} onChange={(e) => updateField("lead_time_days", e.target.value ? parseInt(e.target.value) : null)} />
+        </div>
+        <div>
+          <Label>Est. Cost (€)</Label>
+          <Input type="number" value={part.estimated_cost_eur || ""} onChange={(e) => updateField("estimated_cost_eur", e.target.value ? parseFloat(e.target.value) : null)} />
+        </div>
+      </div>
+      <div>
+        <Label>Criticality</Label>
+        <Select value={part.criticality || "medium"} onValueChange={(v) => updateField("criticality", v)}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {PRIORITY_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
 };
 
 // Collapsible Section Component
-const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = false, count = 0, color = "slate" }) => {
+const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = false, count = 0, color = "slate", onAdd, addLabel = "Add" }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   
   return (
@@ -90,7 +489,14 @@ const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = false, 
             <Badge variant="secondary" className="text-xs px-1.5 py-0">{count}</Badge>
           )}
         </div>
-        {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        <div className="flex items-center gap-2">
+          {onAdd && (
+            <Button size="sm" variant="ghost" className="h-6 px-2" onClick={(e) => { e.stopPropagation(); onAdd(); }}>
+              <Plus className="w-3 h-3 mr-1" />{addLabel}
+            </Button>
+          )}
+          {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </div>
       </button>
       <AnimatePresence>
         {isOpen && (
@@ -110,9 +516,102 @@ const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = false, 
   );
 };
 
-// Criticality Tab Content
-const CriticalityContent = ({ strategy }) => {
-  const config = CRITICALITY_CONFIG[strategy.criticality_level] || CRITICALITY_CONFIG.medium;
+// Editable Item Card
+const EditableItem = ({ children, onEdit, onDelete }) => {
+  return (
+    <div className="group relative p-2 bg-white border rounded hover:border-indigo-300 transition-colors">
+      {children}
+      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onEdit}>
+          <Edit2 className="w-3 h-3" />
+        </Button>
+        <Button size="icon" variant="ghost" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={onDelete}>
+          <X className="w-3 h-3" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+// Criticality Tab Content with Editing
+const CriticalityContent = ({ strategy, criticalityLevel, onUpdate }) => {
+  const [editDialog, setEditDialog] = useState({ open: false, type: null, index: null, data: null });
+
+  const handleSave = () => {
+    const { type, index, data } = editDialog;
+    const newStrategy = { ...strategy };
+    
+    if (type === "operator_round") {
+      newStrategy.operator_rounds = [...(strategy.operator_rounds || [])];
+      if (index === -1) {
+        newStrategy.operator_rounds.push({ ...data, id: `round_${Date.now()}` });
+      } else {
+        newStrategy.operator_rounds[index] = data;
+      }
+    } else if (type === "detection_system") {
+      newStrategy.detection_systems = [...(strategy.detection_systems || [])];
+      if (index === -1) {
+        newStrategy.detection_systems.push({ ...data, id: `det_${Date.now()}` });
+      } else {
+        newStrategy.detection_systems[index] = data;
+      }
+    } else if (type === "maintenance_task") {
+      newStrategy.scheduled_maintenance = [...(strategy.scheduled_maintenance || [])];
+      if (index === -1) {
+        newStrategy.scheduled_maintenance.push({ ...data, id: `task_${Date.now()}` });
+      } else {
+        newStrategy.scheduled_maintenance[index] = data;
+      }
+    } else if (type === "corrective_action") {
+      newStrategy.corrective_actions = [...(strategy.corrective_actions || [])];
+      if (index === -1) {
+        newStrategy.corrective_actions.push({ ...data, id: `corr_${Date.now()}` });
+      } else {
+        newStrategy.corrective_actions[index] = data;
+      }
+    } else if (type === "emergency_procedure") {
+      newStrategy.emergency_procedures = [...(strategy.emergency_procedures || [])];
+      if (index === -1) {
+        newStrategy.emergency_procedures.push({ ...data, id: `emerg_${Date.now()}` });
+      } else {
+        newStrategy.emergency_procedures[index] = data;
+      }
+    }
+    
+    onUpdate(criticalityLevel, newStrategy);
+    setEditDialog({ open: false, type: null, index: null, data: null });
+  };
+
+  const handleDelete = (type, index) => {
+    const newStrategy = { ...strategy };
+    if (type === "operator_round") {
+      newStrategy.operator_rounds = strategy.operator_rounds.filter((_, i) => i !== index);
+    } else if (type === "detection_system") {
+      newStrategy.detection_systems = strategy.detection_systems.filter((_, i) => i !== index);
+    } else if (type === "maintenance_task") {
+      newStrategy.scheduled_maintenance = strategy.scheduled_maintenance.filter((_, i) => i !== index);
+    } else if (type === "corrective_action") {
+      newStrategy.corrective_actions = strategy.corrective_actions.filter((_, i) => i !== index);
+    } else if (type === "emergency_procedure") {
+      newStrategy.emergency_procedures = strategy.emergency_procedures.filter((_, i) => i !== index);
+    }
+    onUpdate(criticalityLevel, newStrategy);
+  };
+
+  const openEdit = (type, index, data) => {
+    setEditDialog({ open: true, type, index, data: { ...data } });
+  };
+
+  const openAdd = (type) => {
+    const defaults = {
+      operator_round: { name: "", frequency: "daily", duration_minutes: 15, checklist: [], skills_required: [], ppe_required: [] },
+      detection_system: { name: "", system_type: "visual", description: "", monitoring_interval: "daily" },
+      maintenance_task: { name: "", description: "", maintenance_type: "preventive", interval: "monthly", duration_hours: 2 },
+      corrective_action: { trigger_condition: "", action_description: "", response_time_hours: 24, priority: "medium" },
+      emergency_procedure: { condition: "", immediate_actions: [], safety_precautions: [], recovery_steps: [] },
+    };
+    setEditDialog({ open: true, type, index: -1, data: defaults[type] });
+  };
   
   return (
     <div className="space-y-3">
@@ -140,132 +639,183 @@ const CriticalityContent = ({ strategy }) => {
         </div>
       </div>
       
-      {/* Cost & Availability */}
-      <div className="flex gap-2">
-        {strategy.estimated_annual_cost_eur && (
-          <div className="flex-1 flex items-center gap-2 text-sm p-2 bg-slate-50 rounded">
-            <DollarSign className="w-4 h-4 text-slate-400" />
-            <span className="text-slate-600">€{strategy.estimated_annual_cost_eur.toLocaleString()}/yr</span>
-          </div>
-        )}
-        {strategy.expected_availability_percent && (
-          <div className="flex-1 flex items-center gap-2 text-sm p-2 bg-slate-50 rounded">
-            <Activity className="w-4 h-4 text-slate-400" />
-            <span className="text-slate-600">{strategy.expected_availability_percent}% availability</span>
-          </div>
-        )}
-      </div>
-      
       {/* Expandable Sections */}
       <div className="space-y-2">
-        {strategy.operator_rounds?.length > 0 && (
-          <CollapsibleSection title="Operator Rounds" icon={Users} count={strategy.operator_rounds.length} color="blue" defaultOpen>
-            {strategy.operator_rounds.map((round, idx) => (
-              <div key={idx} className="p-2 bg-white border rounded">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium text-xs">{round.name}</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                    {FREQUENCY_LABELS[round.frequency] || round.frequency}
-                  </Badge>
-                </div>
-                <div className="text-[11px] text-slate-500">{round.duration_minutes} min • {round.checklist?.length || 0} checks</div>
-                {round.checklist?.slice(0, 3).map((check, cIdx) => (
-                  <div key={cIdx} className="text-[11px] text-slate-600 ml-2 mt-1 flex items-start gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="line-clamp-1">{check.description}</span>
-                  </div>
-                ))}
+        <CollapsibleSection 
+          title="Operator Rounds" 
+          icon={Users} 
+          count={strategy.operator_rounds?.length || 0} 
+          color="blue" 
+          defaultOpen
+          onAdd={() => openAdd("operator_round")}
+        >
+          {(strategy.operator_rounds || []).map((round, idx) => (
+            <EditableItem key={idx} onEdit={() => openEdit("operator_round", idx, round)} onDelete={() => handleDelete("operator_round", idx)}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-medium text-xs">{round.name}</span>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  {FREQUENCY_OPTIONS.find(f => f.value === round.frequency)?.label || round.frequency}
+                </Badge>
               </div>
-            ))}
-          </CollapsibleSection>
-        )}
+              <div className="text-[11px] text-slate-500">{round.duration_minutes} min • {round.checklist?.length || 0} checks</div>
+            </EditableItem>
+          ))}
+          {(!strategy.operator_rounds || strategy.operator_rounds.length === 0) && (
+            <div className="text-xs text-slate-400 italic">No operator rounds defined</div>
+          )}
+        </CollapsibleSection>
         
-        {strategy.detection_systems?.length > 0 && (
-          <CollapsibleSection title="Detection Systems" icon={Gauge} count={strategy.detection_systems.length} color="purple">
-            {strategy.detection_systems.map((system, idx) => (
-              <div key={idx} className="p-2 bg-white border rounded">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium text-xs">{system.name}</span>
-                  <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0">
-                    {system.system_type?.replace("_", " ")}
-                  </Badge>
-                </div>
-                <div className="text-[11px] text-slate-600 line-clamp-2">{system.description}</div>
-                {system.alarm_thresholds && (
-                  <div className="text-[10px] text-slate-500 mt-1">
-                    Warning: {system.alarm_thresholds.warning}, Critical: {system.alarm_thresholds.critical}
-                  </div>
-                )}
+        <CollapsibleSection 
+          title="Detection Systems" 
+          icon={Gauge} 
+          count={strategy.detection_systems?.length || 0} 
+          color="purple"
+          onAdd={() => openAdd("detection_system")}
+        >
+          {(strategy.detection_systems || []).map((system, idx) => (
+            <EditableItem key={idx} onEdit={() => openEdit("detection_system", idx, system)} onDelete={() => handleDelete("detection_system", idx)}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-medium text-xs">{system.name}</span>
+                <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0">
+                  {system.system_type?.replace("_", " ")}
+                </Badge>
               </div>
-            ))}
-          </CollapsibleSection>
-        )}
+              <div className="text-[11px] text-slate-600 line-clamp-1">{system.description}</div>
+            </EditableItem>
+          ))}
+          {(!strategy.detection_systems || strategy.detection_systems.length === 0) && (
+            <div className="text-xs text-slate-400 italic">No detection systems defined</div>
+          )}
+        </CollapsibleSection>
         
-        {strategy.scheduled_maintenance?.length > 0 && (
-          <CollapsibleSection title="Scheduled Maintenance" icon={Calendar} count={strategy.scheduled_maintenance.length} color="green">
-            {strategy.scheduled_maintenance.map((task, idx) => (
-              <div key={idx} className="p-2 bg-white border rounded">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium text-xs">{task.name}</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                    {FREQUENCY_LABELS[task.interval] || task.interval}
-                  </Badge>
-                </div>
-                <div className="text-[11px] text-slate-600 line-clamp-2">{task.description}</div>
-                <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
-                  <Clock className="w-3 h-3" /> {task.duration_hours}h
-                  {task.estimated_cost_eur && <><DollarSign className="w-3 h-3 ml-1" /> €{task.estimated_cost_eur}</>}
-                </div>
+        <CollapsibleSection 
+          title="Scheduled Maintenance" 
+          icon={Calendar} 
+          count={strategy.scheduled_maintenance?.length || 0} 
+          color="green"
+          onAdd={() => openAdd("maintenance_task")}
+        >
+          {(strategy.scheduled_maintenance || []).map((task, idx) => (
+            <EditableItem key={idx} onEdit={() => openEdit("maintenance_task", idx, task)} onDelete={() => handleDelete("maintenance_task", idx)}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-medium text-xs">{task.name}</span>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  {FREQUENCY_OPTIONS.find(f => f.value === task.interval)?.label || task.interval}
+                </Badge>
               </div>
-            ))}
-          </CollapsibleSection>
-        )}
+              <div className="text-[11px] text-slate-600 line-clamp-1">{task.description}</div>
+            </EditableItem>
+          ))}
+          {(!strategy.scheduled_maintenance || strategy.scheduled_maintenance.length === 0) && (
+            <div className="text-xs text-slate-400 italic">No maintenance tasks defined</div>
+          )}
+        </CollapsibleSection>
         
-        {strategy.corrective_actions?.length > 0 && (
-          <CollapsibleSection title="Corrective Actions" icon={Zap} count={strategy.corrective_actions.length} color="orange">
-            {strategy.corrective_actions.map((action, idx) => (
-              <div key={idx} className="p-2 bg-white border rounded">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium text-xs line-clamp-1">{action.trigger_condition}</span>
-                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
-                    action.priority === 'critical' ? 'border-red-500 text-red-600' :
-                    action.priority === 'high' ? 'border-orange-500 text-orange-600' : ''
-                  }`}>
-                    {action.priority} • {action.response_time_hours}h
-                  </Badge>
-                </div>
-                <div className="text-[11px] text-slate-600 line-clamp-2">{action.action_description}</div>
+        <CollapsibleSection 
+          title="Corrective Actions" 
+          icon={Zap} 
+          count={strategy.corrective_actions?.length || 0} 
+          color="orange"
+          onAdd={() => openAdd("corrective_action")}
+        >
+          {(strategy.corrective_actions || []).map((action, idx) => (
+            <EditableItem key={idx} onEdit={() => openEdit("corrective_action", idx, action)} onDelete={() => handleDelete("corrective_action", idx)}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-medium text-xs line-clamp-1">{action.trigger_condition}</span>
+                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
+                  action.priority === 'critical' ? 'border-red-500 text-red-600' :
+                  action.priority === 'high' ? 'border-orange-500 text-orange-600' : ''
+                }`}>
+                  {action.priority} • {action.response_time_hours}h
+                </Badge>
               </div>
-            ))}
-          </CollapsibleSection>
-        )}
+            </EditableItem>
+          ))}
+          {(!strategy.corrective_actions || strategy.corrective_actions.length === 0) && (
+            <div className="text-xs text-slate-400 italic">No corrective actions defined</div>
+          )}
+        </CollapsibleSection>
         
-        {strategy.emergency_procedures?.length > 0 && (
-          <CollapsibleSection title="Emergency Procedures" icon={Bell} count={strategy.emergency_procedures.length} color="red">
-            {strategy.emergency_procedures.map((proc, idx) => (
-              <div key={idx} className="p-2 bg-white border border-red-200 rounded">
-                <div className="font-medium text-xs text-red-700 mb-1">{proc.condition}</div>
-                <div className="text-[11px] text-slate-600">
-                  <strong>Actions:</strong> {proc.immediate_actions?.slice(0, 2).join(", ")}
-                </div>
-                {proc.estimated_downtime_hours && (
-                  <div className="text-[10px] text-slate-500 mt-1">Downtime: {proc.estimated_downtime_hours}h</div>
-                )}
+        <CollapsibleSection 
+          title="Emergency Procedures" 
+          icon={Bell} 
+          count={strategy.emergency_procedures?.length || 0} 
+          color="red"
+          onAdd={() => openAdd("emergency_procedure")}
+        >
+          {(strategy.emergency_procedures || []).map((proc, idx) => (
+            <EditableItem key={idx} onEdit={() => openEdit("emergency_procedure", idx, proc)} onDelete={() => handleDelete("emergency_procedure", idx)}>
+              <div className="font-medium text-xs text-red-700 mb-1">{proc.condition}</div>
+              <div className="text-[11px] text-slate-600 line-clamp-1">
+                {proc.immediate_actions?.slice(0, 2).join(", ")}
               </div>
-            ))}
-          </CollapsibleSection>
-        )}
+            </EditableItem>
+          ))}
+          {(!strategy.emergency_procedures || strategy.emergency_procedures.length === 0) && (
+            <div className="text-xs text-slate-400 italic">No emergency procedures defined</div>
+          )}
+        </CollapsibleSection>
       </div>
+
+      {/* Edit Dialog */}
+      <EditItemDialog
+        open={editDialog.open}
+        onClose={() => setEditDialog({ open: false, type: null, index: null, data: null })}
+        title={editDialog.type === "operator_round" ? (editDialog.index === -1 ? "Add Operator Round" : "Edit Operator Round") :
+               editDialog.type === "detection_system" ? (editDialog.index === -1 ? "Add Detection System" : "Edit Detection System") :
+               editDialog.type === "maintenance_task" ? (editDialog.index === -1 ? "Add Maintenance Task" : "Edit Maintenance Task") :
+               editDialog.type === "corrective_action" ? (editDialog.index === -1 ? "Add Corrective Action" : "Edit Corrective Action") :
+               editDialog.type === "emergency_procedure" ? (editDialog.index === -1 ? "Add Emergency Procedure" : "Edit Emergency Procedure") : "Edit"}
+        onSave={handleSave}
+      >
+        {editDialog.type === "operator_round" && editDialog.data && (
+          <OperatorRoundForm round={editDialog.data} onChange={(data) => setEditDialog(prev => ({ ...prev, data }))} />
+        )}
+        {editDialog.type === "detection_system" && editDialog.data && (
+          <DetectionSystemForm system={editDialog.data} onChange={(data) => setEditDialog(prev => ({ ...prev, data }))} />
+        )}
+        {editDialog.type === "maintenance_task" && editDialog.data && (
+          <MaintenanceTaskForm task={editDialog.data} onChange={(data) => setEditDialog(prev => ({ ...prev, data }))} />
+        )}
+        {editDialog.type === "corrective_action" && editDialog.data && (
+          <CorrectiveActionForm action={editDialog.data} onChange={(data) => setEditDialog(prev => ({ ...prev, data }))} />
+        )}
+        {editDialog.type === "emergency_procedure" && editDialog.data && (
+          <EmergencyProcedureForm procedure={editDialog.data} onChange={(data) => setEditDialog(prev => ({ ...prev, data }))} />
+        )}
+      </EditItemDialog>
     </div>
   );
 };
 
 // Strategy Card Component
-const StrategyCard = ({ strategy, onDelete, isDeleting }) => {
+const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating }) => {
   const [activeTab, setActiveTab] = useState("safety_critical");
+  const [sparePartDialog, setSparePartDialog] = useState({ open: false, index: null, data: null });
   
   const strategiesByCrit = strategy.strategies_by_criticality || [];
-  const activeStrategy = strategiesByCrit.find(s => s.criticality_level === activeTab) || strategiesByCrit[0];
+  
+  const handleCriticalityUpdate = (criticalityLevel, updatedCritStrategy) => {
+    const newStrategies = strategiesByCrit.map(s => 
+      s.criticality_level === criticalityLevel ? updatedCritStrategy : s
+    );
+    onUpdate(strategy.id, { strategies_by_criticality: newStrategies });
+  };
+
+  const handleSparePartSave = () => {
+    const newParts = [...(strategy.spare_parts || [])];
+    if (sparePartDialog.index === -1) {
+      newParts.push({ ...sparePartDialog.data, id: `spare_${Date.now()}` });
+    } else {
+      newParts[sparePartDialog.index] = sparePartDialog.data;
+    }
+    onUpdate(strategy.id, { spare_parts: newParts });
+    setSparePartDialog({ open: false, index: null, data: null });
+  };
+
+  const handleSparePartDelete = (idx) => {
+    onUpdate(strategy.id, { spare_parts: strategy.spare_parts.filter((_, i) => i !== idx) });
+  };
   
   return (
     <Card className="overflow-hidden">
@@ -279,6 +829,7 @@ const StrategyCard = ({ strategy, onDelete, isDeleting }) => {
               <CardTitle className="text-base">{strategy.equipment_type_name}</CardTitle>
               <CardDescription className="text-xs">
                 v{strategy.strategy_version} • {strategiesByCrit.length} criticality levels
+                {isUpdating && <Loader2 className="w-3 h-3 ml-2 inline animate-spin" />}
               </CardDescription>
             </div>
           </div>
@@ -330,26 +881,41 @@ const StrategyCard = ({ strategy, onDelete, isDeleting }) => {
           
           {strategiesByCrit.map((critStrategy) => (
             <TabsContent key={critStrategy.criticality_level} value={critStrategy.criticality_level} className="mt-0">
-              <CriticalityContent strategy={critStrategy} />
+              <CriticalityContent 
+                strategy={critStrategy} 
+                criticalityLevel={critStrategy.criticality_level}
+                onUpdate={handleCriticalityUpdate}
+              />
             </TabsContent>
           ))}
         </Tabs>
         
         {/* Spare Parts Summary */}
-        {strategy.spare_parts?.length > 0 && (
-          <div className="mt-3 pt-3 border-t">
-            <CollapsibleSection title="Spare Parts (All Levels)" icon={Package} count={strategy.spare_parts.length} color="slate">
-              <div className="grid grid-cols-2 gap-2">
-                {strategy.spare_parts.map((part, idx) => (
-                  <div key={idx} className="p-2 bg-white border rounded">
-                    <div className="font-medium text-xs">{part.part_name}</div>
-                    <div className="text-[10px] text-slate-500">Qty: {part.quantity_recommended}</div>
-                  </div>
-                ))}
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
+        <div className="mt-3 pt-3 border-t">
+          <CollapsibleSection 
+            title="Spare Parts (All Levels)" 
+            icon={Package} 
+            count={strategy.spare_parts?.length || 0} 
+            color="slate"
+            onAdd={() => setSparePartDialog({ open: true, index: -1, data: { part_name: "", quantity_recommended: 1, criticality: "medium" } })}
+          >
+            <div className="grid grid-cols-2 gap-2">
+              {(strategy.spare_parts || []).map((part, idx) => (
+                <EditableItem 
+                  key={idx} 
+                  onEdit={() => setSparePartDialog({ open: true, index: idx, data: { ...part } })}
+                  onDelete={() => handleSparePartDelete(idx)}
+                >
+                  <div className="font-medium text-xs">{part.part_name}</div>
+                  <div className="text-[10px] text-slate-500">Qty: {part.quantity_recommended}</div>
+                </EditableItem>
+              ))}
+            </div>
+            {(!strategy.spare_parts || strategy.spare_parts.length === 0) && (
+              <div className="text-xs text-slate-400 italic">No spare parts defined</div>
+            )}
+          </CollapsibleSection>
+        </div>
         
         {/* Auto-generated badge */}
         {strategy.auto_generated && (
@@ -359,6 +925,18 @@ const StrategyCard = ({ strategy, onDelete, isDeleting }) => {
           </div>
         )}
       </CardContent>
+
+      {/* Spare Part Edit Dialog */}
+      <EditItemDialog
+        open={sparePartDialog.open}
+        onClose={() => setSparePartDialog({ open: false, index: null, data: null })}
+        title={sparePartDialog.index === -1 ? "Add Spare Part" : "Edit Spare Part"}
+        onSave={handleSparePartSave}
+      >
+        {sparePartDialog.data && (
+          <SparePartForm part={sparePartDialog.data} onChange={(data) => setSparePartDialog(prev => ({ ...prev, data }))} />
+        )}
+      </EditItemDialog>
     </Card>
   );
 };
@@ -408,6 +986,18 @@ export default function MaintenanceStrategiesPanel() {
     },
   });
   
+  // Update strategy mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ strategyId, data }) => maintenanceStrategyAPI.update(strategyId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["maintenance-strategies"]);
+      toast.success("Strategy updated!");
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.detail || "Failed to update strategy");
+    },
+  });
+  
   // Delete strategy mutation
   const deleteMutation = useMutation({
     mutationFn: maintenanceStrategyAPI.delete,
@@ -432,6 +1022,10 @@ export default function MaintenanceStrategiesPanel() {
       equipmentTypeId: selectedEquipmentType,
       equipmentTypeName: eqType.name,
     });
+  };
+
+  const handleUpdate = (strategyId, data) => {
+    updateMutation.mutate({ strategyId, data });
   };
   
   return (
@@ -509,7 +1103,7 @@ export default function MaintenanceStrategiesPanel() {
         </div>
         
         <p className="text-xs text-slate-500 mt-2">
-          Each strategy includes all 4 criticality levels (Safety Critical, Production Critical, Medium, Low) with tailored maintenance tasks.
+          Each strategy includes all 4 criticality levels. Click on items to edit, or use the + button to add new items.
         </p>
       </div>
       
@@ -533,7 +1127,9 @@ export default function MaintenanceStrategiesPanel() {
                   key={strategy.id}
                   strategy={strategy}
                   onDelete={deleteMutation.mutate}
+                  onUpdate={handleUpdate}
                   isDeleting={deleteMutation.isPending}
+                  isUpdating={updateMutation.isPending}
                 />
               ))}
             </div>

@@ -331,6 +331,14 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
   - NEW: AI-powered strategy generation from FMEA failure modes
   - NEW: "Generate All" button to create strategies for all equipment types at once
   - NEW: Search functionality across strategies, spare parts, and failure modes
+  - NEW: **Full editing capability** with dialogs for each component type:
+    - Add/Edit/Delete operator rounds with checklist items
+    - Add/Edit/Delete detection systems with alarm thresholds
+    - Add/Edit/Delete scheduled maintenance tasks
+    - Add/Edit/Delete corrective actions
+    - Add/Edit/Delete emergency procedures
+    - Add/Edit/Delete spare parts
+    - All changes auto-increment strategy version
   - NEW: Strategy versioning (auto-increments on changes)
   - NEW: Tabbed UI showing all criticality levels in one card
   - NEW: "Maintenance" tab added to Library page
