@@ -370,6 +370,11 @@ const en = {
   hierarchy: {
     addThreat: "Add Threat",
     rightClickHint: "Right-click for options",
+    showDetails: "Show Details",
+    equipmentType: "Equipment Type",
+    discipline: "Discipline",
+    criticality: "Criticality",
+    notAssigned: "Not assigned",
   },
   
   // Chat
@@ -987,6 +992,11 @@ const nl = {
   hierarchy: {
     addThreat: "Dreiging toevoegen",
     rightClickHint: "Rechtsklik voor opties",
+    showDetails: "Details tonen",
+    equipmentType: "Apparatuurtype",
+    discipline: "Discipline",
+    criticality: "Kriticiteit",
+    notAssigned: "Niet toegewezen",
   },
   
   // Chat

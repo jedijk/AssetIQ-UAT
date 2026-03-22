@@ -15,9 +15,15 @@ import {
   Layers,
   AlertTriangle,
   X,
-  Plus
+  Plus,
+  Info,
+  Shield,
+  Zap,
+  Leaf,
+  Star
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 
 // ISO 14224 Level Configuration
 const ISO_LEVEL_CONFIG = {
@@ -77,13 +83,15 @@ function getCumulativeThreatCount(node, threatCountMap) {
 }
 
 // Tree node component
-const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, t }) => {
+const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, t, equipmentTypes }) => {
   const hasChildren = node.children && node.children.length > 0;
   const config = ISO_LEVEL_CONFIG[node.level] || ISO_LEVEL_CONFIG.equipment_unit;
   const Icon = config.icon;
   const critColor = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0 });
+  const [showDetails, setShowDetails] = useState(false);
   const contextMenuRef = useRef(null);
+  const detailsRef = useRef(null);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -91,12 +99,15 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
         setContextMenu({ show: false, x: 0, y: 0 });
       }
+      if (detailsRef.current && !detailsRef.current.contains(e.target)) {
+        setShowDetails(false);
+      }
     };
-    if (contextMenu.show) {
+    if (contextMenu.show || showDetails) {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [contextMenu.show]);
+  }, [contextMenu.show, showDetails]);
 
   const handleContextMenu = (e) => {
     e.preventDefault();
@@ -107,6 +118,43 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   const handleAddThreatClick = () => {
     setContextMenu({ show: false, x: 0, y: 0 });
     onAddThreat?.(node.name);
+  };
+
+  const handleShowDetails = () => {
+    setContextMenu({ show: false, x: 0, y: 0 });
+    setShowDetails(true);
+  };
+
+  // Get equipment type name
+  const getEquipmentTypeName = () => {
+    if (!node.equipment_type) return null;
+    const eqType = equipmentTypes?.find(et => et.id === node.equipment_type);
+    return eqType?.name || node.equipment_type;
+  };
+
+  // Get discipline display name
+  const getDisciplineDisplay = () => {
+    const disciplines = {
+      mechanical: { label: t ? t("library.mechanical") : "Mechanical", color: "bg-blue-100 text-blue-700" },
+      electrical: { label: t ? t("library.electrical") : "Electrical", color: "bg-yellow-100 text-yellow-700" },
+      instrumentation: { label: t ? t("library.instrumentation") : "Instrumentation", color: "bg-purple-100 text-purple-700" },
+      process: { label: t ? t("library.process") : "Process", color: "bg-green-100 text-green-700" }
+    };
+    return disciplines[node.discipline] || null;
+  };
+
+  // Get criticality details
+  const getCriticalityDetails = () => {
+    if (!node.criticality) return null;
+    const crit = node.criticality;
+    return {
+      level: crit.level,
+      safety: crit.safety_impact || 0,
+      production: crit.production_impact || 0,
+      environmental: crit.environmental_impact || 0,
+      reputation: crit.reputation_impact || 0,
+      maxImpact: crit.max_impact || Math.max(crit.safety_impact || 0, crit.production_impact || 0, crit.environmental_impact || 0, crit.reputation_impact || 0)
+    };
   };
   
   return (
@@ -158,9 +206,18 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
       {contextMenu.show && (
         <div 
           ref={contextMenuRef}
-          className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50 min-w-[160px]"
+          className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50 min-w-[180px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
+          <button
+            onClick={handleShowDetails}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 text-slate-700 hover:text-slate-900"
+            data-testid="context-menu-show-details"
+          >
+            <Info className="w-4 h-4" />
+            {t ? t("hierarchy.showDetails") : "Show Details"}
+          </button>
+          <div className="border-t border-slate-100 my-1" />
           <button
             onClick={handleAddThreatClick}
             className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-700"
@@ -169,6 +226,147 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
             <Plus className="w-4 h-4" />
             {t ? t("hierarchy.addThreat") : "Add Threat"}
           </button>
+        </div>
+      )}
+
+      {/* Details Popup */}
+      {showDetails && (
+        <div 
+          ref={detailsRef}
+          className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-50 w-72"
+          style={{ 
+            left: Math.min(contextMenu.x, window.innerWidth - 300), 
+            top: Math.min(contextMenu.y, window.innerHeight - 350) 
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-start gap-3 mb-4">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              node.criticality?.level === 'safety_critical' ? 'bg-red-100' :
+              node.criticality?.level === 'production_critical' ? 'bg-orange-100' :
+              node.criticality?.level === 'medium' ? 'bg-yellow-100' : 'bg-slate-100'
+            }`}>
+              <Icon className={`w-5 h-5 ${critColor || config.color}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-slate-900 text-sm leading-tight">{node.name}</h3>
+              <p className="text-xs text-slate-500 mt-0.5">{config.label}</p>
+            </div>
+            <button 
+              onClick={() => setShowDetails(false)}
+              className="p-1 hover:bg-slate-100 rounded"
+            >
+              <X className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
+
+          {/* Details Grid */}
+          <div className="space-y-3">
+            {/* Equipment Type */}
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">{t ? t("hierarchy.equipmentType") : "Equipment Type"}</label>
+              {getEquipmentTypeName() ? (
+                <Badge variant="outline" className="bg-slate-50">{getEquipmentTypeName()}</Badge>
+              ) : (
+                <span className="text-sm text-slate-400 italic">{t ? t("hierarchy.notAssigned") : "Not assigned"}</span>
+              )}
+            </div>
+
+            {/* Discipline */}
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">{t ? t("hierarchy.discipline") : "Discipline"}</label>
+              {getDisciplineDisplay() ? (
+                <Badge className={getDisciplineDisplay().color}>{getDisciplineDisplay().label}</Badge>
+              ) : (
+                <span className="text-sm text-slate-400 italic">{t ? t("hierarchy.notAssigned") : "Not assigned"}</span>
+              )}
+            </div>
+
+            {/* Criticality */}
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">{t ? t("hierarchy.criticality") : "Criticality"}</label>
+              {getCriticalityDetails() ? (
+                <div className="space-y-2">
+                  {/* Criticality Level Badge */}
+                  <Badge className={`${
+                    getCriticalityDetails().level === 'safety_critical' ? 'bg-red-100 text-red-700' :
+                    getCriticalityDetails().level === 'production_critical' ? 'bg-orange-100 text-orange-700' :
+                    getCriticalityDetails().level === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                  }`}>
+                    {getCriticalityDetails().level === 'safety_critical' ? (t ? t("equipment.safetyCritical") : "Safety Critical") :
+                     getCriticalityDetails().level === 'production_critical' ? (t ? t("equipment.productionCritical") : "Production Critical") :
+                     getCriticalityDetails().level === 'medium' ? (t ? t("common.medium") : "Medium") : (t ? t("common.low") : "Low")}
+                  </Badge>
+                  
+                  {/* 4-Dimension Bars */}
+                  <div className="grid grid-cols-4 gap-1 mt-2">
+                    <div className="text-center">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <Shield className="w-3.5 h-3.5 text-red-500" />
+                        <div className="flex gap-px">
+                          {[1,2,3,4,5].map(i => (
+                            <div key={i} className={`w-1.5 h-3 rounded-sm ${i <= getCriticalityDetails().safety ? 'bg-red-500' : 'bg-slate-200'}`} />
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-slate-500">{getCriticalityDetails().safety}</span>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <Cog className="w-3.5 h-3.5 text-orange-500" />
+                        <div className="flex gap-px">
+                          {[1,2,3,4,5].map(i => (
+                            <div key={i} className={`w-1.5 h-3 rounded-sm ${i <= getCriticalityDetails().production ? 'bg-orange-500' : 'bg-slate-200'}`} />
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-slate-500">{getCriticalityDetails().production}</span>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <Leaf className="w-3.5 h-3.5 text-green-500" />
+                        <div className="flex gap-px">
+                          {[1,2,3,4,5].map(i => (
+                            <div key={i} className={`w-1.5 h-3 rounded-sm ${i <= getCriticalityDetails().environmental ? 'bg-green-500' : 'bg-slate-200'}`} />
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-slate-500">{getCriticalityDetails().environmental}</span>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <Star className="w-3.5 h-3.5 text-purple-500" />
+                        <div className="flex gap-px">
+                          {[1,2,3,4,5].map(i => (
+                            <div key={i} className={`w-1.5 h-3 rounded-sm ${i <= getCriticalityDetails().reputation ? 'bg-purple-500' : 'bg-slate-200'}`} />
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-slate-500">{getCriticalityDetails().reputation}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-sm text-slate-400 italic">{t ? t("equipment.noCriticality") : "No criticality assigned"}</span>
+              )}
+            </div>
+
+            {/* Tag if available */}
+            {node.tag && (
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">{t ? t("equipment.tag") : "Tag"}</label>
+                <span className="text-sm font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{node.tag}</span>
+              </div>
+            )}
+
+            {/* Description if available */}
+            {node.description && (
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">{t ? t("common.description") : "Description"}</label>
+                <p className="text-sm text-slate-600 line-clamp-2">{node.description}</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
       
@@ -237,6 +435,13 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
     staleTime: 30000,
   });
 
+  // Fetch equipment types for details popup
+  const { data: typesData } = useQuery({
+    queryKey: ["equipment-types"],
+    queryFn: equipmentHierarchyAPI.getEquipmentTypes,
+    staleTime: 60000,
+  });
+
   // Fetch threats to show counts
   const { data: threats = [] } = useQuery({
     queryKey: ["threats"],
@@ -244,6 +449,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   });
 
   const nodes = nodesData?.nodes || [];
+  const equipmentTypes = typesData?.equipment_types || [];
   const threatCountByAsset = useMemo(() => getThreatCountByAsset(threats), [threats]);
   
   // Build tree structure
@@ -321,6 +527,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
             threatCount={threatCount}
             onAddThreat={onAddThreat}
             t={t}
+            equipmentTypes={equipmentTypes}
           >
             {node.children && node.children.length > 0 && renderTree(node.children, level + 1)}
           </TreeNode>
