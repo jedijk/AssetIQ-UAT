@@ -833,7 +833,7 @@ const CriticalityContent = ({ strategy, criticalityLevel, onUpdate, onFailureMod
 const StrategyCard = ({ strategy, onDelete, onUpdate, isDeleting, isUpdating, onFailureModeClick }) => {
   const [activeTab, setActiveTab] = useState("safety_critical");
   const [sparePartDialog, setSparePartDialog] = useState({ open: false, index: null, data: null });
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   
   const strategiesByCrit = strategy.strategies_by_criticality || [];
   
