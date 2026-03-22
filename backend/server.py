@@ -4139,23 +4139,45 @@ async def generate_maintenance_strategy(
     if not api_key:
         raise HTTPException(status_code=500, detail="AI API key not configured")
     
-    generator = MaintenanceStrategyGenerator(api_key)
-    strategy = await generator.generate_strategy(
-        equipment_type_id=request.equipment_type_id,
-        equipment_type_name=request.equipment_type_name,
-        failure_modes=failure_modes,
-        user_id=current_user.get("user_id", "unknown")
-    )
-    
-    # Save to database
-    strategy_dict = strategy.model_dump()
-    await db.maintenance_strategies.insert_one(strategy_dict)
-    
-    # Remove MongoDB _id before returning
-    if "_id" in strategy_dict:
-        del strategy_dict["_id"]
-    
-    return strategy_dict
+    try:
+        generator = MaintenanceStrategyGenerator(api_key)
+        strategy = await generator.generate_strategy(
+            equipment_type_id=request.equipment_type_id,
+            equipment_type_name=request.equipment_type_name,
+            failure_modes=failure_modes,
+            user_id=current_user.get("user_id", "unknown")
+        )
+        
+        # Check if strategy generation returned a default (fallback) strategy due to error
+        if strategy.description and "AI generation failed" in strategy.description:
+            error_msg = strategy.description
+            if "Budget has been exceeded" in error_msg or "budget" in error_msg.lower():
+                raise HTTPException(
+                    status_code=402, 
+                    detail="LLM budget exceeded. Please add balance to your Universal Key (Profile → Universal Key → Add Balance)."
+                )
+            raise HTTPException(status_code=500, detail=error_msg)
+        
+        # Save to database
+        strategy_dict = strategy.model_dump()
+        await db.maintenance_strategies.insert_one(strategy_dict)
+        
+        # Remove MongoDB _id before returning
+        if "_id" in strategy_dict:
+            del strategy_dict["_id"]
+        
+        return strategy_dict
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_str = str(e)
+        if "Budget has been exceeded" in error_str or "budget" in error_str.lower():
+            raise HTTPException(
+                status_code=402, 
+                detail="LLM budget exceeded. Please add balance to your Universal Key (Profile → Universal Key → Add Balance)."
+            )
+        raise HTTPException(status_code=500, detail=f"Strategy generation failed: {error_str[:200]}")
 
 
 @api_router.post("/maintenance-strategies/generate-all")
@@ -4205,12 +4227,50 @@ async def generate_all_maintenance_strategies(
             )
             
             strategy_dict = strategy.model_dump()
+            
+            # Check if strategy generation returned a default (fallback) strategy due to error
+            if strategy.description and "AI generation failed" in strategy.description:
+                error_msg = strategy.description
+                if "Budget has been exceeded" in error_msg or "budget" in error_msg.lower():
+                    # Stop processing all - budget is exceeded
+                    results["failed"].append({
+                        "id": eq_id, 
+                        "name": eq_name, 
+                        "error": "LLM budget exceeded - add balance to Universal Key"
+                    })
+                    # Return early with budget exceeded message
+                    return {
+                        "total_equipment_types": len(equipment_types),
+                        "generated": len(results["generated"]),
+                        "skipped": len(results["skipped"]),
+                        "failed": len(results["failed"]),
+                        "details": results,
+                        "error": "LLM budget exceeded. Please add balance to your Universal Key (Profile → Universal Key → Add Balance)."
+                    }
+                results["failed"].append({"id": eq_id, "name": eq_name, "error": error_msg[:100]})
+                continue
+            
             await db.maintenance_strategies.insert_one(strategy_dict)
             
             results["generated"].append({"id": eq_id, "name": eq_name})
             
         except Exception as e:
-            results["failed"].append({"id": eq_id, "name": eq_name, "error": str(e)[:100]})
+            error_str = str(e)
+            if "Budget has been exceeded" in error_str or "budget" in error_str.lower():
+                results["failed"].append({
+                    "id": eq_id, 
+                    "name": eq_name, 
+                    "error": "LLM budget exceeded"
+                })
+                return {
+                    "total_equipment_types": len(equipment_types),
+                    "generated": len(results["generated"]),
+                    "skipped": len(results["skipped"]),
+                    "failed": len(results["failed"]),
+                    "details": results,
+                    "error": "LLM budget exceeded. Please add balance to your Universal Key (Profile → Universal Key → Add Balance)."
+                }
+            results["failed"].append({"id": eq_id, "name": eq_name, "error": error_str[:100]})
     
     return {
         "total_equipment_types": len(equipment_types),

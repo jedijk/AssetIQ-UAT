@@ -1071,7 +1071,13 @@ export default function MaintenanceStrategiesPanel() {
       toast.success("Maintenance strategy generated successfully!");
     },
     onError: (error) => {
-      toast.error(error.response?.data?.detail || "Failed to generate strategy");
+      const detail = error.response?.data?.detail || "Failed to generate strategy";
+      const status = error.response?.status;
+      if (status === 402 || detail.toLowerCase().includes("budget")) {
+        toast.error("LLM budget exceeded. Add balance to Universal Key in Profile.", { duration: 8000 });
+      } else {
+        toast.error(detail);
+      }
     },
   });
   
@@ -1080,10 +1086,22 @@ export default function MaintenanceStrategiesPanel() {
     mutationFn: () => maintenanceStrategyAPI.generateAll(),
     onSuccess: (data) => {
       queryClient.invalidateQueries(["maintenance-strategies"]);
-      toast.success(`Generated ${data.generated} strategies!`);
+      if (data.error) {
+        toast.error(data.error, { duration: 8000 });
+      } else if (data.generated > 0) {
+        toast.success(`Generated ${data.generated} strategies!`);
+      } else if (data.skipped > 0) {
+        toast.info(`All ${data.skipped} strategies already exist`);
+      }
     },
     onError: (error) => {
-      toast.error(error.response?.data?.detail || "Failed to generate strategies");
+      const detail = error.response?.data?.detail || "Failed to generate strategies";
+      const status = error.response?.status;
+      if (status === 402 || detail.toLowerCase().includes("budget")) {
+        toast.error("LLM budget exceeded. Add balance to Universal Key in Profile.", { duration: 8000 });
+      } else {
+        toast.error(detail);
+      }
     },
   });
   
