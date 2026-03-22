@@ -124,6 +124,7 @@ EQUIPMENT_TYPES = [
     {"id": "sensor_flow", "name": "Flow Sensor", "iso_class": "5.1.3", "discipline": "instrumentation", "icon": "gauge"},
     {"id": "plc", "name": "PLC Controller", "iso_class": "5.2.1", "discipline": "instrumentation", "icon": "cpu"},
     {"id": "pipe", "name": "Piping", "iso_class": "6.1.1", "discipline": "mechanical", "icon": "pipette"},
+    {"id": "grinder", "name": "Grinder", "iso_class": "1.5.1", "discipline": "mechanical", "icon": "settings"},
 ]
 
 # Default criticality profiles

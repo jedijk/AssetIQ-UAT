@@ -12,6 +12,11 @@ Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (for
 - Removed Overall System Health banner from Operational Dashboard
 - Added collapsible maintenance strategy cards
 - **Codebase cleanup initiated**: Created modular route structure and extracted reusable components
+- **Added Grinder Equipment Type** (ISO class 1.5.1, Mechanical discipline)
+- **Added 15 Grinder Failure Modes** (IDs 201-215) including:
+  - Grinding Wheel Wear/Breakage, Spindle issues, Motor Overload
+  - Thermal Damage, Surface Finish Deviation, Dimensional Inaccuracy
+  - Wheel Glazing, Workholding Failure, Guard Interlock Failure, etc.
 
 ### Codebase Architecture (Dec 2025 Cleanup)
 
