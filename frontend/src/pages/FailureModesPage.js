@@ -102,6 +102,305 @@ function EquipmentTypeItem({ item, onEdit, onDelete }) {
   );
 }
 
+// Failure Mode View Panel Component
+function FailureModeViewPanel({ 
+  fm, 
+  isEditing, 
+  formData, 
+  setFormData, 
+  onStartEdit, 
+  onSave, 
+  onCancel, 
+  onClose,
+  onDelete,
+  equipmentTypes,
+  categories,
+  t 
+}) {
+  const Icon = categoryIcons[fm?.category] || AlertTriangle;
+  const colors = categoryColors[fm?.category] || "bg-slate-100 text-slate-700 border-slate-200";
+  
+  // Local state for adding keywords/actions in edit mode
+  const [keywordInput, setKeywordInput] = useState("");
+  const [actionInput, setActionInput] = useState("");
+  
+  const addKeyword = () => {
+    if (keywordInput.trim() && formData) {
+      setFormData({ ...formData, keywords: [...(formData.keywords || []), keywordInput.trim()] });
+      setKeywordInput("");
+    }
+  };
+  
+  const removeKeyword = (idx) => {
+    if (formData) {
+      setFormData({ ...formData, keywords: formData.keywords.filter((_, i) => i !== idx) });
+    }
+  };
+  
+  const addAction = () => {
+    if (actionInput.trim() && formData) {
+      setFormData({ ...formData, recommended_actions: [...(formData.recommended_actions || []), actionInput.trim()] });
+      setActionInput("");
+    }
+  };
+  
+  const removeAction = (idx) => {
+    if (formData) {
+      setFormData({ ...formData, recommended_actions: formData.recommended_actions.filter((_, i) => i !== idx) });
+    }
+  };
+
+  if (!fm) {
+    return (
+      <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+        <div className="text-center p-8">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-100 flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-slate-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-600 mb-2">{t("library.selectFailureMode")}</h3>
+          <p className="text-sm text-slate-400">{t("library.selectFailureModeDesc")}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const riskScore = Math.round((fm.severity * fm.occurrence * fm.detectability) / 10);
+  const data = isEditing ? formData : fm;
+
+  return (
+    <div className="h-full bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden" data-testid="failure-mode-view-panel">
+      {/* Header */}
+      <div className="p-4 border-b border-slate-200 flex items-center gap-3">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${colors.split(' ')[0]}`}>
+          <Icon className={`w-6 h-6 ${colors.split(' ')[1]}`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          {isEditing ? (
+            <Input
+              value={formData?.failure_mode || ""}
+              onChange={(e) => setFormData({ ...formData, failure_mode: e.target.value })}
+              className="font-semibold text-lg"
+              placeholder={t("library.failureModeName")}
+              data-testid="view-panel-name-input"
+            />
+          ) : (
+            <>
+              <h2 className="font-semibold text-slate-900 text-lg truncate">{fm.failure_mode}</h2>
+              <p className="text-sm text-slate-500">#{fm.id} • {fm.category}</p>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {!isEditing ? (
+            <>
+              <Button size="sm" variant="outline" onClick={onStartEdit} data-testid="view-panel-edit-btn">
+                <Edit className="w-4 h-4 mr-1" /> {t("common.edit")}
+              </Button>
+              {fm.is_custom && (
+                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => onDelete(fm.id)}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <Button size="sm" variant="ghost" onClick={onCancel}>{t("common.cancel")}</Button>
+              <Button size="sm" onClick={onSave} className="bg-blue-600 hover:bg-blue-700" data-testid="view-panel-save-btn">
+                <ShieldCheck className="w-4 h-4 mr-1" /> {t("common.save")}
+              </Button>
+            </>
+          )}
+          <Button size="sm" variant="ghost" onClick={onClose} className="ml-2">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {/* Risk Score Card */}
+        <div className="grid grid-cols-4 gap-3">
+          <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-slate-800">{riskScore}</div>
+            <div className="text-xs text-slate-500 mt-1">{t("library.riskScore")}</div>
+          </div>
+          <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 text-center">
+            {isEditing ? (
+              <Select value={String(formData?.severity || 5)} onValueChange={(v) => setFormData({ ...formData, severity: parseInt(v) })}>
+                <SelectTrigger className="h-8 text-lg font-bold text-red-700 border-0 bg-transparent justify-center"><SelectValue /></SelectTrigger>
+                <SelectContent>{[1,2,3,4,5,6,7,8,9,10].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
+              </Select>
+            ) : (
+              <div className="text-2xl font-bold text-red-700">{fm.severity}</div>
+            )}
+            <div className="text-xs text-red-600 mt-1">{t("library.severity")}</div>
+          </div>
+          <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-4 text-center">
+            {isEditing ? (
+              <Select value={String(formData?.occurrence || 5)} onValueChange={(v) => setFormData({ ...formData, occurrence: parseInt(v) })}>
+                <SelectTrigger className="h-8 text-lg font-bold text-amber-700 border-0 bg-transparent justify-center"><SelectValue /></SelectTrigger>
+                <SelectContent>{[1,2,3,4,5,6,7,8,9,10].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
+              </Select>
+            ) : (
+              <div className="text-2xl font-bold text-amber-700">{fm.occurrence}</div>
+            )}
+            <div className="text-xs text-amber-600 mt-1">{t("library.occurrence")}</div>
+          </div>
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center">
+            {isEditing ? (
+              <Select value={String(formData?.detectability || 5)} onValueChange={(v) => setFormData({ ...formData, detectability: parseInt(v) })}>
+                <SelectTrigger className="h-8 text-lg font-bold text-blue-700 border-0 bg-transparent justify-center"><SelectValue /></SelectTrigger>
+                <SelectContent>{[1,2,3,4,5,6,7,8,9,10].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
+              </Select>
+            ) : (
+              <div className="text-2xl font-bold text-blue-700">{fm.detectability}</div>
+            )}
+            <div className="text-xs text-blue-600 mt-1">{t("library.detectability")}</div>
+          </div>
+        </div>
+
+        {/* Category & Equipment */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label className="text-xs text-slate-500 mb-2 block">{t("library.category")}</Label>
+            {isEditing ? (
+              <Select value={formData?.category || "Rotating"} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Badge className={`${colors} text-sm`}>{fm.category}</Badge>
+            )}
+          </div>
+          <div>
+            <Label className="text-xs text-slate-500 mb-2 block">{t("library.equipment")}</Label>
+            {isEditing ? (
+              <Input 
+                value={formData?.equipment || ""} 
+                onChange={(e) => setFormData({ ...formData, equipment: e.target.value })}
+                placeholder={t("library.equipmentPlaceholder")}
+              />
+            ) : (
+              <span className="text-sm text-slate-700">{fm.equipment || "-"}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Keywords */}
+        <div>
+          <Label className="text-xs text-slate-500 mb-2 block">{t("library.keywords")}</Label>
+          <div className="flex flex-wrap gap-2">
+            {(isEditing ? formData?.keywords : fm.keywords)?.map((kw, idx) => (
+              <Badge key={idx} variant="secondary" className="bg-slate-100 text-slate-600 gap-1">
+                {kw}
+                {isEditing && (
+                  <button onClick={() => removeKeyword(idx)} className="ml-1 hover:text-red-500">
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </Badge>
+            ))}
+            {isEditing && (
+              <div className="flex gap-1">
+                <Input
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addKeyword())}
+                  placeholder={t("library.addKeyword")}
+                  className="h-7 w-32 text-xs"
+                />
+                <Button size="sm" variant="ghost" onClick={addKeyword} className="h-7 px-2">
+                  <Plus className="w-3 h-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Linked Equipment Types */}
+        <div>
+          <Label className="text-xs text-slate-500 mb-2 block">{t("library.linkedEquipmentTypes")}</Label>
+          {isEditing ? (
+            <div className="flex flex-wrap gap-2">
+              {equipmentTypes.map(et => {
+                const isLinked = formData?.equipment_type_ids?.includes(et.id);
+                return (
+                  <Badge
+                    key={et.id}
+                    variant={isLinked ? "default" : "outline"}
+                    className={`cursor-pointer transition-all ${isLinked ? "bg-blue-600" : "hover:bg-slate-100"}`}
+                    onClick={() => {
+                      const current = formData?.equipment_type_ids || [];
+                      setFormData({
+                        ...formData,
+                        equipment_type_ids: isLinked ? current.filter(id => id !== et.id) : [...current, et.id]
+                      });
+                    }}
+                  >
+                    {et.name}
+                  </Badge>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {fm.equipment_type_ids?.length > 0 ? (
+                fm.equipment_type_ids.map(etId => {
+                  const et = equipmentTypes.find(e => e.id === etId);
+                  return et ? (
+                    <Badge key={etId} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                      <Link className="w-3 h-3 mr-1" />{et.name}
+                    </Badge>
+                  ) : null;
+                })
+              ) : (
+                <span className="text-sm text-slate-400">{t("library.noLinkedTypes")}</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Recommended Actions */}
+        <div>
+          <Label className="text-xs text-slate-500 mb-2 block">{t("library.recommendedActions")}</Label>
+          <div className="space-y-2">
+            {(isEditing ? formData?.recommended_actions : fm.recommended_actions)?.map((action, idx) => (
+              <div key={idx} className="flex items-start gap-2 p-3 bg-slate-50 rounded-lg group">
+                <ShieldCheck className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <span className="text-sm text-slate-700 flex-1">{action}</span>
+                {isEditing && (
+                  <button onClick={() => removeAction(idx)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {(!fm.recommended_actions || fm.recommended_actions.length === 0) && !isEditing && (
+              <span className="text-sm text-slate-400">{t("library.noRecommendedActions")}</span>
+            )}
+            {isEditing && (
+              <div className="flex gap-2">
+                <Input
+                  value={actionInput}
+                  onChange={(e) => setActionInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAction())}
+                  placeholder={t("library.addAction")}
+                  className="flex-1"
+                />
+                <Button variant="outline" onClick={addAction}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const FailureModesPage = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -135,6 +434,9 @@ const FailureModesPage = () => {
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
   const [editingFm, setEditingFm] = useState(null);
+  const [selectedFm, setSelectedFm] = useState(null); // For view panel
+  const [isViewPanelEditing, setIsViewPanelEditing] = useState(false); // Edit mode for view panel
+  const [viewPanelForm, setViewPanelForm] = useState(null); // Form state for view panel editing
   const [newFm, setNewFm] = useState({
     category: "Rotating",
     equipment: "",
@@ -348,6 +650,52 @@ const FailureModesPage = () => {
     setIsFmDialogOpen(true);
   };
 
+  // Handle selecting a failure mode for the view panel
+  const handleSelectFm = (fm) => {
+    setSelectedFm(fm);
+    setIsViewPanelEditing(false);
+    setViewPanelForm(null);
+  };
+
+  // Start editing in the view panel
+  const handleStartViewPanelEdit = () => {
+    if (selectedFm) {
+      setViewPanelForm({
+        category: selectedFm.category,
+        equipment: selectedFm.equipment,
+        failure_mode: selectedFm.failure_mode,
+        keywords: selectedFm.keywords || [],
+        severity: selectedFm.severity,
+        occurrence: selectedFm.occurrence,
+        detectability: selectedFm.detectability,
+        recommended_actions: selectedFm.recommended_actions || [],
+        equipment_type_ids: selectedFm.equipment_type_ids || []
+      });
+      setIsViewPanelEditing(true);
+    }
+  };
+
+  // Save view panel edits
+  const handleSaveViewPanelEdit = () => {
+    if (selectedFm && viewPanelForm) {
+      updateFmMutation.mutate({ 
+        id: selectedFm.id, 
+        data: viewPanelForm,
+        oldData: selectedFm 
+      });
+      // Update local selected state
+      setSelectedFm({ ...selectedFm, ...viewPanelForm });
+      setIsViewPanelEditing(false);
+      setViewPanelForm(null);
+    }
+  };
+
+  // Cancel view panel edit
+  const handleCancelViewPanelEdit = () => {
+    setIsViewPanelEditing(false);
+    setViewPanelForm(null);
+  };
+
   const handleSaveFm = () => {
     if (editingFm) {
       updateFmMutation.mutate({ id: editingFm.id, data: newFm, oldData: editingFm });
@@ -478,101 +826,108 @@ const FailureModesPage = () => {
             </Button>
           </div>
 
-          {/* Failure Modes List - Same style as ThreatsPage priority-list */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="loading-dots">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            </div>
-          ) : failureModes.length === 0 ? (
-            <div className="empty-state py-16">
-              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                <Info className="w-8 h-8 text-slate-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("library.noMatches")}</h3>
-              <p className="text-slate-500">{t("library.tryAdjusting")}</p>
-            </div>
-          ) : (
-            <div className="priority-list" data-testid="failure-modes-list">
-              {failureModes.map((fm, idx) => {
-                const Icon = categoryIcons[fm.category] || AlertTriangle;
-                const colors = categoryColors[fm.category] || "bg-slate-100 text-slate-700";
-                
-                return (
-                  <motion.div
-                    key={fm.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.02 }}
-                    className="priority-item group"
-                    data-testid={`failure-mode-${fm.id}`}
-                  >
-                    {/* Category Icon */}
-                    <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${colors.split(' ')[0]}`}>
-                      <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${colors.split(' ')[1]}`} />
-                    </div>
+          {/* Two-Panel Layout: List + View Panel */}
+          <div className="flex gap-4 h-[calc(100vh-340px)]">
+            {/* Left Panel: Failure Modes List */}
+            <div className={`${selectedFm ? 'w-1/2 lg:w-2/5' : 'w-full'} transition-all duration-300`}>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="loading-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              ) : failureModes.length === 0 ? (
+                <div className="empty-state py-16">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                    <Info className="w-8 h-8 text-slate-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("library.noMatches")}</h3>
+                  <p className="text-slate-500">{t("library.tryAdjusting")}</p>
+                </div>
+              ) : (
+                <div className="space-y-2 overflow-y-auto h-full pr-2" data-testid="failure-modes-list">
+                  {failureModes.map((fm, idx) => {
+                    const Icon = categoryIcons[fm.category] || AlertTriangle;
+                    const colors = categoryColors[fm.category] || "bg-slate-100 text-slate-700";
+                    const isSelected = selectedFm?.id === fm.id;
+                    
+                    return (
+                      <motion.div
+                        key={fm.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.02 }}
+                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
+                          isSelected 
+                            ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200' 
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                        }`}
+                        onClick={() => handleSelectFm(fm)}
+                        data-testid={`failure-mode-${fm.id}`}
+                      >
+                        {/* Category Icon */}
+                        <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${colors.split(' ')[0]}`}>
+                          <Icon className={`w-5 h-5 ${colors.split(' ')[1]}`} />
+                        </div>
 
-                    {/* ID */}
-                    <div className="priority-rank text-sm sm:text-base">
-                      #{fm.id}
-                    </div>
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-xs text-slate-400 font-mono">#{fm.id}</span>
+                            <Badge className={`${colors} text-xs px-1.5 py-0`}>{fm.category}</Badge>
+                          </div>
+                          <h3 className="font-medium text-slate-900 text-sm line-clamp-1">
+                            {fm.failure_mode}
+                          </h3>
+                          <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                            {fm.equipment} • {fm.keywords?.slice(0, 2).join(", ")}
+                          </p>
+                        </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
-                        <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-1">
-                          {fm.failure_mode}
-                        </h3>
-                        <Badge className={colors}>
-                          {fm.category}
-                        </Badge>
-                      </div>
-                      <div className="text-xs sm:text-sm text-slate-500 line-clamp-1">
-                        <span>{fm.equipment}</span>
-                        <span className="mx-1">•</span>
-                        <span>{fm.keywords.slice(0, 3).join(", ")}</span>
-                      </div>
-                    </div>
-
-                    {/* Right side */}
-                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                      {fm.equipment_type_ids && fm.equipment_type_ids.length > 0 && (
-                        <div className="text-right hidden sm:block">
-                          <div className="text-xs text-blue-600 flex items-center gap-1">
-                            <Link className="w-3 h-3" />
-                            {fm.equipment_type_ids.length} {t("library.linked")}
+                        {/* Risk Score Badge */}
+                        <div className="flex-shrink-0 text-center">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
+                            fm.severity * fm.occurrence * fm.detectability / 10 >= 70 ? 'bg-red-100 text-red-700' :
+                            fm.severity * fm.occurrence * fm.detectability / 10 >= 50 ? 'bg-orange-100 text-orange-700' :
+                            fm.severity * fm.occurrence * fm.detectability / 10 >= 30 ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-green-100 text-green-700'
+                          }`}>
+                            {Math.round(fm.severity * fm.occurrence * fm.detectability / 10)}
                           </div>
                         </div>
-                      )}
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        onClick={(e) => { e.stopPropagation(); handleEditFm(fm); }} 
-                        className="h-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                        data-testid={`edit-fm-${fm.id}`}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      {fm.is_custom && (
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => { e.stopPropagation(); deleteFmMutation.mutate(fm.id); }} 
-                          data-testid={`delete-fm-${fm.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Right Panel: View/Edit Panel */}
+            {selectedFm && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="w-1/2 lg:w-3/5 h-full"
+              >
+                <FailureModeViewPanel
+                  fm={selectedFm}
+                  isEditing={isViewPanelEditing}
+                  formData={viewPanelForm}
+                  setFormData={setViewPanelForm}
+                  onStartEdit={handleStartViewPanelEdit}
+                  onSave={handleSaveViewPanelEdit}
+                  onCancel={handleCancelViewPanelEdit}
+                  onClose={() => { setSelectedFm(null); setIsViewPanelEditing(false); setViewPanelForm(null); }}
+                  onDelete={(id) => { deleteFmMutation.mutate(id); setSelectedFm(null); }}
+                  equipmentTypes={equipmentTypes}
+                  categories={categories}
+                  t={t}
+                />
+              </motion.div>
+            )}
+          </div>
         </TabsContent>
 
         {/* Equipment Types Tab */}

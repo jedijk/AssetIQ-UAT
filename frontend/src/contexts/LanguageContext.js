@@ -290,8 +290,15 @@ const en = {
     updateFailureModeDesc: "Update the failure mode details below.",
     category: "Category",
     equipment: "Equipment",
+    equipmentPlaceholder: "e.g., Centrifugal Pump",
     failureModeName: "Failure Mode Name",
     clickToSelect: "Click to select/deselect (multiple allowed)",
+    selectFailureMode: "Select a Failure Mode",
+    selectFailureModeDesc: "Click on a failure mode from the list to view its details",
+    riskScore: "Risk Score",
+    linkedEquipmentTypes: "Linked Equipment Types",
+    noLinkedTypes: "No equipment types linked",
+    noRecommendedActions: "No recommended actions defined",
   },
   
   // Equipment Manager
@@ -899,8 +906,15 @@ const nl = {
     updateFailureModeDesc: "Werk de faalmodus details hieronder bij.",
     category: "Categorie",
     equipment: "Apparatuur",
+    equipmentPlaceholder: "bijv., Centrifugaalpomp",
     failureModeName: "Faalmodus naam",
     clickToSelect: "Klik om te selecteren/deselecteren (meerdere mogelijk)",
+    selectFailureMode: "Selecteer een Faalmodus",
+    selectFailureModeDesc: "Klik op een faalmodus in de lijst om de details te bekijken",
+    riskScore: "Risicoscore",
+    linkedEquipmentTypes: "Gekoppelde apparatuurtypen",
+    noLinkedTypes: "Geen apparatuurtypen gekoppeld",
+    noRecommendedActions: "Geen aanbevolen acties gedefinieerd",
   },
   
   // Equipment Manager
