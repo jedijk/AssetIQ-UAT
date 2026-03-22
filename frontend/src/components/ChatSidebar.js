@@ -22,7 +22,7 @@ import {
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
-const ChatSidebar = ({ isOpen, onClose }) => {
+const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   const [message, setMessage] = useState("");
   const [imageBase64, setImageBase64] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -30,7 +30,19 @@ const ChatSidebar = ({ isOpen, onClose }) => {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
   const queryClient = useQueryClient();
+
+  // Pre-fill message when equipment is provided
+  useEffect(() => {
+    if (prefillEquipment && isOpen) {
+      setMessage(`Issue with ${prefillEquipment}: `);
+      // Focus the textarea after a short delay
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+    }
+  }, [prefillEquipment, isOpen]);
 
   // Fetch chat history
   const { data: messages = [], isLoading } = useQuery({
@@ -392,6 +404,7 @@ const ChatSidebar = ({ isOpen, onClose }) => {
             </Button>
 
             <Textarea
+              ref={textareaRef}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyPress}

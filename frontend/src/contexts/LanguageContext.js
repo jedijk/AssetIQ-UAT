@@ -358,6 +358,12 @@ const en = {
     moving: "Moving",
     clickTarget: "Click on a green highlighted target",
   },
+
+  // Hierarchy context menu
+  hierarchy: {
+    addThreat: "Add Threat",
+    rightClickHint: "Right-click for options",
+  },
   
   // Chat
   chat: {
@@ -961,6 +967,12 @@ const nl = {
     createFirst: "eerst",
     moving: "Verplaatsen",
     clickTarget: "Klik op een groen gemarkeerd doel",
+  },
+
+  // Hierarchy context menu
+  hierarchy: {
+    addThreat: "Dreiging toevoegen",
+    rightClickHint: "Rechtsklik voor opties",
   },
   
   // Chat

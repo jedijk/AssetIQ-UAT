@@ -36,8 +36,21 @@ const Layout = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
   const [hierarchyOpen, setHierarchyOpen] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
+
+  // Handler for opening chat with pre-filled equipment (from hierarchy context menu)
+  const handleAddThreatFromHierarchy = (equipmentName) => {
+    setChatPrefillEquipment(equipmentName);
+    setChatOpen(true);
+  };
+
+  // Clear prefill when chat is closed
+  const handleChatClose = () => {
+    setChatOpen(false);
+    setChatPrefillEquipment(null);
+  };
 
   // Auto-collapse hierarchy when on Equipment Manager page
   useEffect(() => {
@@ -299,6 +312,7 @@ const Layout = () => {
                 isOpen={true} 
                 onClose={() => setHierarchyOpen(false)}
                 isMobile={false}
+                onAddThreat={handleAddThreatFromHierarchy}
               />
             </div>
           </div>
@@ -310,6 +324,7 @@ const Layout = () => {
             isOpen={hierarchyOpen} 
             onClose={() => setHierarchyOpen(false)}
             isMobile={true}
+            onAddThreat={handleAddThreatFromHierarchy}
           />
         </div>
 
@@ -321,7 +336,7 @@ const Layout = () => {
 
       {/* Floating Action Button - Report Threat */}
       <button
-        onClick={() => setChatOpen(true)}
+        onClick={() => { setChatPrefillEquipment(null); setChatOpen(true); }}
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all duration-200 z-30"
         style={{ boxShadow: '0 8px 24px -4px rgba(37, 99, 235, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.25)' }}
         data-testid="fab-report-threat"
@@ -331,7 +346,7 @@ const Layout = () => {
       </button>
 
       {/* Chat Sidebar */}
-      <ChatSidebar isOpen={chatOpen} onClose={() => setChatOpen(false)} />
+      <ChatSidebar isOpen={chatOpen} onClose={handleChatClose} prefillEquipment={chatPrefillEquipment} />
 
       {/* Info Dialog */}
       <Dialog open={infoOpen} onOpenChange={setInfoOpen}>

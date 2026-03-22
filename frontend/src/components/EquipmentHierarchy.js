@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 import { 
   ChevronRight, 
   ChevronDown,
@@ -13,7 +14,8 @@ import {
   Wrench,
   Layers,
   AlertTriangle,
-  X
+  X,
+  Plus
 } from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -75,11 +77,37 @@ function getCumulativeThreatCount(node, threatCountMap) {
 }
 
 // Tree node component
-const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0 }) => {
+const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, t }) => {
   const hasChildren = node.children && node.children.length > 0;
   const config = ISO_LEVEL_CONFIG[node.level] || ISO_LEVEL_CONFIG.equipment_unit;
   const Icon = config.icon;
   const critColor = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
+  const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0 });
+  const contextMenuRef = useRef(null);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+        setContextMenu({ show: false, x: 0, y: 0 });
+      }
+    };
+    if (contextMenu.show) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [contextMenu.show]);
+
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ show: true, x: e.clientX, y: e.clientY });
+  };
+
+  const handleAddThreatClick = () => {
+    setContextMenu({ show: false, x: 0, y: 0 });
+    onAddThreat?.(node.name);
+  };
   
   return (
     <div>
@@ -92,6 +120,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           if (hasChildren) onToggle?.();
           onClick?.();
         }}
+        onContextMenu={handleContextMenu}
         data-testid={`hierarchy-node-${node.id}`}
       >
         {hasChildren ? (
@@ -124,6 +153,25 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           }`} />
         )}
       </div>
+      
+      {/* Context Menu */}
+      {contextMenu.show && (
+        <div 
+          ref={contextMenuRef}
+          className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50 min-w-[160px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={handleAddThreatClick}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-700"
+            data-testid="context-menu-add-threat"
+          >
+            <Plus className="w-4 h-4" />
+            {t ? t("hierarchy.addThreat") : "Add Threat"}
+          </button>
+        </div>
+      )}
+      
       {hasChildren && isOpen && (
         <div>
           {children}
@@ -155,8 +203,9 @@ const LevelSummaryItem = ({ level, count, isActive, onClick }) => {
   );
 };
 
-const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
+const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   
   // Load expanded nodes from localStorage on initial render
   const [expandedNodes, setExpandedNodes] = useState(() => {
@@ -270,6 +319,8 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false }) => {
             onClick={() => handleNodeClick(node)}
             isActive={selectedNodeId === node.id}
             threatCount={threatCount}
+            onAddThreat={onAddThreat}
+            t={t}
           >
             {node.children && node.children.length > 0 && renderTree(node.children, level + 1)}
           </TreeNode>
