@@ -44,6 +44,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { toast } from "sonner";
 import api, { equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
+import MaintenanceStrategiesPanel from "../components/MaintenanceStrategiesPanel";
 
 const categoryIcons = {
   Rotating: Cog,
@@ -391,9 +392,10 @@ const FailureModesPage = () => {
     <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="failure-modes-page">
       {/* Main Tabs */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="failure-modes">Failure Modes</TabsTrigger>
           <TabsTrigger value="libraries">Equipment Types</TabsTrigger>
+          <TabsTrigger value="maintenance" data-testid="maintenance-strategies-tab">Maintenance</TabsTrigger>
         </TabsList>
 
         {/* Failure Modes Tab */}
@@ -568,6 +570,13 @@ const FailureModesPage = () => {
                 />
               ))}
             </div>
+          </div>
+        </TabsContent>
+        
+        {/* Maintenance Strategies Tab */}
+        <TabsContent value="maintenance" className="h-[calc(100vh-200px)]">
+          <div className="card h-full overflow-hidden">
+            <MaintenanceStrategiesPanel />
           </div>
         </TabsContent>
       </Tabs>

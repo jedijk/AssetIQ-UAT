@@ -37,6 +37,11 @@ from investigation_models import (
     ActionItemCreate, ActionItemUpdate, ActionPriority, ActionStatus,
     EvidenceCreate
 )
+from maintenance_strategy_models import (
+    MaintenanceStrategy, CriticalityLevel, MaintenanceFrequency,
+    MaintenanceStrategyCreate, MaintenanceStrategyUpdate, GenerateStrategyRequest
+)
+from maintenance_strategy_generator import MaintenanceStrategyGenerator
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -3779,6 +3784,212 @@ async def get_action_optimization(
     if not optimization:
         raise HTTPException(status_code=404, detail="No action optimization available. Generate one first.")
     return optimization
+
+
+# ============= MAINTENANCE STRATEGY ENDPOINTS =============
+
+@api_router.get("/maintenance-strategies")
+async def list_maintenance_strategies(
+    equipment_type_id: Optional[str] = None,
+    criticality_level: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """List all maintenance strategies, optionally filtered"""
+    query = {}
+    if equipment_type_id:
+        query["equipment_type_id"] = equipment_type_id
+    if criticality_level:
+        query["criticality_level"] = criticality_level
+    
+    strategies = await db.maintenance_strategies.find(query, {"_id": 0}).to_list(1000)
+    return {"strategies": strategies, "total": len(strategies)}
+
+
+@api_router.get("/maintenance-strategies/{strategy_id}")
+async def get_maintenance_strategy(
+    strategy_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific maintenance strategy by ID"""
+    strategy = await db.maintenance_strategies.find_one({"id": strategy_id}, {"_id": 0})
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Maintenance strategy not found")
+    return strategy
+
+
+@api_router.get("/maintenance-strategies/by-equipment-type/{equipment_type_id}")
+async def get_strategies_by_equipment_type(
+    equipment_type_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all maintenance strategies for an equipment type (all criticality levels)"""
+    strategies = await db.maintenance_strategies.find(
+        {"equipment_type_id": equipment_type_id}, 
+        {"_id": 0}
+    ).to_list(100)
+    return {"equipment_type_id": equipment_type_id, "strategies": strategies}
+
+
+@api_router.post("/maintenance-strategies/generate")
+async def generate_maintenance_strategy(
+    request: GenerateStrategyRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Auto-generate a maintenance strategy from FMEA data"""
+    # Check if strategy already exists for this equipment type + criticality
+    existing = await db.maintenance_strategies.find_one({
+        "equipment_type_id": request.equipment_type_id,
+        "criticality_level": request.criticality_level.value
+    })
+    if existing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Strategy already exists for {request.equipment_type_name} at {request.criticality_level.value} criticality. Delete it first to regenerate."
+        )
+    
+    # Get failure modes for this equipment type
+    failure_modes = [
+        fm for fm in FAILURE_MODES_LIBRARY 
+        if fm.get("equipment", "").lower() == request.equipment_type_name.lower()
+        or request.equipment_type_name.lower() in fm.get("equipment", "").lower()
+        or fm.get("equipment_type_ids") and request.equipment_type_id in fm.get("equipment_type_ids", [])
+    ]
+    
+    # If no specific failure modes, get general ones
+    if not failure_modes:
+        failure_modes = FAILURE_MODES_LIBRARY[:10]  # Take first 10 as fallback
+    
+    # Generate strategy using AI
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="AI API key not configured")
+    
+    generator = MaintenanceStrategyGenerator(api_key)
+    strategy = await generator.generate_strategy(
+        equipment_type_id=request.equipment_type_id,
+        equipment_type_name=request.equipment_type_name,
+        criticality_level=request.criticality_level,
+        failure_modes=failure_modes,
+        user_id=current_user.get("user_id", "unknown")
+    )
+    
+    # Save to database
+    strategy_dict = strategy.model_dump()
+    await db.maintenance_strategies.insert_one(strategy_dict)
+    
+    # Remove MongoDB _id before returning
+    if "_id" in strategy_dict:
+        del strategy_dict["_id"]
+    
+    return strategy_dict
+
+
+@api_router.post("/maintenance-strategies")
+async def create_maintenance_strategy(
+    data: MaintenanceStrategyCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new maintenance strategy manually"""
+    # Check if strategy already exists
+    existing = await db.maintenance_strategies.find_one({
+        "equipment_type_id": data.equipment_type_id,
+        "criticality_level": data.criticality_level.value
+    })
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Strategy already exists for this equipment type and criticality level"
+        )
+    
+    strategy = MaintenanceStrategy(
+        id=str(uuid.uuid4()),
+        equipment_type_id=data.equipment_type_id,
+        equipment_type_name=data.equipment_type_name,
+        criticality_level=data.criticality_level,
+        description=data.description,
+        created_by=current_user.get("user_id"),
+        auto_generated=False
+    )
+    
+    strategy_dict = strategy.model_dump()
+    await db.maintenance_strategies.insert_one(strategy_dict)
+    
+    # Remove MongoDB _id before returning
+    if "_id" in strategy_dict:
+        del strategy_dict["_id"]
+    
+    return strategy_dict
+
+
+@api_router.patch("/maintenance-strategies/{strategy_id}")
+async def update_maintenance_strategy(
+    strategy_id: str,
+    data: MaintenanceStrategyUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update an existing maintenance strategy"""
+    strategy = await db.maintenance_strategies.find_one({"id": strategy_id})
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Maintenance strategy not found")
+    
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update_data:
+        # Update version if significant changes
+        if any(k in update_data for k in ['operator_rounds', 'detection_systems', 'scheduled_maintenance']):
+            current_version = strategy.get("strategy_version", "1.0")
+            major, minor = map(int, current_version.split("."))
+            update_data["strategy_version"] = f"{major}.{minor + 1}"
+        
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.maintenance_strategies.update_one(
+            {"id": strategy_id},
+            {"$set": update_data}
+        )
+    
+    updated_strategy = await db.maintenance_strategies.find_one({"id": strategy_id}, {"_id": 0})
+    return updated_strategy
+
+
+@api_router.delete("/maintenance-strategies/{strategy_id}")
+async def delete_maintenance_strategy(
+    strategy_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a maintenance strategy"""
+    result = await db.maintenance_strategies.delete_one({"id": strategy_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Maintenance strategy not found")
+    return {"message": "Maintenance strategy deleted", "id": strategy_id}
+
+
+@api_router.post("/maintenance-strategies/{strategy_id}/increment-version")
+async def increment_strategy_version(
+    strategy_id: str,
+    major: bool = False,
+    current_user: dict = Depends(get_current_user)
+):
+    """Increment the strategy version number"""
+    strategy = await db.maintenance_strategies.find_one({"id": strategy_id})
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Maintenance strategy not found")
+    
+    current_version = strategy.get("strategy_version", "1.0")
+    major_v, minor_v = map(int, current_version.split("."))
+    
+    if major:
+        new_version = f"{major_v + 1}.0"
+    else:
+        new_version = f"{major_v}.{minor_v + 1}"
+    
+    await db.maintenance_strategies.update_one(
+        {"id": strategy_id},
+        {"$set": {
+            "strategy_version": new_version,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"id": strategy_id, "new_version": new_version}
 
 
 app.include_router(api_router)

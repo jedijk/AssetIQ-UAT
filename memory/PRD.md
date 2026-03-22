@@ -317,6 +317,25 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 
 ### Changelog
 
+#### Mar 22, 2026 - Maintenance Strategy Module
+- [x] **Maintenance Strategy Database & Auto-Generation** (Mar 22, 2026):
+  - NEW: Complete Maintenance Strategy data model with:
+    - Operator Rounds (frequency, checklists, PPE requirements)
+    - Detection Systems (vibration, temperature, pressure, etc. with alarm thresholds)
+    - Scheduled Maintenance Tasks (preventive, predictive, condition-based)
+    - Corrective Actions with response times and priorities
+    - Emergency Procedures (for safety-critical equipment)
+    - Spare Parts inventory recommendations
+    - Failure Mode Mappings linking FMEA to maintenance actions
+  - NEW: AI-powered strategy generation from FMEA failure modes
+  - NEW: Strategy versioning (auto-increments on changes)
+  - NEW: Criticality-based strategy variations (Safety Critical, Production Critical, Medium, Low)
+  - NEW: "Maintenance" tab added to Library page
+  - NEW: Interactive strategy cards with expandable sections
+  - Backend files: `maintenance_strategy_models.py`, `maintenance_strategy_generator.py`
+  - Frontend file: `MaintenanceStrategiesPanel.jsx`
+  - API endpoints: `/api/maintenance-strategies/*`
+
 #### Mar 21, 2026 - AI Risk Score Alignment
 - [x] **AI Risk Analysis Score Aligned with Threat Score** (Mar 21, 2026):
   - Fixed confusion where AI Risk Analysis showed a different score than the threat's actual Risk Score
