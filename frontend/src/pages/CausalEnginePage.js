@@ -74,6 +74,7 @@ export default function CausalEnginePage() {
   const [failureForm, setFailureForm] = useState({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" });
   const [causeForm, setCauseForm] = useState({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" });
   const [actionForm, setActionForm] = useState({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" });
+  const [localNotes, setLocalNotes] = useState("");
 
   // Handle inv query parameter - auto-select investigation from URL
   useEffect(() => {
@@ -85,6 +86,22 @@ export default function CausalEnginePage() {
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, setSearchParams, selectedInvId]);
+
+  // Sync localNotes with investigation data when investigation changes
+  useEffect(() => {
+    if (investigationData) {
+      setLocalNotes(investigationData.notes || "");
+    }
+  }, [investigationData]);
+
+  // Debounced save for notes
+  useEffect(() => {
+    if (!selectedInvId || localNotes === (investigationData?.notes || "")) return;
+    const timer = setTimeout(() => {
+      updateInvMutation.mutate({ id: selectedInvId, data: { notes: localNotes } });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [localNotes, selectedInvId]);
 
   const { data: investigationsData, isLoading: loadingInvestigations } = useQuery({
     queryKey: ["investigations"],
@@ -101,6 +118,15 @@ export default function CausalEnginePage() {
   
   const investigation = investigationData?.investigation;
   const timelineEvents = investigationData?.timeline_events || [];
+  // Sort timeline events chronologically by event_time
+  const sortedTimelineEvents = useMemo(() => {
+    return [...timelineEvents].sort((a, b) => {
+      if (!a.event_time && !b.event_time) return 0;
+      if (!a.event_time) return 1;
+      if (!b.event_time) return -1;
+      return new Date(a.event_time) - new Date(b.event_time);
+    });
+  }, [timelineEvents]);
   const failureIdentifications = investigationData?.failure_identifications || [];
   const causeNodes = investigationData?.cause_nodes || [];
   const actionItems = investigationData?.action_items || [];
@@ -112,13 +138,13 @@ export default function CausalEnginePage() {
   }, [investigations, searchQuery]);
 
   const stats = useMemo(() => ({
-    totalEvents: timelineEvents.length,
+    totalEvents: sortedTimelineEvents.length,
     totalFailures: failureIdentifications.length,
     totalCauses: causeNodes.length,
     rootCauses: causeNodes.filter(c => c.is_root_cause).length,
     totalActions: actionItems.length,
     openActions: actionItems.filter(a => a.status === "open" || a.status === "in_progress").length,
-  }), [timelineEvents, failureIdentifications, causeNodes, actionItems]);
+  }), [sortedTimelineEvents, failureIdentifications, causeNodes, actionItems]);
 
   // Build flat cause list is handled by CauseTree component
 
@@ -466,6 +492,21 @@ export default function CausalEnginePage() {
                   <button onClick={() => setActiveTab("causes")} className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"><GitBranch className="w-5 h-5 text-purple-600" /><div className="text-left"><div className="font-medium text-sm">Causes</div><div className="text-xs text-slate-500">Build causal tree</div></div></button>
                   <button onClick={() => setActiveTab("actions")} className="flex items-center gap-3 p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"><CheckSquare className="w-5 h-5 text-green-600" /><div className="text-left"><div className="font-medium text-sm">Actions</div><div className="text-xs text-slate-500">Track corrections</div></div></button>
                 </div>
+
+                {/* Investigation Notes */}
+                <div className="bg-white rounded-lg border p-4">
+                  <div className="flex items-center gap-2 text-slate-700 mb-3">
+                    <FileText className="w-4 h-4" />
+                    <span className="font-medium text-sm">{t("causal.investigationNotes") || "Investigation Notes"}</span>
+                  </div>
+                  <Textarea
+                    value={localNotes}
+                    onChange={(e) => setLocalNotes(e.target.value)}
+                    placeholder={t("causal.notesPlaceholder") || "Add notes, observations, or important details about this investigation..."}
+                    className="min-h-[120px] resize-y text-sm"
+                    data-testid="investigation-notes"
+                  />
+                </div>
               </div>
             )}
             
@@ -476,7 +517,7 @@ export default function CausalEnginePage() {
                   <Button onClick={() => { setEditingItem(null); setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" }); setShowEventDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-event-btn"><Plus className="w-4 h-4 mr-2" />Add Event</Button>
                 </div>
                 
-                {timelineEvents.length === 0 ? (
+                {sortedTimelineEvents.length === 0 ? (
                   <div className="empty-state py-16">
                     <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
                       <Clock className="w-8 h-8 text-slate-400" />
@@ -486,7 +527,7 @@ export default function CausalEnginePage() {
                   </div>
                 ) : (
                   <div className="priority-list">
-                    {timelineEvents.map((event, idx) => {
+                    {sortedTimelineEvents.map((event, idx) => {
                       const category = EVENT_CATEGORIES.find(c => c.value === event.category);
                       return (
                         <motion.div key={event.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }} className="priority-item group" data-testid={`timeline-event-${event.id}`}>

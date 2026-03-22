@@ -68,6 +68,7 @@ class InvestigationCreate(BaseModel):
     investigation_leader: Optional[str] = None
     team_members: List[str] = Field(default_factory=list)
     threat_id: Optional[str] = None  # Link to originating threat
+    notes: Optional[str] = None  # General investigation notes/comments
 
 
 class InvestigationUpdate(BaseModel):
@@ -80,6 +81,7 @@ class InvestigationUpdate(BaseModel):
     investigation_leader: Optional[str] = None
     team_members: Optional[List[str]] = None
     status: Optional[InvestigationStatus] = None
+    notes: Optional[str] = None  # General investigation notes/comments
 
 
 class TimelineEventCreate(BaseModel):
