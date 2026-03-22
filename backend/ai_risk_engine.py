@@ -28,13 +28,13 @@ RISK_ANALYSIS_PROMPT = """You are an AI Risk Analyst for industrial equipment. A
 
 IMPORTANT: Respond ONLY with valid JSON. No markdown, no explanations outside the JSON.
 
-Given the threat details, calculate:
-1. Dynamic Risk Score (0-100) based on:
-   - Severity of potential consequences
-   - Current failure indicators
-   - Equipment criticality
-   - Detection capability
+The threat already has a Risk Score calculated using FMEA methodology:
+- Risk Score = Likelihood × Detectability × 10
+- Scale: 10-250 (Low < 50, Medium 50-99, High 100-149, Critical >= 150)
+- Current threat risk score is provided in the context
 
+Given the threat details, provide:
+1. DO NOT recalculate risk_score - use the provided threat's current risk score
 2. Failure Probability (0-100%):
    - Based on failure mode patterns
    - Equipment condition indicators
@@ -45,28 +45,32 @@ Given the threat details, calculate:
    - Provide in hours (null if uncertain)
 
 4. Risk Trend:
-   - "increasing", "stable", or "decreasing"
+   - "increasing", "stable", or "decreasing" based on current conditions
 
-5. Key Risk Factors (3-5 factors)
+5. Trend Delta:
+   - Expected change in risk score over time (positive = worsening, negative = improving)
 
-6. Forecasts for next 7/14/30 days
+6. Key Risk Factors (3-5 factors)
+
+7. Forecasts for next 7/14/30 days using the SAME FMEA scale (10-250)
+   - Start from the current risk score and project changes
 
 RESPOND IN THIS EXACT JSON FORMAT:
 {
-  "risk_score": 75,
+  "risk_score": <use_the_threats_current_score>,
   "failure_probability": 65.0,
   "time_to_failure_hours": 168,
   "time_to_failure_display": "5-7 days",
   "confidence": "medium",
   "trend": "increasing",
-  "trend_delta": 5,
+  "trend_delta": 10,
   "factors": ["factor1", "factor2", "factor3"],
   "key_insights": ["insight1", "insight2"],
   "recommendations": ["recommendation1", "recommendation2"],
   "forecasts": [
-    {"days_ahead": 7, "predicted_risk_score": 80, "predicted_probability": 70.0, "confidence": "medium"},
-    {"days_ahead": 14, "predicted_risk_score": 85, "predicted_probability": 75.0, "confidence": "low"},
-    {"days_ahead": 30, "predicted_risk_score": 90, "predicted_probability": 85.0, "confidence": "low"}
+    {"days_ahead": 7, "predicted_risk_score": 70, "predicted_probability": 70.0, "confidence": "medium"},
+    {"days_ahead": 14, "predicted_risk_score": 80, "predicted_probability": 75.0, "confidence": "low"},
+    {"days_ahead": 30, "predicted_risk_score": 95, "predicted_probability": 80.0, "confidence": "low"}
   ]
 }"""
 
@@ -298,9 +302,12 @@ EQUIPMENT INFORMATION:
             response = await chat.send_message(message)
             data = self._parse_json_response(response)
             
-            # Build DynamicRiskScore
+            # Use the threat's actual risk_score for consistency
+            threat_risk_score = threat.get("risk_score", 50)
+            
+            # Build DynamicRiskScore - always use threat's risk score
             dynamic_risk = DynamicRiskScore(
-                risk_score=data.get("risk_score", 50),
+                risk_score=threat_risk_score,  # Use threat's actual score, not AI's
                 failure_probability=data.get("failure_probability", 50.0),
                 time_to_failure_hours=data.get("time_to_failure_hours"),
                 time_to_failure_display=data.get("time_to_failure_display"),
@@ -311,13 +318,18 @@ EQUIPMENT INFORMATION:
                 last_updated=datetime.now(timezone.utc).isoformat()
             )
             
-            # Build forecasts
+            # Build forecasts - ensure they use the same FMEA scale
             forecasts = []
             if include_forecast and "forecasts" in data:
                 for fc in data["forecasts"]:
+                    # Ensure forecast scores are reasonable relative to current score
+                    predicted_score = fc["predicted_risk_score"]
+                    # If AI gives a score on 0-100 scale, scale it to FMEA range
+                    if predicted_score <= 100 and threat_risk_score > 100:
+                        predicted_score = int(threat_risk_score * (1 + (fc.get("days_ahead", 7) * 0.01)))
                     forecasts.append(RiskForecast(
                         days_ahead=fc["days_ahead"],
-                        predicted_risk_score=fc["predicted_risk_score"],
+                        predicted_risk_score=min(250, max(10, predicted_score)),  # Clamp to FMEA range
                         predicted_probability=fc["predicted_probability"],
                         confidence=ConfidenceLevel(fc.get("confidence", "medium"))
                     ))

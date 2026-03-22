@@ -317,6 +317,16 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 
 ### Changelog
 
+#### Mar 21, 2026 - AI Risk Score Alignment
+- [x] **AI Risk Analysis Score Aligned with Threat Score** (Mar 21, 2026):
+  - Fixed confusion where AI Risk Analysis showed a different score than the threat's actual Risk Score
+  - AI Risk Analysis now uses the threat's FMEA-calculated risk score (Likelihood × Detectability × 10)
+  - Updated RiskGauge component to use FMEA thresholds: Critical ≥150, High ≥100, Medium ≥50, Low <50
+  - Updated ForecastChart to use 250-point FMEA scale
+  - Backend `ai_risk_engine.py` now always returns threat's actual risk_score for consistency
+  - Forecasts are now properly scaled to FMEA range (10-250)
+  - Updated files: `/app/frontend/src/components/AIInsightsPanel.jsx`, `/app/backend/ai_risk_engine.py`
+
 #### Mar 21, 2026 - Missing Library Data Warning
 - [x] **Missing Library Data Warning in AI Risk Analysis** (Mar 21, 2026):
   - Added automatic detection of missing Equipment Types and Failure Modes from the FMEA library

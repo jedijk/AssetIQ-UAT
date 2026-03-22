@@ -66,12 +66,14 @@ const ConfidenceBadge = ({ confidence, t }) => {
   );
 };
 
-const RiskGauge = ({ score, size = "md" }) => {
+const RiskGauge = ({ score, size = "md", maxScore = 250 }) => {
+  // Color thresholds based on threat's FMEA scoring (10-250 scale)
+  // Critical >= 150, High >= 100, Medium >= 50, Low < 50
   const getColor = (s) => {
-    if (s >= 70) return "#ef4444";
-    if (s >= 50) return "#f97316";
-    if (s >= 30) return "#eab308";
-    return "#22c55e";
+    if (s >= 150) return "#ef4444"; // Critical - Red
+    if (s >= 100) return "#f97316"; // High - Orange
+    if (s >= 50) return "#eab308";  // Medium - Yellow
+    return "#22c55e";               // Low - Green
   };
   
   const sizeConfig = {
@@ -83,7 +85,9 @@ const RiskGauge = ({ score, size = "md" }) => {
   const cfg = sizeConfig[size];
   const radius = (cfg.width - cfg.stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = (score / 100) * circumference;
+  // Normalize score to 0-1 range for progress calculation (max score is 250)
+  const normalizedScore = Math.min(score / maxScore, 1);
+  const progress = normalizedScore * circumference;
   
   return (
     <div className="relative inline-flex items-center justify-center">
@@ -114,10 +118,19 @@ const RiskGauge = ({ score, size = "md" }) => {
   );
 };
 
-const ForecastChart = ({ forecasts, t }) => {
+const ForecastChart = ({ forecasts, t, currentScore = 60 }) => {
   if (!forecasts || forecasts.length === 0) return null;
   
-  const maxScore = Math.max(...forecasts.map(f => f.predicted_risk_score), 100);
+  // Use 250 as max for FMEA scale (5×5×10)
+  const maxScore = 250;
+  
+  // Color thresholds based on FMEA scoring: Critical >= 150, High >= 100, Medium >= 50
+  const getBarColor = (score) => {
+    if (score >= 150) return "bg-red-400";
+    if (score >= 100) return "bg-orange-400";
+    if (score >= 50) return "bg-yellow-400";
+    return "bg-green-400";
+  };
   
   return (
     <div className="mt-3">
@@ -129,11 +142,7 @@ const ForecastChart = ({ forecasts, t }) => {
               <TooltipTrigger asChild>
                 <div className="flex-1 flex flex-col items-center gap-1">
                   <div
-                    className={`w-full rounded-t transition-all ${
-                      forecast.predicted_risk_score >= 70 ? "bg-red-400" :
-                      forecast.predicted_risk_score >= 50 ? "bg-orange-400" :
-                      forecast.predicted_risk_score >= 30 ? "bg-yellow-400" : "bg-green-400"
-                    }`}
+                    className={`w-full rounded-t transition-all ${getBarColor(forecast.predicted_risk_score)}`}
                     style={{ height: `${(forecast.predicted_risk_score / maxScore) * 100}%`, minHeight: '4px' }}
                   />
                   <span className="text-[10px] text-slate-400">{forecast.days_ahead}d</span>
@@ -295,6 +304,9 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
   const displayInsights = analyzeMutation.data?.key_insights || keyInsights;
   const displayRecommendations = analyzeMutation.data?.recommendations || recommendations;
   
+  // Use the threat's actual risk score for consistency
+  const threatRiskScore = threatData?.risk_score || displayData?.risk_score || 0;
+  
   if (!displayData) {
     return null;
   }
@@ -327,7 +339,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
         </div>
         
         <div className="flex items-center gap-3">
-          <RiskGauge score={displayData.risk_score} size="sm" />
+          <RiskGauge score={threatRiskScore} size="sm" />
           <Button
             variant="ghost"
             size="sm"
