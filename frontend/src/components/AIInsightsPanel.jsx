@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { aiRiskAPI, actionsAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
+import { aiRiskAPI, threatsAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -217,29 +217,35 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
     },
   });
 
-  // Mutation to create action from recommendation
-  const createActionMutation = useMutation({
-    mutationFn: (recommendation) => actionsAPI.create({
-      title: recommendation.substring(0, 100),
-      description: recommendation,
-      source_type: "ai_recommendation",
-      source_id: threatId,
-      source_name: threatData?.title || "AI Risk Analysis",
-      priority: threatData?.risk_level === "Critical" ? "critical" : 
-               threatData?.risk_level === "High" ? "high" : "medium",
-    }),
-    onSuccess: (_, recommendation) => {
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
-      setAddedRecommendations(prev => new Set([...prev, recommendation]));
-      toast.success(t("ai.actionCreated"));
+  // Mutation to add recommendation to threat
+  const addRecommendationMutation = useMutation({
+    mutationFn: async (recommendation) => {
+      // Get current recommendations and add the new one
+      const currentRecommendations = threatData?.recommended_actions || [];
+      // Avoid duplicates
+      if (currentRecommendations.includes(recommendation)) {
+        throw new Error("Recommendation already exists");
+      }
+      const updatedRecommendations = [...currentRecommendations, recommendation];
+      return threatsAPI.update(threatId, { recommended_actions: updatedRecommendations });
     },
-    onError: () => {
-      toast.error("Failed to create action");
+    onSuccess: (_, recommendation) => {
+      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      setAddedRecommendations(prev => new Set([...prev, recommendation]));
+      toast.success(t("ai.recommendationAdded") || "Recommendation added to threat!");
+    },
+    onError: (error) => {
+      if (error.message === "Recommendation already exists") {
+        toast.info(t("ai.recommendationExists") || "Recommendation already exists");
+      } else {
+        toast.error(t("ai.recommendationFailed") || "Failed to add recommendation");
+      }
     },
   });
 
-  const handleAddAsAction = (recommendation) => {
-    createActionMutation.mutate(recommendation);
+  const handleAddRecommendation = (recommendation) => {
+    addRecommendationMutation.mutate(recommendation);
   };
   
   const riskData = insights?.dynamic_risk;
@@ -492,7 +498,8 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                   </h5>
                   <div className="space-y-2">
                     {displayRecommendations.map((rec, idx) => {
-                      const isAdded = addedRecommendations.has(rec);
+                      const isAdded = addedRecommendations.has(rec) || 
+                        (threatData?.recommended_actions || []).includes(rec);
                       return (
                         <div 
                           key={idx} 
@@ -506,8 +513,8 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleAddAsAction(rec)}
-                                  disabled={createActionMutation.isPending || isAdded}
+                                  onClick={() => handleAddRecommendation(rec)}
+                                  disabled={addRecommendationMutation.isPending || isAdded}
                                   className={`flex-shrink-0 h-7 px-2 ${
                                     isAdded 
                                       ? "text-green-600 bg-green-50" 
@@ -515,7 +522,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                                   } transition-all`}
                                   data-testid={`add-recommendation-${idx}`}
                                 >
-                                  {createActionMutation.isPending ? (
+                                  {addRecommendationMutation.isPending ? (
                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                   ) : isAdded ? (
                                     <Check className="w-3.5 h-3.5" />
@@ -525,7 +532,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p className="text-xs">{isAdded ? t("ai.addedAsAction") : t("ai.addAsAction")}</p>
+                                <p className="text-xs">{isAdded ? (t("ai.alreadyAdded") || "Already added") : (t("ai.addToThreat") || "Add to threat recommendations")}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
