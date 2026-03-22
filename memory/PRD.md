@@ -6,6 +6,13 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Dec 2025)
+- **4-Dimension Criticality System** (Mar 22, 2026): Changed from single-tier criticality to 4 dimensions:
+  - Safety Impact (1-5)
+  - Production Impact (1-5)
+  - Environmental Impact (1-5)
+  - Reputation Impact (1-5)
+  - Overall Criticality calculated as max of all dimensions
+  - Full EN/NL translation support for all criticality labels
 - Added Reliability Performance Dashboard with snowflake/radar chart visualization
 - Implemented deep linking from dashboard numbers to related app sections
 - Added Back button navigation for improved UX
@@ -78,7 +85,7 @@ Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (for
 - User authentication (JWT)
 - Full CRUD operations
 
-#### 5. Equipment Hierarchy & Criticality Manager - ISO 14224 (Completed - Mar 18, 2026)
+#### 5. Equipment Hierarchy & Criticality Manager - ISO 14224 (Updated Mar 22, 2026)
 - **Three-panel UI**: Libraries (left), Hierarchy Canvas (center), Properties (right)
 - **ISO 14224 Hierarchy Levels** (Updated Mar 18, 2026):
   - Installation (Level 1: Offshore platform, Onshore plant)
@@ -87,7 +94,13 @@ Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (for
   - Equipment Unit (Level 4: Compressor, Pump, Heat exchanger)
   - Subunit (Level 5: Driver, Driven unit, Control system) - NEW
   - Maintainable Item (Level 6: Bearing, Seal, Impeller)
-- **Criticality Assignment**: Safety Critical, Production Critical, Medium, Low
+- **4-Dimension Criticality Assignment** (Mar 22, 2026):
+  - Safety Impact (1-5, red color scale)
+  - Production Impact (1-5, orange color scale)
+  - Environmental Impact (1-5, green color scale)
+  - Reputation Impact (1-5, purple color scale)
+  - Overall Criticality = max of all dimensions
+  - Backwards compatible level mapping: safety_critical, production_critical, medium, low
 - **Discipline Mapping**: Mechanical, Electrical, Instrumentation, Process
 - **Equipment Type Library**: 20+ ISO-compliant equipment types with icons
 - **Custom Equipment Types**: Add/edit/delete custom types

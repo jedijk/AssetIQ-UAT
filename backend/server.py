@@ -2282,15 +2282,22 @@ async def assign_criticality(
     assignment: CriticalityAssignment,
     current_user: dict = Depends(get_current_user)
 ):
-    """Assign criticality to an equipment node."""
+    """Assign criticality to an equipment node using 4-dimension model (Safety, Production, Environmental, Reputation)."""
     node = await db.equipment_nodes.find_one(
         {"id": node_id, "created_by": current_user["id"]}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
-    # If profile_id is None, clear the criticality
-    if assignment.profile_id is None:
+    # Check if all 4 dimensions are None/0 - if so, clear criticality
+    has_any_dimension = (
+        (assignment.safety_impact and assignment.safety_impact > 0) or
+        (assignment.production_impact and assignment.production_impact > 0) or
+        (assignment.environmental_impact and assignment.environmental_impact > 0) or
+        (assignment.reputation_impact and assignment.reputation_impact > 0)
+    )
+    
+    if not has_any_dimension:
         await db.equipment_nodes.update_one(
             {"id": node_id},
             {"$set": {
@@ -2301,28 +2308,53 @@ async def assign_criticality(
         updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
         return updated
     
-    # Find profile
-    profile = next((p for p in CRITICALITY_PROFILES if p["id"] == assignment.profile_id), None)
-    if not profile:
-        raise HTTPException(status_code=400, detail="Criticality profile not found")
+    # Build 4-dimension criticality data
+    safety = assignment.safety_impact or 0
+    production = assignment.production_impact or 0
+    environmental = assignment.environmental_impact or 0
+    reputation = assignment.reputation_impact or 0
     
-    # Merge defaults with custom values
+    # Calculate overall criticality level based on max dimension
+    max_impact = max(safety, production, environmental, reputation)
+    
+    # Determine legacy level for backwards compatibility
+    if safety >= 4 or max_impact == 5:
+        level = "safety_critical"
+        color = "#EF4444"  # Red
+    elif production >= 4 or max_impact >= 4:
+        level = "production_critical"
+        color = "#F97316"  # Orange
+    elif max_impact >= 3:
+        level = "medium"
+        color = "#EAB308"  # Yellow
+    else:
+        level = "low"
+        color = "#22C55E"  # Green
+    
     criticality_data = {
+        # 4-dimension model
+        "safety_impact": safety,
+        "production_impact": production,
+        "environmental_impact": environmental,
+        "reputation_impact": reputation,
+        # Derived values for backwards compatibility
+        "level": level,
+        "color": color,
+        "max_impact": max_impact,
+        # Legacy fields preserved
         "profile_id": assignment.profile_id,
-        "level": profile["level"],
-        "color": profile["color"],
-        "fatality_risk": assignment.fatality_risk or profile["defaults"]["fatality_risk"],
-        "production_loss_per_day": assignment.production_loss_per_day or profile["defaults"]["production_loss_per_day"],
-        "failure_probability": assignment.failure_probability or profile["defaults"]["failure_probability"],
-        "downtime_days": assignment.downtime_days or profile["defaults"]["downtime_days"],
-        "environmental_impact": assignment.environmental_impact or 0
+        "fatality_risk": assignment.fatality_risk or 0,
+        "production_loss_per_day": assignment.production_loss_per_day or 0,
+        "failure_probability": assignment.failure_probability or 0,
+        "downtime_days": assignment.downtime_days or 0,
     }
     
-    # Calculate risk score
+    # Calculate risk score weighted by dimensions
     risk_score = (
-        criticality_data["fatality_risk"] * 1000 +
-        (criticality_data["production_loss_per_day"] * criticality_data["downtime_days"]) / 10000 +
-        criticality_data["failure_probability"] * 100
+        (safety * 25) +  # Safety has highest weight
+        (production * 20) +
+        (environmental * 15) +
+        (reputation * 10)
     )
     criticality_data["risk_score"] = round(risk_score, 2)
     
