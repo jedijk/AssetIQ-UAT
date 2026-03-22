@@ -656,7 +656,7 @@ const ThreatDetailPage = () => {
             : (threat.criticality_score || 0);
           
           // Final Score = (Criticality × 0.7) + (FMEA × 0.3)
-          const calculatedScore = Math.round((criticalityScore * 0.7) + (fmBaseScore * 0.3));
+          const calculatedScore = Math.round((criticalityScore * 0.75) + (fmBaseScore * 0.25));
           
           return (
             <div 
@@ -698,7 +698,7 @@ const ThreatDetailPage = () => {
                   <span className="text-slate-500">)</span>
                 </div>
                 <div className="text-center text-[10px] text-slate-500 mt-1">
-                  ({t("threats.criticalityScoreLabel")} × 70%) + ({t("threats.fmeaScoreLabel")} × 30%)
+                  ({t("threats.criticalityScoreLabel")} × 75%) + ({t("threats.fmeaScoreLabel")} × 25%)
                 </div>
                 <div className="text-center mt-2 pt-2 border-t border-blue-200">
                   <span className="text-slate-500 text-sm">=</span>
@@ -816,12 +816,12 @@ const ThreatDetailPage = () => {
                   <div className="bg-white rounded px-3 py-2 font-mono text-sm">
                     <span className="text-slate-500">(</span>
                     <span className="text-purple-600">{criticalityScore}</span>
-                    <span className="text-slate-400">×0.7</span>
+                    <span className="text-slate-400">×0.75</span>
                     <span className="text-slate-500">)</span>
                     <span className="text-slate-400 mx-1">+</span>
                     <span className="text-slate-500">(</span>
                     <span className="text-blue-600">{fmBaseScore}</span>
-                    <span className="text-slate-400">×0.3</span>
+                    <span className="text-slate-400">×0.25</span>
                     <span className="text-slate-500">)</span>
                     <span className="text-slate-400 mx-1">=</span>
                     <span className={`font-bold ${
