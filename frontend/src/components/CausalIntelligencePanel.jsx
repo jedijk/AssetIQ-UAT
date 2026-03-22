@@ -204,6 +204,35 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
         }
       }
       
+      // Add failure identification if available from threat data
+      if (threatData?.failure_mode || threatData?.asset) {
+        await investigationAPI.createFailure(investigation.id, {
+          asset_name: threatData?.asset || "",
+          subsystem: "",
+          component: "",
+          failure_mode: threatData?.failure_mode || "Unknown failure mode",
+          degradation_mechanism: "",
+          evidence: threatData?.description || "",
+          comment: `Auto-populated from threat: ${threatData?.title || 'Unknown'}`,
+        });
+      }
+      
+      // Add recommended actions from threat as action items
+      const recommendedActions = threatData?.recommended_actions || [];
+      if (recommendedActions.length > 0) {
+        for (let i = 0; i < recommendedActions.length; i++) {
+          const action = recommendedActions[i];
+          await investigationAPI.createAction(investigation.id, {
+            description: action,
+            owner: "",
+            priority: i === 0 ? "high" : "medium",
+            due_date: "",
+            linked_cause_id: null,
+            comment: "Transferred from threat recommendations",
+          });
+        }
+      }
+      
       // Add a timeline event for the AI analysis
       await investigationAPI.createEvent(investigation.id, {
         event_time: new Date().toISOString(),
