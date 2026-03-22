@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { equipmentHierarchyAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import {
   ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
@@ -413,6 +414,7 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
 export default function EquipmentManagerPage() {
   const queryClient = useQueryClient();
   const { pushUndo } = useUndo();
+  const { t } = useLanguage();
   const fileInputRef = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
   
@@ -781,7 +783,7 @@ export default function EquipmentManagerPage() {
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input 
-              placeholder="Search name, description, tag..." 
+              placeholder={t("equipment.searchPlaceholder")} 
               value={searchQuery} 
               onChange={e => setSearchQuery(e.target.value)} 
               className="pl-9 pr-8 h-9" 
@@ -798,14 +800,14 @@ export default function EquipmentManagerPage() {
           </div>
           {searchQuery && (
             <span className="text-sm text-slate-500">
-              {matchingIds.size} {matchingIds.size === 1 ? "match" : "matches"}
+              {matchingIds.size} {t("equipment.matches")}
             </span>
           )}
-          <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />Import List</Button>
-          <Button onClick={() => { setNewNode({ name: "", level: "installation", parent_id: null }); setIsCreateOpen(true); }} size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="add-installation-btn"><Plus className="w-4 h-4 mr-1" />Add Installation</Button>
+          <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
+          <Button onClick={() => { setNewNode({ name: "", level: "installation", parent_id: null }); setIsCreateOpen(true); }} size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="add-installation-btn"><Plus className="w-4 h-4 mr-1" />{t("equipment.addInstallation")}</Button>
           {selectedNode && !movingNode && (
             <>
-              <Button onClick={handleAddChild} size="sm" variant="outline" disabled={selectedNode.level === "maintainable_item"} data-testid="add-child-btn"><Plus className="w-4 h-4 mr-1" />Add Child</Button>
+              <Button onClick={handleAddChild} size="sm" variant="outline" disabled={selectedNode.level === "maintainable_item"} data-testid="add-child-btn"><Plus className="w-4 h-4 mr-1" />{t("equipment.addChild")}</Button>
               <Button onClick={() => deleteMutation.mutate(selectedNode.id)} size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50" data-testid="delete-node-btn"><Trash2 className="w-4 h-4" /></Button>
             </>
           )}
@@ -816,10 +818,10 @@ export default function EquipmentManagerPage() {
           <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Move className="w-5 h-5 text-blue-600" />
-              <span className="text-sm font-medium text-blue-800">Moving: <strong>{movingNode.name}</strong></span>
-              <span className="text-sm text-blue-600">→ Click on a green highlighted target</span>
+              <span className="text-sm font-medium text-blue-800">{t("equipment.moving")}: <strong>{movingNode.name}</strong></span>
+              <span className="text-sm text-blue-600">→ {t("equipment.clickTarget")}</span>
             </div>
-            <Button size="sm" variant="outline" onClick={handleCancelMove}>Cancel</Button>
+            <Button size="sm" variant="outline" onClick={handleCancelMove}>{t("common.cancel")}</Button>
           </div>
         )}
         
@@ -827,11 +829,11 @@ export default function EquipmentManagerPage() {
           {treeData.length === 0 && unstructuredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <Building2 className="w-12 h-12 text-slate-300 mb-3" />
-              <h3 className="text-lg font-semibold text-slate-600 mb-1">No Equipment Hierarchy</h3>
-              <p className="text-sm text-slate-400 mb-4">Start by adding an installation or importing a list</p>
+              <h3 className="text-lg font-semibold text-slate-600 mb-1">{t("equipment.noEquipment")}</h3>
+              <p className="text-sm text-slate-400 mb-4">{t("equipment.addFirstEquipment")}</p>
               <div className="flex gap-2">
-                <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline"><Upload className="w-4 h-4 mr-1" />Import List</Button>
-                <Button onClick={() => setIsCreateOpen(true)} size="sm" className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-1" />Add Installation</Button>
+                <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
+                <Button onClick={() => setIsCreateOpen(true)} size="sm" className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-1" />{t("equipment.addInstallation")}</Button>
               </div>
             </div>
           ) : (
@@ -867,8 +869,8 @@ export default function EquipmentManagerPage() {
             <div className="mt-6 pt-4 border-t border-slate-200">
               <div className="flex items-center gap-2 mb-3">
                 <Package className="w-4 h-4 text-amber-500" />
-                <h3 className="text-sm font-semibold text-slate-700">Unassigned Items ({unstructuredItems.length})</h3>
-                <span className="text-xs text-slate-400">Drag to hierarchy</span>
+                <h3 className="text-sm font-semibold text-slate-700">{t("equipment.unassigned")} ({unstructuredItems.length})</h3>
+                <span className="text-xs text-slate-400">{t("equipment.dragToHierarchy")}</span>
               </div>
               <div className="space-y-2" data-testid="unstructured-items-list">
                 {unstructuredItems.map(item => (
@@ -897,31 +899,31 @@ export default function EquipmentManagerPage() {
       {/* Create Node Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{newNode.parent_id ? `Add ${LEVEL_CONFIG[newNode.level]?.label}` : "Add Installation"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{newNode.parent_id ? `${t("equipment.addChild")} ${LEVEL_CONFIG[newNode.level]?.label}` : t("equipment.addInstallation")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div><Label htmlFor="node-name">Name</Label><Input id="node-name" value={newNode.name} onChange={e => setNewNode({ ...newNode, name: e.target.value })} placeholder="Enter name" data-testid="new-node-name-input" /></div>
-            {!newNode.parent_id && (<div><Label>Level</Label><Select value={newNode.level} onValueChange={v => setNewNode({ ...newNode, level: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{LEVEL_ORDER.map(l => <SelectItem key={l} value={l}>{LEVEL_CONFIG[l]?.label}</SelectItem>)}</SelectContent></Select></div>)}
+            <div><Label htmlFor="node-name">{t("common.name")}</Label><Input id="node-name" value={newNode.name} onChange={e => setNewNode({ ...newNode, name: e.target.value })} placeholder={t("common.enterName")} data-testid="new-node-name-input" /></div>
+            {!newNode.parent_id && (<div><Label>{t("equipment.selectLevel")}</Label><Select value={newNode.level} onValueChange={v => setNewNode({ ...newNode, level: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{LEVEL_ORDER.map(l => <SelectItem key={l} value={l}>{LEVEL_CONFIG[l]?.label}</SelectItem>)}</SelectContent></Select></div>)}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button><Button onClick={() => createMutation.mutate(newNode)} disabled={!newNode.name.trim() || createMutation.isPending} data-testid="create-node-btn">{createMutation.isPending ? "Creating..." : "Create"}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setIsCreateOpen(false)}>{t("common.cancel")}</Button><Button onClick={() => createMutation.mutate(newNode)} disabled={!newNode.name.trim() || createMutation.isPending} data-testid="create-node-btn">{createMutation.isPending ? t("common.creating") : t("common.create")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Import List Dialog */}
       <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Import Equipment List</DialogTitle><DialogDescription>Paste a list or upload a file (Excel, PDF, CSV, TXT)</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{t("equipment.importEquipmentList")}</DialogTitle><DialogDescription>{t("equipment.pasteEquipmentList")}</DialogDescription></DialogHeader>
           <div className="space-y-4 py-4">
-            <div><Label>Paste Equipment List</Label><Textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Pump P-101&#10;Compressor C-201&#10;Heat Exchanger HX-301&#10;..." className="h-32 mt-1" data-testid="import-text-area" /></div>
-            <div className="flex items-center gap-2 text-sm text-slate-500"><div className="flex-1 h-px bg-slate-200" /><span>or</span><div className="flex-1 h-px bg-slate-200" /></div>
+            <div><Label>{t("equipment.pasteEquipmentList")}</Label><Textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Pump P-101&#10;Compressor C-201&#10;Heat Exchanger HX-301&#10;..." className="h-32 mt-1" data-testid="import-text-area" /></div>
+            <div className="flex items-center gap-2 text-sm text-slate-500"><div className="flex-1 h-px bg-slate-200" /><span>{t("equipment.orUpload")}</span><div className="flex-1 h-px bg-slate-200" /></div>
             <div>
               <input ref={fileInputRef} type="file" accept=".txt,.csv,.xlsx,.xls,.pdf" onChange={handleFileUpload} className="hidden" />
               <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full" disabled={parseFileMutation.isPending}>
-                <FileText className="w-4 h-4 mr-2" />{parseFileMutation.isPending ? "Uploading..." : "Upload File"}
+                <FileText className="w-4 h-4 mr-2" />{parseFileMutation.isPending ? t("common.uploading") : t("equipment.uploadFile")}
               </Button>
-              <p className="text-xs text-slate-400 mt-1 text-center">Supported: .txt, .csv, .xlsx, .xls, .pdf</p>
+              <p className="text-xs text-slate-400 mt-1 text-center">{t("equipment.supportedFormats")}</p>
             </div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setIsImportOpen(false)}>Cancel</Button><Button onClick={() => parseListMutation.mutate({ content: importText, source: "paste" })} disabled={!importText.trim() || parseListMutation.isPending} data-testid="parse-list-btn">{parseListMutation.isPending ? "Parsing..." : "Parse List"}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setIsImportOpen(false)}>{t("common.cancel")}</Button><Button onClick={() => parseListMutation.mutate({ content: importText, source: "paste" })} disabled={!importText.trim() || parseListMutation.isPending} data-testid="parse-list-btn">{parseListMutation.isPending ? t("common.parsing") : t("equipment.parseList")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -929,17 +931,17 @@ export default function EquipmentManagerPage() {
       <Dialog open={assignDialog.open} onOpenChange={(open) => !open && setAssignDialog({ open: false, item: null, parentNode: null, selectedLevel: "" })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign to Hierarchy</DialogTitle>
+            <DialogTitle>{t("equipment.assignToHierarchy")}</DialogTitle>
             <DialogDescription>
-              Assign "{assignDialog.item?.name}" under "{assignDialog.parentNode?.name}"
+              {t("equipment.assignUnder")} "{assignDialog.item?.name}" → "{assignDialog.parentNode?.name}"
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Select Level</Label>
+              <Label>{t("equipment.selectLevel")}</Label>
               <Select value={assignDialog.selectedLevel} onValueChange={v => setAssignDialog({ ...assignDialog, selectedLevel: v })}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select level" />
+                  <SelectValue placeholder={t("equipment.selectLevel")} />
                 </SelectTrigger>
                 <SelectContent>
                   {LEVEL_ORDER.filter(l => l !== "installation").map(level => {
@@ -963,10 +965,10 @@ export default function EquipmentManagerPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignDialog({ open: false, item: null, parentNode: null, selectedLevel: "" })}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleAssignToHierarchy} disabled={!assignDialog.selectedLevel || assignToHierarchyMutation.isPending}>
-              {assignToHierarchyMutation.isPending ? "Assigning..." : "Assign"}
+              {assignToHierarchyMutation.isPending ? t("common.assigning") : t("common.assign")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -976,18 +978,18 @@ export default function EquipmentManagerPage() {
       <Dialog open={demoteDialog.open} onOpenChange={(open) => !open && setDemoteDialog({ open: false, node: null, newLevel: null })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Demote to {LEVEL_CONFIG[demoteDialog.newLevel]?.label}</DialogTitle>
+            <DialogTitle>{t("equipment.demoteTo")} {LEVEL_CONFIG[demoteDialog.newLevel]?.label}</DialogTitle>
             <DialogDescription>
-              Select a new parent for "{demoteDialog.node?.name}"
+              {t("equipment.selectNewParent")} "{demoteDialog.node?.name}"
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Select New Parent</Label>
+              <Label>{t("equipment.selectNewParent")}</Label>
               <div className="mt-2 max-h-60 overflow-y-auto border rounded-lg">
                 {getDemoteParentCandidates().length === 0 ? (
                   <div className="p-4 text-center text-slate-500 text-sm">
-                    No valid parent nodes found. Create a {LEVEL_CONFIG[LEVEL_ORDER[LEVEL_ORDER.indexOf(demoteDialog.newLevel) - 1]]?.label} first.
+                    {t("equipment.noValidParents")} {t("equipment.createFirst")} {LEVEL_CONFIG[LEVEL_ORDER[LEVEL_ORDER.indexOf(demoteDialog.newLevel) - 1]]?.label}.
                   </div>
                 ) : (
                   getDemoteParentCandidates().map(parent => {
@@ -1013,7 +1015,7 @@ export default function EquipmentManagerPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDemoteDialog({ open: false, node: null, newLevel: null })}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>

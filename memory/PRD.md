@@ -381,3 +381,27 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
   - Component located at: `/app/frontend/src/components/SearchableCombobox.jsx`
   - Updated file: `/app/frontend/src/pages/ThreatDetailPage.js`
 
+
+
+#### Dec 2025 - Complete Dutch (NL) Localization
+- [x] **Full Application Localization** (Dec 2025):
+  - Extended `LanguageContext.js` with comprehensive translation dictionaries
+  - Updated `FailureModesPage.js` with Dutch translations for:
+    - Tab labels (Failure Modes, Equipment Types, Maintenance)
+    - Form labels (Category, Equipment, Severity, Occurrence, etc.)
+    - Dialog titles (Add/Edit Failure Mode, Add/Edit Equipment Type)
+    - Button labels (Add, Cancel, Save, Create)
+    - Empty states and search placeholders
+  - Updated `EquipmentManagerPage.js` with Dutch translations for:
+    - Toolbar buttons (Import List, Add Installation, Add Child)
+    - Search placeholder and match counts
+    - Empty state messages
+    - Dialog titles and form labels
+    - Move mode banner text
+  - Updated `CausalEnginePage.js` with Dutch translations for:
+    - Investigation sidebar (title, search, empty state)
+    - Tab labels (Overview, Timeline, Failures, Causal Tree, Actions)
+    - Dialog forms (Event, Failure, Cause, Action dialogs)
+    - Form labels and button text
+  - Added URL parameter handling in `FailureModesPage.js` for FMEA linkage from Maintenance Strategies
+  - All pages now support seamless EN/NL language toggle

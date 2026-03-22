@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useUndo } from "../contexts/UndoContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { 
   Search, 
   Filter, 
@@ -102,10 +104,26 @@ function EquipmentTypeItem({ item, onEdit, onDelete }) {
 const FailureModesPage = () => {
   const queryClient = useQueryClient();
   const { pushUndo } = useUndo();
-  const [searchQuery, setSearchQuery] = useState("");
+  const { t } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Initialize state from URL params (for FMEA linkage from Maintenance Strategies)
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [mainTab, setMainTab] = useState("failure-modes");
+  const [mainTab, setMainTab] = useState(() => searchParams.get("tab") || "failure-modes");
   const [libraryTab, setLibraryTab] = useState("equipment");
+  
+  // Handle URL parameter changes (e.g., from Maintenance Strategy FMEA links)
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    const searchParam = searchParams.get("search");
+    if (tabParam) setMainTab(tabParam);
+    if (searchParam) setSearchQuery(searchParam);
+    // Clear URL params after applying them
+    if (tabParam || searchParam) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   
   // Equipment type dialog state
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
@@ -393,9 +411,9 @@ const FailureModesPage = () => {
       {/* Main Tabs */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
         <TabsList className="grid w-full max-w-lg grid-cols-3">
-          <TabsTrigger value="failure-modes">Failure Modes</TabsTrigger>
-          <TabsTrigger value="libraries">Equipment Types</TabsTrigger>
-          <TabsTrigger value="maintenance" data-testid="maintenance-strategies-tab">Maintenance</TabsTrigger>
+          <TabsTrigger value="failure-modes">{t("library.failureModes")}</TabsTrigger>
+          <TabsTrigger value="libraries">{t("library.equipmentTypes")}</TabsTrigger>
+          <TabsTrigger value="maintenance" data-testid="maintenance-strategies-tab">{t("library.maintenance")}</TabsTrigger>
         </TabsList>
 
         {/* Failure Modes Tab */}
@@ -408,7 +426,7 @@ const FailureModesPage = () => {
               </div>
               <div>
                 <span className="text-lg font-bold text-slate-900">{totalModes}</span>
-                <span className="text-xs text-slate-500 ml-1">Failure Modes</span>
+                <span className="text-xs text-slate-500 ml-1">{t("library.failureModes")}</span>
               </div>
             </div>
             <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
@@ -417,7 +435,7 @@ const FailureModesPage = () => {
               </div>
               <div>
                 <span className="text-lg font-bold text-blue-600">{totalCategories}</span>
-                <span className="text-xs text-slate-500 ml-1">Categories</span>
+                <span className="text-xs text-slate-500 ml-1">{t("library.categories")}</span>
               </div>
             </div>
           </div>
@@ -427,7 +445,7 @@ const FailureModesPage = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
-                placeholder="Search failure modes..."
+                placeholder={t("library.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-11"
@@ -437,17 +455,17 @@ const FailureModesPage = () => {
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-full sm:w-48 h-11" data-testid="category-filter">
                 <Filter className="w-4 h-4 mr-2 text-slate-400" />
-                <SelectValue placeholder="All Categories" />
+                <SelectValue placeholder={t("library.allCategories")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="all">{t("library.allCategories")}</SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Button onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-mode-btn">
-              <Plus className="w-4 h-4 mr-1" /> Add Failure Mode
+              <Plus className="w-4 h-4 mr-1" /> {t("library.addFailureMode")}
             </Button>
           </div>
 
@@ -465,8 +483,8 @@ const FailureModesPage = () => {
               <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
                 <Info className="w-8 h-8 text-slate-400" />
               </div>
-              <h3 className="text-xl font-semibold text-slate-700 mb-2">No matches found</h3>
-              <p className="text-slate-500">Try adjusting your search or filters</p>
+              <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("library.noMatches")}</h3>
+              <p className="text-slate-500">{t("library.tryAdjusting")}</p>
             </div>
           ) : (
             <div className="priority-list" data-testid="failure-modes-list">
@@ -516,7 +534,7 @@ const FailureModesPage = () => {
                         <div className="text-right hidden sm:block">
                           <div className="text-xs text-blue-600 flex items-center gap-1">
                             <Link className="w-3 h-3" />
-                            {fm.equipment_type_ids.length} linked
+                            {fm.equipment_type_ids.length} {t("library.linked")}
                           </div>
                         </div>
                       )}
@@ -553,11 +571,11 @@ const FailureModesPage = () => {
           <div className="card">
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-slate-800">Equipment Types</h3>
-                <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} types defined</p>
+                <h3 className="font-semibold text-slate-800">{t("library.equipmentTypes")}</h3>
+                <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} {t("library.typesDefined")}</p>
               </div>
               <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
-                <Plus className="w-4 h-4 mr-1" /> Add Type
+                <Plus className="w-4 h-4 mr-1" /> {t("library.addEquipmentType")}
               </Button>
             </div>
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[calc(100vh-320px)] overflow-y-auto">
@@ -585,12 +603,12 @@ const FailureModesPage = () => {
       <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingType ? "Edit Equipment Type" : "Add Equipment Type"}</DialogTitle>
+            <DialogTitle>{editingType ? t("library.editEquipmentType") : t("library.addEquipmentType")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {!editingType && (
               <div>
-                <Label>ID (unique)</Label>
+                <Label>{t("library.typeId")}</Label>
                 <Input 
                   value={newType.id} 
                   onChange={e => setNewType({ ...newType, id: e.target.value.toLowerCase().replace(/\s+/g, '_') })} 
@@ -600,7 +618,7 @@ const FailureModesPage = () => {
               </div>
             )}
             <div>
-              <Label>Name</Label>
+              <Label>{t("common.name")}</Label>
               <Input 
                 value={newType.name} 
                 onChange={e => setNewType({ ...newType, name: e.target.value })} 
@@ -609,7 +627,7 @@ const FailureModesPage = () => {
               />
             </div>
             <div>
-              <Label>ISO Class (optional)</Label>
+              <Label>{t("library.isoClass")}</Label>
               <Input 
                 value={newType.iso_class} 
                 onChange={e => setNewType({ ...newType, iso_class: e.target.value })} 
@@ -617,7 +635,7 @@ const FailureModesPage = () => {
               />
             </div>
             <div>
-              <Label>Discipline</Label>
+              <Label>{t("library.discipline")}</Label>
               <Select value={newType.discipline} onValueChange={v => setNewType({ ...newType, discipline: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -626,7 +644,7 @@ const FailureModesPage = () => {
               </Select>
             </div>
             <div>
-              <Label>Icon</Label>
+              <Label>{t("library.icon")}</Label>
               <div className="flex flex-wrap gap-2 mt-1">
                 {ICON_OPTIONS.map(icon => { 
                   const IconComp = EQUIPMENT_ICONS[icon] || Cog; 
@@ -645,14 +663,14 @@ const FailureModesPage = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsTypeDialogOpen(false); setEditingType(null); resetTypeForm(); }}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button 
               onClick={handleSaveType} 
               disabled={(!editingType && !newType.id.trim()) || !newType.name.trim()} 
               data-testid="save-type-btn"
             >
-              {editingType ? "Save" : "Create"}
+              {editingType ? t("common.save") : t("common.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -662,16 +680,16 @@ const FailureModesPage = () => {
       <Dialog open={isFmDialogOpen} onOpenChange={setIsFmDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingFm ? "Edit Failure Mode" : "Add Failure Mode"}</DialogTitle>
+            <DialogTitle>{editingFm ? t("library.editFailureMode") : t("library.addFailureMode")}</DialogTitle>
             <DialogDescription>
-              {editingFm ? "Update the failure mode details below." : "Create a new failure mode entry."}
+              {editingFm ? t("library.updateFailureModeDesc") : t("library.addFailureModeDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {/* Row 1: Category & Equipment */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Category *</Label>
+                <Label>{t("library.category")} *</Label>
                 <Select value={newFm.category} onValueChange={v => setNewFm({ ...newFm, category: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -680,7 +698,7 @@ const FailureModesPage = () => {
                 </Select>
               </div>
               <div>
-                <Label>Equipment *</Label>
+                <Label>{t("library.equipment")} *</Label>
                 <Input 
                   value={newFm.equipment} 
                   onChange={e => handleEquipmentChange(e.target.value)} 
@@ -692,7 +710,7 @@ const FailureModesPage = () => {
 
             {/* Failure Mode Name */}
             <div>
-              <Label>Failure Mode Name *</Label>
+              <Label>{t("library.failureModeName")} *</Label>
               <Input 
                 value={newFm.failure_mode} 
                 onChange={e => setNewFm({ ...newFm, failure_mode: e.target.value })} 
@@ -705,28 +723,28 @@ const FailureModesPage = () => {
             <div>
               <Label className="flex items-center gap-2">
                 <Link className="w-4 h-4 text-blue-500" />
-                Linked Equipment Types
+                {t("library.linkedEquipmentTypes")}
               </Label>
-              <p className="text-xs text-slate-500 mb-2">Click to select/deselect (multiple allowed)</p>
+              <p className="text-xs text-slate-500 mb-2">{t("library.clickToSelect")}</p>
               <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg max-h-40 overflow-y-auto">
-                {equipmentTypes.map(t => (
+                {equipmentTypes.map(eqt => (
                   <button
-                    key={t.id}
+                    key={eqt.id}
                     type="button"
-                    onClick={() => toggleEquipmentType(t.id)}
+                    onClick={() => toggleEquipmentType(eqt.id)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                      (newFm.equipment_type_ids || []).includes(t.id)
+                      (newFm.equipment_type_ids || []).includes(eqt.id)
                         ? "bg-blue-500 text-white"
                         : "bg-white border border-slate-200 text-slate-600 hover:border-blue-300"
                     }`}
                   >
-                    {t.name}
+                    {eqt.name}
                   </button>
                 ))}
               </div>
               {(newFm.equipment_type_ids || []).length > 0 && (
                 <p className="text-xs text-blue-600 mt-1">
-                  Selected: {(newFm.equipment_type_ids || []).length} type(s)
+                  {t("library.selected")}: {(newFm.equipment_type_ids || []).length} {t("library.types")}
                 </p>
               )}
             </div>
@@ -734,7 +752,7 @@ const FailureModesPage = () => {
             {/* FMEA Scores Row */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <Label>Severity (1-10) *</Label>
+                <Label>{t("library.severity")} (1-10) *</Label>
                 <Input 
                   type="number" 
                   min={1} max={10} 
@@ -743,7 +761,7 @@ const FailureModesPage = () => {
                 />
               </div>
               <div>
-                <Label>Occurrence (1-10) *</Label>
+                <Label>{t("library.occurrence")} (1-10) *</Label>
                 <Input 
                   type="number" 
                   min={1} max={10} 
@@ -752,7 +770,7 @@ const FailureModesPage = () => {
                 />
               </div>
               <div>
-                <Label>Detectability (1-10) *</Label>
+                <Label>{t("library.detectability")} (1-10) *</Label>
                 <Input 
                   type="number" 
                   min={1} max={10} 
@@ -770,15 +788,15 @@ const FailureModesPage = () => {
 
             {/* Keywords */}
             <div>
-              <Label>Keywords</Label>
+              <Label>{t("library.keywords")}</Label>
               <div className="flex gap-2">
                 <Input 
                   value={keywordInput} 
                   onChange={e => setKeywordInput(e.target.value)} 
                   onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addKeyword())}
-                  placeholder="Add keyword and press Enter" 
+                  placeholder={t("library.addKeyword")} 
                 />
-                <Button type="button" variant="outline" onClick={addKeyword}>Add</Button>
+                <Button type="button" variant="outline" onClick={addKeyword}>{t("common.add")}</Button>
               </div>
               <div className="flex flex-wrap gap-2 mt-2">
                 {newFm.keywords.map((kw, i) => (
@@ -792,15 +810,15 @@ const FailureModesPage = () => {
 
             {/* Recommended Actions */}
             <div>
-              <Label>Recommended Actions</Label>
+              <Label>{t("library.recommendedActions")}</Label>
               <div className="flex gap-2">
                 <Input 
                   value={actionInput} 
                   onChange={e => setActionInput(e.target.value)} 
                   onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addAction())}
-                  placeholder="Add action and press Enter" 
+                  placeholder={t("library.addAction")} 
                 />
-                <Button type="button" variant="outline" onClick={addAction}>Add</Button>
+                <Button type="button" variant="outline" onClick={addAction}>{t("common.add")}</Button>
               </div>
               <ul className="space-y-1 mt-2">
                 {newFm.recommended_actions.map((action, i) => (
@@ -814,14 +832,14 @@ const FailureModesPage = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsFmDialogOpen(false); setEditingFm(null); resetFmForm(); }}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button 
               onClick={handleSaveFm} 
               disabled={!newFm.failure_mode.trim() || !newFm.equipment.trim()} 
               data-testid="save-fm-btn"
             >
-              {editingFm ? "Save Changes" : "Create"}
+              {editingFm ? t("common.save") : t("common.create")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { investigationAPI, actionsAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -51,6 +52,7 @@ const INVESTIGATION_STATUSES = [
 export default function CausalEnginePage() {
   const queryClient = useQueryClient();
   const { pushUndo } = useUndo();
+  const { t } = useLanguage();
   
   const [selectedInvId, setSelectedInvId] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
@@ -298,11 +300,11 @@ export default function CausalEnginePage() {
   const handleToggleRootCause = useCallback((node) => updateCauseMutation.mutate({ causeId: node.id, data: { is_root_cause: !node.is_root_cause } }), [updateCauseMutation]);
 
   const tabs = [
-    { id: "overview", label: "Overview", icon: FileText },
-    { id: "timeline", label: "Timeline", icon: Clock, count: stats.totalEvents },
-    { id: "failures", label: "Failures", icon: AlertTriangle, count: stats.totalFailures },
-    { id: "causes", label: "Causal Tree", icon: GitBranch, count: stats.rootCauses },
-    { id: "actions", label: "Actions", icon: CheckSquare, count: stats.openActions },
+    { id: "overview", label: t("causal.overview"), icon: FileText },
+    { id: "timeline", label: t("causal.timeline"), icon: Clock, count: stats.totalEvents },
+    { id: "failures", label: t("causal.failures"), icon: AlertTriangle, count: stats.totalFailures },
+    { id: "causes", label: t("causal.causalTree"), icon: GitBranch, count: stats.rootCauses },
+    { id: "actions", label: t("causal.correctiveActions"), icon: CheckSquare, count: stats.openActions },
   ];
 
   return (
@@ -311,12 +313,12 @@ export default function CausalEnginePage() {
       <div className="w-80 flex-shrink-0 h-full flex flex-col bg-white border-r border-slate-200">
         <div className="p-4 border-b border-slate-200">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-slate-900">Investigations</h2>
-            <Button size="sm" onClick={() => setShowNewInvDialog(true)} className="h-9 bg-blue-600 hover:bg-blue-700" data-testid="new-investigation-btn"><Plus className="w-4 h-4 mr-1" />New</Button>
+            <h2 className="text-lg font-semibold text-slate-900">{t("causal.investigations")}</h2>
+            <Button size="sm" onClick={() => setShowNewInvDialog(true)} className="h-9 bg-blue-600 hover:bg-blue-700" data-testid="new-investigation-btn"><Plus className="w-4 h-4 mr-1" />{t("common.add")}</Button>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-11" data-testid="search-investigations" />
+            <Input placeholder={t("causal.searchInvestigations")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-11" data-testid="search-investigations" />
           </div>
         </div>
         
@@ -328,7 +330,7 @@ export default function CausalEnginePage() {
               <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3 mx-auto">
                 <FileText className="w-6 h-6 text-slate-400" />
               </div>
-              <p className="text-sm text-slate-500 text-center">No investigations</p>
+              <p className="text-sm text-slate-500 text-center">{t("causal.noInvestigations")}</p>
             </div>
           ) : (
             <div className="p-2 space-y-1">
@@ -354,9 +356,9 @@ export default function CausalEnginePage() {
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
               <ClipboardList className="w-8 h-8 text-slate-400" />
             </div>
-            <h2 className="text-xl font-semibold text-slate-700 mb-2">Select an Investigation</h2>
-            <p className="text-slate-500 mb-4">Choose from the list or create a new one</p>
-            <Button onClick={() => setShowNewInvDialog(true)} className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-2" />New Investigation</Button>
+            <h2 className="text-xl font-semibold text-slate-700 mb-2">{t("causal.noInvestigations")}</h2>
+            <p className="text-slate-500 mb-4">{t("causal.noInvestigationsDesc")}</p>
+            <Button onClick={() => setShowNewInvDialog(true)} className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-2" />{t("causal.newInvestigation")}</Button>
           </div>
         </div>
       ) : loadingInvestigation ? (
@@ -715,79 +717,79 @@ export default function CausalEnginePage() {
       
       <Dialog open={showEventDialog} onOpenChange={(open) => { setShowEventDialog(open); if (!open) setEditingItem(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editingItem?.type === "event" ? "Edit Event" : "Add Event"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem?.type === "event" ? t("causal.editEvent") : t("causal.addEvent")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div><label className="text-sm font-medium">Time *</label><Input value={eventForm.event_time} onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })} placeholder="2024-03-15 14:30" /></div>
-            <div><label className="text-sm font-medium">Description *</label><Textarea value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} placeholder="What happened?" rows={2} /></div>
+            <div><label className="text-sm font-medium">{t("common.time")} *</label><Input value={eventForm.event_time} onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })} placeholder="2024-03-15 14:30" /></div>
+            <div><label className="text-sm font-medium">{t("common.description")} *</label><Textarea value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} placeholder="What happened?" rows={2} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-sm font-medium">Category</label><Select value={eventForm.category} onValueChange={(v) => setEventForm({ ...eventForm, category: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{EVENT_CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select></div>
-              <div><label className="text-sm font-medium">Confidence</label><Select value={eventForm.confidence} onValueChange={(v) => setEventForm({ ...eventForm, confidence: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="high">High</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="low">Low</SelectItem><SelectItem value="uncertain">Uncertain</SelectItem></SelectContent></Select></div>
+              <div><label className="text-sm font-medium">{t("causal.category")}</label><Select value={eventForm.category} onValueChange={(v) => setEventForm({ ...eventForm, category: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{EVENT_CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select></div>
+              <div><label className="text-sm font-medium">{t("causal.confidence")}</label><Select value={eventForm.confidence} onValueChange={(v) => setEventForm({ ...eventForm, confidence: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="high">{t("common.high")}</SelectItem><SelectItem value="medium">{t("common.medium")}</SelectItem><SelectItem value="low">{t("common.low")}</SelectItem><SelectItem value="uncertain">Uncertain</SelectItem></SelectContent></Select></div>
             </div>
-            <div><label className="text-sm font-medium">Evidence Source</label><Input value={eventForm.evidence_source} onChange={(e) => setEventForm({ ...eventForm, evidence_source: e.target.value })} placeholder="Log file, witness..." /></div>
-            <div><label className="text-sm font-medium">Comment</label><Textarea value={eventForm.comment} onChange={(e) => setEventForm({ ...eventForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
+            <div><label className="text-sm font-medium">{t("causal.evidenceSource")}</label><Input value={eventForm.evidence_source} onChange={(e) => setEventForm({ ...eventForm, evidence_source: e.target.value })} placeholder="Log file, witness..." /></div>
+            <div><label className="text-sm font-medium">{t("common.comment")}</label><Textarea value={eventForm.comment} onChange={(e) => setEventForm({ ...eventForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowEventDialog(false); setEditingItem(null); }}>Cancel</Button>
-            <Button onClick={() => { if (editingItem?.type === "event") updateEventMutation.mutate({ eventId: editingItem.data.id, data: eventForm }); else createEventMutation.mutate(eventForm); }} disabled={!eventForm.event_time || !eventForm.description}>{editingItem?.type === "event" ? "Update" : "Add"}</Button>
+            <Button variant="outline" onClick={() => { setShowEventDialog(false); setEditingItem(null); }}>{t("common.cancel")}</Button>
+            <Button onClick={() => { if (editingItem?.type === "event") updateEventMutation.mutate({ eventId: editingItem.data.id, data: eventForm }); else createEventMutation.mutate(eventForm); }} disabled={!eventForm.event_time || !eventForm.description}>{editingItem?.type === "event" ? t("common.update") : t("common.add")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
       <Dialog open={showFailureDialog} onOpenChange={(open) => { setShowFailureDialog(open); if (!open) setEditingItem(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editingItem?.type === "failure" ? "Edit Failure" : "Add Failure"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem?.type === "failure" ? t("causal.editFailure") : t("causal.addFailure")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div><label className="text-sm font-medium">Asset *</label><Input value={failureForm.asset_name} onChange={(e) => setFailureForm({ ...failureForm, asset_name: e.target.value })} placeholder="Equipment" /></div>
+            <div><label className="text-sm font-medium">{t("common.asset")} *</label><Input value={failureForm.asset_name} onChange={(e) => setFailureForm({ ...failureForm, asset_name: e.target.value })} placeholder="Equipment" /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-sm font-medium">Subsystem</label><Input value={failureForm.subsystem} onChange={(e) => setFailureForm({ ...failureForm, subsystem: e.target.value })} placeholder="e.g., Sealing" /></div>
-              <div><label className="text-sm font-medium">Component *</label><Input value={failureForm.component} onChange={(e) => setFailureForm({ ...failureForm, component: e.target.value })} placeholder="e.g., Seal" /></div>
+              <div><label className="text-sm font-medium">{t("causal.subsystem")}</label><Input value={failureForm.subsystem} onChange={(e) => setFailureForm({ ...failureForm, subsystem: e.target.value })} placeholder="e.g., Sealing" /></div>
+              <div><label className="text-sm font-medium">{t("causal.component")} *</label><Input value={failureForm.component} onChange={(e) => setFailureForm({ ...failureForm, component: e.target.value })} placeholder="e.g., Seal" /></div>
             </div>
-            <div><label className="text-sm font-medium">Failure Mode *</label><Input value={failureForm.failure_mode} onChange={(e) => setFailureForm({ ...failureForm, failure_mode: e.target.value })} placeholder="e.g., Leakage" /></div>
-            <div><label className="text-sm font-medium">Mechanism</label><Input value={failureForm.degradation_mechanism} onChange={(e) => setFailureForm({ ...failureForm, degradation_mechanism: e.target.value })} placeholder="e.g., Fatigue" /></div>
-            <div><label className="text-sm font-medium">Comment</label><Textarea value={failureForm.comment} onChange={(e) => setFailureForm({ ...failureForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
+            <div><label className="text-sm font-medium">{t("common.failureMode")} *</label><Input value={failureForm.failure_mode} onChange={(e) => setFailureForm({ ...failureForm, failure_mode: e.target.value })} placeholder="e.g., Leakage" /></div>
+            <div><label className="text-sm font-medium">{t("causal.mechanism")}</label><Input value={failureForm.degradation_mechanism} onChange={(e) => setFailureForm({ ...failureForm, degradation_mechanism: e.target.value })} placeholder="e.g., Fatigue" /></div>
+            <div><label className="text-sm font-medium">{t("common.comment")}</label><Textarea value={failureForm.comment} onChange={(e) => setFailureForm({ ...failureForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowFailureDialog(false); setEditingItem(null); }}>Cancel</Button>
-            <Button onClick={() => { if (editingItem?.type === "failure") updateFailureMutation.mutate({ failureId: editingItem.data.id, data: failureForm }); else createFailureMutation.mutate(failureForm); }} disabled={!failureForm.asset_name || !failureForm.component || !failureForm.failure_mode}>{editingItem?.type === "failure" ? "Update" : "Add"}</Button>
+            <Button variant="outline" onClick={() => { setShowFailureDialog(false); setEditingItem(null); }}>{t("common.cancel")}</Button>
+            <Button onClick={() => { if (editingItem?.type === "failure") updateFailureMutation.mutate({ failureId: editingItem.data.id, data: failureForm }); else createFailureMutation.mutate(failureForm); }} disabled={!failureForm.asset_name || !failureForm.component || !failureForm.failure_mode}>{editingItem?.type === "failure" ? t("common.update") : t("common.add")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
       <Dialog open={showCauseDialog} onOpenChange={(open) => { setShowCauseDialog(open); if (!open) setEditingItem(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editingItem?.type === "cause" ? "Edit Cause" : "Add Cause"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem?.type === "cause" ? t("causal.editCause") : t("causal.addCause")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div><label className="text-sm font-medium">Description *</label><Textarea value={causeForm.description} onChange={(e) => setCauseForm({ ...causeForm, description: e.target.value })} placeholder="Describe..." rows={2} /></div>
+            <div><label className="text-sm font-medium">{t("common.description")} *</label><Textarea value={causeForm.description} onChange={(e) => setCauseForm({ ...causeForm, description: e.target.value })} placeholder="Describe..." rows={2} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-sm font-medium">Category</label><Select value={causeForm.category} onValueChange={(v) => setCauseForm({ ...causeForm, category: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{CAUSE_CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select></div>
-              <div><label className="text-sm font-medium">Parent</label><Select value={causeForm.parent_id || "none"} onValueChange={(v) => setCauseForm({ ...causeForm, parent_id: v === "none" ? null : v })}><SelectTrigger><SelectValue placeholder="None" /></SelectTrigger><SelectContent><SelectItem value="none">None (root)</SelectItem>{causeNodes.filter(c => c.id !== editingItem?.data?.id).map(c => <SelectItem key={c.id} value={c.id}>{c.description.substring(0, 30)}...</SelectItem>)}</SelectContent></Select></div>
+              <div><label className="text-sm font-medium">{t("causal.category")}</label><Select value={causeForm.category} onValueChange={(v) => setCauseForm({ ...causeForm, category: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{CAUSE_CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select></div>
+              <div><label className="text-sm font-medium">{t("causal.parent")}</label><Select value={causeForm.parent_id || "none"} onValueChange={(v) => setCauseForm({ ...causeForm, parent_id: v === "none" ? null : v })}><SelectTrigger><SelectValue placeholder={t("causal.noParent")} /></SelectTrigger><SelectContent><SelectItem value="none">{t("causal.noParent")}</SelectItem>{causeNodes.filter(c => c.id !== editingItem?.data?.id).map(c => <SelectItem key={c.id} value={c.id}>{c.description.substring(0, 30)}...</SelectItem>)}</SelectContent></Select></div>
             </div>
-            <div className="flex items-center gap-2"><input type="checkbox" id="root" checked={causeForm.is_root_cause} onChange={(e) => setCauseForm({ ...causeForm, is_root_cause: e.target.checked })} className="rounded" /><label htmlFor="root" className="text-sm font-medium">Mark as Root Cause</label></div>
-            <div><label className="text-sm font-medium">Evidence</label><Textarea value={causeForm.evidence} onChange={(e) => setCauseForm({ ...causeForm, evidence: e.target.value })} placeholder="Supporting evidence..." rows={2} /></div>
-            <div><label className="text-sm font-medium">Comment</label><Textarea value={causeForm.comment} onChange={(e) => setCauseForm({ ...causeForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
+            <div className="flex items-center gap-2"><input type="checkbox" id="root" checked={causeForm.is_root_cause} onChange={(e) => setCauseForm({ ...causeForm, is_root_cause: e.target.checked })} className="rounded" /><label htmlFor="root" className="text-sm font-medium">{t("causal.markAsRootCause")}</label></div>
+            <div><label className="text-sm font-medium">{t("common.evidence")}</label><Textarea value={causeForm.evidence} onChange={(e) => setCauseForm({ ...causeForm, evidence: e.target.value })} placeholder="Supporting evidence..." rows={2} /></div>
+            <div><label className="text-sm font-medium">{t("common.comment")}</label><Textarea value={causeForm.comment} onChange={(e) => setCauseForm({ ...causeForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => { setShowCauseDialog(false); setEditingItem(null); }}>Cancel</Button><Button onClick={() => { if (editingItem?.type === "cause") updateCauseMutation.mutate({ causeId: editingItem.data.id, data: causeForm }); else createCauseMutation.mutate(causeForm); }} disabled={!causeForm.description}>{editingItem?.type === "cause" ? "Update" : "Add"}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => { setShowCauseDialog(false); setEditingItem(null); }}>{t("common.cancel")}</Button><Button onClick={() => { if (editingItem?.type === "cause") updateCauseMutation.mutate({ causeId: editingItem.data.id, data: causeForm }); else createCauseMutation.mutate(causeForm); }} disabled={!causeForm.description}>{editingItem?.type === "cause" ? t("common.update") : t("common.add")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       
       <Dialog open={showActionDialog} onOpenChange={(open) => { setShowActionDialog(open); if (!open) setEditingItem(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editingItem?.type === "action" ? "Edit Action" : "Add Action"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem?.type === "action" ? t("causal.editAction") : t("causal.addAction")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div><label className="text-sm font-medium">Description *</label><Textarea value={actionForm.description} onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })} placeholder="What to do?" rows={2} /></div>
+            <div><label className="text-sm font-medium">{t("common.description")} *</label><Textarea value={actionForm.description} onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })} placeholder="What to do?" rows={2} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-sm font-medium">Owner</label><Input value={actionForm.owner} onChange={(e) => setActionForm({ ...actionForm, owner: e.target.value })} placeholder="Person" /></div>
-              <div><label className="text-sm font-medium">Priority</label><Select value={actionForm.priority} onValueChange={(v) => setActionForm({ ...actionForm, priority: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ACTION_PRIORITIES.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent></Select></div>
+              <div><label className="text-sm font-medium">{t("common.owner")}</label><Input value={actionForm.owner} onChange={(e) => setActionForm({ ...actionForm, owner: e.target.value })} placeholder="Person" /></div>
+              <div><label className="text-sm font-medium">{t("common.priority")}</label><Select value={actionForm.priority} onValueChange={(v) => setActionForm({ ...actionForm, priority: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ACTION_PRIORITIES.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-sm font-medium">Due Date</label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm({ ...actionForm, due_date: e.target.value })} /></div>
-              <div><label className="text-sm font-medium">Linked Root Cause</label><Select value={actionForm.linked_cause_id || "none"} onValueChange={(v) => setActionForm({ ...actionForm, linked_cause_id: v === "none" ? null : v })}><SelectTrigger><SelectValue placeholder="None" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{causeNodes.filter(c => c.is_root_cause).map(c => <SelectItem key={c.id} value={c.id}>{c.description.substring(0, 30)}...</SelectItem>)}</SelectContent></Select></div>
+              <div><label className="text-sm font-medium">{t("common.dueDate")}</label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm({ ...actionForm, due_date: e.target.value })} /></div>
+              <div><label className="text-sm font-medium">{t("causal.linkedRootCause")}</label><Select value={actionForm.linked_cause_id || "none"} onValueChange={(v) => setActionForm({ ...actionForm, linked_cause_id: v === "none" ? null : v })}><SelectTrigger><SelectValue placeholder={t("causal.noParent")} /></SelectTrigger><SelectContent><SelectItem value="none">{t("causal.noParent")}</SelectItem>{causeNodes.filter(c => c.is_root_cause).map(c => <SelectItem key={c.id} value={c.id}>{c.description.substring(0, 30)}...</SelectItem>)}</SelectContent></Select></div>
             </div>
-            <div><label className="text-sm font-medium">Comment</label><Textarea value={actionForm.comment} onChange={(e) => setActionForm({ ...actionForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
+            <div><label className="text-sm font-medium">{t("common.comment")}</label><Textarea value={actionForm.comment} onChange={(e) => setActionForm({ ...actionForm, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowActionDialog(false); setEditingItem(null); }}>Cancel</Button>
-            <Button onClick={() => { if (editingItem?.type === "action") updateActionMutation.mutate({ actionId: editingItem.data.id, data: actionForm }); else createActionMutation.mutate(actionForm); }} disabled={!actionForm.description}>{editingItem?.type === "action" ? "Update" : "Add"}</Button>
+            <Button variant="outline" onClick={() => { setShowActionDialog(false); setEditingItem(null); }}>{t("common.cancel")}</Button>
+            <Button onClick={() => { if (editingItem?.type === "action") updateActionMutation.mutate({ actionId: editingItem.data.id, data: actionForm }); else createActionMutation.mutate(actionForm); }} disabled={!actionForm.description}>{editingItem?.type === "action" ? t("common.update") : t("common.add")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
