@@ -671,14 +671,25 @@ export default function CausalEnginePage() {
                   <div className="priority-list">
                     {sortedTimelineEvents.map((event, idx) => {
                       const category = EVENT_CATEGORIES.find(c => c.value === event.category);
+                      // Format the timestamp to be more readable
+                      const formatTime = (timeStr) => {
+                        if (!timeStr) return `#${idx + 1}`;
+                        try {
+                          const date = new Date(timeStr);
+                          return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + 
+                            ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                        } catch {
+                          return timeStr.substring(0, 16).replace('T', ' ');
+                        }
+                      };
                       return (
                         <motion.div key={event.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }} className="priority-item group" data-testid={`timeline-event-${event.id}`}>
                           <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${category?.bgClass?.split(' ')[0] || 'bg-slate-100'}`}>
                             <Clock className={`w-5 h-5 sm:w-6 sm:h-6 ${category?.bgClass?.split(' ')[1] || 'text-slate-600'}`} />
                           </div>
-                          <div className="priority-rank text-sm">{event.event_time || `#${idx + 1}`}</div>
-                          <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0 ml-3">
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="text-xs font-medium text-slate-500">{formatTime(event.event_time)}</span>
                               <span className={`text-xs px-2 py-0.5 rounded-full ${category?.bgClass || "bg-slate-100 text-slate-700"}`}>{category?.label || event.category}</span>
                               <span className={`text-xs px-2 py-0.5 rounded-full ${event.confidence === "high" ? "bg-green-100 text-green-700" : event.confidence === "low" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>{event.confidence}</span>
                               {event.comment && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1"><MessageSquare className="w-3 h-3" />Has comment</span>}
@@ -686,7 +697,7 @@ export default function CausalEnginePage() {
                             <p className="text-sm text-slate-900 line-clamp-2">{event.description}</p>
                             {event.evidence_source && <p className="text-xs text-slate-500 mt-1">Source: {event.evidence_source}</p>}
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-shrink-0">
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditingItem({ type: "event", data: event }); setEventForm({ event_time: event.event_time || "", description: event.description, category: event.category, evidence_source: event.evidence_source || "", confidence: event.confidence, notes: event.notes || "", comment: event.comment || "" }); setShowEventDialog(true); }}><Edit className="w-4 h-4" /></Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteEventMutation.mutate(event.id)}><Trash2 className="w-4 h-4" /></Button>
                           </div>
