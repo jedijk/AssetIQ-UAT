@@ -141,6 +141,12 @@ const en = {
     finalScore: "Final Score",
     noFmeaLinked: "No failure mode linked",
     noCriticalityLinked: "No criticality assigned",
+    exactCalculation: "Exact Calculation",
+    linkedTo: "Linked to",
+    usingDefaultScore: "using default score",
+    multiplier: "Multiplier",
+    finalCalculation: "Final Calculation",
+    riskLevelThresholds: "Risk Level Thresholds",
   },
   
   // Causal Engine
@@ -774,6 +780,12 @@ const nl = {
     finalScore: "Eindscore",
     noFmeaLinked: "Geen faalmodus gekoppeld",
     noCriticalityLinked: "Geen kriticiteit toegewezen",
+    exactCalculation: "Exacte Berekening",
+    linkedTo: "Gekoppeld aan",
+    usingDefaultScore: "standaard score gebruikt",
+    multiplier: "Vermenigvuldiger",
+    finalCalculation: "Eindberekening",
+    riskLevelThresholds: "Risiconiveau Drempels",
   },
   
   // Causal Engine
