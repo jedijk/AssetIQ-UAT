@@ -243,6 +243,9 @@ const en = {
     completed: "Completed",
     filterByStatus: "Filter by status",
     allStatus: "All Status",
+    noSourceLinked: "No source linked",
+    linkedToInvestigation: "Linked to Investigation",
+    linkedToThreat: "Linked to Threat",
   },
   
   // Library page
@@ -831,6 +834,9 @@ const nl = {
     completed: "Voltooid",
     filterByStatus: "Filter op status",
     allStatus: "Alle statussen",
+    noSourceLinked: "Geen bron gekoppeld",
+    linkedToInvestigation: "Gekoppeld aan onderzoek",
+    linkedToThreat: "Gekoppeld aan dreiging",
   },
   
   // Library page

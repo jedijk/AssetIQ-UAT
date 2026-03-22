@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { actionsAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -23,6 +23,8 @@ import {
   GitBranch,
   CheckCircle,
   Brain,
+  ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -81,6 +83,7 @@ const sourceConfig = {
 export default function ActionsPage() {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
@@ -394,9 +397,31 @@ export default function ActionsPage() {
                       <Badge className="bg-red-100 text-red-700">Overdue</Badge>
                     )}
                   </div>
-                  <div className="text-xs sm:text-sm text-slate-500 line-clamp-1 flex items-center gap-2">
-                    <SourceIcon className={`w-3.5 h-3.5 ${sourceConfig[action.source_type]?.color}`} />
-                    <span>{action.source_name}</span>
+                  <div className="text-xs sm:text-sm text-slate-500 flex items-center gap-2 flex-wrap">
+                    {/* Source Link - Clickable to navigate to source */}
+                    {action.source_type && action.source_id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (action.source_type === "investigation") {
+                            navigate(`/causal-engine?inv=${action.source_id}`);
+                          } else if (action.source_type === "threat" || action.source_type === "ai_recommendation") {
+                            navigate(`/threats/${action.source_id}`);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-700"
+                        data-testid={`source-link-${action.id}`}
+                      >
+                        <SourceIcon className={`w-3 h-3 ${sourceConfig[action.source_type]?.color}`} />
+                        <span className="font-medium">{sourceConfig[action.source_type]?.label || action.source_type}</span>
+                        <span className="text-slate-500">•</span>
+                        <span className="max-w-[150px] truncate">{action.source_name || "Unknown"}</span>
+                        <ExternalLink className="w-3 h-3 text-slate-400" />
+                      </button>
+                    )}
+                    {!action.source_type && (
+                      <span className="text-slate-400 italic">{t("actionsPage.noSourceLinked") || "No source linked"}</span>
+                    )}
                     {action.assignee && (
                       <>
                         <span className="mx-1">•</span>
