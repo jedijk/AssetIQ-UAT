@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { reliabilityAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { motion } from "framer-motion";
@@ -24,6 +25,7 @@ import {
   X,
   CheckCircle2,
   HelpCircle,
+  ExternalLink,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Input } from "../components/ui/input";
@@ -457,10 +459,17 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
   );
 };
 
-// Stat Card component - matching Threats page style
-const StatCard = ({ label, value, icon: Icon, color, bg }) => {
+// Stat Card component - matching Threats page style, now clickable
+const StatCard = ({ label, value, icon: Icon, color, bg, onClick, clickable = false }) => {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
+    <div 
+      className={`flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200 transition-all ${
+        clickable ? 'cursor-pointer hover:border-slate-300 hover:shadow-sm active:scale-[0.98]' : ''
+      }`}
+      onClick={clickable ? onClick : undefined}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+    >
       <div className={`p-1.5 rounded-md ${bg}`}>
         <Icon className={`w-4 h-4 ${color}`} />
       </div>
@@ -468,6 +477,9 @@ const StatCard = ({ label, value, icon: Icon, color, bg }) => {
         <span className="text-lg font-bold text-slate-900">{value}%</span>
         <span className="text-xs text-slate-500 ml-1">{label}</span>
       </div>
+      {clickable && (
+        <ExternalLink className="w-3 h-3 text-slate-400 ml-1" />
+      )}
     </div>
   );
 };
@@ -492,8 +504,8 @@ const MiniSparkLine = ({ score }) => {
   );
 };
 
-// Equipment Row component - light theme
-const EquipmentRow = ({ item, onSelect }) => {
+// Equipment Row component - light theme with clickable scores
+const EquipmentRow = ({ item, onSelect, onDimensionClick }) => {
   const scores = item.scores || {};
   const overall = item.overall_score || 0;
   const LevelIcon = LEVEL_ICONS[item.node_level] || Cog;
@@ -511,6 +523,13 @@ const EquipmentRow = ({ item, onSelect }) => {
   };
   
   const badge = getScoreBadge(overall);
+
+  const handleScoreClick = (e, dimension) => {
+    e.stopPropagation();
+    if (onDimensionClick) {
+      onDimensionClick(dimension, item);
+    }
+  };
 
   return (
     <motion.div
@@ -535,21 +554,37 @@ const EquipmentRow = ({ item, onSelect }) => {
         <span className={`text-lg font-bold ${getScoreColor(overall)}`}>{overall}%</span>
       </div>
       
-      {/* Dimension Scores */}
+      {/* Dimension Scores - Clickable */}
       <div className="hidden md:flex items-center gap-3">
-        <div className="text-center w-14">
+        <div 
+          className="text-center w-14 p-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+          onClick={(e) => handleScoreClick(e, 'criticality')}
+          title="View Equipment Manager"
+        >
           <p className="text-xs text-slate-400">Crit</p>
           <p className={`text-sm font-semibold ${getScoreColor(scores.criticality || 0)}`}>{scores.criticality || 0}%</p>
         </div>
-        <div className="text-center w-14">
+        <div 
+          className="text-center w-14 p-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+          onClick={(e) => handleScoreClick(e, 'maintenance')}
+          title="View Maintenance Strategies"
+        >
           <p className="text-xs text-slate-400">Maint</p>
           <p className={`text-sm font-semibold ${getScoreColor(scores.maintenance || 0)}`}>{scores.maintenance || 0}%</p>
         </div>
-        <div className="text-center w-14">
+        <div 
+          className="text-center w-14 p-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+          onClick={(e) => handleScoreClick(e, 'threats')}
+          title="View Threats"
+        >
           <p className="text-xs text-slate-400">Threats</p>
           <p className={`text-sm font-semibold ${getScoreColor(scores.threats || 0)}`}>{scores.threats || 0}%</p>
         </div>
-        <div className="text-center w-14">
+        <div 
+          className="text-center w-14 p-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+          onClick={(e) => handleScoreClick(e, 'incidents')}
+          title="View Incidents"
+        >
           <p className="text-xs text-slate-400">Incidents</p>
           <p className={`text-sm font-semibold ${getScoreColor(scores.incidents || 0)}`}>{scores.incidents || 0}%</p>
         </div>
@@ -565,9 +600,42 @@ const EquipmentRow = ({ item, onSelect }) => {
 
 export default function ReliabilityPerformancePage() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [selectedLevel, setSelectedLevel] = useState("all");
   const [selectedNode, setSelectedNode] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Deep link navigation handlers
+  const handleDimensionClick = (dimensionKey, item = null) => {
+    // If item is provided, filter by that specific asset
+    const assetParam = item ? `?assets=${encodeURIComponent(item.node_id)}&assetName=${encodeURIComponent(item.node_name)}` : '';
+    
+    switch (dimensionKey) {
+      case "criticality":
+        // Navigate to Equipment Manager to manage criticality
+        navigate("/equipment-manager");
+        break;
+      case "incidents":
+      case "threats":
+        // Navigate to Threats page, optionally filtered by asset
+        navigate(`/threats${assetParam}`);
+        break;
+      case "investigations":
+        // Navigate to Causal Engine for investigations
+        navigate("/causal-engine");
+        break;
+      case "maintenance":
+        // Navigate to Library with Maintenance tab
+        navigate("/library?tab=maintenance");
+        break;
+      case "reactions":
+        // Navigate to Actions page
+        navigate("/actions");
+        break;
+      default:
+        break;
+    }
+  };
 
   // Fetch reliability scores
   const { data: reliabilityData, isLoading } = useQuery({
@@ -631,7 +699,7 @@ export default function ReliabilityPerformancePage() {
 
   return (
     <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="reliability-performance-page">
-      {/* Stats Row - matching Threats page style */}
+      {/* Stats Row - matching Threats page style, now clickable */}
       <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
         {DIMENSIONS.map(dim => (
           <StatCard
@@ -641,6 +709,8 @@ export default function ReliabilityPerformancePage() {
             icon={dim.icon}
             color={dim.color}
             bg={dim.bg}
+            clickable={true}
+            onClick={() => handleDimensionClick(dim.key)}
           />
         ))}
       </div>
@@ -687,6 +757,7 @@ export default function ReliabilityPerformancePage() {
                   key={item.node_id} 
                   item={item}
                   onSelect={setSelectedNode}
+                  onDimensionClick={handleDimensionClick}
                 />
               ))
             ) : (
@@ -720,13 +791,21 @@ export default function ReliabilityPerformancePage() {
             <h4 className="text-sm font-semibold text-slate-700 mb-3">Dimension Breakdown</h4>
             <div className="space-y-3">
               {DIMENSIONS.map(dim => (
-                <div key={dim.key} className="flex items-center gap-3">
+                <div 
+                  key={dim.key} 
+                  className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 rounded-lg p-1 -mx-1 transition-colors"
+                  onClick={() => handleDimensionClick(dim.key)}
+                  role="button"
+                >
                   <div className={`p-1.5 rounded-md ${dim.bg}`}>
                     <dim.icon className={`w-3 h-3 ${dim.color}`} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-slate-600">{dim.label}</span>
+                      <span className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                        {dim.label}
+                        <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
+                      </span>
                       <span className={`text-xs font-bold ${dim.color}`}>{aggregatedScores[dim.key] || 0}%</span>
                     </div>
                     <Progress value={aggregatedScores[dim.key] || 0} className="h-1.5" />
@@ -744,20 +823,48 @@ export default function ReliabilityPerformancePage() {
                 Quick Stats
               </h4>
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-2 bg-slate-50 rounded-lg">
-                  <p className="text-xs text-slate-500">With Criticality</p>
+                <div 
+                  className="p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"
+                  onClick={() => navigate("/equipment-manager")}
+                  role="button"
+                >
+                  <p className="text-xs text-slate-500 flex items-center gap-1">
+                    With Criticality
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </p>
                   <p className="text-lg font-bold text-slate-700">{reliabilityData.summary.with_criticality}</p>
                 </div>
-                <div className="p-2 bg-amber-50 rounded-lg">
-                  <p className="text-xs text-slate-500">Open Threats</p>
+                <div 
+                  className="p-2 bg-amber-50 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors"
+                  onClick={() => navigate("/threats?status=open")}
+                  role="button"
+                >
+                  <p className="text-xs text-slate-500 flex items-center gap-1">
+                    Open Threats
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </p>
                   <p className="text-lg font-bold text-amber-600">{reliabilityData.summary.open_threats}</p>
                 </div>
-                <div className="p-2 bg-slate-50 rounded-lg">
-                  <p className="text-xs text-slate-500">Investigations</p>
+                <div 
+                  className="p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"
+                  onClick={() => navigate("/causal-engine")}
+                  role="button"
+                >
+                  <p className="text-xs text-slate-500 flex items-center gap-1">
+                    Investigations
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </p>
                   <p className="text-lg font-bold text-slate-700">{reliabilityData.summary.total_investigations}</p>
                 </div>
-                <div className="p-2 bg-slate-50 rounded-lg">
-                  <p className="text-xs text-slate-500">Total Actions</p>
+                <div 
+                  className="p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"
+                  onClick={() => navigate("/actions")}
+                  role="button"
+                >
+                  <p className="text-xs text-slate-500 flex items-center gap-1">
+                    Total Actions
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </p>
                   <p className="text-lg font-bold text-slate-700">{reliabilityData.summary.total_actions}</p>
                 </div>
               </div>
