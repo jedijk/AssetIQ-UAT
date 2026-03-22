@@ -1,11 +1,10 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { reliabilityAPI, equipmentHierarchyAPI } from "../lib/api";
+import { reliabilityAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { motion } from "framer-motion";
 import {
   Building2,
-  ChevronDown,
   Target,
   AlertTriangle,
   Shield,
@@ -17,12 +16,15 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Zap,
   Factory,
   Cog,
   Settings,
+  Filter,
+  Search,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Input } from "../components/ui/input";
+import { Progress } from "../components/ui/progress";
 
 // Level icons map
 const LEVEL_ICONS = {
@@ -39,12 +41,12 @@ const LEVEL_ICONS = {
 
 // Reliability dimensions with colors
 const DIMENSIONS = [
-  { key: "criticality", label: "Criticality", icon: Shield, color: "#F59E0B" },
-  { key: "incidents", label: "Incidents", icon: AlertTriangle, color: "#F97316" },
-  { key: "investigations", label: "Investigations", icon: FileSearch, color: "#14B8A6" },
-  { key: "maintenance", label: "Maintenance", icon: Wrench, color: "#EF4444" },
-  { key: "reactions", label: "Reactions", icon: Activity, color: "#8B5CF6" },
-  { key: "threats", label: "Threats", icon: Target, color: "#10B981" },
+  { key: "criticality", label: "Criticality", icon: Shield, color: "text-amber-600", bg: "bg-amber-50" },
+  { key: "incidents", label: "Incidents", icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50" },
+  { key: "investigations", label: "Investigations", icon: FileSearch, color: "text-teal-600", bg: "bg-teal-50" },
+  { key: "maintenance", label: "Maintenance", icon: Wrench, color: "text-red-600", bg: "bg-red-50" },
+  { key: "reactions", label: "Reactions", icon: Activity, color: "text-purple-600", bg: "bg-purple-50" },
+  { key: "threats", label: "Threats", icon: Target, color: "text-emerald-600", bg: "bg-emerald-50" },
 ];
 
 // Calculate radar points
@@ -58,8 +60,8 @@ const getRadarPoints = (scores, centerX, centerY, radius) => {
     return {
       x: centerX + r * Math.cos(angle),
       y: centerY + r * Math.sin(angle),
-      labelX: centerX + (radius + 30) * Math.cos(angle),
-      labelY: centerY + (radius + 30) * Math.sin(angle),
+      labelX: centerX + (radius + 28) * Math.cos(angle),
+      labelY: centerY + (radius + 28) * Math.sin(angle),
       score,
       angle,
     };
@@ -72,12 +74,12 @@ const createRadarPath = (points) => {
   return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z';
 };
 
-// Snowflake component
+// Snowflake component - Light theme
 const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts = 0, stars = 0 }) => {
-  const size = 220;
+  const size = 240;
   const centerX = size / 2;
   const centerY = size / 2;
-  const radius = size / 2 - 40;
+  const radius = size / 2 - 45;
 
   const normalizedScores = DIMENSIONS.map(dim => {
     const score = scores[dim.key];
@@ -95,30 +97,30 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
   };
 
   return (
-    <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50">
+    <div className="bg-white rounded-xl border border-slate-200 p-5">
       <svg width={size} height={size} className="mx-auto">
         {/* Background */}
-        <circle cx={centerX} cy={centerY} r={radius + 10} fill="#1e293b" />
+        <circle cx={centerX} cy={centerY} r={radius + 10} fill="#f8fafc" />
         
         {/* Grid circles */}
         {gridCircles.map((r, i) => (
-          <circle key={i} cx={centerX} cy={centerY} r={r} fill="none" stroke="#334155" strokeWidth={1} strokeDasharray={i < 3 ? "3,3" : "0"} />
+          <circle key={i} cx={centerX} cy={centerY} r={r} fill="none" stroke="#e2e8f0" strokeWidth={1} strokeDasharray={i < 3 ? "3,3" : "0"} />
         ))}
         
         {/* Spokes */}
         {DIMENSIONS.map((_, i) => {
           const angle = -Math.PI / 2 + i * (2 * Math.PI / DIMENSIONS.length);
           return (
-            <line key={i} x1={centerX} y1={centerY} x2={centerX + radius * Math.cos(angle)} y2={centerY + radius * Math.sin(angle)} stroke="#334155" strokeWidth={1} />
+            <line key={i} x1={centerX} y1={centerY} x2={centerX + radius * Math.cos(angle)} y2={centerY + radius * Math.sin(angle)} stroke="#e2e8f0" strokeWidth={1} />
           );
         })}
         
         {/* Filled area */}
-        <path d={createRadarPath(points)} fill="#EAB308" fillOpacity={0.6} stroke="#EAB308" strokeWidth={2} />
+        <path d={createRadarPath(points)} fill="#EAB308" fillOpacity={0.5} stroke="#EAB308" strokeWidth={2} />
         
         {/* Data points */}
         {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={4} fill="#EAB308" stroke="#1e293b" strokeWidth={2} />
+          <circle key={i} cx={p.x} cy={p.y} r={4} fill="#EAB308" stroke="#fff" strokeWidth={2} />
         ))}
         
         {/* Labels */}
@@ -131,7 +133,7 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
           if (!isTop && !isBottom) anchor = isLeft ? "end" : "start";
           
           return (
-            <text key={i} x={p.labelX} y={p.labelY} textAnchor={anchor} dominantBaseline="middle" className="text-[10px] font-semibold uppercase tracking-wide" fill="#94a3b8">
+            <text key={i} x={p.labelX} y={p.labelY} textAnchor={anchor} dominantBaseline="middle" className="text-[9px] font-semibold uppercase tracking-wide" fill="#64748b">
               {dim.label.slice(0, 6).toUpperCase()}
             </text>
           );
@@ -139,24 +141,24 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
         
         {/* Center score */}
         <text x={centerX} y={centerY - 5} textAnchor="middle" className="text-2xl font-bold" fill="#EAB308">{overall}</text>
-        <text x={centerX} y={centerY + 12} textAnchor="middle" className="text-[9px] uppercase tracking-wider" fill="#64748b">Score</text>
+        <text x={centerX} y={centerY + 12} textAnchor="middle" className="text-[9px] uppercase tracking-wider" fill="#94a3b8">Score</text>
       </svg>
       
-      <p className="text-center mt-3 text-sm text-slate-300">{getAssessment(overall)}</p>
+      <p className="text-center mt-3 text-sm text-slate-600">{getAssessment(overall)}</p>
       
       {/* Bottom stats */}
-      <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-slate-700/50">
-        <span className="text-sm text-slate-400">{itemCount} equipment</span>
+      <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-slate-100">
+        <span className="text-sm text-slate-500">{itemCount} equipment</span>
         {alerts > 0 && (
-          <span className="flex items-center gap-1 text-sm">
-            <span className="w-5 h-5 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center text-xs">!</span>
-            <span className="text-red-400">{alerts}</span>
+          <span className="flex items-center gap-1 px-2 py-0.5 bg-red-50 rounded-full">
+            <AlertTriangle className="w-3 h-3 text-red-500" />
+            <span className="text-xs font-medium text-red-600">{alerts} alerts</span>
           </span>
         )}
         {stars > 0 && (
-          <span className="flex items-center gap-1 text-sm">
-            <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">★</span>
-            <span className="text-emerald-400">{stars}</span>
+          <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 rounded-full">
+            <span className="text-xs text-emerald-500">★</span>
+            <span className="text-xs font-medium text-emerald-600">{stars} excellent</span>
           </span>
         )}
       </div>
@@ -164,32 +166,16 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
   );
 };
 
-// Stat Card component
-const StatCard = ({ label, value, percentage, icon: Icon, trend, accentColor = "#64748b" }) => {
-  const getTrendIcon = () => {
-    if (trend > 0) return <TrendingUp className="w-3 h-3" />;
-    if (trend < 0) return <TrendingDown className="w-3 h-3" />;
-    return <Minus className="w-3 h-3" />;
-  };
-  
-  const getTrendColor = () => {
-    if (trend > 5) return "text-emerald-400";
-    if (trend < -5) return "text-red-400";
-    return "text-slate-400";
-  };
-
+// Stat Card component - matching Threats page style
+const StatCard = ({ label, value, icon: Icon, color, bg }) => {
   return (
-    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 flex-1 min-w-[140px]">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm text-slate-400">{label}</span>
-        <Info className="w-4 h-4 text-slate-500" />
+    <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
+      <div className={`p-1.5 rounded-md ${bg}`}>
+        <Icon className={`w-4 h-4 ${color}`} />
       </div>
-      <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold text-white">{value}%</span>
-      </div>
-      <div className={`flex items-center gap-1 mt-1 text-xs ${getTrendColor()}`}>
-        {getTrendIcon()}
-        <span>{Math.abs(percentage || 0)}%</span>
+      <div>
+        <span className="text-lg font-bold text-slate-900">{value}%</span>
+        <span className="text-xs text-slate-500 ml-1">{label}</span>
       </div>
     </div>
   );
@@ -200,7 +186,6 @@ const MiniSparkLine = ({ score }) => {
   const color = score >= 70 ? "#10B981" : score >= 40 ? "#F59E0B" : "#EF4444";
   const width = 80;
   const height = 24;
-  // Generate a simple line based on score
   const points = [
     { x: 0, y: height - (score * 0.8 * height / 100) },
     { x: width * 0.3, y: height - ((score - 5 + Math.random() * 10) * height / 100) },
@@ -216,76 +201,74 @@ const MiniSparkLine = ({ score }) => {
   );
 };
 
-// Equipment Row component
+// Equipment Row component - light theme
 const EquipmentRow = ({ item, onSelect }) => {
   const scores = item.scores || {};
   const overall = item.overall_score || 0;
   const LevelIcon = LEVEL_ICONS[item.node_level] || Cog;
   
   const getScoreColor = (score) => {
-    if (score >= 70) return "text-emerald-400";
-    if (score >= 40) return "text-amber-400";
-    return "text-red-400";
+    if (score >= 70) return "text-emerald-600";
+    if (score >= 40) return "text-amber-600";
+    return "text-red-600";
   };
   
   const getScoreBadge = (score) => {
-    if (score >= 70) return { bg: "bg-emerald-500/10", text: "text-emerald-400", label: "Good" };
-    if (score >= 40) return { bg: "bg-amber-500/10", text: "text-amber-400", label: "Fair" };
-    return { bg: "bg-red-500/10", text: "text-red-400", label: "Poor" };
+    if (score >= 70) return { bg: "bg-emerald-50", text: "text-emerald-600", label: "Good" };
+    if (score >= 40) return { bg: "bg-amber-50", text: "text-amber-600", label: "Fair" };
+    return { bg: "bg-red-50", text: "text-red-600", label: "Poor" };
   };
   
   const badge = getScoreBadge(overall);
 
   return (
-    <motion.tr 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="border-b border-slate-700/30 hover:bg-slate-700/20 cursor-pointer transition-colors"
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="group flex items-center gap-4 px-4 py-3 bg-white rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-sm cursor-pointer transition-all"
       onClick={() => onSelect && onSelect(item)}
     >
-      {/* Equipment Name */}
-      <td className="py-3 px-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
-            <LevelIcon className="w-4 h-4 text-amber-400" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-white truncate max-w-[200px]">{item.node_name}</p>
-            <p className={`text-xs ${badge.text}`}>{badge.label}</p>
-          </div>
+      {/* Equipment Icon & Name */}
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className={`w-10 h-10 rounded-xl ${badge.bg} flex items-center justify-center flex-shrink-0`}>
+          <LevelIcon className={`w-5 h-5 ${badge.text}`} />
         </div>
-      </td>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-800 truncate">{item.node_name}</p>
+          <p className={`text-xs ${badge.text}`}>{badge.label} • {item.node_level?.replace(/_/g, ' ')}</p>
+        </div>
+      </div>
       
       {/* Overall Score */}
-      <td className="py-3 px-4">
+      <div className="text-center w-16">
         <span className={`text-lg font-bold ${getScoreColor(overall)}`}>{overall}%</span>
-      </td>
+      </div>
       
-      {/* Criticality */}
-      <td className="py-3 px-4">
-        <span className={`text-sm ${getScoreColor(scores.criticality || 0)}`}>{scores.criticality || 0}%</span>
-      </td>
-      
-      {/* Maintenance */}
-      <td className="py-3 px-4">
-        <span className={`text-sm ${getScoreColor(scores.maintenance || 0)}`}>{scores.maintenance || 0}%</span>
-      </td>
-      
-      {/* Threats */}
-      <td className="py-3 px-4">
-        <span className={`text-sm ${getScoreColor(scores.threats || 0)}`}>{scores.threats || 0}%</span>
-      </td>
-      
-      {/* Incidents */}
-      <td className="py-3 px-4">
-        <span className={`text-sm ${getScoreColor(scores.incidents || 0)}`}>{scores.incidents || 0}%</span>
-      </td>
+      {/* Dimension Scores */}
+      <div className="hidden md:flex items-center gap-3">
+        <div className="text-center w-14">
+          <p className="text-xs text-slate-400">Crit</p>
+          <p className={`text-sm font-semibold ${getScoreColor(scores.criticality || 0)}`}>{scores.criticality || 0}%</p>
+        </div>
+        <div className="text-center w-14">
+          <p className="text-xs text-slate-400">Maint</p>
+          <p className={`text-sm font-semibold ${getScoreColor(scores.maintenance || 0)}`}>{scores.maintenance || 0}%</p>
+        </div>
+        <div className="text-center w-14">
+          <p className="text-xs text-slate-400">Threats</p>
+          <p className={`text-sm font-semibold ${getScoreColor(scores.threats || 0)}`}>{scores.threats || 0}%</p>
+        </div>
+        <div className="text-center w-14">
+          <p className="text-xs text-slate-400">Incidents</p>
+          <p className={`text-sm font-semibold ${getScoreColor(scores.incidents || 0)}`}>{scores.incidents || 0}%</p>
+        </div>
+      </div>
       
       {/* Trend Chart */}
-      <td className="py-3 px-4">
+      <div className="hidden lg:block">
         <MiniSparkLine score={overall} />
-      </td>
-    </motion.tr>
+      </div>
+    </motion.div>
   );
 };
 
@@ -293,6 +276,7 @@ export default function ReliabilityPerformancePage() {
   const { t } = useLanguage();
   const [selectedLevel, setSelectedLevel] = useState("all");
   const [selectedNode, setSelectedNode] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch reliability scores
   const { data: reliabilityData, isLoading } = useQuery({
@@ -307,12 +291,19 @@ export default function ReliabilityPerformancePage() {
     return Array.from(levels);
   }, [reliabilityData]);
 
-  // Filter nodes by selected level
+  // Filter nodes by selected level and search
   const filteredNodes = useMemo(() => {
     if (!reliabilityData?.nodes) return [];
-    if (selectedLevel === "all") return reliabilityData.nodes;
-    return reliabilityData.nodes.filter(n => n.node_level === selectedLevel);
-  }, [reliabilityData, selectedLevel]);
+    let nodes = reliabilityData.nodes;
+    if (selectedLevel !== "all") {
+      nodes = nodes.filter(n => n.node_level === selectedLevel);
+    }
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      nodes = nodes.filter(n => n.node_name?.toLowerCase().includes(query));
+    }
+    return nodes;
+  }, [reliabilityData, selectedLevel, searchQuery]);
 
   // Calculate aggregated scores for selected level or all
   const aggregatedScores = useMemo(() => {
@@ -341,121 +332,146 @@ export default function ReliabilityPerformancePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="flex items-center justify-center py-16">
         <div className="loading-dots"><span></span><span></span><span></span></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white" data-testid="reliability-performance-page">
-      {/* Top Section - Snowflake and Stats */}
-      <div className="p-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left - Title and Level Selector */}
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-white">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</h1>
-                <p className="text-slate-400 text-sm mt-1">
-                  {selectedLevel === "all" 
-                    ? `All ${reliabilityData?.total_equipment || 0} equipment items`
-                    : `${filteredNodes.length} ${selectedLevel.replace(/_/g, ' ')} items`
-                  }
+    <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="reliability-performance-page">
+      {/* Stats Row - matching Threats page style */}
+      <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+        {DIMENSIONS.map(dim => (
+          <StatCard
+            key={dim.key}
+            label={dim.label}
+            value={aggregatedScores[dim.key] || 0}
+            icon={dim.icon}
+            color={dim.color}
+            bg={dim.bg}
+          />
+        ))}
+      </div>
+
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left - Equipment List */}
+        <div className="lg:col-span-2">
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Input
+                placeholder="Search equipment..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-11"
+              />
+            </div>
+            <Select value={selectedLevel} onValueChange={setSelectedLevel}>
+              <SelectTrigger className="w-full sm:w-56 h-11">
+                <Filter className="w-4 h-4 mr-2 text-slate-400" />
+                <SelectValue placeholder="Filter by level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Levels ({reliabilityData?.total_equipment || 0})</SelectItem>
+                {availableLevels.map(level => {
+                  const count = reliabilityData?.nodes?.filter(n => n.node_level === level).length || 0;
+                  return (
+                    <SelectItem key={level} value={level} className="capitalize">
+                      {level.replace(/_/g, ' ')} ({count})
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Equipment List */}
+          <div className="space-y-2">
+            {filteredNodes.length > 0 ? (
+              filteredNodes.map(item => (
+                <EquipmentRow 
+                  key={item.node_id} 
+                  item={item}
+                  onSelect={setSelectedNode}
+                />
+              ))
+            ) : (
+              <div className="empty-state py-16">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                  <Building2 className="w-8 h-8 text-slate-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-slate-700 mb-2">
+                  {t("equipment.noEquipment") || "No Equipment Found"}
+                </h3>
+                <p className="text-slate-500">
+                  {searchQuery ? "Try adjusting your search" : "Add equipment to your hierarchy to see reliability scores"}
                 </p>
               </div>
-              
-              <Select value={selectedLevel} onValueChange={setSelectedLevel}>
-                <SelectTrigger className="w-48 bg-slate-800 border-slate-700 text-white">
-                  <SelectValue placeholder="Select hierarchy level" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-800 border-slate-700">
-                  <SelectItem value="all" className="text-white hover:bg-slate-700">All Levels</SelectItem>
-                  {availableLevels.map(level => (
-                    <SelectItem key={level} value={level} className="text-white hover:bg-slate-700 capitalize">
-                      {level.replace(/_/g, ' ')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {/* Stat Cards Row */}
-            <div className="flex flex-wrap gap-3 mb-6">
+            )}
+          </div>
+        </div>
+
+        {/* Right - Snowflake */}
+        <div>
+          <ReliabilitySnowflake 
+            scores={aggregatedScores}
+            overall={aggregatedOverall}
+            itemCount={filteredNodes.length}
+            alerts={alerts}
+            stars={stars}
+          />
+          
+          {/* Dimension Breakdown */}
+          <div className="mt-4 bg-white rounded-xl border border-slate-200 p-4">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3">Dimension Breakdown</h4>
+            <div className="space-y-3">
               {DIMENSIONS.map(dim => (
-                <StatCard
-                  key={dim.key}
-                  label={dim.label}
-                  value={aggregatedScores[dim.key] || 0}
-                  percentage={aggregatedScores[dim.key] || 0}
-                  icon={dim.icon}
-                  trend={0}
-                  accentColor={dim.color}
-                />
+                <div key={dim.key} className="flex items-center gap-3">
+                  <div className={`p-1.5 rounded-md ${dim.bg}`}>
+                    <dim.icon className={`w-3 h-3 ${dim.color}`} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-slate-600">{dim.label}</span>
+                      <span className={`text-xs font-bold ${dim.color}`}>{aggregatedScores[dim.key] || 0}%</span>
+                    </div>
+                    <Progress value={aggregatedScores[dim.key] || 0} className="h-1.5" />
+                  </div>
+                </div>
               ))}
             </div>
           </div>
           
-          {/* Right - Snowflake */}
-          <div className="lg:w-auto">
-            <ReliabilitySnowflake 
-              scores={aggregatedScores}
-              overall={aggregatedOverall}
-              itemCount={filteredNodes.length}
-              alerts={alerts}
-              stars={stars}
-            />
-          </div>
-        </div>
-      </div>
-      
-      {/* Equipment Table */}
-      <div className="px-6 pb-6">
-        <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 overflow-hidden">
-          {/* Table Header */}
-          <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-white">Equipment</h2>
-              <span className="px-2 py-0.5 rounded-full bg-slate-700 text-xs text-slate-300">{filteredNodes.length}</span>
+          {/* Quick Stats */}
+          {reliabilityData?.summary && (
+            <div className="mt-4 bg-white rounded-xl border border-slate-200 p-4">
+              <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                <Info className="w-4 h-4 text-slate-400" />
+                Quick Stats
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-2 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">With Criticality</p>
+                  <p className="text-lg font-bold text-slate-700">{reliabilityData.summary.with_criticality}</p>
+                </div>
+                <div className="p-2 bg-amber-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Open Threats</p>
+                  <p className="text-lg font-bold text-amber-600">{reliabilityData.summary.open_threats}</p>
+                </div>
+                <div className="p-2 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Investigations</p>
+                  <p className="text-lg font-bold text-slate-700">{reliabilityData.summary.total_investigations}</p>
+                </div>
+                <div className="p-2 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Total Actions</p>
+                  <p className="text-lg font-bold text-slate-700">{reliabilityData.summary.total_actions}</p>
+                </div>
+              </div>
             </div>
-          </div>
-          
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-700/50 bg-slate-800/50">
-                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Equipment</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Overall</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Criticality</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Maintenance</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Threats</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Incidents</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Trend</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredNodes.length > 0 ? (
-                  filteredNodes.map(item => (
-                    <EquipmentRow 
-                      key={item.node_id} 
-                      item={item}
-                      onSelect={setSelectedNode}
-                    />
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
-                      <div className="flex flex-col items-center">
-                        <Building2 className="w-12 h-12 text-slate-600 mb-3" />
-                        <p>No equipment found for this level</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          )}
         </div>
       </div>
     </div>
