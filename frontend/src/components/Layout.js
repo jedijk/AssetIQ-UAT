@@ -393,15 +393,43 @@ const Layout = () => {
               </div>
             </div>
 
-            {/* Criticality Adjustment */}
+            {/* 4-Dimension Criticality System */}
             <div>
-              <h4 className="font-medium text-slate-700 mb-2">{t("info.criticalityMultipliers")}</h4>
-              <p className="text-sm text-slate-600 mb-2">{t("info.criticalityDescription")}</p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between p-2 bg-red-50 rounded"><span>{t("equipment.safetyCritical")}</span><span className="font-medium">×1.5</span></div>
-                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>{t("equipment.productionCritical")}</span><span className="font-medium">×1.3</span></div>
-                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>{t("common.medium")}</span><span className="font-medium">×1.1</span></div>
-                <div className="flex justify-between p-2 bg-green-50 rounded"><span>{t("common.low")}</span><span className="font-medium">×1.0</span></div>
+              <h4 className="font-medium text-slate-700 mb-2">{t("info.criticalityDimensions")}</h4>
+              <p className="text-sm text-slate-600 mb-3">{t("info.criticalityDimensionsDesc")}</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-3 p-2 bg-red-50 rounded">
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map(i => <div key={i} className="w-4 h-3 bg-red-500 rounded-sm" />)}
+                  </div>
+                  <span className="flex-1 font-medium text-red-800">{t("info.safetyDimension")}</span>
+                  <span className="text-red-600">{t("info.weight")}: 25</span>
+                </div>
+                <div className="flex items-center gap-3 p-2 bg-orange-50 rounded">
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map(i => <div key={i} className="w-4 h-3 bg-orange-500 rounded-sm" />)}
+                  </div>
+                  <span className="flex-1 font-medium text-orange-800">{t("info.productionDimension")}</span>
+                  <span className="text-orange-600">{t("info.weight")}: 20</span>
+                </div>
+                <div className="flex items-center gap-3 p-2 bg-green-50 rounded">
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map(i => <div key={i} className="w-4 h-3 bg-green-500 rounded-sm" />)}
+                  </div>
+                  <span className="flex-1 font-medium text-green-800">{t("info.environmentalDimension")}</span>
+                  <span className="text-green-600">{t("info.weight")}: 15</span>
+                </div>
+                <div className="flex items-center gap-3 p-2 bg-purple-50 rounded">
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map(i => <div key={i} className="w-4 h-3 bg-purple-500 rounded-sm" />)}
+                  </div>
+                  <span className="flex-1 font-medium text-purple-800">{t("info.reputationDimension")}</span>
+                  <span className="text-purple-600">{t("info.weight")}: 10</span>
+                </div>
+              </div>
+              <div className="mt-3 p-3 bg-slate-100 rounded-lg">
+                <p className="text-xs text-slate-600 font-mono">{t("info.criticalityFormula")}</p>
+                <p className="text-xs text-slate-500 mt-1">{t("info.overallCriticalityDesc")}</p>
               </div>
             </div>
 
