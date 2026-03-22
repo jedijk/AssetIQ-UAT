@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -23,6 +24,7 @@ import {
   Calendar,
   Users,
   Gauge,
+  ExternalLink,
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -43,16 +45,23 @@ const MiniBarChart = ({ data, maxValue }) => {
   );
 };
 
-// Stat card component
-const StatCard = ({ label, value, icon: Icon, color, bg, subtitle, trend, trendUp }) => (
+// Stat card component - clickable with deep linking
+const StatCard = ({ label, value, icon: Icon, color, bg, subtitle, trend, trendUp, onClick, clickable = false }) => (
   <motion.div
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
-    className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow"
+    className={`bg-white rounded-xl border border-slate-200 p-4 transition-all ${
+      clickable ? 'hover:shadow-md hover:border-slate-300 cursor-pointer active:scale-[0.98]' : 'hover:shadow-md'
+    }`}
+    onClick={clickable ? onClick : undefined}
+    role={clickable ? "button" : undefined}
   >
     <div className="flex items-start justify-between">
       <div>
-        <p className="text-sm text-slate-500 mb-1">{label}</p>
+        <p className="text-sm text-slate-500 mb-1 flex items-center gap-1">
+          {label}
+          {clickable && <ExternalLink className="w-3 h-3 text-slate-400" />}
+        </p>
         <p className="text-2xl font-bold text-slate-900">{value}</p>
         {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
       </div>
@@ -69,17 +78,26 @@ const StatCard = ({ label, value, icon: Icon, color, bg, subtitle, trend, trendU
   </motion.div>
 );
 
-// Progress card for completion metrics
-const ProgressCard = ({ title, completed, total, icon: Icon, color }) => {
+// Progress card for completion metrics - clickable
+const ProgressCard = ({ title, completed, total, icon: Icon, color, onClick, clickable = false }) => {
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
+    <div 
+      className={`bg-white rounded-xl border border-slate-200 p-4 transition-all ${
+        clickable ? 'hover:shadow-md hover:border-slate-300 cursor-pointer active:scale-[0.98]' : ''
+      }`}
+      onClick={clickable ? onClick : undefined}
+      role={clickable ? "button" : undefined}
+    >
       <div className="flex items-center gap-3 mb-3">
         <div className={`p-2 rounded-lg ${color}`}>
           <Icon className="w-4 h-4 text-white" />
         </div>
-        <div>
-          <p className="text-sm font-medium text-slate-700">{title}</p>
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-700 flex items-center gap-1">
+            {title}
+            {clickable && <ExternalLink className="w-3 h-3 text-slate-400" />}
+          </p>
           <p className="text-xs text-slate-400">{completed} of {total} completed</p>
         </div>
       </div>
@@ -89,12 +107,21 @@ const ProgressCard = ({ title, completed, total, icon: Icon, color }) => {
   );
 };
 
-// Distribution card
-const DistributionCard = ({ title, data, colors }) => {
+// Distribution card - clickable
+const DistributionCard = ({ title, data, colors, onClick, clickable = false }) => {
   const total = Object.values(data).reduce((a, b) => a + b, 0);
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <h3 className="text-sm font-medium text-slate-700 mb-3">{title}</h3>
+    <div 
+      className={`bg-white rounded-xl border border-slate-200 p-4 transition-all ${
+        clickable ? 'hover:shadow-md hover:border-slate-300 cursor-pointer active:scale-[0.98]' : ''
+      }`}
+      onClick={clickable ? onClick : undefined}
+      role={clickable ? "button" : undefined}
+    >
+      <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-1">
+        {title}
+        {clickable && <ExternalLink className="w-3 h-3 text-slate-400" />}
+      </h3>
       <div className="space-y-2">
         {Object.entries(data).map(([key, value], idx) => {
           const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
@@ -112,12 +139,21 @@ const DistributionCard = ({ title, data, colors }) => {
   );
 };
 
-// Recent item card
-const RecentItemCard = ({ items, title, icon: Icon, emptyMessage, renderItem }) => (
-  <div className="bg-white rounded-xl border border-slate-200 p-4">
+// Recent item card - clickable
+const RecentItemCard = ({ items, title, icon: Icon, emptyMessage, renderItem, onClick, clickable = false }) => (
+  <div 
+    className={`bg-white rounded-xl border border-slate-200 p-4 transition-all ${
+      clickable ? 'hover:shadow-md hover:border-slate-300 cursor-pointer' : ''
+    }`}
+    onClick={clickable ? onClick : undefined}
+    role={clickable ? "button" : undefined}
+  >
     <div className="flex items-center gap-2 mb-3">
       <Icon className="w-4 h-4 text-slate-500" />
-      <h3 className="text-sm font-medium text-slate-700">{title}</h3>
+      <h3 className="text-sm font-medium text-slate-700 flex items-center gap-1">
+        {title}
+        {clickable && <ExternalLink className="w-3 h-3 text-slate-400" />}
+      </h3>
     </div>
     {items.length > 0 ? (
       <div className="space-y-2">
@@ -131,7 +167,11 @@ const RecentItemCard = ({ items, title, icon: Icon, emptyMessage, renderItem }) 
 
 export default function DashboardPage() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("operational");
+
+  // Navigation state for back button support
+  const navState = { from: "dashboard", fromPage: "Dashboard" };
 
   // Fetch all data
   const { data: stats } = useQuery({
@@ -238,6 +278,8 @@ export default function DashboardPage() {
           color="text-amber-600"
           bg="bg-amber-50"
           subtitle={`${openThreats} ${t("common.open") || "open"}`}
+          clickable={true}
+          onClick={() => navigate("/threats", { state: navState })}
         />
         <StatCard
           label={t("dashboard.totalActions") || "Total Actions"}
@@ -246,6 +288,8 @@ export default function DashboardPage() {
           color="text-blue-600"
           bg="bg-blue-50"
           subtitle={`${completedActions} ${t("actionsPage.completed") || "completed"}`}
+          clickable={true}
+          onClick={() => navigate("/actions", { state: navState })}
         />
         <StatCard
           label={t("dashboard.investigations") || "Investigations"}
@@ -254,6 +298,8 @@ export default function DashboardPage() {
           color="text-purple-600"
           bg="bg-purple-50"
           subtitle={`${completedInvestigations} ${t("actionsPage.completed") || "completed"}`}
+          clickable={true}
+          onClick={() => navigate("/causal-engine", { state: navState })}
         />
         <StatCard
           label={t("dashboard.equipment") || "Equipment"}
@@ -262,6 +308,8 @@ export default function DashboardPage() {
           color="text-green-600"
           bg="bg-green-50"
           subtitle={t("dashboard.totalAssets") || "total assets"}
+          clickable={true}
+          onClick={() => navigate("/equipment-manager", { state: navState })}
         />
       </div>
 
@@ -273,6 +321,8 @@ export default function DashboardPage() {
           total={threats.length}
           icon={Shield}
           color="bg-amber-500"
+          clickable={true}
+          onClick={() => navigate("/threats", { state: navState })}
         />
         <ProgressCard
           title={t("dashboard.actionCompletion") || "Action Completion"}
@@ -280,6 +330,8 @@ export default function DashboardPage() {
           total={actions.length}
           icon={Target}
           color="bg-blue-500"
+          clickable={true}
+          onClick={() => navigate("/actions", { state: navState })}
         />
         <ProgressCard
           title={t("dashboard.investigationProgress") || "Investigation Progress"}
@@ -287,6 +339,8 @@ export default function DashboardPage() {
           total={investigations.length}
           icon={GitBranch}
           color="bg-purple-500"
+          clickable={true}
+          onClick={() => navigate("/causal-engine", { state: navState })}
         />
       </div>
 
@@ -296,21 +350,29 @@ export default function DashboardPage() {
           title={t("dashboard.threatsByStatus") || "Threats by Status"}
           data={threatsByStatus}
           colors={["bg-blue-400", "bg-amber-400", "bg-green-400", "bg-slate-400"]}
+          clickable={true}
+          onClick={() => navigate("/threats", { state: navState })}
         />
         <DistributionCard
           title={t("dashboard.threatsByRisk") || "Threats by Risk Level"}
           data={threatsByRisk}
           colors={["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-400"]}
+          clickable={true}
+          onClick={() => navigate("/threats", { state: navState })}
         />
         <DistributionCard
           title={t("dashboard.actionsByStatus") || "Actions by Status"}
           data={actionsByStatus}
           colors={["bg-blue-400", "bg-amber-400", "bg-green-400"]}
+          clickable={true}
+          onClick={() => navigate("/actions", { state: navState })}
         />
         <DistributionCard
           title={t("dashboard.actionsByPriority") || "Actions by Priority"}
           data={actionsByPriority}
           colors={["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-400"]}
+          clickable={true}
+          onClick={() => navigate("/actions", { state: navState })}
         />
       </div>
 
@@ -321,6 +383,8 @@ export default function DashboardPage() {
           icon={AlertTriangle}
           items={threats.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))}
           emptyMessage={t("dashboard.noThreats") || "No threats recorded"}
+          clickable={true}
+          onClick={() => navigate("/threats", { state: navState })}
           renderItem={(item, idx) => (
             <div key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
               <div className={`w-2 h-2 rounded-full ${
@@ -346,6 +410,8 @@ export default function DashboardPage() {
           icon={CheckCircle2}
           items={actions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))}
           emptyMessage={t("dashboard.noActions") || "No actions recorded"}
+          clickable={true}
+          onClick={() => navigate("/actions", { state: navState })}
           renderItem={(item, idx) => (
             <div key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
               <div className={`w-2 h-2 rounded-full ${
@@ -371,6 +437,8 @@ export default function DashboardPage() {
           icon={GitBranch}
           items={investigations.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))}
           emptyMessage={t("dashboard.noInvestigations") || "No investigations started"}
+          clickable={true}
+          onClick={() => navigate("/causal-engine", { state: navState })}
           renderItem={(item, idx) => (
             <div key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
               <div className={`w-2 h-2 rounded-full ${
@@ -396,9 +464,13 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-6 bg-white rounded-xl border border-slate-200 p-4"
+          className="mt-6 bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md hover:border-slate-300 cursor-pointer transition-all"
+          onClick={() => navigate("/threats", { state: navState })}
         >
-          <h3 className="text-sm font-medium text-slate-700 mb-4">{t("dashboard.threatsByEquipment") || "Threats by Equipment Type"}</h3>
+          <h3 className="text-sm font-medium text-slate-700 mb-4 flex items-center gap-1">
+            {t("dashboard.threatsByEquipment") || "Threats by Equipment Type"}
+            <ExternalLink className="w-3 h-3 text-slate-400" />
+          </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {Object.entries(threatsByType).map(([type, count], idx) => (
               <div key={type} className="bg-slate-50 rounded-lg p-3 text-center">
