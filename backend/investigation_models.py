@@ -109,7 +109,7 @@ class FailureIdentificationCreate(BaseModel):
     investigation_id: str
     asset_name: str
     subsystem: Optional[str] = None
-    component: str
+    component: Optional[str] = None
     failure_mode: str
     degradation_mechanism: Optional[str] = None
     evidence: Optional[str] = None

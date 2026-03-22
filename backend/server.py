@@ -2946,13 +2946,14 @@ async def create_failure_identification(
     failure_doc = {
         "id": failure_id,
         "investigation_id": inv_id,
-        "asset_name": data.asset_name,
-        "subsystem": data.subsystem,
-        "component": data.component,
-        "failure_mode": data.failure_mode,
-        "degradation_mechanism": data.degradation_mechanism,
-        "evidence": data.evidence,
+        "asset_name": data.asset_name or "",
+        "subsystem": data.subsystem or "",
+        "component": data.component or "",
+        "failure_mode": data.failure_mode or "",
+        "degradation_mechanism": data.degradation_mechanism or "",
+        "evidence": data.evidence or "",
         "failure_mode_id": data.failure_mode_id,
+        "comment": data.comment or "",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -3108,11 +3109,12 @@ async def create_action_item(
         "investigation_id": inv_id,
         "action_number": action_number,
         "description": data.description,
-        "owner": data.owner,
-        "priority": data.priority.value,
-        "due_date": data.due_date,
+        "owner": data.owner or "",
+        "priority": data.priority.value if hasattr(data.priority, 'value') else data.priority,
+        "due_date": data.due_date or "",
         "status": ActionStatus.OPEN.value,
         "linked_cause_id": data.linked_cause_id,
+        "comment": data.comment or "",
         "completion_notes": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
