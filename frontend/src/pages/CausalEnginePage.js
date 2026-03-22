@@ -370,17 +370,18 @@ export default function CausalEnginePage() {
       description: action.description,
       source_type: "investigation",
       source_id: selectedInvId,
-      source_name: selectedInv?.title || "Unknown Investigation",
+      source_name: investigation?.title || "Unknown Investigation",
       priority: action.priority || "medium",
       assignee: action.owner || "",
       due_date: action.due_date || null,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success("Action promoted! View it in the Actions tab.");
+      toast.success(t("causal.actionPromoted") || "Action promoted! View it in the Actions tab.");
     },
-    onError: () => {
-      toast.error("Failed to promote action");
+    onError: (error) => {
+      console.error("Failed to promote action:", error);
+      toast.error(t("causal.actionPromoteFailed") || "Failed to promote action");
     },
   });
 
