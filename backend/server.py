@@ -4170,8 +4170,8 @@ async def generate_all_maintenance_strategies(
     
     generator = MaintenanceStrategyGenerator(api_key)
     
-    # Get all equipment types
-    equipment_types = list(EQUIPMENT_TYPES.values())
+    # Get all equipment types (EQUIPMENT_TYPES is already a list)
+    equipment_types = EQUIPMENT_TYPES
     
     results = {"generated": [], "skipped": [], "failed": []}
     
