@@ -36,7 +36,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   // Pre-fill message when equipment is provided
   useEffect(() => {
     if (prefillEquipment && isOpen) {
-      setMessage(`Issue with ${prefillEquipment}: `);
+      // More explicit format to help AI extract the asset name correctly
+      setMessage(`Reporting issue for equipment "${prefillEquipment}": `);
       // Focus the textarea after a short delay
       setTimeout(() => {
         textareaRef.current?.focus();

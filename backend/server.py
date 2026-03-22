@@ -255,8 +255,15 @@ Before asking ANY question, carefully analyze the user's message for:
 - "P-101 is leaking" → Asset: P-101, Failure: leaking → COMPLETE
 - "grinding noise from main pump" → Asset: main pump, Failure: grinding noise → COMPLETE  
 - "the compressor in unit 3 overheats" → Asset: compressor (unit 3), Failure: overheating → COMPLETE
+- 'Reporting issue for equipment "Production Unit A": vibration detected' → Asset: Production Unit A, Failure: vibration → COMPLETE
+- 'Reporting issue for equipment "Pump P-101": seal leak' → Asset: Pump P-101, Failure: seal leak → COMPLETE
 - "something wrong with equipment" → Need to ask which equipment AND what's wrong
 - "pump has issues" → Asset: pump, but failure unclear → Ask what's wrong
+
+## IMPORTANT: Equipment Name Extraction
+- If message contains 'Reporting issue for equipment "X"', extract X exactly as the asset name
+- If message contains 'Issue with X:', extract X exactly as the asset name
+- Preserve the full equipment name including any prefixes or suffixes
 
 ## Auto-fill from your expertise:
 - Equipment Type: Infer from asset name (P-xxx = Pump, C-xxx = Compressor, etc.)
@@ -1045,8 +1052,17 @@ async def send_chat_message(
         "id": threat_id,
         "title": threat_data.get("title", "Unknown Threat"),
         "asset": resolved_asset_name,  # Use resolved full name from hierarchy
+        "linked_equipment_id": hierarchy_node.get("id") if hierarchy_node else None,  # Link to equipment node
         "equipment_type": threat_data.get("equipment_type", "Unknown"),
         "equipment_criticality": criticality_level,  # Store equipment criticality
+        "equipment_criticality_data": {
+            "safety_impact": equipment_criticality.get("safety_impact", 0),
+            "production_impact": equipment_criticality.get("production_impact", 0),
+            "environmental_impact": equipment_criticality.get("environmental_impact", 0),
+            "reputation_impact": equipment_criticality.get("reputation_impact", 0),
+            "level": criticality_level,
+            "multiplier": criticality_multiplier
+        } if equipment_criticality else None,
         "failure_mode": threat_data.get("failure_mode", "Unknown"),
         "cause": threat_data.get("cause"),
         "impact": threat_data.get("impact", "Equipment Damage"),
@@ -1175,17 +1191,24 @@ async def recalculate_all_threat_scores(
     if not threats:
         return {"message": "No threats found", "updated_count": 0}
     
-    # Get all equipment nodes with criticality
+    # Get all equipment nodes (they're stored flat in MongoDB, not nested)
     equipment_nodes = await db.equipment_nodes.find(
         {"created_by": current_user["id"]},
-        {"_id": 0, "name": 1, "criticality": 1}
+        {"_id": 0, "id": 1, "name": 1, "criticality": 1}
     ).to_list(1000)
     
-    # Build asset -> criticality lookup
-    asset_criticality = {}
+    # Build asset name -> (node_id, criticality) lookup
+    # Use lowercase for case-insensitive matching
+    asset_data = {}
     for node in equipment_nodes:
-        if node.get("criticality"):
-            asset_criticality[node["name"]] = node["criticality"]
+        name_lower = node["name"].lower()
+        asset_data[name_lower] = {
+            "id": node["id"],
+            "name": node["name"],
+            "criticality": node.get("criticality")
+        }
+    
+    logger.info(f"Found {len(asset_data)} equipment nodes for matching")
     
     CRITICALITY_MULTIPLIERS = {
         "safety_critical": 1.5,
@@ -1195,6 +1218,7 @@ async def recalculate_all_threat_scores(
     }
     
     updated_count = 0
+    linked_count = 0
     
     for threat in threats:
         # Get base score from FMEA if failure mode is linked
@@ -1209,15 +1233,32 @@ async def recalculate_all_threat_scores(
                     base_risk_score = min(100, int(rpn_score))
                     break
         
-        # Get criticality multiplier from asset
-        asset_name = threat.get("asset")
+        # Get criticality data from asset (case-insensitive match)
+        asset_name = threat.get("asset", "")
+        asset_name_lower = asset_name.lower() if asset_name else ""
+        
+        linked_equipment_id = threat.get("linked_equipment_id")  # Preserve existing link
         criticality_level = "low"
         criticality_multiplier = 1.0
+        criticality_data = None
         
-        if asset_name and asset_name in asset_criticality:
-            crit = asset_criticality[asset_name]
-            criticality_level = crit.get("level", "low")
-            criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
+        # Look up equipment by name
+        if asset_name_lower and asset_name_lower in asset_data:
+            node_info = asset_data[asset_name_lower]
+            linked_equipment_id = node_info["id"]
+            linked_count += 1
+            crit = node_info.get("criticality")
+            if crit:
+                criticality_level = crit.get("level", "low")
+                criticality_multiplier = CRITICALITY_MULTIPLIERS.get(criticality_level, 1.0)
+                criticality_data = {
+                    "safety_impact": crit.get("safety_impact", 0),
+                    "production_impact": crit.get("production_impact", 0),
+                    "environmental_impact": crit.get("environmental_impact", 0),
+                    "reputation_impact": crit.get("reputation_impact", 0),
+                    "level": criticality_level,
+                    "multiplier": criticality_multiplier
+                }
         
         # Calculate adjusted score
         adjusted_risk_score = min(100, int(base_risk_score * criticality_multiplier))
@@ -1232,17 +1273,22 @@ async def recalculate_all_threat_scores(
         else:
             risk_level = "Low"
         
-        # Update threat
-        await db.threats.update_one(
-            {"id": threat["id"]},
-            {"$set": {
-                "risk_score": adjusted_risk_score,
-                "base_risk_score": base_risk_score,
-                "risk_level": risk_level,
-                "equipment_criticality": criticality_level
-            }}
-        )
+        # Update threat with full criticality data
+        update_fields = {
+            "risk_score": adjusted_risk_score,
+            "base_risk_score": base_risk_score,
+            "risk_level": risk_level,
+            "equipment_criticality": criticality_level
+        }
+        if linked_equipment_id:
+            update_fields["linked_equipment_id"] = linked_equipment_id
+        if criticality_data:
+            update_fields["equipment_criticality_data"] = criticality_data
+        
+        await db.threats.update_one({"id": threat["id"]}, {"$set": update_fields})
         updated_count += 1
+    
+    logger.info(f"Updated {updated_count} threats, linked {linked_count} to equipment")
     
     # Update all ranks
     await update_all_ranks(current_user["id"])

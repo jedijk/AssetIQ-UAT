@@ -188,21 +188,47 @@ const ThreatDetailPage = () => {
   }, [threat?.failure_mode, failureModes]);
 
   // Get criticality data for the linked asset
+  // First check if threat has stored criticality data, otherwise look up from equipment nodes
   const linkedCriticalityData = useMemo(() => {
-    if (!threat?.asset) return null;
-    const findNode = (nodes) => {
-      for (const node of nodes) {
-        if (node.name === threat.asset) return node;
-        if (node.children) {
-          const found = findNode(node.children);
-          if (found) return found;
+    // First priority: use stored criticality data from the threat itself
+    if (threat?.equipment_criticality_data) {
+      return threat.equipment_criticality_data;
+    }
+    
+    // Second priority: look up from equipment nodes by linked_equipment_id
+    if (threat?.linked_equipment_id) {
+      const findById = (nodes) => {
+        for (const node of nodes) {
+          if (node.id === threat.linked_equipment_id) return node;
+          if (node.children) {
+            const found = findById(node.children);
+            if (found) return found;
+          }
         }
-      }
-      return null;
-    };
-    const node = findNode(equipmentNodes);
-    return node?.criticality || null;
-  }, [threat?.asset, equipmentNodes]);
+        return null;
+      };
+      const node = findById(equipmentNodes);
+      return node?.criticality || null;
+    }
+    
+    // Third priority: look up from equipment nodes by asset name
+    if (threat?.asset) {
+      const findNode = (nodes) => {
+        for (const node of nodes) {
+          if (node.name === threat.asset) return node;
+          if (node.children) {
+            const found = findNode(node.children);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      const node = findNode(equipmentNodes);
+      return node?.criticality || null;
+    }
+    
+    return null;
+  }, [threat?.equipment_criticality_data, threat?.linked_equipment_id, threat?.asset, equipmentNodes]);
 
   // Update mutation
   const updateMutation = useMutation({
