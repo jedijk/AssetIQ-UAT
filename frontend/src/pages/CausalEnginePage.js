@@ -87,22 +87,6 @@ export default function CausalEnginePage() {
     }
   }, [searchParams, setSearchParams, selectedInvId]);
 
-  // Sync localNotes with investigation data when investigation changes
-  useEffect(() => {
-    if (investigationData) {
-      setLocalNotes(investigationData.notes || "");
-    }
-  }, [investigationData]);
-
-  // Debounced save for notes
-  useEffect(() => {
-    if (!selectedInvId || localNotes === (investigationData?.notes || "")) return;
-    const timer = setTimeout(() => {
-      updateInvMutation.mutate({ id: selectedInvId, data: { notes: localNotes } });
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [localNotes, selectedInvId]);
-
   const { data: investigationsData, isLoading: loadingInvestigations } = useQuery({
     queryKey: ["investigations"],
     queryFn: () => investigationAPI.getAll(),
@@ -168,6 +152,22 @@ export default function CausalEnginePage() {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
     },
   });
+
+  // Sync localNotes with investigation data when investigation changes
+  useEffect(() => {
+    if (investigationData) {
+      setLocalNotes(investigationData.notes || "");
+    }
+  }, [investigationData]);
+
+  // Debounced save for notes
+  useEffect(() => {
+    if (!selectedInvId || localNotes === (investigationData?.notes || "")) return;
+    const timer = setTimeout(() => {
+      updateInvMutation.mutate({ id: selectedInvId, data: { notes: localNotes } });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [localNotes, selectedInvId, investigationData, updateInvMutation]);
   
   const deleteInvMutation = useMutation({
     mutationFn: async (id) => {
