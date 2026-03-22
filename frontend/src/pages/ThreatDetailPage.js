@@ -793,16 +793,7 @@ const ThreatDetailPage = () => {
                       </div>
                       <div className="flex items-center justify-between bg-white rounded px-2 py-1.5">
                         <span className="text-xs text-slate-500">{t("threats.criticalityScoreLabel")}:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-purple-600">{criticalityScore}</span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            linkedCriticalityData.level === "safety_critical" ? "bg-red-100 text-red-700" :
-                            linkedCriticalityData.level === "production_critical" ? "bg-orange-100 text-orange-700" :
-                            linkedCriticalityData.level === "medium" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
-                          }`}>
-                            {linkedCriticalityData.level?.replace("_", " ") || "low"}
-                          </span>
-                        </div>
+                        <span className="text-lg font-bold text-purple-600">{criticalityScore}</span>
                       </div>
                       <div className="text-xs text-slate-600 bg-white rounded px-2 py-1.5 font-mono mt-2">
                         ({linkedCriticalityData.safety_impact || 0}×25 + {linkedCriticalityData.production_impact || 0}×20 + {linkedCriticalityData.environmental_impact || 0}×15 + {linkedCriticalityData.reputation_impact || 0}×10) ÷ 3.5 = <span className="font-bold text-purple-600">{criticalityScore}</span>
@@ -886,17 +877,6 @@ const ThreatDetailPage = () => {
               {linkedCriticalityData ? (
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-sm text-slate-600">{threat.asset}</span>
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                    linkedCriticalityData.level === "safety_critical" ? "bg-red-100 text-red-700" :
-                    linkedCriticalityData.level === "production_critical" ? "bg-orange-100 text-orange-700" :
-                    linkedCriticalityData.level === "medium" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
-                  }`}>
-                    {linkedCriticalityData.level?.replace("_", " ") || "low"} × {
-                      linkedCriticalityData.level === "safety_critical" ? "1.5" :
-                      linkedCriticalityData.level === "production_critical" ? "1.4" :
-                      linkedCriticalityData.level === "medium" ? "1.2" : "1.0"
-                    }
-                  </span>
                 </div>
               ) : (
                 <div className="text-sm text-slate-400 italic">{t("threats.noCriticalityLinked")}</div>
@@ -972,15 +952,6 @@ const ThreatDetailPage = () => {
                 >
                   <div className="font-medium text-slate-800">{eq.name}</div>
                   <div className="text-xs text-slate-500 mt-0.5">{eq.path}</div>
-                  {eq.hasCriticality && (
-                    <div className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] ${
-                      eq.criticalityLevel === "safety_critical" ? "bg-red-100 text-red-700" :
-                      eq.criticalityLevel === "production_critical" ? "bg-orange-100 text-orange-700" :
-                      eq.criticalityLevel === "medium" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
-                    }`}>
-                      {eq.criticalityLevel?.replace("_", " ")}
-                    </div>
-                  )}
                 </button>
               ))}
               {flatEquipmentList.length === 0 && (

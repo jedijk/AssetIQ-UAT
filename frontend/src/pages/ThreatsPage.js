@@ -317,18 +317,6 @@ const ThreatsPage = () => {
                     {threat.title}
                   </h3>
                   <RiskBadge level={threat.risk_level} size="sm" />
-                  {threat.equipment_criticality && (
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                      threat.equipment_criticality === "safety_critical" ? "bg-red-100 text-red-700" :
-                      threat.equipment_criticality === "production_critical" ? "bg-orange-100 text-orange-700" :
-                      threat.equipment_criticality === "medium" ? "bg-yellow-100 text-yellow-700" :
-                      "bg-slate-100 text-slate-600"
-                    }`}>
-                      {threat.equipment_criticality === "safety_critical" ? "Safety Critical" :
-                       threat.equipment_criticality === "production_critical" ? "Production Critical" :
-                       threat.equipment_criticality === "medium" ? "Medium Crit." : "Low Crit."}
-                    </span>
-                  )}
                 </div>
                 <div className="text-xs sm:text-sm text-slate-500 line-clamp-1">
                   <span>{threat.asset}</span>

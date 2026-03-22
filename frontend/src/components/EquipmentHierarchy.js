@@ -287,17 +287,6 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
               <label className="text-xs text-slate-500 block mb-1">{t ? t("hierarchy.criticality") : "Criticality"}</label>
               {getCriticalityDetails() ? (
                 <div className="space-y-2">
-                  {/* Criticality Level Badge */}
-                  <Badge className={`${
-                    getCriticalityDetails().level === 'safety_critical' ? 'bg-red-100 text-red-700' :
-                    getCriticalityDetails().level === 'production_critical' ? 'bg-orange-100 text-orange-700' :
-                    getCriticalityDetails().level === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
-                  }`}>
-                    {getCriticalityDetails().level === 'safety_critical' ? (t ? t("equipment.safetyCritical") : "Safety Critical") :
-                     getCriticalityDetails().level === 'production_critical' ? (t ? t("equipment.productionCritical") : "Production Critical") :
-                     getCriticalityDetails().level === 'medium' ? (t ? t("common.medium") : "Medium") : (t ? t("common.low") : "Low")}
-                  </Badge>
-                  
                   {/* 4-Dimension Bars */}
                   <div className="grid grid-cols-4 gap-1 mt-2">
                     <div className="text-center">
