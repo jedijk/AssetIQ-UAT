@@ -369,10 +369,10 @@ const Layout = () => {
             <div>
               <h4 className="font-medium text-slate-700 mb-2">{t("info.severity")}</h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between p-2 bg-red-50 rounded"><span>{t("info.safetyHazard")}</span><span className="font-medium">10</span></div>
-                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>{t("info.productionLoss")}</span><span className="font-medium">8</span></div>
-                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>{t("info.equipmentDamage")}</span><span className="font-medium">6</span></div>
-                <div className="flex justify-between p-2 bg-green-50 rounded"><span>{t("info.environmental")}</span><span className="font-medium">4</span></div>
+                <div className="flex justify-between p-2 bg-green-50 rounded"><span>{t("info.severity1to3")}</span><span className="font-medium text-green-700">1-3</span></div>
+                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>{t("info.severity4to6")}</span><span className="font-medium text-yellow-700">4-6</span></div>
+                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>{t("info.severity7to9")}</span><span className="font-medium text-orange-700">7-9</span></div>
+                <div className="flex justify-between p-2 bg-red-50 rounded"><span>{t("info.severity10")}</span><span className="font-medium text-red-700">10</span></div>
               </div>
             </div>
 
@@ -380,20 +380,21 @@ const Layout = () => {
             <div>
               <h4 className="font-medium text-slate-700 mb-2">{t("info.occurrence")}</h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.firstTime")}</span><span className="font-medium">2</span></div>
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.rare")}</span><span className="font-medium">4</span></div>
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.occasional")}</span><span className="font-medium">6</span></div>
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.frequent")}</span><span className="font-medium">8</span></div>
+                <div className="flex justify-between p-2 bg-green-50 rounded"><span>{t("info.occurrence1to3")}</span><span className="font-medium text-green-700">1-3</span></div>
+                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>{t("info.occurrence4to6")}</span><span className="font-medium text-yellow-700">4-6</span></div>
+                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>{t("info.occurrence7to9")}</span><span className="font-medium text-orange-700">7-9</span></div>
+                <div className="flex justify-between p-2 bg-red-50 rounded"><span>{t("info.occurrence10")}</span><span className="font-medium text-red-700">10</span></div>
               </div>
             </div>
 
             {/* Detection */}
             <div>
               <h4 className="font-medium text-slate-700 mb-2">{t("info.detection")}</h4>
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.easy")}</span><span className="font-medium">3</span></div>
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.moderate")}</span><span className="font-medium">5</span></div>
-                <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{t("info.difficult")}</span><span className="font-medium">7</span></div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between p-2 bg-green-50 rounded"><span>{t("info.detection1to3")}</span><span className="font-medium text-green-700">1-3</span></div>
+                <div className="flex justify-between p-2 bg-yellow-50 rounded"><span>{t("info.detection4to6")}</span><span className="font-medium text-yellow-700">4-6</span></div>
+                <div className="flex justify-between p-2 bg-orange-50 rounded"><span>{t("info.detection7to9")}</span><span className="font-medium text-orange-700">7-9</span></div>
+                <div className="flex justify-between p-2 bg-red-50 rounded"><span>{t("info.detection10")}</span><span className="font-medium text-red-700">10</span></div>
               </div>
             </div>
 
