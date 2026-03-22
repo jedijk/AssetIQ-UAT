@@ -361,38 +361,116 @@ function PropertiesPanel({ node, equipmentTypes, criticalityProfiles, discipline
           )}
           
           <div>
-            <Label className="text-xs text-slate-500 mb-2">Criticality</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {criticalityProfiles?.map(p => { 
-                const isActive = node.criticality?.profile_id === p.id; 
-                const colors = CRIT_COLORS[p.level]; 
-                return (
-                  <button 
-                    key={p.id} 
-                    onClick={() => {
-                      // Toggle: if already active, clear it; otherwise assign
-                      if (isActive) {
-                        onAssignCriticality(node.id, { profile_id: null });
-                      } else {
-                        onAssignCriticality(node.id, { profile_id: p.id });
-                      }
-                    }} 
-                    className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${isActive ? `${colors?.bg} ${colors?.border} ring-2 ring-offset-1` : "bg-white border-slate-200 hover:border-slate-300"}`}
-                  >
-                    <div className={`w-3 h-3 rounded-full ${colors?.dot}`} />
-                    <span className={`text-xs font-medium ${isActive ? colors?.text : "text-slate-600"}`}>{p.name}</span>
-                    {isActive && <X className="w-3 h-3 ml-auto text-slate-400" />}
-                  </button>
-                ); 
-              })}
+            <Label className="text-xs text-slate-500 mb-2">{t("equipment.criticality") || "Criticality Assessment"}</Label>
+            
+            {/* Four Criticality Dimensions */}
+            <div className="space-y-3 bg-slate-50 p-3 rounded-lg">
+              {/* Safety Impact */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-red-700">{t("equipment.safetyImpact") || "Safety"}</span>
+                  <span className="text-xs text-slate-500">{node.criticality?.safety_impact || 0}/5</span>
+                </div>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(level => (
+                    <button
+                      key={level}
+                      onClick={() => onAssignCriticality(node.id, { ...node.criticality, safety_impact: node.criticality?.safety_impact === level ? null : level })}
+                      className={`flex-1 h-6 rounded transition-all ${
+                        (node.criticality?.safety_impact || 0) >= level 
+                          ? "bg-red-500" 
+                          : "bg-red-100 hover:bg-red-200"
+                      }`}
+                      title={`Safety Impact: ${level}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              {/* Production Impact */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-orange-700">{t("equipment.productionImpact") || "Production"}</span>
+                  <span className="text-xs text-slate-500">{node.criticality?.production_impact || 0}/5</span>
+                </div>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(level => (
+                    <button
+                      key={level}
+                      onClick={() => onAssignCriticality(node.id, { ...node.criticality, production_impact: node.criticality?.production_impact === level ? null : level })}
+                      className={`flex-1 h-6 rounded transition-all ${
+                        (node.criticality?.production_impact || 0) >= level 
+                          ? "bg-orange-500" 
+                          : "bg-orange-100 hover:bg-orange-200"
+                      }`}
+                      title={`Production Impact: ${level}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              {/* Environmental Impact */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-green-700">{t("equipment.environmentalImpact") || "Environmental"}</span>
+                  <span className="text-xs text-slate-500">{node.criticality?.environmental_impact || 0}/5</span>
+                </div>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(level => (
+                    <button
+                      key={level}
+                      onClick={() => onAssignCriticality(node.id, { ...node.criticality, environmental_impact: node.criticality?.environmental_impact === level ? null : level })}
+                      className={`flex-1 h-6 rounded transition-all ${
+                        (node.criticality?.environmental_impact || 0) >= level 
+                          ? "bg-green-500" 
+                          : "bg-green-100 hover:bg-green-200"
+                      }`}
+                      title={`Environmental Impact: ${level}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              {/* Reputation Impact */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-purple-700">{t("equipment.reputationImpact") || "Reputation"}</span>
+                  <span className="text-xs text-slate-500">{node.criticality?.reputation_impact || 0}/5</span>
+                </div>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(level => (
+                    <button
+                      key={level}
+                      onClick={() => onAssignCriticality(node.id, { ...node.criticality, reputation_impact: node.criticality?.reputation_impact === level ? null : level })}
+                      className={`flex-1 h-6 rounded transition-all ${
+                        (node.criticality?.reputation_impact || 0) >= level 
+                          ? "bg-purple-500" 
+                          : "bg-purple-100 hover:bg-purple-200"
+                      }`}
+                      title={`Reputation Impact: ${level}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              {/* Overall Criticality Score */}
+              {(node.criticality?.safety_impact || node.criticality?.production_impact || node.criticality?.environmental_impact || node.criticality?.reputation_impact) && (
+                <div className="pt-2 border-t border-slate-200 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-700">{t("equipment.overallCriticality") || "Overall Criticality"}</span>
+                    <span className="text-sm font-bold text-slate-800">
+                      {Math.max(
+                        node.criticality?.safety_impact || 0,
+                        node.criticality?.production_impact || 0,
+                        node.criticality?.environmental_impact || 0,
+                        node.criticality?.reputation_impact || 0
+                      )}/5
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-          
-          {node.criticality && (
-            <div className="p-3 bg-slate-50 rounded-lg">
-              <h4 className="text-xs font-semibold text-slate-600 mb-2">Risk Score: <span className="text-lg">{node.criticality.risk_score}</span></h4>
-            </div>
-          )}
           
           {/* Delete button at the bottom */}
           {node.level !== "installation" && (

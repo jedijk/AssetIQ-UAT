@@ -196,9 +196,14 @@ class EquipmentNodeUpdate(BaseModel):
 
 class CriticalityAssignment(BaseModel):
     profile_id: Optional[str] = None
+    # Four criticality dimensions (1-5 scale each)
+    safety_impact: Optional[int] = None  # Safety impact (1-5)
+    production_impact: Optional[int] = None  # Production impact (1-5)
+    environmental_impact: Optional[int] = None  # Environmental impact (1-5)
+    reputation_impact: Optional[int] = None  # Reputation impact (1-5)
+    # Legacy fields for backwards compatibility
     fatality_risk: Optional[float] = None
     production_loss_per_day: Optional[float] = None
-    environmental_impact: Optional[float] = None
     failure_probability: Optional[float] = None
     downtime_days: Optional[float] = None
 
