@@ -39,7 +39,8 @@ from investigation_models import (
 )
 from maintenance_strategy_models import (
     MaintenanceStrategy, CriticalityLevel, MaintenanceFrequency,
-    MaintenanceStrategyCreate, MaintenanceStrategyUpdate, GenerateStrategyRequest
+    MaintenanceStrategyCreate, MaintenanceStrategyUpdate, GenerateStrategyRequest,
+    GenerateAllStrategiesRequest
 )
 from maintenance_strategy_generator import MaintenanceStrategyGenerator
 
@@ -3791,17 +3792,27 @@ async def get_action_optimization(
 @api_router.get("/maintenance-strategies")
 async def list_maintenance_strategies(
     equipment_type_id: Optional[str] = None,
-    criticality_level: Optional[str] = None,
+    search: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """List all maintenance strategies, optionally filtered"""
     query = {}
     if equipment_type_id:
         query["equipment_type_id"] = equipment_type_id
-    if criticality_level:
-        query["criticality_level"] = criticality_level
     
     strategies = await db.maintenance_strategies.find(query, {"_id": 0}).to_list(1000)
+    
+    # Apply search filter if provided
+    if search:
+        search_lower = search.lower()
+        strategies = [
+            s for s in strategies
+            if search_lower in s.get("equipment_type_name", "").lower()
+            or search_lower in s.get("description", "").lower()
+            or any(search_lower in sp.get("part_name", "").lower() for sp in s.get("spare_parts", []))
+            or any(search_lower in fm.get("failure_mode_name", "").lower() for fm in s.get("failure_mode_mappings", []))
+        ]
+    
     return {"strategies": strategies, "total": len(strategies)}
 
 
@@ -3822,12 +3833,12 @@ async def get_strategies_by_equipment_type(
     equipment_type_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all maintenance strategies for an equipment type (all criticality levels)"""
-    strategies = await db.maintenance_strategies.find(
+    """Get maintenance strategy for an equipment type"""
+    strategy = await db.maintenance_strategies.find_one(
         {"equipment_type_id": equipment_type_id}, 
         {"_id": 0}
-    ).to_list(100)
-    return {"equipment_type_id": equipment_type_id, "strategies": strategies}
+    )
+    return {"equipment_type_id": equipment_type_id, "strategy": strategy}
 
 
 @api_router.post("/maintenance-strategies/generate")
@@ -3835,16 +3846,15 @@ async def generate_maintenance_strategy(
     request: GenerateStrategyRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    """Auto-generate a maintenance strategy from FMEA data"""
-    # Check if strategy already exists for this equipment type + criticality
+    """Auto-generate a maintenance strategy for ALL criticality levels from FMEA data"""
+    # Check if strategy already exists for this equipment type
     existing = await db.maintenance_strategies.find_one({
-        "equipment_type_id": request.equipment_type_id,
-        "criticality_level": request.criticality_level.value
+        "equipment_type_id": request.equipment_type_id
     })
     if existing:
         raise HTTPException(
             status_code=400, 
-            detail=f"Strategy already exists for {request.equipment_type_name} at {request.criticality_level.value} criticality. Delete it first to regenerate."
+            detail=f"Strategy already exists for {request.equipment_type_name}. Delete it first to regenerate."
         )
     
     # Get failure modes for this equipment type
@@ -3852,12 +3862,12 @@ async def generate_maintenance_strategy(
         fm for fm in FAILURE_MODES_LIBRARY 
         if fm.get("equipment", "").lower() == request.equipment_type_name.lower()
         or request.equipment_type_name.lower() in fm.get("equipment", "").lower()
-        or fm.get("equipment_type_ids") and request.equipment_type_id in fm.get("equipment_type_ids", [])
+        or (fm.get("equipment_type_ids") and request.equipment_type_id in fm.get("equipment_type_ids", []))
     ]
     
-    # If no specific failure modes, get general ones
+    # If no specific failure modes, get general ones based on category
     if not failure_modes:
-        failure_modes = FAILURE_MODES_LIBRARY[:10]  # Take first 10 as fallback
+        failure_modes = FAILURE_MODES_LIBRARY[:15]
     
     # Generate strategy using AI
     api_key = os.environ.get("EMERGENT_LLM_KEY")
@@ -3868,7 +3878,6 @@ async def generate_maintenance_strategy(
     strategy = await generator.generate_strategy(
         equipment_type_id=request.equipment_type_id,
         equipment_type_name=request.equipment_type_name,
-        criticality_level=request.criticality_level,
         failure_modes=failure_modes,
         user_id=current_user.get("user_id", "unknown")
     )
@@ -3884,6 +3893,69 @@ async def generate_maintenance_strategy(
     return strategy_dict
 
 
+@api_router.post("/maintenance-strategies/generate-all")
+async def generate_all_maintenance_strategies(
+    request: GenerateAllStrategiesRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate maintenance strategies for ALL equipment types"""
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="AI API key not configured")
+    
+    generator = MaintenanceStrategyGenerator(api_key)
+    
+    # Get all equipment types
+    equipment_types = list(EQUIPMENT_TYPES.values())
+    
+    results = {"generated": [], "skipped": [], "failed": []}
+    
+    for eq_type in equipment_types:
+        eq_id = eq_type.get("id", "")
+        eq_name = eq_type.get("name", "")
+        
+        # Check if strategy already exists
+        existing = await db.maintenance_strategies.find_one({"equipment_type_id": eq_id})
+        if existing:
+            results["skipped"].append({"id": eq_id, "name": eq_name, "reason": "Already exists"})
+            continue
+        
+        try:
+            # Get failure modes for this equipment type
+            failure_modes = [
+                fm for fm in FAILURE_MODES_LIBRARY 
+                if fm.get("equipment", "").lower() == eq_name.lower()
+                or eq_name.lower() in fm.get("equipment", "").lower()
+                or (fm.get("equipment_type_ids") and eq_id in fm.get("equipment_type_ids", []))
+            ]
+            
+            if not failure_modes:
+                failure_modes = FAILURE_MODES_LIBRARY[:10]
+            
+            strategy = await generator.generate_strategy(
+                equipment_type_id=eq_id,
+                equipment_type_name=eq_name,
+                failure_modes=failure_modes,
+                user_id=current_user.get("user_id", "unknown")
+            )
+            
+            strategy_dict = strategy.model_dump()
+            await db.maintenance_strategies.insert_one(strategy_dict)
+            
+            results["generated"].append({"id": eq_id, "name": eq_name})
+            
+        except Exception as e:
+            results["failed"].append({"id": eq_id, "name": eq_name, "error": str(e)[:100]})
+    
+    return {
+        "total_equipment_types": len(equipment_types),
+        "generated": len(results["generated"]),
+        "skipped": len(results["skipped"]),
+        "failed": len(results["failed"]),
+        "details": results
+    }
+
+
 @api_router.post("/maintenance-strategies")
 async def create_maintenance_strategy(
     data: MaintenanceStrategyCreate,
@@ -3892,20 +3964,18 @@ async def create_maintenance_strategy(
     """Create a new maintenance strategy manually"""
     # Check if strategy already exists
     existing = await db.maintenance_strategies.find_one({
-        "equipment_type_id": data.equipment_type_id,
-        "criticality_level": data.criticality_level.value
+        "equipment_type_id": data.equipment_type_id
     })
     if existing:
         raise HTTPException(
             status_code=400,
-            detail=f"Strategy already exists for this equipment type and criticality level"
+            detail=f"Strategy already exists for this equipment type"
         )
     
     strategy = MaintenanceStrategy(
         id=str(uuid.uuid4()),
         equipment_type_id=data.equipment_type_id,
         equipment_type_name=data.equipment_type_name,
-        criticality_level=data.criticality_level,
         description=data.description,
         created_by=current_user.get("user_id"),
         auto_generated=False

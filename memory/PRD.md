@@ -319,8 +319,9 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 
 #### Mar 22, 2026 - Maintenance Strategy Module
 - [x] **Maintenance Strategy Database & Auto-Generation** (Mar 22, 2026):
-  - NEW: Complete Maintenance Strategy data model with:
-    - Operator Rounds (frequency, checklists, PPE requirements)
+  - NEW: Complete Maintenance Strategy data model combining ALL 4 criticality levels per equipment type:
+    - Safety Critical, Production Critical, Medium, Low - each with tailored strategies
+    - Operator Rounds (frequency-based: shift/daily/weekly/monthly)
     - Detection Systems (vibration, temperature, pressure, etc. with alarm thresholds)
     - Scheduled Maintenance Tasks (preventive, predictive, condition-based)
     - Corrective Actions with response times and priorities
@@ -328,13 +329,14 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
     - Spare Parts inventory recommendations
     - Failure Mode Mappings linking FMEA to maintenance actions
   - NEW: AI-powered strategy generation from FMEA failure modes
+  - NEW: "Generate All" button to create strategies for all equipment types at once
+  - NEW: Search functionality across strategies, spare parts, and failure modes
   - NEW: Strategy versioning (auto-increments on changes)
-  - NEW: Criticality-based strategy variations (Safety Critical, Production Critical, Medium, Low)
+  - NEW: Tabbed UI showing all criticality levels in one card
   - NEW: "Maintenance" tab added to Library page
-  - NEW: Interactive strategy cards with expandable sections
   - Backend files: `maintenance_strategy_models.py`, `maintenance_strategy_generator.py`
   - Frontend file: `MaintenanceStrategiesPanel.jsx`
-  - API endpoints: `/api/maintenance-strategies/*`
+  - API endpoints: `/api/maintenance-strategies/*`, `/api/maintenance-strategies/generate-all`
 
 #### Mar 21, 2026 - AI Risk Score Alignment
 - [x] **AI Risk Analysis Score Aligned with Threat Score** (Mar 21, 2026):

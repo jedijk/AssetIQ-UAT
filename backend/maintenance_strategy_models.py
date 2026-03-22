@@ -158,33 +158,41 @@ class FailureModeMapping(BaseModel):
     risk_if_unaddressed: str = "medium"  # low, medium, high, critical
 
 
-# ============= Main Strategy Model =============
+# ============= Criticality-Specific Strategy =============
 
-class MaintenanceStrategy(BaseModel):
-    """Complete maintenance strategy for an equipment type at a criticality level"""
-    id: str
-    equipment_type_id: str
-    equipment_type_name: str
+class CriticalityStrategy(BaseModel):
+    """Strategy components for a specific criticality level"""
     criticality_level: CriticalityLevel
-    strategy_version: str = "1.0"
-    description: Optional[str] = None
-    
-    # Proactive strategies
     operator_rounds: List[OperatorRound] = []
     detection_systems: List[DetectionSystem] = []
     scheduled_maintenance: List[MaintenanceTask] = []
-    
-    # Reactive strategies
     corrective_actions: List[CorrectiveAction] = []
     emergency_procedures: List[EmergencyProcedure] = []
+    estimated_annual_cost_eur: Optional[float] = None
+    expected_availability_percent: Optional[float] = None
+
+
+# ============= Main Strategy Model =============
+
+class MaintenanceStrategy(BaseModel):
+    """Complete maintenance strategy for an equipment type with ALL criticality levels"""
+    id: str
+    equipment_type_id: str
+    equipment_type_name: str
+    strategy_version: str = "1.0"
+    description: Optional[str] = None
     
-    # Supporting data
+    # Strategies by criticality level
+    strategies_by_criticality: List[CriticalityStrategy] = []
+    
+    # Common spare parts for all criticality levels
     spare_parts: List[SparePart] = []
+    
+    # Failure mode mappings
     failure_mode_mappings: List[FailureModeMapping] = []
     
     # Metadata
     total_annual_cost_estimate_eur: Optional[float] = None
-    expected_availability_percent: Optional[float] = None
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     created_by: Optional[str] = None
@@ -197,7 +205,6 @@ class MaintenanceStrategyCreate(BaseModel):
     """Create a new maintenance strategy"""
     equipment_type_id: str
     equipment_type_name: str
-    criticality_level: CriticalityLevel
     description: Optional[str] = None
 
 
@@ -205,18 +212,18 @@ class MaintenanceStrategyUpdate(BaseModel):
     """Update an existing maintenance strategy"""
     description: Optional[str] = None
     strategy_version: Optional[str] = None
-    operator_rounds: Optional[List[OperatorRound]] = None
-    detection_systems: Optional[List[DetectionSystem]] = None
-    scheduled_maintenance: Optional[List[MaintenanceTask]] = None
-    corrective_actions: Optional[List[CorrectiveAction]] = None
-    emergency_procedures: Optional[List[EmergencyProcedure]] = None
+    strategies_by_criticality: Optional[List[CriticalityStrategy]] = None
     spare_parts: Optional[List[SparePart]] = None
     failure_mode_mappings: Optional[List[FailureModeMapping]] = None
 
 
 class GenerateStrategyRequest(BaseModel):
-    """Request to auto-generate a maintenance strategy"""
+    """Request to auto-generate a maintenance strategy for ALL criticality levels"""
     equipment_type_id: str
     equipment_type_name: str
-    criticality_level: CriticalityLevel = CriticalityLevel.MEDIUM
+    include_costs: bool = True
+
+
+class GenerateAllStrategiesRequest(BaseModel):
+    """Request to generate strategies for all equipment types"""
     include_costs: bool = True

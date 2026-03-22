@@ -506,11 +506,11 @@ export const aiRiskAPI = {
 
 // Maintenance Strategy API
 export const maintenanceStrategyAPI = {
-  // List all strategies
+  // List all strategies with optional search
   getAll: async (filters = {}) => {
     const params = new URLSearchParams();
     if (filters.equipment_type_id) params.append("equipment_type_id", filters.equipment_type_id);
-    if (filters.criticality_level) params.append("criticality_level", filters.criticality_level);
+    if (filters.search) params.append("search", filters.search);
     const response = await api.get(`/maintenance-strategies?${params.toString()}`);
     return response.data;
   },
@@ -521,18 +521,25 @@ export const maintenanceStrategyAPI = {
     return response.data;
   },
   
-  // Get strategies by equipment type
+  // Get strategy by equipment type
   getByEquipmentType: async (equipmentTypeId) => {
     const response = await api.get(`/maintenance-strategies/by-equipment-type/${equipmentTypeId}`);
     return response.data;
   },
   
-  // Generate a strategy from FMEA data
-  generate: async (equipmentTypeId, equipmentTypeName, criticalityLevel) => {
+  // Generate a strategy for an equipment type (all criticality levels)
+  generate: async (equipmentTypeId, equipmentTypeName) => {
     const response = await api.post("/maintenance-strategies/generate", {
       equipment_type_id: equipmentTypeId,
       equipment_type_name: equipmentTypeName,
-      criticality_level: criticalityLevel,
+      include_costs: true,
+    });
+    return response.data;
+  },
+  
+  // Generate strategies for ALL equipment types
+  generateAll: async () => {
+    const response = await api.post("/maintenance-strategies/generate-all", {
       include_costs: true,
     });
     return response.data;
