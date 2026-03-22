@@ -104,6 +104,7 @@ const en = {
     assign: "Assign",
     assigning: "Assigning...",
     add: "Add",
+    notLinked: "Not linked",
   },
   
   // Threats page
@@ -130,6 +131,16 @@ const en = {
     startInvestigation: "Start Investigation",
     editThreat: "Edit Threat",
     deleteThreat: "Delete Threat",
+    rightClickForDetails: "right-click for details",
+    scoreCalculation: "Score Calculation",
+    formula: "Formula",
+    baseScore: "Base Score",
+    criticalityMultiplier: "Criticality Multiplier",
+    fmeaScores: "FMEA Scores",
+    equipmentCriticality: "Equipment Criticality",
+    finalScore: "Final Score",
+    noFmeaLinked: "No failure mode linked",
+    noCriticalityLinked: "No criticality assigned",
   },
   
   // Causal Engine
@@ -725,6 +736,8 @@ const nl = {
     parsing: "Verwerken...",
     assign: "Toewijzen",
     assigning: "Toewijzen...",
+    add: "Toevoegen",
+    notLinked: "Niet gekoppeld",
   },
   
   // Threats page
@@ -751,6 +764,16 @@ const nl = {
     startInvestigation: "Start onderzoek",
     editThreat: "Bewerk dreiging",
     deleteThreat: "Verwijder dreiging",
+    rightClickForDetails: "rechtsklik voor details",
+    scoreCalculation: "Score Berekening",
+    formula: "Formule",
+    baseScore: "Basisscore",
+    criticalityMultiplier: "Kriticiteits Vermenigvuldiger",
+    fmeaScores: "FMEA Scores",
+    equipmentCriticality: "Apparatuur Kriticiteit",
+    finalScore: "Eindscore",
+    noFmeaLinked: "Geen faalmodus gekoppeld",
+    noCriticalityLinked: "Geen kriticiteit toegewezen",
   },
   
   // Causal Engine
