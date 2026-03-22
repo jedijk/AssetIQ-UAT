@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -4408,6 +4409,19 @@ async def increment_strategy_version(
     
     return {"id": strategy_id, "new_version": new_version}
 
+# Document download endpoint
+@api_router.get("/download/documentation")
+async def download_documentation():
+    """Download the ReliabilityOS Architecture & Cost Documentation"""
+    file_path = Path(__file__).parent.parent / "ReliabilityOS_Architecture_Cost_Documentation.docx"
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Documentation file not found")
+    return FileResponse(
+        path=str(file_path),
+        filename="ReliabilityOS_Architecture_Cost_Documentation.docx",
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+
 
 app.include_router(api_router)
 
@@ -4422,3 +4436,4 @@ app.add_middleware(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
