@@ -199,32 +199,9 @@ export default function DashboardPage() {
   const closedThreats = (threatsByStatus["Closed"] || 0) + (threatsByStatus["Mitigated"] || 0);
   const completedActions = actionsByStatus["completed"] || 0;
   const completedInvestigations = investigationsByStatus["completed"] || 0;
-
-  // Overall health score (simple calculation)
+  
+  // Used for stat card subtitle
   const openThreats = threatsByStatus["Open"] || 0;
-  const criticalThreats = (threatsByRisk["Critical"] || 0) + (threatsByRisk["High"] || 0);
-  const overdueActions = actions.filter(a => {
-    if (!a.due_date || a.status === "completed") return false;
-    return new Date(a.due_date) < new Date();
-  }).length;
-
-  const healthScore = Math.max(0, Math.min(100, 
-    100 - (criticalThreats * 10) - (openThreats * 2) - (overdueActions * 5)
-  ));
-
-  const getHealthColor = (score) => {
-    if (score >= 80) return "text-green-500";
-    if (score >= 60) return "text-yellow-500";
-    if (score >= 40) return "text-orange-500";
-    return "text-red-500";
-  };
-
-  const getHealthLabel = (score) => {
-    if (score >= 80) return t("dashboard.excellent") || "Excellent";
-    if (score >= 60) return t("dashboard.good") || "Good";
-    if (score >= 40) return t("dashboard.needsAttention") || "Needs Attention";
-    return t("dashboard.critical") || "Critical";
-  };
 
   return (
     <div className="p-6 max-w-7xl mx-auto" data-testid="dashboard-page">
@@ -252,40 +229,6 @@ export default function DashboardPage() {
           
           {/* Operational Dashboard Tab */}
           <TabsContent value="operational" className="mt-6">
-            {/* Health Score Banner */}
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 mb-6 text-white"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-400 text-sm mb-1">{t("dashboard.overallHealth") || "Overall System Health"}</p>
-                  <div className="flex items-baseline gap-3">
-                    <span className={`text-5xl font-bold ${getHealthColor(healthScore)}`}>{healthScore}</span>
-                    <span className="text-slate-400">/100</span>
-                    <span className={`text-lg font-medium ${getHealthColor(healthScore)}`}>
-                      {getHealthLabel(healthScore)}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <p className="text-3xl font-bold">{openThreats}</p>
-                    <p className="text-xs text-slate-400">{t("dashboard.openThreats") || "Open Threats"}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-red-400">{criticalThreats}</p>
-                    <p className="text-xs text-slate-400">{t("dashboard.criticalHighRisk") || "Critical/High Risk"}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-amber-400">{overdueActions}</p>
-                    <p className="text-xs text-slate-400">{t("dashboard.overdueActions") || "Overdue Actions"}</p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
       {/* Key Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard
