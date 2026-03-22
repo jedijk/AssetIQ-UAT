@@ -1,9 +1,9 @@
-# ThreatBase - AI-Powered Threat Capture & Prioritization Platform
+# ReliabilityOS - AI-Powered Reliability Intelligence Platform
 
 ## Product Requirements Document (PRD)
 
 ### Original Problem Statement
-Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
+Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Core Modules
 

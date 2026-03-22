@@ -345,7 +345,7 @@ const en = {
   
   // Info dialog
   info: {
-    title: "ThreatBase - Risk Methodology",
+    title: "ReliabilityOS - Risk Methodology",
     fmeaScoring: "FMEA Risk Scoring",
     fmeaDescription: "Risk scores are calculated using Failure Mode and Effects Analysis (FMEA) methodology:",
     formula: "Risk Score = (Severity × Occurrence × Detection) / 10",
@@ -811,7 +811,7 @@ const nl = {
   
   // Info dialog
   info: {
-    title: "ThreatBase - Risicomethodologie",
+    title: "ReliabilityOS - Risicomethodologie",
     fmeaScoring: "FMEA Risicoscoring",
     fmeaDescription: "Risicoscores worden berekend met behulp van Failure Mode and Effects Analysis (FMEA) methodologie:",
     formula: "Risicoscore = (Ernst × Frequentie × Detectie) / 10",
@@ -938,12 +938,12 @@ const translations = { en, nl };
 
 export const LanguageProvider = ({ children }) => {
   const [language, setLanguage] = useState(() => {
-    const saved = localStorage.getItem("threatbase_language");
+    const saved = localStorage.getItem("reliabilityos_language");
     return saved || "en";
   });
 
   useEffect(() => {
-    localStorage.setItem("threatbase_language", language);
+    localStorage.setItem("reliabilityos_language", language);
   }, [language]);
 
   const t = (key) => {

@@ -82,12 +82,12 @@ const Layout = () => {
             {/* Logo */}
             <div className="flex items-center gap-3 flex-shrink-0">
               <img 
-                src="/app-icon.png" 
-                alt="ThreatBase" 
+                src="/logo.png" 
+                alt="ReliabilityOS" 
                 className="w-9 h-9 rounded-lg"
               />
               <span className="text-xl font-bold text-slate-900 hidden sm:block" data-testid="app-logo">
-                ThreatBase
+                ReliabilityOS
               </span>
             </div>
 

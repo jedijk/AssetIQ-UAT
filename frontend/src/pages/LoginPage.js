@@ -34,12 +34,12 @@ const LoginPage = () => {
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
           <img 
-            src="/app-icon.png" 
-            alt="ThreatBase" 
+            src="/logo.png" 
+            alt="ReliabilityOS" 
             className="w-10 h-10 rounded-lg"
           />
           <span className="text-2xl font-bold text-slate-900" data-testid="login-logo">
-            ThreatBase
+            ReliabilityOS
           </span>
         </div>
 
