@@ -83,7 +83,7 @@ function getCumulativeThreatCount(node, threatCountMap) {
 }
 
 // Tree node component
-const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, t, equipmentTypes }) => {
+const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, onEditEquipment, t, equipmentTypes }) => {
   const hasChildren = node.children && node.children.length > 0;
   const config = ISO_LEVEL_CONFIG[node.level] || ISO_LEVEL_CONFIG.equipment_unit;
   const Icon = config.icon;
@@ -356,6 +356,22 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
               </div>
             )}
           </div>
+
+          {/* Edit Button */}
+          <div className="mt-4 pt-3 border-t border-slate-200">
+            <Button 
+              size="sm" 
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setShowDetails(false);
+                onEditEquipment?.(node.id);
+              }}
+              data-testid="edit-equipment-btn"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              {t ? t("hierarchy.editInManager") : "Edit in Equipment Manager"}
+            </Button>
+          </div>
         </div>
       )}
       
@@ -497,6 +513,12 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
     if (isMobile) onClose?.();
   };
 
+  // Navigate to Equipment Manager with selected equipment for editing
+  const handleEditEquipment = (nodeId) => {
+    navigate(`/equipment-manager?edit=${nodeId}`);
+    if (isMobile) onClose?.();
+  };
+
   // Render tree recursively
   const renderTree = (treeNodes, level = 0) => {
     return treeNodes
@@ -515,6 +537,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
             isActive={selectedNodeId === node.id}
             threatCount={threatCount}
             onAddThreat={onAddThreat}
+            onEditEquipment={handleEditEquipment}
             t={t}
             equipmentTypes={equipmentTypes}
           >

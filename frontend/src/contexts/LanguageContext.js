@@ -406,6 +406,7 @@ const en = {
     discipline: "Discipline",
     criticality: "Criticality",
     notAssigned: "Not assigned",
+    editInManager: "Edit in Equipment Manager",
   },
   
   // Chat
@@ -1067,6 +1068,7 @@ const nl = {
     discipline: "Discipline",
     criticality: "Kriticiteit",
     notAssigned: "Niet toegewezen",
+    editInManager: "Bewerken in Apparatuurbeheer",
   },
   
   // Chat

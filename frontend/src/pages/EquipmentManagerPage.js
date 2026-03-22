@@ -544,6 +544,31 @@ export default function EquipmentManagerPage() {
 
   const treeData = useMemo(() => buildTreeData(nodes), [nodes]);
   
+  // Handle edit query parameter - auto-select and expand to equipment
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const editId = params.get('edit');
+    if (editId && nodes.length > 0) {
+      // Find the node to edit
+      const nodeToEdit = nodes.find(n => n.id === editId);
+      if (nodeToEdit) {
+        setSelectedNode(nodeToEdit);
+        
+        // Expand all parents to make the node visible
+        const parentIds = new Set();
+        let currentId = nodeToEdit.parent_id;
+        while (currentId) {
+          parentIds.add(currentId);
+          const parentNode = nodes.find(n => n.id === currentId);
+          currentId = parentNode?.parent_id;
+        }
+        if (parentIds.size > 0) {
+          setExpandedIds(prev => new Set([...prev, ...parentIds]));
+        }
+      }
+    }
+  }, [location.search, nodes]);
+  
   // Search matching function - matches name, description, tag, and equipment type
   const nodeMatchesSearch = useCallback((node, query) => {
     if (!query) return true;
