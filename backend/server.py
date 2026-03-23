@@ -794,8 +794,9 @@ async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new
 async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new_severity: int, new_occurrence: int, new_detectability: int):
     """
     Recalculate risk scores for all threats linked to a specific failure mode when FMEA scores change.
+    Formula: Risk Score = (Criticality × 0.75) + (Likelihood Score × 0.25)
     """
-    # Find all threats with this failure mode
+    # Find all threats with this failure mode (case-insensitive)
     threats = await db.threats.find(
         {"failure_mode": {"$regex": f"^{failure_mode_name}$", "$options": "i"}}
     ).to_list(1000)
@@ -803,7 +804,7 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
     if not threats:
         return 0
     
-    # Calculate new FMEA score from RPN: (S × O × D) / 10
+    # Calculate new FMEA/Likelihood score from RPN: (S × O × D) / 10
     new_fmea_score = min(100, int((new_severity * new_occurrence * new_detectability) / 10))
     
     updated_count = 0
@@ -828,8 +829,8 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
             ) / 3.5
             criticality_score = min(100, int(criticality_score))
         
-        # NEW METHODOLOGY: Risk Score = (Criticality × 0.75) + (FMEA × 0.25)
-        final_risk_score = int((criticality_score + new_fmea_score) / 2)
+        # CORRECT FORMULA: Risk Score = (Criticality × 0.75) + (Likelihood Score × 0.25)
+        final_risk_score = int((criticality_score * 0.75) + (new_fmea_score * 0.25))
         final_risk_score = min(100, max(0, final_risk_score))
         
         # Determine risk level
@@ -850,7 +851,8 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
                 "fmea_score": new_fmea_score,
                 "criticality_score": criticality_score,
                 "base_risk_score": new_fmea_score,
-                "risk_level": risk_level
+                "risk_level": risk_level,
+                "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
         updated_count += 1
@@ -1495,7 +1497,31 @@ async def get_threat(
             {"name": asset_name, "created_by": current_user["id"]}
         )
     
-    # If equipment node found with criticality, recalculate scores
+    # Auto-sync FMEA score from linked failure mode
+    failure_mode_name = threat.get("failure_mode")
+    failure_mode_id = threat.get("failure_mode_id")
+    fmea_score = threat.get("fmea_score", threat.get("base_risk_score", 50))
+    fmea_changed = False
+    
+    if failure_mode_name and failure_mode_name != "Unknown":
+        # Look up current failure mode data
+        for fm in FAILURE_MODES_LIBRARY:
+            if (failure_mode_id and fm["id"] == failure_mode_id) or \
+               fm["failure_mode"].lower() == failure_mode_name.lower():
+                # Calculate current FMEA score from failure mode
+                current_fmea = min(100, int((fm["severity"] * fm["occurrence"] * fm["detectability"]) / 10))
+                if current_fmea != fmea_score:
+                    fmea_score = current_fmea
+                    fmea_changed = True
+                    logger.info(f"Auto-synced FMEA score for threat {threat_id}: {fmea_score}")
+                break
+    
+    # Calculate criticality score from equipment
+    new_criticality_score = threat.get("criticality_score", 0)
+    criticality_level = threat.get("equipment_criticality", "low")
+    criticality_data = threat.get("equipment_criticality_data")
+    criticality_changed = False
+    
     if equipment_node and equipment_node.get("criticality"):
         criticality = equipment_node["criticality"]
         safety_impact = criticality.get("safety_impact", 0) or 0
@@ -1504,13 +1530,17 @@ async def get_threat(
         reputation_impact = criticality.get("reputation_impact", 0) or 0
         
         # Calculate criticality score
-        new_criticality_score = (
+        calc_criticality_score = (
             (safety_impact * 25) + 
             (production_impact * 20) + 
             (environmental_impact * 15) + 
             (reputation_impact * 10)
         ) / 3.5
-        new_criticality_score = min(100, int(new_criticality_score))
+        calc_criticality_score = min(100, int(calc_criticality_score))
+        
+        if calc_criticality_score != new_criticality_score:
+            new_criticality_score = calc_criticality_score
+            criticality_changed = True
         
         # Determine criticality level
         max_impact = max(safety_impact, production_impact, environmental_impact, reputation_impact)
@@ -1523,9 +1553,17 @@ async def get_threat(
         else:
             criticality_level = "low"
         
-        # Get FMEA score
-        fmea_score = threat.get("fmea_score", threat.get("base_risk_score", 50))
-        
+        criticality_data = {
+            "safety_impact": safety_impact,
+            "production_impact": production_impact,
+            "environmental_impact": environmental_impact,
+            "reputation_impact": reputation_impact,
+            "level": criticality_level,
+            "criticality_score": new_criticality_score
+        }
+    
+    # If either changed, recalculate risk score
+    if fmea_changed or criticality_changed:
         # Calculate new risk score: (Criticality × 0.75) + (Likelihood Score × 0.25)
         new_risk_score = int((new_criticality_score * 0.75) + (fmea_score * 0.25))
         new_risk_score = min(100, max(0, new_risk_score))
@@ -1540,41 +1578,36 @@ async def get_threat(
         else:
             risk_level = "Low"
         
-        # Check if scores changed
-        if (threat.get("criticality_score") != new_criticality_score or 
-            threat.get("risk_score") != new_risk_score):
-            
-            # Update the threat in database
-            criticality_data = {
-                "safety_impact": safety_impact,
-                "production_impact": production_impact,
-                "environmental_impact": environmental_impact,
-                "reputation_impact": reputation_impact,
-                "level": criticality_level,
-                "criticality_score": new_criticality_score
-            }
-            
-            update_data = {
-                "risk_score": new_risk_score,
-                "criticality_score": new_criticality_score,
-                "risk_level": risk_level,
-                "equipment_criticality": criticality_level,
-                "equipment_criticality_data": criticality_data,
-                "linked_equipment_id": equipment_node["id"],  # Ensure link is set
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }
-            
-            await db.threats.update_one({"id": threat_id}, {"$set": update_data})
-            
-            # Return updated values
-            threat["risk_score"] = new_risk_score
-            threat["criticality_score"] = new_criticality_score
-            threat["risk_level"] = risk_level
-            threat["equipment_criticality"] = criticality_level
+        # Update the threat in database
+        update_data = {
+            "risk_score": new_risk_score,
+            "fmea_score": fmea_score,
+            "criticality_score": new_criticality_score,
+            "risk_level": risk_level,
+            "equipment_criticality": criticality_level,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        if criticality_data:
+            update_data["equipment_criticality_data"] = criticality_data
+        
+        if equipment_node:
+            update_data["linked_equipment_id"] = equipment_node["id"]
+        
+        await db.threats.update_one({"id": threat_id}, {"$set": update_data})
+        
+        # Return updated values
+        threat["risk_score"] = new_risk_score
+        threat["fmea_score"] = fmea_score
+        threat["criticality_score"] = new_criticality_score
+        threat["risk_level"] = risk_level
+        threat["equipment_criticality"] = criticality_level
+        if criticality_data:
             threat["equipment_criticality_data"] = criticality_data
+        if equipment_node:
             threat["linked_equipment_id"] = equipment_node["id"]
-            
-            logger.info(f"Auto-synced criticality for threat {threat_id}: risk={new_risk_score}, crit={new_criticality_score}")
+        
+        logger.info(f"Auto-synced threat {threat_id}: risk={new_risk_score}, crit={new_criticality_score}, fmea={fmea_score}")
     
     # Ensure risk_score is int
     if isinstance(threat.get("risk_score"), float):

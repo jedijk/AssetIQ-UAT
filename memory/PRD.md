@@ -6,6 +6,11 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **FMEA Score Change Propagation to Threats** (Mar 23, 2026):
+  - When FMEA scores (Severity, Occurrence, Detectability) are changed in the Library, all linked threats recalculate their risk scores
+  - Fixed `recalculate_threat_scores_for_failure_mode` function to use correct formula: `(Criticality × 0.75) + (Likelihood × 0.25)` (was incorrectly averaging)
+  - Updated `GET /api/threats/{threat_id}` to also auto-sync FMEA score from the linked failure mode
+  - API response includes `threats_updated` count when FMEA scores change
 - **Auto-Sync Criticality on Threat Open** (Mar 23, 2026):
   - When opening a threat detail page, the system now automatically syncs the criticality from the linked equipment
   - Modified `GET /api/threats/{threat_id}` to:
