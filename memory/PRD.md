@@ -6,6 +6,18 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Backend Refactoring - Route Modules Created** (Mar 23, 2026):
+  - Created modular route files in `/app/backend/routes/`:
+    - `equipment.py` (853 lines): Equipment hierarchy management, ISO 14224 compliance
+    - `investigations.py` (738 lines): Causal Engine, root cause analysis
+    - `actions.py` (263 lines): Centralized action management, overdue tracking
+    - `deps.py` (88 lines): Shared dependencies, auth, utilities
+    - `auth.py` (110 lines): Authentication routes
+    - `threats.py` (184 lines): Threat CRUD operations
+    - `stats.py` (251 lines): Statistics and dashboard data
+  - Total route modules: 2,505 lines
+  - Main `server.py` still at 5,562 lines (to be gradually migrated)
+  - Refactoring follows incremental approach to avoid breaking changes
 - **Recalibrated Full FMEA Database RPN with New Definitions** (Mar 23, 2026):
   - Recalibrated all 215 failure modes in the FMEA library with new realistic values
   - **New Severity Scale (Repair Complexity)**: 
