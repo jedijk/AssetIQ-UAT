@@ -185,23 +185,24 @@ export default function DashboardPage() {
   });
   const threats = Array.isArray(threatsData) ? threatsData : [];
 
-  const { data: actionsData = [] } = useQuery({
+  const { data: actionsData = { actions: [], stats: {} } } = useQuery({
     queryKey: ["actions"],
     queryFn: actionsAPI.getAll,
   });
-  const actions = Array.isArray(actionsData) ? actionsData : [];
+  const actions = Array.isArray(actionsData?.actions) ? actionsData.actions : (Array.isArray(actionsData) ? actionsData : []);
+  const actionsStats = actionsData?.stats || {};
 
-  const { data: investigationsData = [] } = useQuery({
+  const { data: investigationsData = { investigations: [] } } = useQuery({
     queryKey: ["investigations"],
     queryFn: investigationAPI.getAll,
   });
-  const investigations = Array.isArray(investigationsData) ? investigationsData : [];
+  const investigations = Array.isArray(investigationsData?.investigations) ? investigationsData.investigations : (Array.isArray(investigationsData) ? investigationsData : []);
 
-  const { data: equipmentData = [] } = useQuery({
+  const { data: equipmentData = { nodes: [] } } = useQuery({
     queryKey: ["equipment"],
-    queryFn: equipmentHierarchyAPI.getAll,
+    queryFn: equipmentHierarchyAPI.getNodes,
   });
-  const equipment = Array.isArray(equipmentData) ? equipmentData : [];
+  const equipment = Array.isArray(equipmentData?.nodes) ? equipmentData.nodes : (Array.isArray(equipmentData) ? equipmentData : []);
 
   // Calculate metrics
   const threatsByStatus = threats.reduce((acc, t) => {
