@@ -6,6 +6,11 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Renamed "Root Cause" to "Probable Cause"** (Mar 23, 2026):
+  - Updated ThreatDetailPage.js section header from "Root Cause" to "Probable Cause"
+  - Updated placeholder text from "Enter root cause analysis..." to "Enter probable cause analysis..."
+  - Updated LanguageContext.js translations for both EN ("Probable Cause") and NL ("Waarschijnlijke Oorzaak")
+  - Per user request to align terminology across the application
 - **Backend Refactoring - Route Modules Created** (Mar 23, 2026):
   - Created modular route files in `/app/backend/routes/`:
     - `equipment.py` (853 lines): Equipment hierarchy management, ISO 14224 compliance

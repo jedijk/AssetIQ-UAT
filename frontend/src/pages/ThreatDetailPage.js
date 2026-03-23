@@ -1134,12 +1134,12 @@ const ThreatDetailPage = () => {
         className="card p-6 mb-6"
         data-testid="threat-cause-section"
       >
-        <h3 className="font-semibold text-slate-900 mb-2">Root Cause</h3>
+        <h3 className="font-semibold text-slate-900 mb-2">Probable Cause</h3>
         {isEditing ? (
           <Textarea
             value={editForm.cause || ""}
             onChange={(e) => setEditForm({ ...editForm, cause: e.target.value })}
-            placeholder="Enter root cause analysis..."
+            placeholder="Enter probable cause analysis..."
             rows={3}
           />
         ) : (
