@@ -39,6 +39,7 @@ from models.form_models import (
     FormSubmission
 )
 from services.form_service import FormService
+from services.observation_service import ObservationService
 from iso14224_models import (
     ISOLevel, ISO_LEVEL_ORDER, EQUIPMENT_TYPES, CRITICALITY_PROFILES, Discipline,
     get_valid_parent_level, get_valid_child_levels, is_valid_parent_child, normalize_level,
@@ -80,6 +81,9 @@ task_service = TaskService(db)
 
 # Initialize Form Service
 form_service = FormService(db)
+
+# Initialize Observation Service
+observation_service = ObservationService(db)
 
 # JWT Config
 JWT_SECRET = os.environ.get('JWT_SECRET_KEY', 'default_secret_key')
@@ -1314,6 +1318,30 @@ async def send_chat_message(
         "location": threat_data.get("location")
     }
     await db.threats.insert_one(threat_doc)
+    
+    # Also create a structured observation linked to the threat
+    try:
+        obs_data = {
+            "equipment_id": hierarchy_node.get("id") if hierarchy_node else None,
+            "failure_mode_id": failure_mode_id,
+            "description": threat_data.get("description") or threat_data.get("title", "Observation from chat"),
+            "severity": "critical" if risk_level == "Critical" else ("high" if risk_level == "High" else ("medium" if risk_level == "Medium" else "low")),
+            "observation_type": "failure",
+            "tags": [threat_data.get("equipment_type", "")],
+        }
+        observation = await observation_service.create_observation(
+            obs_data,
+            created_by=current_user["id"],
+            source="chat"
+        )
+        # Link observation back to threat
+        await db.threats.update_one(
+            {"id": threat_id},
+            {"$set": {"observation_id": observation["id"]}}
+        )
+        logger.info(f"Created observation {observation['id']} for threat {threat_id}")
+    except Exception as obs_err:
+        logger.error(f"Failed to create observation for threat: {obs_err}")
     
     # Update ranks for all threats
     await update_all_ranks(current_user["id"])
@@ -4295,6 +4323,206 @@ async def get_form_analytics(
     to_dt = datetime.fromisoformat(to_date) if to_date else None
     
     return await form_service.get_form_analytics(template_id, from_dt, to_dt)
+
+# ============= OBSERVATION ENGINE ENDPOINTS =============
+
+class ObservationCreate(BaseModel):
+    equipment_id: Optional[str] = None
+    efm_id: Optional[str] = None
+    task_id: Optional[str] = None
+    failure_mode_id: Optional[str] = None
+    description: str
+    severity: Optional[str] = "medium"
+    observation_type: Optional[str] = "general"
+    media_urls: List[str] = []
+    measured_values: List[dict] = []
+    location: Optional[str] = None
+    tags: List[str] = []
+
+class ObservationUpdate(BaseModel):
+    description: Optional[str] = None
+    severity: Optional[str] = None
+    observation_type: Optional[str] = None
+    status: Optional[str] = None
+    failure_mode_id: Optional[str] = None
+    efm_id: Optional[str] = None
+    media_urls: Optional[List[str]] = None
+    measured_values: Optional[List[dict]] = None
+    location: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+@api_router.get("/observations")
+async def get_observations(
+    equipment_id: Optional[str] = None,
+    efm_id: Optional[str] = None,
+    failure_mode_id: Optional[str] = None,
+    severity: Optional[str] = None,
+    status: Optional[str] = None,
+    source: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get observations with optional filters."""
+    from_dt = datetime.fromisoformat(from_date) if from_date else None
+    to_dt = datetime.fromisoformat(to_date) if to_date else None
+    
+    return await observation_service.get_observations(
+        equipment_id=equipment_id,
+        efm_id=efm_id,
+        failure_mode_id=failure_mode_id,
+        severity=severity,
+        status=status,
+        source=source,
+        from_date=from_dt,
+        to_date=to_dt,
+        search=search,
+        skip=skip,
+        limit=limit
+    )
+
+@api_router.get("/observations/combined")
+async def get_combined_observations(
+    include_threats: bool = True,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get observations from both new system and existing threats."""
+    return await observation_service.get_observations_from_threats(
+        user_id=current_user["id"],
+        include_converted=include_threats,
+        skip=skip,
+        limit=limit
+    )
+
+@api_router.get("/observations/unlinked")
+async def get_unlinked_observations(
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get observations without failure mode links (need AI suggestions)."""
+    return await observation_service.get_unlinked_observations(
+        user_id=current_user["id"],
+        limit=limit
+    )
+
+@api_router.get("/observations/trends")
+async def get_observation_trends(
+    equipment_id: Optional[str] = None,
+    days: int = 30,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get observation trends over time."""
+    return await observation_service.get_observation_trends(
+        equipment_id=equipment_id,
+        days=days
+    )
+
+@api_router.get("/observations/{obs_id}")
+async def get_observation(
+    obs_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific observation."""
+    obs = await observation_service.get_observation_by_id(obs_id)
+    if not obs:
+        raise HTTPException(status_code=404, detail="Observation not found")
+    return obs
+
+@api_router.post("/observations")
+async def create_observation(
+    data: ObservationCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new observation manually."""
+    return await observation_service.create_observation(
+        data.model_dump(),
+        created_by=current_user["id"],
+        source="manual"
+    )
+
+@api_router.patch("/observations/{obs_id}")
+async def update_observation(
+    obs_id: str,
+    data: ObservationUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update an observation."""
+    result = await observation_service.update_observation(
+        obs_id,
+        data.model_dump(exclude_unset=True)
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Observation not found")
+    return result
+
+@api_router.post("/observations/{obs_id}/close")
+async def close_observation(
+    obs_id: str,
+    resolution_notes: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Close an observation."""
+    result = await observation_service.close_observation(obs_id, resolution_notes)
+    if not result:
+        raise HTTPException(status_code=404, detail="Observation not found")
+    return result
+
+# --- AI Failure Mode Suggestions ---
+
+class SuggestRequest(BaseModel):
+    description: str
+    equipment_id: Optional[str] = None
+    equipment_type_id: Optional[str] = None
+    max_suggestions: int = 5
+
+@api_router.post("/observations/suggest-failure-modes")
+async def suggest_failure_modes(
+    data: SuggestRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get AI-suggested failure modes for an observation description."""
+    suggestions = await observation_service.suggest_failure_modes(
+        description=data.description,
+        equipment_id=data.equipment_id,
+        equipment_type_id=data.equipment_type_id,
+        max_suggestions=data.max_suggestions
+    )
+    return {"suggestions": suggestions}
+
+@api_router.post("/observations/{obs_id}/link-failure-mode")
+async def link_failure_mode_to_observation(
+    obs_id: str,
+    failure_mode_id: str,
+    efm_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Link a failure mode to an observation (accept AI suggestion)."""
+    result = await observation_service.link_failure_mode_to_observation(
+        obs_id=obs_id,
+        failure_mode_id=failure_mode_id,
+        efm_id=efm_id
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Observation or failure mode not found")
+    return result
+
+# --- Threat Conversion ---
+
+@api_router.post("/threats/{threat_id}/convert-to-observation")
+async def convert_threat_to_observation(
+    threat_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Convert an existing threat to the new observation format."""
+    result = await observation_service.convert_threat_to_observation(threat_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Threat not found")
+    return result
 
 # ============= UNSTRUCTURED ITEMS ENDPOINTS =============
 

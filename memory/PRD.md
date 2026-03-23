@@ -6,6 +6,16 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Phase 4 Complete: Observation Engine** (Mar 23, 2026):
+  - **Chat Integration**: Observations auto-created when threats captured via chat
+  - **AI Failure Mode Suggestions**: Keyword-based matching with relevance scoring (Bearing Failure matched at 77.2% for vibration+noise+bearing description)
+  - **Structured Observations**: Manual creation with equipment, severity, measured values, tags
+  - **Link to EFMs**: Observations can be linked to specific Equipment Failure Modes
+  - **Combined View**: See observations from all sources (manual, chat, form threshold breaches)
+  - **Unlinked Queue**: Observations without failure mode get AI suggestions automatically
+  - **Trends & Analytics**: By severity, failure mode, equipment over configurable time periods
+  - New file: `/app/backend/services/observation_service.py`
+  - 10+ API endpoints for observation CRUD, suggestions, linking, trends
 - **Phase 3 Complete: Form Designer & Data Capture** (Mar 23, 2026):
   - **Form Templates**: Reusable forms with versioning, discipline tagging, equipment/failure mode linkage
   - **Field Types**: Numeric (with units), Text, Textarea, Dropdown, Multi-select, Boolean, Range, Date, File, Image, Signature
