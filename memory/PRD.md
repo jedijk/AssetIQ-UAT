@@ -6,6 +6,16 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Phase 1A Complete: Migrated Failure Modes to MongoDB** (Mar 23, 2026):
+  - Created `failure_modes` MongoDB collection with 215 seeded failure modes
+  - Added **ISO 14224 Mechanism** field to each failure mode (e.g., "SHC - Electrical - Short Circuit")
+  - New service layer: `/app/backend/services/failure_modes_service.py` (async MongoDB operations)
+  - Migration script: `/app/backend/migrations/seed_failure_modes.py`
+  - All CRUD operations now persist to MongoDB (previously in-memory only)
+  - Created indexes: `legacy_id`, `category`, `equipment`, `failure_mode`, `equipment_type_ids`, `mechanism`
+  - Fallback to static library if MongoDB is empty (backward compatible)
+  - Updated UI to display ISO 14224 Mechanism badge in failure mode detail panel
+  - Added EN/NL translations for mechanism label
 - **Renamed "Root Cause" to "Probable Cause"** (Mar 23, 2026):
   - Updated ThreatDetailPage.js section header from "Root Cause" to "Probable Cause"
   - Updated placeholder text from "Enter root cause analysis..." to "Enter probable cause analysis..."

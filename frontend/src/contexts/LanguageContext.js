@@ -379,6 +379,7 @@ const en = {
     confirmValidation: "Confirm Validation",
     validationAdded: "Validation added successfully",
     validationRemoved: "Validation removed",
+    mechanism: "ISO 14224 Mechanism",
   },
   
   // Equipment Manager
@@ -1089,6 +1090,7 @@ const nl = {
     confirmValidation: "Validatie Bevestigen",
     validationAdded: "Validatie succesvol toegevoegd",
     validationRemoved: "Validatie verwijderd",
+    mechanism: "ISO 14224 Mechanisme",
   },
   
   // Equipment Manager

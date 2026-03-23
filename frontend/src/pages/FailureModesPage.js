@@ -347,6 +347,16 @@ function FailureModeViewPanel({
           </div>
         </div>
 
+        {/* ISO 14224 Mechanism */}
+        {fm.mechanism && fm.mechanism !== "UNK - Unknown" && (
+          <div>
+            <Label className="text-xs text-slate-500 mb-2 block">{t("library.mechanism") || "ISO 14224 Mechanism"}</Label>
+            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+              {fm.mechanism}
+            </Badge>
+          </div>
+        )}
+
         {/* Keywords */}
         <div>
           <Label className="text-xs text-slate-500 mb-2 block">{t("library.keywords")}</Label>

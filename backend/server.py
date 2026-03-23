@@ -25,6 +25,7 @@ from failure_modes import (
     get_all_categories,
     get_all_equipment_types
 )
+from services.failure_modes_service import FailureModesService, find_matching_failure_modes_db
 from iso14224_models import (
     ISOLevel, ISO_LEVEL_ORDER, EQUIPMENT_TYPES, CRITICALITY_PROFILES, Discipline,
     get_valid_parent_level, get_valid_child_levels, is_valid_parent_child, normalize_level,
@@ -54,6 +55,9 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+# Initialize Failure Modes Service (MongoDB-backed)
+failure_modes_service = FailureModesService(db)
 
 # JWT Config
 JWT_SECRET = os.environ.get('JWT_SECRET_KEY', 'default_secret_key')
@@ -2235,70 +2239,132 @@ async def get_failure_modes(
     category: Optional[str] = None,
     equipment: Optional[str] = None,
     search: Optional[str] = None,
-    min_rpn: Optional[int] = None
+    min_rpn: Optional[int] = None,
+    equipment_type_id: Optional[str] = None,
+    mechanism: Optional[str] = None,
+    is_validated: Optional[bool] = None,
+    skip: int = 0,
+    limit: int = 500
 ):
-    """Get failure modes from the library with optional filters."""
-    results = FAILURE_MODES_LIBRARY.copy()
-    
-    # Apply search filter first (searches across keywords, equipment, failure_mode, category)
-    if search:
-        search_lower = search.lower()
-        filtered = []
-        for fm in results:
-            # Check if search term appears in any searchable field
-            if (search_lower in fm["failure_mode"].lower() or
+    """Get failure modes from MongoDB with optional filters."""
+    # Try MongoDB first, fall back to static library if empty
+    try:
+        result = await failure_modes_service.get_all(
+            category=category,
+            equipment=equipment,
+            search=search,
+            min_rpn=min_rpn,
+            equipment_type_id=equipment_type_id,
+            mechanism=mechanism,
+            is_validated=is_validated,
+            skip=skip,
+            limit=limit
+        )
+        
+        # If MongoDB is empty, use static library as fallback
+        if result["total"] == 0 and not any([category, equipment, search, min_rpn, equipment_type_id, mechanism]):
+            logger.info("MongoDB failure_modes empty, using static library fallback")
+            results = FAILURE_MODES_LIBRARY.copy()
+            results.sort(key=lambda x: -x["rpn"])
+            return {"total": len(results), "failure_modes": results, "source": "static"}
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching from MongoDB, falling back to static: {e}")
+        # Fallback to static library
+        results = FAILURE_MODES_LIBRARY.copy()
+        
+        if search:
+            search_lower = search.lower()
+            results = [fm for fm in results if (
+                search_lower in fm["failure_mode"].lower() or
                 search_lower in fm["equipment"].lower() or
                 search_lower in fm["category"].lower() or
-                any(search_lower in kw.lower() for kw in fm["keywords"]) or
-                any(search_lower in action.lower() for action in fm["recommended_actions"])):
-                filtered.append(fm)
-        results = filtered
-    
-    # Then apply category filter
-    if category and category.lower() != "all":
-        results = [fm for fm in results if fm["category"].lower() == category.lower()]
-    
-    if equipment:
-        results = [fm for fm in results if fm["equipment"].lower() == equipment.lower()]
-    
-    if min_rpn:
-        results = [fm for fm in results if fm["rpn"] >= min_rpn]
-    
-    # Sort by RPN descending
-    results.sort(key=lambda x: -x["rpn"])
-    
-    return {
-        "total": len(results),
-        "failure_modes": results
-    }
+                any(search_lower in kw.lower() for kw in fm.get("keywords", []))
+            )]
+        
+        if category and category.lower() != "all":
+            results = [fm for fm in results if fm["category"].lower() == category.lower()]
+        
+        if equipment:
+            results = [fm for fm in results if fm["equipment"].lower() == equipment.lower()]
+        
+        if min_rpn:
+            results = [fm for fm in results if fm["rpn"] >= min_rpn]
+        
+        results.sort(key=lambda x: -x["rpn"])
+        return {"total": len(results), "failure_modes": results, "source": "static"}
 
 @api_router.get("/failure-modes/categories")
 async def get_categories():
     """Get all unique categories."""
+    try:
+        categories = await failure_modes_service.get_categories()
+        if categories:
+            return {"categories": categories}
+    except Exception as e:
+        logger.error(f"Error fetching categories from MongoDB: {e}")
+    # Fallback to static
     return {"categories": get_all_categories()}
 
 @api_router.get("/failure-modes/equipment-types")
 async def get_equipment_types():
     """Get all unique equipment types."""
+    try:
+        types = await failure_modes_service.get_equipment_types()
+        if types:
+            return {"equipment_types": types}
+    except Exception as e:
+        logger.error(f"Error fetching equipment types from MongoDB: {e}")
+    # Fallback to static
     return {"equipment_types": get_all_equipment_types()}
 
+@api_router.get("/failure-modes/mechanisms")
+async def get_mechanisms():
+    """Get all unique ISO 14224 mechanisms."""
+    try:
+        mechanisms = await failure_modes_service.get_mechanisms()
+        return {"mechanisms": mechanisms}
+    except Exception as e:
+        logger.error(f"Error fetching mechanisms: {e}")
+        return {"mechanisms": []}
+
 @api_router.get("/failure-modes/high-risk")
-async def get_high_risk_modes(threshold: int = 250):
+async def get_high_risk_modes(threshold: int = 150):
     """Get failure modes with RPN above threshold."""
-    high_risk = [fm for fm in FAILURE_MODES_LIBRARY if fm["rpn"] >= threshold]
-    high_risk.sort(key=lambda x: -x["rpn"])
-    return {
-        "threshold": threshold,
-        "total": len(high_risk),
-        "failure_modes": high_risk
-    }
+    try:
+        high_risk = await failure_modes_service.get_high_risk(threshold)
+        return {
+            "threshold": threshold,
+            "total": len(high_risk),
+            "failure_modes": high_risk
+        }
+    except Exception as e:
+        logger.error(f"Error fetching high-risk modes: {e}")
+        # Fallback
+        high_risk = [fm for fm in FAILURE_MODES_LIBRARY if fm["rpn"] >= threshold]
+        high_risk.sort(key=lambda x: -x["rpn"])
+        return {"threshold": threshold, "total": len(high_risk), "failure_modes": high_risk}
 
 @api_router.get("/failure-modes/{mode_id}")
-async def get_failure_mode_by_id(mode_id: int):
-    """Get a specific failure mode by ID."""
-    for fm in FAILURE_MODES_LIBRARY:
-        if fm["id"] == mode_id:
+async def get_failure_mode_by_id(mode_id: str):
+    """Get a specific failure mode by ID (MongoDB _id or legacy_id)."""
+    try:
+        fm = await failure_modes_service.get_by_id(mode_id)
+        if fm:
             return fm
+    except Exception as e:
+        logger.error(f"Error fetching failure mode {mode_id}: {e}")
+    
+    # Fallback to static library with legacy_id
+    try:
+        legacy_id = int(mode_id)
+        for fm in FAILURE_MODES_LIBRARY:
+            if fm["id"] == legacy_id:
+                return fm
+    except ValueError:
+        pass
+    
     raise HTTPException(status_code=404, detail="Failure mode not found")
 
 
@@ -2397,145 +2463,231 @@ async def create_failure_mode(
     data: FailureModeCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Create a new failure mode."""
-    # Generate new ID
-    max_id = max((fm["id"] for fm in FAILURE_MODES_LIBRARY), default=0)
-    new_id = max_id + 1
-    
+    """Create a new failure mode in MongoDB."""
     # Auto-link equipment types if not provided
     equipment_type_ids = data.equipment_type_ids if data.equipment_type_ids else auto_link_equipment_types(data.equipment)
     
-    new_fm = {
-        "id": new_id,
-        "category": data.category,
-        "equipment": data.equipment,
-        "failure_mode": data.failure_mode,
-        "keywords": data.keywords,
-        "severity": data.severity,
-        "occurrence": data.occurrence,
-        "detectability": data.detectability,
-        "rpn": data.severity * data.occurrence * data.detectability,
-        "recommended_actions": data.recommended_actions,
-        "equipment_type_ids": equipment_type_ids,
-        "is_custom": True,
-        "created_by": current_user["id"]
-    }
-    
-    FAILURE_MODES_LIBRARY.append(new_fm)
-    return new_fm
+    try:
+        new_fm = await failure_modes_service.create(
+            data={
+                "category": data.category,
+                "equipment": data.equipment,
+                "failure_mode": data.failure_mode,
+                "keywords": data.keywords,
+                "severity": data.severity,
+                "occurrence": data.occurrence,
+                "detectability": data.detectability,
+                "recommended_actions": data.recommended_actions,
+                "equipment_type_ids": equipment_type_ids,
+            },
+            created_by=current_user["id"]
+        )
+        return new_fm
+    except Exception as e:
+        logger.error(f"Error creating failure mode in MongoDB: {e}")
+        # Fallback to in-memory (will be lost on restart)
+        max_id = max((fm["id"] for fm in FAILURE_MODES_LIBRARY), default=0)
+        new_id = max_id + 1
+        
+        new_fm = {
+            "id": new_id,
+            "category": data.category,
+            "equipment": data.equipment,
+            "failure_mode": data.failure_mode,
+            "keywords": data.keywords,
+            "severity": data.severity,
+            "occurrence": data.occurrence,
+            "detectability": data.detectability,
+            "rpn": data.severity * data.occurrence * data.detectability,
+            "recommended_actions": data.recommended_actions,
+            "equipment_type_ids": equipment_type_ids,
+            "is_custom": True,
+            "created_by": current_user["id"]
+        }
+        
+        FAILURE_MODES_LIBRARY.append(new_fm)
+        return new_fm
 
 
 @api_router.patch("/failure-modes/{mode_id}")
 async def update_failure_mode(
-    mode_id: int,
+    mode_id: str,
     data: FailureModeUpdate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Update a failure mode."""
-    for i, fm in enumerate(FAILURE_MODES_LIBRARY):
-        if fm["id"] == mode_id:
-            # Track if FMEA scores changed
-            fmea_changed = False
-            old_failure_mode_name = fm["failure_mode"]
-            
-            # Update fields
-            if data.category is not None:
-                fm["category"] = data.category
-            if data.equipment is not None:
-                fm["equipment"] = data.equipment
-                # Auto-link if equipment changed and no explicit types provided
-                if data.equipment_type_ids is None:
-                    auto_types = auto_link_equipment_types(data.equipment)
-                    if auto_types:
-                        fm["equipment_type_ids"] = auto_types
-            if data.failure_mode is not None:
-                fm["failure_mode"] = data.failure_mode
-            if data.keywords is not None:
-                fm["keywords"] = data.keywords
-            if data.severity is not None:
-                fmea_changed = True
-                fm["severity"] = data.severity
-            if data.occurrence is not None:
-                fmea_changed = True
-                fm["occurrence"] = data.occurrence
-            if data.detectability is not None:
-                fmea_changed = True
-                fm["detectability"] = data.detectability
-            if data.recommended_actions is not None:
-                fm["recommended_actions"] = data.recommended_actions
-            if data.equipment_type_ids is not None:
-                fm["equipment_type_ids"] = data.equipment_type_ids
-            
-            # Recalculate RPN
-            fm["rpn"] = fm["severity"] * fm["occurrence"] * fm["detectability"]
-            
+    """Update a failure mode in MongoDB."""
+    try:
+        update_data = {}
+        if data.category is not None:
+            update_data["category"] = data.category
+        if data.equipment is not None:
+            update_data["equipment"] = data.equipment
+            # Auto-link if equipment changed and no explicit types provided
+            if data.equipment_type_ids is None:
+                auto_types = auto_link_equipment_types(data.equipment)
+                if auto_types:
+                    update_data["equipment_type_ids"] = auto_types
+        if data.failure_mode is not None:
+            update_data["failure_mode"] = data.failure_mode
+        if data.keywords is not None:
+            update_data["keywords"] = data.keywords
+        if data.severity is not None:
+            update_data["severity"] = data.severity
+        if data.occurrence is not None:
+            update_data["occurrence"] = data.occurrence
+        if data.detectability is not None:
+            update_data["detectability"] = data.detectability
+        if data.recommended_actions is not None:
+            update_data["recommended_actions"] = data.recommended_actions
+        if data.equipment_type_ids is not None:
+            update_data["equipment_type_ids"] = data.equipment_type_ids
+        
+        result = await failure_modes_service.update(mode_id, update_data)
+        
+        if result:
             # If FMEA scores changed, recalculate all linked threat scores
-            if fmea_changed:
+            if result.get("fmea_changed"):
+                old_name = result.get("old_failure_mode_name", result["failure_mode"])
                 updated_threats = await recalculate_threat_scores_for_failure_mode(
-                    old_failure_mode_name,
-                    fm["severity"],
-                    fm["occurrence"],
-                    fm["detectability"]
+                    old_name,
+                    result["severity"],
+                    result["occurrence"],
+                    result["detectability"]
                 )
-                logger.info(f"Updated {updated_threats} threat scores after FMEA change for '{old_failure_mode_name}'")
-                fm["threats_updated"] = updated_threats
-            
-            return fm
-    
-    raise HTTPException(status_code=404, detail="Failure mode not found")
+                logger.info(f"Updated {updated_threats} threat scores after FMEA change")
+                result["threats_updated"] = updated_threats
+            return result
+        
+        raise HTTPException(status_code=404, detail="Failure mode not found")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating failure mode: {e}")
+        # Fallback to in-memory
+        try:
+            legacy_id = int(mode_id)
+            for fm in FAILURE_MODES_LIBRARY:
+                if fm["id"] == legacy_id:
+                    if data.category is not None:
+                        fm["category"] = data.category
+                    if data.equipment is not None:
+                        fm["equipment"] = data.equipment
+                    if data.failure_mode is not None:
+                        fm["failure_mode"] = data.failure_mode
+                    if data.keywords is not None:
+                        fm["keywords"] = data.keywords
+                    if data.severity is not None:
+                        fm["severity"] = data.severity
+                    if data.occurrence is not None:
+                        fm["occurrence"] = data.occurrence
+                    if data.detectability is not None:
+                        fm["detectability"] = data.detectability
+                    if data.recommended_actions is not None:
+                        fm["recommended_actions"] = data.recommended_actions
+                    if data.equipment_type_ids is not None:
+                        fm["equipment_type_ids"] = data.equipment_type_ids
+                    fm["rpn"] = fm["severity"] * fm["occurrence"] * fm["detectability"]
+                    return fm
+        except ValueError:
+            pass
+        raise HTTPException(status_code=404, detail="Failure mode not found")
 
 
 @api_router.post("/failure-modes/{mode_id}/validate")
 async def validate_failure_mode(
-    mode_id: int,
+    mode_id: str,
     data: FailureModeValidation,
     current_user: dict = Depends(get_current_user)
 ):
     """Validate a failure mode with validator name and position."""
-    from datetime import datetime, timezone
-    
-    for fm in FAILURE_MODES_LIBRARY:
-        if fm["id"] == mode_id:
-            fm["is_validated"] = True
-            fm["validated_by_name"] = data.validated_by_name
-            fm["validated_by_position"] = data.validated_by_position
-            fm["validated_at"] = datetime.now(timezone.utc).isoformat()
-            return fm
-    
-    raise HTTPException(status_code=404, detail="Failure mode not found")
+    try:
+        result = await failure_modes_service.validate(
+            mode_id,
+            data.validated_by_name,
+            data.validated_by_position
+        )
+        if result:
+            return result
+        raise HTTPException(status_code=404, detail="Failure mode not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating failure mode: {e}")
+        # Fallback
+        try:
+            legacy_id = int(mode_id)
+            for fm in FAILURE_MODES_LIBRARY:
+                if fm["id"] == legacy_id:
+                    fm["is_validated"] = True
+                    fm["validated_by_name"] = data.validated_by_name
+                    fm["validated_by_position"] = data.validated_by_position
+                    fm["validated_at"] = datetime.now(timezone.utc).isoformat()
+                    return fm
+        except ValueError:
+            pass
+        raise HTTPException(status_code=404, detail="Failure mode not found")
 
 
 @api_router.post("/failure-modes/{mode_id}/unvalidate")
 async def unvalidate_failure_mode(
-    mode_id: int,
+    mode_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """Remove validation from a failure mode."""
-    for fm in FAILURE_MODES_LIBRARY:
-        if fm["id"] == mode_id:
-            fm["is_validated"] = False
-            fm["validated_by_name"] = None
-            fm["validated_by_position"] = None
-            fm["validated_at"] = None
-            return fm
-    
-    raise HTTPException(status_code=404, detail="Failure mode not found")
+    try:
+        result = await failure_modes_service.unvalidate(mode_id)
+        if result:
+            return result
+        raise HTTPException(status_code=404, detail="Failure mode not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unvalidating failure mode: {e}")
+        # Fallback
+        try:
+            legacy_id = int(mode_id)
+            for fm in FAILURE_MODES_LIBRARY:
+                if fm["id"] == legacy_id:
+                    fm["is_validated"] = False
+                    fm["validated_by_name"] = None
+                    fm["validated_by_position"] = None
+                    fm["validated_at"] = None
+                    return fm
+        except ValueError:
+            pass
+        raise HTTPException(status_code=404, detail="Failure mode not found")
 
 
 @api_router.delete("/failure-modes/{mode_id}")
 async def delete_failure_mode(
-    mode_id: int,
+    mode_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete a custom failure mode."""
-    for i, fm in enumerate(FAILURE_MODES_LIBRARY):
-        if fm["id"] == mode_id:
-            if not fm.get("is_custom"):
-                raise HTTPException(status_code=400, detail="Cannot delete built-in failure modes")
-            FAILURE_MODES_LIBRARY.pop(i)
+    """Delete a custom failure mode from MongoDB."""
+    try:
+        deleted = await failure_modes_service.delete(mode_id)
+        if deleted:
             return {"message": "Failure mode deleted"}
-    
-    raise HTTPException(status_code=404, detail="Failure mode not found")
+        raise HTTPException(status_code=404, detail="Failure mode not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting failure mode: {e}")
+        # Fallback
+        try:
+            legacy_id = int(mode_id)
+            for i, fm in enumerate(FAILURE_MODES_LIBRARY):
+                if fm["id"] == legacy_id:
+                    if not fm.get("is_custom"):
+                        raise HTTPException(status_code=400, detail="Cannot delete built-in failure modes")
+                    FAILURE_MODES_LIBRARY.pop(i)
+                    return {"message": "Failure mode deleted"}
+        except ValueError:
+            pass
+        raise HTTPException(status_code=404, detail="Failure mode not found")
 
 
 # ============= ISO 14224 EQUIPMENT HIERARCHY ENDPOINTS =============
