@@ -640,7 +640,7 @@ const ThreatDetailPage = () => {
         {/* Score Calculation Popup */}
         {scoreCalcPopup.show && (() => {
           // Calculate the actual values using NEW METHODOLOGY
-          // FMEA Score = (S × O × D) / 10
+          // Likelihood Score = (S × O × D) / 10
           const fmBaseScore = linkedFmData 
             ? Math.round((linkedFmData.severity * linkedFmData.occurrence * linkedFmData.detectability) / 10)
             : (threat.fmea_score || threat.base_risk_score || 50);
@@ -655,7 +655,7 @@ const ThreatDetailPage = () => {
               ) / 3.5)
             : (threat.criticality_score || 0);
           
-          // Final Score = (Criticality × 0.7) + (FMEA × 0.3)
+          // Final Score = (Criticality × 0.75) + (Likelihood × 0.25)
           const calculatedScore = Math.round((criticalityScore * 0.75) + (fmBaseScore * 0.25));
           
           return (
