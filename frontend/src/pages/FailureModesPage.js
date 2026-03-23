@@ -270,6 +270,54 @@ function FailureModeViewPanel({
           </div>
         </div>
 
+        {/* Validation Status - Compact Banner */}
+        {fm.is_validated ? (
+          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+              <CheckCircle className="w-4 h-4 text-green-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-green-800">{t("library.validated")}</span>
+                <span className="text-xs text-green-600">•</span>
+                <span className="text-xs text-green-700">{fm.validated_by_name}</span>
+                <span className="text-xs text-green-600">({fm.validated_by_position})</span>
+              </div>
+              {fm.validated_at && (
+                <span className="text-xs text-green-500">{new Date(fm.validated_at).toLocaleDateString()}</span>
+              )}
+            </div>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="h-7 px-2 text-green-600 hover:text-red-600 hover:bg-red-50"
+              onClick={() => onUnvalidate(fm.id)}
+              data-testid="remove-validation-btn"
+            >
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <span className="text-sm font-medium text-amber-800">{t("library.notValidated")}</span>
+              <p className="text-xs text-amber-600">{t("library.notValidatedDesc")}</p>
+            </div>
+            <Button 
+              size="sm" 
+              onClick={() => setShowValidationDialog(true)}
+              className="h-8 bg-green-600 hover:bg-green-700 text-white"
+              data-testid="validate-btn"
+            >
+              <CheckCircle className="w-3.5 h-3.5 mr-1" />
+              {t("library.validate")}
+            </Button>
+          </div>
+        )}
+
         {/* Category & Equipment */}
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -406,73 +454,6 @@ function FailureModeViewPanel({
               </div>
             )}
           </div>
-        </div>
-
-        {/* Validation Status Section */}
-        <div className="border-t border-slate-200 pt-4">
-          <Label className="text-xs text-slate-500 mb-3 block">{t("library.validationStatus")}</Label>
-          {fm.is_validated ? (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold text-green-800">{t("library.validated")}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm text-green-700">
-                      <User className="w-3.5 h-3.5" />
-                      <span>{fm.validated_by_name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-green-700">
-                      <Briefcase className="w-3.5 h-3.5" />
-                      <span>{fm.validated_by_position}</span>
-                    </div>
-                    {fm.validated_at && (
-                      <div className="flex items-center gap-2 text-xs text-green-600">
-                        <Calendar className="w-3 h-3" />
-                        <span>{new Date(fm.validated_at).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-green-700 hover:text-red-600 hover:bg-red-50"
-                  onClick={() => onUnvalidate(fm.id)}
-                  data-testid="remove-validation-btn"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold text-amber-800">{t("library.notValidated")}</span>
-                    <p className="text-xs text-amber-600">{t("library.notValidatedDesc")}</p>
-                  </div>
-                </div>
-                <Button 
-                  size="sm" 
-                  onClick={() => setShowValidationDialog(true)}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  data-testid="validate-btn"
-                >
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  {t("library.validate")}
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Validation Dialog */}
