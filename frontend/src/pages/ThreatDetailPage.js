@@ -440,14 +440,13 @@ const ThreatDetailPage = () => {
   }
 
   const infoItems = [
-    { label: "Asset", value: threat.asset, icon: Wrench, field: "asset", type: "searchable", options: assetOptions },
-    { label: "Equipment Type", value: threat.equipment_type, icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
-    { label: "Failure Mode", value: threat.failure_mode, icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
-    { label: "Impact", value: threat.impact, icon: Activity, field: "impact", type: "select", options: IMPACT_OPTIONS },
-    { label: "Frequency", value: threat.frequency, icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
-    { label: "Likelihood", value: threat.likelihood, icon: Activity, field: "likelihood", type: "select", options: LIKELIHOOD_OPTIONS },
-    { label: "Detectability", value: threat.detectability, icon: Eye, field: "detectability", type: "select", options: DETECTABILITY_OPTIONS },
-    { label: "Location", value: threat.location || "Not specified", icon: MapPin, field: "location", type: "text" },
+    { label: t("threats.equipmentType"), value: threat.equipment_type, icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
+    { label: t("threats.failureMode"), value: threat.failure_mode, icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
+    { label: t("threats.impact"), value: threat.impact, icon: Activity, field: "impact", type: "select", options: IMPACT_OPTIONS },
+    { label: t("threats.frequency"), value: threat.frequency, icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
+    { label: t("threats.likelihood"), value: threat.likelihood, icon: Activity, field: "likelihood", type: "select", options: LIKELIHOOD_OPTIONS },
+    { label: t("threats.detectability"), value: threat.detectability, icon: Eye, field: "detectability", type: "select", options: DETECTABILITY_OPTIONS },
+    { label: t("threats.location"), value: threat.location || "Not specified", icon: MapPin, field: "location", type: "text" },
   ];
 
   const startEditing = () => {
@@ -853,80 +852,86 @@ const ThreatDetailPage = () => {
         })()}
       </motion.div>
 
-      {/* Equipment Criticality Linkage Card */}
+      {/* Equipment & Criticality Card */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.12 }}
-        className="card p-4 mb-6"
+        className="card p-5 mb-6"
         data-testid="equipment-criticality-card"
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+        <div className="flex items-center gap-2 mb-4">
+          <Wrench className="w-5 h-5 text-slate-600" />
+          <h3 className="text-sm font-semibold text-slate-700">{t("threats.equipment")}</h3>
+        </div>
+        
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Equipment Name & Link Status */}
+          <div className="flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
               linkedCriticalityData ? 'bg-purple-50' : 'bg-slate-100'
             }`}>
               {linkedCriticalityData ? (
-                <Link className="w-5 h-5 text-purple-600" />
+                <Link className="w-6 h-6 text-purple-600" />
               ) : (
-                <Unlink className="w-5 h-5 text-slate-400" />
+                <Unlink className="w-6 h-6 text-slate-400" />
               )}
             </div>
             <div>
-              <div className="text-sm font-medium text-slate-900">
-                {t("threats.equipmentCriticality")}
+              <div className="text-lg font-semibold text-slate-900">
+                {threat.asset || t("threats.noEquipmentLinked")}
               </div>
               {linkedCriticalityData ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm text-slate-600">{threat.asset}</span>
+                <div className="text-sm text-green-600 flex items-center gap-1">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  {t("threats.criticalityLinked")}
                 </div>
               ) : (
-                <div className="text-sm text-slate-400 italic">{t("threats.noCriticalityLinked")}</div>
+                <div className="text-sm text-amber-600 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  {t("threats.noCriticalityLinked")}
+                </div>
               )}
             </div>
           </div>
           
-          {/* 4-Dimension Display or Link Button */}
-          {linkedCriticalityData ? (
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1">
-                <div className="flex flex-col items-center px-2">
-                  <Shield className="w-3 h-3 text-red-500 mb-0.5" />
-                  <span className="text-sm font-bold text-red-600">{linkedCriticalityData.safety_impact || 0}</span>
-                </div>
-                <div className="flex flex-col items-center px-2">
-                  <Cog className="w-3 h-3 text-orange-500 mb-0.5" />
-                  <span className="text-sm font-bold text-orange-600">{linkedCriticalityData.production_impact || 0}</span>
-                </div>
-                <div className="flex flex-col items-center px-2">
-                  <Leaf className="w-3 h-3 text-green-500 mb-0.5" />
-                  <span className="text-sm font-bold text-green-600">{linkedCriticalityData.environmental_impact || 0}</span>
-                </div>
-                <div className="flex flex-col items-center px-2">
-                  <Star className="w-3 h-3 text-purple-500 mb-0.5" />
-                  <span className="text-sm font-bold text-purple-600">{linkedCriticalityData.reputation_impact || 0}</span>
-                </div>
+          {/* 4-Dimension Criticality Display */}
+          {linkedCriticalityData && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
+              <div className="flex flex-col items-center px-3 border-r border-slate-200">
+                <Shield className="w-4 h-4 text-red-500 mb-1" />
+                <span className="text-lg font-bold text-red-600">{linkedCriticalityData.safety_impact || 0}</span>
+                <span className="text-[10px] text-slate-500">{t("threats.safety")}</span>
               </div>
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => setShowLinkEquipmentDialog(true)}
-                data-testid="change-equipment-link-btn"
-              >
-                {t("threats.changeLink")}
-              </Button>
+              <div className="flex flex-col items-center px-3 border-r border-slate-200">
+                <Cog className="w-4 h-4 text-orange-500 mb-1" />
+                <span className="text-lg font-bold text-orange-600">{linkedCriticalityData.production_impact || 0}</span>
+                <span className="text-[10px] text-slate-500">{t("threats.production")}</span>
+              </div>
+              <div className="flex flex-col items-center px-3 border-r border-slate-200">
+                <Leaf className="w-4 h-4 text-green-500 mb-1" />
+                <span className="text-lg font-bold text-green-600">{linkedCriticalityData.environmental_impact || 0}</span>
+                <span className="text-[10px] text-slate-500">{t("threats.environment")}</span>
+              </div>
+              <div className="flex flex-col items-center px-3">
+                <Star className="w-4 h-4 text-purple-500 mb-1" />
+                <span className="text-lg font-bold text-purple-600">{linkedCriticalityData.reputation_impact || 0}</span>
+                <span className="text-[10px] text-slate-500">{t("threats.reputation")}</span>
+              </div>
             </div>
-          ) : (
-            <Button 
-              size="sm" 
-              onClick={() => setShowLinkEquipmentDialog(true)}
-              className="bg-purple-600 hover:bg-purple-700"
-              data-testid="link-equipment-btn"
-            >
-              <Link className="w-4 h-4 mr-1" />
-              {t("threats.linkEquipment")}
-            </Button>
           )}
+          
+          {/* Link/Change Button */}
+          <Button 
+            size="sm" 
+            variant={linkedCriticalityData ? "outline" : "default"}
+            onClick={() => setShowLinkEquipmentDialog(true)}
+            className={linkedCriticalityData ? "" : "bg-purple-600 hover:bg-purple-700"}
+            data-testid={linkedCriticalityData ? "change-equipment-link-btn" : "link-equipment-btn"}
+          >
+            <Link className="w-4 h-4 mr-1" />
+            {linkedCriticalityData ? t("threats.changeLink") : t("threats.linkEquipment")}
+          </Button>
         </div>
       </motion.div>
 

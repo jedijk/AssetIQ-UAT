@@ -187,6 +187,14 @@ const en = {
     relink: "Relink",
     criticalityScoreLabel: "Criticality Score",
     fmeaScoreLabel: "Likelihood Score",
+    equipment: "Equipment",
+    noEquipmentLinked: "No equipment linked",
+    criticalityLinked: "Criticality linked",
+    safety: "Safety",
+    production: "Production",
+    environment: "Environ.",
+    reputation: "Reputation",
+    location: "Location",
   },
   
   // Causal Engine
@@ -889,6 +897,14 @@ const nl = {
     relink: "Herkoppelen",
     criticalityScoreLabel: "Kriticiteits Score",
     fmeaScoreLabel: "Likelihood Score",
+    equipment: "Apparatuur",
+    noEquipmentLinked: "Geen apparatuur gekoppeld",
+    criticalityLinked: "Kriticiteit gekoppeld",
+    safety: "Veiligheid",
+    production: "Productie",
+    environment: "Milieu",
+    reputation: "Reputatie",
+    location: "Locatie",
   },
   
   // Causal Engine
