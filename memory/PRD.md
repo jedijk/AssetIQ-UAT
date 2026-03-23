@@ -6,6 +6,15 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Phase 3 Complete: Form Designer & Data Capture** (Mar 23, 2026):
+  - **Form Templates**: Reusable forms with versioning, discipline tagging, equipment/failure mode linkage
+  - **Field Types**: Numeric (with units), Text, Textarea, Dropdown, Multi-select, Boolean, Range, Date, File, Image, Signature
+  - **Threshold System**: Warning/Critical thresholds with automatic evaluation
+  - **Failure Indicators**: Dropdown options can mark failure, numeric fields can trigger on above/below/outside range
+  - **Auto-Observations**: Critical threshold breaches automatically create observations in the database
+  - **Analytics**: Field statistics (avg/min/max), warning/critical rates per form
+  - New files: `/app/backend/models/form_models.py`, `/app/backend/services/form_service.py`
+  - 15+ API endpoints for templates, fields, submissions, and analytics
 - **Phase 2 Complete: Task Management System** (Mar 23, 2026):
   - **Task Templates**: Reusable task definitions with discipline, mitigation strategy, procedure steps, safety requirements, tools, and spare parts
   - **Task Plans**: Equipment-specific schedules with interval overrides (time/usage/condition-based)
