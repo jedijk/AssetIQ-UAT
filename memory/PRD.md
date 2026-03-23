@@ -6,6 +6,18 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Phase 5 Complete: Decision Engine (Closed-Loop Learning)** (Mar 23, 2026):
+  - **5 Built-in Rules**:
+    1. **Task Frequency Adjustment**: Suggests increasing frequency when observation rate is high
+    2. **Detection Gap**: Suggests new detection task when failures occur without prior warning
+    3. **EFM Likelihood Update**: Auto-increases EFM likelihood based on observations (AUTO-EXECUTE)
+    4. **New Failure Mode Suggestion**: Suggests creating new FM for recurring unlinked observations
+    5. **Task Effectiveness Review**: Flags tasks with low detection rates despite high observation rates
+  - **Suggestion Workflow**: Pending → Approve/Reject → Execute
+  - **Configurable Rules**: Enable/disable, auto-execute, custom thresholds
+  - **Dashboard**: Stats for pending/approved/executed suggestions
+  - New file: `/app/backend/services/decision_engine.py`
+  - 8 API endpoints for rules, suggestions, and execution
 - **Phase 4 Complete: Observation Engine** (Mar 23, 2026):
   - **Chat Integration**: Observations auto-created when threats captured via chat
   - **AI Failure Mode Suggestions**: Keyword-based matching with relevance scoring (Bearing Failure matched at 77.2% for vibration+noise+bearing description)
