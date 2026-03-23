@@ -31,6 +31,16 @@ const en = {
     comingSoon: "This feature is coming soon. We're working hard to bring you this functionality.",
   },
   
+  // Notifications
+  notifications: {
+    overdueActions: "Overdue Actions",
+    noOverdueActions: "No overdue actions",
+    viewAll: "View All",
+    dueToday: "Due today",
+    overdueBy1Day: "Overdue by 1 day",
+    overdueByDays: "Overdue by {days} days",
+  },
+  
   // Dashboard
   dashboard: {
     title: "Dashboard",
@@ -706,6 +716,16 @@ const nl = {
     criticalityDefinitionsDesc: "Definieer en pas kriticiteitsschalen aan",
     underDevelopment: "In ontwikkeling",
     comingSoon: "Deze functie komt binnenkort. We werken hard om u deze functionaliteit te bieden.",
+  },
+  
+  // Notifications
+  notifications: {
+    overdueActions: "Achterstallige Acties",
+    noOverdueActions: "Geen achterstallige acties",
+    viewAll: "Alles bekijken",
+    dueToday: "Vandaag verschuldigd",
+    overdueBy1Day: "1 dag achterstallig",
+    overdueByDays: "{days} dagen achterstallig",
   },
   
   // Dashboard

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard, Users, BarChart3, Sliders } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -27,6 +28,7 @@ import {
 } from "./ui/dialog";
 import ChatSidebar from "./ChatSidebar";
 import EquipmentHierarchy from "./EquipmentHierarchy";
+import { actionsAPI } from "../lib/api";
 
 const Layout = () => {
   const { user, logout } = useAuth();
@@ -39,6 +41,28 @@ const Layout = () => {
   const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
   const [hierarchyOpen, setHierarchyOpen] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
+
+  // Query overdue actions for notification bell
+  const { data: overdueData } = useQuery({
+    queryKey: ["overdue-actions"],
+    queryFn: actionsAPI.getOverdue,
+    refetchInterval: 60000, // Refresh every minute
+    staleTime: 30000,
+  });
+
+  const overdueActions = overdueData?.overdue_actions || [];
+  const overdueCount = overdueData?.count || 0;
+
+  // Format how overdue an action is
+  const formatOverdue = (dueDate) => {
+    if (!dueDate) return "";
+    const due = new Date(dueDate);
+    const now = new Date();
+    const diffDays = Math.floor((now - due) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return t("notifications.dueToday");
+    if (diffDays === 1) return t("notifications.overdueBy1Day");
+    return t("notifications.overdueByDays").replace("{days}", diffDays);
+  };
 
   // Handler for opening chat with pre-filled equipment (from hierarchy context menu)
   const handleAddThreatFromHierarchy = (equipmentName) => {
@@ -182,6 +206,84 @@ const Layout = () => {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+
+            {/* Notifications Bell */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-slate-600 hover:text-slate-900 relative"
+                  data-testid="notifications-button"
+                >
+                  <Bell className="w-5 h-5" />
+                  {overdueCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                      {overdueCount > 9 ? "9+" : overdueCount}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel className="flex items-center justify-between">
+                  <span>{t("notifications.overdueActions")}</span>
+                  {overdueCount > 0 && (
+                    <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                      {overdueCount}
+                    </span>
+                  )}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {overdueCount === 0 ? (
+                  <div className="px-3 py-6 text-center text-slate-400 text-sm">
+                    <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    {t("notifications.noOverdueActions")}
+                  </div>
+                ) : (
+                  <>
+                    <div className="max-h-64 overflow-y-auto">
+                      {overdueActions.slice(0, 5).map((action) => (
+                        <DropdownMenuItem
+                          key={action.id}
+                          className="cursor-pointer flex flex-col items-start gap-1 py-2"
+                          onClick={() => navigate("/actions")}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-medium text-slate-800 truncate max-w-[200px]">
+                              {action.title}
+                            </span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                              action.priority === "critical" ? "bg-red-100 text-red-700" :
+                              action.priority === "high" ? "bg-orange-100 text-orange-700" :
+                              action.priority === "medium" ? "bg-yellow-100 text-yellow-700" :
+                              "bg-slate-100 text-slate-600"
+                            }`}>
+                              {action.priority}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-red-600">
+                            <Clock className="w-3 h-3" />
+                            {formatOverdue(action.due_date)}
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
+                    {overdueCount > 5 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="cursor-pointer justify-center text-blue-600 font-medium"
+                          onClick={() => navigate("/actions")}
+                        >
+                          {t("notifications.viewAll")} ({overdueCount})
+                          <ChevronRight className="w-4 h-4 ml-1" />
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Language Switcher */}
             <TooltipProvider>

@@ -449,6 +449,11 @@ export const actionsAPI = {
     return response.data;
   },
   
+  getOverdue: async () => {
+    const response = await api.get('/actions/overdue');
+    return response.data;
+  },
+  
   get: async (actionId) => {
     const response = await api.get(`/actions/${actionId}`);
     return response.data;

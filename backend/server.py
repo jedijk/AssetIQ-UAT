@@ -4098,6 +4098,25 @@ async def get_all_actions(
     }
 
 
+@api_router.get("/actions/overdue")
+async def get_overdue_actions(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all overdue actions for notifications."""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    overdue_actions = await db.central_actions.find({
+        "created_by": current_user["id"],
+        "status": {"$in": ["open", "in_progress"]},
+        "due_date": {"$lt": now, "$ne": None, "$ne": ""}
+    }, {"_id": 0}).sort("due_date", 1).to_list(50)
+    
+    return {
+        "overdue_actions": overdue_actions,
+        "count": len(overdue_actions)
+    }
+
+
 @api_router.post("/actions")
 async def create_central_action(
     data: CentralActionCreate,
