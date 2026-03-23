@@ -6,6 +6,21 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Recalibrated Full FMEA Database RPN with New Definitions** (Mar 23, 2026):
+  - Recalibrated all 215 failure modes in the FMEA library with new realistic values
+  - **New Severity Scale (Repair Complexity)**: 
+    - 1-3: Quick fix (minor repair, simple swap)
+    - 4-6: Moderate (some downtime, skilled labor)
+    - 7-9: Significant (major work, extended downtime)
+    - 10: Full replacement (catastrophic, complete rebuild)
+  - **New Occurrence Scale (Expected Interval)**:
+    - 1-3: Every 10-20 years (rare events)
+    - 4-6: Every 1-5 years (occasional)
+    - 7-8: Monthly to yearly (frequent)
+    - 9-10: Every few weeks (very frequent)
+  - Applied intelligent calibration rules by failure type and category
+  - RPN Distribution: 0-50 (3), 51-100 (17), 101-150 (96), 151-200 (91), 201+ (8)
+  - Triggered recalculation of all 8 existing threats with new FMEA values
 - **FMEA Score Change Propagation to Threats** (Mar 23, 2026):
   - When FMEA scores (Severity, Occurrence, Detectability) are changed in the Library, all linked threats recalculate their risk scores
   - Fixed `recalculate_threat_scores_for_failure_mode` function to use correct formula: `(Criticality × 0.75) + (Likelihood × 0.25)` (was incorrectly averaging)
