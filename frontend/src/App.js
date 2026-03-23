@@ -14,6 +14,7 @@ import FailureModesPage from "./pages/FailureModesPage";
 import EquipmentManagerPage from "./pages/EquipmentManagerPage";
 import CausalEnginePage from "./pages/CausalEnginePage";
 import ActionsPage from "./pages/ActionsPage";
+import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
 import "@/App.css";
 
 const queryClient = new QueryClient({
@@ -110,6 +111,9 @@ function App() {
                 <Route path="library" element={<FailureModesPage />} />
                 <Route path="equipment-manager" element={<EquipmentManagerPage />} />
                 <Route path="causal-engine" element={<CausalEnginePage />} />
+                <Route path="settings/user-management" element={<UnderDevelopmentPage />} />
+                <Route path="settings/statistics" element={<UnderDevelopmentPage />} />
+                <Route path="settings/criticality-definitions" element={<UnderDevelopmentPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

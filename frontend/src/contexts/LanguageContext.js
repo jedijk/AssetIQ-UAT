@@ -14,6 +14,21 @@ const en = {
     equipmentManager: "Equipment Manager",
     settings: "Settings",
     logout: "Logout",
+    userManagement: "User Management",
+    statistics: "Statistics",
+    criticalityDefinitions: "Criticality Definitions",
+  },
+  
+  // Settings pages
+  settings: {
+    userManagement: "User Management",
+    userManagementDesc: "Manage users, roles, and permissions",
+    statistics: "Statistics",
+    statisticsDesc: "View system statistics and analytics",
+    criticalityDefinitions: "Criticality Definitions",
+    criticalityDefinitionsDesc: "Define and customize criticality scales",
+    underDevelopment: "Under Development",
+    comingSoon: "This feature is coming soon. We're working hard to bring you this functionality.",
   },
   
   // Dashboard
@@ -83,6 +98,7 @@ const en = {
     low: "Low",
     critical: "Critical",
     name: "Name",
+    goBack: "Go Back",
     description: "Description",
     date: "Date",
     time: "Time",
@@ -675,6 +691,21 @@ const nl = {
     equipmentManager: "Apparatuurbeheer",
     settings: "Instellingen",
     logout: "Uitloggen",
+    userManagement: "Gebruikersbeheer",
+    statistics: "Statistieken",
+    criticalityDefinitions: "Kriticiteitsdefinities",
+  },
+  
+  // Settings pages
+  settings: {
+    userManagement: "Gebruikersbeheer",
+    userManagementDesc: "Beheer gebruikers, rollen en rechten",
+    statistics: "Statistieken",
+    statisticsDesc: "Bekijk systeemstatistieken en analyses",
+    criticalityDefinitions: "Kriticiteitsdefinities",
+    criticalityDefinitionsDesc: "Definieer en pas kriticiteitsschalen aan",
+    underDevelopment: "In ontwikkeling",
+    comingSoon: "Deze functie komt binnenkort. We werken hard om u deze functionaliteit te bieden.",
   },
   
   // Dashboard
@@ -744,6 +775,7 @@ const nl = {
     low: "Laag",
     critical: "Kritiek",
     name: "Naam",
+    goBack: "Terug",
     description: "Beschrijving",
     date: "Datum",
     time: "Tijd",

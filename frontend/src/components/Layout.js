@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard, Users, BarChart3, Sliders } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -226,6 +226,30 @@ const Layout = () => {
                 >
                   <Building2 className="w-4 h-4 mr-2" />
                   {t("nav.equipmentManager")}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => navigate("/settings/user-management")}
+                  className="cursor-pointer"
+                  data-testid="user-management-menu-item"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  {t("nav.userManagement")}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => navigate("/settings/statistics")}
+                  className="cursor-pointer"
+                  data-testid="statistics-menu-item"
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  {t("nav.statistics")}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => navigate("/settings/criticality-definitions")}
+                  className="cursor-pointer"
+                  data-testid="criticality-definitions-menu-item"
+                >
+                  <Sliders className="w-4 h-4 mr-2" />
+                  {t("nav.criticalityDefinitions")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
