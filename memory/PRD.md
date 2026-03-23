@@ -6,6 +6,16 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Phase 2 Complete: Task Management System** (Mar 23, 2026):
+  - **Task Templates**: Reusable task definitions with discipline, mitigation strategy, procedure steps, safety requirements, tools, and spare parts
+  - **Task Plans**: Equipment-specific schedules with interval overrides (time/usage/condition-based)
+  - **Task Instances**: Individual scheduled tasks with full lifecycle (planned → in_progress → completed)
+  - **Auto-Scheduling**: Generate instances from plans with configurable horizon
+  - **Execution Tracking**: Start/complete tasks with duration, issues found, follow-up flags
+  - **Calendar View**: Date-range query for task visualization
+  - **Statistics**: Dashboard metrics (by status, due this week, completed)
+  - New files: `/app/backend/models/task_models.py`, `/app/backend/services/task_service.py`
+  - 20+ API endpoints for complete CRUD + workflow operations
 - **Phase 1B Complete: Equipment Failure Modes (EFM) Layer** (Mar 23, 2026):
   - Created `equipment_failure_modes` MongoDB collection
   - New service: `/app/backend/services/efm_service.py`

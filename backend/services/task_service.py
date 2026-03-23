@@ -1,0 +1,847 @@
+"""
+Task Management Service - Handles task templates, plans, and instances.
+
+Implements:
+- Task Templates: Reusable task definitions
+- Task Plans: Equipment-specific task schedules
+- Task Instances: Individual scheduled tasks
+- Auto-scheduling: Generate instances from plans
+"""
+
+from datetime import datetime, timezone, timedelta
+from typing import Optional, List, Dict, Any
+from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorDatabase
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class TaskService:
+    """Service for task management operations."""
+    
+    def __init__(self, db: AsyncIOMotorDatabase):
+        self.db = db
+        self.templates = db["task_templates"]
+        self.plans = db["task_plans"]
+        self.instances = db["task_instances"]
+        self.equipment = db["equipment_nodes"]
+        self.efms = db["equipment_failure_modes"]
+    
+    # ==================== TASK TEMPLATES ====================
+    
+    async def create_template(self, data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
+        """Create a new task template."""
+        now = datetime.now(timezone.utc)
+        
+        doc = {
+            "name": data["name"],
+            "description": data.get("description"),
+            "discipline": data["discipline"],
+            "mitigation_strategy": data["mitigation_strategy"],
+            "equipment_type_ids": data.get("equipment_type_ids", []),
+            "failure_mode_ids": data.get("failure_mode_ids", []),
+            "frequency_type": data.get("frequency_type", "time_based"),
+            "default_interval": data.get("default_interval", 30),
+            "default_unit": data.get("default_unit", "days"),
+            "estimated_duration_minutes": data.get("estimated_duration_minutes"),
+            "procedure_steps": data.get("procedure_steps", []),
+            "safety_requirements": data.get("safety_requirements", []),
+            "tools_required": data.get("tools_required", []),
+            "spare_parts": data.get("spare_parts", []),
+            "form_template_id": data.get("form_template_id"),
+            "tags": data.get("tags", []),
+            "is_active": True,
+            "usage_count": 0,  # Track how many plans use this template
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now,
+        }
+        
+        result = await self.templates.insert_one(doc)
+        doc["_id"] = result.inserted_id
+        
+        return self._serialize_template(doc)
+    
+    async def get_templates(
+        self,
+        discipline: Optional[str] = None,
+        mitigation_strategy: Optional[str] = None,
+        equipment_type_id: Optional[str] = None,
+        search: Optional[str] = None,
+        active_only: bool = True,
+        skip: int = 0,
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """Get task templates with filters."""
+        
+        query = {}
+        
+        if active_only:
+            query["is_active"] = True
+        
+        if discipline:
+            query["discipline"] = discipline
+        
+        if mitigation_strategy:
+            query["mitigation_strategy"] = mitigation_strategy
+        
+        if equipment_type_id:
+            query["equipment_type_ids"] = equipment_type_id
+        
+        if search:
+            query["$or"] = [
+                {"name": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}},
+                {"tags": {"$regex": search, "$options": "i"}},
+            ]
+        
+        cursor = self.templates.find(query).sort("name", 1).skip(skip).limit(limit)
+        
+        templates = []
+        async for doc in cursor:
+            templates.append(self._serialize_template(doc))
+        
+        total = await self.templates.count_documents(query)
+        
+        return {"total": total, "templates": templates}
+    
+    async def get_template_by_id(self, template_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific template."""
+        if not ObjectId.is_valid(template_id):
+            return None
+        
+        doc = await self.templates.find_one({"_id": ObjectId(template_id)})
+        if doc:
+            return self._serialize_template(doc)
+        return None
+    
+    async def update_template(self, template_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update a task template."""
+        if not ObjectId.is_valid(template_id):
+            return None
+        
+        update = {"updated_at": datetime.now(timezone.utc)}
+        
+        allowed_fields = [
+            "name", "description", "discipline", "mitigation_strategy",
+            "equipment_type_ids", "failure_mode_ids", "frequency_type",
+            "default_interval", "default_unit", "estimated_duration_minutes",
+            "procedure_steps", "safety_requirements", "tools_required",
+            "spare_parts", "form_template_id", "tags", "is_active"
+        ]
+        
+        for field in allowed_fields:
+            if field in data and data[field] is not None:
+                update[field] = data[field]
+        
+        result = await self.templates.find_one_and_update(
+            {"_id": ObjectId(template_id)},
+            {"$set": update},
+            return_document=True
+        )
+        
+        if result:
+            return self._serialize_template(result)
+        return None
+    
+    async def delete_template(self, template_id: str) -> bool:
+        """Delete a task template (soft delete by deactivating)."""
+        if not ObjectId.is_valid(template_id):
+            return False
+        
+        # Check if any active plans use this template
+        plans_count = await self.plans.count_documents({
+            "task_template_id": template_id,
+            "is_active": True
+        })
+        
+        if plans_count > 0:
+            raise ValueError(f"Cannot delete template: {plans_count} active plans use it")
+        
+        result = await self.templates.update_one(
+            {"_id": ObjectId(template_id)},
+            {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
+        )
+        
+        return result.modified_count > 0
+    
+    # ==================== TASK PLANS ====================
+    
+    async def create_plan(self, data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
+        """Create a task plan for specific equipment."""
+        now = datetime.now(timezone.utc)
+        
+        # Validate equipment exists
+        equipment = await self.equipment.find_one({"id": data["equipment_id"]})
+        if not equipment:
+            raise ValueError("Equipment not found")
+        
+        # Validate template exists
+        template = await self.get_template_by_id(data["task_template_id"])
+        if not template:
+            raise ValueError("Task template not found")
+        
+        # Get frequency settings (use template defaults if not overridden)
+        frequency_type = data.get("frequency_type") or template["frequency_type"]
+        interval_value = data.get("interval_value") or template["default_interval"]
+        interval_unit = data.get("interval_unit") or template["default_unit"]
+        
+        # Calculate next due date
+        effective_from = data.get("effective_from") or now
+        next_due = self._calculate_next_due(effective_from, interval_value, interval_unit)
+        
+        doc = {
+            "equipment_id": data["equipment_id"],
+            "equipment_name": equipment.get("name"),
+            "task_template_id": data["task_template_id"],
+            "task_template_name": template["name"],
+            "efm_id": data.get("efm_id"),
+            "frequency_type": frequency_type,
+            "interval_value": interval_value,
+            "interval_unit": interval_unit,
+            "trigger_condition": data.get("trigger_condition"),
+            "assigned_team": data.get("assigned_team"),
+            "assigned_user_id": data.get("assigned_user_id"),
+            "effective_from": effective_from,
+            "effective_until": data.get("effective_until"),
+            "last_executed_at": None,
+            "next_due_date": next_due,
+            "execution_count": 0,
+            "notes": data.get("notes"),
+            "is_active": True,
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now,
+        }
+        
+        result = await self.plans.insert_one(doc)
+        doc["_id"] = result.inserted_id
+        
+        # Increment template usage count
+        await self.templates.update_one(
+            {"_id": ObjectId(data["task_template_id"])},
+            {"$inc": {"usage_count": 1}}
+        )
+        
+        return self._serialize_plan(doc)
+    
+    async def get_plans(
+        self,
+        equipment_id: Optional[str] = None,
+        template_id: Optional[str] = None,
+        active_only: bool = True,
+        due_before: Optional[datetime] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """Get task plans with filters."""
+        
+        query = {}
+        
+        if active_only:
+            query["is_active"] = True
+        
+        if equipment_id:
+            query["equipment_id"] = equipment_id
+        
+        if template_id:
+            query["task_template_id"] = template_id
+        
+        if due_before:
+            query["next_due_date"] = {"$lte": due_before}
+        
+        cursor = self.plans.find(query).sort("next_due_date", 1).skip(skip).limit(limit)
+        
+        plans = []
+        async for doc in cursor:
+            plans.append(self._serialize_plan(doc))
+        
+        total = await self.plans.count_documents(query)
+        
+        return {"total": total, "plans": plans}
+    
+    async def get_plan_by_id(self, plan_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific plan."""
+        if not ObjectId.is_valid(plan_id):
+            return None
+        
+        doc = await self.plans.find_one({"_id": ObjectId(plan_id)})
+        if doc:
+            return self._serialize_plan(doc)
+        return None
+    
+    async def update_plan(self, plan_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update a task plan."""
+        if not ObjectId.is_valid(plan_id):
+            return None
+        
+        existing = await self.plans.find_one({"_id": ObjectId(plan_id)})
+        if not existing:
+            return None
+        
+        update = {"updated_at": datetime.now(timezone.utc)}
+        
+        allowed_fields = [
+            "frequency_type", "interval_value", "interval_unit",
+            "trigger_condition", "assigned_team", "assigned_user_id",
+            "effective_from", "effective_until", "notes", "is_active"
+        ]
+        
+        for field in allowed_fields:
+            if field in data and data[field] is not None:
+                update[field] = data[field]
+        
+        # Recalculate next due if frequency changed
+        if any(f in data for f in ["interval_value", "interval_unit"]):
+            interval_value = data.get("interval_value") or existing["interval_value"]
+            interval_unit = data.get("interval_unit") or existing["interval_unit"]
+            base_date = existing.get("last_executed_at") or existing.get("effective_from") or datetime.now(timezone.utc)
+            update["next_due_date"] = self._calculate_next_due(base_date, interval_value, interval_unit)
+        
+        result = await self.plans.find_one_and_update(
+            {"_id": ObjectId(plan_id)},
+            {"$set": update},
+            return_document=True
+        )
+        
+        if result:
+            return self._serialize_plan(result)
+        return None
+    
+    async def delete_plan(self, plan_id: str) -> bool:
+        """Deactivate a task plan."""
+        if not ObjectId.is_valid(plan_id):
+            return False
+        
+        plan = await self.plans.find_one({"_id": ObjectId(plan_id)})
+        if not plan:
+            return False
+        
+        result = await self.plans.update_one(
+            {"_id": ObjectId(plan_id)},
+            {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
+        )
+        
+        # Decrement template usage count
+        if result.modified_count > 0 and plan.get("task_template_id"):
+            await self.templates.update_one(
+                {"_id": ObjectId(plan["task_template_id"])},
+                {"$inc": {"usage_count": -1}}
+            )
+        
+        return result.modified_count > 0
+    
+    # ==================== TASK INSTANCES ====================
+    
+    async def create_instance(self, data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
+        """Create a task instance."""
+        now = datetime.now(timezone.utc)
+        
+        # Get plan details
+        plan = await self.get_plan_by_id(data["task_plan_id"])
+        if not plan:
+            raise ValueError("Task plan not found")
+        
+        # Get template for additional info
+        template = await self.get_template_by_id(plan["task_template_id"])
+        
+        doc = {
+            "task_plan_id": data["task_plan_id"],
+            "task_template_id": plan["task_template_id"],
+            "task_template_name": plan["task_template_name"],
+            "equipment_id": plan["equipment_id"],
+            "equipment_name": plan["equipment_name"],
+            "efm_id": plan.get("efm_id"),
+            "scheduled_date": data["scheduled_date"],
+            "due_date": data["due_date"],
+            "status": "planned",
+            "priority": data.get("priority", "medium"),
+            "assigned_team": data.get("assigned_team") or plan.get("assigned_team"),
+            "assigned_user_id": data.get("assigned_user_id") or plan.get("assigned_user_id"),
+            "discipline": template["discipline"] if template else None,
+            "estimated_duration_minutes": template.get("estimated_duration_minutes") if template else None,
+            "started_at": None,
+            "completed_at": None,
+            "actual_duration_minutes": None,
+            "completion_notes": None,
+            "issues_found": [],
+            "follow_up_required": False,
+            "follow_up_notes": None,
+            "form_data": None,
+            "notes": data.get("notes"),
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now,
+        }
+        
+        result = await self.instances.insert_one(doc)
+        doc["_id"] = result.inserted_id
+        
+        return self._serialize_instance(doc)
+    
+    async def get_instances(
+        self,
+        equipment_id: Optional[str] = None,
+        plan_id: Optional[str] = None,
+        status: Optional[str] = None,
+        priority: Optional[str] = None,
+        assigned_user_id: Optional[str] = None,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """Get task instances with filters."""
+        
+        query = {}
+        
+        if equipment_id:
+            query["equipment_id"] = equipment_id
+        
+        if plan_id:
+            query["task_plan_id"] = plan_id
+        
+        if status:
+            query["status"] = status
+        
+        if priority:
+            query["priority"] = priority
+        
+        if assigned_user_id:
+            query["assigned_user_id"] = assigned_user_id
+        
+        if from_date or to_date:
+            query["scheduled_date"] = {}
+            if from_date:
+                query["scheduled_date"]["$gte"] = from_date
+            if to_date:
+                query["scheduled_date"]["$lte"] = to_date
+        
+        cursor = self.instances.find(query).sort("scheduled_date", 1).skip(skip).limit(limit)
+        
+        instances = []
+        async for doc in cursor:
+            instances.append(self._serialize_instance(doc))
+        
+        total = await self.instances.count_documents(query)
+        
+        return {"total": total, "instances": instances}
+    
+    async def get_instance_by_id(self, instance_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific instance."""
+        if not ObjectId.is_valid(instance_id):
+            return None
+        
+        doc = await self.instances.find_one({"_id": ObjectId(instance_id)})
+        if doc:
+            return self._serialize_instance(doc)
+        return None
+    
+    async def update_instance(self, instance_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update a task instance."""
+        if not ObjectId.is_valid(instance_id):
+            return None
+        
+        update = {"updated_at": datetime.now(timezone.utc)}
+        
+        allowed_fields = [
+            "scheduled_date", "due_date", "status", "priority",
+            "assigned_team", "assigned_user_id", "started_at",
+            "completed_at", "completion_notes", "notes"
+        ]
+        
+        for field in allowed_fields:
+            if field in data and data[field] is not None:
+                update[field] = data[field]
+        
+        result = await self.instances.find_one_and_update(
+            {"_id": ObjectId(instance_id)},
+            {"$set": update},
+            return_document=True
+        )
+        
+        if result:
+            return self._serialize_instance(result)
+        return None
+    
+    async def start_task(self, instance_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Mark a task as started."""
+        if not ObjectId.is_valid(instance_id):
+            return None
+        
+        result = await self.instances.find_one_and_update(
+            {"_id": ObjectId(instance_id)},
+            {"$set": {
+                "status": "in_progress",
+                "started_at": datetime.now(timezone.utc),
+                "assigned_user_id": user_id,
+                "updated_at": datetime.now(timezone.utc)
+            }},
+            return_document=True
+        )
+        
+        if result:
+            return self._serialize_instance(result)
+        return None
+    
+    async def complete_task(self, instance_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Mark a task as completed and update plan."""
+        if not ObjectId.is_valid(instance_id):
+            return None
+        
+        instance = await self.instances.find_one({"_id": ObjectId(instance_id)})
+        if not instance:
+            return None
+        
+        now = datetime.now(timezone.utc)
+        
+        # Calculate actual duration if started_at exists
+        actual_duration = None
+        if instance.get("started_at"):
+            started = instance["started_at"]
+            if isinstance(started, str):
+                started = datetime.fromisoformat(started.replace('Z', '+00:00'))
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            delta = now - started
+            actual_duration = int(delta.total_seconds() / 60)
+        
+        update = {
+            "status": "completed",
+            "completed_at": now,
+            "actual_duration_minutes": data.get("actual_duration_minutes") or actual_duration,
+            "completion_notes": data.get("completion_notes"),
+            "issues_found": data.get("issues_found", []),
+            "follow_up_required": data.get("follow_up_required", False),
+            "follow_up_notes": data.get("follow_up_notes"),
+            "form_data": data.get("form_data"),
+            "updated_at": now,
+        }
+        
+        result = await self.instances.find_one_and_update(
+            {"_id": ObjectId(instance_id)},
+            {"$set": update},
+            return_document=True
+        )
+        
+        if result:
+            # Update plan: set last_executed_at and calculate next_due_date
+            plan_id = instance.get("task_plan_id")
+            if plan_id:
+                plan = await self.plans.find_one({"_id": ObjectId(plan_id)})
+                if plan:
+                    next_due = self._calculate_next_due(
+                        now,
+                        plan["interval_value"],
+                        plan["interval_unit"]
+                    )
+                    await self.plans.update_one(
+                        {"_id": ObjectId(plan_id)},
+                        {"$set": {
+                            "last_executed_at": now,
+                            "next_due_date": next_due,
+                            "updated_at": now
+                        },
+                        "$inc": {"execution_count": 1}}
+                    )
+            
+            return self._serialize_instance(result)
+        return None
+    
+    # ==================== SCHEDULING ====================
+    
+    async def generate_instances_for_plan(
+        self,
+        plan_id: str,
+        horizon_days: int = 30,
+        created_by: str = "system"
+    ) -> List[Dict[str, Any]]:
+        """Generate task instances for a plan within the horizon."""
+        
+        plan = await self.get_plan_by_id(plan_id)
+        if not plan or not plan["is_active"]:
+            return []
+        
+        now = datetime.now(timezone.utc)
+        horizon_end = now + timedelta(days=horizon_days)
+        
+        # Get existing instances to avoid duplicates
+        existing = await self.instances.find({
+            "task_plan_id": plan_id,
+            "scheduled_date": {"$gte": now, "$lte": horizon_end},
+            "status": {"$in": ["planned", "scheduled"]}
+        }).to_list(100)
+        
+        existing_dates = set()
+        for inst in existing:
+            sd = inst["scheduled_date"]
+            if isinstance(sd, str):
+                sd = datetime.fromisoformat(sd.replace('Z', '+00:00'))
+            if sd.tzinfo is None:
+                sd = sd.replace(tzinfo=timezone.utc)
+            existing_dates.add(sd.date())
+        
+        # Generate instances
+        generated = []
+        current_date = plan["next_due_date"]
+        
+        # Parse if string and ensure timezone
+        if isinstance(current_date, str):
+            current_date = datetime.fromisoformat(current_date.replace('Z', '+00:00'))
+        if current_date.tzinfo is None:
+            current_date = current_date.replace(tzinfo=timezone.utc)
+        
+        while current_date <= horizon_end:
+            if current_date.date() not in existing_dates and current_date >= now:
+                instance = await self.create_instance({
+                    "task_plan_id": plan_id,
+                    "scheduled_date": current_date,
+                    "due_date": current_date + timedelta(days=1),  # 1 day grace period
+                    "priority": "medium",
+                }, created_by)
+                generated.append(instance)
+            
+            # Calculate next occurrence
+            current_date = self._calculate_next_due(
+                current_date,
+                plan["interval_value"],
+                plan["interval_unit"]
+            )
+        
+        return generated
+    
+    async def generate_all_due_instances(
+        self,
+        horizon_days: int = 30,
+        created_by: str = "system"
+    ) -> Dict[str, Any]:
+        """Generate instances for all active plans."""
+        
+        now = datetime.now(timezone.utc)
+        horizon_end = now + timedelta(days=horizon_days)
+        
+        # Get all active plans with due dates within horizon
+        plans = await self.plans.find({
+            "is_active": True,
+            "next_due_date": {"$lte": horizon_end}
+        }).to_list(1000)
+        
+        total_generated = 0
+        plans_processed = 0
+        
+        for plan in plans:
+            plan_id = str(plan["_id"])
+            instances = await self.generate_instances_for_plan(
+                plan_id, horizon_days, created_by
+            )
+            total_generated += len(instances)
+            plans_processed += 1
+        
+        return {
+            "plans_processed": plans_processed,
+            "instances_generated": total_generated,
+            "horizon_days": horizon_days
+        }
+    
+    async def mark_overdue_tasks(self) -> int:
+        """Mark tasks past due date as overdue."""
+        now = datetime.now(timezone.utc)
+        
+        result = await self.instances.update_many(
+            {
+                "status": {"$in": ["planned", "scheduled"]},
+                "due_date": {"$lt": now}
+            },
+            {"$set": {"status": "overdue", "updated_at": now}}
+        )
+        
+        return result.modified_count
+    
+    # ==================== DASHBOARD / STATS ====================
+    
+    async def get_task_stats(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get task statistics."""
+        
+        now = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_end = today_start + timedelta(days=7)
+        
+        base_query = {}
+        if user_id:
+            base_query["assigned_user_id"] = user_id
+        
+        # Count by status
+        status_counts = {}
+        for status in ["planned", "scheduled", "in_progress", "completed", "overdue"]:
+            query = {**base_query, "status": status}
+            status_counts[status] = await self.instances.count_documents(query)
+        
+        # Due this week
+        due_this_week = await self.instances.count_documents({
+            **base_query,
+            "status": {"$in": ["planned", "scheduled"]},
+            "due_date": {"$gte": today_start, "$lte": week_end}
+        })
+        
+        # Completed this week
+        completed_this_week = await self.instances.count_documents({
+            **base_query,
+            "status": "completed",
+            "completed_at": {"$gte": today_start}
+        })
+        
+        # Active plans count
+        active_plans = await self.plans.count_documents({"is_active": True})
+        
+        # Active templates count
+        active_templates = await self.templates.count_documents({"is_active": True})
+        
+        return {
+            "by_status": status_counts,
+            "due_this_week": due_this_week,
+            "completed_this_week": completed_this_week,
+            "active_plans": active_plans,
+            "active_templates": active_templates,
+            "overdue_count": status_counts.get("overdue", 0)
+        }
+    
+    async def get_calendar_view(
+        self,
+        from_date: datetime,
+        to_date: datetime,
+        equipment_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get tasks for calendar view."""
+        
+        query = {
+            "scheduled_date": {"$gte": from_date, "$lte": to_date}
+        }
+        
+        if equipment_id:
+            query["equipment_id"] = equipment_id
+        
+        cursor = self.instances.find(query).sort("scheduled_date", 1)
+        
+        events = []
+        async for doc in cursor:
+            events.append({
+                "id": str(doc["_id"]),
+                "title": doc.get("task_template_name", "Task"),
+                "equipment": doc.get("equipment_name"),
+                "start": doc["scheduled_date"].isoformat(),
+                "end": doc["due_date"].isoformat() if doc.get("due_date") else None,
+                "status": doc["status"],
+                "priority": doc.get("priority", "medium"),
+            })
+        
+        return events
+    
+    # ==================== HELPERS ====================
+    
+    def _calculate_next_due(
+        self,
+        base_date: datetime,
+        interval_value: int,
+        interval_unit: str
+    ) -> datetime:
+        """Calculate next due date based on interval."""
+        
+        if isinstance(base_date, str):
+            base_date = datetime.fromisoformat(base_date.replace('Z', '+00:00'))
+        
+        if interval_unit == "hours":
+            return base_date + timedelta(hours=interval_value)
+        elif interval_unit == "days":
+            return base_date + timedelta(days=interval_value)
+        elif interval_unit == "weeks":
+            return base_date + timedelta(weeks=interval_value)
+        elif interval_unit == "months":
+            # Approximate months as 30 days
+            return base_date + timedelta(days=interval_value * 30)
+        elif interval_unit == "years":
+            return base_date + timedelta(days=interval_value * 365)
+        else:
+            return base_date + timedelta(days=interval_value)
+    
+    def _serialize_template(self, doc: Dict) -> Dict[str, Any]:
+        """Serialize template document."""
+        return {
+            "id": str(doc["_id"]),
+            "name": doc["name"],
+            "description": doc.get("description"),
+            "discipline": doc["discipline"],
+            "mitigation_strategy": doc["mitigation_strategy"],
+            "equipment_type_ids": doc.get("equipment_type_ids", []),
+            "failure_mode_ids": doc.get("failure_mode_ids", []),
+            "frequency_type": doc.get("frequency_type", "time_based"),
+            "default_interval": doc.get("default_interval", 30),
+            "default_unit": doc.get("default_unit", "days"),
+            "estimated_duration_minutes": doc.get("estimated_duration_minutes"),
+            "procedure_steps": doc.get("procedure_steps", []),
+            "safety_requirements": doc.get("safety_requirements", []),
+            "tools_required": doc.get("tools_required", []),
+            "spare_parts": doc.get("spare_parts", []),
+            "form_template_id": doc.get("form_template_id"),
+            "tags": doc.get("tags", []),
+            "is_active": doc.get("is_active", True),
+            "usage_count": doc.get("usage_count", 0),
+            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
+        }
+    
+    def _serialize_plan(self, doc: Dict) -> Dict[str, Any]:
+        """Serialize plan document."""
+        return {
+            "id": str(doc["_id"]),
+            "equipment_id": doc["equipment_id"],
+            "equipment_name": doc.get("equipment_name"),
+            "task_template_id": doc["task_template_id"],
+            "task_template_name": doc.get("task_template_name"),
+            "efm_id": doc.get("efm_id"),
+            "frequency_type": doc["frequency_type"],
+            "interval_value": doc["interval_value"],
+            "interval_unit": doc["interval_unit"],
+            "trigger_condition": doc.get("trigger_condition"),
+            "assigned_team": doc.get("assigned_team"),
+            "assigned_user_id": doc.get("assigned_user_id"),
+            "effective_from": doc.get("effective_from").isoformat() if doc.get("effective_from") else None,
+            "effective_until": doc.get("effective_until").isoformat() if doc.get("effective_until") else None,
+            "last_executed_at": doc.get("last_executed_at").isoformat() if doc.get("last_executed_at") else None,
+            "next_due_date": doc.get("next_due_date").isoformat() if doc.get("next_due_date") else None,
+            "execution_count": doc.get("execution_count", 0),
+            "notes": doc.get("notes"),
+            "is_active": doc.get("is_active", True),
+            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
+        }
+    
+    def _serialize_instance(self, doc: Dict) -> Dict[str, Any]:
+        """Serialize instance document."""
+        return {
+            "id": str(doc["_id"]),
+            "task_plan_id": doc["task_plan_id"],
+            "task_template_id": doc.get("task_template_id"),
+            "task_template_name": doc.get("task_template_name"),
+            "equipment_id": doc["equipment_id"],
+            "equipment_name": doc.get("equipment_name"),
+            "efm_id": doc.get("efm_id"),
+            "scheduled_date": doc["scheduled_date"].isoformat() if doc.get("scheduled_date") else None,
+            "due_date": doc["due_date"].isoformat() if doc.get("due_date") else None,
+            "status": doc["status"],
+            "priority": doc.get("priority", "medium"),
+            "assigned_team": doc.get("assigned_team"),
+            "assigned_user_id": doc.get("assigned_user_id"),
+            "discipline": doc.get("discipline"),
+            "estimated_duration_minutes": doc.get("estimated_duration_minutes"),
+            "started_at": doc.get("started_at").isoformat() if doc.get("started_at") else None,
+            "completed_at": doc.get("completed_at").isoformat() if doc.get("completed_at") else None,
+            "actual_duration_minutes": doc.get("actual_duration_minutes"),
+            "completion_notes": doc.get("completion_notes"),
+            "issues_found": doc.get("issues_found", []),
+            "follow_up_required": doc.get("follow_up_required", False),
+            "follow_up_notes": doc.get("follow_up_notes"),
+            "notes": doc.get("notes"),
+            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
+        }
