@@ -95,10 +95,12 @@ const ThreatDetailPage = () => {
     due_date: "",
   });
 
-  // Fetch threat
-  const { data: threat, isLoading, error } = useQuery({
+  // Fetch threat - refetch on mount to get latest criticality
+  const { data: threat, isLoading, error, refetch: refetchThreat } = useQuery({
     queryKey: ["threat", id],
     queryFn: () => threatsAPI.getById(id),
+    refetchOnMount: "always", // Always refetch when component mounts
+    staleTime: 0, // Consider data always stale
   });
 
   // Fetch equipment hierarchy nodes for Asset dropdown

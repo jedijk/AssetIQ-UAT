@@ -6,6 +6,14 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Auto-Sync Criticality on Threat Open** (Mar 23, 2026):
+  - When opening a threat detail page, the system now automatically syncs the criticality from the linked equipment
+  - Modified `GET /api/threats/{threat_id}` to:
+    - Look up linked equipment by `linked_equipment_id` or asset name
+    - Recalculate and update `risk_score`, `criticality_score`, `risk_level` if they've changed
+    - Auto-link the equipment if found by name but not yet linked
+  - Frontend ThreatDetailPage now uses `refetchOnMount: "always"` and `staleTime: 0` to ensure fresh data
+  - This ensures threats always show the latest criticality even if changed in Equipment Manager
 - **Criticality Change Propagation to Threats** (Mar 23, 2026):
   - When criticality is changed in Equipment Manager, all linked threats are automatically recalculated
   - Updated `recalculate_threat_scores_for_asset` function to use the correct formula: `Risk Score = (Criticality × 0.75) + (Likelihood Score × 0.25)`
