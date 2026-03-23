@@ -164,7 +164,7 @@ function FailureModeViewPanel({
     );
   }
 
-  const riskScore = Math.round((fm.severity * fm.occurrence * fm.detectability) / 10);
+  const likelihoodScore = Math.round((fm.severity * fm.occurrence * fm.detectability) / 10);
   const data = isEditing ? formData : fm;
 
   return (
@@ -218,10 +218,10 @@ function FailureModeViewPanel({
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Risk Score Card */}
+        {/* Likelihood Score Card */}
         <div className="grid grid-cols-4 gap-3">
           <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-slate-800">{riskScore}</div>
+            <div className="text-2xl font-bold text-slate-800">{likelihoodScore}</div>
             <div className="text-xs text-slate-500 mt-1">{t("library.riskScore")}</div>
           </div>
           <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 text-center">
@@ -886,7 +886,7 @@ const FailureModesPage = () => {
                           </p>
                         </div>
 
-                        {/* Risk Score Badge */}
+                        {/* Likelihood Score Badge */}
                         <div className="flex-shrink-0 text-center">
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
                             fm.severity * fm.occurrence * fm.detectability / 10 >= 70 ? 'bg-red-100 text-red-700' :

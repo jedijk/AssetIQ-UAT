@@ -5,7 +5,14 @@
 ### Original Problem Statement
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
-### Latest Update (Mar 22, 2026)
+### Latest Update (Mar 23, 2026)
+- **Terminology Update - Failure Modes "Risk Score" → "Likelihood Score"** (Mar 23, 2026):
+  - Changed "Risk Score" label to "Likelihood Score" in the Failure Modes Library detail panel
+  - Updated both English and Dutch translations in LanguageContext.js
+  - Updated variable name from `riskScore` to `likelihoodScore` in FailureModesPage.js
+  - Updated code comments to reflect the terminology change
+
+### Previous Update (Mar 22, 2026)
 - **NEW Risk Score Methodology** (Mar 22, 2026):
   - Changed formula from multiplier-based to averaging: **Risk Score = (Criticality Score + FMEA Score) / 2**
   - Criticality Score = (Safety×25 + Production×20 + Environmental×15 + Reputation×10) / 3.5 (0-100)
