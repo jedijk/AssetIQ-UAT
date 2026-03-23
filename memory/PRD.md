@@ -6,6 +6,12 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Criticality Change Propagation to Threats** (Mar 23, 2026):
+  - When criticality is changed in Equipment Manager, all linked threats are automatically recalculated
+  - Updated `recalculate_threat_scores_for_asset` function to use the correct formula: `Risk Score = (Criticality × 0.75) + (Likelihood Score × 0.25)`
+  - Threats are found by both asset name AND `linked_equipment_id` for comprehensive coverage
+  - Updated fields on propagation: `risk_score`, `criticality_score`, `fmea_score`, `risk_level`, `equipment_criticality`, `equipment_criticality_data`
+  - API response includes `threats_updated` count
 - **Human Validation Feature for Failure Modes** (Mar 23, 2026):
   - Added validation status tracking for each failure mode in the FMEA Library
   - New fields: `is_validated`, `validated_by_name`, `validated_by_position`, `validated_at`
