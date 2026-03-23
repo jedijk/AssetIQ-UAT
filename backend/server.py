@@ -566,7 +566,7 @@ async def answer_data_query(message: str, session_id: str, data_context: str) ->
         }
 
 async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Optional[str] = None) -> dict:
-    """Analyze failure description using GPT-5.2"""
+    """Analyze failure description using GPT-5.2 with fallback for AI unavailability"""
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
@@ -607,7 +607,50 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
         
         return json.loads(clean_response)
     except Exception as e:
+        error_str = str(e)
         logger.error(f"AI analysis error: {e}")
+        
+        # Check if it's a budget/gateway error - provide fallback extraction
+        if "502" in error_str or "BadGateway" in error_str or "402" in error_str or "budget" in error_str.lower():
+            logger.warning("AI service unavailable, using fallback extraction")
+            
+            # Simple keyword-based extraction as fallback
+            message_lower = message.lower()
+            
+            # Try to extract asset from common patterns
+            asset = "Unknown"
+            import re
+            # Look for equipment tags like P-101, C-201, HX-301, etc.
+            tag_match = re.search(r'\b([A-Z]{1,3}-?\d{2,4}[A-Z]?)\b', message, re.IGNORECASE)
+            if tag_match:
+                asset = tag_match.group(1).upper()
+            
+            # Try to extract failure mode keywords
+            failure_mode = "Unknown"
+            failure_keywords = ["leak", "vibration", "noise", "overheat", "corrosion", "crack", "wear", "failure", "damage", "broken"]
+            for keyword in failure_keywords:
+                if keyword in message_lower:
+                    failure_mode = keyword.capitalize()
+                    break
+            
+            # Return a basic extraction with prompt to add more details
+            return {
+                "complete": True,
+                "threat": {
+                    "title": message[:100] + ("..." if len(message) > 100 else ""),
+                    "description": message,
+                    "asset": asset,
+                    "failure_mode": failure_mode,
+                    "equipment_type": "Unknown",
+                    "severity": "medium",
+                    "impact": "moderate",
+                    "detectability": "moderate",
+                    "likelihood": "possible"
+                },
+                "ai_unavailable": True,
+                "message": "AI service temporarily unavailable. Threat created with basic extraction - please review and update details."
+            }
+        
         raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
 
 async def transcribe_audio_with_ai(audio_base64: str) -> str:
@@ -1256,7 +1299,10 @@ async def send_chat_message(
         updated_threat["risk_score"] = int(updated_threat["risk_score"])
     
     # Store AI response with threat summary details
-    response_text = "Threat recorded successfully."
+    if analysis.get("ai_unavailable"):
+        response_text = "⚠️ AI service temporarily unavailable. Threat created with basic extraction - please review and update the details."
+    else:
+        response_text = "Threat recorded successfully."
     
     ai_response = {
         "id": str(uuid.uuid4()),
