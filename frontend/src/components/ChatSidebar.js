@@ -257,10 +257,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop - Click anywhere outside to close */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
+        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+        data-testid="chat-backdrop"
       />
 
       {/* Sidebar */}
@@ -396,8 +397,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyPress}
               placeholder="Describe the issue..."
-              className="flex-1 min-h-[40px] max-h-24 resize-none rounded-xl border-slate-200 text-sm"
-              rows={1}
+              className="flex-1 min-h-[80px] max-h-32 resize-none rounded-xl border-slate-200 text-sm"
+              rows={3}
               data-testid="sidebar-chat-message-input"
             />
 
