@@ -6,6 +6,22 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Phase 1B Complete: Equipment Failure Modes (EFM) Layer** (Mar 23, 2026):
+  - Created `equipment_failure_modes` MongoDB collection
+  - New service: `/app/backend/services/efm_service.py`
+  - **Auto-generation**: EFMs auto-created when equipment linked to equipment type
+  - **Sync on type change**: EFMs updated/deactivated when equipment type changes
+  - **Override capability**: Per-equipment likelihood/detectability/severity overrides
+  - **Risk calculation**: Equipment risk aggregation from EFMs
+  - **API Endpoints**:
+    - `GET /equipment/{id}/efms` - Get EFMs for equipment
+    - `GET /equipment/{id}/efms/summary` - EFM statistics
+    - `GET /equipment/{id}/risk` - Aggregated risk calculation
+    - `POST /equipment/{id}/efms/generate` - Manual EFM generation
+    - `PATCH /efms/{id}` - Update EFM (override template)
+    - `POST /efms/{id}/reset` - Reset to template values
+    - `GET /efms/high-risk` - High-risk EFMs across equipment
+  - Template propagation: Changes to failure mode library propagate to non-overridden EFMs
 - **Phase 1A Complete: Migrated Failure Modes to MongoDB** (Mar 23, 2026):
   - Created `failure_modes` MongoDB collection with 215 seeded failure modes
   - Added **ISO 14224 Mechanism** field to each failure mode (e.g., "SHC - Electrical - Short Circuit")
