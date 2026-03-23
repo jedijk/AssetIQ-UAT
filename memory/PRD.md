@@ -6,6 +6,17 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 23, 2026)
+- **Human Validation Feature for Failure Modes** (Mar 23, 2026):
+  - Added validation status tracking for each failure mode in the FMEA Library
+  - New fields: `is_validated`, `validated_by_name`, `validated_by_position`, `validated_at`
+  - Visual indicators in the failure mode list (✓ green checkmark for validated, ⚠ amber warning for not validated)
+  - Validation section in the detail panel showing:
+    - "Not Yet Validated" amber warning with "Validate" button for unvalidated modes
+    - "Validated" green box showing validator name, position, and date for validated modes
+    - "X" button to remove validation if needed
+  - Validate dialog with name and position input fields
+  - New API endpoints: `POST /api/failure-modes/{id}/validate`, `POST /api/failure-modes/{id}/unvalidate`
+  - Full EN/NL translations for all validation-related UI text
 - **Terminology Update - Failure Modes "Risk Score" → "Likelihood Score"** (Mar 23, 2026):
   - Changed "Risk Score" label to "Likelihood Score" in the Failure Modes Library detail panel
   - Updated both English and Dutch translations in LanguageContext.js

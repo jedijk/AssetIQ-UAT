@@ -139,6 +139,19 @@ export const failureModesAPI = {
     const response = await api.delete(`/failure-modes/${id}`);
     return response.data;
   },
+  
+  validate: async (id, validatorName, validatorPosition) => {
+    const response = await api.post(`/failure-modes/${id}/validate`, {
+      validated_by_name: validatorName,
+      validated_by_position: validatorPosition
+    });
+    return response.data;
+  },
+  
+  unvalidate: async (id) => {
+    const response = await api.post(`/failure-modes/${id}/unvalidate`);
+    return response.data;
+  },
 };
 
 // Equipment Hierarchy API (ISO 14224)

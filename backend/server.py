@@ -2124,6 +2124,17 @@ class FailureModeUpdate(BaseModel):
     detectability: Optional[int] = Field(None, ge=1, le=10)
     recommended_actions: Optional[List[str]] = None
     equipment_type_ids: Optional[List[str]] = None
+    # Validation fields
+    is_validated: Optional[bool] = None
+    validated_by_name: Optional[str] = None
+    validated_by_position: Optional[str] = None
+    validated_at: Optional[str] = None
+
+
+class FailureModeValidation(BaseModel):
+    """Model for validating a failure mode"""
+    validated_by_name: str
+    validated_by_position: str
 
 
 def auto_link_equipment_types(equipment_name: str) -> List[str]:
@@ -2268,6 +2279,43 @@ async def update_failure_mode(
                 logger.info(f"Updated {updated_threats} threat scores after FMEA change for '{old_failure_mode_name}'")
                 fm["threats_updated"] = updated_threats
             
+            return fm
+    
+    raise HTTPException(status_code=404, detail="Failure mode not found")
+
+
+@api_router.post("/failure-modes/{mode_id}/validate")
+async def validate_failure_mode(
+    mode_id: int,
+    data: FailureModeValidation,
+    current_user: dict = Depends(get_current_user)
+):
+    """Validate a failure mode with validator name and position."""
+    from datetime import datetime, timezone
+    
+    for fm in FAILURE_MODES_LIBRARY:
+        if fm["id"] == mode_id:
+            fm["is_validated"] = True
+            fm["validated_by_name"] = data.validated_by_name
+            fm["validated_by_position"] = data.validated_by_position
+            fm["validated_at"] = datetime.now(timezone.utc).isoformat()
+            return fm
+    
+    raise HTTPException(status_code=404, detail="Failure mode not found")
+
+
+@api_router.post("/failure-modes/{mode_id}/unvalidate")
+async def unvalidate_failure_mode(
+    mode_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Remove validation from a failure mode."""
+    for fm in FAILURE_MODES_LIBRARY:
+        if fm["id"] == mode_id:
+            fm["is_validated"] = False
+            fm["validated_by_name"] = None
+            fm["validated_by_position"] = None
+            fm["validated_at"] = None
             return fm
     
     raise HTTPException(status_code=404, detail="Failure mode not found")

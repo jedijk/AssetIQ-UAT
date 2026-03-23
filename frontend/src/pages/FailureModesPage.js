@@ -28,7 +28,11 @@ import {
   Flame,
   ShieldCheck,
   Link,
-  X
+  X,
+  CheckCircle,
+  User,
+  Briefcase,
+  Calendar
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -113,6 +117,8 @@ function FailureModeViewPanel({
   onCancel, 
   onClose,
   onDelete,
+  onValidate,
+  onUnvalidate,
   equipmentTypes,
   categories,
   t 
@@ -123,6 +129,11 @@ function FailureModeViewPanel({
   // Local state for adding keywords/actions in edit mode
   const [keywordInput, setKeywordInput] = useState("");
   const [actionInput, setActionInput] = useState("");
+  
+  // Validation dialog state
+  const [showValidationDialog, setShowValidationDialog] = useState(false);
+  const [validatorName, setValidatorName] = useState("");
+  const [validatorPosition, setValidatorPosition] = useState("");
   
   const addKeyword = () => {
     if (keywordInput.trim() && formData) {
@@ -396,6 +407,129 @@ function FailureModeViewPanel({
             )}
           </div>
         </div>
+
+        {/* Validation Status Section */}
+        <div className="border-t border-slate-200 pt-4">
+          <Label className="text-xs text-slate-500 mb-3 block">{t("library.validationStatus")}</Label>
+          {fm.is_validated ? (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold text-green-800">{t("library.validated")}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-green-700">
+                      <User className="w-3.5 h-3.5" />
+                      <span>{fm.validated_by_name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-green-700">
+                      <Briefcase className="w-3.5 h-3.5" />
+                      <span>{fm.validated_by_position}</span>
+                    </div>
+                    {fm.validated_at && (
+                      <div className="flex items-center gap-2 text-xs text-green-600">
+                        <Calendar className="w-3 h-3" />
+                        <span>{new Date(fm.validated_at).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="text-green-700 hover:text-red-600 hover:bg-red-50"
+                  onClick={() => onUnvalidate(fm.id)}
+                  data-testid="remove-validation-btn"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-semibold text-amber-800">{t("library.notValidated")}</span>
+                    <p className="text-xs text-amber-600">{t("library.notValidatedDesc")}</p>
+                  </div>
+                </div>
+                <Button 
+                  size="sm" 
+                  onClick={() => setShowValidationDialog(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  data-testid="validate-btn"
+                >
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  {t("library.validate")}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Validation Dialog */}
+        <Dialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                {t("library.validateFailureMode")}
+              </DialogTitle>
+              <DialogDescription>
+                {t("library.validateFailureModeDesc")}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label className="text-sm font-medium mb-2 block">{t("library.validatorName")}</Label>
+                <Input
+                  value={validatorName}
+                  onChange={(e) => setValidatorName(e.target.value)}
+                  placeholder={t("library.validatorNamePlaceholder")}
+                  data-testid="validator-name-input"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium mb-2 block">{t("library.validatorPosition")}</Label>
+                <Input
+                  value={validatorPosition}
+                  onChange={(e) => setValidatorPosition(e.target.value)}
+                  placeholder={t("library.validatorPositionPlaceholder")}
+                  data-testid="validator-position-input"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowValidationDialog(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (validatorName.trim() && validatorPosition.trim()) {
+                    onValidate(fm.id, validatorName.trim(), validatorPosition.trim());
+                    setShowValidationDialog(false);
+                    setValidatorName("");
+                    setValidatorPosition("");
+                  }
+                }}
+                disabled={!validatorName.trim() || !validatorPosition.trim()}
+                className="bg-green-600 hover:bg-green-700"
+                data-testid="confirm-validation-btn"
+              >
+                <CheckCircle className="w-4 h-4 mr-1" />
+                {t("library.confirmValidation")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
@@ -619,6 +753,42 @@ const FailureModesPage = () => {
     },
     onError: e => toast.error(e.response?.data?.detail || "Cannot delete built-in failure modes")
   });
+
+  // Validation mutations
+  const validateFmMutation = useMutation({
+    mutationFn: ({ id, validatorName, validatorPosition }) => 
+      failureModesAPI.validate(id, validatorName, validatorPosition),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["failureModes"]);
+      // Update selected FM if it matches
+      if (selectedFm && selectedFm.id === data.id) {
+        setSelectedFm(data);
+      }
+      toast.success(t("library.validationAdded"));
+    },
+    onError: e => toast.error(e.response?.data?.detail || "Failed to validate")
+  });
+
+  const unvalidateFmMutation = useMutation({
+    mutationFn: (id) => failureModesAPI.unvalidate(id),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["failureModes"]);
+      // Update selected FM if it matches
+      if (selectedFm && selectedFm.id === data.id) {
+        setSelectedFm(data);
+      }
+      toast.success(t("library.validationRemoved"));
+    },
+    onError: e => toast.error(e.response?.data?.detail || "Failed to remove validation")
+  });
+
+  const handleValidateFm = (id, validatorName, validatorPosition) => {
+    validateFmMutation.mutate({ id, validatorName, validatorPosition });
+  };
+
+  const handleUnvalidateFm = (id) => {
+    unvalidateFmMutation.mutate(id);
+  };
 
   const handleEditType = (type) => { 
     setEditingType(type); 
@@ -887,7 +1057,7 @@ const FailureModesPage = () => {
                         </div>
 
                         {/* Likelihood Score Badge */}
-                        <div className="flex-shrink-0 text-center">
+                        <div className="flex-shrink-0 flex flex-col items-center gap-1">
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
                             fm.severity * fm.occurrence * fm.detectability / 10 >= 70 ? 'bg-red-100 text-red-700' :
                             fm.severity * fm.occurrence * fm.detectability / 10 >= 50 ? 'bg-orange-100 text-orange-700' :
@@ -896,6 +1066,12 @@ const FailureModesPage = () => {
                           }`}>
                             {Math.round(fm.severity * fm.occurrence * fm.detectability / 10)}
                           </div>
+                          {/* Validation indicator */}
+                          {fm.is_validated ? (
+                            <CheckCircle className="w-4 h-4 text-green-500" title={t("library.validated")} />
+                          ) : (
+                            <AlertTriangle className="w-4 h-4 text-amber-400" title={t("library.notValidated")} />
+                          )}
                         </div>
                       </motion.div>
                     );
@@ -921,6 +1097,8 @@ const FailureModesPage = () => {
                   onCancel={handleCancelViewPanelEdit}
                   onClose={() => { setSelectedFm(null); setIsViewPanelEditing(false); setViewPanelForm(null); }}
                   onDelete={(id) => { deleteFmMutation.mutate(id); setSelectedFm(null); }}
+                  onValidate={handleValidateFm}
+                  onUnvalidate={handleUnvalidateFm}
                   equipmentTypes={equipmentTypes}
                   categories={categories}
                   t={t}

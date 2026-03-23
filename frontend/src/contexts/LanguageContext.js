@@ -356,6 +356,21 @@ const en = {
     linkedEquipmentTypes: "Linked Equipment Types",
     noLinkedTypes: "No equipment types linked",
     noRecommendedActions: "No recommended actions defined",
+    // Validation translations
+    validationStatus: "Validation Status",
+    validated: "Validated",
+    notValidated: "Not Yet Validated",
+    notValidatedDesc: "This failure mode requires human validation",
+    validate: "Validate",
+    validateFailureMode: "Validate Failure Mode",
+    validateFailureModeDesc: "Confirm this failure mode has been reviewed and approved by a subject matter expert",
+    validatorName: "Validator Name",
+    validatorNamePlaceholder: "e.g., John Smith",
+    validatorPosition: "Position / Role",
+    validatorPositionPlaceholder: "e.g., Reliability Engineer",
+    confirmValidation: "Confirm Validation",
+    validationAdded: "Validation added successfully",
+    validationRemoved: "Validation removed",
   },
   
   // Equipment Manager
@@ -1043,6 +1058,21 @@ const nl = {
     linkedEquipmentTypes: "Gekoppelde apparatuurtypen",
     noLinkedTypes: "Geen apparatuurtypen gekoppeld",
     noRecommendedActions: "Geen aanbevolen acties gedefinieerd",
+    // Validation translations
+    validationStatus: "Validatiestatus",
+    validated: "Gevalideerd",
+    notValidated: "Nog Niet Gevalideerd",
+    notValidatedDesc: "Deze faalmodus vereist menselijke validatie",
+    validate: "Valideren",
+    validateFailureMode: "Faalmodus Valideren",
+    validateFailureModeDesc: "Bevestig dat deze faalmodus is beoordeeld en goedgekeurd door een vakexpert",
+    validatorName: "Naam Validator",
+    validatorNamePlaceholder: "bijv., Jan Jansen",
+    validatorPosition: "Positie / Rol",
+    validatorPositionPlaceholder: "bijv., Betrouwbaarheidsingenieur",
+    confirmValidation: "Validatie Bevestigen",
+    validationAdded: "Validatie succesvol toegevoegd",
+    validationRemoved: "Validatie verwijderd",
   },
   
   // Equipment Manager
