@@ -857,81 +857,67 @@ const ThreatDetailPage = () => {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.12 }}
-        className="card p-5 mb-6"
+        className="card p-4 mb-6"
         data-testid="equipment-criticality-card"
       >
-        <div className="flex items-center gap-2 mb-4">
-          <Wrench className="w-5 h-5 text-slate-600" />
-          <h3 className="text-sm font-semibold text-slate-700">{t("threats.equipment")}</h3>
-        </div>
-        
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center justify-between">
           {/* Equipment Name & Link Status */}
-          <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
               linkedCriticalityData ? 'bg-purple-50' : 'bg-slate-100'
             }`}>
               {linkedCriticalityData ? (
-                <Link className="w-6 h-6 text-purple-600" />
+                <Link className="w-4 h-4 text-purple-600" />
               ) : (
-                <Unlink className="w-6 h-6 text-slate-400" />
+                <Unlink className="w-4 h-4 text-slate-400" />
               )}
             </div>
             <div>
-              <div className="text-lg font-semibold text-slate-900">
+              <div className="text-sm font-semibold text-slate-900">
                 {threat.asset || t("threats.noEquipmentLinked")}
               </div>
               {linkedCriticalityData ? (
-                <div className="text-sm text-green-600 flex items-center gap-1">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  {t("threats.criticalityLinked")}
-                </div>
+                <span className="text-xs text-green-600">{t("threats.criticalityLinked")}</span>
               ) : (
-                <div className="text-sm text-amber-600 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  {t("threats.noCriticalityLinked")}
-                </div>
+                <span className="text-xs text-amber-600">{t("threats.noCriticalityLinked")}</span>
               )}
             </div>
           </div>
           
-          {/* 4-Dimension Criticality Display */}
-          {linkedCriticalityData && (
-            <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
-              <div className="flex flex-col items-center px-3 border-r border-slate-200">
-                <Shield className="w-4 h-4 text-red-500 mb-1" />
-                <span className="text-lg font-bold text-red-600">{linkedCriticalityData.safety_impact || 0}</span>
-                <span className="text-[10px] text-slate-500">{t("threats.safety")}</span>
+          {/* 4-Dimension Criticality Display + Button */}
+          <div className="flex items-center gap-3">
+            {linkedCriticalityData && (
+              <div className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="flex items-center gap-0.5 px-1.5">
+                  <Shield className="w-3 h-3 text-red-500" />
+                  <span className="text-sm font-bold text-red-600">{linkedCriticalityData.safety_impact || 0}</span>
+                </div>
+                <div className="flex items-center gap-0.5 px-1.5 border-l border-slate-200">
+                  <Cog className="w-3 h-3 text-orange-500" />
+                  <span className="text-sm font-bold text-orange-600">{linkedCriticalityData.production_impact || 0}</span>
+                </div>
+                <div className="flex items-center gap-0.5 px-1.5 border-l border-slate-200">
+                  <Leaf className="w-3 h-3 text-green-500" />
+                  <span className="text-sm font-bold text-green-600">{linkedCriticalityData.environmental_impact || 0}</span>
+                </div>
+                <div className="flex items-center gap-0.5 px-1.5 border-l border-slate-200">
+                  <Star className="w-3 h-3 text-purple-500" />
+                  <span className="text-sm font-bold text-purple-600">{linkedCriticalityData.reputation_impact || 0}</span>
+                </div>
               </div>
-              <div className="flex flex-col items-center px-3 border-r border-slate-200">
-                <Cog className="w-4 h-4 text-orange-500 mb-1" />
-                <span className="text-lg font-bold text-orange-600">{linkedCriticalityData.production_impact || 0}</span>
-                <span className="text-[10px] text-slate-500">{t("threats.production")}</span>
-              </div>
-              <div className="flex flex-col items-center px-3 border-r border-slate-200">
-                <Leaf className="w-4 h-4 text-green-500 mb-1" />
-                <span className="text-lg font-bold text-green-600">{linkedCriticalityData.environmental_impact || 0}</span>
-                <span className="text-[10px] text-slate-500">{t("threats.environment")}</span>
-              </div>
-              <div className="flex flex-col items-center px-3">
-                <Star className="w-4 h-4 text-purple-500 mb-1" />
-                <span className="text-lg font-bold text-purple-600">{linkedCriticalityData.reputation_impact || 0}</span>
-                <span className="text-[10px] text-slate-500">{t("threats.reputation")}</span>
-              </div>
-            </div>
-          )}
-          
-          {/* Link/Change Button */}
-          <Button 
-            size="sm" 
-            variant={linkedCriticalityData ? "outline" : "default"}
-            onClick={() => setShowLinkEquipmentDialog(true)}
-            className={linkedCriticalityData ? "" : "bg-purple-600 hover:bg-purple-700"}
-            data-testid={linkedCriticalityData ? "change-equipment-link-btn" : "link-equipment-btn"}
-          >
-            <Link className="w-4 h-4 mr-1" />
-            {linkedCriticalityData ? t("threats.changeLink") : t("threats.linkEquipment")}
-          </Button>
+            )}
+            
+            <Button 
+              size="sm" 
+              variant={linkedCriticalityData ? "outline" : "default"}
+              onClick={() => setShowLinkEquipmentDialog(true)}
+              className={`h-8 ${linkedCriticalityData ? "" : "bg-purple-600 hover:bg-purple-700"}`}
+              data-testid={linkedCriticalityData ? "change-equipment-link-btn" : "link-equipment-btn"}
+            >
+              <Link className="w-3.5 h-3.5 mr-1" />
+              {linkedCriticalityData ? t("threats.changeLink") : t("threats.linkEquipment")}
+            </Button>
+          </div>
         </div>
       </motion.div>
 
