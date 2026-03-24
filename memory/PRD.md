@@ -6,6 +6,11 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Sticky Header Position Fixed** (Mar 24, 2026):
+  - **Problem**: The sticky header on Observation Detail view appeared at the very top of the viewport, overlapping the main navigation header.
+  - **Fix**: Changed `top-0` to `top-16` and `z-50` to `z-30` in `/app/frontend/src/pages/ThreatDetailPage.js` (line 507).
+  - **Result**: Sticky header now appears directly below the main navigation, creating a cohesive layered experience when scrolling.
+
 - **Task Scheduler Plans & Templates Delete Fixed** (Mar 24, 2026):
   - **Problem**: Could not delete "Pump Seal Inspection" template - also couldn't delete plans.
   - **Root Causes**:

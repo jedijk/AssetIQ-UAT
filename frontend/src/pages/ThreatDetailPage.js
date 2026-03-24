@@ -497,13 +497,13 @@ const ThreatDetailPage = () => {
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl" data-testid="threat-detail-page">
-      {/* Sticky Header - Shows when scrolling down */}
+      {/* Sticky Header - Shows when scrolling down (positioned below main nav header) */}
       {showStickyHeader && (
         <motion.div
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -100, opacity: 0 }}
-          className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm"
+          className="fixed top-16 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm"
         >
           <div className="container mx-auto px-4 py-3 max-w-4xl">
             <div className="flex items-center justify-between">
