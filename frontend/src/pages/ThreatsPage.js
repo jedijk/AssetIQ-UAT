@@ -85,6 +85,7 @@ const ThreatsPage = () => {
   const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState("all");
+  const [riskFilter, setRiskFilter] = useState("all"); // New: filter by risk level
   const [searchQuery, setSearchQuery] = useState("");
   const [assetFilter, setAssetFilter] = useState(""); // Display name for the filter
   const [assetsToFilter, setAssetsToFilter] = useState([]); // Array of asset names to filter by
@@ -128,7 +129,7 @@ const ThreatsPage = () => {
     queryFn: () => threatsAPI.getAll(statusFilter === "all" ? null : statusFilter),
   });
 
-  // Filter threats by search query and/or asset hierarchy
+  // Filter threats by search query, asset hierarchy, and risk level
   const filteredThreats = threats.filter((threat) => {
     // First check if we have a hierarchical asset filter
     if (assetsToFilter.length > 0) {
@@ -138,6 +139,11 @@ const ThreatsPage = () => {
         threat.asset.toLowerCase().includes(filterAsset.toLowerCase())
       );
       if (!assetMatches) return false;
+    }
+    
+    // Apply risk level filter
+    if (riskFilter !== "all") {
+      if (threat.risk_level !== riskFilter) return false;
     }
     
     // Then apply search query filter if present
@@ -244,7 +250,7 @@ const ThreatsPage = () => {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48 h-11" data-testid="status-filter-select">
+          <SelectTrigger className="w-full sm:w-40 h-11" data-testid="status-filter-select">
             <Filter className="w-4 h-4 mr-2 text-slate-400" />
             <SelectValue placeholder={t("actionsPage.filterByStatus")} />
           </SelectTrigger>
@@ -253,6 +259,39 @@ const ThreatsPage = () => {
             <SelectItem value="Open">{t("common.open")}</SelectItem>
             <SelectItem value="Mitigated">{t("threatDetail.mitigated")}</SelectItem>
             <SelectItem value="Closed">{t("common.closed")}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={riskFilter} onValueChange={setRiskFilter}>
+          <SelectTrigger className="w-full sm:w-40 h-11" data-testid="risk-filter-select">
+            <AlertTriangle className="w-4 h-4 mr-2 text-slate-400" />
+            <SelectValue placeholder="Risk Level" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Risk Levels</SelectItem>
+            <SelectItem value="Critical">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                Critical
+              </span>
+            </SelectItem>
+            <SelectItem value="High">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                High
+              </span>
+            </SelectItem>
+            <SelectItem value="Medium">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                Medium
+              </span>
+            </SelectItem>
+            <SelectItem value="Low">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                Low
+              </span>
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>

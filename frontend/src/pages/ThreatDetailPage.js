@@ -95,6 +95,23 @@ const ThreatDetailPage = () => {
     due_date: "",
   });
 
+  // Sticky header visibility state (must be before any early returns)
+  const [showStickyHeader, setShowStickyHeader] = useState(false);
+  const headerRef = useRef(null);
+
+  // Sticky header scroll effect (must be before any early returns)
+  useEffect(() => {
+    const handleScroll = () => {
+      if (headerRef.current) {
+        const headerBottom = headerRef.current.getBoundingClientRect().bottom;
+        setShowStickyHeader(headerBottom < 0);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // Fetch threat - refetch on mount to get latest criticality
   const { data: threat, isLoading, error, refetch: refetchThreat } = useQuery({
     queryKey: ["threat", id],
@@ -475,10 +492,90 @@ const ThreatDetailPage = () => {
     updateMutation.mutate(editForm);
   };
 
+  // Calculate RPN from linked failure mode
+  const rpnValue = linkedFmData?.rpn || threat.fmea_rpn || threat.rpn || null;
+
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl" data-testid="threat-detail-page">
+      {/* Sticky Header - Shows when scrolling down */}
+      {showStickyHeader && (
+        <motion.div
+          initial={{ y: -100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -100, opacity: 0 }}
+          className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm"
+        >
+          <div className="container mx-auto px-4 py-3 max-w-4xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate("/threats")}
+                  className="text-slate-500 hover:text-slate-700"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex items-center gap-3">
+                  <RiskBadge level={threat.risk_level} size="sm" />
+                  <span className="font-semibold text-slate-900 truncate max-w-[200px] sm:max-w-[300px]">
+                    {threat.title}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                {/* Score Display */}
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-lg">
+                    <Target className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="font-medium text-slate-700">Score: {threat.risk_score}</span>
+                  </div>
+                  {rpnValue && (
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${
+                      rpnValue >= 300 ? "bg-red-100 text-red-700" :
+                      rpnValue >= 200 ? "bg-orange-100 text-orange-700" :
+                      rpnValue >= 100 ? "bg-yellow-100 text-yellow-700" :
+                      "bg-green-100 text-green-700"
+                    }`}>
+                      <Activity className="w-3.5 h-3.5" />
+                      <span className="font-medium">RPN: {rpnValue}</span>
+                    </div>
+                  )}
+                </div>
+                {/* Quick Actions */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={startEditing}
+                  >
+                    <Edit className="w-3.5 h-3.5 mr-1" />
+                    Edit
+                  </Button>
+                  <Select
+                    value={threat.status}
+                    onValueChange={(value) => updateMutation.mutate({ status: value })}
+                    disabled={updateMutation.isPending}
+                  >
+                    <SelectTrigger className="w-28 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Header */}
       <motion.div
+        ref={headerRef}
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className="mb-6"
@@ -616,12 +713,33 @@ const ThreatDetailPage = () => {
         onContextMenu={handleScoreContextMenu}
       >
         <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium text-slate-500 mb-1 flex items-center gap-2">
-              {t("observations.riskScore")}
-              <span className="text-xs text-slate-400 font-normal">({t("observations.rightClickForDetails")})</span>
+          <div className="flex items-center gap-8">
+            {/* Risk Score */}
+            <div>
+              <div className="text-sm font-medium text-slate-500 mb-1 flex items-center gap-2">
+                {t("observations.riskScore")}
+                <span className="text-xs text-slate-400 font-normal">({t("observations.rightClickForDetails")})</span>
+              </div>
+              <div className="text-4xl font-bold text-slate-900">{threat.risk_score}</div>
             </div>
-            <div className="text-4xl font-bold text-slate-900">{threat.risk_score}</div>
+            
+            {/* RPN Display */}
+            {rpnValue && (
+              <div className="border-l border-slate-200 pl-8">
+                <div className="text-sm font-medium text-slate-500 mb-1 flex items-center gap-2">
+                  RPN
+                  <span className="text-xs text-slate-400 font-normal">(Risk Priority Number)</span>
+                </div>
+                <div className={`text-4xl font-bold ${
+                  rpnValue >= 300 ? "text-red-600" :
+                  rpnValue >= 200 ? "text-orange-600" :
+                  rpnValue >= 100 ? "text-yellow-600" :
+                  "text-green-600"
+                }`}>
+                  {rpnValue}
+                </div>
+              </div>
+            )}
           </div>
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
             threat.risk_level === "Critical" ? "bg-red-50" :
