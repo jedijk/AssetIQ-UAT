@@ -278,7 +278,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 THREAT_ANALYSIS_SYSTEM_PROMPT = """You are AssetIQ AI extracting equipment failures from user messages.
 
 ## EXTRACT BEFORE ASKING
-Analyze message for: Equipment (P-101, pump, extruder, compressor) + Problem (leaking, vibrating, overheating)
+Analyze message for: Equipment (P-101, pump, extruder, compressor) + Problem (leaking, vibrating, overheating, wear)
 
 ## Required Fields:
 1. Asset: Equipment tag or name
@@ -290,13 +290,20 @@ Analyze message for: Equipment (P-101, pump, extruder, compressor) + Problem (le
 - If failure unclear → complete=false, question_type="failure", ask what's wrong
 - NEVER ask for info already clearly stated
 
-## Failure Mode Mapping:
-- leaking/leak → "Seal Failure"
+## Failure Mode Mapping (IMPORTANT - always map to these standard modes):
+- leaking/leak/drip → "Seal Failure"
 - vibration/vibrating/shaking → "Bearing Failure"  
-- noise/grinding → "Bearing Failure"
-- overheating/hot → "Overheating"
-- corrosion/rust → "Corrosion"
-- stuck/jammed → "Valve Stuck"
+- noise/grinding/squealing → "Bearing Failure"
+- overheating/hot/high temperature → "Overheating"
+- corrosion/rust/corroded → "Corrosion"
+- stuck/jammed/won't move → "Valve Stuck"
+- wear/worn/wearing/abrasion → "Screw Wear (Abrasive)" for extruders, "Bearing Failure" for pumps/motors
+- fouling/blocked/clogged → "Fouling"
+- cavitation/bubbles → "Cavitation"
+- misalignment/alignment → "Misalignment"
+- surge/unstable → "Surge"
+- failure/failed/broken → "General Failure"
+- problem/issue/trouble (generic) → ask for more details about the failure
 
 ## Equipment Detection:
 - Specific tags (P-101, C-201) → Use directly, complete=true
@@ -304,7 +311,7 @@ Analyze message for: Equipment (P-101, pump, extruder, compressor) + Problem (le
 - 'Reporting issue for equipment "X"' → asset=X exactly
 
 RESPOND IN JSON:
-{"complete":true/false,"follow_up_question":"if incomplete","question_type":"asset|failure","threat":{"title":"short title","asset":"equipment name","equipment_type":"pump|compressor|etc","failure_mode":"standard mode","impact":"description","frequency":"First Time|Occasional|Frequent","risk_score":0-100,"risk_level":"Critical|High|Medium|Low","recommended_actions":["action1","action2"]}}"""
+{"complete":true/false,"follow_up_question":"if incomplete","question_type":"asset|failure","threat":{"title":"short title","asset":"equipment name","equipment_type":"pump|compressor|extruder|etc","failure_mode":"standard mode from mapping above","impact":"description","frequency":"First Time|Occasional|Frequent","risk_score":0-100,"risk_level":"Critical|High|Medium|Low","recommended_actions":["action1","action2"]}}"""
 
 IMAGE_ANALYSIS_SYSTEM_PROMPT = """You are ThreatBase AI analyzing an image of equipment failure or damage. 
 Describe what you see in the image, identifying:
@@ -1293,8 +1300,12 @@ async def send_chat_message(
         # Always store original message for context when asking for equipment
         pending_threat_data = {
             "original_message": message.content,
-            "failure_description": analysis.get("threat", {}).get("title") or message.content,
-            "failure_mode": analysis.get("threat", {}).get("failure_mode"),
+            "failure_description": (analysis.get("threat", {}) or {}).get("title") or message.content,
+            "failure_mode": (analysis.get("threat", {}) or {}).get("failure_mode"),
+        } if analysis else {
+            "original_message": message.content,
+            "failure_description": message.content,
+            "failure_mode": None,
         }
         
         ai_response = {
@@ -1312,7 +1323,7 @@ async def send_chat_message(
         
         return ChatResponse(
             message=question,
-            follow_up_question=analysis.get("follow_up_question"),
+            follow_up_question=analysis.get("follow_up_question") if analysis else None,
             question_type=question_type,
             equipment_suggestions=equipment_suggestions,
             failure_mode_suggestions=failure_mode_suggestions
