@@ -1216,10 +1216,21 @@ async def get_threats(
         query["status"] = status
     
     threats = await db.threats.find(query, {"_id": 0}).sort("rank", 1).limit(limit).to_list(limit)
-    # Ensure risk_score is int
+    # Ensure required fields have values and risk_score is int
     for t in threats:
         if isinstance(t.get("risk_score"), float):
             t["risk_score"] = int(t["risk_score"])
+        # Ensure required string fields are not None
+        if not t.get("equipment_type"):
+            t["equipment_type"] = "Equipment"
+        if not t.get("impact"):
+            t["impact"] = "Unknown"
+        if not t.get("frequency"):
+            t["frequency"] = "Unknown"
+        if not t.get("likelihood"):
+            t["likelihood"] = "Unknown"
+        if not t.get("detectability"):
+            t["detectability"] = "Unknown"
     return threats
 
 @api_router.get("/threats/top", response_model=List[ThreatResponse])
@@ -1231,10 +1242,21 @@ async def get_top_threats(
         {"created_by": current_user["id"], "status": {"$ne": "Closed"}},
         {"_id": 0}
     ).sort("risk_score", -1).limit(limit).to_list(limit)
-    # Ensure risk_score is int
+    # Ensure required fields have values and risk_score is int
     for t in threats:
         if isinstance(t.get("risk_score"), float):
             t["risk_score"] = int(t["risk_score"])
+        # Ensure required string fields are not None
+        if not t.get("equipment_type"):
+            t["equipment_type"] = "Equipment"
+        if not t.get("impact"):
+            t["impact"] = "Unknown"
+        if not t.get("frequency"):
+            t["frequency"] = "Unknown"
+        if not t.get("likelihood"):
+            t["likelihood"] = "Unknown"
+        if not t.get("detectability"):
+            t["detectability"] = "Unknown"
     return threats
 
 
