@@ -37,6 +37,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   const [audioChunks, setAudioChunks] = useState([]);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
@@ -65,6 +66,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   // Send message mutation
   const sendMutation = useMutation({
     mutationFn: ({ content, image }) => chatAPI.sendMessage(content, image),
+    onMutate: () => {
+      setIsSending(true);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
@@ -76,6 +80,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     onError: (error) => {
       const errorMsg = error.response?.data?.detail || "Failed to send message";
       toast.error(errorMsg);
+    },
+    onSettled: () => {
+      setIsSending(false);
     },
   });
 
@@ -559,15 +566,15 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               {/* Send Recording Button */}
               <button
                 onClick={sendRecording}
-                disabled={isTranscribing || sendMutation.isPending}
+                disabled={isTranscribing || isSending}
                 className={`flex-shrink-0 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-70 ${
-                  isTranscribing || sendMutation.isPending 
+                  isTranscribing || isSending 
                     ? 'bg-blue-400' 
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}
                 title={isTranscribing ? "Processing voice..." : "Send voice message"}
               >
-                {isTranscribing || sendMutation.isPending ? (
+                {isTranscribing || isSending ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <Send className="w-5 h-5" />
@@ -610,16 +617,16 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               {message.trim() || imageBase64 ? (
                 <button
                   onClick={handleSend}
-                  disabled={sendMutation.isPending}
+                  disabled={isSending}
                   className={`flex-shrink-0 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-70 ${
-                    sendMutation.isPending 
+                    isSending 
                       ? 'bg-blue-400' 
                       : 'bg-blue-600 hover:bg-blue-700'
                   }`}
                   data-testid="sidebar-send-message-button"
                   title="Send message"
                 >
-                  {sendMutation.isPending ? (
+                  {isSending ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     <Send className="w-5 h-5" />
@@ -628,7 +635,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               ) : (
                 <button
                   onClick={startRecording}
-                  disabled={sendMutation.isPending}
+                  disabled={isSending}
                   className="flex-shrink-0 w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-70"
                   data-testid="sidebar-voice-record-button"
                   title="Hold to record voice"
