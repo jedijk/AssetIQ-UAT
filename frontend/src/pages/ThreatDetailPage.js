@@ -440,13 +440,13 @@ const ThreatDetailPage = () => {
   }
 
   const infoItems = [
-    { label: t("threats.equipmentType"), value: threat.equipment_type, icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
-    { label: t("threats.failureMode"), value: threat.failure_mode, icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
-    { label: t("threats.impact"), value: threat.impact, icon: Activity, field: "impact", type: "select", options: IMPACT_OPTIONS },
-    { label: t("threats.frequency"), value: threat.frequency, icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
-    { label: t("threats.likelihood"), value: threat.likelihood, icon: Activity, field: "likelihood", type: "select", options: LIKELIHOOD_OPTIONS },
-    { label: t("threats.detectability"), value: threat.detectability, icon: Eye, field: "detectability", type: "select", options: DETECTABILITY_OPTIONS },
-    { label: t("threats.location"), value: threat.location || "Not specified", icon: MapPin, field: "location", type: "text" },
+    { label: t("observations.equipmentType"), value: threat.equipment_type, icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
+    { label: t("observations.failureMode"), value: threat.failure_mode, icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
+    { label: t("observations.impact"), value: threat.impact, icon: Activity, field: "impact", type: "select", options: IMPACT_OPTIONS },
+    { label: t("observations.frequency"), value: threat.frequency, icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
+    { label: t("observations.likelihood"), value: threat.likelihood, icon: Activity, field: "likelihood", type: "select", options: LIKELIHOOD_OPTIONS },
+    { label: t("observations.detectability"), value: threat.detectability, icon: Eye, field: "detectability", type: "select", options: DETECTABILITY_OPTIONS },
+    { label: t("observations.location"), value: threat.location || "Not specified", icon: MapPin, field: "location", type: "text" },
   ];
 
   const startEditing = () => {
@@ -618,8 +618,8 @@ const ThreatDetailPage = () => {
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm font-medium text-slate-500 mb-1 flex items-center gap-2">
-              {t("threats.riskScore")}
-              <span className="text-xs text-slate-400 font-normal">({t("threats.rightClickForDetails")})</span>
+              {t("observations.riskScore")}
+              <span className="text-xs text-slate-400 font-normal">({t("observations.rightClickForDetails")})</span>
             </div>
             <div className="text-4xl font-bold text-slate-900">{threat.risk_score}</div>
           </div>
@@ -672,7 +672,7 @@ const ThreatDetailPage = () => {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Calculator className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-slate-900">{t("threats.scoreCalculation")}</h3>
+                  <h3 className="font-semibold text-slate-900">{t("observations.scoreCalculation")}</h3>
                 </div>
                 <button 
                   onClick={() => setScoreCalcPopup({ show: false, x: 0, y: 0 })}
@@ -684,7 +684,7 @@ const ThreatDetailPage = () => {
 
               {/* Exact Calculation Box - WEIGHTED METHODOLOGY */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 mb-4 border border-blue-100">
-                <div className="text-xs text-blue-600 font-medium mb-2">{t("threats.exactCalculation")}</div>
+                <div className="text-xs text-blue-600 font-medium mb-2">{t("observations.exactCalculation")}</div>
                 <div className="font-mono text-lg text-slate-800 text-center py-2">
                   <span className="text-slate-500">(</span>
                   <span className="text-purple-600">{criticalityScore}</span>
@@ -699,7 +699,7 @@ const ThreatDetailPage = () => {
                   <span className="text-slate-500">)</span>
                 </div>
                 <div className="text-center text-[10px] text-slate-500 mt-1">
-                  ({t("threats.criticalityScoreLabel")} × 75%) + ({t("threats.fmeaScoreLabel")} × 25%)
+                  ({t("observations.criticalityScoreLabel")} × 75%) + ({t("observations.fmeaScoreLabel")} × 25%)
                 </div>
                 <div className="text-center mt-2 pt-2 border-t border-blue-200">
                   <span className="text-slate-500 text-sm">=</span>
@@ -723,7 +723,7 @@ const ThreatDetailPage = () => {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</div>
-                      <span className="text-xs font-medium text-slate-700">{t("threats.fmeaScores")}</span>
+                      <span className="text-xs font-medium text-slate-700">{t("observations.fmeaScores")}</span>
                     </div>
                     <button
                       onClick={() => setShowLinkFailureModeDialog(true)}
@@ -731,7 +731,7 @@ const ThreatDetailPage = () => {
                       data-testid="link-failure-mode-btn"
                     >
                       <Link className="w-3 h-3" />
-                      {linkedFmData ? t("threats.relink") : t("threats.linkFailureMode")}
+                      {linkedFmData ? t("observations.relink") : t("observations.linkFailureMode")}
                     </button>
                   </div>
                   {linkedFmData ? (
@@ -753,11 +753,11 @@ const ThreatDetailPage = () => {
                       <div className="text-xs text-slate-600 bg-white rounded px-2 py-1.5 font-mono">
                         ({linkedFmData.severity} × {linkedFmData.occurrence} × {linkedFmData.detectability}) ÷ 10 = <span className="font-bold text-blue-600">{fmBaseScore}</span>
                       </div>
-                      <div className="text-[10px] text-slate-400 mt-1">{t("threats.linkedTo")}: {threat.failure_mode}</div>
+                      <div className="text-[10px] text-slate-400 mt-1">{t("observations.linkedTo")}: {threat.failure_mode}</div>
                     </>
                   ) : (
                     <div className="text-sm text-slate-400 italic bg-white rounded px-3 py-2">
-                      {t("threats.noFmeaLinked")} — {t("threats.fmeaScoreLabel")}: <span className="font-bold text-slate-600">{fmBaseScore}</span>
+                      {t("observations.noFmeaLinked")} — {t("observations.fmeaScoreLabel")}: <span className="font-bold text-slate-600">{fmBaseScore}</span>
                     </div>
                   )}
                 </div>
@@ -766,7 +766,7 @@ const ThreatDetailPage = () => {
                 <div className="bg-slate-50 rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">2</div>
-                    <span className="text-xs font-medium text-slate-700">{t("threats.equipmentCriticality")}</span>
+                    <span className="text-xs font-medium text-slate-700">{t("observations.equipmentCriticality")}</span>
                   </div>
                   {linkedCriticalityData ? (
                     <>
@@ -793,17 +793,17 @@ const ThreatDetailPage = () => {
                         </div>
                       </div>
                       <div className="flex items-center justify-between bg-white rounded px-2 py-1.5">
-                        <span className="text-xs text-slate-500">{t("threats.criticalityScoreLabel")}:</span>
+                        <span className="text-xs text-slate-500">{t("observations.criticalityScoreLabel")}:</span>
                         <span className="text-lg font-bold text-purple-600">{criticalityScore}</span>
                       </div>
                       <div className="text-xs text-slate-600 bg-white rounded px-2 py-1.5 font-mono mt-2">
                         ({linkedCriticalityData.safety_impact || 0}×25 + {linkedCriticalityData.production_impact || 0}×20 + {linkedCriticalityData.environmental_impact || 0}×15 + {linkedCriticalityData.reputation_impact || 0}×10) ÷ 3.5 = <span className="font-bold text-purple-600">{criticalityScore}</span>
                       </div>
-                      <div className="text-[10px] text-slate-400 mt-1">{t("threats.linkedTo")}: {threat.asset}</div>
+                      <div className="text-[10px] text-slate-400 mt-1">{t("observations.linkedTo")}: {threat.asset}</div>
                     </>
                   ) : (
                     <div className="text-sm text-slate-400 italic bg-white rounded px-3 py-2">
-                      {t("threats.noCriticalityLinked")} — {t("threats.criticalityScoreLabel")}: <span className="font-bold text-slate-600">0</span>
+                      {t("observations.noCriticalityLinked")} — {t("observations.criticalityScoreLabel")}: <span className="font-bold text-slate-600">0</span>
                     </div>
                   )}
                 </div>
@@ -812,7 +812,7 @@ const ThreatDetailPage = () => {
                 <div className="bg-slate-50 rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">3</div>
-                    <span className="text-xs font-medium text-slate-700">{t("threats.finalCalculation")}</span>
+                    <span className="text-xs font-medium text-slate-700">{t("observations.finalCalculation")}</span>
                   </div>
                   <div className="bg-white rounded px-3 py-2 font-mono text-sm">
                     <span className="text-slate-500">(</span>
@@ -839,7 +839,7 @@ const ThreatDetailPage = () => {
 
               {/* Risk Level Legend */}
               <div className="mt-3 pt-3 border-t border-slate-200">
-                <div className="text-[10px] text-slate-400 mb-1">{t("threats.riskLevelThresholds")}:</div>
+                <div className="text-[10px] text-slate-400 mb-1">{t("observations.riskLevelThresholds")}:</div>
                 <div className="flex gap-2 text-[10px]">
                   <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-600">≥70 Critical</span>
                   <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-600">50-69 High</span>
@@ -874,12 +874,12 @@ const ThreatDetailPage = () => {
             </div>
             <div>
               <div className="text-sm font-semibold text-slate-900">
-                {threat.asset || t("threats.noEquipmentLinked")}
+                {threat.asset || t("observations.noEquipmentLinked")}
               </div>
               {linkedCriticalityData ? (
-                <span className="text-xs text-green-600">{t("threats.criticalityLinked")}</span>
+                <span className="text-xs text-green-600">{t("observations.criticalityLinked")}</span>
               ) : (
-                <span className="text-xs text-amber-600">{t("threats.noCriticalityLinked")}</span>
+                <span className="text-xs text-amber-600">{t("observations.noCriticalityLinked")}</span>
               )}
             </div>
           </div>
@@ -915,7 +915,7 @@ const ThreatDetailPage = () => {
               data-testid={linkedCriticalityData ? "change-equipment-link-btn" : "link-equipment-btn"}
             >
               <Link className="w-3.5 h-3.5 mr-1" />
-              {linkedCriticalityData ? t("threats.changeLink") : t("threats.linkEquipment")}
+              {linkedCriticalityData ? t("observations.changeLink") : t("observations.linkEquipment")}
             </Button>
           </div>
         </div>
@@ -927,11 +927,11 @@ const ThreatDetailPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Link className="w-5 h-5 text-purple-600" />
-              {t("threats.linkToEquipment")}
+              {t("observations.linkToEquipment")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-slate-600">{t("threats.linkEquipmentDesc")}</p>
+            <p className="text-sm text-slate-600">{t("observations.linkEquipmentDesc")}</p>
             <div className="max-h-64 overflow-y-auto space-y-1 border rounded-lg p-2">
               {flatEquipmentList.map((eq) => (
                 <button
@@ -948,7 +948,7 @@ const ThreatDetailPage = () => {
                 </button>
               ))}
               {flatEquipmentList.length === 0 && (
-                <div className="text-center py-4 text-slate-400">{t("threats.noEquipmentFound")}</div>
+                <div className="text-center py-4 text-slate-400">{t("observations.noEquipmentFound")}</div>
               )}
             </div>
           </div>
@@ -966,7 +966,7 @@ const ThreatDetailPage = () => {
               ) : (
                 <Link className="w-4 h-4 mr-1" />
               )}
-              {t("threats.linkAndRecalculate")}
+              {t("observations.linkAndRecalculate")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -978,17 +978,17 @@ const ThreatDetailPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-600" />
-              {t("threats.linkToFailureMode")}
+              {t("observations.linkToFailureMode")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-slate-600">{t("threats.linkFailureModeDesc")}</p>
+            <p className="text-sm text-slate-600">{t("observations.linkFailureModeDesc")}</p>
             
             {/* Search Input */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder={t("threats.searchFailureModes")}
+                placeholder={t("observations.searchFailureModes")}
                 value={failureModeSearch}
                 onChange={(e) => setFailureModeSearch(e.target.value)}
                 className="pl-9"
@@ -1030,7 +1030,7 @@ const ThreatDetailPage = () => {
                 </button>
               ))}
               {filteredFailureModes.length === 0 && (
-                <div className="text-center py-4 text-slate-400">{t("threats.noFailureModesFound")}</div>
+                <div className="text-center py-4 text-slate-400">{t("observations.noFailureModesFound")}</div>
               )}
             </div>
           </div>
@@ -1052,7 +1052,7 @@ const ThreatDetailPage = () => {
               ) : (
                 <Link className="w-4 h-4 mr-1" />
               )}
-              {t("threats.linkAndRecalculate")}
+              {t("observations.linkAndRecalculate")}
             </Button>
           </DialogFooter>
         </DialogContent>
