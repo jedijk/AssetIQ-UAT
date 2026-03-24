@@ -1497,6 +1497,9 @@ const FailureModesPage = () => {
                       if (curr.failure_mode !== prev.failure_mode) {
                         changes.push({ field: 'Name', from: prev.failure_mode, to: curr.failure_mode });
                       }
+                      if (curr.category !== prev.category) {
+                        changes.push({ field: 'Category', from: prev.category, to: curr.category });
+                      }
                       if (curr.severity !== prev.severity) {
                         changes.push({ field: 'Severity', from: prev.severity, to: curr.severity });
                       }
@@ -1512,6 +1515,36 @@ const FailureModesPage = () => {
                         changes.push({ field: 'RPN', from: prevRPN, to: currRPN, isRPN: true });
                       }
                       
+                      // Check recommended actions
+                      const currActions = curr.recommended_actions || [];
+                      const prevActions = prev.recommended_actions || [];
+                      if (currActions.length !== prevActions.length || JSON.stringify(currActions) !== JSON.stringify(prevActions)) {
+                        const added = currActions.filter(a => !prevActions.includes(a)).length;
+                        const removed = prevActions.filter(a => !currActions.includes(a)).length;
+                        if (added > 0 || removed > 0) {
+                          let actionChange = '';
+                          if (added > 0 && removed > 0) actionChange = `+${added}/-${removed}`;
+                          else if (added > 0) actionChange = `+${added} added`;
+                          else if (removed > 0) actionChange = `-${removed} removed`;
+                          changes.push({ field: 'Actions', from: `${prevActions.length}`, to: `${currActions.length} (${actionChange})`, isAction: true });
+                        }
+                      }
+                      
+                      // Check keywords
+                      const currKeywords = curr.keywords || [];
+                      const prevKeywords = prev.keywords || [];
+                      if (currKeywords.length !== prevKeywords.length || JSON.stringify(currKeywords.sort()) !== JSON.stringify(prevKeywords.sort())) {
+                        const added = currKeywords.filter(k => !prevKeywords.includes(k)).length;
+                        const removed = prevKeywords.filter(k => !currKeywords.includes(k)).length;
+                        if (added > 0 || removed > 0) {
+                          let keywordChange = '';
+                          if (added > 0 && removed > 0) keywordChange = `+${added}/-${removed}`;
+                          else if (added > 0) keywordChange = `+${added} added`;
+                          else if (removed > 0) keywordChange = `-${removed} removed`;
+                          changes.push({ field: 'Keywords', from: `${prevKeywords.length}`, to: `${currKeywords.length} (${keywordChange})` });
+                        }
+                      }
+                      
                       return changes.length > 0 ? (
                         <div className="p-2 bg-white/50 rounded border border-green-200">
                           <div className="text-xs font-medium text-green-800 mb-1">
@@ -1521,6 +1554,7 @@ const FailureModesPage = () => {
                             {changes.map((change, cIdx) => (
                               <span key={cIdx} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${
                                 change.isRPN ? (change.to > change.from ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')
+                                : change.isAction ? 'bg-purple-100 text-purple-700'
                                 : 'bg-slate-100 text-slate-700'
                               }`}>
                                 <span className="font-medium">{change.field}:</span>
@@ -1578,6 +1612,36 @@ const FailureModesPage = () => {
                     if (thisRPN !== newerRPN) {
                       changes.push({ field: 'RPN', from: thisRPN, to: newerRPN, isRPN: true });
                     }
+                    
+                    // Check recommended actions
+                    const thisActions = thisVersion.recommended_actions || [];
+                    const newerActions = newer.recommended_actions || [];
+                    if (thisActions.length !== newerActions.length || JSON.stringify(thisActions) !== JSON.stringify(newerActions)) {
+                      const added = newerActions.filter(a => !thisActions.includes(a)).length;
+                      const removed = thisActions.filter(a => !newerActions.includes(a)).length;
+                      if (added > 0 || removed > 0) {
+                        let actionChange = '';
+                        if (added > 0 && removed > 0) actionChange = `+${added}/-${removed}`;
+                        else if (added > 0) actionChange = `+${added} added`;
+                        else if (removed > 0) actionChange = `-${removed} removed`;
+                        changes.push({ field: 'Actions', from: `${thisActions.length}`, to: `${newerActions.length} (${actionChange})`, isAction: true });
+                      }
+                    }
+                    
+                    // Check keywords
+                    const thisKeywords = thisVersion.keywords || [];
+                    const newerKeywords = newer.keywords || [];
+                    if (thisKeywords.length !== newerKeywords.length || JSON.stringify(thisKeywords.sort()) !== JSON.stringify(newerKeywords.sort())) {
+                      const added = newerKeywords.filter(k => !thisKeywords.includes(k)).length;
+                      const removed = thisKeywords.filter(k => !newerKeywords.includes(k)).length;
+                      if (added > 0 || removed > 0) {
+                        let keywordChange = '';
+                        if (added > 0 && removed > 0) keywordChange = `+${added}/-${removed}`;
+                        else if (added > 0) keywordChange = `+${added} added`;
+                        else if (removed > 0) keywordChange = `-${removed} removed`;
+                        changes.push({ field: 'Keywords', from: `${thisKeywords.length}`, to: `${newerKeywords.length} (${keywordChange})` });
+                      }
+                    }
                   }
                   
                   const rpn = (thisVersion.severity || 0) * (thisVersion.occurrence || 0) * (thisVersion.detectability || 0);
@@ -1613,7 +1677,9 @@ const FailureModesPage = () => {
                                       ? change.to > change.from 
                                         ? 'bg-red-100 text-red-700' 
                                         : 'bg-green-100 text-green-700'
-                                      : 'bg-slate-100 text-slate-700'
+                                      : change.isAction
+                                        ? 'bg-purple-100 text-purple-700'
+                                        : 'bg-slate-100 text-slate-700'
                                   }`}
                                 >
                                   <span className="font-medium">{change.field}:</span>
