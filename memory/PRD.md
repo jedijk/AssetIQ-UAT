@@ -6,6 +6,55 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Form Designer UI Complete** (Mar 24, 2026):
+  - **New Page**: `/forms` - Form Designer for creating and managing data collection forms
+  - **Features**:
+    - Template management with CRUD operations
+    - Stats cards (Templates, Submissions, Warnings, Critical counts)
+    - Two tabs: Templates and Submissions
+    - Search and discipline filter
+    - Create form template dialog with:
+      - Basic info (name, description, discipline)
+      - Signature requirement toggle
+      - Allow partial submission toggle
+      - Dynamic field builder with 12 field types:
+        - Numeric (with thresholds: warning/critical low/high)
+        - Text, Textarea, Dropdown, Multi-select
+        - Boolean, Range slider, Date, DateTime
+        - File upload, Image upload, Signature
+    - Field preview with drag handle, edit/delete actions
+    - Form submission viewer with expandable value details
+    - Threshold status badges (Normal, Warning, Critical)
+  - New file: `/app/frontend/src/pages/FormsPage.js`
+
+- **Decision Engine UI Complete** (Mar 24, 2026):
+  - **New Page**: `/decision-engine` - AI Engine for automated learning rules and suggestions
+  - **Features**:
+    - Dashboard stats (Pending, Approved, Executed, High Priority, Rules Active)
+    - Two tabs: Suggestions and Rules
+    - Status and priority filters for suggestions
+    - Suggestion cards with:
+      - Title and description
+      - Status badge (Pending, Approved, Rejected, Executed)
+      - Priority badge (High, Medium, Low)
+      - Expandable recommended action JSON
+      - Approve/Reject/Execute action buttons
+    - Rule cards with:
+      - Rule name, description
+      - Category and trigger type badges
+      - Enable/disable toggle
+      - Auto-execute badge for automatic rules
+      - Configure button for settings
+    - Rule configuration dialog with enable/auto-execute toggles
+    - Approve/Reject dialogs with notes/reason fields
+    - "Evaluate Rules" button to generate new suggestions
+  - New file: `/app/frontend/src/pages/DecisionEnginePage.js`
+
+- **Navigation Updated**:
+  - Added "Forms" tab (FileText icon) between Tasks and AI Engine
+  - Added "AI Engine" tab (Brain icon) between Forms and Analytics
+  - Routes added: `/forms` and `/decision-engine`
+
 - **Voice & Image Input Enabled** (Mar 24, 2026):
   - **Voice Input**: Users can record voice messages using the microphone button
     - Uses OpenAI Whisper (`whisper-1`) via emergentintegrations library

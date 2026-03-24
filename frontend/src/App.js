@@ -17,6 +17,8 @@ import ActionsPage from "./pages/ActionsPage";
 import TaskSchedulerPage from "./pages/TaskSchedulerPage";
 import AnalyticsDashboardPage from "./pages/AnalyticsDashboardPage";
 import SettingsUserManagementPage from "./pages/SettingsUserManagementPage";
+import FormsPage from "./pages/FormsPage";
+import DecisionEnginePage from "./pages/DecisionEnginePage";
 import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
 import "@/App.css";
 
@@ -116,6 +118,8 @@ function App() {
                 <Route path="causal-engine" element={<CausalEnginePage />} />
                 <Route path="tasks" element={<TaskSchedulerPage />} />
                 <Route path="analytics" element={<AnalyticsDashboardPage />} />
+                <Route path="forms" element={<FormsPage />} />
+                <Route path="decision-engine" element={<DecisionEnginePage />} />
                 <Route path="settings/user-management" element={<SettingsUserManagementPage />} />
                 <Route path="settings/statistics" element={<AnalyticsDashboardPage />} />
                 <Route path="settings/criticality-definitions" element={<UnderDevelopmentPage />} />
