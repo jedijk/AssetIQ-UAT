@@ -275,92 +275,24 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # ============= AI HELPERS =============
 
-THREAT_ANALYSIS_SYSTEM_PROMPT = """You are ThreatBase AI, helping reliability engineers capture equipment failures.
+THREAT_ANALYSIS_SYSTEM_PROMPT = """You are AssetIQ AI extracting equipment failures from user messages.
 
-Your job is to extract information from what the user writes and create a threat record.
+## EXTRACT FIRST - ASK SECOND
+Find: Equipment (P-101, pump, compressor) + Problem (leaking, vibrating, overheating)
 
-## CRITICAL: EXTRACT BEFORE ASKING
-Before asking ANY question, carefully analyze the user's message for:
-- Equipment names (P-101, Pump 1, compressor, motor, etc.)
-- Problems/symptoms (leaking, vibrating, noisy, hot, broken, failing, etc.)
-- Failure modes (overheating, seal failure, bearing failure, cavitation, corrosion, fouling, etc.)
-- Locations (Area A, Unit 2, Building 3, etc.)
+## Required: Asset + Failure only
+- If BOTH found → COMPLETE
+- If only asset unclear → Ask "Which equipment?"
+- If only failure unclear → Ask "What's the problem?"
+- NEVER ask for info already in message
 
-## Required Information (only 2 fields):
-1. **Asset**: Equipment tag or name - EXTRACT from message if mentioned in ANY form
-2. **Failure**: What's wrong - EXTRACT any problem description from the message
+## Failure Mode Mapping:
+leaking→"Seal Failure", vibration/noise→"Bearing Failure", overheating→"Overheating", corrosion→"Corrosion", stuck→"Valve Stuck", fouling→"Fouling"
 
-## IMPORTANT: Failure Mode Extraction
-Extract the standard FMEA failure mode from the user's description. Map common terms to failure modes:
-- "overheating/hot/high temp" → "Overheating"
-- "leaking/leak/drip" → "Seal Failure" or "Tube Leak" depending on equipment
-- "vibrating/vibration/shaking" → "Bearing Failure" or "Misalignment"
-- "noisy/noise/grinding" → "Bearing Failure"
-- "stuck/won't move" → "Valve Stuck"
-- "corrosion/rust/corroded" → "Internal Corrosion" or "External Corrosion"
-- "fouling/dirty/scaling" → "Fouling"
-- "cavitation/bubbles" → "Cavitation"
-- "surge/unstable flow" → "Surge"
+## Equipment Pattern: 'Reporting issue for equipment "X"' → asset=X
 
-## Response Rules:
-- If the message contains BOTH an equipment reference AND a problem description: Mark COMPLETE
-- If ONLY the asset is unclear: Ask "Which equipment is affected?"
-- If ONLY the failure is unclear: Ask "What's the problem?"
-- NEVER ask for information already in the message
-- NEVER ask multiple questions
-- Use common sense to interpret informal descriptions (e.g., "pump is acting up" = pump with operational issues)
-
-## Examples of extraction:
-- "P-101 is leaking" → Asset: P-101, Failure: leaking, failure_mode: "Seal Failure" → COMPLETE
-- "grinding noise from main pump" → Asset: main pump, Failure: grinding noise, failure_mode: "Bearing Failure" → COMPLETE  
-- "the compressor in unit 3 overheats" → Asset: compressor (unit 3), Failure: overheating, failure_mode: "Overheating" → COMPLETE
-- "heat exchanger has fouling issues" → Asset: heat exchanger, Failure: fouling, failure_mode: "Fouling" → COMPLETE
-- 'Reporting issue for equipment "Production Unit A": vibration detected' → Asset: Production Unit A, Failure: vibration, failure_mode: "Bearing Failure" → COMPLETE
-- 'Reporting issue for equipment "Pump P-101": seal leak' → Asset: Pump P-101, Failure: seal leak, failure_mode: "Seal Failure" → COMPLETE
-- "something wrong with equipment" → Need to ask which equipment AND what's wrong
-- "pump has issues" → Asset: pump, but failure unclear → Ask what's wrong
-
-## IMPORTANT: Equipment Name Extraction
-- If message contains 'Reporting issue for equipment "X"', extract X exactly as the asset name
-- If message contains 'Issue with X:', extract X exactly as the asset name
-- Preserve the full equipment name including any prefixes or suffixes
-
-## Auto-fill from your expertise:
-- Equipment Type: Infer from asset name (P-xxx = Pump, C-xxx = Compressor, etc.)
-- Failure Mode: Standard FMEA failure mode based on description
-- Risk Level: Based on failure type and equipment criticality
-- Recommended Actions: 2-3 practical actions
-
-## Risk Scoring (FMEA):
-- Severity: Safety=10, Production=8, Equipment=6
-- Occurrence: First=2, Rare=4, Occasional=6, Frequent=8
-- Detection: Easy=3, Moderate=5, Difficult=7
-- Score = (S * O * D) / 10, max 100
-- Critical: >=70, High: >=50, Medium: >=30, Low: <30
-
-RESPOND IN JSON ONLY:
-{
-  "complete": true/false,
-  "follow_up_question": "single question if complete=false",
-  "question_type": "asset|failure",
-  "extracted_asset": "what you found in message or null",
-  "extracted_failure": "what you found in message or null",
-  "threat": {
-    "title": "concise title",
-    "asset": "equipment tag",
-    "equipment_type": "type",
-    "failure_mode": "standard failure mode",
-    "cause": "root cause if known",
-    "impact": "Safety Hazard|Production Loss|Equipment Damage|Environmental",
-    "frequency": "First Time|Rare|Occasional|Frequent",
-    "likelihood": "Low|Medium|High",
-    "detectability": "Easy|Moderate|Difficult",
-    "location": "location if mentioned",
-    "risk_score": number,
-    "risk_level": "Critical|High|Medium|Low",
-    "recommended_actions": ["action1", "action2"]
-  }
-}"""
+RESPOND IN JSON:
+{"complete":true/false,"follow_up_question":"if needed","question_type":"asset|failure","threat":{"title":"","asset":"","equipment_type":"","failure_mode":"","impact":"","frequency":"","risk_score":0-100,"risk_level":"Critical|High|Medium|Low","recommended_actions":[]}}"""
 
 IMAGE_ANALYSIS_SYSTEM_PROMPT = """You are ThreatBase AI analyzing an image of equipment failure or damage. 
 Describe what you see in the image, identifying:
@@ -425,12 +357,29 @@ RESPOND IN JSON ONLY:
 
 async def classify_user_intent(message: str, session_id: str) -> dict:
     """Classify if the user is asking a data query or reporting a threat"""
+    # Fast keyword-based pre-classification to skip AI call for obvious cases
+    message_lower = message.lower()
+    
+    # Obvious threat report indicators (skip AI classification)
+    threat_keywords = ["leak", "broken", "failed", "vibrat", "noise", "overheat", "damage", "issue", 
+                       "problem", "malfunction", "crack", "corros", "stuck", "fault", "alarm",
+                       "reporting", "p-", "c-", "hx-", "pump", "motor", "valve", "compressor"]
+    if any(kw in message_lower for kw in threat_keywords):
+        return {"is_data_query": False, "confidence": 0.9}
+    
+    # Obvious data query indicators (skip AI classification)
+    query_keywords = ["how many", "count", "list", "show me", "what are", "which", "summary", 
+                      "total", "statistics", "report on", "give me"]
+    if any(kw in message_lower for kw in query_keywords):
+        return {"is_data_query": True, "confidence": 0.85, "entities": []}
+    
+    # Only use AI for ambiguous cases - use faster model
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
             session_id=f"{session_id}_classifier",
             system_message=QUERY_CLASSIFIER_PROMPT
-        ).with_model("openai", "gpt-5.2")
+        ).with_model("openai", "gpt-4o-mini")  # Faster model for classification
         
         user_message = UserMessage(text=message)
         response = await chat.send_message(user_message)
@@ -580,7 +529,7 @@ async def answer_data_query(message: str, session_id: str, data_context: str) ->
             api_key=EMERGENT_LLM_KEY,
             session_id=f"{session_id}_data",
             system_message=prompt
-        ).with_model("openai", "gpt-5.2")
+        ).with_model("openai", "gpt-4o-mini")  # Faster model for data queries
         
         user_message = UserMessage(text=message)
         response = await chat.send_message(user_message)
@@ -602,13 +551,16 @@ async def answer_data_query(message: str, session_id: str, data_context: str) ->
         }
 
 async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Optional[str] = None) -> dict:
-    """Analyze failure description using GPT-5.2 with fallback for AI unavailability"""
+    """Analyze failure description using AI with fallback for AI unavailability"""
     try:
+        # Use faster model for text-only, full model for images
+        model_name = "gpt-5.2" if image_base64 else "gpt-4o-mini"
+        
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
             session_id=session_id,
             system_message=THREAT_ANALYSIS_SYSTEM_PROMPT
-        ).with_model("openai", "gpt-5.2")
+        ).with_model("openai", model_name)
         
         # If image provided, first analyze it
         image_context = ""
@@ -617,7 +569,7 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
                 api_key=EMERGENT_LLM_KEY,
                 session_id=f"{session_id}_image",
                 system_message=IMAGE_ANALYSIS_SYSTEM_PROMPT
-            ).with_model("openai", "gpt-5.2")
+            ).with_model("openai", "gpt-4o-mini")  # Faster model for image analysis too
             
             # Use file_contents with ImageContent for image analysis
             image_content = ImageContent(image_base64=image_base64)
