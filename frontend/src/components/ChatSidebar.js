@@ -244,13 +244,22 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     if (msg.role === "user") {
       return (
         <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm p-3 max-w-[85%] shadow-sm text-sm">
-          <p className="whitespace-pre-wrap">{msg.content}</p>
-          {msg.has_image && (
-            <div className="mt-2 text-blue-200 text-xs flex items-center gap-1">
-              <ImageIcon className="w-3 h-3" />
-              Image attached
+          {msg.has_image && msg.image_data && (
+            <div className="mb-2">
+              <img 
+                src={`data:image/jpeg;base64,${msg.image_data}`}
+                alt="Attached"
+                className="rounded-lg max-w-full max-h-48 object-cover border border-blue-400"
+              />
             </div>
           )}
+          {msg.has_image && !msg.image_data && (
+            <div className="mb-2 p-3 bg-blue-500/50 rounded-lg flex items-center gap-2 text-blue-100">
+              <ImageIcon className="w-4 h-4" />
+              <span className="text-xs">Image attached</span>
+            </div>
+          )}
+          <p className="whitespace-pre-wrap">{msg.content}</p>
         </div>
       );
     }

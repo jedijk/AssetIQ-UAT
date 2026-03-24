@@ -1005,13 +1005,20 @@ async def send_chat_message(
 ):
     session_id = f"user_{current_user['id']}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
     
-    # Store user message
+    # Store user message (with image thumbnail if provided)
+    image_thumbnail = None
+    if message.image_base64:
+        # Store a compressed thumbnail for display in chat history
+        # Keep the base64 but limit size for storage
+        image_thumbnail = message.image_base64[:50000] if len(message.image_base64) > 50000 else message.image_base64
+    
     chat_msg = {
         "id": str(uuid.uuid4()),
         "user_id": current_user["id"],
         "role": "user",
         "content": message.content,
         "has_image": message.image_base64 is not None,
+        "image_data": image_thumbnail,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.chat_messages.insert_one(chat_msg)
