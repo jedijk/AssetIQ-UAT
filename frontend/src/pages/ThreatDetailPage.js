@@ -1250,33 +1250,12 @@ const ThreatDetailPage = () => {
         ))}
       </motion.div>
 
-      {/* Cause */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="card p-6 mb-6"
-        data-testid="threat-cause-section"
-      >
-        <h3 className="font-semibold text-slate-900 mb-2">Probable Cause</h3>
-        {isEditing ? (
-          <Textarea
-            value={editForm.cause || ""}
-            onChange={(e) => setEditForm({ ...editForm, cause: e.target.value })}
-            placeholder="Enter probable cause analysis..."
-            rows={3}
-          />
-        ) : (
-          <p className="text-slate-600">{threat.cause || "Not specified"}</p>
-        )}
-      </motion.div>
-
-      {/* Attachments / Images */}
+      {/* Attachments / Images - Moved right after scoring grid */}
       {threat.attachments && threat.attachments.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
+          transition={{ delay: 0.25 }}
           className="card p-6 mb-6"
           data-testid="threat-attachments-section"
         >
@@ -1323,6 +1302,27 @@ const ThreatDetailPage = () => {
           </div>
         </motion.div>
       )}
+
+      {/* Cause */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="card p-6 mb-6"
+        data-testid="threat-cause-section"
+      >
+        <h3 className="font-semibold text-slate-900 mb-2">Probable Cause</h3>
+        {isEditing ? (
+          <Textarea
+            value={editForm.cause || ""}
+            onChange={(e) => setEditForm({ ...editForm, cause: e.target.value })}
+            placeholder="Enter probable cause analysis..."
+            rows={3}
+          />
+        ) : (
+          <p className="text-slate-600">{threat.cause || "Not specified"}</p>
+        )}
+      </motion.div>
 
       {/* Image Viewer Modal */}
       {selectedImage && (
