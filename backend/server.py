@@ -691,7 +691,7 @@ async def transcribe_audio_with_ai(audio_base64: str) -> str:
     """Transcribe audio using OpenAI Whisper via emergentintegrations"""
     try:
         import tempfile
-        import aiofiles
+        from emergentintegrations.llm.openai import OpenAISpeechToText
         
         # Decode base64 audio
         audio_data = base64.b64decode(audio_base64)
@@ -701,22 +701,18 @@ async def transcribe_audio_with_ai(audio_base64: str) -> str:
             f.write(audio_data)
             temp_path = f.name
         
-        # Use OpenAI Whisper API directly
-        import httpx
-        async with httpx.AsyncClient() as client:
-            with open(temp_path, "rb") as audio_file:
-                response = await client.post(
-                    "https://api.openai.com/v1/audio/transcriptions",
-                    headers={"Authorization": f"Bearer {EMERGENT_LLM_KEY}"},
-                    files={"file": ("audio.webm", audio_file, "audio/webm")},
-                    data={"model": "whisper-1"}
-                )
-                if response.status_code == 200:
-                    result = response.json()
-                    return result.get("text", "")
-                else:
-                    logger.error(f"Whisper API error: {response.text}")
-                    raise HTTPException(status_code=500, detail="Transcription failed")
+        # Use emergentintegrations Whisper
+        stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
+        
+        with open(temp_path, "rb") as audio_file:
+            response = await stt.transcribe(
+                file=audio_file,
+                model="whisper-1",
+                response_format="json",
+                language="en"  # Can be removed for auto-detection
+            )
+        
+        return response.text
         
     except Exception as e:
         logger.error(f"Transcription error: {e}")

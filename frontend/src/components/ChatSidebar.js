@@ -353,6 +353,18 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             </div>
           )}
 
+          {/* Quick tips for new users */}
+          <div className="flex items-center gap-3 mb-3 px-1">
+            <div className="flex items-center gap-1 text-xs text-slate-500">
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span>Attach photo</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-slate-500">
+              <Mic className="w-3.5 h-3.5" />
+              <span>Voice input</span>
+            </div>
+          </div>
+
           <div className="flex items-end gap-2">
             <input
               ref={fileInputRef}
@@ -366,8 +378,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               variant="ghost"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
-              className="flex-shrink-0 h-10 w-10 rounded-full text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+              className="flex-shrink-0 h-10 w-10 rounded-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
               data-testid="sidebar-upload-image-button"
+              title="Upload an image of the issue"
             >
               <ImageIcon className="w-5 h-5" />
             </Button>
@@ -377,12 +390,13 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               variant="ghost"
               size="icon"
               onClick={isRecording ? stopRecording : startRecording}
-              className={`flex-shrink-0 h-10 w-10 rounded-full ${
+              className={`flex-shrink-0 h-10 w-10 rounded-full transition-colors ${
                 isRecording
-                  ? "bg-red-50 text-red-600 hover:bg-red-100"
+                  ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
                   : "text-slate-500 hover:text-blue-600 hover:bg-blue-50"
               }`}
               data-testid="sidebar-voice-record-button"
+              title={isRecording ? "Stop recording" : "Start voice recording"}
             >
               {isRecording ? (
                 <MicOff className="w-5 h-5" />
@@ -396,7 +410,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder="Describe the issue..."
+              placeholder="Describe the issue or use voice/image..."
               className="flex-1 min-h-[80px] max-h-32 resize-none rounded-xl border-slate-200 text-sm"
               rows={3}
               data-testid="sidebar-chat-message-input"
@@ -407,6 +421,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               disabled={sendMutation.isPending || (!message.trim() && !imageBase64)}
               className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-600 hover:bg-blue-700"
               data-testid="sidebar-send-message-button"
+              title="Send message"
             >
               {sendMutation.isPending ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -417,9 +432,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           </div>
 
           {isRecording && (
-            <div className="mt-2 flex items-center gap-2 text-red-600 text-xs">
+            <div className="mt-2 flex items-center gap-2 text-red-600 text-xs font-medium">
               <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              Recording... Tap to stop
+              Recording... Tap microphone to stop
             </div>
           )}
         </div>

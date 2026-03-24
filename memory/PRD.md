@@ -6,6 +6,23 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Voice & Image Input Enabled** (Mar 24, 2026):
+  - **Voice Input**: Users can record voice messages using the microphone button
+    - Uses OpenAI Whisper (`whisper-1`) via emergentintegrations library
+    - Supports webm audio format from browser MediaRecorder
+    - Transcribed text auto-fills the chat input
+    - Visual recording indicator with pulse animation
+  - **Image Input**: Users can attach photos of equipment failures
+    - Supports JPEG, PNG, WebP formats (max 5MB)
+    - AI analyzes images using GPT-5.2 vision capabilities
+    - Image context merged with text description for threat analysis
+  - **Enhanced UI**:
+    - Added quick tips showing "Attach photo" and "Voice input" labels
+    - Tooltips on hover for all action buttons
+    - Updated placeholder text: "Describe the issue or use voice/image..."
+    - Improved recording state with animated pulse indicator
+  - Files modified: `/app/frontend/src/components/ChatSidebar.js`, `/app/backend/server.py`
+
 - **Phase 6 Complete: Analytics Dashboard & RBAC** (Mar 24, 2026):
   - **Analytics Dashboard** (`/analytics`):
     - Risk Overview: Total threats, critical risks, high risk EFMs, avg RPN
