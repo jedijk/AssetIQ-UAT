@@ -2,6 +2,7 @@
 Failure Modes Service - MongoDB-backed failure mode operations.
 
 This replaces the static FAILURE_MODES_LIBRARY with persistent MongoDB storage.
+Includes versioning support for tracking changes and rollback capability.
 """
 
 from datetime import datetime, timezone
@@ -19,6 +20,7 @@ class FailureModesService:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
         self.collection = db["failure_modes"]
+        self.versions_collection = db["failure_mode_versions"]
     
     # ============== READ OPERATIONS ==============
     
@@ -221,8 +223,8 @@ class FailureModesService:
         
         return self._serialize(doc)
     
-    async def update(self, mode_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Update a failure mode. Returns updated doc or None if not found."""
+    async def update(self, mode_id: str, data: Dict[str, Any], updated_by: Optional[str] = None, change_reason: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Update a failure mode with version history. Returns updated doc or None if not found."""
         
         # Find the document first
         query = self._build_id_query(mode_id)
@@ -233,8 +235,15 @@ class FailureModesService:
         if not existing:
             return None
         
+        # Save current state as a version before updating
+        await self._save_version(existing, updated_by, change_reason)
+        
         # Build update
         update_fields = {"updated_at": datetime.now(timezone.utc)}
+        
+        # Track version number
+        current_version = existing.get("version", 1)
+        update_fields["version"] = current_version + 1
         
         # Update allowed fields
         allowed_fields = [
@@ -272,6 +281,133 @@ class FailureModesService:
             serialized["fmea_changed"] = fmea_changed
             serialized["old_failure_mode_name"] = existing["failure_mode"]
             return serialized
+        
+        return None
+    
+    async def _save_version(self, doc: Dict[str, Any], updated_by: Optional[str] = None, change_reason: Optional[str] = None) -> None:
+        """Save a version snapshot of the failure mode."""
+        
+        # Get the failure mode ID (could be ObjectId or legacy_id)
+        fm_id = str(doc["_id"])
+        
+        # Build version document
+        version_doc = {
+            "failure_mode_id": fm_id,
+            "version": doc.get("version", 1),
+            "snapshot": {
+                "category": doc.get("category"),
+                "equipment": doc.get("equipment"),
+                "failure_mode": doc.get("failure_mode"),
+                "keywords": doc.get("keywords", []),
+                "severity": doc.get("severity"),
+                "occurrence": doc.get("occurrence"),
+                "detectability": doc.get("detectability"),
+                "rpn": doc.get("rpn"),
+                "recommended_actions": doc.get("recommended_actions", []),
+                "equipment_type_ids": doc.get("equipment_type_ids", []),
+                "mechanism": doc.get("mechanism"),
+                "is_validated": doc.get("is_validated", False),
+                "validated_by_name": doc.get("validated_by_name"),
+                "validated_by_position": doc.get("validated_by_position"),
+                "validated_at": doc.get("validated_at"),
+            },
+            "updated_by": updated_by,
+            "change_reason": change_reason,
+            "created_at": datetime.now(timezone.utc),
+        }
+        
+        await self.versions_collection.insert_one(version_doc)
+    
+    async def get_versions(self, mode_id: str) -> List[Dict[str, Any]]:
+        """Get version history for a failure mode."""
+        
+        # Get current document to find the correct ID format
+        query = self._build_id_query(mode_id)
+        if not query:
+            return []
+        
+        existing = await self.collection.find_one(query)
+        if not existing:
+            return []
+        
+        fm_id = str(existing["_id"])
+        
+        # Fetch all versions sorted by version number descending
+        cursor = self.versions_collection.find(
+            {"failure_mode_id": fm_id}
+        ).sort("version", -1)
+        
+        versions = []
+        async for doc in cursor:
+            versions.append({
+                "id": str(doc["_id"]),
+                "version": doc["version"],
+                "snapshot": doc["snapshot"],
+                "updated_by": doc.get("updated_by"),
+                "change_reason": doc.get("change_reason"),
+                "created_at": doc["created_at"].isoformat() if doc.get("created_at") else None,
+            })
+        
+        return versions
+    
+    async def rollback_to_version(self, mode_id: str, version_id: str, rolled_back_by: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Rollback a failure mode to a specific version."""
+        
+        # Find the version
+        if not ObjectId.is_valid(version_id):
+            return None
+        
+        version_doc = await self.versions_collection.find_one({"_id": ObjectId(version_id)})
+        if not version_doc:
+            return None
+        
+        snapshot = version_doc.get("snapshot", {})
+        if not snapshot:
+            return None
+        
+        # Find the current document
+        query = self._build_id_query(mode_id)
+        if not query:
+            return None
+        
+        existing = await self.collection.find_one(query)
+        if not existing:
+            return None
+        
+        # Save current state before rollback
+        await self._save_version(
+            existing, 
+            rolled_back_by, 
+            f"Before rollback to version {version_doc.get('version', '?')}"
+        )
+        
+        # Build rollback update
+        rollback_fields = {
+            "category": snapshot.get("category"),
+            "equipment": snapshot.get("equipment"),
+            "failure_mode": snapshot.get("failure_mode"),
+            "keywords": snapshot.get("keywords", []),
+            "severity": snapshot.get("severity"),
+            "occurrence": snapshot.get("occurrence"),
+            "detectability": snapshot.get("detectability"),
+            "rpn": snapshot.get("rpn"),
+            "recommended_actions": snapshot.get("recommended_actions", []),
+            "equipment_type_ids": snapshot.get("equipment_type_ids", []),
+            "mechanism": snapshot.get("mechanism"),
+            "updated_at": datetime.now(timezone.utc),
+            "version": existing.get("version", 1) + 1,
+            "rolled_back_from_version": version_doc.get("version"),
+        }
+        
+        # Perform rollback
+        result = await self.collection.find_one_and_update(
+            query,
+            {"$set": rollback_fields},
+            return_document=True
+        )
+        
+        if result:
+            return self._serialize(result)
         
         return None
     
@@ -386,6 +522,8 @@ class FailureModesService:
             "validated_at": doc.get("validated_at").isoformat() if doc.get("validated_at") else None,
             "is_custom": doc.get("is_custom", False),
             "is_builtin": doc.get("is_builtin", True),
+            "version": doc.get("version", 1),
+            "rolled_back_from_version": doc.get("rolled_back_from_version"),
             "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
             "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
         }

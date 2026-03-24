@@ -2592,7 +2592,11 @@ async def update_failure_mode(
         if data.equipment_type_ids is not None:
             update_data["equipment_type_ids"] = data.equipment_type_ids
         
-        result = await failure_modes_service.update(mode_id, update_data)
+        result = await failure_modes_service.update(
+            mode_id, 
+            update_data,
+            updated_by=current_user.get("name", current_user.get("email", "Unknown"))
+        )
         
         if result:
             # If FMEA scores changed, recalculate all linked threat scores
@@ -2655,6 +2659,56 @@ async def update_failure_mode(
         except ValueError:
             pass
         raise HTTPException(status_code=404, detail="Failure mode not found")
+
+
+# ============= FAILURE MODE VERSION HISTORY ENDPOINTS =============
+
+@api_router.get("/failure-modes/{mode_id}/versions")
+async def get_failure_mode_versions(
+    mode_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get version history for a failure mode."""
+    try:
+        versions = await failure_modes_service.get_versions(mode_id)
+        return {"versions": versions, "total": len(versions)}
+    except Exception as e:
+        logger.error(f"Error getting failure mode versions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RollbackRequest(BaseModel):
+    version_id: str
+    reason: Optional[str] = None
+
+
+@api_router.post("/failure-modes/{mode_id}/rollback")
+async def rollback_failure_mode(
+    mode_id: str,
+    data: RollbackRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Rollback a failure mode to a specific version."""
+    try:
+        user_name = current_user.get("name", current_user.get("email", "Unknown"))
+        result = await failure_modes_service.rollback_to_version(
+            mode_id,
+            data.version_id,
+            rolled_back_by=user_name
+        )
+        
+        if result:
+            return {
+                **result,
+                "message": f"Rolled back to version {result.get('rolled_back_from_version', '?')}"
+            }
+        
+        raise HTTPException(status_code=404, detail="Version or failure mode not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rolling back failure mode: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @api_router.post("/failure-modes/{mode_id}/validate")

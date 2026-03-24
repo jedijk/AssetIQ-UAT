@@ -32,7 +32,11 @@ import {
   CheckCircle,
   User,
   Briefcase,
-  Calendar
+  Calendar,
+  History,
+  RotateCcw,
+  Clock,
+  ChevronRight
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -119,6 +123,7 @@ function FailureModeViewPanel({
   onDelete,
   onValidate,
   onUnvalidate,
+  onShowVersionHistory,
   equipmentTypes,
   categories,
   t 
@@ -197,13 +202,29 @@ function FailureModeViewPanel({
           ) : (
             <>
               <h2 className="font-semibold text-slate-900 text-lg truncate">{fm.failure_mode}</h2>
-              <p className="text-sm text-slate-500">{fm.category}</p>
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <span>{fm.category}</span>
+                {fm.version && (
+                  <Badge variant="outline" className="text-xs py-0 px-1.5">
+                    v{fm.version}
+                  </Badge>
+                )}
+              </div>
             </>
           )}
         </div>
         <div className="flex items-center gap-2">
           {!isEditing ? (
             <>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => onShowVersionHistory(fm.id)}
+                className="text-slate-500 hover:text-blue-600"
+                title="View version history"
+              >
+                <History className="w-4 h-4" />
+              </Button>
               <Button size="sm" variant="outline" onClick={onStartEdit} data-testid="view-panel-edit-btn">
                 <Edit className="w-4 h-4 mr-1" /> {t("common.edit")}
               </Button>
@@ -572,6 +593,13 @@ const FailureModesPage = () => {
   const [selectedFm, setSelectedFm] = useState(null); // For view panel
   const [isViewPanelEditing, setIsViewPanelEditing] = useState(false); // Edit mode for view panel
   const [viewPanelForm, setViewPanelForm] = useState(null); // Form state for view panel editing
+  
+  // Version history state
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [versionHistoryFmId, setVersionHistoryFmId] = useState(null);
+  const [versions, setVersions] = useState([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  
   const [newFm, setNewFm] = useState({
     category: "Rotating",
     equipment: "",
@@ -789,6 +817,42 @@ const FailureModesPage = () => {
 
   const handleUnvalidateFm = (id) => {
     unvalidateFmMutation.mutate(id);
+  };
+
+  // Version history handlers
+  const handleShowVersionHistory = async (fmId) => {
+    setVersionHistoryFmId(fmId);
+    setVersionsLoading(true);
+    setShowVersionHistory(true);
+    
+    try {
+      const data = await failureModesAPI.getVersions(fmId);
+      setVersions(data.versions || []);
+    } catch (error) {
+      toast.error("Failed to load version history");
+      setVersions([]);
+    } finally {
+      setVersionsLoading(false);
+    }
+  };
+
+  const rollbackMutation = useMutation({
+    mutationFn: ({ fmId, versionId }) => failureModesAPI.rollback(fmId, versionId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["failureModes"]);
+      if (selectedFm && selectedFm.id === data.id) {
+        setSelectedFm(data);
+      }
+      toast.success(`Rolled back to version ${data.rolled_back_from_version}`);
+      setShowVersionHistory(false);
+    },
+    onError: (e) => toast.error(e.response?.data?.detail || "Failed to rollback")
+  });
+
+  const handleRollback = (versionId) => {
+    if (versionHistoryFmId && versionId) {
+      rollbackMutation.mutate({ fmId: versionHistoryFmId, versionId });
+    }
   };
 
   const handleEditType = (type) => { 
@@ -1100,6 +1164,7 @@ const FailureModesPage = () => {
                   onDelete={(id) => { deleteFmMutation.mutate(id); setSelectedFm(null); }}
                   onValidate={handleValidateFm}
                   onUnvalidate={handleUnvalidateFm}
+                  onShowVersionHistory={handleShowVersionHistory}
                   equipmentTypes={equipmentTypes}
                   categories={categories}
                   t={t}
@@ -1383,6 +1448,119 @@ const FailureModesPage = () => {
               data-testid="save-fm-btn"
             >
               {editingFm ? t("common.save") : t("common.create")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Version History Dialog */}
+      <Dialog open={showVersionHistory} onOpenChange={setShowVersionHistory}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5 text-blue-600" />
+              Version History
+            </DialogTitle>
+            <DialogDescription>
+              View previous versions and rollback if needed. Each edit creates a new version.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto">
+            {versionsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+              </div>
+            ) : versions.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <History className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>No version history available</p>
+                <p className="text-sm text-slate-400 mt-1">History will appear after the first edit</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {versions.map((version, idx) => (
+                  <div 
+                    key={version.id}
+                    className={`p-4 rounded-lg border ${idx === 0 ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white'}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className={idx === 0 ? 'border-blue-500 text-blue-700' : ''}>
+                            v{version.version}
+                          </Badge>
+                          {idx === 0 && (
+                            <Badge className="bg-blue-100 text-blue-700">Previous</Badge>
+                          )}
+                          <span className="text-xs text-slate-500 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(version.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-slate-500">Name:</span>{" "}
+                            <span className="font-medium">{version.snapshot?.failure_mode}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Category:</span>{" "}
+                            <span>{version.snapshot?.category}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">RPN:</span>{" "}
+                            <span className={`font-semibold ${
+                              (version.snapshot?.severity * version.snapshot?.occurrence * version.snapshot?.detectability) >= 200 ? 'text-red-600' :
+                              (version.snapshot?.severity * version.snapshot?.occurrence * version.snapshot?.detectability) >= 125 ? 'text-orange-600' :
+                              'text-slate-700'
+                            }`}>
+                              {version.snapshot?.severity * version.snapshot?.occurrence * version.snapshot?.detectability}
+                            </span>
+                            <span className="text-slate-400 ml-1 text-xs">
+                              ({version.snapshot?.severity}×{version.snapshot?.occurrence}×{version.snapshot?.detectability})
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Equipment:</span>{" "}
+                            <span>{version.snapshot?.equipment}</span>
+                          </div>
+                        </div>
+                        
+                        {version.updated_by && (
+                          <div className="mt-2 text-xs text-slate-500 flex items-center gap-1">
+                            <User className="w-3 h-3" />
+                            Changed by: {version.updated_by}
+                          </div>
+                        )}
+                        
+                        {version.change_reason && (
+                          <div className="mt-1 text-xs text-slate-500 italic">
+                            Reason: {version.change_reason}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRollback(version.id)}
+                        disabled={rollbackMutation.isPending}
+                        className="flex-shrink-0 gap-1"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Restore
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVersionHistory(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
