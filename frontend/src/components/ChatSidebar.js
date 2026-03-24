@@ -304,7 +304,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               {msg.threat_asset && (
                 <div className="flex items-center gap-1.5">
                   <Wrench className="w-3 h-3 text-slate-400" />
-                  <span><strong>Asset:</strong> {msg.threat_asset}</span>
+                  <span><strong>Equipment:</strong> {msg.threat_asset}</span>
                 </div>
               )}
               {msg.threat_failure_mode && (
