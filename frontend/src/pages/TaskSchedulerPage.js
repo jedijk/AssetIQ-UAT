@@ -148,7 +148,7 @@ const taskAPI = {
     const queryParams = new URLSearchParams();
     if (params.status) queryParams.append("status", params.status);
     if (params.plan_id) queryParams.append("plan_id", params.plan_id);
-    const response = await fetch(`${API_BASE_URL}/api/tasks/instances?${queryParams}`, {
+    const response = await fetch(`${API_BASE_URL}/api/task-instances?${queryParams}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch instances");
@@ -156,14 +156,14 @@ const taskAPI = {
   },
   getCalendar: async (startDate, endDate) => {
     const response = await fetch(
-      `${API_BASE_URL}/api/tasks/calendar?start_date=${startDate}&end_date=${endDate}`,
+      `${API_BASE_URL}/api/task-instances/calendar?start_date=${startDate}&end_date=${endDate}`,
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }}
     );
     if (!response.ok) throw new Error("Failed to fetch calendar");
     return response.json();
   },
   startInstance: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/tasks/instances/${id}/start`, {
+    const response = await fetch(`${API_BASE_URL}/api/task-instances/${id}/start`, {
       method: "POST",
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
@@ -171,7 +171,7 @@ const taskAPI = {
     return response.json();
   },
   completeInstance: async ({ id, data }) => {
-    const response = await fetch(`${API_BASE_URL}/api/tasks/instances/${id}/complete`, {
+    const response = await fetch(`${API_BASE_URL}/api/task-instances/${id}/complete`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

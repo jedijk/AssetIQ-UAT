@@ -667,9 +667,8 @@ class TaskService:
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         week_end = today_start + timedelta(days=7)
         
+        # Don't filter by user for overall stats
         base_query = {}
-        if user_id:
-            base_query["assigned_user_id"] = user_id
         
         # Count by status
         status_counts = {}
