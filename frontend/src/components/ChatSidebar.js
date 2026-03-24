@@ -591,15 +591,6 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                   style={{ height: '44px' }}
                   data-testid="sidebar-chat-message-input"
                 />
-                
-                {/* Camera Button - inside input */}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors mr-1"
-                  title="Take photo"
-                >
-                  <Camera className="w-5 h-5" />
-                </button>
               </div>
 
               {/* Mic or Send Button */}
