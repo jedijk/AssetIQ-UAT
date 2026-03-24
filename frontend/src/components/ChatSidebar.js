@@ -354,7 +354,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                   sendMutation.mutate({ content: equipmentText, image: null });
                 }}
                 disabled={isSending}
-                className="w-full text-left p-2.5 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors group disabled:opacity-50"
+                className="w-full text-left p-2.5 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center justify-between">
                   <div>
@@ -363,7 +363,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                       <span className="ml-2 text-blue-600 text-xs">({eq.tag})</span>
                     )}
                   </div>
-                  <ArrowRight className="w-4 h-4 text-blue-400 group-hover:text-blue-600 transition-colors" />
+                  {isSending ? (
+                    <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                  ) : (
+                    <ArrowRight className="w-4 h-4 text-blue-400 group-hover:text-blue-600 transition-colors" />
+                  )}
                 </div>
                 {eq.equipment_type && (
                   <span className="text-xs text-blue-500">{eq.equipment_type}</span>
@@ -379,7 +383,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                   textareaRef.current.focus();
                 }
               }}
-              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
+              disabled={isSending}
+              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm disabled:opacity-50"
             >
               <X className="w-3.5 h-3.5 inline mr-1" />
               None of these / Cancel
@@ -612,7 +617,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               </div>
 
               {/* Mic or Send Button */}
-              {message.trim() || imageBase64 ? (
+              {message.trim() || imageBase64 || isSending ? (
                 <button
                   onClick={handleSend}
                   disabled={isSending}
