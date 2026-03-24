@@ -573,8 +573,8 @@ async def answer_data_query(message: str, session_id: str, data_context: str) ->
 async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Optional[str] = None) -> dict:
     """Analyze failure description using AI with fallback for AI unavailability"""
     try:
-        # Use faster model for text-only, full model for images
-        model_name = "gpt-5.2" if image_base64 else "gpt-4o-mini"
+        # Use gpt-5.2 for better analysis quality
+        model_name = "gpt-5.2"
         
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
@@ -1054,7 +1054,7 @@ async def send_chat_message(
             
             # Match if normalized names match or contain each other
             if eq_name_normalized and (eq_name_normalized in message_normalized or message_normalized in eq_name_normalized):
-                # User selected this equipment - create the threat with it
+                # User selected this equipment
                 equipment_selected = True
                 selected_equipment_id = eq.get("id")
                 selected_equipment_name = eq.get("name")
@@ -1062,7 +1062,77 @@ async def send_chat_message(
                 # Get the pending threat data from conversation context
                 pending_data = last_assistant_msg.get("pending_threat_data") or {}
                 original_failure = pending_data.get("original_message") or pending_data.get("failure_description") or "issue reported"
+                original_failure_mode = pending_data.get("failure_mode")
                 
+                # Check if the original message had a failure mode term that matches multiple FMEA entries
+                # If so, ask user to select which specific failure mode
+                original_lower = original_failure.lower()
+                
+                # Score failure modes against the original message
+                fm_matches = []
+                for fm in FAILURE_MODES_LIBRARY:
+                    score = 0
+                    fm_name_lower = fm.get("failure_mode", "").lower()
+                    keywords = [k.lower() for k in fm.get("keywords", [])]
+                    
+                    # Check for name match
+                    if fm_name_lower in original_lower or original_lower in fm_name_lower:
+                        score += 50
+                    
+                    # Check keywords
+                    for keyword in keywords:
+                        if keyword in original_lower or original_lower in keyword:
+                            score += 30
+                            break
+                    
+                    # Check word overlap
+                    for word in original_lower.split():
+                        if len(word) >= 4 and word in fm_name_lower:
+                            score += 10
+                    
+                    if score >= 30:
+                        fm_matches.append({
+                            "id": fm["id"],
+                            "failure_mode": fm.get("failure_mode"),
+                            "category": fm.get("category"),
+                            "equipment": fm.get("equipment"),
+                            "severity": fm.get("severity"),
+                            "rpn": fm.get("rpn"),
+                            "score": score,
+                            "recommended_actions": fm.get("recommended_actions", [])
+                        })
+                
+                fm_matches.sort(key=lambda x: x["score"], reverse=True)
+                
+                # If multiple failure modes match, ask user to select
+                if len(fm_matches) > 1:
+                    question = "Which type of failure? Please select:"
+                    
+                    ai_response = {
+                        "id": str(uuid.uuid4()),
+                        "user_id": current_user["id"],
+                        "role": "assistant",
+                        "content": question,
+                        "question_type": "failure",
+                        "failure_mode_suggestions": fm_matches[:8],
+                        "partial_threat_data": {
+                            "asset": selected_equipment_name,
+                            "linked_equipment_id": selected_equipment_id,
+                            "title": f"{selected_equipment_name} - {original_failure}",
+                            "failure_description": original_failure,
+                        },
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    await db.chat_messages.insert_one(ai_response)
+                    
+                    return ChatResponse(
+                        message=question,
+                        follow_up_question=question,
+                        question_type="failure",
+                        failure_mode_suggestions=fm_matches[:8]
+                    )
+                
+                # Single match or no matches - proceed with analysis
                 # Construct a clear message for the AI with the selected equipment
                 enhanced_message = f'Reporting issue for equipment "{selected_equipment_name}": {original_failure}'
                 
@@ -1072,13 +1142,16 @@ async def send_chat_message(
                 # Force the asset to be the selected equipment and mark complete
                 if analysis.get("threat"):
                     analysis["threat"]["asset"] = selected_equipment_name
+                    # If we had a single FM match, use it
+                    if len(fm_matches) == 1:
+                        analysis["threat"]["failure_mode"] = fm_matches[0]["failure_mode"]
                 else:
                     # If AI didn't return threat, create a basic one
                     analysis["threat"] = {
                         "title": f"{selected_equipment_name} - {original_failure}",
                         "asset": selected_equipment_name,
                         "equipment_type": "Equipment",
-                        "failure_mode": pending_data.get("failure_mode") or "Unknown",
+                        "failure_mode": fm_matches[0]["failure_mode"] if fm_matches else (pending_data.get("failure_mode") or "Unknown"),
                         "impact": "Equipment Damage",
                         "frequency": "First Time",
                         "risk_score": 30,
@@ -1152,7 +1225,8 @@ async def send_chat_message(
                         "recommended_actions": fm.get("recommended_actions", [])
                     },
                     "selected_equipment_id": equipment_id,
-                    "selected_failure_mode_id": fm.get("id")
+                    "selected_failure_mode_id": fm.get("id"),
+                    "user_selected_failure_mode": True  # Flag to skip ambiguity check
                 }
                 break
     
@@ -1176,7 +1250,7 @@ async def send_chat_message(
     # Check if the extracted asset is generic (needs disambiguation) BEFORE processing
     extracted_asset = analysis.get("threat", {}).get("asset", "").lower() if analysis.get("threat") else ""
     user_input_lower = message.content.lower()
-    generic_equipment_terms = ["extruder", "pump", "compressor", "motor", "valve", "heat exchanger", "fan", "blower", "conveyor", "mixer"]
+    generic_equipment_terms = ["extruder", "pump", "compressor", "motor", "valve", "heat exchanger", "fan", "blower", "conveyor", "mixer", "strainer", "filter", "tank", "vessel", "pipe", "sensor", "turbine"]
     
     # Determine if the user's input was generic (user said "extruder" not "00 1L01 extruder")
     user_used_generic_term = False
@@ -1231,6 +1305,30 @@ async def send_chat_message(
         analysis["complete"] = False
         analysis["question_type"] = "failure"
         analysis["follow_up_question"] = "What specifically is wrong? Please select or describe the failure:"
+    
+    # Check if the failure mode term in user message matches MULTIPLE FMEA entries
+    # If so, force the user to select which specific failure mode they mean
+    # BUT skip this if user has already explicitly selected a failure mode
+    if analysis and analysis.get("complete", False) and not analysis.get("user_selected_failure_mode", False):
+        ai_failure_mode = (analysis.get("threat", {}).get("failure_mode") or "").lower()
+        
+        # Find all FMEA entries that match the failure mode term
+        fm_matches = []
+        for fm in FAILURE_MODES_LIBRARY:
+            fm_name_lower = fm.get("failure_mode", "").lower()
+            keywords = [k.lower() for k in fm.get("keywords", [])]
+            
+            # Check if this FMEA entry matches the AI's failure mode
+            if ai_failure_mode and (ai_failure_mode in fm_name_lower or fm_name_lower in ai_failure_mode):
+                fm_matches.append(fm)
+            elif any(ai_failure_mode in kw or kw in ai_failure_mode for kw in keywords):
+                fm_matches.append(fm)
+        
+        # If multiple FMEA entries match, ask user to select
+        if len(fm_matches) > 1:
+            analysis["complete"] = False
+            analysis["question_type"] = "failure"
+            analysis["follow_up_question"] = "Which type of failure? Please select:"
     
     if not analysis.get("complete", False):
         # Need more info - return follow-up question
@@ -1813,9 +1911,15 @@ async def send_chat_message(
     
     # Also create a structured observation linked to the threat
     try:
+        # failure_mode_id from FMEA library is an integer, but observation service expects ObjectId string
+        # Only pass failure_mode_id if it's a valid ObjectId string (24 hex chars)
+        obs_failure_mode_id = None
+        if failure_mode_id and isinstance(failure_mode_id, str) and len(failure_mode_id) == 24:
+            obs_failure_mode_id = failure_mode_id
+        
         obs_data = {
             "equipment_id": hierarchy_node.get("id") if hierarchy_node else None,
-            "failure_mode_id": failure_mode_id,
+            "failure_mode_id": obs_failure_mode_id,
             "description": threat_data.get("description") or threat_data.get("title", "Observation from chat"),
             "severity": "critical" if risk_level == "Critical" else ("high" if risk_level == "High" else ("medium" if risk_level == "Medium" else "low")),
             "observation_type": "failure",

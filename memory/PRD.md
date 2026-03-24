@@ -6,6 +6,18 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Chat Disambiguation Improvements** (Mar 24, 2026):
+  - **Changes Made**:
+    1. Switched back to GPT-5.2 for better analysis quality (was using GPT-4o-mini for speed)
+    2. Added "strainer", "filter", "tank", "vessel", "pipe", "sensor", "turbine" to generic equipment terms for disambiguation
+    3. After equipment selection, system now checks if the failure mode matches multiple FMEA entries and asks user to select
+    4. Added `user_selected_failure_mode` flag to prevent re-asking after user makes selection
+  - **Flow Now Works**:
+    - "strainer fouling" → asks "which strainer?" (shows options)
+    - User selects strainer → asks "which type of fouling?" (Fouling, Material Buildup/Fouling)
+    - User selects failure type → "Observation recorded successfully"
+  - **Files Modified**: `/app/backend/server.py`
+
 - **Chat Failure Mode Selection Loop Fixed** (Mar 24, 2026):
   - **Problem 1**: When user typed specific failure modes like "fouling", system showed irrelevant equipment-based fallback suggestions.
   - **Problem 2**: After selecting a failure mode, the chat would loop back asking for equipment/failure mode endlessly.
