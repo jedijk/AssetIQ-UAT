@@ -777,3 +777,21 @@ Risk Levels:
   - Integrated into Dashboard page with tabs: "Operational" | "Reliability Performance"
   - Added Dutch (NL) translations for all new dashboard features
   - Files: `/app/frontend/src/components/ReliabilitySnowflake.jsx`, `/app/frontend/src/pages/ReliabilityPerformancePage.js`
+
+- [x] **App Renamed to AssetIQ** (Dec 2025):
+  - Renamed application from "PlantOS" to "AssetIQ" across all files
+  - Updated: LoginPage.js, RegisterPage.js, Layout.js, LanguageContext.js, offlineQueue.js, index.html, manifest.json, service-worker.js, offline.html, server.py
+
+- [x] **Failure Mode Matching with Selection** (Dec 2025):
+  - Implemented failure mode suggestions similar to equipment matching
+  - When AI detects multiple potential failure modes (score >= 40), shows selection UI
+  - Backend changes to `server.py`:
+    - Added `failure_mode_suggestions` field to ChatResponse model
+    - Implemented scoring algorithm for failure mode matching (exact=100, containment=80, keyword=60, word overlap=40+)
+    - Returns top 5 matching failure modes with id, name, category, equipment, severity, rpn, score
+  - Frontend changes to `ChatSidebar.js`:
+    - Added amber-colored failure mode suggestion buttons (distinct from blue equipment buttons)
+    - Each button shows failure mode name, category badge, equipment type, and RPN score
+    - Clicking a button directly submits the selected failure mode
+    - "None of these / Describe differently" cancel option
+  - Files: `/app/backend/server.py`, `/app/frontend/src/components/ChatSidebar.js`

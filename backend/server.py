@@ -238,8 +238,9 @@ class ChatResponse(BaseModel):
     message: str
     threat: Optional[ThreatResponse] = None
     follow_up_question: Optional[str] = None
-    question_type: Optional[str] = None  # asset, location, photo, frequency, impact, details
+    question_type: Optional[str] = None  # asset, location, photo, frequency, impact, details, failure
     equipment_suggestions: Optional[List[dict]] = None  # List of suggested equipment when unclear
+    failure_mode_suggestions: Optional[List[dict]] = None  # List of suggested failure modes when unclear
 
 class VoiceTranscriptionResponse(BaseModel):
     text: str
@@ -1148,6 +1149,73 @@ async def send_chat_message(
             if equipment_suggestions:
                 question = "I found some equipment that might match. Please select the correct one, or describe it differently:"
         
+        # If failure type is unclear, get failure mode suggestions
+        failure_mode_suggestions = None
+        if question_type == "failure":
+            # Get all failure modes from library
+            all_failure_modes = FAILURE_MODES_LIBRARY
+            
+            # Try to find matching failure modes based on message content
+            message_lower = message.content.lower()
+            scored_modes = []
+            
+            for fm in all_failure_modes:
+                score = 0
+                fm_name_lower = fm.get("failure_mode", "").lower()
+                category_lower = fm.get("category", "").lower()
+                equipment_lower = fm.get("equipment", "").lower()
+                keywords = [k.lower() for k in fm.get("keywords", [])]
+                
+                # Score based on matches
+                for word in message_lower.split():
+                    if len(word) > 2:  # Skip short words
+                        if word in fm_name_lower:
+                            score += 5
+                        if word in category_lower:
+                            score += 2
+                        if word in equipment_lower:
+                            score += 2
+                        for keyword in keywords:
+                            if word in keyword or keyword in word:
+                                score += 3
+                
+                if score > 0:
+                    scored_modes.append({
+                        "id": fm["id"],
+                        "failure_mode": fm.get("failure_mode", "Unknown"),
+                        "category": fm.get("category"),
+                        "equipment": fm.get("equipment"),
+                        "severity": fm.get("severity"),
+                        "rpn": fm.get("rpn"),
+                        "score": score
+                    })
+            
+            # Sort by score and take top 5
+            scored_modes.sort(key=lambda x: x["score"], reverse=True)
+            
+            # If no matches found, show common failure modes
+            if not scored_modes and all_failure_modes:
+                # Get top failure modes by RPN (most critical ones)
+                sorted_by_rpn = sorted(all_failure_modes, key=lambda x: x.get("rpn", 0), reverse=True)
+                failure_mode_suggestions = [
+                    {
+                        "id": fm["id"],
+                        "failure_mode": fm.get("failure_mode", "Unknown"),
+                        "category": fm.get("category"),
+                        "equipment": fm.get("equipment"),
+                        "severity": fm.get("severity"),
+                        "rpn": fm.get("rpn"),
+                        "score": 0
+                    }
+                    for fm in sorted_by_rpn[:5]
+                ]
+            else:
+                failure_mode_suggestions = scored_modes[:5]
+            
+            # Update the question to be more helpful
+            if failure_mode_suggestions:
+                question = "I found some failure modes that might match. Please select the correct one, or describe the failure differently:"
+        
         # Add helpful prompts based on question type
         if question_type == "photo":
             question += "\n\n💡 Tip: Use the camera button to attach a photo."
@@ -1161,6 +1229,7 @@ async def send_chat_message(
             "content": question,
             "question_type": question_type,
             "equipment_suggestions": equipment_suggestions,
+            "failure_mode_suggestions": failure_mode_suggestions,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.chat_messages.insert_one(ai_response)
@@ -1169,7 +1238,8 @@ async def send_chat_message(
             message=question,
             follow_up_question=analysis.get("follow_up_question"),
             question_type=question_type,
-            equipment_suggestions=equipment_suggestions
+            equipment_suggestions=equipment_suggestions,
+            failure_mode_suggestions=failure_mode_suggestions
         )
     
     # Create threat
@@ -1323,65 +1393,94 @@ async def send_chat_message(
     matched_failure_mode = None
     failure_mode_id = None
     failure_mode_data = None
+    multiple_failure_matches = []
     
     if failure_mode_name and failure_mode_name != "Unknown":
-        # Get equipment type for better matching
-        equipment_type = threat_data.get("equipment_type", "")
-        
         # First, do a direct search against the FMEA library for exact/close matches
         failure_mode_lower = failure_mode_name.lower()
         
-        # Priority 1: Exact failure mode name match in library
+        # Collect all potential matches with scores
         for fm in FAILURE_MODES_LIBRARY:
-            if fm["failure_mode"].lower() == failure_mode_lower:
-                matched_failure_mode = fm
-                break
-        
-        # Priority 2: Failure mode name contains our search term or vice versa
-        if not matched_failure_mode:
-            for fm in FAILURE_MODES_LIBRARY:
-                fm_name_lower = fm["failure_mode"].lower()
-                # Check both directions for containment
-                if failure_mode_lower in fm_name_lower or fm_name_lower in failure_mode_lower:
-                    matched_failure_mode = fm
-                    break
-        
-        # Priority 3: Keyword match in the failure mode's keywords
-        if not matched_failure_mode:
-            for fm in FAILURE_MODES_LIBRARY:
+            score = 0
+            fm_name_lower = fm["failure_mode"].lower()
+            
+            # Exact match gets highest score
+            if fm_name_lower == failure_mode_lower:
+                score = 100
+            # Containment match
+            elif failure_mode_lower in fm_name_lower or fm_name_lower in failure_mode_lower:
+                score = 80
+            else:
+                # Keyword match
                 for keyword in fm.get("keywords", []):
                     if failure_mode_lower in keyword.lower() or keyword.lower() in failure_mode_lower:
-                        matched_failure_mode = fm
+                        score = max(score, 60)
                         break
-                if matched_failure_mode:
-                    break
-        
-        # Priority 4: Use fuzzy matching with equipment context
-        if not matched_failure_mode:
-            search_text = f"{failure_mode_name} {threat_data.get('title', '')} {equipment_type}"
-            matching_modes = find_matching_failure_modes(search_text, limit=5)
-            
-            if matching_modes:
-                # Filter to only include modes where failure mode words significantly overlap
-                failure_words = set(w for w in failure_mode_lower.split() if len(w) >= 4)
                 
-                for fm in matching_modes:
-                    fm_words = set(w.lower() for w in fm["failure_mode"].split() if len(w) >= 4)
-                    # Check if there's meaningful word overlap
+                # Word overlap matching
+                if score == 0:
+                    failure_words = set(w for w in failure_mode_lower.split() if len(w) >= 3)
+                    fm_words = set(w.lower() for w in fm_name_lower.split() if len(w) >= 3)
                     overlap = failure_words & fm_words
                     if overlap:
-                        matched_failure_mode = fm
-                        break
-                
-                # If still no match with word overlap, check keywords
-                if not matched_failure_mode:
-                    for fm in matching_modes:
-                        for keyword in fm.get("keywords", []):
-                            if any(fw in keyword.lower() for fw in failure_words):
-                                matched_failure_mode = fm
-                                break
-                        if matched_failure_mode:
-                            break
+                        score = 40 + (len(overlap) * 10)
+            
+            if score > 0:
+                multiple_failure_matches.append({
+                    "fm": fm,
+                    "score": score
+                })
+        
+        # Sort by score
+        multiple_failure_matches.sort(key=lambda x: x["score"], reverse=True)
+        
+        # If we have multiple good matches (score >= 40), ask user to select
+        good_matches = [m for m in multiple_failure_matches if m["score"] >= 40]
+        
+        if len(good_matches) > 1 and good_matches[0]["score"] < 100:
+            # Multiple matches found - return suggestions to user
+            failure_mode_suggestions = [
+                {
+                    "id": m["fm"]["id"],
+                    "failure_mode": m["fm"].get("failure_mode", "Unknown"),
+                    "category": m["fm"].get("category"),
+                    "equipment": m["fm"].get("equipment"),
+                    "severity": m["fm"].get("severity"),
+                    "rpn": m["fm"].get("rpn"),
+                    "score": m["score"]
+                }
+                for m in good_matches[:5]
+            ]
+            
+            question = "I found multiple failure modes that could match. Please select the most appropriate one:"
+            
+            ai_response = {
+                "id": str(uuid.uuid4()),
+                "user_id": current_user["id"],
+                "role": "assistant",
+                "content": question,
+                "question_type": "failure",
+                "failure_mode_suggestions": failure_mode_suggestions,
+                "partial_threat_data": {
+                    "asset": asset_name,
+                    "linked_equipment_id": hierarchy_node.get("id") if hierarchy_node else None,
+                    "title": threat_data.get("title"),
+                    "failure_description": threat_data.get("failure_description"),
+                },
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.chat_messages.insert_one(ai_response)
+            
+            return ChatResponse(
+                message=question,
+                follow_up_question=question,
+                question_type="failure",
+                failure_mode_suggestions=failure_mode_suggestions
+            )
+        
+        # Single good match or exact match - use it
+        if good_matches:
+            matched_failure_mode = good_matches[0]["fm"]
         
         # If we found a match, extract the data
         if matched_failure_mode:

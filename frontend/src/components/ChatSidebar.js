@@ -392,7 +392,62 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           </div>
         )}
         
-        {isFollowUp && !msg.threat_id && !msg.equipment_suggestions && (
+        {/* Failure Mode Suggestions */}
+        {msg.failure_mode_suggestions && msg.failure_mode_suggestions.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {msg.failure_mode_suggestions.map((fm) => (
+              <button
+                key={fm.id}
+                onClick={() => {
+                  // Directly submit with the selected failure mode
+                  const failureModeText = `Failure mode: ${fm.failure_mode}`;
+                  sendMutation.mutate({ content: failureModeText, image: null });
+                }}
+                disabled={isSending}
+                className="w-full text-left p-2.5 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-medium text-amber-900 text-sm">{fm.failure_mode}</span>
+                  </div>
+                  {isSending ? (
+                    <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+                  ) : (
+                    <ArrowRight className="w-4 h-4 text-amber-400 group-hover:text-amber-600 transition-colors" />
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  {fm.category && (
+                    <span className="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{fm.category}</span>
+                  )}
+                  {fm.equipment && (
+                    <span className="text-xs text-amber-500">{fm.equipment}</span>
+                  )}
+                  {fm.rpn && (
+                    <span className="text-xs text-amber-700 font-medium">RPN: {fm.rpn}</span>
+                  )}
+                </div>
+              </button>
+            ))}
+            
+            {/* Cancel option for failure modes */}
+            <button
+              onClick={() => {
+                setMessage("");
+                if (textareaRef.current) {
+                  textareaRef.current.focus();
+                }
+              }}
+              disabled={isSending}
+              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm disabled:opacity-50"
+            >
+              <X className="w-3.5 h-3.5 inline mr-1" />
+              None of these / Describe differently
+            </button>
+          </div>
+        )}
+        
+        {isFollowUp && !msg.threat_id && !msg.equipment_suggestions && !msg.failure_mode_suggestions && (
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1 text-blue-600 text-xs">
             <HelpCircle className="w-3 h-3" />
             <span>Please provide more details</span>
