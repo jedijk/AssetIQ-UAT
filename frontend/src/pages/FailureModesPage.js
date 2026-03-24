@@ -175,7 +175,7 @@ function FailureModeViewPanel({
     );
   }
 
-  const likelihoodScore = Math.round((fm.severity * fm.occurrence * fm.detectability) / 10);
+  const rpn = fm.severity * fm.occurrence * fm.detectability;
   const data = isEditing ? formData : fm;
 
   return (
@@ -197,7 +197,7 @@ function FailureModeViewPanel({
           ) : (
             <>
               <h2 className="font-semibold text-slate-900 text-lg truncate">{fm.failure_mode}</h2>
-              <p className="text-sm text-slate-500">#{fm.id} • {fm.category}</p>
+              <p className="text-sm text-slate-500">{fm.category}</p>
             </>
           )}
         </div>
@@ -229,11 +229,21 @@ function FailureModeViewPanel({
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Likelihood Score Card */}
+        {/* RPN Score Card */}
         <div className="grid grid-cols-4 gap-3">
-          <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-slate-800">{likelihoodScore}</div>
-            <div className="text-xs text-slate-500 mt-1">{t("library.riskScore")}</div>
+          <div className={`bg-gradient-to-br rounded-xl p-4 text-center ${
+            rpn >= 200 ? 'from-red-50 to-red-100' :
+            rpn >= 125 ? 'from-orange-50 to-orange-100' :
+            rpn >= 80 ? 'from-yellow-50 to-yellow-100' :
+            'from-green-50 to-green-100'
+          }`}>
+            <div className={`text-2xl font-bold ${
+              rpn >= 200 ? 'text-red-700' :
+              rpn >= 125 ? 'text-orange-700' :
+              rpn >= 80 ? 'text-yellow-700' :
+              'text-green-700'
+            }`}>{rpn}</div>
+            <div className="text-xs text-slate-500 mt-1">RPN</div>
           </div>
           <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 text-center">
             {isEditing ? (
@@ -1036,7 +1046,6 @@ const FailureModesPage = () => {
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-xs text-slate-400 font-mono">#{fm.id}</span>
                             <Badge className={`${colors} text-xs px-1.5 py-0`}>{fm.category}</Badge>
                           </div>
                           <h3 className="font-medium text-slate-900 text-sm line-clamp-1">
@@ -1047,15 +1056,16 @@ const FailureModesPage = () => {
                           </p>
                         </div>
 
-                        {/* Likelihood Score Badge */}
+                        {/* RPN Score Badge */}
                         <div className="flex-shrink-0 flex flex-col items-center gap-1">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
-                            fm.severity * fm.occurrence * fm.detectability / 10 >= 70 ? 'bg-red-100 text-red-700' :
-                            fm.severity * fm.occurrence * fm.detectability / 10 >= 50 ? 'bg-orange-100 text-orange-700' :
-                            fm.severity * fm.occurrence * fm.detectability / 10 >= 30 ? 'bg-yellow-100 text-yellow-700' :
+                          <div className={`w-12 h-10 rounded-lg flex flex-col items-center justify-center text-sm font-bold ${
+                            fm.severity * fm.occurrence * fm.detectability >= 200 ? 'bg-red-100 text-red-700' :
+                            fm.severity * fm.occurrence * fm.detectability >= 125 ? 'bg-orange-100 text-orange-700' :
+                            fm.severity * fm.occurrence * fm.detectability >= 80 ? 'bg-yellow-100 text-yellow-700' :
                             'bg-green-100 text-green-700'
                           }`}>
-                            {Math.round(fm.severity * fm.occurrence * fm.detectability / 10)}
+                            <span className="text-lg leading-tight">{fm.severity * fm.occurrence * fm.detectability}</span>
+                            <span className="text-[9px] opacity-70">RPN</span>
                           </div>
                           {/* Validation indicator */}
                           {fm.is_validated ? (
