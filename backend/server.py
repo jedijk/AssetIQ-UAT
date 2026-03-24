@@ -25,6 +25,7 @@ from failure_modes import (
     get_all_categories,
     get_all_equipment_types
 )
+from chat_handler_v2 import process_chat_message, ChatState
 from services.failure_modes_service import FailureModesService, find_matching_failure_modes_db
 from services.efm_service import EFMService
 from services.task_service import TaskService
@@ -978,18 +979,23 @@ async def send_chat_message(
     message: ChatMessageCreate,
     current_user: dict = Depends(get_current_user)
 ):
+    """
+    Clean 2-step chat flow:
+    1. Match equipment from hierarchy (subunit level and below)
+    2. Match failure mode from FMEA library
+    Auto-creates observation if confident (1 match each)
+    """
     session_id = f"user_{current_user['id']}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+    user_id = current_user["id"]
     
-    # Store user message (with image thumbnail if provided)
+    # Store user message
     image_thumbnail = None
     if message.image_base64:
-        # Store a compressed thumbnail for display in chat history
-        # Keep the base64 but limit size for storage
         image_thumbnail = message.image_base64[:50000] if len(message.image_base64) > 50000 else message.image_base64
     
     chat_msg = {
         "id": str(uuid.uuid4()),
-        "user_id": current_user["id"],
+        "user_id": user_id,
         "role": "user",
         "content": message.content,
         "has_image": message.image_base64 is not None,
@@ -998,22 +1004,18 @@ async def send_chat_message(
     }
     await db.chat_messages.insert_one(chat_msg)
     
-    # First, classify the user's intent (data query vs threat report)
-    # Skip classification if there's an image (likely a threat report)
+    # Check for data queries (skip if image provided)
     if not message.image_base64:
         intent = await classify_user_intent(message.content, session_id)
         
         if intent.get("is_data_query", False) and intent.get("confidence", 0) > 0.6:
-            # Handle as a data query
-            data_context = await get_data_context(current_user["id"], intent.get("entities"))
+            data_context = await get_data_context(user_id, intent.get("entities"))
             query_response = await answer_data_query(message.content, session_id, data_context)
-            
             answer = query_response.get("answer", "I couldn't find the information you're looking for.")
             
-            # Store AI response
             ai_response = {
                 "id": str(uuid.uuid4()),
-                "user_id": current_user["id"],
+                "user_id": user_id,
                 "role": "assistant",
                 "content": answer,
                 "is_data_query": True,
@@ -1027,981 +1029,159 @@ async def send_chat_message(
                 question_type="data_query"
             )
     
-    # Get recent conversation context for follow-up questions
-    recent_messages = await db.chat_messages.find(
-        {"user_id": current_user["id"]},
-        {"_id": 0}
-    ).sort("created_at", -1).limit(10).to_list(10)
+    # Process with clean 2-step chat handler
+    result = await process_chat_message(
+        db=db,
+        user_id=user_id,
+        message_content=message.content,
+        failure_modes_library=FAILURE_MODES_LIBRARY,
+        session_id=session_id,
+        image_base64=message.image_base64
+    )
     
-    # Check if this is an equipment selection response
-    # (user selecting from previous equipment suggestions)
-    last_assistant_msg = None
-    for msg in recent_messages:
-        if msg.get("role") == "assistant" and msg.get("equipment_suggestions"):
-            last_assistant_msg = msg
-            break
-    
-    equipment_selected = False
-    analysis = None
-    
-    if last_assistant_msg and last_assistant_msg.get("equipment_suggestions"):
-        # Check if user's message matches any suggested equipment
-        message_lower = message.content.lower().strip()
-        # Normalize whitespace for comparison
-        message_normalized = ' '.join(message_lower.split())
-        
-        for eq in last_assistant_msg["equipment_suggestions"]:
-            eq_name_lower = (eq.get("name") or "").lower()
-            eq_name_normalized = ' '.join(eq_name_lower.split())  # Normalize whitespace
-            
-            # Match if normalized names match or contain each other
-            if eq_name_normalized and (eq_name_normalized in message_normalized or message_normalized in eq_name_normalized):
-                # User selected this equipment
-                equipment_selected = True
-                selected_equipment_id = eq.get("id")
-                selected_equipment_name = eq.get("name")
-                
-                # Get the pending threat data from conversation context
-                pending_data = last_assistant_msg.get("pending_threat_data") or {}
-                original_failure = pending_data.get("original_message") or pending_data.get("failure_description") or "issue reported"
-                original_failure_mode = pending_data.get("failure_mode")
-                
-                # Check if the original message had a failure mode term that matches multiple FMEA entries
-                # If so, ask user to select which specific failure mode
-                original_lower = original_failure.lower()
-                
-                # Score failure modes against the original message
-                fm_matches = []
-                for fm in FAILURE_MODES_LIBRARY:
-                    score = 0
-                    fm_name_lower = fm.get("failure_mode", "").lower()
-                    keywords = [k.lower() for k in fm.get("keywords", [])]
-                    
-                    # Check for name match
-                    if fm_name_lower in original_lower or original_lower in fm_name_lower:
-                        score += 50
-                    
-                    # Check keywords
-                    for keyword in keywords:
-                        if keyword in original_lower or original_lower in keyword:
-                            score += 30
-                            break
-                    
-                    # Check word overlap
-                    for word in original_lower.split():
-                        if len(word) >= 4 and word in fm_name_lower:
-                            score += 10
-                    
-                    if score >= 30:
-                        fm_matches.append({
-                            "id": fm["id"],
-                            "failure_mode": fm.get("failure_mode"),
-                            "category": fm.get("category"),
-                            "equipment": fm.get("equipment"),
-                            "severity": fm.get("severity"),
-                            "rpn": fm.get("rpn"),
-                            "score": score,
-                            "recommended_actions": fm.get("recommended_actions", [])
-                        })
-                
-                fm_matches.sort(key=lambda x: x["score"], reverse=True)
-                
-                # If multiple failure modes match, ask user to select
-                if len(fm_matches) > 1:
-                    question = "Which type of failure? Please select:"
-                    
-                    ai_response = {
-                        "id": str(uuid.uuid4()),
-                        "user_id": current_user["id"],
-                        "role": "assistant",
-                        "content": question,
-                        "question_type": "failure",
-                        "failure_mode_suggestions": fm_matches[:8],
-                        "partial_threat_data": {
-                            "asset": selected_equipment_name,
-                            "linked_equipment_id": selected_equipment_id,
-                            "title": f"{selected_equipment_name} - {original_failure}",
-                            "failure_description": original_failure,
-                        },
-                        "created_at": datetime.now(timezone.utc).isoformat()
-                    }
-                    await db.chat_messages.insert_one(ai_response)
-                    
-                    return ChatResponse(
-                        message=question,
-                        follow_up_question=question,
-                        question_type="failure",
-                        failure_mode_suggestions=fm_matches[:8]
-                    )
-                
-                # Single match or no matches - proceed with analysis
-                # Construct a clear message for the AI with the selected equipment
-                enhanced_message = f'Reporting issue for equipment "{selected_equipment_name}": {original_failure}'
-                
-                # Analyze with the enhanced message
-                analysis = await analyze_threat_with_ai(enhanced_message, session_id, message.image_base64)
-                
-                # Force the asset to be the selected equipment and mark complete
-                if analysis.get("threat"):
-                    analysis["threat"]["asset"] = selected_equipment_name
-                    # If we had a single FM match, use its failure_mode and equipment_type
-                    if len(fm_matches) == 1:
-                        analysis["threat"]["failure_mode"] = fm_matches[0]["failure_mode"]
-                        analysis["threat"]["equipment_type"] = fm_matches[0].get("equipment", analysis["threat"].get("equipment_type", "Equipment"))
-                else:
-                    # If AI didn't return threat, create a basic one
-                    analysis["threat"] = {
-                        "title": f"{selected_equipment_name} - {original_failure}",
-                        "asset": selected_equipment_name,
-                        "equipment_type": fm_matches[0].get("equipment", "Equipment") if fm_matches else "Equipment",
-                        "failure_mode": fm_matches[0]["failure_mode"] if fm_matches else (pending_data.get("failure_mode") or "Unknown"),
-                        "impact": "Equipment Damage",
-                        "frequency": "First Time",
-                        "risk_score": 30,
-                        "risk_level": "Medium",
-                        "recommended_actions": fm_matches[0].get("recommended_actions", []) if fm_matches else []
-                    }
-                analysis["complete"] = True
-                analysis["selected_equipment_id"] = selected_equipment_id
-                break
-    
-    # Check if this is a FAILURE MODE selection response
-    # (user selecting from previous failure_mode_suggestions)
-    failure_mode_selected = False
-    last_fm_msg = None
-    for msg in recent_messages:
-        if msg.get("role") == "assistant" and msg.get("failure_mode_suggestions"):
-            last_fm_msg = msg
-            break
-    
-    if not equipment_selected and last_fm_msg and last_fm_msg.get("failure_mode_suggestions"):
-        message_lower = message.content.lower().strip()
-        
-        # Check for "Failure mode: X" pattern from frontend
-        if message_lower.startswith("failure mode:"):
-            selected_fm_name = message.content.split(":", 1)[1].strip()
-        else:
-            selected_fm_name = message.content.strip()
-        
-        selected_fm_name_lower = selected_fm_name.lower()
-        
-        for fm in last_fm_msg["failure_mode_suggestions"]:
-            fm_name = fm.get("failure_mode", "")
-            if fm_name.lower() == selected_fm_name_lower:
-                failure_mode_selected = True
-                
-                # Get threat data from conversation - check multiple sources
-                partial_data = last_fm_msg.get("partial_threat_data") or {}
-                pending_data = last_fm_msg.get("pending_threat_data") or {}
-                
-                # Try to find equipment info from the conversation history
-                # Look for the most recent message that had an equipment selection
-                selected_eq_name = None
-                selected_eq_id = None
-                for hist_msg in recent_messages:
-                    if hist_msg.get("role") == "user":
-                        # Check if this was an equipment selection (user clicking equipment button)
-                        user_content = hist_msg.get("content", "").lower()
-                        # Look for equipment patterns like "TEST_Full_Equip" or equipment names
-                        if "test_" in user_content or "equip" in user_content.lower():
-                            # This might be an equipment selection
-                            selected_eq_name = hist_msg.get("content", "Equipment")
-                            break
-                
-                # Use partial_data (from second flow) or pending_data (from first flow)
-                asset_name = partial_data.get("asset") or selected_eq_name or pending_data.get("failure_description", "Equipment")
-                equipment_id = partial_data.get("linked_equipment_id") or selected_eq_id
-                failure_desc = partial_data.get("failure_description") or pending_data.get("failure_description") or fm_name
-                
-                # Build the analysis with selected failure mode
-                analysis = {
-                    "complete": True,
-                    "threat": {
-                        "title": f"{asset_name} - {fm_name}",
-                        "asset": asset_name,
-                        "equipment_type": fm.get("equipment", "Equipment"),
-                        "failure_mode": fm_name,
-                        "impact": "Equipment Damage",
-                        "frequency": "First Time",
-                        "risk_score": min(100, int(fm.get("rpn", 100) / 10)),
-                        "risk_level": "High" if fm.get("rpn", 0) > 200 else "Medium",
-                        "recommended_actions": fm.get("recommended_actions", [])
-                    },
-                    "selected_equipment_id": equipment_id,
-                    "selected_failure_mode_id": fm.get("id"),
-                    "user_selected_failure_mode": True  # Flag to skip ambiguity check
-                }
-                break
-    
-    # If no equipment was selected from suggestions, do normal analysis
-    if not equipment_selected and not failure_mode_selected:
-        # Build context from recent messages
-        context = ""
-        if len(recent_messages) > 1:
-            context = "\n\nPrevious conversation context:\n"
-            for msg in reversed(recent_messages[1:6]):  # Last 5 messages excluding current
-                role = "User" if msg["role"] == "user" else "Assistant"
-                context += f"{role}: {msg['content'][:200]}\n"
-        
-        # Analyze with AI for threat reporting
-        analysis = await analyze_threat_with_ai(
-            message.content + context, 
-            session_id, 
-            message.image_base64
-        )
-    
-    # Check if the extracted asset is generic (needs disambiguation) BEFORE processing
-    extracted_asset = analysis.get("threat", {}).get("asset", "").lower() if analysis.get("threat") else ""
-    user_input_lower = message.content.lower()
-    generic_equipment_terms = ["extruder", "pump", "compressor", "motor", "valve", "heat exchanger", "fan", "blower", "conveyor", "mixer", "strainer", "filter", "tank", "vessel", "pipe", "sensor", "turbine"]
-    
-    # Determine if the user's input was generic (user said "extruder" not "00 1L01 extruder")
-    user_used_generic_term = False
-    for term in generic_equipment_terms:
-        if term in user_input_lower:
-            # Check if user provided a specific identifier (tag like P-101, C-201, etc.)
-            # Look for patterns like P-101, CW-101, 00 1L01, etc. anywhere in the message
-            import re
-            has_specific_id = bool(re.search(r'\b[A-Za-z]{1,3}[-]?\d{2,4}\b|\b\d{2}\s+\d[A-Za-z]\d{2}\b', user_input_lower))
-            if not has_specific_id:
-                user_used_generic_term = True
-                break
-    
-    # Find which generic term the user used
-    matched_generic_term = None
-    for term in generic_equipment_terms:
-        if term in user_input_lower:
-            matched_generic_term = term
-            break
-    
-    # Check if multiple equipment match when user used generic term
-    if user_used_generic_term and matched_generic_term and analysis.get("complete", False):
-        subunit_levels = ["subunit", "maintainable_item", "equipment"]
-        matching_equipment = await db.equipment_nodes.find(
-            {
-                "$and": [
-                    {"$or": [{"user_id": current_user["id"]}, {"user_id": None}, {"user_id": {"$exists": False}}]},
-                    {"level": {"$in": subunit_levels}},
-                    {"name": {"$regex": matched_generic_term, "$options": "i"}}
-                ]
-            },
-            {"_id": 0, "id": 1, "name": 1}
-        ).to_list(10)
-        
-        # If multiple equipment match, force disambiguation
-        if len(matching_equipment) > 1:
-            analysis["complete"] = False
-            analysis["question_type"] = "asset"
-            analysis["follow_up_question"] = f"I found multiple equipment matching '{matched_generic_term}'. Please select the correct one:"
-    
-    # Check for vague failure terms - force failure mode selection
-    vague_failure_terms = ["failing", "failed", "broken", "problem", "issue", "trouble", "not working", 
-                          "down", "bad", "wrong", "fault", "error", "malfunction", "acting up", "stopped",
-                          "doesn't work", "isn't working", "won't work", "having issues", "having problems"]
-    
-    user_has_vague_failure = any(term in user_input_lower for term in vague_failure_terms)
-    ai_detected_vague = analysis.get("is_vague_failure", False) if analysis else False
-    
-    # If vague failure detected and we have a specific equipment, ask for failure mode
-    if (user_has_vague_failure or ai_detected_vague) and analysis and analysis.get("complete", False):
-        # Override - we need more specific failure info
-        analysis["complete"] = False
-        analysis["question_type"] = "failure"
-        analysis["follow_up_question"] = "What specifically is wrong? Please select or describe the failure:"
-    
-    # Check if the failure mode term in user message matches MULTIPLE FMEA entries
-    # If so, force the user to select which specific failure mode they mean
-    # BUT skip this if user has already explicitly selected a failure mode
-    if analysis and analysis.get("complete", False) and not analysis.get("user_selected_failure_mode", False):
-        ai_failure_mode = (analysis.get("threat", {}).get("failure_mode") or "").lower()
-        
-        # Find all FMEA entries that match the failure mode term
-        fm_matches = []
-        for fm in FAILURE_MODES_LIBRARY:
-            fm_name_lower = fm.get("failure_mode", "").lower()
-            keywords = [k.lower() for k in fm.get("keywords", [])]
-            
-            # Check if this FMEA entry matches the AI's failure mode
-            if ai_failure_mode and (ai_failure_mode in fm_name_lower or fm_name_lower in ai_failure_mode):
-                fm_matches.append(fm)
-            elif any(ai_failure_mode in kw or kw in ai_failure_mode for kw in keywords):
-                fm_matches.append(fm)
-        
-        # If multiple FMEA entries match, ask user to select
-        if len(fm_matches) > 1:
-            analysis["complete"] = False
-            analysis["question_type"] = "failure"
-            analysis["follow_up_question"] = "Which type of failure? Please select:"
-    
-    if not analysis.get("complete", False):
-        # Need more info - return follow-up question
-        question = analysis.get("follow_up_question", "Could you provide more details about the failure?")
-        question_type = analysis.get("question_type", "details")
-        
-        equipment_suggestions = None
-        
-        if user_used_generic_term or question_type == "asset":
-            question_type = "asset"  # Force asset question type
-            # Only get equipment at subunit level and below (not installation, unit, plant_unit, etc.)
-            subunit_levels = ["subunit", "maintainable_item", "equipment"]
-            all_equipment = await db.equipment_nodes.find(
-                {
-                    "$and": [
-                        {"$or": [{"user_id": current_user["id"]}, {"user_id": None}, {"user_id": {"$exists": False}}]},
-                        {"level": {"$in": subunit_levels}}
-                    ]
-                },
-                {"_id": 0, "id": 1, "name": 1, "tag": 1, "equipment_type": 1, "description": 1, "level": 1}
-            ).to_list(100)
-            
-            # Try to find matching equipment based on message content
-            message_lower = message.content.lower()
-            scored_equipment = []
-            
-            for eq in all_equipment:
-                score = 0
-                name_lower = (eq.get("name") or "").lower()
-                tag_lower = (eq.get("tag") or "").lower()
-                desc_lower = (eq.get("description") or "").lower()
-                eq_type_lower = (eq.get("equipment_type") or "").lower()
-                
-                # Score based on matches
-                for word in message_lower.split():
-                    if len(word) > 2:  # Skip short words
-                        if word in name_lower:
-                            score += 3
-                        if word in tag_lower:
-                            score += 3
-                        if word in desc_lower:
-                            score += 1
-                        if word in eq_type_lower:
-                            score += 2
-                
-                if score > 0:
-                    scored_equipment.append({
-                        "id": eq["id"],
-                        "name": eq.get("name", "Unknown"),
-                        "tag": eq.get("tag"),
-                        "equipment_type": eq.get("equipment_type"),
-                        "score": score
-                    })
-            
-            # Sort by score and take top 5
-            scored_equipment.sort(key=lambda x: x["score"], reverse=True)
-            
-            # If no matches found, show first 5 equipment items
-            if not scored_equipment and all_equipment:
-                equipment_suggestions = [
-                    {
-                        "id": eq["id"],
-                        "name": eq.get("name", "Unknown"),
-                        "tag": eq.get("tag"),
-                        "equipment_type": eq.get("equipment_type"),
-                        "score": 0
-                    }
-                    for eq in all_equipment[:5]
-                ]
-            else:
-                equipment_suggestions = scored_equipment[:5]
-            
-            # Update the question to be more helpful
-            if equipment_suggestions:
-                question = "I found some equipment that might match. Please select the correct one, or describe it differently:"
-        
-        # If failure type is unclear, get failure mode suggestions
-        failure_mode_suggestions = None
-        if question_type == "failure":
-            # Get all failure modes from library
-            all_failure_modes = FAILURE_MODES_LIBRARY
-            
-            # Try to find matching failure modes based on message content and equipment type
-            message_lower = message.content.lower()
-            
-            # Get the extracted equipment type if available
-            extracted_equipment_type = ""
-            if analysis and analysis.get("threat"):
-                extracted_equipment_type = (analysis.get("threat", {}).get("equipment_type") or "").lower()
-                extracted_asset = (analysis.get("threat", {}).get("asset") or "").lower()
-                # Also try to detect equipment type from asset name
-                if "pump" in extracted_asset:
-                    extracted_equipment_type = "pump"
-                elif "extruder" in extracted_asset:
-                    extracted_equipment_type = "extruder"
-                elif "compressor" in extracted_asset:
-                    extracted_equipment_type = "compressor"
-                elif "motor" in extracted_asset:
-                    extracted_equipment_type = "motor"
-                elif "valve" in extracted_asset:
-                    extracted_equipment_type = "valve"
-                elif "exchanger" in extracted_asset:
-                    extracted_equipment_type = "heat exchanger"
-            
-            scored_modes = []
-            
-            # Extract meaningful words from user message (min 3 chars)
-            message_words = [w for w in message_lower.split() if len(w) >= 3]
-            
-            for fm in all_failure_modes:
-                score = 0
-                fm_name_lower = fm.get("failure_mode", "").lower()
-                category_lower = fm.get("category", "").lower()
-                equipment_lower = fm.get("equipment", "").lower()
-                keywords = [k.lower() for k in fm.get("keywords", [])]
-                
-                # HIGHEST PRIORITY: Exact failure mode name match (user says "fouling" → "Fouling")
-                if fm_name_lower in message_lower or message_lower in fm_name_lower:
-                    score += 50  # Strong bonus for direct match
-                
-                # HIGH PRIORITY: Exact keyword match (user says "fouling" → keyword contains "fouling")  
-                for keyword in keywords:
-                    if keyword in message_lower or message_lower in keyword:
-                        score += 30
-                        break  # Only count once
-                
-                # Boost score if equipment type matches the identified equipment
-                if extracted_equipment_type and extracted_equipment_type in equipment_lower:
-                    score += 15
-                
-                # Word-level matching (lower priority)
-                for word in message_words:
-                    if word in fm_name_lower:
-                        score += 5
-                    if word in category_lower:
-                        score += 2
-                    if word in equipment_lower:
-                        score += 2
-                    for keyword in keywords:
-                        if word in keyword or keyword in word:
-                            score += 3
-                
-                if score > 0:
-                    scored_modes.append({
-                        "id": fm["id"],
-                        "failure_mode": fm.get("failure_mode", "Unknown"),
-                        "category": fm.get("category"),
-                        "equipment": fm.get("equipment"),
-                        "severity": fm.get("severity"),
-                        "rpn": fm.get("rpn"),
-                        "score": score
-                    })
-            
-            # Sort by score and take top 8 (more options for selection)
-            scored_modes.sort(key=lambda x: x["score"], reverse=True)
-            
-            # PRIORITY: If user mentioned something specific that matched failure modes, show those
-            # Only fall back to equipment-type suggestions if NO good matches found
-            
-            # Check if we have high-confidence matches (score >= 30 means direct name/keyword match)
-            high_confidence_matches = [m for m in scored_modes if m["score"] >= 30]
-            medium_confidence_matches = [m for m in scored_modes if m["score"] >= 10]
-            
-            if high_confidence_matches:
-                # User mentioned something very specific (e.g., "fouling") - only show those
-                failure_mode_suggestions = high_confidence_matches[:8]
-            elif medium_confidence_matches:
-                # User mentioned something somewhat specific - show medium+ matches
-                failure_mode_suggestions = medium_confidence_matches[:8]
-            elif all_failure_modes:
-                # No specific matches - fall back to equipment-type suggestions
-                if extracted_equipment_type:
-                    filtered_modes = [fm for fm in all_failure_modes 
-                                    if extracted_equipment_type in fm.get("equipment", "").lower()]
-                    if filtered_modes:
-                        sorted_modes = sorted(filtered_modes, key=lambda x: x.get("rpn", 0), reverse=True)
-                    else:
-                        sorted_modes = sorted(all_failure_modes, key=lambda x: x.get("rpn", 0), reverse=True)
-                else:
-                    sorted_modes = sorted(all_failure_modes, key=lambda x: x.get("rpn", 0), reverse=True)
-                
-                failure_mode_suggestions = [
-                    {
-                        "id": fm["id"],
-                        "failure_mode": fm.get("failure_mode", "Unknown"),
-                        "category": fm.get("category"),
-                        "equipment": fm.get("equipment"),
-                        "severity": fm.get("severity"),
-                        "rpn": fm.get("rpn"),
-                        "score": 0
-                    }
-                    for fm in sorted_modes[:8]
-                ]
-            else:
-                failure_mode_suggestions = scored_modes[:8]
-            
-            # Update the question to be more helpful
-            if failure_mode_suggestions:
-                question = "What specifically is wrong? Please select the failure type:"
-        
-        # Add helpful prompts based on question type
-        if question_type == "photo":
-            question += "\n\n💡 Tip: Use the camera button to attach a photo."
-        elif question_type == "location":
-            question += "\n\n💡 Tip: Include area, unit, or building name."
-        
-        # Store pending threat data for equipment selection follow-up
-        # Always store original message for context when asking for equipment
-        pending_threat_data = {
-            "original_message": message.content,
-            "failure_description": (analysis.get("threat", {}) or {}).get("title") or message.content,
-            "failure_mode": (analysis.get("threat", {}) or {}).get("failure_mode"),
-        } if analysis else {
-            "original_message": message.content,
-            "failure_description": message.content,
-            "failure_mode": None,
-        }
-        
-        ai_response = {
-            "id": str(uuid.uuid4()),
-            "user_id": current_user["id"],
-            "role": "assistant",
-            "content": question,
-            "question_type": question_type,
-            "equipment_suggestions": equipment_suggestions,
-            "failure_mode_suggestions": failure_mode_suggestions,
-            "pending_threat_data": pending_threat_data,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.chat_messages.insert_one(ai_response)
-        
-        return ChatResponse(
-            message=question,
-            follow_up_question=analysis.get("follow_up_question") if analysis else None,
-            question_type=question_type,
-            equipment_suggestions=equipment_suggestions,
-            failure_mode_suggestions=failure_mode_suggestions
-        )
-    
-    # Create threat
-    threat_data = analysis.get("threat", {})
-    asset_name = threat_data.get("asset", "Unknown")
-    
-    # Check if equipment was pre-selected by user
-    selected_equipment_id = analysis.get("selected_equipment_id")
-    
-    # Get all equipment nodes (include shared equipment without created_by)
-    # Prioritize subunit-level matches
-    subunit_levels = ["subunit", "maintainable_item", "equipment"]
-    all_equipment_nodes = await db.equipment_nodes.find(
-        {"$or": [
-            {"created_by": current_user["id"]}, 
-            {"created_by": None}, 
-            {"created_by": {"$exists": False}},
-            {"user_id": current_user["id"]},
-            {"user_id": None},
-            {"user_id": {"$exists": False}}
-        ]},
-        {"_id": 0, "name": 1, "level": 1, "id": 1, "criticality": 1, "tag": 1}
-    ).to_list(500)
-    
-    # Try to resolve partial tag name to full equipment name
-    hierarchy_node = None
-    resolved_asset_name = asset_name
-    asset_lower = asset_name.lower()
-    
-    # If equipment was pre-selected, use it directly
-    if selected_equipment_id:
-        for node in all_equipment_nodes:
-            if node.get("id") == selected_equipment_id:
-                hierarchy_node = node
-                resolved_asset_name = node["name"]
-                break
-    
-    # Otherwise, try to match by name
-    if not hierarchy_node:
-        # Collect all matches with scoring
-        all_matches = []
-    
-        for node in all_equipment_nodes:
-            node_name_lower = node["name"].lower()
-            node_tag_lower = (node.get("tag") or "").lower()
-            is_subunit = node.get("level") in subunit_levels
-            
-            match_score = 0
-            
-            # Exact match
-            if node_name_lower == asset_lower:
-                match_score = 100 if is_subunit else 50
-            # Asset name contained in node name (partial match)
-            elif asset_lower in node_name_lower:
-                match_score = 80 if is_subunit else 30
-            # Node name contained in asset (reverse partial)
-            elif node_name_lower in asset_lower:
-                match_score = 70 if is_subunit else 25
-            # Tag match
-            elif asset_lower == node_tag_lower or asset_lower in node_tag_lower:
-                match_score = 90 if is_subunit else 40
-            # Word match (e.g., "extruder" matches "ZSE 60 Extruder")
-            elif any(part.lower() == asset_lower for part in node["name"].split()):
-                match_score = 85 if is_subunit else 35
-            # Fuzzy match (removing spaces/dashes)
-            elif asset_lower.replace(" ", "").replace("-", "") in node_name_lower.replace(" ", "").replace("-", ""):
-                match_score = 60 if is_subunit else 20
-            
-            if match_score > 0:
-                all_matches.append({
-                    "node": node,
-                    "score": match_score,
-                    "is_subunit": is_subunit
-                })
-        
-        if all_matches:
-            # Sort by score (highest first), then by subunit preference
-            all_matches.sort(key=lambda x: (x["score"], x["is_subunit"]), reverse=True)
-            
-            # Filter to only subunit-level matches with good scores
-            subunit_matches = [m for m in all_matches if m["is_subunit"] and m["score"] >= 60]
-            
-            # If multiple subunit matches, ask user to select
-            if len(subunit_matches) > 1:
-                # Store the partial threat data for later completion
-                equipment_suggestions = [
-                    {
-                        "id": m["node"]["id"],
-                        "name": m["node"].get("name", "Unknown"),
-                        "tag": m["node"].get("tag"),
-                        "equipment_type": m["node"].get("equipment_type"),
-                        "score": m["score"]
-                    }
-                    for m in subunit_matches[:5]  # Top 5 matches
-                ]
-                
-                question = f"I found multiple equipment matching '{asset_name}'. Please select the correct one:"
-                
-                ai_response = {
-                    "id": str(uuid.uuid4()),
-                    "user_id": current_user["id"],
-                    "role": "assistant",
-                    "content": question,
-                    "question_type": "asset",
-                    "equipment_suggestions": equipment_suggestions,
-                    "pending_threat_data": threat_data,  # Store for later
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }
-                await db.chat_messages.insert_one(ai_response)
-                
-                return ChatResponse(
-                    message=question,
-                    follow_up_question=question,
-                    question_type="asset",
-                    equipment_suggestions=equipment_suggestions
-                )
-            
-            # Single match or clear winner - use it
-            best_match = all_matches[0]
-            hierarchy_node = best_match["node"]
-            resolved_asset_name = hierarchy_node["name"]
-    
-    if not hierarchy_node:
-        # Asset not found in hierarchy - create threat anyway but flag it
-        # This allows users to report threats quickly without rigid hierarchy matching
-        resolved_asset_name = asset_name
-        hierarchy_node = {}  # Empty dict, threat created without hierarchy link
-    
-    # Get equipment criticality from hierarchy node
-    equipment_criticality = {}
-    if hierarchy_node:
-        crit = hierarchy_node.get("criticality")
-        if crit and isinstance(crit, dict):
-            equipment_criticality = crit
-    criticality_level = equipment_criticality.get("level") if equipment_criticality else None
-    
-    # Calculate 4-Dimension Criticality Score using weighted formula
-    # Formula: (Safety×25 + Production×20 + Environmental×15 + Reputation×10) / 3.5
-    # Max = (5×25 + 5×20 + 5×15 + 5×10) / 3.5 = 350 / 3.5 = 100
-    safety_impact = equipment_criticality.get("safety_impact", 0) or 0
-    production_impact = equipment_criticality.get("production_impact", 0) or 0
-    environmental_impact = equipment_criticality.get("environmental_impact", 0) or 0
-    reputation_impact = equipment_criticality.get("reputation_impact", 0) or 0
-    
-    criticality_score = (
-        (safety_impact * 25) + 
-        (production_impact * 20) + 
-        (environmental_impact * 15) + 
-        (reputation_impact * 10)
-    ) / 3.5
-    criticality_score = min(100, int(criticality_score))  # Normalize to 0-100
-    
-    rank, total = await calculate_rank(threat_data.get("risk_score", 50), current_user["id"])
-    
-    threat_id = str(uuid.uuid4())
-    
-    # Default FMEA score from AI estimation
-    fmea_score = threat_data.get("risk_score", 50)
-    fmea_score = int(fmea_score) if isinstance(fmea_score, (int, float)) else 50
-    
-    # ============= FAILURE MODE MATCHING =============
-    # Extract failure mode from AI response and match against FMEA library
-    failure_mode_name = threat_data.get("failure_mode", "Unknown")
-    matched_failure_mode = None
-    failure_mode_id = None
-    failure_mode_data = None
-    multiple_failure_matches = []
-    
-    if failure_mode_name and failure_mode_name != "Unknown":
-        # First, do a direct search against the FMEA library for exact/close matches
-        failure_mode_lower = failure_mode_name.lower()
-        
-        # Collect all potential matches with scores
-        for fm in FAILURE_MODES_LIBRARY:
-            score = 0
-            fm_name_lower = fm["failure_mode"].lower()
-            
-            # Exact match gets highest score
-            if fm_name_lower == failure_mode_lower:
-                score = 100
-            # Containment match
-            elif failure_mode_lower in fm_name_lower or fm_name_lower in failure_mode_lower:
-                score = 80
-            else:
-                # Keyword match
-                for keyword in fm.get("keywords", []):
-                    if failure_mode_lower in keyword.lower() or keyword.lower() in failure_mode_lower:
-                        score = max(score, 60)
-                        break
-                
-                # Word overlap matching
-                if score == 0:
-                    failure_words = set(w for w in failure_mode_lower.split() if len(w) >= 3)
-                    fm_words = set(w.lower() for w in fm_name_lower.split() if len(w) >= 3)
-                    overlap = failure_words & fm_words
-                    if overlap:
-                        score = 40 + (len(overlap) * 10)
-            
-            if score > 0:
-                multiple_failure_matches.append({
-                    "fm": fm,
-                    "score": score
-                })
-        
-        # Sort by score
-        multiple_failure_matches.sort(key=lambda x: x["score"], reverse=True)
-        
-        # If we have a very good match (score >= 80), use it directly without asking
-        # Only ask for selection if matches are ambiguous (multiple similar scores, no clear winner)
-        good_matches = [m for m in multiple_failure_matches if m["score"] >= 60]
-        
-        # Check if we should ask user to select:
-        # - Must have multiple matches
-        # - Top match must NOT be an exact/near-exact match (score < 90)
-        # - Top matches must be very close in score (within 10 points)
-        # This ensures we only ask when genuinely ambiguous
-        should_ask_for_selection = (
-            len(good_matches) > 1 and 
-            good_matches[0]["score"] < 90 and
-            (good_matches[0]["score"] - good_matches[1]["score"]) < 10
-        )
-        
-        if should_ask_for_selection:
-            # Multiple matches found - return suggestions to user
-            failure_mode_suggestions = [
-                {
-                    "id": m["fm"]["id"],
-                    "failure_mode": m["fm"].get("failure_mode", "Unknown"),
-                    "category": m["fm"].get("category"),
-                    "equipment": m["fm"].get("equipment"),
-                    "severity": m["fm"].get("severity"),
-                    "rpn": m["fm"].get("rpn"),
-                    "score": m["score"]
-                }
-                for m in good_matches[:5]
-            ]
-            
-            question = "I found multiple failure modes that could match. Please select the most appropriate one:"
-            
-            ai_response = {
-                "id": str(uuid.uuid4()),
-                "user_id": current_user["id"],
-                "role": "assistant",
-                "content": question,
-                "question_type": "failure",
-                "failure_mode_suggestions": failure_mode_suggestions,
-                "partial_threat_data": {
-                    "asset": asset_name,
-                    "linked_equipment_id": hierarchy_node.get("id") if hierarchy_node else None,
-                    "title": threat_data.get("title"),
-                    "failure_description": threat_data.get("failure_description"),
-                },
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            await db.chat_messages.insert_one(ai_response)
-            
-            return ChatResponse(
-                message=question,
-                follow_up_question=question,
-                question_type="failure",
-                failure_mode_suggestions=failure_mode_suggestions
-            )
-        
-        # Single good match or exact match - use it
-        if good_matches:
-            matched_failure_mode = good_matches[0]["fm"]
-        
-        # If we found a match, extract the data
-        if matched_failure_mode:
-            failure_mode_id = matched_failure_mode["id"]
-            failure_mode_data = {
-                "id": matched_failure_mode["id"],
-                "failure_mode": matched_failure_mode["failure_mode"],
-                "category": matched_failure_mode["category"],
-                "equipment": matched_failure_mode["equipment"],
-                "severity": matched_failure_mode["severity"],
-                "occurrence": matched_failure_mode["occurrence"],
-                "detectability": matched_failure_mode["detectability"],
-                "rpn": matched_failure_mode["rpn"],
-                "recommended_actions": matched_failure_mode.get("recommended_actions", [])
-            }
-            # Use matched failure mode name for consistency
-            failure_mode_name = matched_failure_mode["failure_mode"]
-            
-            # Calculate FMEA score from RPN (Severity × Occurrence × Detectability) / 10
-            # RPN is already S×O×D, so divide by 10 to normalize to 0-100
-            fmea_score = min(100, int(matched_failure_mode["rpn"] / 10))
-    
-    # NEW METHODOLOGY: Risk Score = (Criticality × 0.75) + (FMEA × 0.25)
-    # This averages the equipment criticality contribution with the failure mode severity
-    final_risk_score = int((criticality_score * 0.75) + (fmea_score * 0.25))
-    final_risk_score = min(100, max(0, final_risk_score))  # Clamp to 0-100
-    
-    # Determine risk level based on final score
-    if final_risk_score >= 70:
-        risk_level = "Critical"
-    elif final_risk_score >= 50:
-        risk_level = "High"
-    elif final_risk_score >= 30:
-        risk_level = "Medium"
-    else:
-        risk_level = "Low"
-    
-    threat_doc = {
-        "id": threat_id,
-        "title": threat_data.get("title", "Unknown Threat"),
-        "asset": resolved_asset_name,  # Use resolved full name from hierarchy
-        "linked_equipment_id": hierarchy_node.get("id") if hierarchy_node else None,  # Link to equipment node
-        "equipment_type": threat_data.get("equipment_type", "Unknown"),
-        "equipment_criticality": criticality_level,  # Store equipment criticality
-        "equipment_criticality_data": {
-            "safety_impact": safety_impact,
-            "production_impact": production_impact,
-            "environmental_impact": environmental_impact,
-            "reputation_impact": reputation_impact,
-            "level": criticality_level,
-            "criticality_score": criticality_score  # Store calculated criticality score
-        } if equipment_criticality else None,
-        "failure_mode": failure_mode_name,  # Use matched failure mode name
-        "failure_mode_id": failure_mode_id,  # Link to FMEA library
-        "failure_mode_data": failure_mode_data,  # Store FMEA data snapshot
-        "fmea_score": fmea_score,  # Store FMEA score component
-        "criticality_score": criticality_score,  # Store criticality score component
-        "cause": threat_data.get("cause"),
-        "impact": threat_data.get("impact", "Equipment Damage"),
-        "frequency": threat_data.get("frequency", "First Time"),
-        "likelihood": threat_data.get("likelihood", "Medium"),
-        "detectability": threat_data.get("detectability", "Moderate"),
-        "risk_level": risk_level,  # Use calculated risk level
-        "risk_score": final_risk_score,  # Use averaged risk score
-        "base_risk_score": fmea_score,  # Store FMEA score for reference
-        "rank": rank,
-        "total_threats": total,
-        "status": "Open",
-        "recommended_actions": threat_data.get("recommended_actions", []),
-        "created_by": current_user["id"],
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "occurrence_count": 1,
-        "image_url": None,
-        "location": threat_data.get("location"),
-        "session_id": session_id,  # Store session_id to retrieve related images
-        "attachments": []  # Store list of attachment URLs/data
-    }
-    
-    # If there's an image in the session, add it to attachments
-    # Find any messages with images in this session
-    session_images = await db.chat_messages.find(
-        {"user_id": current_user["id"], "has_image": True},
-        {"_id": 0, "image_data": 1, "created_at": 1}
-    ).sort("created_at", -1).limit(5).to_list(5)
-    
-    if session_images:
-        threat_doc["attachments"] = [
-            {
-                "type": "image",
-                "data": img.get("image_data"),
-                "created_at": img.get("created_at")
-            }
-            for img in session_images if img.get("image_data")
-        ]
-    
-    await db.threats.insert_one(threat_doc)
-    
-    # Also create a structured observation linked to the threat
-    try:
-        # failure_mode_id from FMEA library is an integer, but observation service expects ObjectId string
-        # Only pass failure_mode_id if it's a valid ObjectId string (24 hex chars)
-        obs_failure_mode_id = None
-        if failure_mode_id and isinstance(failure_mode_id, str) and len(failure_mode_id) == 24:
-            obs_failure_mode_id = failure_mode_id
-        
-        obs_data = {
-            "equipment_id": hierarchy_node.get("id") if hierarchy_node else None,
-            "failure_mode_id": obs_failure_mode_id,
-            "description": threat_data.get("description") or threat_data.get("title", "Observation from chat"),
-            "severity": "critical" if risk_level == "Critical" else ("high" if risk_level == "High" else ("medium" if risk_level == "Medium" else "low")),
-            "observation_type": "failure",
-            "tags": [threat_data.get("equipment_type", "")],
-        }
-        observation = await observation_service.create_observation(
-            obs_data,
-            created_by=current_user["id"],
-            source="chat"
-        )
-        # Link observation back to threat
-        await db.threats.update_one(
-            {"id": threat_id},
-            {"$set": {"observation_id": observation["id"]}}
-        )
-        logger.info(f"Created observation {observation['id']} for threat {threat_id}")
-    except Exception as obs_err:
-        logger.error(f"Failed to create observation for threat: {obs_err}")
-    
-    # Update ranks for all threats
-    await update_all_ranks(current_user["id"])
-    
-    # Get updated threat
-    updated_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0})
-    # Ensure risk_score is int
-    if isinstance(updated_threat.get("risk_score"), float):
-        updated_threat["risk_score"] = int(updated_threat["risk_score"])
-    
-    # Store AI response with threat summary details
-    if analysis.get("ai_unavailable"):
-        response_text = "⚠️ AI service temporarily unavailable. Threat created with basic extraction - please review and update the details."
-    else:
-        response_text = "Observation recorded successfully."
-    
+    # Store assistant response
     ai_response = {
         "id": str(uuid.uuid4()),
-        "user_id": current_user["id"],
+        "user_id": user_id,
         "role": "assistant",
-        "content": response_text,
-        "threat_id": threat_id,
-        "threat_title": updated_threat["title"],
-        "threat_asset": updated_threat["asset"],
-        "threat_equipment_type": updated_threat["equipment_type"],
-        "threat_equipment_criticality": updated_threat.get("equipment_criticality"),
-        "threat_failure_mode": updated_threat["failure_mode"],
-        "threat_risk_level": updated_threat["risk_level"],
-        "threat_risk_score": updated_threat["risk_score"],
-        "threat_rank": updated_threat["rank"],
-        "threat_location": updated_threat.get("location"),
-        "threat_summary": True,
+        "content": result["response_text"],
+        "chat_state": result["state"],
+        "pending_data": result.get("pending_data", {}),
+        "equipment_suggestions": result.get("equipment_suggestions"),
+        "failure_mode_suggestions": result.get("failure_mode_suggestions"),
+        "original_message": result.get("original_message"),
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.chat_messages.insert_one(ai_response)
     
+    # If we need to create an observation
+    if result.get("create_observation") and result.get("observation_data"):
+        obs_data = result["observation_data"]
+        
+        # Build the threat/observation
+        threat_id = str(uuid.uuid4())
+        equipment_name = obs_data.get("equipment_name", "Unknown")
+        failure_mode_name = obs_data.get("failure_mode_name", "Unknown")
+        
+        # Get FMEA data for risk calculation
+        fmea_data = obs_data.get("failure_mode", {})
+        rpn = fmea_data.get("rpn", 100)
+        fmea_score = min(100, int(rpn / 10))
+        
+        # Get equipment_type - prefer from equipment hierarchy, fallback to FMEA data
+        equipment_type = obs_data.get("equipment_type") or fmea_data.get("equipment") or "Equipment"
+        
+        # Get criticality data if available
+        criticality = obs_data.get("criticality", {})
+        criticality_score = 0
+        if isinstance(criticality, dict):
+            safety = criticality.get("safety_impact", 0) or 0
+            production = criticality.get("production_impact", 0) or 0
+            environmental = criticality.get("environmental_impact", 0) or 0
+            reputation = criticality.get("reputation_impact", 0) or 0
+            criticality_score = int(((safety * 25) + (production * 20) + (environmental * 15) + (reputation * 10)) / 3.5)
+            criticality_score = min(100, criticality_score)
+        
+        # Calculate risk score: (Criticality × 0.75) + (FMEA × 0.25)
+        final_risk_score = int((criticality_score * 0.75) + (fmea_score * 0.25))
+        final_risk_score = min(100, max(0, final_risk_score))
+        
+        # Determine risk level
+        if final_risk_score >= 70:
+            risk_level = "Critical"
+        elif final_risk_score >= 50:
+            risk_level = "High"
+        elif final_risk_score >= 30:
+            risk_level = "Medium"
+        else:
+            risk_level = "Low"
+        
+        # Calculate rank
+        rank, total = await calculate_rank(final_risk_score, user_id)
+        
+        # Create threat document
+        threat_doc = {
+            "id": threat_id,
+            "title": f"{equipment_name} - {failure_mode_name}",
+            "asset": equipment_name,
+            "equipment_type": equipment_type,
+            "failure_mode": failure_mode_name,
+            "failure_mode_id": obs_data.get("failure_mode_id"),
+            "failure_mode_data": fmea_data if fmea_data else None,
+            "cause": None,
+            "impact": "Equipment Damage",
+            "frequency": "First Time",
+            "likelihood": "Possible",
+            "detectability": "Moderate",
+            "risk_level": risk_level,
+            "risk_score": final_risk_score,
+            "fmea_score": fmea_score,
+            "fmea_rpn": rpn if fmea_data else None,
+            "criticality_score": criticality_score,
+            "base_risk_score": fmea_score,
+            "rank": rank,
+            "total_threats": total,
+            "status": "Open",
+            "recommended_actions": obs_data.get("recommended_actions", fmea_data.get("recommended_actions", [])),
+            "created_by": user_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "occurrence_count": 1,
+            "image_url": None,
+            "location": None,
+            "linked_equipment_id": obs_data.get("equipment_id"),
+            "equipment_criticality": criticality.get("level") if isinstance(criticality, dict) else None,
+            "equipment_criticality_data": criticality if isinstance(criticality, dict) else None,
+            "session_id": session_id,
+            "attachments": []
+        }
+        
+        # Add images if available
+        if message.image_base64:
+            threat_doc["attachments"] = [{
+                "type": "image",
+                "data": image_thumbnail,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }]
+        
+        await db.threats.insert_one(threat_doc)
+        
+        # Update all ranks
+        await update_all_ranks(user_id)
+        
+        # Get updated threat
+        updated_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+        if isinstance(updated_threat.get("risk_score"), float):
+            updated_threat["risk_score"] = int(updated_threat["risk_score"])
+        
+        # Update assistant message with threat info
+        await db.chat_messages.update_one(
+            {"id": ai_response["id"]},
+            {"$set": {
+                "threat_id": threat_id,
+                "threat_title": updated_threat["title"],
+                "threat_asset": updated_threat["asset"],
+                "threat_equipment_type": updated_threat["equipment_type"],
+                "threat_failure_mode": updated_threat["failure_mode"],
+                "threat_risk_level": updated_threat["risk_level"],
+                "threat_risk_score": updated_threat["risk_score"],
+                "threat_rank": updated_threat["rank"],
+                "threat_summary": True
+            }}
+        )
+        
+        return ChatResponse(
+            message=result["response_text"],
+            threat=ThreatResponse(**updated_threat)
+        )
+    
+    # Return follow-up question response
     return ChatResponse(
-        message=response_text,
-        threat=ThreatResponse(**updated_threat)
+        message=result["response_text"],
+        follow_up_question=result["response_text"] if result["state"] != ChatState.COMPLETE else None,
+        question_type="asset" if result.get("equipment_suggestions") else ("failure" if result.get("failure_mode_suggestions") else None),
+        equipment_suggestions=result.get("equipment_suggestions"),
+        failure_mode_suggestions=result.get("failure_mode_suggestions")
     )
-
 @api_router.get("/chat/history")
 async def get_chat_history(
     limit: int = 50,

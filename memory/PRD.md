@@ -6,6 +6,23 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+
+- **CHAT FUNCTION REWRITE** (Mar 24, 2026):
+  - **Problem**: Previous chat logic was overly complex with 1000+ lines of convoluted code that mixed equipment from hierarchy with FMEA library data incorrectly
+  - **Solution**: Complete rewrite with clean 2-step flow:
+    1. **Step 1 - Equipment Selection**: Search hierarchy (subunit level and below) by name, tag, description, or equipment_type
+    2. **Step 2 - Failure Mode Selection**: Search FMEA library by failure mode name, keywords, category, equipment type
+    3. **Auto-create**: If exactly 1 match for both, automatically create observation
+    4. **User Selection**: If multiple matches, show selection buttons
+  - **New File Created**: `/app/backend/chat_handler_v2.py` - Clean, modular chat handler
+  - **Server.py Updated**: Replaced 1000+ lines of old chat code with ~200 lines using new handler
+  - **Key Classes**:
+    - `ChatState`: Tracks conversation state (INITIAL, AWAITING_EQUIPMENT, AWAITING_FAILURE_MODE, COMPLETE)
+    - `search_equipment_hierarchy()`: Searches equipment nodes at operational levels
+    - `search_failure_modes()`: Searches FMEA library with scoring
+    - `process_chat_message()`: Main orchestration function
+  - **Operational Levels Searched**: subunit, maintainable_item, equipment, component, equipment_unit
+
 - **Execution Generation Date Range Fix** (Mar 24, 2026):
   - **Fixed**: Execution instances are now ONLY generated within the plan's `effective_from` → `effective_until` date range
   - **Logic Changes in `task_service.py`**:
