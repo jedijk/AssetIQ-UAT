@@ -284,10 +284,13 @@ const TaskSchedulerPage = () => {
     equipment_id: "",
     task_template_id: "",
     form_template_id: "",
-    interval_value: 30,
-    interval_unit: "days",
+    interval_value: null, // null means inherit from template
+    interval_unit: null,  // null means inherit from template
+    effective_from: "",
+    effective_until: "",
     notes: ""
   });
+  const [inheritedInterval, setInheritedInterval] = useState({ value: 30, unit: "days" });
   const [templateForm, setTemplateForm] = useState({
     name: "",
     description: "",
@@ -392,13 +395,22 @@ const TaskSchedulerPage = () => {
   });
 
   const createPlanMutation = useMutation({
-    mutationFn: taskAPI.createPlan,
+    mutationFn: (data) => {
+      // Use inherited values if not overridden
+      const submitData = {
+        ...data,
+        interval_value: data.interval_value || inheritedInterval.value,
+        interval_unit: data.interval_unit || inheritedInterval.unit,
+      };
+      return taskAPI.createPlan(submitData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(["task-plans"]);
       queryClient.invalidateQueries(["task-stats"]);
       toast.success("Plan created");
       setShowPlanDialog(false);
-      setPlanForm({ equipment_id: "", task_template_id: "", form_template_id: "", interval_value: 30, interval_unit: "days", notes: "" });
+      setPlanForm({ equipment_id: "", task_template_id: "", form_template_id: "", interval_value: null, interval_unit: null, effective_from: "", effective_until: "", notes: "" });
+      setInheritedInterval({ value: 30, unit: "days" });
     },
     onError: (error) => toast.error(error.message || "Failed to create plan")
   });
@@ -499,6 +511,24 @@ const TaskSchedulerPage = () => {
       safety_requirements: template.safety_requirements || [],
     });
     setShowTemplateDialog(true);
+  };
+
+  const handleTemplateSelect = (templateId) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      setInheritedInterval({
+        value: template.default_interval || 30,
+        unit: template.default_unit || "days"
+      });
+      setPlanForm({
+        ...planForm,
+        task_template_id: templateId,
+        interval_value: null, // Reset to inherit
+        interval_unit: null,  // Reset to inherit
+      });
+    } else {
+      setPlanForm({ ...planForm, task_template_id: templateId });
+    }
   };
 
   const handleStartTask = (instance) => {
@@ -1113,7 +1143,7 @@ const TaskSchedulerPage = () => {
               <Label>Execution Template *</Label>
               <Select 
                 value={planForm.task_template_id} 
-                onValueChange={(v) => setPlanForm({ ...planForm, task_template_id: v })}
+                onValueChange={handleTemplateSelect}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a template" />
@@ -1142,20 +1172,26 @@ const TaskSchedulerPage = () => {
               </Select>
             </div>
             <div>
-              <Label>Interval</Label>
+              <Label className="flex items-center justify-between">
+                <span>Interval</span>
+                {planForm.task_template_id && (planForm.interval_value === null) && (
+                  <span className="text-xs text-slate-400 font-normal">Inherited from template</span>
+                )}
+              </Label>
               <div className="flex gap-2">
                 <Input
                   type="number"
-                  value={planForm.interval_value}
+                  value={planForm.interval_value ?? inheritedInterval.value}
                   onChange={(e) => setPlanForm({ ...planForm, interval_value: parseInt(e.target.value) || 1 })}
                   min={1}
-                  className="w-20"
+                  className={`w-20 ${planForm.interval_value === null ? 'text-slate-400 bg-slate-50' : ''}`}
+                  placeholder={inheritedInterval.value.toString()}
                 />
                 <Select 
-                  value={planForm.interval_unit} 
+                  value={planForm.interval_unit ?? inheritedInterval.unit} 
                   onValueChange={(v) => setPlanForm({ ...planForm, interval_unit: v })}
                 >
-                  <SelectTrigger className="w-[100px]">
+                  <SelectTrigger className={`w-[100px] ${planForm.interval_unit === null ? 'text-slate-400 bg-slate-50' : ''}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1164,6 +1200,44 @@ const TaskSchedulerPage = () => {
                     <SelectItem value="months">Months</SelectItem>
                   </SelectContent>
                 </Select>
+                {(planForm.interval_value !== null || planForm.interval_unit !== null) && (
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setPlanForm({ ...planForm, interval_value: null, interval_unit: null })}
+                    className="text-xs text-slate-500"
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
+              {planForm.task_template_id && planForm.interval_value === null && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Template default: {inheritedInterval.value} {inheritedInterval.unit}
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Begin Date</Label>
+                <Input
+                  type="datetime-local"
+                  value={planForm.effective_from}
+                  onChange={(e) => setPlanForm({ ...planForm, effective_from: e.target.value })}
+                  className="text-sm"
+                />
+                <p className="text-xs text-slate-400 mt-1">When to start scheduling</p>
+              </div>
+              <div>
+                <Label>End Date (Optional)</Label>
+                <Input
+                  type="datetime-local"
+                  value={planForm.effective_until}
+                  onChange={(e) => setPlanForm({ ...planForm, effective_until: e.target.value })}
+                  className="text-sm"
+                />
+                <p className="text-xs text-slate-400 mt-1">When to stop scheduling</p>
               </div>
             </div>
             <div>

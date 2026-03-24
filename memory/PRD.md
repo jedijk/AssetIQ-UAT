@@ -6,6 +6,18 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Plan Creation Enhanced with Inherited Interval & Date Pickers** (Mar 24, 2026):
+  - **Inherited Interval**: When a template is selected, the interval is automatically populated from template defaults
+    - Shows "Inherited from template" label
+    - Shows "Template default: X days" helper text
+    - Interval fields have grayed-out styling when using inherited values
+    - "Reset" button appears when user overrides values to restore inheritance
+  - **Date Pickers**: Added Begin Date and End Date (Optional) datetime pickers
+    - Begin Date: "When to start scheduling"
+    - End Date: "When to stop scheduling"
+  - **State Management**: Added `inheritedInterval` state to track template defaults
+  - **File Modified**: `/app/frontend/src/pages/TaskSchedulerPage.js`
+
 - **Delete Executions Added** (Mar 24, 2026):
   - **Delete Button**: Added red trash icon button to each execution row in the table
   - **Confirmation Dialog**: Shows "Delete Execution" dialog with warning message before deletion
