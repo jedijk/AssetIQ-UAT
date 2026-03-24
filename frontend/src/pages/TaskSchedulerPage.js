@@ -75,14 +75,14 @@ const taskAPI = {
     const queryParams = new URLSearchParams();
     if (params.discipline) queryParams.append("discipline", params.discipline);
     if (params.search) queryParams.append("search", params.search);
-    const response = await fetch(`${API_BASE_URL}/api/tasks/templates?${queryParams}`, {
+    const response = await fetch(`${API_BASE_URL}/api/task-templates?${queryParams}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch templates");
     return response.json();
   },
   createTemplate: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/api/tasks/templates`, {
+    const response = await fetch(`${API_BASE_URL}/api/task-templates`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -94,7 +94,7 @@ const taskAPI = {
     return response.json();
   },
   deleteTemplate: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/tasks/templates/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/task-templates/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
@@ -210,10 +210,11 @@ const StatusBadge = ({ status }) => {
 // Discipline badge
 const DisciplineBadge = ({ discipline }) => {
   const colors = {
-    mechanical: "bg-blue-100 text-blue-700",
-    electrical: "bg-yellow-100 text-yellow-700",
-    instrumentation: "bg-purple-100 text-purple-700",
-    process: "bg-green-100 text-green-700",
+    operations: "bg-blue-100 text-blue-700",
+    maintenance: "bg-yellow-100 text-yellow-700",
+    lab: "bg-purple-100 text-purple-700",
+    inspection: "bg-green-100 text-green-700",
+    engineering: "bg-orange-100 text-orange-700",
   };
   return (
     <Badge className={colors[discipline] || "bg-slate-100 text-slate-700"}>
@@ -238,7 +239,7 @@ const TaskSchedulerPage = () => {
   const [templateForm, setTemplateForm] = useState({
     name: "",
     description: "",
-    discipline: "mechanical",
+    discipline: "maintenance",
     mitigation_strategy: "preventive",
     default_interval: 30,
     default_unit: "days",
@@ -343,7 +344,7 @@ const TaskSchedulerPage = () => {
     setTemplateForm({
       name: "",
       description: "",
-      discipline: "mechanical",
+      discipline: "maintenance",
       mitigation_strategy: "preventive",
       default_interval: 30,
       default_unit: "days",
@@ -535,10 +536,11 @@ const TaskSchedulerPage = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Disciplines</SelectItem>
-                    <SelectItem value="mechanical">Mechanical</SelectItem>
-                    <SelectItem value="electrical">Electrical</SelectItem>
-                    <SelectItem value="instrumentation">Instrumentation</SelectItem>
-                    <SelectItem value="process">Process</SelectItem>
+                    <SelectItem value="operations">Operations</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="lab">Lab</SelectItem>
+                    <SelectItem value="inspection">Inspection</SelectItem>
+                    <SelectItem value="engineering">Engineering</SelectItem>
                   </SelectContent>
                 </Select>
               </>
@@ -760,10 +762,11 @@ const TaskSchedulerPage = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="mechanical">Mechanical</SelectItem>
-                    <SelectItem value="electrical">Electrical</SelectItem>
-                    <SelectItem value="instrumentation">Instrumentation</SelectItem>
-                    <SelectItem value="process">Process</SelectItem>
+                    <SelectItem value="operations">Operations</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="lab">Lab</SelectItem>
+                    <SelectItem value="inspection">Inspection</SelectItem>
+                    <SelectItem value="engineering">Engineering</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -779,7 +782,7 @@ const TaskSchedulerPage = () => {
                   <SelectContent>
                     <SelectItem value="preventive">Preventive</SelectItem>
                     <SelectItem value="predictive">Predictive</SelectItem>
-                    <SelectItem value="condition_based">Condition Based</SelectItem>
+                    <SelectItem value="detective">Detective</SelectItem>
                     <SelectItem value="corrective">Corrective</SelectItem>
                   </SelectContent>
                 </Select>

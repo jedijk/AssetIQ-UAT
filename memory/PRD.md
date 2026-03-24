@@ -6,6 +6,19 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Task Template Creation Fixed** (Mar 24, 2026):
+  - **Problem**: Could not create and save task templates - API returning validation errors.
+  - **Root Cause**:
+    1. Frontend using wrong API endpoint (`/api/tasks/templates` vs correct `/api/task-templates`)
+    2. Frontend discipline values ("mechanical", "electrical") didn't match backend enum ("operations", "maintenance", "lab", "inspection", "engineering")
+    3. Frontend mitigation strategy "condition_based" didn't match backend "detective"
+  - **Fixes Applied**:
+    - Fixed API endpoints in `TaskSchedulerPage.js` to use `/api/task-templates`
+    - Updated discipline dropdown options to: Operations, Maintenance, Lab, Inspection, Engineering
+    - Updated strategy dropdown to: Preventive, Predictive, Detective, Corrective
+    - Fixed DisciplineBadge colors for new discipline values
+  - **Result**: Task templates can now be created and saved successfully.
+
 - **Chat Disambiguation Improvements** (Mar 24, 2026):
   - **Changes Made**:
     1. Switched back to GPT-5.2 for better analysis quality (was using GPT-4o-mini for speed)
