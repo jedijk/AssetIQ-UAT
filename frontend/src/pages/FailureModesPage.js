@@ -1482,88 +1482,127 @@ const FailureModesPage = () => {
               </div>
             ) : (
               <div className="space-y-3">
+                {/* First show comparison with current state */}
+                {selectedFm && versions.length > 0 && (
+                  <div className="p-4 rounded-lg border-2 border-green-200 bg-green-50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge className="bg-green-600 text-white">Current v{selectedFm.version}</Badge>
+                      <span className="text-xs text-green-700">Live version</span>
+                    </div>
+                    {(() => {
+                      const curr = selectedFm;
+                      const prev = versions[0]?.snapshot || {};
+                      const changes = [];
+                      
+                      if (curr.failure_mode !== prev.failure_mode) {
+                        changes.push({ field: 'Name', from: prev.failure_mode, to: curr.failure_mode });
+                      }
+                      if (curr.severity !== prev.severity) {
+                        changes.push({ field: 'Severity', from: prev.severity, to: curr.severity });
+                      }
+                      if (curr.occurrence !== prev.occurrence) {
+                        changes.push({ field: 'Occurrence', from: prev.occurrence, to: curr.occurrence });
+                      }
+                      if (curr.detectability !== prev.detectability) {
+                        changes.push({ field: 'Detectability', from: prev.detectability, to: curr.detectability });
+                      }
+                      const currRPN = curr.severity * curr.occurrence * curr.detectability;
+                      const prevRPN = (prev.severity || 0) * (prev.occurrence || 0) * (prev.detectability || 0);
+                      if (currRPN !== prevRPN) {
+                        changes.push({ field: 'RPN', from: prevRPN, to: currRPN, isRPN: true });
+                      }
+                      
+                      return changes.length > 0 ? (
+                        <div className="p-2 bg-white/50 rounded border border-green-200">
+                          <div className="text-xs font-medium text-green-800 mb-1">
+                            Changes from v{versions[0]?.version}:
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {changes.map((change, cIdx) => (
+                              <span key={cIdx} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                                change.isRPN ? (change.to > change.from ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')
+                                : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                <span className="font-medium">{change.field}:</span>
+                                <span className="opacity-60">{change.from}</span>
+                                <span>→</span>
+                                <span className="font-semibold">{change.to}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-green-700">No changes from previous version</div>
+                      );
+                    })()}
+                    <div className="mt-2 flex items-center gap-4 text-sm">
+                      <span className={`font-bold text-lg ${
+                        selectedFm.severity * selectedFm.occurrence * selectedFm.detectability >= 200 ? 'text-red-600' : 'text-green-700'
+                      }`}>
+                        {selectedFm.severity * selectedFm.occurrence * selectedFm.detectability}
+                      </span>
+                      <span className="text-green-600">{selectedFm.failure_mode}</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Historical versions */}
                 {versions.map((version, idx) => {
-                  // Compare with next version (older) to show what changed
-                  const nextVersion = versions[idx + 1];
+                  // Compare this version with the NEXT newer version (or current if idx=0)
+                  const newerVersion = idx === 0 ? selectedFm : versions[idx - 1]?.snapshot;
+                  const thisVersion = version.snapshot || {};
                   const changes = [];
                   
-                  if (nextVersion) {
-                    const curr = version.snapshot || {};
-                    const prev = nextVersion.snapshot || {};
+                  if (newerVersion && idx > 0) {
+                    const newer = versions[idx - 1]?.snapshot || {};
                     
-                    // Check each field for changes
-                    if (curr.failure_mode !== prev.failure_mode) {
-                      changes.push({ field: 'Name', from: prev.failure_mode, to: curr.failure_mode });
+                    // Show what changed FROM this version TO the newer version
+                    if (thisVersion.failure_mode !== newer.failure_mode) {
+                      changes.push({ field: 'Name', from: thisVersion.failure_mode, to: newer.failure_mode });
                     }
-                    if (curr.category !== prev.category) {
-                      changes.push({ field: 'Category', from: prev.category, to: curr.category });
+                    if (thisVersion.category !== newer.category) {
+                      changes.push({ field: 'Category', from: thisVersion.category, to: newer.category });
                     }
-                    if (curr.equipment !== prev.equipment) {
-                      changes.push({ field: 'Equipment', from: prev.equipment, to: curr.equipment });
+                    if (thisVersion.severity !== newer.severity) {
+                      changes.push({ field: 'Severity', from: thisVersion.severity, to: newer.severity });
                     }
-                    if (curr.severity !== prev.severity) {
-                      changes.push({ field: 'Severity', from: prev.severity, to: curr.severity, isNumber: true });
+                    if (thisVersion.occurrence !== newer.occurrence) {
+                      changes.push({ field: 'Occurrence', from: thisVersion.occurrence, to: newer.occurrence });
                     }
-                    if (curr.occurrence !== prev.occurrence) {
-                      changes.push({ field: 'Occurrence', from: prev.occurrence, to: curr.occurrence, isNumber: true });
-                    }
-                    if (curr.detectability !== prev.detectability) {
-                      changes.push({ field: 'Detectability', from: prev.detectability, to: curr.detectability, isNumber: true });
-                    }
-                    if (curr.mechanism !== prev.mechanism) {
-                      changes.push({ field: 'Mechanism', from: prev.mechanism, to: curr.mechanism });
+                    if (thisVersion.detectability !== newer.detectability) {
+                      changes.push({ field: 'Detectability', from: thisVersion.detectability, to: newer.detectability });
                     }
                     
-                    // Check RPN change
-                    const currRPN = (curr.severity || 0) * (curr.occurrence || 0) * (curr.detectability || 0);
-                    const prevRPN = (prev.severity || 0) * (prev.occurrence || 0) * (prev.detectability || 0);
-                    if (currRPN !== prevRPN) {
-                      changes.push({ field: 'RPN', from: prevRPN, to: currRPN, isNumber: true, isRPN: true });
-                    }
-                    
-                    // Check keywords
-                    const currKeywords = (curr.keywords || []).join(', ');
-                    const prevKeywords = (prev.keywords || []).join(', ');
-                    if (currKeywords !== prevKeywords) {
-                      changes.push({ field: 'Keywords', from: prevKeywords || '(none)', to: currKeywords || '(none)' });
-                    }
-                    
-                    // Check recommended actions count
-                    const currActionsCount = (curr.recommended_actions || []).length;
-                    const prevActionsCount = (prev.recommended_actions || []).length;
-                    if (currActionsCount !== prevActionsCount) {
-                      changes.push({ field: 'Actions', from: `${prevActionsCount} items`, to: `${currActionsCount} items` });
+                    const thisRPN = (thisVersion.severity || 0) * (thisVersion.occurrence || 0) * (thisVersion.detectability || 0);
+                    const newerRPN = (newer.severity || 0) * (newer.occurrence || 0) * (newer.detectability || 0);
+                    if (thisRPN !== newerRPN) {
+                      changes.push({ field: 'RPN', from: thisRPN, to: newerRPN, isRPN: true });
                     }
                   }
                   
-                  const rpn = (version.snapshot?.severity || 0) * (version.snapshot?.occurrence || 0) * (version.snapshot?.detectability || 0);
+                  const rpn = (thisVersion.severity || 0) * (thisVersion.occurrence || 0) * (thisVersion.detectability || 0);
                   
                   return (
                   <div 
                     key={version.id}
-                    className={`p-4 rounded-lg border ${idx === 0 ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white'}`}
+                    className="p-4 rounded-lg border border-slate-200 bg-white"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="outline" className={idx === 0 ? 'border-blue-500 text-blue-700' : ''}>
-                            v{version.version}
-                          </Badge>
-                          {idx === 0 && (
-                            <Badge className="bg-blue-100 text-blue-700">Previous</Badge>
-                          )}
+                          <Badge variant="outline">v{version.version}</Badge>
                           <span className="text-xs text-slate-500 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             {new Date(version.created_at).toLocaleString()}
                           </span>
                         </div>
                         
-                        {/* Change Summary */}
+                        {/* Change Summary - what changed FROM this version TO the next */}
                         {changes.length > 0 && (
                           <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
                             <div className="text-xs font-medium text-amber-800 mb-1 flex items-center gap-1">
                               <ChevronRight className="w-3 h-3" />
-                              Changes from v{nextVersion?.version}:
+                              Changed to v{versions[idx - 1]?.version}:
                             </div>
                             <div className="flex flex-wrap gap-2">
                               {changes.map((change, cIdx) => (
@@ -1578,7 +1617,7 @@ const FailureModesPage = () => {
                                   }`}
                                 >
                                   <span className="font-medium">{change.field}:</span>
-                                  <span className="line-through opacity-60">{change.from}</span>
+                                  <span className="opacity-60">{change.from}</span>
                                   <span>→</span>
                                   <span className="font-semibold">{change.to}</span>
                                 </span>
@@ -1598,11 +1637,11 @@ const FailureModesPage = () => {
                               {rpn}
                             </span>
                             <span className="text-slate-400 text-xs">
-                              ({version.snapshot?.severity}×{version.snapshot?.occurrence}×{version.snapshot?.detectability})
+                              ({thisVersion.severity}×{thisVersion.occurrence}×{thisVersion.detectability})
                             </span>
                           </div>
                           <span className="text-slate-300">|</span>
-                          <span className="text-slate-600">{version.snapshot?.failure_mode}</span>
+                          <span className="text-slate-600">{thisVersion.failure_mode}</span>
                         </div>
                         
                         {version.updated_by && (
@@ -1614,7 +1653,7 @@ const FailureModesPage = () => {
                         
                         {version.change_reason && (
                           <div className="mt-1 text-xs text-slate-500 italic">
-                            Reason: {version.change_reason}
+                            {version.change_reason}
                           </div>
                         )}
                       </div>
