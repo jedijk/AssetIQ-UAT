@@ -234,3 +234,71 @@
 .recording-indicator {
     animation: recording 1s ease-in-out infinite;
 }
+
+/* Mobile-specific fixes */
+@media (max-width: 640px) {
+    /* Prevent zoom on input focus */
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+    
+    /* Header compact mode */
+    .app-header {
+        padding: 0.5rem 0.75rem !important;
+    }
+    
+    .header-content {
+        gap: 0.5rem !important;
+    }
+    
+    /* Smaller buttons on mobile */
+    .app-header button {
+        min-width: unset;
+    }
+    
+    /* Prevent horizontal scroll */
+    body {
+        overflow-x: hidden;
+    }
+    
+    /* Main content padding */
+    .main-content {
+        padding: 0.75rem !important;
+    }
+    
+    /* Card adjustments */
+    .card {
+        border-radius: 0.75rem;
+    }
+    
+    /* Dialog full width on mobile */
+    [role="dialog"] {
+        max-width: calc(100vw - 2rem) !important;
+        margin: 1rem;
+    }
+    
+    /* Touch-friendly tap targets */
+    button, a, [role="button"] {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* Fix overlapping elements */
+    .flex.items-center.gap-2,
+    .flex.items-center.gap-3 {
+        flex-wrap: nowrap;
+    }
+}
+
+/* Safe area padding for notched phones */
+@supports (padding: max(0px)) {
+    .app-header {
+        padding-top: max(0.5rem, env(safe-area-inset-top));
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+    
+    .main-content {
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+}

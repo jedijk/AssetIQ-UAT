@@ -154,8 +154,8 @@ const Layout = () => {
           </div>
 
           {/* Right Side */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Info Button */}
+          <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
+            {/* Info Button - Hidden on small mobile */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -163,7 +163,7 @@ const Layout = () => {
                     variant="outline"
                     size="icon"
                     onClick={() => setInfoOpen(true)}
-                    className="h-9 w-9 text-slate-500 border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                    className="h-8 w-8 sm:h-9 sm:w-9 text-slate-500 border-slate-300 hover:bg-slate-50 hover:text-slate-700 hidden sm:flex"
                     data-testid="info-button"
                   >
                     <Info className="w-4 h-4" />
@@ -184,7 +184,7 @@ const Layout = () => {
                     size="icon"
                     onClick={undo}
                     disabled={!canUndo || isUndoing}
-                    className={`h-9 w-9 relative transition-all duration-200 ${
+                    className={`h-8 w-8 sm:h-9 sm:w-9 relative transition-all duration-200 ${
                       canUndo 
                         ? "text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700" 
                         : "text-slate-300 border-slate-200"
@@ -193,7 +193,7 @@ const Layout = () => {
                   >
                     <Undo2 className="w-4 h-4" />
                     {undoCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 h-4 w-4 text-[10px] font-bold bg-amber-500 text-white rounded-full flex items-center justify-center">
+                      <span className="absolute -top-1 -right-1 h-4 w-4 text-[10px] font-bold bg-amber-500 text-white rounded-full flex items-center justify-center">
                         {undoCount}
                       </span>
                     )}
@@ -215,12 +215,12 @@ const Layout = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 text-slate-600 hover:text-slate-900 relative"
+                  className="h-8 w-8 sm:h-9 sm:w-9 text-slate-600 hover:text-slate-900 relative"
                   data-testid="notifications-button"
                 >
-                  <Bell className="w-5 h-5" />
+                  <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
                   {overdueCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full min-w-[16px] sm:min-w-[18px] h-[16px] sm:h-[18px] flex items-center justify-center px-0.5">
                       {overdueCount > 9 ? "9+" : overdueCount}
                     </span>
                   )}
@@ -287,7 +287,7 @@ const Layout = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Language Switcher */}
+            {/* Language Switcher - Compact on mobile */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -295,11 +295,11 @@ const Layout = () => {
                     variant="outline"
                     size="sm"
                     onClick={toggleLanguage}
-                    className="h-9 px-3 text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-800 font-medium"
+                    className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-800 font-medium"
                     data-testid="language-switcher"
                   >
-                    <Languages className="w-4 h-4 mr-1.5" />
-                    {language.toUpperCase()}
+                    <Languages className="w-4 h-4 sm:mr-1.5" />
+                    <span className="hidden sm:inline">{language.toUpperCase()}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
@@ -314,10 +314,10 @@ const Layout = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 text-slate-600 hover:text-slate-900"
+                  className="h-8 w-8 sm:h-9 sm:w-9 text-slate-600 hover:text-slate-900"
                   data-testid="settings-menu-button"
                 >
-                  <Settings className="w-5 h-5" />
+                  <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -365,7 +365,7 @@ const Layout = () => {
               variant="ghost"
               size="sm"
               onClick={logout}
-              className="text-slate-500 hover:text-slate-700"
+              className="h-8 sm:h-9 px-2 sm:px-3 text-slate-500 hover:text-slate-700"
               data-testid="logout-button"
             >
               <LogOut className="w-4 h-4" />
@@ -374,7 +374,7 @@ const Layout = () => {
 
             {/* Mobile Menu Toggle */}
             <button
-              className="md:hidden p-2 rounded-lg hover:bg-slate-100"
+              className="md:hidden p-1.5 rounded-lg hover:bg-slate-100"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               data-testid="mobile-menu-toggle"
             >
