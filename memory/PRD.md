@@ -6,6 +6,17 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Status Options & Multi-Select Filter Added** (Mar 24, 2026):
+  - **New Status Options**: Added "Parked" (gray) and "Canceled" (red) to both the list filter and detail page dropdown
+  - **Multi-Select Filter**: Status filter now supports selecting multiple statuses simultaneously
+    - Shows "2 selected", "3 selected", etc. when multiple statuses chosen
+    - "Clear all filters" option appears when any status is selected
+    - Checkmarks indicate selected statuses
+    - Click outside to close dropdown
+  - **Files Modified**: 
+    - `/app/frontend/src/pages/ThreatsPage.js` - Multi-select dropdown, STATUS_OPTIONS constant
+    - `/app/frontend/src/pages/ThreatDetailPage.js` - Added Parked/Canceled to STATUS_OPTIONS
+
 - **Observation Attachments Feature Added** (Mar 24, 2026):
   - **Backend Changes** (`/app/backend/server.py`):
     - Added `session_id` and `attachments` fields to threat documents

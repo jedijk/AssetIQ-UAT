@@ -28,7 +28,11 @@ import {
   Trash2,
   BarChart3,
   Target,
-  Loader2
+  Loader2,
+  Check,
+  PauseCircle,
+  XCircle,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -52,6 +56,16 @@ import {
 import ThreatCard from "../components/ThreatCard";
 import RiskBadge from "../components/RiskBadge";
 import BackButton from "../components/BackButton";
+
+// Status options with colors and icons
+const STATUS_OPTIONS = [
+  { value: "Open", label: "Open", color: "bg-blue-500", textColor: "text-blue-700", bgColor: "bg-blue-100" },
+  { value: "In Progress", label: "In Progress", color: "bg-amber-500", textColor: "text-amber-700", bgColor: "bg-amber-100" },
+  { value: "Parked", label: "Parked", color: "bg-slate-500", textColor: "text-slate-700", bgColor: "bg-slate-100" },
+  { value: "Mitigated", label: "Mitigated", color: "bg-green-500", textColor: "text-green-700", bgColor: "bg-green-100" },
+  { value: "Closed", label: "Closed", color: "bg-slate-400", textColor: "text-slate-600", bgColor: "bg-slate-50" },
+  { value: "Canceled", label: "Canceled", color: "bg-red-400", textColor: "text-red-700", bgColor: "bg-red-50" },
+];
 
 // Equipment type to icon mapping
 const getEquipmentIcon = (equipmentType, asset) => {
@@ -100,7 +114,8 @@ const ThreatsPage = () => {
   const queryClient = useQueryClient();
   const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState([]); // Multi-select: array of selected statuses
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [riskFilter, setRiskFilter] = useState("all"); // Filter by risk level
   const [sortBy, setSortBy] = useState("business_risk"); // "business_risk" or "rpn"
   const [searchQuery, setSearchQuery] = useState("");
@@ -108,6 +123,27 @@ const ThreatsPage = () => {
   const [assetsToFilter, setAssetsToFilter] = useState([]); // Array of asset names to filter by
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [threatToDelete, setThreatToDelete] = useState(null);
+
+  // Toggle status in multi-select
+  const toggleStatus = (status) => {
+    setStatusFilter(prev => 
+      prev.includes(status) 
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  // Clear all status filters
+  const clearStatusFilter = () => {
+    setStatusFilter([]);
+  };
+
+  // Get status display text
+  const getStatusDisplayText = () => {
+    if (statusFilter.length === 0) return "All Status";
+    if (statusFilter.length === 1) return statusFilter[0];
+    return `${statusFilter.length} selected`;
+  };
 
   // Initialize filters from URL params
   useEffect(() => {
@@ -142,10 +178,10 @@ const ThreatsPage = () => {
     queryFn: statsAPI.get,
   });
 
-  // Fetch threats
+  // Fetch threats (fetch all, filter client-side for multi-select)
   const { data: threats = [], isLoading } = useQuery({
-    queryKey: ["threats", statusFilter === "all" ? null : statusFilter],
-    queryFn: () => threatsAPI.getAll(statusFilter === "all" ? null : statusFilter),
+    queryKey: ["threats"],
+    queryFn: () => threatsAPI.getAll(null),
   });
 
   // Delete mutation
@@ -175,7 +211,7 @@ const ThreatsPage = () => {
     }
   };
 
-  // Filter threats by search query, asset hierarchy, and risk level
+  // Filter threats by search query, asset hierarchy, status, and risk level
   const filteredThreats = threats.filter((threat) => {
     // First check if we have a hierarchical asset filter
     if (assetsToFilter.length > 0) {
@@ -185,6 +221,11 @@ const ThreatsPage = () => {
         threat.asset.toLowerCase().includes(filterAsset.toLowerCase())
       );
       if (!assetMatches) return false;
+    }
+    
+    // Apply status filter (multi-select)
+    if (statusFilter.length > 0) {
+      if (!statusFilter.includes(threat.status)) return false;
     }
     
     // Apply risk level filter
@@ -308,18 +349,64 @@ const ThreatsPage = () => {
             data-testid="search-threats-input"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-40 h-11" data-testid="status-filter-select">
-            <Filter className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder={t("actionsPage.filterByStatus")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("actionsPage.allStatus")}</SelectItem>
-            <SelectItem value="Open">{t("common.open")}</SelectItem>
-            <SelectItem value="Mitigated">{t("threatDetail.mitigated")}</SelectItem>
-            <SelectItem value="Closed">{t("common.closed")}</SelectItem>
-          </SelectContent>
-        </Select>
+        
+        {/* Multi-select Status Filter */}
+        <div className="relative">
+          {/* Click outside to close dropdown */}
+          {statusDropdownOpen && (
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setStatusDropdownOpen(false)}
+            />
+          )}
+          
+          <button
+            onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+            className="flex items-center justify-between w-full sm:w-48 h-11 px-3 bg-white border border-slate-200 rounded-md text-sm hover:bg-slate-50 transition-colors"
+            data-testid="status-filter-select"
+          >
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <span className={statusFilter.length > 0 ? "text-slate-900" : "text-slate-500"}>
+                {getStatusDisplayText()}
+              </span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {statusDropdownOpen && (
+            <div className="absolute top-full left-0 mt-1 w-full sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+              {/* Clear All Option */}
+              {statusFilter.length > 0 && (
+                <button
+                  onClick={clearStatusFilter}
+                  className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 border-b border-slate-100"
+                >
+                  Clear all filters
+                </button>
+              )}
+              
+              {/* Status Options */}
+              {STATUS_OPTIONS.map((status) => (
+                <button
+                  key={status.value}
+                  onClick={() => toggleStatus(status.value)}
+                  className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                  data-testid={`status-option-${status.value}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${status.color}`}></span>
+                    <span className="text-sm text-slate-700">{status.label}</span>
+                  </div>
+                  {statusFilter.includes(status.value) && (
+                    <Check className="w-4 h-4 text-blue-600" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        
         <Select value={riskFilter} onValueChange={setRiskFilter}>
           <SelectTrigger className="w-full sm:w-40 h-11" data-testid="risk-filter-select">
             <AlertTriangle className="w-4 h-4 mr-2 text-slate-400" />
@@ -473,14 +560,15 @@ const ThreatsPage = () => {
 
                 {/* Status Badge */}
                 <div className="hidden sm:block">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                    threat.status === "Open" ? "bg-blue-100 text-blue-700" :
-                    threat.status === "Mitigated" ? "bg-green-100 text-green-700" :
-                    threat.status === "Closed" ? "bg-slate-100 text-slate-600" :
-                    "bg-amber-100 text-amber-700"
-                  }`}>
-                    {threat.status}
-                  </span>
+                  {(() => {
+                    const statusConfig = STATUS_OPTIONS.find(s => s.value === threat.status) || 
+                      { bgColor: "bg-slate-100", textColor: "text-slate-600" };
+                    return (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}>
+                        {threat.status}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* Delete Button */}
