@@ -78,12 +78,22 @@ const Layout = () => {
     setChatPrefillEquipment(null);
   };
 
-  // Auto-collapse hierarchy when on Equipment Manager page
+  // Check if mobile viewport
+  const [isMobileView, setIsMobileView] = useState(false);
+  
   useEffect(() => {
-    if (location.pathname === "/equipment-manager") {
+    const checkMobile = () => setIsMobileView(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Auto-collapse hierarchy on mobile and on Equipment Manager page
+  useEffect(() => {
+    if (location.pathname === "/equipment-manager" || isMobileView) {
       setHierarchyOpen(false);
     }
-  }, [location.pathname]);
+  }, [location.pathname, isMobileView]);
 
   const lastAction = getLastAction();
 
