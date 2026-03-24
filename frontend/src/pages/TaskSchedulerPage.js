@@ -105,6 +105,21 @@ const taskAPI = {
     }
     return response.json();
   },
+  updateTemplate: async (id, data) => {
+    const response = await fetch(`${API_BASE_URL}/api/task-templates/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Failed to update template");
+    }
+    return response.json();
+  },
 
   // Plans
   getPlans: async (params = {}) => {
@@ -270,6 +285,7 @@ const TaskSchedulerPage = () => {
     issues_found: [],
     needs_follow_up: false
   });
+  const [editingTemplate, setEditingTemplate] = useState(null); // For editing templates
 
   // Queries
   const { data: statsData } = useQuery({
@@ -399,6 +415,18 @@ const TaskSchedulerPage = () => {
     onError: () => toast.error("Failed to generate executions")
   });
 
+  const updateTemplateMutation = useMutation({
+    mutationFn: ({ id, data }) => taskAPI.updateTemplate(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["task-templates"]);
+      toast.success("Template updated");
+      setShowTemplateDialog(false);
+      setEditingTemplate(null);
+      resetTemplateForm();
+    },
+    onError: () => toast.error("Failed to update template")
+  });
+
   const templates = templatesData?.templates || [];
   const plans = plansData?.plans || [];
   const instances = instancesData?.instances || [];
@@ -419,7 +447,27 @@ const TaskSchedulerPage = () => {
   };
 
   const handleCreateTemplate = () => {
-    createTemplateMutation.mutate(templateForm);
+    if (editingTemplate) {
+      updateTemplateMutation.mutate({ id: editingTemplate.id, data: templateForm });
+    } else {
+      createTemplateMutation.mutate(templateForm);
+    }
+  };
+
+  const handleEditTemplate = (template) => {
+    setEditingTemplate(template);
+    setTemplateForm({
+      name: template.name || "",
+      description: template.description || "",
+      discipline: template.discipline || "maintenance",
+      mitigation_strategy: template.mitigation_strategy || "preventive",
+      default_interval: template.default_interval || 30,
+      default_unit: template.default_unit || "days",
+      estimated_duration_minutes: template.estimated_duration_minutes || 60,
+      procedure_steps: template.procedure_steps || [],
+      safety_requirements: template.safety_requirements || [],
+    });
+    setShowTemplateDialog(true);
   };
 
   const handleStartTask = (instance) => {
@@ -774,24 +822,25 @@ const TaskSchedulerPage = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {templates.map((template) => (
-                <Card key={template.id} className="hover:shadow-md transition-shadow">
+                <Card key={template.id} className="hover:shadow-md transition-shadow" data-testid={`template-card-${template.id}`}>
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-base">{template.name}</CardTitle>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`template-menu-${template.id}`}>
                             <MoreVertical className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditTemplate(template)} data-testid={`template-edit-${template.id}`}>
                             <Edit className="w-4 h-4 mr-2" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             className="text-red-600"
                             onClick={() => deleteTemplateMutation.mutate(template.id)}
+                            data-testid={`template-delete-${template.id}`}
                           >
                             <Trash2 className="w-4 h-4 mr-2" /> Delete
                           </DropdownMenuItem>
@@ -825,11 +874,17 @@ const TaskSchedulerPage = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Create Template Dialog */}
-      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+      {/* Create/Edit Template Dialog */}
+      <Dialog open={showTemplateDialog} onOpenChange={(open) => {
+        setShowTemplateDialog(open);
+        if (!open) {
+          setEditingTemplate(null);
+          resetTemplateForm();
+        }
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Create Task Template</DialogTitle>
+            <DialogTitle>{editingTemplate ? "Edit Execution Template" : "Create Execution Template"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
             <div>
@@ -923,12 +978,18 @@ const TaskSchedulerPage = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => {
+              setShowTemplateDialog(false);
+              setEditingTemplate(null);
+              resetTemplateForm();
+            }}>Cancel</Button>
             <Button 
               onClick={handleCreateTemplate} 
-              disabled={!templateForm.name || createTemplateMutation.isPending}
+              disabled={!templateForm.name || createTemplateMutation.isPending || updateTemplateMutation.isPending}
             >
-              {createTemplateMutation.isPending ? "Creating..." : "Create Template"}
+              {(createTemplateMutation.isPending || updateTemplateMutation.isPending) 
+                ? (editingTemplate ? "Saving..." : "Creating...") 
+                : (editingTemplate ? "Save Changes" : "Create Template")}
             </Button>
           </DialogFooter>
         </DialogContent>

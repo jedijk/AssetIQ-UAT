@@ -6,6 +6,15 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Execution Template Editing Added** (Mar 24, 2026):
+  - **Edit Button**: Added Edit option to template dropdown menu (Edit icon + "Edit" text)
+  - **Edit Dialog**: Reuses create dialog with "Edit Execution Template" title
+  - **Pre-populated Fields**: All template fields (name, description, discipline, strategy, interval, duration) are pre-filled when editing
+  - **Save Changes**: Button text changes to "Save Changes" when editing
+  - **API Integration**: Added `updateTemplate` API function using PATCH method
+  - **Test IDs**: Added data-testid attributes for easier testing
+  - **File Modified**: `/app/frontend/src/pages/TaskSchedulerPage.js`
+
 - **Linked Forms with Execution Plans** (Mar 24, 2026):
   - **New Field**: Added "Linked Form (Optional)" dropdown to plan creation dialog
   - **Form Template Selection**: Plans can now be associated with form templates
