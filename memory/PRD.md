@@ -6,6 +6,29 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **App Icon Updated** (Mar 24, 2026):
+  - Generated new professional icon: gear/shield with checkmark on deep blue gradient
+  - Created all required sizes: logo.png (128), logo192.png, logo512.png, apple-touch-icon.png (180), favicon-32x32.png, favicon-16x16.png
+  - Updated index.html with proper favicon links
+  - Updated manifest.json with matching dark background color (#1e3a5f)
+
+- **PWA Offline Sync Complete** (Mar 24, 2026):
+  - **New Files**:
+    - `/app/frontend/src/lib/offlineQueue.js` - IndexedDB utility for offline data queue
+    - `/app/frontend/src/hooks/useOfflineSync.js` - React hook for offline sync
+  - **Features**:
+    - IndexedDB stores for: pending_observations, pending_tasks, pending_forms, pending_threats, cached_data
+    - Automatic network status detection (online/offline)
+    - Queue functions for observations, tasks, forms, and threat reports
+    - Background sync registration when back online
+    - Manual sync trigger with visual feedback
+  - **UI Integration**:
+    - Offline status indicator in header (WiFi icon)
+    - Green = online & synced, Amber = pending items, Red = offline
+    - Badge showing pending item count
+    - Click to manually sync pending items
+  - Updated service-worker.js with forms and threats sync handlers
+
 - **Form Designer UI Complete** (Mar 24, 2026):
   - **New Page**: `/forms` - Form Designer for creating and managing data collection forms
   - **Features**:

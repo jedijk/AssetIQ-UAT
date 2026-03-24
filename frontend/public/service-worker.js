@@ -159,6 +159,10 @@ self.addEventListener('sync', (event) => {
     event.waitUntil(syncOfflineData('observations'));
   } else if (event.tag === 'sync-tasks') {
     event.waitUntil(syncOfflineData('tasks'));
+  } else if (event.tag === 'sync-forms') {
+    event.waitUntil(syncOfflineData('forms'));
+  } else if (event.tag === 'sync-threats') {
+    event.waitUntil(syncOfflineData('threats'));
   }
 });
 
@@ -210,6 +214,12 @@ function openIndexedDB() {
       }
       if (!db.objectStoreNames.contains('pending_tasks')) {
         db.createObjectStore('pending_tasks', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('pending_forms')) {
+        db.createObjectStore('pending_forms', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('pending_threats')) {
+        db.createObjectStore('pending_threats', { keyPath: 'id', autoIncrement: true });
       }
       if (!db.objectStoreNames.contains('cached_data')) {
         db.createObjectStore('cached_data', { keyPath: 'key' });

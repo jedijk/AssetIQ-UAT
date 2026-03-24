@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -29,11 +29,13 @@ import {
 import ChatSidebar from "./ChatSidebar";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 import { actionsAPI } from "../lib/api";
+import { useOfflineSync } from "../hooks/useOfflineSync";
 
 const Layout = () => {
   const { user, logout } = useAuth();
   const { canUndo, undo, isUndoing, getLastAction, undoCount } = useUndo();
   const { language, toggleLanguage, t } = useLanguage();
+  const { isOnline, totalPending, isSyncing, syncAllPending } = useOfflineSync();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -288,6 +290,56 @@ const Layout = () => {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Offline Status Indicator */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-8 w-8 sm:h-9 sm:w-9 relative ${
+                      isOnline 
+                        ? totalPending > 0 ? "text-amber-500 hover:text-amber-600" : "text-green-500 hover:text-green-600"
+                        : "text-red-500 hover:text-red-600"
+                    }`}
+                    onClick={isOnline && totalPending > 0 ? syncAllPending : undefined}
+                    disabled={isSyncing || !isOnline}
+                    data-testid="offline-status-button"
+                  >
+                    {isSyncing ? (
+                      <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                    ) : isOnline ? (
+                      totalPending > 0 ? (
+                        <Cloud className="w-4 h-4 sm:w-5 sm:h-5" />
+                      ) : (
+                        <Wifi className="w-4 h-4 sm:w-5 sm:h-5" />
+                      )
+                    ) : (
+                      <WifiOff className="w-4 h-4 sm:w-5 sm:h-5" />
+                    )}
+                    {totalPending > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full min-w-[16px] sm:min-w-[18px] h-[16px] sm:h-[18px] flex items-center justify-center px-0.5">
+                        {totalPending > 9 ? "9+" : totalPending}
+                      </span>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {isSyncing ? (
+                    <p>Syncing data...</p>
+                  ) : isOnline ? (
+                    totalPending > 0 ? (
+                      <p>Click to sync {totalPending} pending items</p>
+                    ) : (
+                      <p>Online - All data synced</p>
+                    )
+                  ) : (
+                    <p>Offline - Data will sync when connected</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {/* Language Switcher - Compact on mobile */}
             <TooltipProvider>
