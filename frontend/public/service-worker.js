@@ -200,7 +200,7 @@ async function syncOfflineData(type) {
 // Open IndexedDB
 function openIndexedDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('ReliabilityOS', 1);
+    const request = indexedDB.open('PlantOS', 1);
     
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
@@ -248,7 +248,7 @@ self.addEventListener('push', (event) => {
     };
     
     event.waitUntil(
-      self.registration.showNotification(data.title || 'ReliabilityOS', options)
+      self.registration.showNotification(data.title || 'PlantOS', options)
     );
   } catch (error) {
     console.error('[SW] Push notification error:', error);

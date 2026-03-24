@@ -37,11 +37,11 @@ const LoginPage = () => {
         <div className="flex items-center gap-3 mb-8">
           <img 
             src="/logo.png" 
-            alt="ReliabilityOS" 
+            alt="PlantOS" 
             className="w-10 h-10 rounded-lg"
           />
           <span className="text-2xl font-bold text-slate-900" data-testid="login-logo">
-            ReliabilityOS
+            PlantOS
           </span>
         </div>
 

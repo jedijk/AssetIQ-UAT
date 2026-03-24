@@ -136,11 +136,11 @@ const Layout = () => {
             <div className="flex items-center gap-3 flex-shrink-0">
               <img 
                 src="/logo.png" 
-                alt="ReliabilityOS" 
+                alt="PlantOS" 
                 className="w-9 h-9 rounded-lg"
               />
               <span className="text-xl font-bold text-slate-900 hidden sm:block" data-testid="app-logo">
-                ReliabilityOS
+                PlantOS
               </span>
             </div>
 

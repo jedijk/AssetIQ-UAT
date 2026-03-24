@@ -1,6 +1,6 @@
 {
-  "name": "ReliabilityOS",
-  "short_name": "ReliabilityOS",
+  "name": "PlantOS",
+  "short_name": "PlantOS",
   "description": "AI-Powered Reliability Intelligence Platform",
   "start_url": "/",
   "display": "standalone",
