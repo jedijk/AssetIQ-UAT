@@ -568,8 +568,8 @@ const TaskSchedulerPage = () => {
             <Calendar className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Execution</h1>
-            <p className="text-sm text-slate-500">Manage maintenance execution and schedules</p>
+            <h1 className="text-2xl font-bold text-slate-900">Execution Scheduler</h1>
+            <p className="text-sm text-slate-500">Manage work execution and schedules</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
