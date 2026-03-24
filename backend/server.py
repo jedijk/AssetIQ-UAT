@@ -282,15 +282,18 @@ Analyze message for: Equipment (P-101, pump, extruder, compressor) + Problem (le
 
 ## Required Fields:
 1. Asset: Equipment tag or name
-2. Failure: What's wrong (problem/symptom)
+2. Failure: What's wrong (problem/symptom) - MUST be specific
 
 ## Response Rules:
-- If BOTH asset AND failure found → complete=true
-- If asset unclear/generic (just "pump", "extruder" without tag) → complete=false, question_type="asset", ask which specific one
-- If failure unclear → complete=false, question_type="failure", ask what's wrong
+- If BOTH asset AND specific failure found → complete=true
+- If asset unclear/generic (just "pump", "extruder" without tag) → complete=false, question_type="asset"
+- If failure is VAGUE (failing, broken, problem, issue, not working, down) → complete=false, question_type="failure", ask what specifically is wrong
 - NEVER ask for info already clearly stated
 
-## Failure Mode Mapping (IMPORTANT - always map to these standard modes):
+## VAGUE FAILURE TERMS (always ask for clarification):
+failing, failed, broken, problem, issue, trouble, not working, down, bad, wrong, fault, error, malfunction, acting up, stopped
+
+## SPECIFIC FAILURE TERMS (can proceed):
 - leaking/leak/drip → "Seal Failure"
 - vibration/vibrating/shaking → "Bearing Failure"  
 - noise/grinding/squealing → "Bearing Failure"
@@ -302,16 +305,14 @@ Analyze message for: Equipment (P-101, pump, extruder, compressor) + Problem (le
 - cavitation/bubbles → "Cavitation"
 - misalignment/alignment → "Misalignment"
 - surge/unstable → "Surge"
-- failure/failed/broken → "General Failure"
-- problem/issue/trouble (generic) → ask for more details about the failure
 
 ## Equipment Detection:
-- Specific tags (P-101, C-201) → Use directly, complete=true
+- Specific tags (P-101, C-201) → Use directly
 - Generic names (pump, extruder, compressor) without ID → complete=false, question_type="asset"
 - 'Reporting issue for equipment "X"' → asset=X exactly
 
 RESPOND IN JSON:
-{"complete":true/false,"follow_up_question":"if incomplete","question_type":"asset|failure","threat":{"title":"short title","asset":"equipment name","equipment_type":"pump|compressor|extruder|etc","failure_mode":"standard mode from mapping above","impact":"description","frequency":"First Time|Occasional|Frequent","risk_score":0-100,"risk_level":"Critical|High|Medium|Low","recommended_actions":["action1","action2"]}}"""
+{"complete":true/false,"follow_up_question":"if incomplete","question_type":"asset|failure","is_vague_failure":true/false,"threat":{"title":"short title","asset":"equipment name","equipment_type":"pump|compressor|extruder|etc","failure_mode":"standard mode or null if vague","impact":"description","frequency":"First Time|Occasional|Frequent","risk_score":0-100,"risk_level":"Critical|High|Medium|Low","recommended_actions":["action1","action2"]}}"""
 
 IMAGE_ANALYSIS_SYSTEM_PROMPT = """You are ThreatBase AI analyzing an image of equipment failure or damage. 
 Describe what you see in the image, identifying:
@@ -1114,9 +1115,10 @@ async def send_chat_message(
     user_used_generic_term = False
     for term in generic_equipment_terms:
         if term in user_input_lower:
-            # Check if user used JUST the generic term without specific identifiers
-            words_before_term = user_input_lower.split(term)[0].strip().split()
-            has_specific_id = any(any(c.isdigit() for c in word) for word in words_before_term[-2:] if word)
+            # Check if user provided a specific identifier (tag like P-101, C-201, etc.)
+            # Look for patterns like P-101, CW-101, 00 1L01, etc. anywhere in the message
+            import re
+            has_specific_id = bool(re.search(r'\b[A-Za-z]{1,3}[-]?\d{2,4}\b|\b\d{2}\s+\d[A-Za-z]\d{2}\b', user_input_lower))
             if not has_specific_id:
                 user_used_generic_term = True
                 break
@@ -1147,6 +1149,21 @@ async def send_chat_message(
             analysis["complete"] = False
             analysis["question_type"] = "asset"
             analysis["follow_up_question"] = f"I found multiple equipment matching '{matched_generic_term}'. Please select the correct one:"
+    
+    # Check for vague failure terms - force failure mode selection
+    vague_failure_terms = ["failing", "failed", "broken", "problem", "issue", "trouble", "not working", 
+                          "down", "bad", "wrong", "fault", "error", "malfunction", "acting up", "stopped",
+                          "doesn't work", "isn't working", "won't work", "having issues", "having problems"]
+    
+    user_has_vague_failure = any(term in user_input_lower for term in vague_failure_terms)
+    ai_detected_vague = analysis.get("is_vague_failure", False) if analysis else False
+    
+    # If vague failure detected and we have a specific equipment, ask for failure mode
+    if (user_has_vague_failure or ai_detected_vague) and analysis and analysis.get("complete", False):
+        # Override - we need more specific failure info
+        analysis["complete"] = False
+        analysis["question_type"] = "failure"
+        analysis["follow_up_question"] = "What specifically is wrong? Please select or describe the failure:"
     
     if not analysis.get("complete", False):
         # Need more info - return follow-up question
@@ -1229,8 +1246,28 @@ async def send_chat_message(
             # Get all failure modes from library
             all_failure_modes = FAILURE_MODES_LIBRARY
             
-            # Try to find matching failure modes based on message content
+            # Try to find matching failure modes based on message content and equipment type
             message_lower = message.content.lower()
+            
+            # Get the extracted equipment type if available
+            extracted_equipment_type = ""
+            if analysis and analysis.get("threat"):
+                extracted_equipment_type = (analysis.get("threat", {}).get("equipment_type") or "").lower()
+                extracted_asset = (analysis.get("threat", {}).get("asset") or "").lower()
+                # Also try to detect equipment type from asset name
+                if "pump" in extracted_asset:
+                    extracted_equipment_type = "pump"
+                elif "extruder" in extracted_asset:
+                    extracted_equipment_type = "extruder"
+                elif "compressor" in extracted_asset:
+                    extracted_equipment_type = "compressor"
+                elif "motor" in extracted_asset:
+                    extracted_equipment_type = "motor"
+                elif "valve" in extracted_asset:
+                    extracted_equipment_type = "valve"
+                elif "exchanger" in extracted_asset:
+                    extracted_equipment_type = "heat exchanger"
+            
             scored_modes = []
             
             for fm in all_failure_modes:
@@ -1239,6 +1276,10 @@ async def send_chat_message(
                 category_lower = fm.get("category", "").lower()
                 equipment_lower = fm.get("equipment", "").lower()
                 keywords = [k.lower() for k in fm.get("keywords", [])]
+                
+                # Boost score if equipment type matches
+                if extracted_equipment_type and extracted_equipment_type in equipment_lower:
+                    score += 10
                 
                 # Score based on matches
                 for word in message_lower.split():
@@ -1264,13 +1305,22 @@ async def send_chat_message(
                         "score": score
                     })
             
-            # Sort by score and take top 5
+            # Sort by score and take top 8 (more options for selection)
             scored_modes.sort(key=lambda x: x["score"], reverse=True)
             
-            # If no matches found, show common failure modes
-            if not scored_modes and all_failure_modes:
-                # Get top failure modes by RPN (most critical ones)
-                sorted_by_rpn = sorted(all_failure_modes, key=lambda x: x.get("rpn", 0), reverse=True)
+            # If no matches found or vague failure, show common failure modes for this equipment type
+            if (not scored_modes or user_has_vague_failure) and all_failure_modes:
+                # Filter by equipment type if available, otherwise show top by RPN
+                if extracted_equipment_type:
+                    filtered_modes = [fm for fm in all_failure_modes 
+                                    if extracted_equipment_type in fm.get("equipment", "").lower()]
+                    if filtered_modes:
+                        sorted_modes = sorted(filtered_modes, key=lambda x: x.get("rpn", 0), reverse=True)
+                    else:
+                        sorted_modes = sorted(all_failure_modes, key=lambda x: x.get("rpn", 0), reverse=True)
+                else:
+                    sorted_modes = sorted(all_failure_modes, key=lambda x: x.get("rpn", 0), reverse=True)
+                
                 failure_mode_suggestions = [
                     {
                         "id": fm["id"],
@@ -1281,14 +1331,14 @@ async def send_chat_message(
                         "rpn": fm.get("rpn"),
                         "score": 0
                     }
-                    for fm in sorted_by_rpn[:5]
+                    for fm in sorted_modes[:8]
                 ]
             else:
-                failure_mode_suggestions = scored_modes[:5]
+                failure_mode_suggestions = scored_modes[:8]
             
             # Update the question to be more helpful
             if failure_mode_suggestions:
-                question = "I found some failure modes that might match. Please select the correct one, or describe the failure differently:"
+                question = "What specifically is wrong? Please select the failure type:"
         
         # Add helpful prompts based on question type
         if question_type == "photo":
