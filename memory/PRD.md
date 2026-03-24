@@ -6,6 +6,13 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **FMEA Recommended Actions Enhanced** (Mar 24, 2026):
+  - **Discipline Field**: Added dropdown with options (Mechanical, Electrical, Instrumentation, Process, Civil/Structural, Operations)
+  - **Action Type Field**: Added dropdown for PM (Preventive - blue), CM (Corrective - amber), PDM (Predictive - purple)
+  - **Visual Badges**: Actions now display color-coded type badges and discipline labels
+  - **Backward Compatible**: Old string-format actions still display correctly, new actions use the enhanced object format
+  - **File Modified**: `/app/frontend/src/pages/FailureModesPage.js`
+
 - **Causal Engine List View Redesigned** (Mar 24, 2026):
   - **Improved Investigation Cards**: Card-based design with rounded corners, subtle borders, and shadows
   - **Color-coded Status Badges**: Draft (gray), In Progress (amber), Completed (green), Closed (blue)

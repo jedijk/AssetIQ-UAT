@@ -155,7 +155,12 @@ function FailureModeViewPanel({
   
   const addAction = () => {
     if (actionInput.trim() && formData) {
-      setFormData({ ...formData, recommended_actions: [...(formData.recommended_actions || []), actionInput.trim()] });
+      const newAction = {
+        description: actionInput.trim(),
+        discipline: actionDiscipline,
+        action_type: actionType
+      };
+      setFormData({ ...formData, recommended_actions: [...(formData.recommended_actions || []), newAction] });
       setActionInput("");
     }
   };
@@ -165,6 +170,25 @@ function FailureModeViewPanel({
       setFormData({ ...formData, recommended_actions: formData.recommended_actions.filter((_, i) => i !== idx) });
     }
   };
+  
+  // State for action discipline and type in inline editing
+  const [actionDiscipline, setActionDiscipline] = useState("mechanical");
+  const [actionType, setActionType] = useState("PM");
+  
+  const DISCIPLINE_OPTIONS = [
+    { value: "mechanical", label: "Mechanical" },
+    { value: "electrical", label: "Electrical" },
+    { value: "instrumentation", label: "Instrumentation" },
+    { value: "process", label: "Process" },
+    { value: "civil", label: "Civil/Structural" },
+    { value: "operations", label: "Operations" },
+  ];
+  
+  const ACTION_TYPE_OPTIONS = [
+    { value: "PM", label: "PM (Preventive)", color: "bg-blue-100 text-blue-700" },
+    { value: "CM", label: "CM (Corrective)", color: "bg-amber-100 text-amber-700" },
+    { value: "PDM", label: "PDM (Predictive)", color: "bg-purple-100 text-purple-700" },
+  ];
 
   if (!fm) {
     return (
@@ -464,32 +488,84 @@ function FailureModeViewPanel({
         <div>
           <Label className="text-xs text-slate-500 mb-2 block">{t("library.recommendedActions")}</Label>
           <div className="space-y-2">
-            {(isEditing ? formData?.recommended_actions : fm.recommended_actions)?.map((action, idx) => (
-              <div key={idx} className="flex items-start gap-2 p-3 bg-slate-50 rounded-lg group">
-                <ShieldCheck className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                <span className="text-sm text-slate-700 flex-1">{action}</span>
-                {isEditing && (
-                  <button onClick={() => removeAction(idx)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            ))}
+            {(isEditing ? formData?.recommended_actions : fm.recommended_actions)?.map((action, idx) => {
+              // Handle both old string format and new object format
+              const isObject = typeof action === 'object';
+              const description = isObject ? action.description : action;
+              const discipline = isObject ? action.discipline : null;
+              const actionType = isObject ? action.action_type : null;
+              
+              const typeColors = {
+                PM: "bg-blue-100 text-blue-700",
+                CM: "bg-amber-100 text-amber-700",
+                PDM: "bg-purple-100 text-purple-700",
+              };
+              
+              return (
+                <div key={idx} className="flex items-start gap-2 p-3 bg-slate-50 rounded-lg group border border-slate-100">
+                  <ShieldCheck className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    {(actionType || discipline) && (
+                      <div className="flex items-center gap-2 mb-1">
+                        {actionType && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeColors[actionType] || 'bg-slate-100 text-slate-600'}`}>
+                            {actionType}
+                          </span>
+                        )}
+                        {discipline && (
+                          <span className="text-xs text-slate-500 capitalize">{discipline}</span>
+                        )}
+                      </div>
+                    )}
+                    <span className="text-sm text-slate-700">{description}</span>
+                  </div>
+                  {isEditing && (
+                    <button onClick={() => removeAction(idx)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
             {(!fm.recommended_actions || fm.recommended_actions.length === 0) && !isEditing && (
               <span className="text-sm text-slate-400">{t("library.noRecommendedActions")}</span>
             )}
             {isEditing && (
-              <div className="flex gap-2">
-                <Input
-                  value={actionInput}
-                  onChange={(e) => setActionInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAction())}
-                  placeholder={t("library.addAction")}
-                  className="flex-1"
-                />
-                <Button variant="outline" onClick={addAction}>
-                  <Plus className="w-4 h-4" />
-                </Button>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    value={actionInput}
+                    onChange={(e) => setActionInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAction())}
+                    placeholder={t("library.addAction")}
+                    className="flex-1"
+                  />
+                  <Button variant="outline" onClick={addAction}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Select value={actionDiscipline} onValueChange={setActionDiscipline}>
+                    <SelectTrigger className="w-36 h-9 text-xs">
+                      <SelectValue placeholder="Discipline" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DISCIPLINE_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={actionType} onValueChange={setActionType}>
+                    <SelectTrigger className="w-36 h-9 text-xs">
+                      <SelectValue placeholder="Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACTION_TYPE_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
           </div>
@@ -614,6 +690,23 @@ const FailureModesPage = () => {
   });
   const [keywordInput, setKeywordInput] = useState("");
   const [actionInput, setActionInput] = useState("");
+  const [actionDiscipline, setActionDiscipline] = useState("mechanical");
+  const [actionType, setActionType] = useState("PM");
+  
+  const DISCIPLINE_OPTIONS = [
+    { value: "mechanical", label: "Mechanical" },
+    { value: "electrical", label: "Electrical" },
+    { value: "instrumentation", label: "Instrumentation" },
+    { value: "process", label: "Process" },
+    { value: "civil", label: "Civil/Structural" },
+    { value: "operations", label: "Operations" },
+  ];
+  
+  const ACTION_TYPE_OPTIONS = [
+    { value: "PM", label: "PM (Preventive)", color: "bg-blue-100 text-blue-700" },
+    { value: "CM", label: "CM (Corrective)", color: "bg-amber-100 text-amber-700" },
+    { value: "PDM", label: "PDM (Predictive)", color: "bg-purple-100 text-purple-700" },
+  ];
   
   const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
   const resetFmForm = () => {
@@ -956,7 +1049,12 @@ const FailureModesPage = () => {
 
   const addAction = () => {
     if (actionInput.trim()) {
-      setNewFm({ ...newFm, recommended_actions: [...newFm.recommended_actions, actionInput.trim()] });
+      const newAction = {
+        description: actionInput.trim(),
+        discipline: actionDiscipline,
+        action_type: actionType
+      };
+      setNewFm({ ...newFm, recommended_actions: [...newFm.recommended_actions, newAction] });
       setActionInput("");
     }
   };
@@ -1435,13 +1533,56 @@ const FailureModesPage = () => {
                 />
                 <Button type="button" variant="outline" onClick={addAction}>{t("common.add")}</Button>
               </div>
-              <ul className="space-y-1 mt-2">
-                {newFm.recommended_actions.map((action, i) => (
-                  <li key={i} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
-                    <span>{i + 1}. {action}</span>
-                    <button onClick={() => removeAction(i)} className="text-red-500 hover:text-red-700"><X className="w-4 h-4" /></button>
-                  </li>
-                ))}
+              <div className="flex gap-2 mt-2">
+                <Select value={actionDiscipline} onValueChange={setActionDiscipline}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Discipline" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DISCIPLINE_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={actionType} onValueChange={setActionType}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACTION_TYPE_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <ul className="space-y-2 mt-3">
+                {newFm.recommended_actions.map((action, i) => {
+                  // Handle both old string format and new object format
+                  const isObject = typeof action === 'object';
+                  const description = isObject ? action.description : action;
+                  const discipline = isObject ? action.discipline : null;
+                  const type = isObject ? action.action_type : null;
+                  const typeConfig = ACTION_TYPE_OPTIONS.find(t => t.value === type);
+                  
+                  return (
+                    <li key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {type && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeConfig?.color || 'bg-slate-100 text-slate-600'}`}>
+                              {type}
+                            </span>
+                          )}
+                          {discipline && (
+                            <span className="text-xs text-slate-500 capitalize">{discipline}</span>
+                          )}
+                        </div>
+                        <span className="text-sm">{i + 1}. {description}</span>
+                      </div>
+                      <button onClick={() => removeAction(i)} className="text-red-500 hover:text-red-700 ml-2"><X className="w-4 h-4" /></button>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>
