@@ -1270,6 +1270,9 @@ async def send_chat_message(
             
             scored_modes = []
             
+            # Extract meaningful words from user message (min 3 chars)
+            message_words = [w for w in message_lower.split() if len(w) >= 3]
+            
             for fm in all_failure_modes:
                 score = 0
                 fm_name_lower = fm.get("failure_mode", "").lower()
@@ -1277,22 +1280,31 @@ async def send_chat_message(
                 equipment_lower = fm.get("equipment", "").lower()
                 keywords = [k.lower() for k in fm.get("keywords", [])]
                 
-                # Boost score if equipment type matches
-                if extracted_equipment_type and extracted_equipment_type in equipment_lower:
-                    score += 10
+                # HIGHEST PRIORITY: Exact failure mode name match (user says "fouling" → "Fouling")
+                if fm_name_lower in message_lower or message_lower in fm_name_lower:
+                    score += 50  # Strong bonus for direct match
                 
-                # Score based on matches
-                for word in message_lower.split():
-                    if len(word) > 2:  # Skip short words
-                        if word in fm_name_lower:
-                            score += 5
-                        if word in category_lower:
-                            score += 2
-                        if word in equipment_lower:
-                            score += 2
-                        for keyword in keywords:
-                            if word in keyword or keyword in word:
-                                score += 3
+                # HIGH PRIORITY: Exact keyword match (user says "fouling" → keyword contains "fouling")  
+                for keyword in keywords:
+                    if keyword in message_lower or message_lower in keyword:
+                        score += 30
+                        break  # Only count once
+                
+                # Boost score if equipment type matches the identified equipment
+                if extracted_equipment_type and extracted_equipment_type in equipment_lower:
+                    score += 15
+                
+                # Word-level matching (lower priority)
+                for word in message_words:
+                    if word in fm_name_lower:
+                        score += 5
+                    if word in category_lower:
+                        score += 2
+                    if word in equipment_lower:
+                        score += 2
+                    for keyword in keywords:
+                        if word in keyword or keyword in word:
+                            score += 3
                 
                 if score > 0:
                     scored_modes.append({
@@ -1308,9 +1320,21 @@ async def send_chat_message(
             # Sort by score and take top 8 (more options for selection)
             scored_modes.sort(key=lambda x: x["score"], reverse=True)
             
-            # If no matches found or vague failure, show common failure modes for this equipment type
-            if (not scored_modes or user_has_vague_failure) and all_failure_modes:
-                # Filter by equipment type if available, otherwise show top by RPN
+            # PRIORITY: If user mentioned something specific that matched failure modes, show those
+            # Only fall back to equipment-type suggestions if NO good matches found
+            
+            # Check if we have high-confidence matches (score >= 30 means direct name/keyword match)
+            high_confidence_matches = [m for m in scored_modes if m["score"] >= 30]
+            medium_confidence_matches = [m for m in scored_modes if m["score"] >= 10]
+            
+            if high_confidence_matches:
+                # User mentioned something very specific (e.g., "fouling") - only show those
+                failure_mode_suggestions = high_confidence_matches[:8]
+            elif medium_confidence_matches:
+                # User mentioned something somewhat specific - show medium+ matches
+                failure_mode_suggestions = medium_confidence_matches[:8]
+            elif all_failure_modes:
+                # No specific matches - fall back to equipment-type suggestions
                 if extracted_equipment_type:
                     filtered_modes = [fm for fm in all_failure_modes 
                                     if extracted_equipment_type in fm.get("equipment", "").lower()]

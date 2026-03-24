@@ -6,6 +6,16 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Chat Failure Mode Matching Fix** (Mar 24, 2026):
+  - **Problem**: When user typed specific failure modes like "fouling", the system showed irrelevant equipment-based fallback suggestions instead of matching the actual failure mode.
+  - **Root Cause**: The code was using `user_has_vague_failure` flag to override matched results with equipment-type-based fallbacks.
+  - **Fix**: Improved scoring algorithm in `/app/backend/server.py`:
+    - Added higher priority scoring (50pts) for exact failure mode name matches
+    - Added keyword exact match bonus (30pts) for FMEA keywords
+    - Implemented confidence-based filtering: high (≥30), medium (≥10) scores
+    - Only falls back to equipment-type suggestions when no good matches exist
+  - **Result**: Typing "fouling" now shows only 3 relevant fouling options instead of generic pump failures.
+
 - **App Icon Updated** (Mar 24, 2026):
   - Generated new professional icon: gear/shield with checkmark on deep blue gradient
   - Created all required sizes: logo.png (128), logo192.png, logo512.png, apple-touch-icon.png (180), favicon-32x32.png, favicon-16x16.png
