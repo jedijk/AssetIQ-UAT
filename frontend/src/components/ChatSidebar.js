@@ -17,20 +17,30 @@ import {
   MapPin,
   Wrench,
   Activity,
-  CheckCircle2
+  CheckCircle2,
+  Camera,
+  Paperclip,
+  Trash2,
+  Pause,
+  Play,
+  Square
 } from "lucide-react";
 import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
 
 const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   const [message, setMessage] = useState("");
   const [imageBase64, setImageBase64] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [audioChunks, setAudioChunks] = useState([]);
   const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
+  const recordingTimerRef = useRef(null);
   const queryClient = useQueryClient();
 
   // Pre-fill message when equipment is provided
@@ -121,9 +131,67 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
       const recorder = new MediaRecorder(stream);
       const chunks = [];
 
-      recorder.ondataavailable = (e) => chunks.push(e.data);
-      recorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: "audio/webm" });
+      recorder.ondataavailable = (e) => {
+        chunks.push(e.data);
+        setAudioChunks([...chunks]);
+      };
+      
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      recorder.start(100); // Collect data every 100ms for waveform
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      setIsPaused(false);
+      setRecordingTime(0);
+      
+      // Start timer
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      toast.error("Could not access microphone");
+    }
+  };
+
+  const pauseRecording = () => {
+    if (mediaRecorder && isRecording) {
+      if (isPaused) {
+        mediaRecorder.resume();
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingTime(prev => prev + 1);
+        }, 1000);
+      } else {
+        mediaRecorder.pause();
+        clearInterval(recordingTimerRef.current);
+      }
+      setIsPaused(!isPaused);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      clearInterval(recordingTimerRef.current);
+      setIsRecording(false);
+      setIsPaused(false);
+      setRecordingTime(0);
+      setAudioChunks([]);
+      setMediaRecorder(null);
+    }
+  };
+
+  const sendRecording = async () => {
+    if (mediaRecorder && audioChunks.length > 0) {
+      clearInterval(recordingTimerRef.current);
+      mediaRecorder.stop();
+      
+      setIsTranscribing(true);
+      
+      // Wait a bit for final chunks
+      setTimeout(async () => {
+        const blob = new Blob(audioChunks, { type: "audio/webm" });
         const reader = new FileReader();
         reader.onloadend = async () => {
           const base64 = reader.result.split(",")[1];
@@ -133,27 +201,36 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             toast.success("Voice transcribed!");
           } catch (error) {
             toast.error("Failed to transcribe voice");
+          } finally {
+            setIsTranscribing(false);
           }
         };
         reader.readAsDataURL(blob);
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      recorder.start();
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-    } catch (error) {
-      toast.error("Could not access microphone");
+        
+        setIsRecording(false);
+        setIsPaused(false);
+        setRecordingTime(0);
+        setAudioChunks([]);
+        setMediaRecorder(null);
+      }, 200);
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.stop();
-      setIsRecording(false);
-      setMediaRecorder(null);
-    }
+  // Format recording time
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, []);
 
   // Render message content
   const renderMessageContent = (msg) => {
@@ -334,18 +411,19 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
-        <div className="border-t border-slate-200 bg-white p-4">
+        {/* Input Area - WhatsApp Style */}
+        <div className="border-t border-slate-200 bg-slate-100 p-3">
+          {/* Image Preview */}
           {imagePreview && (
-            <div className="mb-3">
+            <div className="mb-3 px-1">
               <div className="relative inline-block">
-                <img src={imagePreview} alt="Upload preview" className="rounded-lg max-h-24" />
+                <img src={imagePreview} alt="Upload preview" className="rounded-lg max-h-20 border border-slate-300" />
                 <button
                   onClick={() => {
                     setImageBase64(null);
                     setImagePreview(null);
                   }}
-                  className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-700"
+                  className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-slate-900 transition-colors"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -353,88 +431,148 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             </div>
           )}
 
-          {/* Quick tips for new users */}
-          <div className="flex items-center gap-3 mb-3 px-1">
-            <div className="flex items-center gap-1 text-xs text-slate-500">
-              <ImageIcon className="w-3.5 h-3.5" />
-              <span>Attach photo</span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+
+          {/* Recording State */}
+          {isRecording ? (
+            <div className="flex items-center gap-2">
+              {/* Cancel/Delete Button */}
+              <button
+                onClick={cancelRecording}
+                className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+                title="Cancel recording"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+
+              {/* Recording Bar */}
+              <div className="flex-1 h-12 bg-slate-800 rounded-full flex items-center px-4 gap-3">
+                {/* Recording indicator */}
+                <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
+                
+                {/* Timer */}
+                <span className="text-white text-sm font-medium min-w-[40px]">
+                  {formatTime(recordingTime)}
+                </span>
+
+                {/* Waveform visualization */}
+                <div className="flex-1 flex items-center justify-center gap-[2px] h-6 overflow-hidden">
+                  {[...Array(40)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="w-[2px] bg-slate-400 rounded-full"
+                      animate={{
+                        height: isPaused ? 4 : [4, Math.random() * 20 + 4, 4],
+                      }}
+                      transition={{
+                        duration: 0.5,
+                        repeat: isPaused ? 0 : Infinity,
+                        delay: i * 0.02,
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Pause/Play Button */}
+                <button
+                  onClick={pauseRecording}
+                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-colors"
+                  title={isPaused ? "Resume" : "Pause"}
+                >
+                  {isPaused ? (
+                    <Play className="w-4 h-4" />
+                  ) : (
+                    <Pause className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+
+              {/* Send Recording Button */}
+              <button
+                onClick={sendRecording}
+                disabled={isTranscribing}
+                className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                title="Send voice message"
+              >
+                {isTranscribing ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </button>
             </div>
-            <div className="flex items-center gap-1 text-xs text-slate-500">
-              <Mic className="w-3.5 h-3.5" />
-              <span>Voice input</span>
-            </div>
-          </div>
+          ) : (
+            /* Normal Input State */
+            <div className="flex items-end gap-2">
+              {/* Attachment Button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+                title="Attach file"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
 
-          <div className="flex items-end gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-shrink-0 h-10 w-10 rounded-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-              data-testid="sidebar-upload-image-button"
-              title="Upload an image of the issue"
-            >
-              <ImageIcon className="w-5 h-5" />
-            </Button>
+              {/* Input Container */}
+              <div className="flex-1 bg-white rounded-3xl border border-slate-200 flex items-end overflow-hidden shadow-sm">
+                <textarea
+                  ref={textareaRef}
+                  value={message}
+                  onChange={(e) => {
+                    setMessage(e.target.value);
+                    // Auto-resize
+                    e.target.style.height = 'auto';
+                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                  }}
+                  onKeyDown={handleKeyPress}
+                  placeholder="Type a message..."
+                  className="flex-1 px-4 py-3 text-sm bg-transparent border-none outline-none resize-none min-h-[44px] max-h-[120px] placeholder:text-slate-400"
+                  rows={1}
+                  style={{ height: '44px' }}
+                  data-testid="sidebar-chat-message-input"
+                />
+                
+                {/* Camera Button - inside input */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors mr-1"
+                  title="Take photo"
+                >
+                  <Camera className="w-5 h-5" />
+                </button>
+              </div>
 
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={isRecording ? stopRecording : startRecording}
-              className={`flex-shrink-0 h-10 w-10 rounded-full transition-colors ${
-                isRecording
-                  ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
-                  : "text-slate-500 hover:text-blue-600 hover:bg-blue-50"
-              }`}
-              data-testid="sidebar-voice-record-button"
-              title={isRecording ? "Stop recording" : "Start voice recording"}
-            >
-              {isRecording ? (
-                <MicOff className="w-5 h-5" />
+              {/* Mic or Send Button */}
+              {message.trim() || imageBase64 ? (
+                <button
+                  onClick={handleSend}
+                  disabled={sendMutation.isPending}
+                  className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                  data-testid="sidebar-send-message-button"
+                  title="Send message"
+                >
+                  {sendMutation.isPending ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
+                </button>
               ) : (
-                <Mic className="w-5 h-5" />
+                <button
+                  onClick={startRecording}
+                  className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-lg transition-all active:scale-95"
+                  data-testid="sidebar-voice-record-button"
+                  title="Hold to record voice"
+                >
+                  <Mic className="w-5 h-5" />
+                </button>
               )}
-            </Button>
-
-            <Textarea
-              ref={textareaRef}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Describe the issue or use voice/image..."
-              className="flex-1 min-h-[80px] max-h-32 resize-none rounded-xl border-slate-200 text-sm"
-              rows={3}
-              data-testid="sidebar-chat-message-input"
-            />
-
-            <Button
-              onClick={handleSend}
-              disabled={sendMutation.isPending || (!message.trim() && !imageBase64)}
-              className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-600 hover:bg-blue-700"
-              data-testid="sidebar-send-message-button"
-              title="Send message"
-            >
-              {sendMutation.isPending ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </Button>
-          </div>
-
-          {isRecording && (
-            <div className="mt-2 flex items-center gap-2 text-red-600 text-xs font-medium">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              Recording... Tap microphone to stop
             </div>
           )}
         </div>
