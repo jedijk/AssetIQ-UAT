@@ -29,6 +29,7 @@ export const DISCIPLINE_OPTIONS = [
   { value: "electrical", label: "Electrical" },
   { value: "instrumentation", label: "Instrumentation" },
   { value: "operations", label: "Operations" },
+  { value: "laboratory", label: "Laboratory" },
   { value: "predictive", label: "Predictive Maintenance" },
   { value: "reliability", label: "Reliability Engineering" },
 ];

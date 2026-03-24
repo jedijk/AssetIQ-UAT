@@ -238,6 +238,7 @@ const DisciplineBadge = ({ discipline }) => {
     operations: "bg-blue-100 text-blue-700",
     maintenance: "bg-yellow-100 text-yellow-700",
     lab: "bg-purple-100 text-purple-700",
+    laboratory: "bg-purple-100 text-purple-700",
     inspection: "bg-green-100 text-green-700",
     engineering: "bg-orange-100 text-orange-700",
   };
@@ -650,7 +651,7 @@ const TaskSchedulerPage = () => {
                     <SelectItem value="all">All Disciplines</SelectItem>
                     <SelectItem value="operations">Operations</SelectItem>
                     <SelectItem value="maintenance">Maintenance</SelectItem>
-                    <SelectItem value="lab">Lab</SelectItem>
+                    <SelectItem value="laboratory">Laboratory</SelectItem>
                     <SelectItem value="inspection">Inspection</SelectItem>
                     <SelectItem value="engineering">Engineering</SelectItem>
                   </SelectContent>
@@ -917,7 +918,7 @@ const TaskSchedulerPage = () => {
                   <SelectContent>
                     <SelectItem value="operations">Operations</SelectItem>
                     <SelectItem value="maintenance">Maintenance</SelectItem>
-                    <SelectItem value="lab">Lab</SelectItem>
+                    <SelectItem value="laboratory">Laboratory</SelectItem>
                     <SelectItem value="inspection">Inspection</SelectItem>
                     <SelectItem value="engineering">Engineering</SelectItem>
                   </SelectContent>

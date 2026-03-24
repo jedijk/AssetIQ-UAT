@@ -38,7 +38,7 @@ const LEVEL_CONFIG = {
 const LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
 const LEGACY_LEVEL_MAP = { "unit": "plant_unit", "system": "section_system", "equipment": "equipment_unit" };
 const CRIT_COLORS = { safety_critical: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", dot: "bg-red-500" }, production_critical: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", dot: "bg-orange-500" }, medium: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", dot: "bg-yellow-500" }, low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } };
-const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process"];
+const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process", "laboratory"];
 
 // Normalize legacy levels to ISO 14224 standard
 function normalizeLevel(level) {

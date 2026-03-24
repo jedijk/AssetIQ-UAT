@@ -88,7 +88,7 @@ const EQUIPMENT_ICONS = {
   cpu: Cpu, pipette: Pipette, flame: Flame 
 };
 const ICON_OPTIONS = ["droplets", "wind", "cog", "thermometer", "box", "circle-dot", "zap", "gauge", "cpu", "pipette", "flame"];
-const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process"];
+const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process", "laboratory"];
 
 // Equipment Type Library Item
 function EquipmentTypeItem({ item, onEdit, onDelete }) {
@@ -182,6 +182,7 @@ function FailureModeViewPanel({
     { value: "process", label: "Process" },
     { value: "civil", label: "Civil/Structural" },
     { value: "operations", label: "Operations" },
+    { value: "laboratory", label: "Laboratory" },
   ];
   
   const ACTION_TYPE_OPTIONS = [
@@ -700,6 +701,7 @@ const FailureModesPage = () => {
     { value: "process", label: "Process" },
     { value: "civil", label: "Civil/Structural" },
     { value: "operations", label: "Operations" },
+    { value: "laboratory", label: "Laboratory" },
   ];
   
   const ACTION_TYPE_OPTIONS = [

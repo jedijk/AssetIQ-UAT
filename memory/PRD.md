@@ -6,6 +6,16 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Added "Laboratory" Discipline** (Mar 24, 2026):
+  - Added "Laboratory" as a discipline option across the application
+  - **Files Updated**:
+    - `/app/frontend/src/pages/TaskSchedulerPage.js` - Template form and filter dropdown
+    - `/app/frontend/src/pages/FailureModesPage.js` - DISCIPLINES array and DISCIPLINE_OPTIONS
+    - `/app/frontend/src/pages/EquipmentManagerPage.js` - DISCIPLINES array
+    - `/app/frontend/src/components/maintenance/constants.js` - DISCIPLINE_OPTIONS
+    - `/app/backend/models/task_models.py` - TaskDiscipline enum
+  - Added purple color badge for laboratory discipline
+
 - **Execution Template Editing Added** (Mar 24, 2026):
   - **Edit Button**: Added Edit option to template dropdown menu (Edit icon + "Edit" text)
   - **Edit Dialog**: Reuses create dialog with "Edit Execution Template" title

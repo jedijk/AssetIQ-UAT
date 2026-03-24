@@ -18,6 +18,7 @@ class TaskDiscipline(str, Enum):
     OPERATIONS = "operations"
     MAINTENANCE = "maintenance"
     LAB = "lab"
+    LABORATORY = "laboratory"
     INSPECTION = "inspection"
     ENGINEERING = "engineering"
 
