@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import {
-  Calendar,
+  Calendar as CalendarIcon,
   ClipboardList,
   Clock,
   Plus,
@@ -68,6 +69,8 @@ import {
 } from "../components/ui/alert-dialog";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
+import { Calendar } from "../components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import {
   Card,
   CardContent,
@@ -286,8 +289,8 @@ const TaskSchedulerPage = () => {
     form_template_id: "",
     interval_value: null, // null means inherit from template
     interval_unit: null,  // null means inherit from template
-    effective_from: "",
-    effective_until: "",
+    effective_from: null, // Date object
+    effective_until: null, // Date object
     notes: ""
   });
   const [inheritedInterval, setInheritedInterval] = useState({ value: 30, unit: "days" });
@@ -401,6 +404,8 @@ const TaskSchedulerPage = () => {
         ...data,
         interval_value: data.interval_value || inheritedInterval.value,
         interval_unit: data.interval_unit || inheritedInterval.unit,
+        effective_from: data.effective_from ? data.effective_from.toISOString() : null,
+        effective_until: data.effective_until ? data.effective_until.toISOString() : null,
       };
       return taskAPI.createPlan(submitData);
     },
@@ -409,7 +414,7 @@ const TaskSchedulerPage = () => {
       queryClient.invalidateQueries(["task-stats"]);
       toast.success("Plan created");
       setShowPlanDialog(false);
-      setPlanForm({ equipment_id: "", task_template_id: "", form_template_id: "", interval_value: null, interval_unit: null, effective_from: "", effective_until: "", notes: "" });
+      setPlanForm({ equipment_id: "", task_template_id: "", form_template_id: "", interval_value: null, interval_unit: null, effective_from: null, effective_until: null, notes: "" });
       setInheritedInterval({ value: 30, unit: "days" });
     },
     onError: (error) => toast.error(error.message || "Failed to create plan")
@@ -565,7 +570,7 @@ const TaskSchedulerPage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-            <Calendar className="h-5 w-5 text-white" />
+            <CalendarIcon className="h-5 w-5 text-white" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Execution Scheduler</h1>
@@ -858,7 +863,7 @@ const TaskSchedulerPage = () => {
                         Every {plan.interval_value} {plan.interval_unit}
                       </div>
                       <div className="flex items-center gap-2 text-slate-600">
-                        <Calendar className="w-4 h-4" />
+                        <CalendarIcon className="w-4 h-4" />
                         Next: {formatDate(plan.next_due_date)}
                       </div>
                       {plan.form_template_id && (
@@ -1221,22 +1226,87 @@ const TaskSchedulerPage = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Begin Date</Label>
-                <Input
-                  type="datetime-local"
-                  value={planForm.effective_from}
-                  onChange={(e) => setPlanForm({ ...planForm, effective_from: e.target.value })}
-                  className="text-sm"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={`w-full justify-start text-left font-normal ${!planForm.effective_from ? "text-muted-foreground" : ""}`}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {planForm.effective_from ? format(planForm.effective_from, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={planForm.effective_from}
+                      onSelect={(date) => setPlanForm({ ...planForm, effective_from: date })}
+                      initialFocus
+                    />
+                    <div className="p-3 border-t border-slate-200 flex justify-between">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setPlanForm({ ...planForm, effective_from: new Date() })}
+                      >
+                        Today
+                      </Button>
+                      {planForm.effective_from && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setPlanForm({ ...planForm, effective_from: null })}
+                          className="text-red-500"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <p className="text-xs text-slate-400 mt-1">When to start scheduling</p>
               </div>
               <div>
                 <Label>End Date (Optional)</Label>
-                <Input
-                  type="datetime-local"
-                  value={planForm.effective_until}
-                  onChange={(e) => setPlanForm({ ...planForm, effective_until: e.target.value })}
-                  className="text-sm"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={`w-full justify-start text-left font-normal ${!planForm.effective_until ? "text-muted-foreground" : ""}`}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {planForm.effective_until ? format(planForm.effective_until, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={planForm.effective_until}
+                      onSelect={(date) => setPlanForm({ ...planForm, effective_until: date })}
+                      initialFocus
+                      disabled={(date) => planForm.effective_from && date < planForm.effective_from}
+                    />
+                    <div className="p-3 border-t border-slate-200 flex justify-between">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setPlanForm({ ...planForm, effective_until: new Date() })}
+                      >
+                        Today
+                      </Button>
+                      {planForm.effective_until && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setPlanForm({ ...planForm, effective_until: null })}
+                          className="text-red-500"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <p className="text-xs text-slate-400 mt-1">When to stop scheduling</p>
               </div>
             </div>

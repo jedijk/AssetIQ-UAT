@@ -6,6 +6,18 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Calendar Date Picker for Plan Creation** (Mar 24, 2026):
+  - **Visual Calendar**: Replaced basic datetime-local inputs with proper calendar popover
+  - **Features**:
+    - Month/year navigation arrows
+    - Day grid with clickable dates
+    - "Today" button for quick selection
+    - "Clear" button when date is selected
+    - End date disables dates before begin date
+  - **Date Format**: Displays as "March 24, 2026" format using date-fns
+  - **Imports Added**: Calendar component, Popover component, date-fns format function
+  - **File Modified**: `/app/frontend/src/pages/TaskSchedulerPage.js`
+
 - **Plan Creation Enhanced with Inherited Interval & Date Pickers** (Mar 24, 2026):
   - **Inherited Interval**: When a template is selected, the interval is automatically populated from template defaults
     - Shows "Inherited from template" label
