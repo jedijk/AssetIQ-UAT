@@ -98,17 +98,11 @@ const Layout = () => {
   const lastAction = getLastAction();
 
   const navItems = [
-    { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, hasSubmenu: true },
+    { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { path: "/threats", label: t("nav.observations"), icon: AlertTriangle },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
     { path: "/library", label: t("nav.library"), icon: BookOpen },
-  ];
-
-  // Dashboard submenu items
-  const dashboardSubmenu = [
-    { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
-    { path: "/analytics", label: "Analytics", icon: Activity },
   ];
 
   // Settings menu items (including Tasks, Forms, AI Engine)
@@ -159,38 +153,8 @@ const Layout = () => {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-1" data-testid="desktop-nav">
-              {/* Dashboard Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-150 ${
-                      location.pathname === "/dashboard" || location.pathname === "/analytics"
-                        ? "bg-blue-50 text-blue-700" 
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                    }`}
-                    data-testid="nav-dashboard-dropdown"
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    {t("nav.dashboard")}
-                    <ChevronRight className="w-3 h-3 rotate-90" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  {dashboardSubmenu.map((item) => (
-                    <DropdownMenuItem
-                      key={item.path}
-                      onClick={() => navigate(item.path)}
-                      className="cursor-pointer"
-                    >
-                      <item.icon className="w-4 h-4 mr-2" />
-                      {item.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Other Nav Items */}
-              {navItems.filter(item => !item.hasSubmenu).map((item) => (
+              {/* All Nav Items (including Dashboard as direct link) */}
+              {navItems.map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
@@ -486,31 +450,8 @@ const Layout = () => {
               Equipment Hierarchy
             </button>
             
-            {/* Dashboard Section */}
-            <div className="border-b border-slate-100 pb-2 mb-2">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-3 py-2">Dashboard</p>
-              {dashboardSubmenu.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.path === "/dashboard"}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 p-3 rounded-lg ${
-                      isActive
-                        ? "bg-blue-50 text-blue-600"
-                        : "text-slate-600 hover:bg-slate-50"
-                    }`
-                  }
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
-            
             {/* Main Navigation Items */}
-            {navItems.filter(item => !item.hasSubmenu).map((item) => (
+            {navItems.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}

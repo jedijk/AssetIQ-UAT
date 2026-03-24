@@ -29,6 +29,7 @@ import {
 import { Progress } from "../components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import ReliabilityPerformancePage from "./ReliabilityPerformancePage";
+import AnalyticsDashboardPage from "./AnalyticsDashboardPage";
 
 // Mini chart component for trends
 const MiniBarChart = ({ data, maxValue }) => {
@@ -257,14 +258,18 @@ export default function DashboardPage() {
         
         {/* Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="operational" className="flex items-center gap-2" data-testid="operational-tab">
               <Activity className="w-4 h-4" />
               {t("dashboard.operational") || "Operational"}
             </TabsTrigger>
             <TabsTrigger value="reliability" className="flex items-center gap-2" data-testid="reliability-tab">
               <Gauge className="w-4 h-4" />
-              {t("dashboard.reliabilityPerformance") || "Reliability Performance"}
+              {t("dashboard.reliabilityPerformance") || "Reliability"}
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2" data-testid="analytics-tab">
+              <BarChart3 className="w-4 h-4" />
+              {t("dashboard.analytics") || "Analytics"}
             </TabsTrigger>
           </TabsList>
           
@@ -487,6 +492,11 @@ export default function DashboardPage() {
           {/* Reliability Performance Tab */}
           <TabsContent value="reliability" className="mt-6">
             <ReliabilityPerformancePage />
+          </TabsContent>
+          
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="mt-6">
+            <AnalyticsDashboardPage embedded={true} />
           </TabsContent>
         </Tabs>
       </div>

@@ -150,7 +150,7 @@ const StatCard = ({ title, value, subtitle, icon: Icon, trend, trendValue, color
   );
 };
 
-const AnalyticsDashboardPage = () => {
+const AnalyticsDashboardPage = ({ embedded = false }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [timePeriod, setTimePeriod] = useState("30");
@@ -180,36 +180,61 @@ const AnalyticsDashboardPage = () => {
   const formSummary = dashboard?.form_summary || {};
 
   return (
-    <div className="p-6 max-w-7xl mx-auto" data-testid="analytics-dashboard">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-            <BarChart3 className="h-5 w-5 text-white" />
+    <div className={embedded ? "" : "p-6 max-w-7xl mx-auto"} data-testid="analytics-dashboard">
+      {/* Header - only show when not embedded */}
+      {!embedded && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <BarChart3 className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Analytics Dashboard</h1>
+              <p className="text-sm text-slate-500">Real-time reliability intelligence</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Analytics Dashboard</h1>
-            <p className="text-sm text-slate-500">Real-time reliability intelligence</p>
+          <div className="flex items-center gap-3">
+            <Select value={timePeriod} onValueChange={setTimePeriod}>
+              <SelectTrigger className="w-[140px]">
+                <Calendar className="w-4 h-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isRefetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Select value={timePeriod} onValueChange={setTimePeriod}>
-            <SelectTrigger className="w-[140px]">
-              <Calendar className="w-4 h-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-              <SelectItem value="90">Last 90 days</SelectItem>
-            </SelectContent>
-          </Select>
+      )}
+      
+      {/* Compact header for embedded mode */}
+      {embedded && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Select value={timePeriod} onValueChange={setTimePeriod}>
+              <SelectTrigger className="w-[140px]">
+                <Calendar className="w-4 h-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
             <RefreshCw className={`w-4 h-4 mr-2 ${isRefetching ? "animate-spin" : ""}`} />
             Refresh
           </Button>
         </div>
-      </div>
+      )}
 
       {/* Risk Overview Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
