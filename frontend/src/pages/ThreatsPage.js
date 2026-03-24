@@ -153,14 +153,14 @@ const ThreatsPage = () => {
 
   const statCards = [
     {
-      label: t("threats.totalThreats"),
+      label: t("observations.totalObservations"),
       value: stats?.total_threats || 0,
       icon: AlertTriangle,
       color: "text-slate-600",
       bg: "bg-slate-100",
     },
     {
-      label: t("threats.openThreats"),
+      label: t("observations.openObservations"),
       value: stats?.open_threats || 0,
       icon: Clock,
       color: "text-blue-600",
@@ -174,7 +174,7 @@ const ThreatsPage = () => {
       bg: "bg-red-50",
     },
     {
-      label: t("threats.highPriority"),
+      label: t("observations.highPriority"),
       value: stats?.high_count || 0,
       icon: AlertTriangle,
       color: "text-orange-600",
@@ -236,7 +236,7 @@ const ThreatsPage = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input
-            placeholder={t("threats.searchPlaceholder")}
+            placeholder={t("observations.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 h-11"
@@ -271,11 +271,11 @@ const ThreatsPage = () => {
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
             <CheckCircle className="w-8 h-8 text-slate-400" />
           </div>
-          <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("threats.noThreats")}</h3>
+          <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("observations.noObservations")}</h3>
           <p className="text-slate-500">
             {searchQuery
               ? t("common.noResults")
-              : t("threats.noThreatsDesc")}
+              : t("observations.noObservationsDesc")}
           </p>
         </div>
       ) : (
