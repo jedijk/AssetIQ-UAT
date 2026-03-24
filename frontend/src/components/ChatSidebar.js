@@ -349,14 +349,12 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               <button
                 key={eq.id}
                 onClick={() => {
+                  // Directly submit with the selected equipment
                   const equipmentText = eq.tag ? `${eq.name} (${eq.tag})` : eq.name;
-                  setMessage(equipmentText);
-                  // Auto-focus the input
-                  if (textareaRef.current) {
-                    textareaRef.current.focus();
-                  }
+                  sendMutation.mutate({ content: equipmentText, image: null });
                 }}
-                className="w-full text-left p-2.5 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors group"
+                disabled={isSending}
+                className="w-full text-left p-2.5 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors group disabled:opacity-50"
               >
                 <div className="flex items-center justify-between">
                   <div>
