@@ -617,10 +617,11 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
                 system_message=IMAGE_ANALYSIS_SYSTEM_PROMPT
             ).with_model("openai", "gpt-5.2")
             
+            # Use file_contents with ImageContent for image analysis
             image_content = ImageContent(image_base64=image_base64)
             image_message = UserMessage(
                 text="Analyze this image of equipment failure:",
-                image_contents=[image_content]
+                file_contents=[image_content]
             )
             image_analysis = await image_chat.send_message(image_message)
             image_context = f"\n\nImage Analysis: {image_analysis}"
@@ -1150,7 +1151,11 @@ async def send_chat_message(
         hierarchy_node = {}  # Empty dict, threat created without hierarchy link
     
     # Get equipment criticality from hierarchy node
-    equipment_criticality = hierarchy_node.get("criticality", {}) if hierarchy_node else {}
+    equipment_criticality = {}
+    if hierarchy_node:
+        crit = hierarchy_node.get("criticality")
+        if crit and isinstance(crit, dict):
+            equipment_criticality = crit
     criticality_level = equipment_criticality.get("level") if equipment_criticality else None
     
     # Calculate 4-Dimension Criticality Score using weighted formula
