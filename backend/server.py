@@ -1082,10 +1082,16 @@ async def send_chat_message(
         
         # If asset is unclear, get equipment suggestions
         if question_type == "asset":
-            # Get all equipment (some may not have user_id set)
+            # Only get equipment at subunit level and below (not installation, unit, plant_unit, etc.)
+            subunit_levels = ["subunit", "maintainable_item", "equipment"]
             all_equipment = await db.equipment_nodes.find(
-                {"$or": [{"user_id": current_user["id"]}, {"user_id": None}, {"user_id": {"$exists": False}}]},
-                {"_id": 0, "id": 1, "name": 1, "tag": 1, "equipment_type": 1, "description": 1}
+                {
+                    "$and": [
+                        {"$or": [{"user_id": current_user["id"]}, {"user_id": None}, {"user_id": {"$exists": False}}]},
+                        {"level": {"$in": subunit_levels}}
+                    ]
+                },
+                {"_id": 0, "id": 1, "name": 1, "tag": 1, "equipment_type": 1, "description": 1, "level": 1}
             ).to_list(100)
             
             # Try to find matching equipment based on message content
