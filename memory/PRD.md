@@ -6,6 +6,15 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Causal Engine List View Redesigned** (Mar 24, 2026):
+  - **Improved Investigation Cards**: Card-based design with rounded corners, subtle borders, and shadows
+  - **Color-coded Status Badges**: Draft (gray), In Progress (amber), Completed (green), Closed (blue)
+  - **Better Typography**: Case numbers in monospace with background pill, prominent titles
+  - **Enhanced Metadata Display**: Asset name and incident date with icons
+  - **Investigation Count**: Header now shows total count (e.g., "17 investigations")
+  - **Improved Spacing**: More breathing room between cards for better readability
+  - **File Modified**: `/app/frontend/src/pages/CausalEnginePage.js`
+
 - **Status Options & Multi-Select Filter Added** (Mar 24, 2026):
   - **New Status Options**: Added "Parked" (gray) and "Canceled" (red) to both the list filter and detail page dropdown
   - **Multi-Select Filter**: Status filter now supports selecting multiple statuses simultaneously
