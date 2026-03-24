@@ -6,6 +6,18 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Observation Attachments Feature Added** (Mar 24, 2026):
+  - **Backend Changes** (`/app/backend/server.py`):
+    - Added `session_id` and `attachments` fields to threat documents
+    - When creating a threat from chat, automatically captures images from the chat session
+    - Updated `ThreatResponse` model to include `session_id` and `attachments`
+  - **Frontend Changes** (`/app/frontend/src/pages/ThreatDetailPage.js`):
+    - Added "Attachments" section that displays images in a responsive grid (2-4 columns)
+    - Images show thumbnails with date overlay and click-to-expand functionality
+    - Full-screen image viewer modal with close button
+    - Section only appears when attachments exist (no empty state)
+  - **Note**: Existing observations created before this feature won't have attachments. New observations created via chat with image uploads will display their images.
+
 - **Observations List Enhanced** (Mar 24, 2026):
   - **RPN Display**: Each observation item now shows both Business Risk Score and RPN (color-coded by severity)
   - **Sort Options**: New "Sort By" dropdown to switch between Business Risk (default) and RPN (FMEA) sorting

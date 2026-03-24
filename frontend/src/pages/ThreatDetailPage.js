@@ -34,6 +34,9 @@ import {
   Link,
   Unlink,
   Search,
+  Image,
+  FileImage,
+  Maximize2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -94,6 +97,9 @@ const ThreatDetailPage = () => {
     assignee: "",
     due_date: "",
   });
+
+  // Image viewer state
+  const [selectedImage, setSelectedImage] = useState(null);
 
   // Sticky header visibility state (must be before any early returns)
   const [showStickyHeader, setShowStickyHeader] = useState(false);
@@ -1264,6 +1270,81 @@ const ThreatDetailPage = () => {
           <p className="text-slate-600">{threat.cause || "Not specified"}</p>
         )}
       </motion.div>
+
+      {/* Attachments / Images */}
+      {threat.attachments && threat.attachments.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="card p-6 mb-6"
+          data-testid="threat-attachments-section"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <FileImage className="w-5 h-5 text-slate-500" />
+            <h3 className="font-semibold text-slate-900">Attachments</h3>
+            <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+              {threat.attachments.length} {threat.attachments.length === 1 ? 'image' : 'images'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {threat.attachments.map((attachment, idx) => (
+              <div
+                key={idx}
+                className="relative group cursor-pointer rounded-lg overflow-hidden border border-slate-200 hover:border-blue-400 transition-colors"
+                onClick={() => setSelectedImage(attachment.data)}
+                data-testid={`attachment-${idx}`}
+              >
+                {attachment.type === 'image' && attachment.data ? (
+                  <>
+                    <img
+                      src={attachment.data.startsWith('data:') ? attachment.data : `data:image/jpeg;base64,${attachment.data}`}
+                      alt={`Attachment ${idx + 1}`}
+                      className="w-full h-24 sm:h-32 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                      <Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    {attachment.created_at && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1">
+                        <span className="text-[10px] text-white/80">
+                          {new Date(attachment.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full h-24 sm:h-32 bg-slate-100 flex items-center justify-center">
+                    <Image className="w-8 h-8 text-slate-300" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Image Viewer Modal */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setSelectedImage(null)}
+          data-testid="image-viewer-modal"
+        >
+          <button
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            onClick={() => setSelectedImage(null)}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img
+            src={selectedImage.startsWith('data:') ? selectedImage : `data:image/jpeg;base64,${selectedImage}`}
+            alt="Full size attachment"
+            className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
 
       {/* Recommended Actions */}
       <motion.div

@@ -217,6 +217,8 @@ class ThreatResponse(BaseModel):
     linked_equipment_id: Optional[str] = None
     equipment_criticality: Optional[str] = None
     equipment_criticality_data: Optional[dict] = None
+    session_id: Optional[str] = None
+    attachments: Optional[List[dict]] = None
 
 class ThreatUpdate(BaseModel):
     title: Optional[str] = None
@@ -1906,8 +1908,28 @@ async def send_chat_message(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "occurrence_count": 1,
         "image_url": None,
-        "location": threat_data.get("location")
+        "location": threat_data.get("location"),
+        "session_id": session_id,  # Store session_id to retrieve related images
+        "attachments": []  # Store list of attachment URLs/data
     }
+    
+    # If there's an image in the session, add it to attachments
+    # Find any messages with images in this session
+    session_images = await db.chat_messages.find(
+        {"user_id": current_user["id"], "has_image": True},
+        {"_id": 0, "image_data": 1, "created_at": 1}
+    ).sort("created_at", -1).limit(5).to_list(5)
+    
+    if session_images:
+        threat_doc["attachments"] = [
+            {
+                "type": "image",
+                "data": img.get("image_data"),
+                "created_at": img.get("created_at")
+            }
+            for img in session_images if img.get("image_data")
+        ]
+    
     await db.threats.insert_one(threat_doc)
     
     # Also create a structured observation linked to the threat
