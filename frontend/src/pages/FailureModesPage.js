@@ -1482,7 +1482,63 @@ const FailureModesPage = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {versions.map((version, idx) => (
+                {versions.map((version, idx) => {
+                  // Compare with next version (older) to show what changed
+                  const nextVersion = versions[idx + 1];
+                  const changes = [];
+                  
+                  if (nextVersion) {
+                    const curr = version.snapshot || {};
+                    const prev = nextVersion.snapshot || {};
+                    
+                    // Check each field for changes
+                    if (curr.failure_mode !== prev.failure_mode) {
+                      changes.push({ field: 'Name', from: prev.failure_mode, to: curr.failure_mode });
+                    }
+                    if (curr.category !== prev.category) {
+                      changes.push({ field: 'Category', from: prev.category, to: curr.category });
+                    }
+                    if (curr.equipment !== prev.equipment) {
+                      changes.push({ field: 'Equipment', from: prev.equipment, to: curr.equipment });
+                    }
+                    if (curr.severity !== prev.severity) {
+                      changes.push({ field: 'Severity', from: prev.severity, to: curr.severity, isNumber: true });
+                    }
+                    if (curr.occurrence !== prev.occurrence) {
+                      changes.push({ field: 'Occurrence', from: prev.occurrence, to: curr.occurrence, isNumber: true });
+                    }
+                    if (curr.detectability !== prev.detectability) {
+                      changes.push({ field: 'Detectability', from: prev.detectability, to: curr.detectability, isNumber: true });
+                    }
+                    if (curr.mechanism !== prev.mechanism) {
+                      changes.push({ field: 'Mechanism', from: prev.mechanism, to: curr.mechanism });
+                    }
+                    
+                    // Check RPN change
+                    const currRPN = (curr.severity || 0) * (curr.occurrence || 0) * (curr.detectability || 0);
+                    const prevRPN = (prev.severity || 0) * (prev.occurrence || 0) * (prev.detectability || 0);
+                    if (currRPN !== prevRPN) {
+                      changes.push({ field: 'RPN', from: prevRPN, to: currRPN, isNumber: true, isRPN: true });
+                    }
+                    
+                    // Check keywords
+                    const currKeywords = (curr.keywords || []).join(', ');
+                    const prevKeywords = (prev.keywords || []).join(', ');
+                    if (currKeywords !== prevKeywords) {
+                      changes.push({ field: 'Keywords', from: prevKeywords || '(none)', to: currKeywords || '(none)' });
+                    }
+                    
+                    // Check recommended actions count
+                    const currActionsCount = (curr.recommended_actions || []).length;
+                    const prevActionsCount = (prev.recommended_actions || []).length;
+                    if (currActionsCount !== prevActionsCount) {
+                      changes.push({ field: 'Actions', from: `${prevActionsCount} items`, to: `${currActionsCount} items` });
+                    }
+                  }
+                  
+                  const rpn = (version.snapshot?.severity || 0) * (version.snapshot?.occurrence || 0) * (version.snapshot?.detectability || 0);
+                  
+                  return (
                   <div 
                     key={version.id}
                     className={`p-4 rounded-lg border ${idx === 0 ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white'}`}
@@ -1502,32 +1558,51 @@ const FailureModesPage = () => {
                           </span>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-slate-500">Name:</span>{" "}
-                            <span className="font-medium">{version.snapshot?.failure_mode}</span>
+                        {/* Change Summary */}
+                        {changes.length > 0 && (
+                          <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                            <div className="text-xs font-medium text-amber-800 mb-1 flex items-center gap-1">
+                              <ChevronRight className="w-3 h-3" />
+                              Changes from v{nextVersion?.version}:
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {changes.map((change, cIdx) => (
+                                <span 
+                                  key={cIdx} 
+                                  className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                                    change.isRPN 
+                                      ? change.to > change.from 
+                                        ? 'bg-red-100 text-red-700' 
+                                        : 'bg-green-100 text-green-700'
+                                      : 'bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  <span className="font-medium">{change.field}:</span>
+                                  <span className="line-through opacity-60">{change.from}</span>
+                                  <span>→</span>
+                                  <span className="font-semibold">{change.to}</span>
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-slate-500">Category:</span>{" "}
-                            <span>{version.snapshot?.category}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-500">RPN:</span>{" "}
-                            <span className={`font-semibold ${
-                              (version.snapshot?.severity * version.snapshot?.occurrence * version.snapshot?.detectability) >= 200 ? 'text-red-600' :
-                              (version.snapshot?.severity * version.snapshot?.occurrence * version.snapshot?.detectability) >= 125 ? 'text-orange-600' :
+                        )}
+                        
+                        {/* Version snapshot summary */}
+                        <div className="flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-bold text-lg ${
+                              rpn >= 200 ? 'text-red-600' :
+                              rpn >= 125 ? 'text-orange-600' :
                               'text-slate-700'
                             }`}>
-                              {version.snapshot?.severity * version.snapshot?.occurrence * version.snapshot?.detectability}
+                              {rpn}
                             </span>
-                            <span className="text-slate-400 ml-1 text-xs">
+                            <span className="text-slate-400 text-xs">
                               ({version.snapshot?.severity}×{version.snapshot?.occurrence}×{version.snapshot?.detectability})
                             </span>
                           </div>
-                          <div>
-                            <span className="text-slate-500">Equipment:</span>{" "}
-                            <span>{version.snapshot?.equipment}</span>
-                          </div>
+                          <span className="text-slate-300">|</span>
+                          <span className="text-slate-600">{version.snapshot?.failure_mode}</span>
                         </div>
                         
                         {version.updated_by && (
@@ -1556,7 +1631,8 @@ const FailureModesPage = () => {
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
