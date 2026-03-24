@@ -574,7 +574,7 @@ class TaskService:
         horizon_days: int = 30,
         created_by: str = "system"
     ) -> List[Dict[str, Any]]:
-        """Generate task instances for a plan within the horizon."""
+        """Generate task instances for a plan within the horizon and date range."""
         
         plan = await self.get_plan_by_id(plan_id)
         if not plan or not plan["is_active"]:
@@ -583,10 +583,39 @@ class TaskService:
         now = datetime.now(timezone.utc)
         horizon_end = now + timedelta(days=horizon_days)
         
+        # Parse plan's effective_from and effective_until dates
+        effective_from = plan.get("effective_from")
+        if effective_from:
+            if isinstance(effective_from, str):
+                effective_from = datetime.fromisoformat(effective_from.replace('Z', '+00:00'))
+            if effective_from.tzinfo is None:
+                effective_from = effective_from.replace(tzinfo=timezone.utc)
+        else:
+            effective_from = now
+        
+        effective_until = plan.get("effective_until")
+        if effective_until:
+            if isinstance(effective_until, str):
+                effective_until = datetime.fromisoformat(effective_until.replace('Z', '+00:00'))
+            if effective_until.tzinfo is None:
+                effective_until = effective_until.replace(tzinfo=timezone.utc)
+        
+        # The generation window is bounded by both the horizon AND the plan's effective_until
+        generation_end = horizon_end
+        if effective_until and effective_until < generation_end:
+            generation_end = effective_until
+        
+        # Start date must be at least effective_from, or now if that's later
+        generation_start = max(now, effective_from)
+        
+        # If the plan's date range is entirely in the past, don't generate anything
+        if effective_until and effective_until < now:
+            return []
+        
         # Get existing instances to avoid duplicates
         existing = await self.instances.find({
             "task_plan_id": plan_id,
-            "scheduled_date": {"$gte": now, "$lte": horizon_end},
+            "scheduled_date": {"$gte": generation_start, "$lte": generation_end},
             "status": {"$in": ["planned", "scheduled"]}
         }).to_list(100)
         
@@ -609,15 +638,26 @@ class TaskService:
         if current_date.tzinfo is None:
             current_date = current_date.replace(tzinfo=timezone.utc)
         
-        while current_date <= horizon_end:
-            if current_date.date() not in existing_dates and current_date >= now:
-                instance = await self.create_instance({
-                    "task_plan_id": plan_id,
-                    "scheduled_date": current_date,
-                    "due_date": current_date + timedelta(days=1),  # 1 day grace period
-                    "priority": "medium",
-                }, created_by)
-                generated.append(instance)
+        # If the next_due_date is before effective_from, calculate forward to effective_from
+        while current_date < effective_from:
+            current_date = self._calculate_next_due(
+                current_date,
+                plan["interval_value"],
+                plan["interval_unit"]
+            )
+        
+        # Generate instances within the valid date range
+        while current_date <= generation_end:
+            # Only create if within the effective date range and not already existing
+            if current_date.date() not in existing_dates and current_date >= generation_start:
+                if not effective_until or current_date <= effective_until:
+                    instance = await self.create_instance({
+                        "task_plan_id": plan_id,
+                        "scheduled_date": current_date,
+                        "due_date": current_date + timedelta(days=1),  # 1 day grace period
+                        "priority": "medium",
+                    }, created_by)
+                    generated.append(instance)
             
             # Calculate next occurrence
             current_date = self._calculate_next_due(
@@ -633,15 +673,19 @@ class TaskService:
         horizon_days: int = 30,
         created_by: str = "system"
     ) -> Dict[str, Any]:
-        """Generate instances for all active plans."""
+        """Generate instances for all active plans within their effective date ranges."""
         
         now = datetime.now(timezone.utc)
         horizon_end = now + timedelta(days=horizon_days)
         
-        # Get all active plans with due dates within horizon
+        # Get all active plans with due dates within horizon and not past their effective_until
         plans = await self.plans.find({
             "is_active": True,
-            "next_due_date": {"$lte": horizon_end}
+            "next_due_date": {"$lte": horizon_end},
+            "$or": [
+                {"effective_until": None},
+                {"effective_until": {"$gte": now}}
+            ]
         }).to_list(1000)
         
         total_generated = 0

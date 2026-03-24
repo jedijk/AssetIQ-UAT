@@ -6,6 +6,17 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Execution Generation Date Range Fix** (Mar 24, 2026):
+  - **Fixed**: Execution instances are now ONLY generated within the plan's `effective_from` → `effective_until` date range
+  - **Logic Changes in `task_service.py`**:
+    - `generate_instances_for_plan()`: Now parses and respects both effective dates
+    - If `effective_until` is in the past, no executions are generated
+    - Generation window is bounded by BOTH the horizon days AND the plan's effective_until
+    - Forward-calculates from `next_due_date` if it's before `effective_from`
+  - `generate_all_due_instances()`: Excludes plans past their `effective_until` date
+  - **Example**: A plan with effective Mar 31 → Apr 7 with daily interval generates exactly 7 executions (Apr 1-7)
+  - **File Modified**: `/app/backend/services/task_service.py`
+
 - **Calendar Date Picker for Plan Creation** (Mar 24, 2026):
   - **Visual Calendar**: Replaced basic datetime-local inputs with proper calendar popover
   - **Features**:
