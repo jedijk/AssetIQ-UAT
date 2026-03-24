@@ -94,21 +94,21 @@ const formAPI = {
     const queryParams = new URLSearchParams();
     if (params.discipline) queryParams.append("discipline", params.discipline);
     if (params.search) queryParams.append("search", params.search);
-    const response = await fetch(`${API_BASE_URL}/api/forms/templates?${queryParams}`, {
+    const response = await fetch(`${API_BASE_URL}/api/form-templates?${queryParams}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch templates");
     return response.json();
   },
   getTemplate: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/forms/templates/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch template");
     return response.json();
   },
   createTemplate: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/api/forms/templates`, {
+    const response = await fetch(`${API_BASE_URL}/api/form-templates`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -120,7 +120,7 @@ const formAPI = {
     return response.json();
   },
   updateTemplate: async ({ id, data }) => {
-    const response = await fetch(`${API_BASE_URL}/api/forms/templates/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -132,7 +132,7 @@ const formAPI = {
     return response.json();
   },
   deleteTemplate: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/forms/templates/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
@@ -144,14 +144,14 @@ const formAPI = {
     if (params.form_template_id) queryParams.append("form_template_id", params.form_template_id);
     if (params.has_warnings) queryParams.append("has_warnings", "true");
     if (params.has_critical) queryParams.append("has_critical", "true");
-    const response = await fetch(`${API_BASE_URL}/api/forms/submissions?${queryParams}`, {
+    const response = await fetch(`${API_BASE_URL}/api/form-submissions?${queryParams}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch submissions");
     return response.json();
   },
   getAnalytics: async (templateId) => {
-    const response = await fetch(`${API_BASE_URL}/api/forms/templates/${templateId}/analytics`, {
+    const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/analytics`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch analytics");
