@@ -441,7 +441,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
 
           {/* Recording State */}
           {isRecording ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               {/* Cancel/Delete Button */}
               <button
                 onClick={cancelRecording}
@@ -452,23 +452,23 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               </button>
 
               {/* Recording Bar */}
-              <div className="flex-1 h-12 bg-slate-800 rounded-full flex items-center px-4 gap-3">
+              <div className="flex-1 min-w-0 h-12 bg-slate-800 rounded-full flex items-center px-3 gap-2">
                 {/* Recording indicator */}
-                <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
                 
                 {/* Timer */}
-                <span className="text-white text-sm font-medium min-w-[40px]">
+                <span className="text-white text-sm font-medium flex-shrink-0">
                   {formatTime(recordingTime)}
                 </span>
 
                 {/* Waveform visualization */}
-                <div className="flex-1 flex items-center justify-center gap-[2px] h-6 overflow-hidden">
-                  {[...Array(40)].map((_, i) => (
+                <div className="flex-1 min-w-0 flex items-center justify-center gap-[2px] h-6 overflow-hidden">
+                  {[...Array(30)].map((_, i) => (
                     <motion.div
                       key={i}
-                      className="w-[2px] bg-slate-400 rounded-full"
+                      className="w-[2px] bg-slate-400 rounded-full flex-shrink-0"
                       animate={{
-                        height: isPaused ? 4 : [4, Math.random() * 20 + 4, 4],
+                        height: isPaused ? 4 : [4, Math.random() * 16 + 4, 4],
                       }}
                       transition={{
                         duration: 0.5,
@@ -482,7 +482,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                 {/* Pause/Play Button */}
                 <button
                   onClick={pauseRecording}
-                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-colors"
+                  className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-colors"
                   title={isPaused ? "Resume" : "Pause"}
                 >
                   {isPaused ? (
@@ -497,7 +497,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               <button
                 onClick={sendRecording}
                 disabled={isTranscribing}
-                className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                className="flex-shrink-0 w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-50"
                 title="Send voice message"
               >
                 {isTranscribing ? (
@@ -553,7 +553,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                 <button
                   onClick={handleSend}
                   disabled={sendMutation.isPending}
-                  className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                  className="flex-shrink-0 w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-50"
                   data-testid="sidebar-send-message-button"
                   title="Send message"
                 >
@@ -566,7 +566,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               ) : (
                 <button
                   onClick={startRecording}
-                  className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-lg transition-all active:scale-95"
+                  className="flex-shrink-0 w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg transition-all active:scale-95"
                   data-testid="sidebar-voice-record-button"
                   title="Hold to record voice"
                 >
