@@ -53,6 +53,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
@@ -245,6 +246,13 @@ const TaskSchedulerPage = () => {
   const [showPlanDialog, setShowPlanDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState(null);
+  const [planForm, setPlanForm] = useState({
+    equipment_id: "",
+    task_template_id: "",
+    interval_value: 30,
+    interval_unit: "days",
+    notes: ""
+  });
   const [templateForm, setTemplateForm] = useState({
     name: "",
     description: "",
@@ -274,13 +282,25 @@ const TaskSchedulerPage = () => {
       search: search || undefined,
       discipline: disciplineFilter !== "all" ? disciplineFilter : undefined
     }),
-    enabled: activeTab === "templates"
+    enabled: activeTab === "templates" || showPlanDialog
   });
 
   const { data: plansData, isLoading: plansLoading } = useQuery({
     queryKey: ["task-plans"],
     queryFn: () => taskAPI.getPlans(),
     enabled: activeTab === "plans"
+  });
+
+  const { data: equipmentData } = useQuery({
+    queryKey: ["equipment-nodes"],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE_URL}/api/equipment-hierarchy/nodes`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (!response.ok) throw new Error("Failed to fetch equipment");
+      return response.json();
+    },
+    enabled: showPlanDialog
   });
 
   const { data: instancesData, isLoading: instancesLoading, refetch: refetchInstances } = useQuery({
@@ -320,6 +340,18 @@ const TaskSchedulerPage = () => {
       toast.success("Plan deleted");
     },
     onError: (error) => toast.error(error.message || "Failed to delete plan")
+  });
+
+  const createPlanMutation = useMutation({
+    mutationFn: taskAPI.createPlan,
+    onSuccess: () => {
+      queryClient.invalidateQueries(["task-plans"]);
+      queryClient.invalidateQueries(["task-stats"]);
+      toast.success("Plan created");
+      setShowPlanDialog(false);
+      setPlanForm({ equipment_id: "", task_template_id: "", interval_value: 30, interval_unit: "days", notes: "" });
+    },
+    onError: (error) => toast.error(error.message || "Failed to create plan")
   });
 
   const startInstanceMutation = useMutation({
@@ -635,6 +667,12 @@ const TaskSchedulerPage = () => {
 
         {/* Plans Tab */}
         <TabsContent value="plans">
+          <div className="flex justify-end mb-4">
+            <Button onClick={() => setShowPlanDialog(true)} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="w-4 h-4 mr-2" />
+              New Plan
+            </Button>
+          </div>
           {plansLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
@@ -644,6 +682,10 @@ const TaskSchedulerPage = () => {
               <CalendarDays className="w-12 h-12 mx-auto mb-3 text-slate-300" />
               <p className="text-slate-500">No task plans created yet</p>
               <p className="text-sm text-slate-400 mt-1">Create plans from templates to schedule recurring tasks</p>
+              <Button onClick={() => setShowPlanDialog(true)} className="mt-4 bg-blue-600 hover:bg-blue-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Create First Plan
+              </Button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -912,6 +954,93 @@ const TaskSchedulerPage = () => {
               disabled={completeInstanceMutation.isPending}
             >
               {completeInstanceMutation.isPending ? "Completing..." : "Mark Complete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Plan Dialog */}
+      <Dialog open={showPlanDialog} onOpenChange={setShowPlanDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Task Plan</DialogTitle>
+            <DialogDescription>Schedule recurring tasks for equipment</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Task Template *</Label>
+              <Select 
+                value={planForm.task_template_id} 
+                onValueChange={(v) => setPlanForm({ ...planForm, task_template_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a template" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Equipment *</Label>
+              <Select 
+                value={planForm.equipment_id} 
+                onValueChange={(v) => setPlanForm({ ...planForm, equipment_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select equipment" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(equipmentData?.nodes || []).map((eq) => (
+                    <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Interval</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  value={planForm.interval_value}
+                  onChange={(e) => setPlanForm({ ...planForm, interval_value: parseInt(e.target.value) || 1 })}
+                  min={1}
+                  className="w-20"
+                />
+                <Select 
+                  value={planForm.interval_unit} 
+                  onValueChange={(v) => setPlanForm({ ...planForm, interval_unit: v })}
+                >
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">Days</SelectItem>
+                    <SelectItem value="weeks">Weeks</SelectItem>
+                    <SelectItem value="months">Months</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea 
+                value={planForm.notes}
+                onChange={(e) => setPlanForm({ ...planForm, notes: e.target.value })}
+                placeholder="Optional notes about this plan"
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPlanDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={() => createPlanMutation.mutate(planForm)}
+              disabled={!planForm.task_template_id || !planForm.equipment_id || createPlanMutation.isPending}
+            >
+              {createPlanMutation.isPending ? "Creating..." : "Create Plan"}
             </Button>
           </DialogFooter>
         </DialogContent>
