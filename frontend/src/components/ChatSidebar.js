@@ -197,8 +197,15 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           const base64 = reader.result.split(",")[1];
           try {
             const result = await voiceAPI.transcribe(base64);
-            setMessage((prev) => prev + (prev ? " " : "") + result.text);
-            toast.success("Voice transcribed!");
+            const transcribedText = result.text;
+            
+            // Directly submit the transcribed text
+            if (transcribedText && transcribedText.trim()) {
+              sendMutation.mutate({ content: transcribedText, image: imageBase64 });
+              toast.success("Voice message sent!");
+            } else {
+              toast.error("Could not transcribe voice - no text detected");
+            }
           } catch (error) {
             toast.error("Failed to transcribe voice");
           } finally {
