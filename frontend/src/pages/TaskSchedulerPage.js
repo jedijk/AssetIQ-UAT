@@ -249,6 +249,7 @@ const TaskSchedulerPage = () => {
   const [planForm, setPlanForm] = useState({
     equipment_id: "",
     task_template_id: "",
+    form_template_id: "",
     interval_value: 30,
     interval_unit: "days",
     notes: ""
@@ -303,6 +304,18 @@ const TaskSchedulerPage = () => {
     enabled: showPlanDialog
   });
 
+  const { data: formTemplatesData } = useQuery({
+    queryKey: ["form-templates"],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE_URL}/api/form-templates`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (!response.ok) throw new Error("Failed to fetch form templates");
+      return response.json();
+    },
+    enabled: showPlanDialog
+  });
+
   const { data: instancesData, isLoading: instancesLoading, refetch: refetchInstances } = useQuery({
     queryKey: ["task-instances", statusFilter],
     queryFn: () => taskAPI.getInstances({
@@ -349,7 +362,7 @@ const TaskSchedulerPage = () => {
       queryClient.invalidateQueries(["task-stats"]);
       toast.success("Plan created");
       setShowPlanDialog(false);
-      setPlanForm({ equipment_id: "", task_template_id: "", interval_value: 30, interval_unit: "days", notes: "" });
+      setPlanForm({ equipment_id: "", task_template_id: "", form_template_id: "", interval_value: 30, interval_unit: "days", notes: "" });
     },
     onError: (error) => toast.error(error.message || "Failed to create plan")
   });
@@ -680,8 +693,8 @@ const TaskSchedulerPage = () => {
           ) : plans.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
               <CalendarDays className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p className="text-slate-500">No task plans created yet</p>
-              <p className="text-sm text-slate-400 mt-1">Create plans from templates to schedule recurring tasks</p>
+              <p className="text-slate-500">No execution plans created yet</p>
+              <p className="text-sm text-slate-400 mt-1">Create plans from templates to schedule recurring executions</p>
               <Button onClick={() => setShowPlanDialog(true)} className="mt-4 bg-blue-600 hover:bg-blue-700">
                 <Plus className="w-4 h-4 mr-2" />
                 Create First Plan
@@ -730,6 +743,12 @@ const TaskSchedulerPage = () => {
                         <Calendar className="w-4 h-4" />
                         Next: {formatDate(plan.next_due_date)}
                       </div>
+                      {plan.form_template_id && (
+                        <div className="flex items-center gap-2 text-blue-600">
+                          <FileText className="w-4 h-4" />
+                          <span className="truncate">{plan.form_template_name || "Linked Form"}</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -963,12 +982,12 @@ const TaskSchedulerPage = () => {
       <Dialog open={showPlanDialog} onOpenChange={setShowPlanDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create Task Plan</DialogTitle>
-            <DialogDescription>Schedule recurring tasks for equipment</DialogDescription>
+            <DialogTitle>Create Execution Plan</DialogTitle>
+            <DialogDescription>Schedule recurring executions for equipment</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Task Template *</Label>
+              <Label>Execution Template *</Label>
               <Select 
                 value={planForm.task_template_id} 
                 onValueChange={(v) => setPlanForm({ ...planForm, task_template_id: v })}
@@ -1023,6 +1042,29 @@ const TaskSchedulerPage = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div>
+              <Label>Linked Form (Optional)</Label>
+              <Select 
+                value={planForm.form_template_id} 
+                onValueChange={(v) => setPlanForm({ ...planForm, form_template_id: v === "none" ? "" : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a form template" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No form</SelectItem>
+                  {(formTemplatesData?.templates || []).map((form) => (
+                    <SelectItem key={form.id} value={form.id}>
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-slate-400" />
+                        {form.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500 mt-1">Link a form to be filled during execution</p>
             </div>
             <div>
               <Label>Notes</Label>

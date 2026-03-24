@@ -6,6 +6,16 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Linked Forms with Execution Plans** (Mar 24, 2026):
+  - **New Field**: Added "Linked Form (Optional)" dropdown to plan creation dialog
+  - **Form Template Selection**: Plans can now be associated with form templates
+  - **Visual Indicator**: Plan cards show linked form with blue icon when a form is assigned
+  - **Backend Support**: `form_template_id` and `form_template_name` stored in task plans
+  - **Files Modified**: 
+    - `/app/frontend/src/pages/TaskSchedulerPage.js` - Added form template dropdown
+    - `/app/backend/models/task_models.py` - Added form_template_id to TaskPlanCreate/Update
+    - `/app/backend/services/task_service.py` - Lookup and store form template name
+
 - **Renamed "Task" to "Execution" Across App** (Mar 24, 2026):
   - **Navigation Menu**: Settings dropdown now shows "Execution" instead of "Tasks"
   - **Page Header**: "Execution" with subtitle "Manage maintenance execution and schedules"

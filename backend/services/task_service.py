@@ -182,6 +182,13 @@ class TaskService:
         if not template:
             raise ValueError("Task template not found")
         
+        # Lookup form template name if provided
+        form_template_name = None
+        if data.get("form_template_id"):
+            form_template = await self.db.form_templates.find_one({"id": data["form_template_id"]})
+            if form_template:
+                form_template_name = form_template.get("name")
+        
         # Get frequency settings (use template defaults if not overridden)
         frequency_type = data.get("frequency_type") or template["frequency_type"]
         interval_value = data.get("interval_value") or template["default_interval"]
@@ -196,6 +203,8 @@ class TaskService:
             "equipment_name": equipment.get("name"),
             "task_template_id": data["task_template_id"],
             "task_template_name": template["name"],
+            "form_template_id": data.get("form_template_id"),
+            "form_template_name": form_template_name,
             "efm_id": data.get("efm_id"),
             "frequency_type": frequency_type,
             "interval_value": interval_value,
@@ -797,6 +806,8 @@ class TaskService:
             "equipment_name": doc.get("equipment_name"),
             "task_template_id": doc["task_template_id"],
             "task_template_name": doc.get("task_template_name"),
+            "form_template_id": doc.get("form_template_id"),
+            "form_template_name": doc.get("form_template_name"),
             "efm_id": doc.get("efm_id"),
             "frequency_type": doc["frequency_type"],
             "interval_value": doc["interval_value"],

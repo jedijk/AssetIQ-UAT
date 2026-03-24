@@ -127,6 +127,7 @@ class TaskPlanCreate(BaseModel):
     equipment_id: str
     task_template_id: str
     efm_id: Optional[str] = None  # Optional link to specific EFM
+    form_template_id: Optional[str] = None  # Optional link to form template
     
     # Override template frequency
     frequency_type: Optional[FrequencyType] = None
@@ -159,6 +160,7 @@ class TaskPlanUpdate(BaseModel):
     effective_until: Optional[datetime] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
+    form_template_id: Optional[str] = None  # Optional link to form template
 
 
 # ============= TASK INSTANCE MODELS =============
