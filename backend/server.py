@@ -277,22 +277,34 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 THREAT_ANALYSIS_SYSTEM_PROMPT = """You are AssetIQ AI extracting equipment failures from user messages.
 
-## EXTRACT FIRST - ASK SECOND
-Find: Equipment (P-101, pump, compressor) + Problem (leaking, vibrating, overheating)
+## EXTRACT BEFORE ASKING
+Analyze message for: Equipment (P-101, pump, extruder, compressor) + Problem (leaking, vibrating, overheating)
 
-## Required: Asset + Failure only
-- If BOTH found → COMPLETE
-- If only asset unclear → Ask "Which equipment?"
-- If only failure unclear → Ask "What's the problem?"
-- NEVER ask for info already in message
+## Required Fields:
+1. Asset: Equipment tag or name
+2. Failure: What's wrong (problem/symptom)
+
+## Response Rules:
+- If BOTH asset AND failure found → complete=true
+- If asset unclear/generic (just "pump", "extruder" without tag) → complete=false, question_type="asset", ask which specific one
+- If failure unclear → complete=false, question_type="failure", ask what's wrong
+- NEVER ask for info already clearly stated
 
 ## Failure Mode Mapping:
-leaking→"Seal Failure", vibration/noise→"Bearing Failure", overheating→"Overheating", corrosion→"Corrosion", stuck→"Valve Stuck", fouling→"Fouling"
+- leaking/leak → "Seal Failure"
+- vibration/vibrating/shaking → "Bearing Failure"  
+- noise/grinding → "Bearing Failure"
+- overheating/hot → "Overheating"
+- corrosion/rust → "Corrosion"
+- stuck/jammed → "Valve Stuck"
 
-## Equipment Pattern: 'Reporting issue for equipment "X"' → asset=X
+## Equipment Detection:
+- Specific tags (P-101, C-201) → Use directly, complete=true
+- Generic names (pump, extruder, compressor) without ID → complete=false, question_type="asset"
+- 'Reporting issue for equipment "X"' → asset=X exactly
 
 RESPOND IN JSON:
-{"complete":true/false,"follow_up_question":"if needed","question_type":"asset|failure","threat":{"title":"","asset":"","equipment_type":"","failure_mode":"","impact":"","frequency":"","risk_score":0-100,"risk_level":"Critical|High|Medium|Low","recommended_actions":[]}}"""
+{"complete":true/false,"follow_up_question":"if incomplete","question_type":"asset|failure","threat":{"title":"short title","asset":"equipment name","equipment_type":"pump|compressor|etc","failure_mode":"standard mode","impact":"description","frequency":"First Time|Occasional|Frequent","risk_score":0-100,"risk_level":"Critical|High|Medium|Low","recommended_actions":["action1","action2"]}}"""
 
 IMAGE_ANALYSIS_SYSTEM_PROMPT = """You are ThreatBase AI analyzing an image of equipment failure or damage. 
 Describe what you see in the image, identifying:
@@ -1011,20 +1023,107 @@ async def send_chat_message(
         {"_id": 0}
     ).sort("created_at", -1).limit(10).to_list(10)
     
-    # Build context from recent messages
-    context = ""
-    if len(recent_messages) > 1:
-        context = "\n\nPrevious conversation context:\n"
-        for msg in reversed(recent_messages[1:6]):  # Last 5 messages excluding current
-            role = "User" if msg["role"] == "user" else "Assistant"
-            context += f"{role}: {msg['content'][:200]}\n"
+    # Check if this is an equipment selection response
+    # (user selecting from previous equipment suggestions)
+    last_assistant_msg = None
+    for msg in recent_messages:
+        if msg.get("role") == "assistant" and msg.get("equipment_suggestions"):
+            last_assistant_msg = msg
+            break
     
-    # Analyze with AI for threat reporting
-    analysis = await analyze_threat_with_ai(
-        message.content + context, 
-        session_id, 
-        message.image_base64
-    )
+    equipment_selected = False
+    analysis = None
+    
+    if last_assistant_msg and last_assistant_msg.get("equipment_suggestions"):
+        # Check if user's message matches any suggested equipment
+        message_lower = message.content.lower().strip()
+        # Normalize whitespace for comparison
+        message_normalized = ' '.join(message_lower.split())
+        
+        for eq in last_assistant_msg["equipment_suggestions"]:
+            eq_name_lower = (eq.get("name") or "").lower()
+            eq_name_normalized = ' '.join(eq_name_lower.split())  # Normalize whitespace
+            
+            # Match if normalized names match or contain each other
+            if eq_name_normalized and (eq_name_normalized in message_normalized or message_normalized in eq_name_normalized):
+                # User selected this equipment - create the threat with it
+                equipment_selected = True
+                
+                # Get the pending threat data from conversation context
+                pending_data = last_assistant_msg.get("pending_threat_data") or {}
+                original_failure = pending_data.get("original_message") or pending_data.get("failure_description") or "issue reported"
+                
+                # Construct a clear message for the AI with the selected equipment
+                enhanced_message = f'Reporting issue for equipment "{eq.get("name")}": {original_failure}'
+                
+                # Analyze with the enhanced message
+                analysis = await analyze_threat_with_ai(enhanced_message, session_id, message.image_base64)
+                
+                # Force the asset to be the selected equipment and mark complete
+                if analysis.get("threat"):
+                    analysis["threat"]["asset"] = eq.get("name")
+                analysis["complete"] = True
+                break
+    
+    # If no equipment was selected from suggestions, do normal analysis
+    if not equipment_selected:
+        # Build context from recent messages
+        context = ""
+        if len(recent_messages) > 1:
+            context = "\n\nPrevious conversation context:\n"
+            for msg in reversed(recent_messages[1:6]):  # Last 5 messages excluding current
+                role = "User" if msg["role"] == "user" else "Assistant"
+                context += f"{role}: {msg['content'][:200]}\n"
+        
+        # Analyze with AI for threat reporting
+        analysis = await analyze_threat_with_ai(
+            message.content + context, 
+            session_id, 
+            message.image_base64
+        )
+    
+    # Check if the extracted asset is generic (needs disambiguation) BEFORE processing
+    extracted_asset = analysis.get("threat", {}).get("asset", "").lower() if analysis.get("threat") else ""
+    user_input_lower = message.content.lower()
+    generic_equipment_terms = ["extruder", "pump", "compressor", "motor", "valve", "heat exchanger", "fan", "blower", "conveyor", "mixer"]
+    
+    # Determine if the user's input was generic (user said "extruder" not "00 1L01 extruder")
+    user_used_generic_term = False
+    for term in generic_equipment_terms:
+        if term in user_input_lower:
+            # Check if user used JUST the generic term without specific identifiers
+            words_before_term = user_input_lower.split(term)[0].strip().split()
+            has_specific_id = any(any(c.isdigit() for c in word) for word in words_before_term[-2:] if word)
+            if not has_specific_id:
+                user_used_generic_term = True
+                break
+    
+    # Find which generic term the user used
+    matched_generic_term = None
+    for term in generic_equipment_terms:
+        if term in user_input_lower:
+            matched_generic_term = term
+            break
+    
+    # Check if multiple equipment match when user used generic term
+    if user_used_generic_term and matched_generic_term and analysis.get("complete", False):
+        subunit_levels = ["subunit", "maintainable_item", "equipment"]
+        matching_equipment = await db.equipment_nodes.find(
+            {
+                "$and": [
+                    {"$or": [{"user_id": current_user["id"]}, {"user_id": None}, {"user_id": {"$exists": False}}]},
+                    {"level": {"$in": subunit_levels}},
+                    {"name": {"$regex": matched_generic_term, "$options": "i"}}
+                ]
+            },
+            {"_id": 0, "id": 1, "name": 1}
+        ).to_list(10)
+        
+        # If multiple equipment match, force disambiguation
+        if len(matching_equipment) > 1:
+            analysis["complete"] = False
+            analysis["question_type"] = "asset"
+            analysis["follow_up_question"] = f"I found multiple equipment matching '{matched_generic_term}'. Please select the correct one:"
     
     if not analysis.get("complete", False):
         # Need more info - return follow-up question
@@ -1033,8 +1132,8 @@ async def send_chat_message(
         
         equipment_suggestions = None
         
-        # If asset is unclear, get equipment suggestions
-        if question_type == "asset":
+        if user_used_generic_term or question_type == "asset":
+            question_type = "asset"  # Force asset question type
             # Only get equipment at subunit level and below (not installation, unit, plant_unit, etc.)
             subunit_levels = ["subunit", "maintainable_item", "equipment"]
             all_equipment = await db.equipment_nodes.find(
@@ -1174,6 +1273,15 @@ async def send_chat_message(
         elif question_type == "location":
             question += "\n\n💡 Tip: Include area, unit, or building name."
         
+        # Store pending threat data for equipment selection follow-up
+        pending_threat_data = None
+        if equipment_suggestions and analysis.get("threat"):
+            pending_threat_data = {
+                "failure_description": analysis.get("threat", {}).get("title", message.content),
+                "failure_mode": analysis.get("threat", {}).get("failure_mode"),
+                "original_message": message.content
+            }
+        
         ai_response = {
             "id": str(uuid.uuid4()),
             "user_id": current_user["id"],
@@ -1182,6 +1290,7 @@ async def send_chat_message(
             "question_type": question_type,
             "equipment_suggestions": equipment_suggestions,
             "failure_mode_suggestions": failure_mode_suggestions,
+            "pending_threat_data": pending_threat_data,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.chat_messages.insert_one(ai_response)
@@ -1386,10 +1495,21 @@ async def send_chat_message(
         # Sort by score
         multiple_failure_matches.sort(key=lambda x: x["score"], reverse=True)
         
-        # If we have multiple good matches (score >= 40), ask user to select
-        good_matches = [m for m in multiple_failure_matches if m["score"] >= 40]
+        # If we have a very good match (score >= 80), use it directly without asking
+        # Only ask for selection if matches are ambiguous (multiple similar scores, no clear winner)
+        good_matches = [m for m in multiple_failure_matches if m["score"] >= 60]
         
-        if len(good_matches) > 1 and good_matches[0]["score"] < 100:
+        # Check if we should ask user to select:
+        # - Must have multiple matches
+        # - Top match must NOT be an exact/near-exact match (score < 80)
+        # - Top matches must be close in score (within 20 points)
+        should_ask_for_selection = (
+            len(good_matches) > 1 and 
+            good_matches[0]["score"] < 80 and
+            (good_matches[0]["score"] - good_matches[1]["score"]) < 20
+        )
+        
+        if should_ask_for_selection:
             # Multiple matches found - return suggestions to user
             failure_mode_suggestions = [
                 {
