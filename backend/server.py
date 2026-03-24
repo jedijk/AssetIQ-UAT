@@ -1235,6 +1235,46 @@ async def send_chat_message(
     if all_matches:
         # Sort by score (highest first), then by subunit preference
         all_matches.sort(key=lambda x: (x["score"], x["is_subunit"]), reverse=True)
+        
+        # Filter to only subunit-level matches with good scores
+        subunit_matches = [m for m in all_matches if m["is_subunit"] and m["score"] >= 60]
+        
+        # If multiple subunit matches, ask user to select
+        if len(subunit_matches) > 1:
+            # Store the partial threat data for later completion
+            equipment_suggestions = [
+                {
+                    "id": m["node"]["id"],
+                    "name": m["node"].get("name", "Unknown"),
+                    "tag": m["node"].get("tag"),
+                    "equipment_type": m["node"].get("equipment_type"),
+                    "score": m["score"]
+                }
+                for m in subunit_matches[:5]  # Top 5 matches
+            ]
+            
+            question = f"I found multiple equipment matching '{asset_name}'. Please select the correct one:"
+            
+            ai_response = {
+                "id": str(uuid.uuid4()),
+                "user_id": current_user["id"],
+                "role": "assistant",
+                "content": question,
+                "question_type": "asset",
+                "equipment_suggestions": equipment_suggestions,
+                "pending_threat_data": threat_data,  # Store for later
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.chat_messages.insert_one(ai_response)
+            
+            return ChatResponse(
+                message=question,
+                follow_up_question=question,
+                question_type="asset",
+                equipment_suggestions=equipment_suggestions
+            )
+        
+        # Single match or clear winner - use it
         best_match = all_matches[0]
         hierarchy_node = best_match["node"]
         resolved_asset_name = hierarchy_node["name"]
