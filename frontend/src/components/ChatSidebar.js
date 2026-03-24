@@ -201,15 +201,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             
             // Directly submit the transcribed text
             if (transcribedText && transcribedText.trim()) {
-              // Keep isTranscribing true - it will be reset by mutation onSettled
-              sendMutation.mutate(
-                { content: transcribedText, image: imageBase64 },
-                {
-                  onSettled: () => {
-                    setIsTranscribing(false);
-                  }
-                }
-              );
+              setIsTranscribing(false); // Reset before mutation
+              sendMutation.mutate({ content: transcribedText, image: imageBase64 });
             } else {
               toast.error("Could not transcribe voice - no text detected");
               setIsTranscribing(false);
@@ -572,7 +565,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                     ? 'bg-blue-400' 
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}
-                title="Send voice message"
+                title={isTranscribing ? "Processing voice..." : "Send voice message"}
               >
                 {isTranscribing || sendMutation.isPending ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -617,16 +610,16 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               {message.trim() || imageBase64 ? (
                 <button
                   onClick={handleSend}
-                  disabled={sendMutation.isPending || isTranscribing}
+                  disabled={sendMutation.isPending}
                   className={`flex-shrink-0 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-70 ${
-                    sendMutation.isPending || isTranscribing 
+                    sendMutation.isPending 
                       ? 'bg-blue-400' 
                       : 'bg-blue-600 hover:bg-blue-700'
                   }`}
                   data-testid="sidebar-send-message-button"
                   title="Send message"
                 >
-                  {sendMutation.isPending || isTranscribing ? (
+                  {sendMutation.isPending ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     <Send className="w-5 h-5" />
@@ -635,20 +628,12 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               ) : (
                 <button
                   onClick={startRecording}
-                  disabled={sendMutation.isPending || isTranscribing}
-                  className={`flex-shrink-0 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-70 ${
-                    sendMutation.isPending || isTranscribing 
-                      ? 'bg-blue-400' 
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
+                  disabled={sendMutation.isPending}
+                  className="flex-shrink-0 w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-70"
                   data-testid="sidebar-voice-record-button"
                   title="Hold to record voice"
                 >
-                  {sendMutation.isPending || isTranscribing ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Mic className="w-5 h-5" />
-                  )}
+                  <Mic className="w-5 h-5" />
                 </button>
               )}
             </div>
