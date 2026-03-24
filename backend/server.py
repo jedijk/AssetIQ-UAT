@@ -1048,21 +1048,37 @@ async def send_chat_message(
             if eq_name_normalized and (eq_name_normalized in message_normalized or message_normalized in eq_name_normalized):
                 # User selected this equipment - create the threat with it
                 equipment_selected = True
+                selected_equipment_id = eq.get("id")
+                selected_equipment_name = eq.get("name")
                 
                 # Get the pending threat data from conversation context
                 pending_data = last_assistant_msg.get("pending_threat_data") or {}
                 original_failure = pending_data.get("original_message") or pending_data.get("failure_description") or "issue reported"
                 
                 # Construct a clear message for the AI with the selected equipment
-                enhanced_message = f'Reporting issue for equipment "{eq.get("name")}": {original_failure}'
+                enhanced_message = f'Reporting issue for equipment "{selected_equipment_name}": {original_failure}'
                 
                 # Analyze with the enhanced message
                 analysis = await analyze_threat_with_ai(enhanced_message, session_id, message.image_base64)
                 
                 # Force the asset to be the selected equipment and mark complete
                 if analysis.get("threat"):
-                    analysis["threat"]["asset"] = eq.get("name")
+                    analysis["threat"]["asset"] = selected_equipment_name
+                else:
+                    # If AI didn't return threat, create a basic one
+                    analysis["threat"] = {
+                        "title": f"{selected_equipment_name} - {original_failure}",
+                        "asset": selected_equipment_name,
+                        "equipment_type": "Equipment",
+                        "failure_mode": pending_data.get("failure_mode") or "Unknown",
+                        "impact": "Equipment Damage",
+                        "frequency": "First Time",
+                        "risk_score": 30,
+                        "risk_level": "Medium",
+                        "recommended_actions": []
+                    }
                 analysis["complete"] = True
+                analysis["selected_equipment_id"] = selected_equipment_id
                 break
     
     # If no equipment was selected from suggestions, do normal analysis
@@ -1274,13 +1290,12 @@ async def send_chat_message(
             question += "\n\n💡 Tip: Include area, unit, or building name."
         
         # Store pending threat data for equipment selection follow-up
-        pending_threat_data = None
-        if equipment_suggestions and analysis.get("threat"):
-            pending_threat_data = {
-                "failure_description": analysis.get("threat", {}).get("title", message.content),
-                "failure_mode": analysis.get("threat", {}).get("failure_mode"),
-                "original_message": message.content
-            }
+        # Always store original message for context when asking for equipment
+        pending_threat_data = {
+            "original_message": message.content,
+            "failure_description": analysis.get("threat", {}).get("title") or message.content,
+            "failure_mode": analysis.get("threat", {}).get("failure_mode"),
+        }
         
         ai_response = {
             "id": str(uuid.uuid4()),
@@ -1307,6 +1322,9 @@ async def send_chat_message(
     threat_data = analysis.get("threat", {})
     asset_name = threat_data.get("asset", "Unknown")
     
+    # Check if equipment was pre-selected by user
+    selected_equipment_id = analysis.get("selected_equipment_id")
+    
     # Get all equipment nodes (include shared equipment without created_by)
     # Prioritize subunit-level matches
     subunit_levels = ["subunit", "maintainable_item", "equipment"]
@@ -1327,88 +1345,98 @@ async def send_chat_message(
     resolved_asset_name = asset_name
     asset_lower = asset_name.lower()
     
-    # Collect all matches with scoring
-    all_matches = []
+    # If equipment was pre-selected, use it directly
+    if selected_equipment_id:
+        for node in all_equipment_nodes:
+            if node.get("id") == selected_equipment_id:
+                hierarchy_node = node
+                resolved_asset_name = node["name"]
+                break
     
-    for node in all_equipment_nodes:
-        node_name_lower = node["name"].lower()
-        node_tag_lower = (node.get("tag") or "").lower()
-        is_subunit = node.get("level") in subunit_levels
-        
-        match_score = 0
-        
-        # Exact match
-        if node_name_lower == asset_lower:
-            match_score = 100 if is_subunit else 50
-        # Asset name contained in node name (partial match)
-        elif asset_lower in node_name_lower:
-            match_score = 80 if is_subunit else 30
-        # Node name contained in asset (reverse partial)
-        elif node_name_lower in asset_lower:
-            match_score = 70 if is_subunit else 25
-        # Tag match
-        elif asset_lower == node_tag_lower or asset_lower in node_tag_lower:
-            match_score = 90 if is_subunit else 40
-        # Word match (e.g., "extruder" matches "ZSE 60 Extruder")
-        elif any(part.lower() == asset_lower for part in node["name"].split()):
-            match_score = 85 if is_subunit else 35
-        # Fuzzy match (removing spaces/dashes)
-        elif asset_lower.replace(" ", "").replace("-", "") in node_name_lower.replace(" ", "").replace("-", ""):
-            match_score = 60 if is_subunit else 20
-        
-        if match_score > 0:
-            all_matches.append({
-                "node": node,
-                "score": match_score,
-                "is_subunit": is_subunit
-            })
+    # Otherwise, try to match by name
+    if not hierarchy_node:
+        # Collect all matches with scoring
+        all_matches = []
     
-    if all_matches:
-        # Sort by score (highest first), then by subunit preference
-        all_matches.sort(key=lambda x: (x["score"], x["is_subunit"]), reverse=True)
+        for node in all_equipment_nodes:
+            node_name_lower = node["name"].lower()
+            node_tag_lower = (node.get("tag") or "").lower()
+            is_subunit = node.get("level") in subunit_levels
+            
+            match_score = 0
+            
+            # Exact match
+            if node_name_lower == asset_lower:
+                match_score = 100 if is_subunit else 50
+            # Asset name contained in node name (partial match)
+            elif asset_lower in node_name_lower:
+                match_score = 80 if is_subunit else 30
+            # Node name contained in asset (reverse partial)
+            elif node_name_lower in asset_lower:
+                match_score = 70 if is_subunit else 25
+            # Tag match
+            elif asset_lower == node_tag_lower or asset_lower in node_tag_lower:
+                match_score = 90 if is_subunit else 40
+            # Word match (e.g., "extruder" matches "ZSE 60 Extruder")
+            elif any(part.lower() == asset_lower for part in node["name"].split()):
+                match_score = 85 if is_subunit else 35
+            # Fuzzy match (removing spaces/dashes)
+            elif asset_lower.replace(" ", "").replace("-", "") in node_name_lower.replace(" ", "").replace("-", ""):
+                match_score = 60 if is_subunit else 20
+            
+            if match_score > 0:
+                all_matches.append({
+                    "node": node,
+                    "score": match_score,
+                    "is_subunit": is_subunit
+                })
         
-        # Filter to only subunit-level matches with good scores
-        subunit_matches = [m for m in all_matches if m["is_subunit"] and m["score"] >= 60]
-        
-        # If multiple subunit matches, ask user to select
-        if len(subunit_matches) > 1:
-            # Store the partial threat data for later completion
-            equipment_suggestions = [
-                {
-                    "id": m["node"]["id"],
-                    "name": m["node"].get("name", "Unknown"),
-                    "tag": m["node"].get("tag"),
-                    "equipment_type": m["node"].get("equipment_type"),
-                    "score": m["score"]
+        if all_matches:
+            # Sort by score (highest first), then by subunit preference
+            all_matches.sort(key=lambda x: (x["score"], x["is_subunit"]), reverse=True)
+            
+            # Filter to only subunit-level matches with good scores
+            subunit_matches = [m for m in all_matches if m["is_subunit"] and m["score"] >= 60]
+            
+            # If multiple subunit matches, ask user to select
+            if len(subunit_matches) > 1:
+                # Store the partial threat data for later completion
+                equipment_suggestions = [
+                    {
+                        "id": m["node"]["id"],
+                        "name": m["node"].get("name", "Unknown"),
+                        "tag": m["node"].get("tag"),
+                        "equipment_type": m["node"].get("equipment_type"),
+                        "score": m["score"]
+                    }
+                    for m in subunit_matches[:5]  # Top 5 matches
+                ]
+                
+                question = f"I found multiple equipment matching '{asset_name}'. Please select the correct one:"
+                
+                ai_response = {
+                    "id": str(uuid.uuid4()),
+                    "user_id": current_user["id"],
+                    "role": "assistant",
+                    "content": question,
+                    "question_type": "asset",
+                    "equipment_suggestions": equipment_suggestions,
+                    "pending_threat_data": threat_data,  # Store for later
+                    "created_at": datetime.now(timezone.utc).isoformat()
                 }
-                for m in subunit_matches[:5]  # Top 5 matches
-            ]
+                await db.chat_messages.insert_one(ai_response)
+                
+                return ChatResponse(
+                    message=question,
+                    follow_up_question=question,
+                    question_type="asset",
+                    equipment_suggestions=equipment_suggestions
+                )
             
-            question = f"I found multiple equipment matching '{asset_name}'. Please select the correct one:"
-            
-            ai_response = {
-                "id": str(uuid.uuid4()),
-                "user_id": current_user["id"],
-                "role": "assistant",
-                "content": question,
-                "question_type": "asset",
-                "equipment_suggestions": equipment_suggestions,
-                "pending_threat_data": threat_data,  # Store for later
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            await db.chat_messages.insert_one(ai_response)
-            
-            return ChatResponse(
-                message=question,
-                follow_up_question=question,
-                question_type="asset",
-                equipment_suggestions=equipment_suggestions
-            )
-        
-        # Single match or clear winner - use it
-        best_match = all_matches[0]
-        hierarchy_node = best_match["node"]
-        resolved_asset_name = hierarchy_node["name"]
+            # Single match or clear winner - use it
+            best_match = all_matches[0]
+            hierarchy_node = best_match["node"]
+            resolved_asset_name = hierarchy_node["name"]
     
     if not hierarchy_node:
         # Asset not found in hierarchy - create threat anyway but flag it
@@ -1501,12 +1529,13 @@ async def send_chat_message(
         
         # Check if we should ask user to select:
         # - Must have multiple matches
-        # - Top match must NOT be an exact/near-exact match (score < 80)
-        # - Top matches must be close in score (within 20 points)
+        # - Top match must NOT be an exact/near-exact match (score < 90)
+        # - Top matches must be very close in score (within 10 points)
+        # This ensures we only ask when genuinely ambiguous
         should_ask_for_selection = (
             len(good_matches) > 1 and 
-            good_matches[0]["score"] < 80 and
-            (good_matches[0]["score"] - good_matches[1]["score"]) < 20
+            good_matches[0]["score"] < 90 and
+            (good_matches[0]["score"] - good_matches[1]["score"]) < 10
         )
         
         if should_ask_for_selection:
