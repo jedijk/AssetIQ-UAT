@@ -67,7 +67,7 @@ const Layout = () => {
   };
 
   // Handler for opening chat with pre-filled equipment (from hierarchy context menu)
-  const handleAddThreatFromHierarchy = (equipmentName) => {
+  const handleAddObservationFromHierarchy = (equipmentName) => {
     setChatPrefillEquipment(equipmentName);
     setChatOpen(true);
   };
@@ -99,7 +99,7 @@ const Layout = () => {
 
   const navItems = [
     { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
-    { path: "/threats", label: t("nav.threats"), icon: AlertTriangle },
+    { path: "/threats", label: t("nav.observations"), icon: AlertTriangle },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
     { path: "/tasks", label: "Tasks", icon: Calendar },
@@ -504,7 +504,7 @@ const Layout = () => {
                 isOpen={true} 
                 onClose={() => setHierarchyOpen(false)}
                 isMobile={false}
-                onAddThreat={handleAddThreatFromHierarchy}
+                onAddThreat={handleAddObservationFromHierarchy}
               />
             </div>
           </div>
@@ -516,7 +516,7 @@ const Layout = () => {
             isOpen={hierarchyOpen} 
             onClose={() => setHierarchyOpen(false)}
             isMobile={true}
-            onAddThreat={handleAddThreatFromHierarchy}
+            onAddThreat={handleAddObservationFromHierarchy}
           />
         </div>
 
@@ -526,13 +526,13 @@ const Layout = () => {
         </main>
       </div>
 
-      {/* Floating Action Button - Report Threat */}
+      {/* Floating Action Button - Report Observation */}
       <button
         onClick={() => { setChatPrefillEquipment(null); setChatOpen(true); }}
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all duration-200 z-30"
         style={{ boxShadow: '0 8px 24px -4px rgba(37, 99, 235, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.25)' }}
-        data-testid="fab-report-threat"
-        title="Report Threat"
+        data-testid="fab-report-observation"
+        title="Report Observation"
       >
         <Plus className="w-7 h-7" />
       </button>

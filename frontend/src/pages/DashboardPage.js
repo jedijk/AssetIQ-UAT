@@ -179,11 +179,11 @@ export default function DashboardPage() {
     queryFn: statsAPI.get,
   });
 
-  const { data: threatsData = [] } = useQuery({
+  const { data: observationsData = [] } = useQuery({
     queryKey: ["threats"],
     queryFn: threatsAPI.getAll,
   });
-  const threats = Array.isArray(threatsData) ? threatsData : [];
+  const observations = Array.isArray(observationsData) ? observationsData : [];
 
   const { data: actionsData = { actions: [], stats: {} } } = useQuery({
     queryKey: ["actions"],
@@ -205,17 +205,17 @@ export default function DashboardPage() {
   const equipment = Array.isArray(equipmentData?.nodes) ? equipmentData.nodes : (Array.isArray(equipmentData) ? equipmentData : []);
 
   // Calculate metrics
-  const threatsByStatus = threats.reduce((acc, t) => {
+  const observationsByStatus = observations.reduce((acc, t) => {
     acc[t.status] = (acc[t.status] || 0) + 1;
     return acc;
   }, {});
 
-  const threatsByRisk = threats.reduce((acc, t) => {
+  const observationsByRisk = observations.reduce((acc, t) => {
     acc[t.risk_level] = (acc[t.risk_level] || 0) + 1;
     return acc;
   }, {});
 
-  const threatsByType = threats.reduce((acc, t) => {
+  const observationsByType = observations.reduce((acc, t) => {
     const type = t.equipment_type || "Unknown";
     acc[type] = (acc[type] || 0) + 1;
     return acc;
@@ -237,12 +237,12 @@ export default function DashboardPage() {
   }, {});
 
   // Calculate completion rates
-  const closedThreats = (threatsByStatus["Closed"] || 0) + (threatsByStatus["Mitigated"] || 0);
+  const closedObservations = (observationsByStatus["Closed"] || 0) + (observationsByStatus["Mitigated"] || 0);
   const completedActions = actionsByStatus["completed"] || 0;
   const completedInvestigations = investigationsByStatus["completed"] || 0;
   
   // Used for stat card subtitle
-  const openThreats = threatsByStatus["Open"] || 0;
+  const openObservations = observationsByStatus["Open"] || 0;
 
   return (
     <div className="p-6 max-w-7xl mx-auto" data-testid="dashboard-page">
@@ -273,12 +273,12 @@ export default function DashboardPage() {
       {/* Key Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard
-          label={t("dashboard.totalThreats") || "Total Threats"}
-          value={threats.length}
+          label={t("dashboard.totalObservations") || "Total Observations"}
+          value={observations.length}
           icon={AlertTriangle}
           color="text-amber-600"
           bg="bg-amber-50"
-          subtitle={`${openThreats} ${t("common.open") || "open"}`}
+          subtitle={`${openObservations} ${t("common.open") || "open"}`}
           clickable={true}
           onClick={() => navigate("/threats", { state: navState })}
         />
@@ -317,9 +317,9 @@ export default function DashboardPage() {
       {/* Progress Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <ProgressCard
-          title={t("dashboard.threatResolution") || "Threat Resolution"}
-          completed={closedThreats}
-          total={threats.length}
+          title={t("dashboard.observationResolution") || "Observation Resolution"}
+          completed={closedObservations}
+          total={observations.length}
           icon={Shield}
           color="bg-amber-500"
           clickable={true}
@@ -348,15 +348,15 @@ export default function DashboardPage() {
       {/* Distribution Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <DistributionCard
-          title={t("dashboard.threatsByStatus") || "Threats by Status"}
-          data={threatsByStatus}
+          title={t("dashboard.observationsByStatus") || "Threats by Status"}
+          data={observationsByStatus}
           colors={["bg-blue-400", "bg-amber-400", "bg-green-400", "bg-slate-400"]}
           clickable={true}
           onClick={() => navigate("/threats", { state: navState })}
         />
         <DistributionCard
-          title={t("dashboard.threatsByRisk") || "Threats by Risk Level"}
-          data={threatsByRisk}
+          title={t("dashboard.observationsByRisk") || "Threats by Risk Level"}
+          data={observationsByRisk}
           colors={["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-400"]}
           clickable={true}
           onClick={() => navigate("/threats", { state: navState })}
@@ -380,10 +380,10 @@ export default function DashboardPage() {
       {/* Recent Activity */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <RecentItemCard
-          title={t("dashboard.recentThreats") || "Recent Threats"}
+          title={t("dashboard.recentObservations") || "Recent Observations"}
           icon={AlertTriangle}
-          items={threats.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))}
-          emptyMessage={t("dashboard.noThreats") || "No threats recorded"}
+          items={observations.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))}
+          emptyMessage={t("dashboard.noObservations") || "No observations recorded"}
           clickable={true}
           onClick={() => navigate("/threats", { state: navState })}
           renderItem={(item, idx) => (
@@ -461,7 +461,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Equipment by Type */}
-      {Object.keys(threatsByType).length > 0 && (
+      {Object.keys(observationsByType).length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -469,11 +469,11 @@ export default function DashboardPage() {
           onClick={() => navigate("/threats", { state: navState })}
         >
           <h3 className="text-sm font-medium text-slate-700 mb-4 flex items-center gap-1">
-            {t("dashboard.threatsByEquipment") || "Threats by Equipment Type"}
+            {t("dashboard.observationsByEquipment") || "Observations by Equipment Type"}
             <ExternalLink className="w-3 h-3 text-slate-400" />
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {Object.entries(threatsByType).map(([type, count], idx) => (
+            {Object.entries(observationsByType).map(([type, count], idx) => (
               <div key={type} className="bg-slate-50 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-slate-700">{count}</p>
                 <p className="text-xs text-slate-500 truncate" title={type}>{type}</p>

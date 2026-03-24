@@ -279,7 +279,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
         {msg.threat_id && (
           <div className="flex items-center gap-2 text-green-600 mb-2">
             <CheckCircle2 className="w-4 h-4" />
-            <span className="font-medium">Threat Recorded</span>
+            <span className="font-medium">Observation Recorded</span>
           </div>
         )}
         
@@ -426,7 +426,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               <MessageSquare className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="font-semibold text-slate-900">Report Threat</h2>
+              <h2 className="font-semibold text-slate-900">Report Observation</h2>
               <p className="text-xs text-slate-500">Describe the failure</p>
             </div>
           </div>

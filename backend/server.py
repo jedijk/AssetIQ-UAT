@@ -1496,7 +1496,7 @@ async def send_chat_message(
     if analysis.get("ai_unavailable"):
         response_text = "⚠️ AI service temporarily unavailable. Threat created with basic extraction - please review and update the details."
     else:
-        response_text = "Threat recorded successfully."
+        response_text = "Observation recorded successfully."
     
     ai_response = {
         "id": str(uuid.uuid4()),
