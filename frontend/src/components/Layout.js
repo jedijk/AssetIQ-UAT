@@ -98,15 +98,28 @@ const Layout = () => {
   const lastAction = getLastAction();
 
   const navItems = [
-    { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
+    { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, hasSubmenu: true },
     { path: "/threats", label: t("nav.observations"), icon: AlertTriangle },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
+    { path: "/library", label: t("nav.library"), icon: BookOpen },
+  ];
+
+  // Dashboard submenu items
+  const dashboardSubmenu = [
+    { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
+    { path: "/analytics", label: "Analytics", icon: Activity },
+  ];
+
+  // Settings menu items (including Tasks, Forms, AI Engine)
+  const settingsMenuItems = [
+    { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2 },
     { path: "/tasks", label: "Tasks", icon: Calendar },
     { path: "/forms", label: "Forms", icon: FileText },
     { path: "/decision-engine", label: "AI Engine", icon: Brain },
-    { path: "/analytics", label: "Analytics", icon: Activity },
-    { path: "/library", label: t("nav.library"), icon: BookOpen },
+    { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users },
+    { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
+    { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders },
   ];
 
   return (
@@ -146,7 +159,38 @@ const Layout = () => {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-1" data-testid="desktop-nav">
-              {navItems.map((item) => (
+              {/* Dashboard Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-150 ${
+                      location.pathname === "/dashboard" || location.pathname === "/analytics"
+                        ? "bg-blue-50 text-blue-700" 
+                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    }`}
+                    data-testid="nav-dashboard-dropdown"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    {t("nav.dashboard")}
+                    <ChevronRight className="w-3 h-3 rotate-90" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  {dashboardSubmenu.map((item) => (
+                    <DropdownMenuItem
+                      key={item.path}
+                      onClick={() => navigate(item.path)}
+                      className="cursor-pointer"
+                    >
+                      <item.icon className="w-4 h-4 mr-2" />
+                      {item.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Other Nav Items */}
+              {navItems.filter(item => !item.hasSubmenu).map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
@@ -158,7 +202,7 @@ const Layout = () => {
                         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     }`
                   }
-                  data-testid={`nav-${item.label.toLowerCase()}`}
+                  data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
                   <item.icon className="w-4 h-4" />
                   {item.label}
@@ -387,38 +431,17 @@ const Layout = () => {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>{t("nav.settings")}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={() => navigate("/equipment-manager")}
-                  className="cursor-pointer"
-                  data-testid="equipment-manager-menu-item"
-                >
-                  <Building2 className="w-4 h-4 mr-2" />
-                  {t("nav.equipmentManager")}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => navigate("/settings/user-management")}
-                  className="cursor-pointer"
-                  data-testid="user-management-menu-item"
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  {t("nav.userManagement")}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => navigate("/settings/statistics")}
-                  className="cursor-pointer"
-                  data-testid="statistics-menu-item"
-                >
-                  <BarChart3 className="w-4 h-4 mr-2" />
-                  {t("nav.statistics")}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => navigate("/settings/criticality-definitions")}
-                  className="cursor-pointer"
-                  data-testid="criticality-definitions-menu-item"
-                >
-                  <Sliders className="w-4 h-4 mr-2" />
-                  {t("nav.criticalityDefinitions")}
-                </DropdownMenuItem>
+                {settingsMenuItems.map((item) => (
+                  <DropdownMenuItem 
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                    className="cursor-pointer"
+                    data-testid={`settings-${item.path.replace(/\//g, '-').replace(/^-/, '')}-menu-item`}
+                  >
+                    <item.icon className="w-4 h-4 mr-2" />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -462,16 +485,32 @@ const Layout = () => {
               <PanelLeftOpen className="w-5 h-5" />
               Equipment Hierarchy
             </button>
-            {/* Equipment Manager for mobile */}
-            <button
-              onClick={() => { navigate("/equipment-manager"); setMobileMenuOpen(false); }}
-              className="flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-50 w-full"
-              data-testid="mobile-nav-equipment-manager"
-            >
-              <Building2 className="w-5 h-5" />
-              Equipment Manager (ISO 14224)
-            </button>
-            {navItems.map((item) => (
+            
+            {/* Dashboard Section */}
+            <div className="border-b border-slate-100 pb-2 mb-2">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-3 py-2">Dashboard</p>
+              {dashboardSubmenu.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === "/dashboard"}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 p-3 rounded-lg ${
+                      isActive
+                        ? "bg-blue-50 text-blue-600"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`
+                  }
+                >
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+            
+            {/* Main Navigation Items */}
+            {navItems.filter(item => !item.hasSubmenu).map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
@@ -484,12 +523,34 @@ const Layout = () => {
                       : "text-slate-600 hover:bg-slate-50"
                   }`
                 }
-                data-testid={`mobile-nav-${item.label.toLowerCase()}`}
+                data-testid={`mobile-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
               >
                 <item.icon className="w-5 h-5" />
                 {item.label}
               </NavLink>
             ))}
+            
+            {/* Settings Section */}
+            <div className="border-t border-slate-100 pt-2 mt-2">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-3 py-2">Settings</p>
+              {settingsMenuItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 p-3 rounded-lg ${
+                      isActive
+                        ? "bg-blue-50 text-blue-600"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`
+                  }
+                >
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
           </nav>
         )}
       </header>
