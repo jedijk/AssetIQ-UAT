@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { threatsAPI, statsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { 
   AlertTriangle, 
   TrendingUp, 
@@ -23,7 +24,11 @@ import {
   Activity,
   Flame,
   Droplets,
-  Box
+  Box,
+  Trash2,
+  BarChart3,
+  Target,
+  Loader2
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -34,6 +39,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import ThreatCard from "../components/ThreatCard";
 import RiskBadge from "../components/RiskBadge";
 import BackButton from "../components/BackButton";
@@ -82,13 +97,17 @@ const getEquipmentIcon = (equipmentType, asset) => {
 const ThreatsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState("all");
-  const [riskFilter, setRiskFilter] = useState("all"); // New: filter by risk level
+  const [riskFilter, setRiskFilter] = useState("all"); // Filter by risk level
+  const [sortBy, setSortBy] = useState("business_risk"); // "business_risk" or "rpn"
   const [searchQuery, setSearchQuery] = useState("");
   const [assetFilter, setAssetFilter] = useState(""); // Display name for the filter
   const [assetsToFilter, setAssetsToFilter] = useState([]); // Array of asset names to filter by
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [threatToDelete, setThreatToDelete] = useState(null);
 
   // Initialize filters from URL params
   useEffect(() => {
@@ -129,6 +148,33 @@ const ThreatsPage = () => {
     queryFn: () => threatsAPI.getAll(statusFilter === "all" ? null : statusFilter),
   });
 
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id) => threatsAPI.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      toast.success("Observation deleted successfully");
+      setDeleteDialogOpen(false);
+      setThreatToDelete(null);
+    },
+    onError: () => {
+      toast.error("Failed to delete observation");
+    },
+  });
+
+  const handleDeleteClick = (e, threat) => {
+    e.stopPropagation(); // Prevent navigation to detail page
+    setThreatToDelete(threat);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (threatToDelete) {
+      deleteMutation.mutate(threatToDelete.id);
+    }
+  };
+
   // Filter threats by search query, asset hierarchy, and risk level
   const filteredThreats = threats.filter((threat) => {
     // First check if we have a hierarchical asset filter
@@ -155,6 +201,19 @@ const ThreatsPage = () => {
       threat.equipment_type.toLowerCase().includes(query) ||
       threat.failure_mode.toLowerCase().includes(query)
     );
+  });
+
+  // Sort threats based on selected sort method
+  const sortedThreats = [...filteredThreats].sort((a, b) => {
+    if (sortBy === "rpn") {
+      // Sort by RPN (higher first), fall back to risk_score if no RPN
+      const rpnA = a.fmea_rpn || a.rpn || a.failure_mode_data?.rpn || 0;
+      const rpnB = b.fmea_rpn || b.rpn || b.failure_mode_data?.rpn || 0;
+      return rpnB - rpnA;
+    } else {
+      // Default: sort by business risk score (higher first)
+      return (b.risk_score || 0) - (a.risk_score || 0);
+    }
   });
 
   const statCards = [
@@ -294,6 +353,26 @@ const ThreatsPage = () => {
             </SelectItem>
           </SelectContent>
         </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full sm:w-44 h-11" data-testid="sort-by-select">
+            <BarChart3 className="w-4 h-4 mr-2 text-slate-400" />
+            <SelectValue placeholder="Sort By" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="business_risk">
+              <span className="flex items-center gap-2">
+                <Target className="w-3.5 h-3.5 text-purple-500" />
+                Business Risk
+              </span>
+            </SelectItem>
+            <SelectItem value="rpn">
+              <span className="flex items-center gap-2">
+                <Activity className="w-3.5 h-3.5 text-blue-500" />
+                RPN (FMEA)
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Threats List */}
@@ -305,7 +384,7 @@ const ThreatsPage = () => {
             <span></span>
           </div>
         </div>
-      ) : filteredThreats.length === 0 ? (
+      ) : sortedThreats.length === 0 ? (
         <div className="empty-state py-16" data-testid="no-threats-message">
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
             <CheckCircle className="w-8 h-8 text-slate-400" />
@@ -319,8 +398,9 @@ const ThreatsPage = () => {
         </div>
       ) : (
         <div className="priority-list" data-testid="threats-list">
-          {filteredThreats.map((threat, idx) => {
+          {sortedThreats.map((threat, idx) => {
             const EquipmentIcon = getEquipmentIcon(threat.equipment_type, threat.asset);
+            const rpnValue = threat.fmea_rpn || threat.rpn || threat.failure_mode_data?.rpn || null;
             return (
             <motion.div
               key={threat.id}
@@ -364,21 +444,87 @@ const ThreatsPage = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              {/* Score Display - Business Risk and RPN */}
+              <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+                {/* Business Risk Score */}
                 <div className="text-right">
-                  <div className="text-xs sm:text-sm font-medium text-slate-700">
+                  <div className="text-xs text-slate-400 hidden sm:block">Score</div>
+                  <div className="text-sm sm:text-base font-semibold text-slate-700">
                     {threat.risk_score}
                   </div>
-                  <div className="text-xs text-slate-400 hidden sm:block">
-                    {threat.status}
-                  </div>
                 </div>
+                
+                {/* RPN */}
+                <div className="text-right min-w-[50px]">
+                  <div className="text-xs text-slate-400 hidden sm:block">RPN</div>
+                  {rpnValue ? (
+                    <div className={`text-sm sm:text-base font-semibold ${
+                      rpnValue >= 300 ? "text-red-600" :
+                      rpnValue >= 200 ? "text-orange-600" :
+                      rpnValue >= 100 ? "text-yellow-600" :
+                      "text-green-600"
+                    }`}>
+                      {rpnValue}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-slate-300">—</div>
+                  )}
+                </div>
+
+                {/* Status Badge */}
+                <div className="hidden sm:block">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    threat.status === "Open" ? "bg-blue-100 text-blue-700" :
+                    threat.status === "Mitigated" ? "bg-green-100 text-green-700" :
+                    threat.status === "Closed" ? "bg-slate-100 text-slate-600" :
+                    "bg-amber-100 text-amber-700"
+                  }`}>
+                    {threat.status}
+                  </span>
+                </div>
+
+                {/* Delete Button */}
+                <button
+                  onClick={(e) => handleDeleteClick(e, threat)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                  title="Delete observation"
+                  data-testid={`delete-threat-${threat.id}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </motion.div>
             );
           })}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Observation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{threatToDelete?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
