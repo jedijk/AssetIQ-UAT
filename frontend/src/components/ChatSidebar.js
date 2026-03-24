@@ -326,7 +326,54 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           <p className="whitespace-pre-wrap">{msg.content}</p>
         )}
         
-        {isFollowUp && !msg.threat_id && (
+        {/* Equipment Suggestions */}
+        {msg.equipment_suggestions && msg.equipment_suggestions.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {msg.equipment_suggestions.map((eq) => (
+              <button
+                key={eq.id}
+                onClick={() => {
+                  const equipmentText = eq.tag ? `${eq.name} (${eq.tag})` : eq.name;
+                  setMessage(equipmentText);
+                  // Auto-focus the input
+                  if (textareaRef.current) {
+                    textareaRef.current.focus();
+                  }
+                }}
+                className="w-full text-left p-2.5 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors group"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-medium text-blue-900 text-sm">{eq.name}</span>
+                    {eq.tag && (
+                      <span className="ml-2 text-blue-600 text-xs">({eq.tag})</span>
+                    )}
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-blue-400 group-hover:text-blue-600 transition-colors" />
+                </div>
+                {eq.equipment_type && (
+                  <span className="text-xs text-blue-500">{eq.equipment_type}</span>
+                )}
+              </button>
+            ))}
+            
+            {/* Cancel option */}
+            <button
+              onClick={() => {
+                setMessage("");
+                if (textareaRef.current) {
+                  textareaRef.current.focus();
+                }
+              }}
+              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
+            >
+              <X className="w-3.5 h-3.5 inline mr-1" />
+              None of these / Cancel
+            </button>
+          </div>
+        )}
+        
+        {isFollowUp && !msg.threat_id && !msg.equipment_suggestions && (
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1 text-blue-600 text-xs">
             <HelpCircle className="w-3 h-3" />
             <span>Please provide more details</span>

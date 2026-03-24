@@ -239,6 +239,7 @@ class ChatResponse(BaseModel):
     threat: Optional[ThreatResponse] = None
     follow_up_question: Optional[str] = None
     question_type: Optional[str] = None  # asset, location, photo, frequency, impact, details
+    equipment_suggestions: Optional[List[dict]] = None  # List of suggested equipment when unclear
 
 class VoiceTranscriptionResponse(BaseModel):
     text: str
@@ -1070,6 +1071,70 @@ async def send_chat_message(
         question = analysis.get("follow_up_question", "Could you provide more details about the failure?")
         question_type = analysis.get("question_type", "details")
         
+        equipment_suggestions = None
+        
+        # If asset is unclear, get equipment suggestions
+        if question_type == "asset":
+            # Get all equipment (some may not have user_id set)
+            all_equipment = await db.equipment_nodes.find(
+                {"$or": [{"user_id": current_user["id"]}, {"user_id": None}, {"user_id": {"$exists": False}}]},
+                {"_id": 0, "id": 1, "name": 1, "tag": 1, "equipment_type": 1, "description": 1}
+            ).to_list(100)
+            
+            # Try to find matching equipment based on message content
+            message_lower = message.content.lower()
+            scored_equipment = []
+            
+            for eq in all_equipment:
+                score = 0
+                name_lower = (eq.get("name") or "").lower()
+                tag_lower = (eq.get("tag") or "").lower()
+                desc_lower = (eq.get("description") or "").lower()
+                eq_type_lower = (eq.get("equipment_type") or "").lower()
+                
+                # Score based on matches
+                for word in message_lower.split():
+                    if len(word) > 2:  # Skip short words
+                        if word in name_lower:
+                            score += 3
+                        if word in tag_lower:
+                            score += 3
+                        if word in desc_lower:
+                            score += 1
+                        if word in eq_type_lower:
+                            score += 2
+                
+                if score > 0:
+                    scored_equipment.append({
+                        "id": eq["id"],
+                        "name": eq.get("name", "Unknown"),
+                        "tag": eq.get("tag"),
+                        "equipment_type": eq.get("equipment_type"),
+                        "score": score
+                    })
+            
+            # Sort by score and take top 5
+            scored_equipment.sort(key=lambda x: x["score"], reverse=True)
+            
+            # If no matches found, show first 5 equipment items
+            if not scored_equipment and all_equipment:
+                equipment_suggestions = [
+                    {
+                        "id": eq["id"],
+                        "name": eq.get("name", "Unknown"),
+                        "tag": eq.get("tag"),
+                        "equipment_type": eq.get("equipment_type"),
+                        "score": 0
+                    }
+                    for eq in all_equipment[:5]
+                ]
+            else:
+                equipment_suggestions = scored_equipment[:5]
+            
+            # Update the question to be more helpful
+            if equipment_suggestions:
+                question = "I found some equipment that might match. Please select the correct one, or describe it differently:"
+        
         # Add helpful prompts based on question type
         if question_type == "photo":
             question += "\n\n💡 Tip: Use the camera button to attach a photo."
@@ -1082,6 +1147,7 @@ async def send_chat_message(
             "role": "assistant",
             "content": question,
             "question_type": question_type,
+            "equipment_suggestions": equipment_suggestions,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.chat_messages.insert_one(ai_response)
@@ -1089,7 +1155,8 @@ async def send_chat_message(
         return ChatResponse(
             message=question,
             follow_up_question=analysis.get("follow_up_question"),
-            question_type=question_type
+            question_type=question_type,
+            equipment_suggestions=equipment_suggestions
         )
     
     # Create threat
