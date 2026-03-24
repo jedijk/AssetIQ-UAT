@@ -1142,21 +1142,22 @@ async def send_chat_message(
                 # Force the asset to be the selected equipment and mark complete
                 if analysis.get("threat"):
                     analysis["threat"]["asset"] = selected_equipment_name
-                    # If we had a single FM match, use it
+                    # If we had a single FM match, use its failure_mode and equipment_type
                     if len(fm_matches) == 1:
                         analysis["threat"]["failure_mode"] = fm_matches[0]["failure_mode"]
+                        analysis["threat"]["equipment_type"] = fm_matches[0].get("equipment", analysis["threat"].get("equipment_type", "Equipment"))
                 else:
                     # If AI didn't return threat, create a basic one
                     analysis["threat"] = {
                         "title": f"{selected_equipment_name} - {original_failure}",
                         "asset": selected_equipment_name,
-                        "equipment_type": "Equipment",
+                        "equipment_type": fm_matches[0].get("equipment", "Equipment") if fm_matches else "Equipment",
                         "failure_mode": fm_matches[0]["failure_mode"] if fm_matches else (pending_data.get("failure_mode") or "Unknown"),
                         "impact": "Equipment Damage",
                         "frequency": "First Time",
                         "risk_score": 30,
                         "risk_level": "Medium",
-                        "recommended_actions": []
+                        "recommended_actions": fm_matches[0].get("recommended_actions", []) if fm_matches else []
                     }
                 analysis["complete"] = True
                 analysis["selected_equipment_id"] = selected_equipment_id

@@ -6,6 +6,14 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Chat Equipment Type Storage Fixed** (Mar 24, 2026):
+  - **Problem**: Observations were storing the equipment name (e.g., "strainer") as the equipment_type instead of the FMEA equipment type (e.g., "Heat Exchanger").
+  - **Root Cause**: When creating observations from failure mode selection, the code wasn't using the FMEA's equipment type field.
+  - **Fix**: Updated equipment selection handler in `/app/backend/server.py` (lines 1143-1162) to:
+    - Use `fm_matches[0].get("equipment")` when single FM match exists
+    - Set `equipment_type` from FMEA library data in all code paths
+  - **Result**: New observations now show correct FMEA equipment type (e.g., "Heat Exchanger" for Fouling).
+
 - **Task Template Creation Fixed** (Mar 24, 2026):
   - **Problem**: Could not create and save task templates - API returning validation errors.
   - **Root Cause**:
