@@ -6,6 +6,16 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Delete Executions Added** (Mar 24, 2026):
+  - **Delete Button**: Added red trash icon button to each execution row in the table
+  - **Confirmation Dialog**: Shows "Delete Execution" dialog with warning message before deletion
+  - **Backend Endpoint**: Added `DELETE /api/task-instances/{id}` endpoint
+  - **Service Method**: Added `delete_instance()` method to TaskService
+  - **Files Modified**:
+    - `/app/frontend/src/pages/TaskSchedulerPage.js` - Delete button, mutation, dialog
+    - `/app/backend/server.py` - DELETE endpoint
+    - `/app/backend/services/task_service.py` - delete_instance method
+
 - **Added "Laboratory" Discipline** (Mar 24, 2026):
   - Added "Laboratory" as a discipline option across the application
   - **Files Updated**:

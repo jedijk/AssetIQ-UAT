@@ -558,6 +558,14 @@ class TaskService:
             return self._serialize_instance(result)
         return None
     
+    async def delete_instance(self, instance_id: str) -> bool:
+        """Delete a task instance."""
+        try:
+            result = await self.instances.delete_one({"_id": ObjectId(instance_id)})
+            return result.deleted_count > 0
+        except Exception:
+            return False
+    
     # ==================== SCHEDULING ====================
     
     async def generate_instances_for_plan(

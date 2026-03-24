@@ -4746,6 +4746,17 @@ async def complete_task_instance(
         raise HTTPException(status_code=404, detail="Task instance not found")
     return result
 
+@api_router.delete("/task-instances/{instance_id}")
+async def delete_task_instance(
+    instance_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a task instance."""
+    result = await task_service.delete_instance(instance_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Task instance not found")
+    return {"message": "Task instance deleted successfully"}
+
 # --- Task Scheduling ---
 
 @api_router.post("/task-plans/{plan_id}/generate-instances")

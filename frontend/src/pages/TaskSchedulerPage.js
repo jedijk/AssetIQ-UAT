@@ -56,6 +56,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "../components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import {
@@ -205,6 +215,14 @@ const taskAPI = {
     if (!response.ok) throw new Error("Failed to generate instances");
     return response.json();
   },
+  deleteInstance: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/api/task-instances/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    if (!response.ok) throw new Error("Failed to delete execution");
+    return response.json();
+  },
   getStats: async () => {
     const response = await fetch(`${API_BASE_URL}/api/tasks/stats`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -287,6 +305,7 @@ const TaskSchedulerPage = () => {
     needs_follow_up: false
   });
   const [editingTemplate, setEditingTemplate] = useState(null); // For editing templates
+  const [deleteInstanceId, setDeleteInstanceId] = useState(null); // For delete confirmation
 
   // Queries
   const { data: statsData } = useQuery({
@@ -426,6 +445,17 @@ const TaskSchedulerPage = () => {
       resetTemplateForm();
     },
     onError: () => toast.error("Failed to update template")
+  });
+
+  const deleteInstanceMutation = useMutation({
+    mutationFn: taskAPI.deleteInstance,
+    onSuccess: () => {
+      queryClient.invalidateQueries(["task-instances"]);
+      queryClient.invalidateQueries(["task-stats"]);
+      toast.success("Execution deleted");
+      setDeleteInstanceId(null);
+    },
+    onError: () => toast.error("Failed to delete execution")
   });
 
   const templates = templatesData?.templates || [];
@@ -716,6 +746,15 @@ const TaskSchedulerPage = () => {
                                 <CheckCircle2 className="w-4 h-4 mr-1" /> Complete
                               </Button>
                             )}
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => setDeleteInstanceId(instance.id)}
+                              data-testid={`delete-execution-${instance.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -1039,6 +1078,28 @@ const TaskSchedulerPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Execution Confirmation Dialog */}
+      <AlertDialog open={!!deleteInstanceId} onOpenChange={(open) => !open && setDeleteInstanceId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Execution</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this execution? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteInstanceId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteInstanceMutation.mutate(deleteInstanceId)}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteInstanceMutation.isPending}
+            >
+              {deleteInstanceMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Create Plan Dialog */}
       <Dialog open={showPlanDialog} onOpenChange={setShowPlanDialog}>
