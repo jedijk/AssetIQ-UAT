@@ -1176,53 +1176,68 @@ async def send_chat_message(
     threat_data = analysis.get("threat", {})
     asset_name = threat_data.get("asset", "Unknown")
     
-    # Get all equipment nodes for this user (including criticality)
+    # Get all equipment nodes (include shared equipment without created_by)
+    # Prioritize subunit-level matches
+    subunit_levels = ["subunit", "maintainable_item", "equipment"]
     all_equipment_nodes = await db.equipment_nodes.find(
-        {"created_by": current_user["id"]},
-        {"_id": 0, "name": 1, "level": 1, "id": 1, "criticality": 1}
-    ).to_list(200)
+        {"$or": [
+            {"created_by": current_user["id"]}, 
+            {"created_by": None}, 
+            {"created_by": {"$exists": False}},
+            {"user_id": current_user["id"]},
+            {"user_id": None},
+            {"user_id": {"$exists": False}}
+        ]},
+        {"_id": 0, "name": 1, "level": 1, "id": 1, "criticality": 1, "tag": 1}
+    ).to_list(500)
     
     # Try to resolve partial tag name to full equipment name
     hierarchy_node = None
     resolved_asset_name = asset_name
+    asset_lower = asset_name.lower()
     
-    # First try exact match
+    # Collect all matches with scoring
+    all_matches = []
+    
     for node in all_equipment_nodes:
-        if node["name"].lower() == asset_name.lower():
-            hierarchy_node = node
-            resolved_asset_name = node["name"]
-            break
+        node_name_lower = node["name"].lower()
+        node_tag_lower = (node.get("tag") or "").lower()
+        is_subunit = node.get("level") in subunit_levels
+        
+        match_score = 0
+        
+        # Exact match
+        if node_name_lower == asset_lower:
+            match_score = 100 if is_subunit else 50
+        # Asset name contained in node name (partial match)
+        elif asset_lower in node_name_lower:
+            match_score = 80 if is_subunit else 30
+        # Node name contained in asset (reverse partial)
+        elif node_name_lower in asset_lower:
+            match_score = 70 if is_subunit else 25
+        # Tag match
+        elif asset_lower == node_tag_lower or asset_lower in node_tag_lower:
+            match_score = 90 if is_subunit else 40
+        # Word match (e.g., "extruder" matches "ZSE 60 Extruder")
+        elif any(part.lower() == asset_lower for part in node["name"].split()):
+            match_score = 85 if is_subunit else 35
+        # Fuzzy match (removing spaces/dashes)
+        elif asset_lower.replace(" ", "").replace("-", "") in node_name_lower.replace(" ", "").replace("-", ""):
+            match_score = 60 if is_subunit else 20
+        
+        if match_score > 0:
+            all_matches.append({
+                "node": node,
+                "score": match_score,
+                "is_subunit": is_subunit
+            })
     
-    # If no exact match, try partial match (tag number like P-101, C-201, HX-301)
-    if not hierarchy_node:
-        asset_lower = asset_name.lower()
-        matches = []
-        
-        for node in all_equipment_nodes:
-            node_name_lower = node["name"].lower()
-            # Check if asset name is contained in node name or vice versa
-            if asset_lower in node_name_lower or node_name_lower in asset_lower:
-                matches.append(node)
-            # Check for tag pattern match (e.g., "P-101" matches "Cooling Water Pump P-101")
-            elif any(part.lower() == asset_lower for part in node["name"].split()):
-                matches.append(node)
-            # Check if tag number appears anywhere in the name
-            elif asset_lower.replace(" ", "").replace("-", "") in node_name_lower.replace(" ", "").replace("-", ""):
-                matches.append(node)
-        
-        if len(matches) == 1:
-            # Single match found - use it
-            hierarchy_node = matches[0]
-            resolved_asset_name = matches[0]["name"]
-        elif len(matches) > 1:
-            # Multiple matches - pick equipment-level nodes first, or the shortest name
-            equipment_matches = [m for m in matches if m.get("level") in ["equipment_unit", "equipment", "subunit", "maintainable_item"]]
-            if equipment_matches:
-                matches = equipment_matches
-            # Sort by name length and pick shortest (most specific match)
-            matches.sort(key=lambda x: len(x["name"]))
-            hierarchy_node = matches[0]
-            resolved_asset_name = matches[0]["name"]
+    if all_matches:
+        # Sort by score (highest first), then by subunit preference
+        all_matches.sort(key=lambda x: (x["score"], x["is_subunit"]), reverse=True)
+        best_match = all_matches[0]
+        hierarchy_node = best_match["node"]
+        resolved_asset_name = hierarchy_node["name"]
     
     if not hierarchy_node:
         # Asset not found in hierarchy - create threat anyway but flag it
