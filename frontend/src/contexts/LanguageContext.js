@@ -472,7 +472,7 @@ const en = {
   
   // Info dialog
   info: {
-    title: "PlantOS - Risk Methodology",
+    title: "AssetIQ - Risk Methodology",
     fmeaScoring: "Likelihood Scoring",
     fmeaDescription: "Likelihood Score is calculated using Failure Mode and Effects Analysis methodology:",
     formula: "Likelihood Score = (Severity × Occurrence × Detection) / 10",
@@ -1184,7 +1184,7 @@ const nl = {
   
   // Info dialog
   info: {
-    title: "PlantOS - Risicomethodologie",
+    title: "AssetIQ - Risicomethodologie",
     fmeaScoring: "Waarschijnlijkheidsscore",
     fmeaDescription: "Waarschijnlijkheidsscore wordt berekend met behulp van Failure Mode and Effects Analysis methodologie:",
     formula: "Waarschijnlijkheidsscore = (Ernst × Frequentie × Detectie) / 10",

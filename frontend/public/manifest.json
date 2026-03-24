@@ -1,6 +1,6 @@
 {
-  "name": "PlantOS",
-  "short_name": "PlantOS",
+  "name": "AssetIQ",
+  "short_name": "AssetIQ",
   "description": "AI-Powered Reliability Intelligence Platform",
   "start_url": "/",
   "display": "standalone",

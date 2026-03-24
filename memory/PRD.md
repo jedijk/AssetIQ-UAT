@@ -1,4 +1,4 @@
-# ReliabilityOS - AI-Powered Reliability Intelligence Platform
+# AssetIQ - AI-Powered Reliability Intelligence Platform
 
 ## Product Requirements Document (PRD)
 

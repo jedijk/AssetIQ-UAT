@@ -7015,25 +7015,25 @@ async def increment_strategy_version(
 # Document download endpoint
 @api_router.get("/download/documentation")
 async def download_documentation():
-    """Download the PlantOS Architecture & Cost Documentation"""
-    file_path = Path(__file__).parent.parent / "PlantOS_Architecture_Cost_Documentation.docx"
+    """Download the AssetIQ Architecture & Cost Documentation"""
+    file_path = Path(__file__).parent.parent / "AssetIQ_Architecture_Cost_Documentation.docx"
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Documentation file not found")
     return FileResponse(
         path=str(file_path),
-        filename="PlantOS_Architecture_Cost_Documentation.docx",
+        filename="AssetIQ_Architecture_Cost_Documentation.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
 
 @api_router.get("/download/functional-spec")
 async def download_functional_spec():
-    """Download the PlantOS Functional Specification Document"""
-    file_path = Path(__file__).parent.parent / "PlantOS_Functional_Specification.docx"
+    """Download the AssetIQ Functional Specification Document"""
+    file_path = Path(__file__).parent.parent / "AssetIQ_Functional_Specification.docx"
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Functional specification file not found")
     return FileResponse(
         path=str(file_path),
-        filename="PlantOS_Functional_Specification.docx",
+        filename="AssetIQ_Functional_Specification.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
 

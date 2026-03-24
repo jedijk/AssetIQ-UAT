@@ -3,7 +3,7 @@
  * Handles storing and syncing data when the app goes offline
  */
 
-const DB_NAME = 'PlantOS';
+const DB_NAME = 'AssetIQ';
 const DB_VERSION = 1;
 
 // Open IndexedDB connection
