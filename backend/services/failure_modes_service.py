@@ -467,19 +467,19 @@ class FailureModesService:
         return None
     
     async def delete(self, mode_id: str) -> bool:
-        """Delete a failure mode. Only custom modes can be deleted."""
+        """Delete a failure mode. Any failure mode can be deleted."""
         
         query = self._build_id_query(mode_id)
         if not query:
             return False
         
-        # Check if it's a built-in mode
+        # Check if exists
         existing = await self.collection.find_one(query)
         if not existing:
             return False
         
-        if existing.get("is_builtin") and not existing.get("is_custom"):
-            raise ValueError("Cannot delete built-in failure modes")
+        # Save version before deleting (for potential recovery via undo)
+        await self._save_version(existing, updated_by="System", change_reason="Deleted")
         
         result = await self.collection.delete_one(query)
         return result.deleted_count > 0

@@ -228,11 +228,9 @@ function FailureModeViewPanel({
               <Button size="sm" variant="outline" onClick={onStartEdit} data-testid="view-panel-edit-btn">
                 <Edit className="w-4 h-4 mr-1" /> {t("common.edit")}
               </Button>
-              {fm.is_custom && (
-                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => onDelete(fm.id)}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              )}
+              <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => onDelete(fm.id)} data-testid="view-panel-delete-btn">
+                <Trash2 className="w-4 h-4" />
+              </Button>
             </>
           ) : (
             <>
@@ -599,6 +597,9 @@ const FailureModesPage = () => {
   const [versionHistoryFmId, setVersionHistoryFmId] = useState(null);
   const [versions, setVersions] = useState([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
+  
+  // Delete confirmation state
+  const [deleteConfirmFm, setDeleteConfirmFm] = useState(null);
   
   const [newFm, setNewFm] = useState({
     category: "Rotating",
@@ -1164,7 +1165,10 @@ const FailureModesPage = () => {
                   onSave={handleSaveViewPanelEdit}
                   onCancel={handleCancelViewPanelEdit}
                   onClose={() => { setSelectedFm(null); setIsViewPanelEditing(false); setViewPanelForm(null); }}
-                  onDelete={(id) => { deleteFmMutation.mutate(id); setSelectedFm(null); }}
+                  onDelete={(id) => { 
+                    const fmToDelete = failureModes.find(fm => fm.id === id);
+                    setDeleteConfirmFm(fmToDelete);
+                  }}
                   onValidate={handleValidateFm}
                   onUnvalidate={handleUnvalidateFm}
                   onShowVersionHistory={handleShowVersionHistory}
@@ -1745,6 +1749,67 @@ const FailureModesPage = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowVersionHistory(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmFm} onOpenChange={() => setDeleteConfirmFm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              Delete Failure Mode
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this failure mode? This action can be undone using the global undo button.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {deleteConfirmFm && (
+            <div className="py-4">
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="flex items-center gap-3 mb-2">
+                  <Badge className={categoryColors[deleteConfirmFm.category] || "bg-slate-100"}>
+                    {deleteConfirmFm.category}
+                  </Badge>
+                  <span className={`font-bold ${
+                    deleteConfirmFm.severity * deleteConfirmFm.occurrence * deleteConfirmFm.detectability >= 200 
+                      ? 'text-red-600' : 'text-slate-700'
+                  }`}>
+                    RPN: {deleteConfirmFm.severity * deleteConfirmFm.occurrence * deleteConfirmFm.detectability}
+                  </span>
+                </div>
+                <h3 className="font-semibold text-slate-900">{deleteConfirmFm.failure_mode}</h3>
+                <p className="text-sm text-slate-500 mt-1">{deleteConfirmFm.equipment}</p>
+                {deleteConfirmFm.is_builtin && (
+                  <div className="mt-2 text-xs text-amber-600 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    This is a built-in failure mode
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmFm(null)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={() => {
+                if (deleteConfirmFm) {
+                  deleteFmMutation.mutate(deleteConfirmFm.id);
+                  setSelectedFm(null);
+                  setDeleteConfirmFm(null);
+                }
+              }}
+              disabled={deleteFmMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteFmMutation.isPending ? "Deleting..." : "Delete Failure Mode"}
             </Button>
           </DialogFooter>
         </DialogContent>
