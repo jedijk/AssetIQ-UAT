@@ -105,10 +105,10 @@ const Layout = () => {
     { path: "/library", label: t("nav.library"), icon: BookOpen },
   ];
 
-  // Settings menu items (including Tasks, Forms, AI Engine)
+  // Settings menu items (including Execution, Forms, AI Engine)
   const settingsMenuItems = [
     { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2 },
-    { path: "/tasks", label: "Tasks", icon: Calendar },
+    { path: "/tasks", label: "Execution", icon: Calendar },
     { path: "/forms", label: "Forms", icon: FileText },
     { path: "/decision-engine", label: "AI Engine", icon: Brain },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users },

@@ -6,6 +6,18 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Renamed "Task" to "Execution" Across App** (Mar 24, 2026):
+  - **Navigation Menu**: Settings dropdown now shows "Execution" instead of "Tasks"
+  - **Page Header**: "Execution" with subtitle "Manage maintenance execution and schedules"
+  - **Stats Cards**: "Total Executions", "Overdue Executions"
+  - **Tabs**: "Executions" tab (previously "Task Instances")
+  - **Table Headers**: "Execution" column
+  - **Toast Messages**: "Execution started", "Execution completed"
+  - **Dialogs**: "Complete Execution" dialog title
+  - **Analytics**: "Execution Compliance", "Overdue Executions"
+  - **Translations**: Updated EN/NL for task→execution (uitvoering)
+  - **Files Modified**: `Layout.js`, `TaskSchedulerPage.js`, `AnalyticsDashboardPage.js`, `LanguageContext.js`
+
 - **FMEA Recommended Actions Enhanced** (Mar 24, 2026):
   - **Discipline Field**: Added dropdown with options (Mechanical, Electrical, Instrumentation, Process, Civil/Structural, Operations)
   - **Action Type Field**: Added dropdown for PM (Preventive - blue), CM (Corrective - amber), PDM (Predictive - purple)

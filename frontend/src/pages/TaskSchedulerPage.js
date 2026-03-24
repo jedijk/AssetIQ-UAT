@@ -359,9 +359,9 @@ const TaskSchedulerPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(["task-instances"]);
       queryClient.invalidateQueries(["task-stats"]);
-      toast.success("Task started");
+      toast.success("Execution started");
     },
-    onError: () => toast.error("Failed to start task")
+    onError: () => toast.error("Failed to start execution")
   });
 
   const completeInstanceMutation = useMutation({
@@ -369,11 +369,11 @@ const TaskSchedulerPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(["task-instances"]);
       queryClient.invalidateQueries(["task-stats"]);
-      toast.success("Task completed");
+      toast.success("Execution completed");
       setShowCompleteDialog(false);
       setSelectedInstance(null);
     },
-    onError: () => toast.error("Failed to complete task")
+    onError: () => toast.error("Failed to complete execution")
   });
 
   const generateInstancesMutation = useMutation({
@@ -381,9 +381,9 @@ const TaskSchedulerPage = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries(["task-instances"]);
       queryClient.invalidateQueries(["task-stats"]);
-      toast.success(`Generated ${data.created || 0} new task instances`);
+      toast.success(`Generated ${data.created || 0} new executions`);
     },
-    onError: () => toast.error("Failed to generate instances")
+    onError: () => toast.error("Failed to generate executions")
   });
 
   const templates = templatesData?.templates || [];
@@ -446,8 +446,8 @@ const TaskSchedulerPage = () => {
             <Calendar className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Task Scheduler</h1>
-            <p className="text-sm text-slate-500">Manage maintenance tasks and schedules</p>
+            <h1 className="text-2xl font-bold text-slate-900">Execution</h1>
+            <p className="text-sm text-slate-500">Manage maintenance execution and schedules</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -458,7 +458,7 @@ const TaskSchedulerPage = () => {
             disabled={generateInstancesMutation.isPending}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${generateInstancesMutation.isPending ? "animate-spin" : ""}`} />
-            Generate Tasks
+            Generate Executions
           </Button>
           <Button size="sm" onClick={() => setShowTemplateDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />
@@ -477,7 +477,7 @@ const TaskSchedulerPage = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.total || 0}</p>
-                <p className="text-xs text-slate-500">Total Tasks</p>
+                <p className="text-xs text-slate-500">Total Executions</p>
               </div>
             </div>
           </CardContent>
@@ -542,7 +542,7 @@ const TaskSchedulerPage = () => {
           <TabsList>
             <TabsTrigger value="instances" className="gap-2">
               <ClipboardList className="w-4 h-4" />
-              Task Instances
+              Executions
             </TabsTrigger>
             <TabsTrigger value="plans" className="gap-2">
               <CalendarDays className="w-4 h-4" />
@@ -599,7 +599,7 @@ const TaskSchedulerPage = () => {
           </div>
         </div>
 
-        {/* Task Instances Tab */}
+        {/* Executions Tab */}
         <TabsContent value="instances">
           {instancesLoading ? (
             <div className="flex items-center justify-center py-12">
@@ -608,7 +608,7 @@ const TaskSchedulerPage = () => {
           ) : instances.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
               <ClipboardList className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p className="text-slate-500">No task instances found</p>
+              <p className="text-slate-500">No executions found</p>
               <Button variant="link" onClick={() => generateInstancesMutation.mutate()}>
                 Generate from plans
               </Button>
@@ -619,7 +619,7 @@ const TaskSchedulerPage = () => {
                 <table className="w-full">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">Task</th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">Execution</th>
                       <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">Equipment</th>
                       <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600 hidden md:table-cell">Scheduled</th>
                       <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">Status</th>
@@ -628,7 +628,7 @@ const TaskSchedulerPage = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {instances.map((instance) => (
-                      <tr key={instance.id} className="hover:bg-slate-50" data-testid={`task-instance-${instance.id}`}>
+                      <tr key={instance.id} className="hover:bg-slate-50" data-testid={`execution-instance-${instance.id}`}>
                         <td className="px-4 py-3">
                           <div className="font-medium text-slate-900">{instance.task_template_name}</div>
                           <div className="text-sm text-slate-500">{instance.task_plan_name}</div>
@@ -915,11 +915,11 @@ const TaskSchedulerPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Complete Task Dialog */}
+      {/* Complete Execution Dialog */}
       <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Complete Task</DialogTitle>
+            <DialogTitle>Complete Execution</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-slate-600">

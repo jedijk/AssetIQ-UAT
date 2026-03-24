@@ -269,19 +269,19 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
         />
       </div>
 
-      {/* Task Compliance Row */}
+      {/* Execution Compliance Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
-          title="Task Compliance"
+          title="Execution Compliance"
           value={`${taskCompliance?.compliance_rate || 100}%`}
-          subtitle={`${taskCompliance?.total_tasks || 0} tasks`}
+          subtitle={`${taskCompliance?.total_tasks || 0} executions`}
           icon={CheckCircle2}
           color="green"
           trend={taskCompliance?.compliance_rate >= 90 ? "up" : "down"}
           trendValue={taskCompliance?.compliance_rate >= 90 ? "On track" : "Below target"}
         />
         <StatCard
-          title="Overdue Tasks"
+          title="Overdue Executions"
           value={taskCompliance?.by_status?.overdue || 0}
           subtitle={`${taskCompliance?.overdue_rate || 0}% overdue rate`}
           icon={Clock}
@@ -290,7 +290,7 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
         <StatCard
           title="Issues Found Rate"
           value={`${taskCompliance?.issues_found_rate || 0}%`}
-          subtitle="During task execution"
+          subtitle="During execution"
           icon={Target}
           color="blue"
         />
