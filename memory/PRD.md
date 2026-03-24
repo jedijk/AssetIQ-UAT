@@ -6,15 +6,18 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
-- **Chat Failure Mode Matching Fix** (Mar 24, 2026):
-  - **Problem**: When user typed specific failure modes like "fouling", the system showed irrelevant equipment-based fallback suggestions instead of matching the actual failure mode.
-  - **Root Cause**: The code was using `user_has_vague_failure` flag to override matched results with equipment-type-based fallbacks.
-  - **Fix**: Improved scoring algorithm in `/app/backend/server.py`:
-    - Added higher priority scoring (50pts) for exact failure mode name matches
-    - Added keyword exact match bonus (30pts) for FMEA keywords
-    - Implemented confidence-based filtering: high (≥30), medium (≥10) scores
-    - Only falls back to equipment-type suggestions when no good matches exist
-  - **Result**: Typing "fouling" now shows only 3 relevant fouling options instead of generic pump failures.
+- **Chat Failure Mode Selection Loop Fixed** (Mar 24, 2026):
+  - **Problem 1**: When user typed specific failure modes like "fouling", system showed irrelevant equipment-based fallback suggestions.
+  - **Problem 2**: After selecting a failure mode, the chat would loop back asking for equipment/failure mode endlessly.
+  - **Root Cause**: 
+    1. `user_has_vague_failure` flag was overriding matched results with equipment-type fallbacks
+    2. No handler existed for when user clicks a failure mode suggestion button
+  - **Fixes Applied** (`/app/backend/server.py`):
+    1. Improved scoring: exact name match +50pts, keyword match +30pts, equipment boost +15pts
+    2. Confidence-based filtering: high (≥30pts), medium (≥10pts) thresholds
+    3. Added failure mode selection handler (lines 1092-1158) that detects "Failure mode: X" pattern from frontend
+    4. Handler extracts equipment context from conversation history and creates complete observation
+  - **Result**: Chat flow now completes correctly: report → select equipment → select failure mode → "Observation recorded"
 
 - **App Icon Updated** (Mar 24, 2026):
   - Generated new professional icon: gear/shield with checkmark on deep blue gradient

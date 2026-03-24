@@ -1089,8 +1089,75 @@ async def send_chat_message(
                 analysis["selected_equipment_id"] = selected_equipment_id
                 break
     
+    # Check if this is a FAILURE MODE selection response
+    # (user selecting from previous failure_mode_suggestions)
+    failure_mode_selected = False
+    last_fm_msg = None
+    for msg in recent_messages:
+        if msg.get("role") == "assistant" and msg.get("failure_mode_suggestions"):
+            last_fm_msg = msg
+            break
+    
+    if not equipment_selected and last_fm_msg and last_fm_msg.get("failure_mode_suggestions"):
+        message_lower = message.content.lower().strip()
+        
+        # Check for "Failure mode: X" pattern from frontend
+        if message_lower.startswith("failure mode:"):
+            selected_fm_name = message.content.split(":", 1)[1].strip()
+        else:
+            selected_fm_name = message.content.strip()
+        
+        selected_fm_name_lower = selected_fm_name.lower()
+        
+        for fm in last_fm_msg["failure_mode_suggestions"]:
+            fm_name = fm.get("failure_mode", "")
+            if fm_name.lower() == selected_fm_name_lower:
+                failure_mode_selected = True
+                
+                # Get threat data from conversation - check multiple sources
+                partial_data = last_fm_msg.get("partial_threat_data") or {}
+                pending_data = last_fm_msg.get("pending_threat_data") or {}
+                
+                # Try to find equipment info from the conversation history
+                # Look for the most recent message that had an equipment selection
+                selected_eq_name = None
+                selected_eq_id = None
+                for hist_msg in recent_messages:
+                    if hist_msg.get("role") == "user":
+                        # Check if this was an equipment selection (user clicking equipment button)
+                        user_content = hist_msg.get("content", "").lower()
+                        # Look for equipment patterns like "TEST_Full_Equip" or equipment names
+                        if "test_" in user_content or "equip" in user_content.lower():
+                            # This might be an equipment selection
+                            selected_eq_name = hist_msg.get("content", "Equipment")
+                            break
+                
+                # Use partial_data (from second flow) or pending_data (from first flow)
+                asset_name = partial_data.get("asset") or selected_eq_name or pending_data.get("failure_description", "Equipment")
+                equipment_id = partial_data.get("linked_equipment_id") or selected_eq_id
+                failure_desc = partial_data.get("failure_description") or pending_data.get("failure_description") or fm_name
+                
+                # Build the analysis with selected failure mode
+                analysis = {
+                    "complete": True,
+                    "threat": {
+                        "title": f"{asset_name} - {fm_name}",
+                        "asset": asset_name,
+                        "equipment_type": fm.get("equipment", "Equipment"),
+                        "failure_mode": fm_name,
+                        "impact": "Equipment Damage",
+                        "frequency": "First Time",
+                        "risk_score": min(100, int(fm.get("rpn", 100) / 10)),
+                        "risk_level": "High" if fm.get("rpn", 0) > 200 else "Medium",
+                        "recommended_actions": fm.get("recommended_actions", [])
+                    },
+                    "selected_equipment_id": equipment_id,
+                    "selected_failure_mode_id": fm.get("id")
+                }
+                break
+    
     # If no equipment was selected from suggestions, do normal analysis
-    if not equipment_selected:
+    if not equipment_selected and not failure_mode_selected:
         # Build context from recent messages
         context = ""
         if len(recent_messages) > 1:
