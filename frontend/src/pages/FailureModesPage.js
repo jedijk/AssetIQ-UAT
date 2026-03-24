@@ -717,7 +717,7 @@ const FailureModesPage = () => {
 
   const updateFmMutation = useMutation({
     mutationFn: ({ id, data, oldData }) => failureModesAPI.update(id, data).then(result => ({ result, id, data, oldData })),
-    onSuccess: ({ id, data, oldData }) => {
+    onSuccess: ({ result, id, data, oldData }) => {
       if (oldData) {
         pushUndo({
           type: "UPDATE_FAILURE_MODE",
@@ -739,8 +739,12 @@ const FailureModesPage = () => {
           },
         });
       }
+      // Update selectedFm with the new data including updated version
+      if (selectedFm && selectedFm.id === id && result) {
+        setSelectedFm(result);
+      }
       queryClient.invalidateQueries(["failureModes"]);
-      toast.success("Failure mode updated");
+      toast.success(`Failure mode updated (v${result?.version || '?'})`);
       setIsFmDialogOpen(false);
       setEditingFm(null);
       resetFmForm();
@@ -918,8 +922,7 @@ const FailureModesPage = () => {
         data: viewPanelForm,
         oldData: selectedFm 
       });
-      // Update local selected state
-      setSelectedFm({ ...selectedFm, ...viewPanelForm });
+      // Note: selectedFm will be updated in onSuccess with the new version
       setIsViewPanelEditing(false);
       setViewPanelForm(null);
     }
