@@ -5,7 +5,40 @@
 ### Original Problem Statement
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
-### Latest Update (Mar 23, 2026)
+### Latest Update (Mar 24, 2026)
+- **Phase 6 Complete: Analytics Dashboard & RBAC** (Mar 24, 2026):
+  - **Analytics Dashboard** (`/analytics`):
+    - Risk Overview: Total threats, critical risks, high risk EFMs, avg RPN
+    - Task Compliance: Compliance rate, overdue tasks, issues found rate
+    - Form Submissions: Total, warning/critical rates
+    - Top Risks by RPN: Equipment Failure Modes ranked by risk
+    - Failure Mode Pareto: Most observed failure modes with cumulative percentage
+    - Equipment Risk Ranking: Equipment by aggregated failure mode risk
+    - Detection Effectiveness: Effective vs ineffective tasks by detection rate
+    - Task Workload: 7-day calendar view of scheduled tasks
+    - Under-controlled risks, Over-maintained assets analysis
+  - **RBAC (Role-Based Access Control)** (`Settings → User Management`):
+    - 5 User Roles: Admin, Reliability Engineer, Maintenance, Operations, Viewer
+    - Role stats cards showing user distribution
+    - User table with name, email, role, department, last login, status
+    - Edit profile dialog (name, department, position, phone)
+    - Change role dialog with role descriptions
+    - Activate/Deactivate user functionality
+    - Role filtering and user search
+  - New files: `/app/backend/services/analytics_service.py`, `/app/backend/services/rbac_service.py`
+  - New pages: `AnalyticsDashboardPage.js`, `SettingsUserManagementPage.js`, `TaskSchedulerPage.js`
+  - 15+ new API endpoints for analytics and user management
+- **Phase 7 Started: Mobile & Offline PWA** (Mar 24, 2026):
+  - PWA manifest.json with app metadata and shortcuts
+  - Service worker for offline caching (static assets, API responses)
+  - Offline.html fallback page
+  - IndexedDB structure for pending observations and tasks
+  - Background sync registration for offline data submission
+- **Frontend Navigation Updated**:
+  - Added "Tasks" and "Analytics" tabs to main navigation
+  - Settings menu now leads to User Management (implemented) and Statistics (links to Analytics)
+
+### Previous Update (Mar 23, 2026)
 - **Phase 5 Complete: Decision Engine (Closed-Loop Learning)** (Mar 23, 2026):
   - **5 Built-in Rules**:
     1. **Task Frequency Adjustment**: Suggests increasing frequency when observation rate is high

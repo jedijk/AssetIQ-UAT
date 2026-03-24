@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -90,6 +90,8 @@ const Layout = () => {
     { path: "/threats", label: t("nav.threats"), icon: AlertTriangle },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
+    { path: "/tasks", label: "Tasks", icon: Calendar },
+    { path: "/analytics", label: "Analytics", icon: Activity },
     { path: "/library", label: t("nav.library"), icon: BookOpen },
   ];
 

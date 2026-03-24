@@ -14,6 +14,9 @@ import FailureModesPage from "./pages/FailureModesPage";
 import EquipmentManagerPage from "./pages/EquipmentManagerPage";
 import CausalEnginePage from "./pages/CausalEnginePage";
 import ActionsPage from "./pages/ActionsPage";
+import TaskSchedulerPage from "./pages/TaskSchedulerPage";
+import AnalyticsDashboardPage from "./pages/AnalyticsDashboardPage";
+import SettingsUserManagementPage from "./pages/SettingsUserManagementPage";
 import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
 import "@/App.css";
 
@@ -111,8 +114,10 @@ function App() {
                 <Route path="library" element={<FailureModesPage />} />
                 <Route path="equipment-manager" element={<EquipmentManagerPage />} />
                 <Route path="causal-engine" element={<CausalEnginePage />} />
-                <Route path="settings/user-management" element={<UnderDevelopmentPage />} />
-                <Route path="settings/statistics" element={<UnderDevelopmentPage />} />
+                <Route path="tasks" element={<TaskSchedulerPage />} />
+                <Route path="analytics" element={<AnalyticsDashboardPage />} />
+                <Route path="settings/user-management" element={<SettingsUserManagementPage />} />
+                <Route path="settings/statistics" element={<AnalyticsDashboardPage />} />
                 <Route path="settings/criticality-definitions" element={<UnderDevelopmentPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
