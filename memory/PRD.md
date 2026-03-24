@@ -6,6 +6,19 @@
 Build an AI-Powered Reliability Intelligence Platform named "ReliabilityOS" (formerly ThreatBase) that enables reliability engineers to capture failures via chat, have them automatically structured, and receive a clear prioritized risk decision.
 
 ### Latest Update (Mar 24, 2026)
+- **Task Scheduler Plans & Templates Delete Fixed** (Mar 24, 2026):
+  - **Problem**: Could not delete "Pump Seal Inspection" template - also couldn't delete plans.
+  - **Root Causes**:
+    1. Plan API endpoints were wrong (`/api/tasks/plans` → `/api/task-plans`)
+    2. Plan cards had no delete button
+    3. Template delete error message was generic, not showing actual reason
+  - **Fixes Applied** (`/app/frontend/src/pages/TaskSchedulerPage.js`):
+    - Fixed plan API endpoints: getPlans, createPlan, deletePlan
+    - Added 3-dot menu with "Delete Plan" option to plan cards
+    - Added `deletePlanMutation` with proper error handling
+    - Improved error messages to show backend error details
+  - **Result**: Can now delete plans first, then delete templates. Error messages are informative.
+
 - **Chat Equipment Type Storage Fixed** (Mar 24, 2026):
   - **Problem**: Observations were storing the equipment name (e.g., "strainer") as the equipment_type instead of the FMEA equipment type (e.g., "Heat Exchanger").
   - **Root Cause**: When creating observations from failure mode selection, the code wasn't using the FMEA's equipment type field.

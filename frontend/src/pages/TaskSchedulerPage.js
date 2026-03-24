@@ -98,7 +98,10 @@ const taskAPI = {
       method: "DELETE",
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
-    if (!response.ok) throw new Error("Failed to delete template");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Failed to delete template");
+    }
     return response.json();
   },
 
@@ -106,14 +109,14 @@ const taskAPI = {
   getPlans: async (params = {}) => {
     const queryParams = new URLSearchParams();
     if (params.equipment_id) queryParams.append("equipment_id", params.equipment_id);
-    const response = await fetch(`${API_BASE_URL}/api/tasks/plans?${queryParams}`, {
+    const response = await fetch(`${API_BASE_URL}/api/task-plans?${queryParams}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch plans");
     return response.json();
   },
   createPlan: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/api/tasks/plans`, {
+    const response = await fetch(`${API_BASE_URL}/api/task-plans`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -121,15 +124,21 @@ const taskAPI = {
       },
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error("Failed to create plan");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Failed to create plan");
+    }
     return response.json();
   },
   deletePlan: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/tasks/plans/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/task-plans/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
-    if (!response.ok) throw new Error("Failed to delete plan");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Failed to delete plan");
+    }
     return response.json();
   },
 
@@ -300,7 +309,17 @@ const TaskSchedulerPage = () => {
       queryClient.invalidateQueries(["task-templates"]);
       toast.success("Template deleted");
     },
-    onError: () => toast.error("Failed to delete template")
+    onError: (error) => toast.error(error.message || "Failed to delete template")
+  });
+
+  const deletePlanMutation = useMutation({
+    mutationFn: taskAPI.deletePlan,
+    onSuccess: () => {
+      queryClient.invalidateQueries(["task-plans"]);
+      queryClient.invalidateQueries(["task-templates"]);
+      toast.success("Plan deleted");
+    },
+    onError: (error) => toast.error(error.message || "Failed to delete plan")
   });
 
   const startInstanceMutation = useMutation({
@@ -633,12 +652,30 @@ const TaskSchedulerPage = () => {
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle className="text-base">{plan.name}</CardTitle>
+                        <CardTitle className="text-base">{plan.task_template_name || plan.name}</CardTitle>
                         <CardDescription>{plan.equipment_name}</CardDescription>
                       </div>
-                      <Badge className={plan.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}>
-                        {plan.is_active ? "Active" : "Inactive"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={plan.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}>
+                          {plan.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                              className="text-red-600"
+                              onClick={() => deletePlanMutation.mutate(plan.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Plan
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
