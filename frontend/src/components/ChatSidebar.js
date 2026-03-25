@@ -86,12 +86,22 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     },
   });
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom when chat opens (instant) and on new messages (smooth)
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && messagesEndRef.current) {
+      // Use setTimeout to ensure DOM has rendered
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      }, 100);
+    }
+  }, [isOpen]);
+
+  // Scroll to bottom smoothly on new messages
+  useEffect(() => {
+    if (isOpen && messages.length > 0) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isOpen]);
+  }, [messages]);
 
   // Handle send
   const handleSend = () => {
