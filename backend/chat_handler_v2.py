@@ -245,15 +245,47 @@ async def process_chat_message(
         
         # Check if user selected one of the suggested equipment
         message_normalized = normalize_text(message_content)
+        # Also handle "NAME (TAG)" format from frontend
+        message_without_tag = re.sub(r'\s*\([^)]*\)\s*$', '', message_content).strip()
+        message_without_tag_normalized = normalize_text(message_without_tag)
+        
         selected_equipment = None
         
+        # First pass: Look for EXACT matches only
         for eq in prev_suggestions:
-            eq_name_normalized = normalize_text(eq.get("name", ""))
-            if eq_name_normalized and (eq_name_normalized == message_normalized or 
-                                       eq_name_normalized in message_normalized or 
-                                       message_normalized in eq_name_normalized):
+            eq_name = eq.get("name", "")
+            eq_name_normalized = normalize_text(eq_name)
+            eq_tag = eq.get("tag", "")
+            
+            # Build possible match strings
+            eq_with_tag = f"{eq_name} ({eq_tag})" if eq_tag else eq_name
+            eq_with_tag_normalized = normalize_text(eq_with_tag)
+            
+            # Exact match check
+            if eq_name_normalized and (
+                eq_name_normalized == message_normalized or
+                eq_name_normalized == message_without_tag_normalized or
+                eq_with_tag_normalized == message_normalized
+            ):
                 selected_equipment = eq
+                logger.info(f"Equipment EXACT matched: {eq_name} from message: {message_content}")
                 break
+        
+        # Second pass: If no exact match, try partial matches (longer matches first)
+        if not selected_equipment:
+            # Sort by name length descending to prefer more specific matches
+            sorted_suggestions = sorted(prev_suggestions, key=lambda x: len(x.get("name", "")), reverse=True)
+            for eq in sorted_suggestions:
+                eq_name = eq.get("name", "")
+                eq_name_normalized = normalize_text(eq_name)
+                
+                if eq_name_normalized and len(eq_name_normalized) >= 3:
+                    # Check partial match
+                    if (eq_name_normalized in message_normalized or
+                        message_without_tag_normalized in eq_name_normalized):
+                        selected_equipment = eq
+                        logger.info(f"Equipment PARTIAL matched: {eq_name} from message: {message_content}")
+                        break
         
         if selected_equipment:
             # Equipment selected! Now search for failure modes
@@ -403,19 +435,28 @@ async def process_chat_message(
         prev_suggestions = conv_state.get("failure_mode_suggestions", [])
         
         # Check if user selected one of the suggested failure modes
-        message_normalized = normalize_text(message_content)
-        # Also handle "Failure mode: X" pattern from frontend buttons
-        if message_normalized.startswith("failure mode:"):
-            message_normalized = normalize_text(message_content.split(":", 1)[1])
+        message_text = message_content
+        # Handle "Failure mode: X" pattern from frontend buttons
+        if message_text.lower().startswith("failure mode:"):
+            message_text = message_text.split(":", 1)[1].strip()
+        
+        message_normalized = normalize_text(message_text)
+        logger.info(f"Looking for failure mode match: '{message_text}' (normalized: '{message_normalized}')")
         
         selected_fm = None
         
         for fm in prev_suggestions:
-            fm_name_normalized = normalize_text(fm.get("failure_mode", ""))
-            if fm_name_normalized and (fm_name_normalized == message_normalized or
-                                       fm_name_normalized in message_normalized or
-                                       message_normalized in fm_name_normalized):
+            fm_name = fm.get("failure_mode", "")
+            fm_name_normalized = normalize_text(fm_name)
+            logger.info(f"  Checking FM: '{fm_name}' (normalized: '{fm_name_normalized}')")
+            
+            if fm_name_normalized and (
+                fm_name_normalized == message_normalized or
+                fm_name_normalized in message_normalized or
+                message_normalized in fm_name_normalized
+            ):
                 selected_fm = fm
+                logger.info(f"  -> MATCHED!")
                 break
         
         if selected_fm:
