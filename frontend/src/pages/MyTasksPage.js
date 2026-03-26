@@ -31,6 +31,8 @@ import {
   Zap,
   Target,
   Eye,
+  User,
+  Users,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -72,6 +74,7 @@ const myTasksAPI = {
     if (params.date) queryParams.append("date", params.date);
     if (params.equipment_id) queryParams.append("equipment_id", params.equipment_id);
     if (params.status) queryParams.append("status", params.status);
+    if (params.assignee) queryParams.append("assignee", params.assignee);
     
     const response = await fetch(`${API_BASE_URL}/api/my-tasks?${queryParams}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -799,14 +802,16 @@ const MyTasksPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
   const [executionDialogOpen, setExecutionDialogOpen] = useState(false);
+  const [selectedAssignee, setSelectedAssignee] = useState("");
   
   // Fetch tasks
   const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useQuery({
-    queryKey: ["my-tasks", activeFilter, selectedDate, selectedEquipment],
+    queryKey: ["my-tasks", activeFilter, selectedDate, selectedEquipment, selectedAssignee],
     queryFn: () => myTasksAPI.getTasks({
       filter: activeFilter,
       date: activeFilter === "today" ? format(selectedDate, "yyyy-MM-dd") : undefined,
       equipment_id: selectedEquipment || undefined,
+      assignee: selectedAssignee || undefined,
     }),
     refetchInterval: 30000, // Refresh every 30 seconds
   });
@@ -815,6 +820,18 @@ const MyTasksPage = () => {
   const { data: equipmentData } = useQuery({
     queryKey: ["equipment-list"],
     queryFn: myTasksAPI.getEquipmentList,
+  });
+  
+  // Fetch users list for assignee filter
+  const { data: usersData } = useQuery({
+    queryKey: ["users-list"],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE_URL}/api/rbac/users`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (!response.ok) throw new Error("Failed to fetch users");
+      return response.json();
+    },
   });
   
   // Complete task mutation
@@ -938,6 +955,22 @@ const MyTasksPage = () => {
             {equipment.map((eq) => (
               <SelectItem key={eq.id} value={eq.id}>
                 {eq.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        {/* Assignee Filter */}
+        <Select value={selectedAssignee || "all"} onValueChange={(v) => setSelectedAssignee(v === "all" ? "" : v)}>
+          <SelectTrigger className="w-full sm:w-[180px]" data-testid="assignee-filter">
+            <User className="w-4 h-4 mr-2 text-slate-400" />
+            <SelectValue placeholder="All Assignees" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Assignees</SelectItem>
+            {(usersData?.users || []).map((user) => (
+              <SelectItem key={user.id} value={user.name || user.email}>
+                {user.name || user.email}
               </SelectItem>
             ))}
           </SelectContent>
