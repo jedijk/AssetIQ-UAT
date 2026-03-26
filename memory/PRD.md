@@ -1,109 +1,91 @@
 # ThreatBase - AI-Powered Threat Capture & Prioritization Platform
 
 ## Original Problem Statement
-Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" with:
-- User authentication
-- Chat-based threat capture system
-- Risk prioritization
-- Equipment Hierarchy FMEA Library
-- Causal Engine
+Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" (now AssetIQ). Includes user auth, chat-based threat capture, risk prioritization, Equipment Hierarchy FMEA Library, and Causal Engine.
 
-## Core Architecture
-```
-/app/
-├── backend/
-│   ├── server.py               # Slim entry point (39 lines)
-│   ├── database.py             # DB connection
-│   ├── auth.py                 # Auth utilities
-│   ├── ai_helpers.py           # AI/LLM helpers (GPT-5.2, Whisper)
-│   ├── models/                 # Pydantic models (api_models.py)
-│   ├── routes/                 # 16 Extracted API routes
-│   ├── services/               # Core services (ai, rbac, etc.)
-│   └── failure_modes.py        # FMEA static definitions library
-├── frontend/
-│   └── src/
-│       ├── App.js                  
-│       ├── components/         # Reusable UI components
-│       ├── contexts/           # Auth, Language contexts
-│       └── pages/              # Page components (needs segmentation)
-└── memory/
-    └── PRD.md                    
-```
+## Architecture
+- **Frontend**: React + Shadcn UI + TanStack Query + Framer Motion
+- **Backend**: FastAPI + Motor (async MongoDB)
+- **Database**: MongoDB
+- **AI**: GPT-5.2 via Emergent LLM Key (risk analysis, causal analysis, chat)
 
 ## What's Been Implemented
 
-### ✅ Completed Features
-- [x] User Authentication (JWT-based)
-- [x] Dashboard with analytics
-- [x] Observations/Threats management with risk scoring
-- [x] Equipment Hierarchy Manager (Tree + Levels view)
-- [x] FMEA Library with structured recommended_actions (CM/PM/PDM + disciplines)
-- [x] Chat-based threat capture (2-step flow: equipment → failure mode)
-- [x] Voice input with Whisper (auto-language detection - Dutch/English)
-- [x] Causal Engine for investigations
-- [x] Actions management
-- [x] Backend modular architecture (16 route files)
+### Core Features (Complete)
+- User Authentication (JWT)
+- Chat-based Threat Capture with voice/image support
+- Risk Prioritization (FMEA scoring, RPN, AI-powered)
+- Equipment Hierarchy Manager with drag-and-drop
+- FMEA Failure Mode Library with recommended actions
+- Causal Engine for root cause investigations
+- AI Risk Insights (GPT-5.2)
+- Causal Intelligence Analysis
+- Action Tracker with central management
+- Decision Engine with automated rules
+- Form Designer
+- Task/Execution Scheduler
+- Analytics Dashboard
+- Reliability Performance tracking
+- Multi-language support (EN/NL)
+- Mobile-responsive UI
 
-### 🔧 Recent Changes (March 26, 2026)
-- **FIXED**: Post-Login Redirect Bug (Recurring 5x) - Users now correctly land on their intended page after login. Implemented `location.state` to preserve the original URL during redirect to login.
-- **NEW**: Frontend Code Segmentation - Major refactoring completed:
-  - **ThreatDetailPage.js**: 1738 → 1304 lines (25% reduction)
-    - `RecommendedActionsSection.jsx` (326 lines)
-    - `RiskScoreCard.jsx` (198 lines)
-    - `ThreatHeader.jsx` (177 lines)
-  - **FailureModesPage.js**: 1964 → 1411 lines (28% reduction)
-    - `FailureModeViewPanel.jsx` (581 lines)
-    - `EquipmentTypeItem.jsx` (46 lines)
-- **NEW**: Add Recommended Action with Type & Discipline - Users can now manually add recommended actions to observations with `action_type` (CM/PM/PDM) and `discipline` fields. New "Add Recommendation" button in ThreatDetailPage with full form dialog including live preview.
-- **NEW**: AI Risk Analysis now generates structured recommendations with `action_type` (CM/PM/PDM) and `discipline` fields. Updated AI prompts and frontend panel to display badges and discipline tags.
-- Removed "Create Action" button from Recommended Actions section (redundant with "Act" buttons on each action)
-- Fixed voice chat to support Dutch via auto-language detection (removed hardcoded `language="en"`)
-- Fixed chat "Failed to send message" bug - `NoneType` iteration error in chat_handler_v2.py when suggestions were None
-- Fixed chat 2-step flow bug - `ThreatResponse` Pydantic model now accepts structured `recommended_actions` dicts
-- Created mobile frontend at `/mobile` route with LinkedIn-style bottom navigation (Hierarchy, Observations, Report, Actions, Alerts)
-- Updated mobile frontend to match desktop light theme (white backgrounds, blue accents, card layouts)
-- Added Risk Score and RPN display to Actions page with filtering capability
-- Backend fully refactored from monolithic server.py to modular routes
+### Structured Recommended Actions
+All recommended actions (manual, FMEA library, AI-generated) use structured format:
+- `action` (string): Action description
+- `action_type` (CM/PM/PDM): Corrective/Preventive/Predictive Maintenance
+- `discipline` (string): e.g., Mechanical, Electrical
 
-## Pending Items
+## Completed in This Session (Mar 26, 2026)
 
-### P1 - High Priority
-- [ ] Frontend Code Segmentation (FailureModesPage.js ~1964 lines, ThreatDetailPage.js ~1508 lines)
-- [ ] Multi-Language Translations (Dutch/English - currently hardcoded English)
+### Bug Fix
+- **Fixed "Objects not valid as React child" error**: `CausalIntelligencePanel.jsx` was rendering structured `{action, action_type, discipline}` objects directly in JSX. Fixed to extract `.action` property for display.
+- **Fixed `handleAddRecommendation` in CausalIntelligencePanel**: Was passing entire action object as description string to investigation actions.
 
-### P2 - Medium Priority  
-- [ ] Post-Login Redirect Bug (deep-linking broken)
-- [ ] Image analysis for damage detection
-- [ ] Report generation (PowerPoint/PDF) for Causal Investigations
+### Backend Route Deduplication
+- Removed duplicate `/actions` endpoints from `routes/investigations.py` (canonical endpoints remain in `routes/actions.py`)
+- Fixed unused import lint errors in `investigations.py`
 
-### P3 - Future/Backlog
-- [ ] Export equipment hierarchy to PDF/Excel
-- [ ] Bulk criticality assignment for equipment
+### Multi-Language Translations (EN/NL)
+Added translation keys and wrapped hardcoded English strings with `t()` calls:
+- `TaskSchedulerPage.js` — 0 hardcoded remaining (was 73)
+- `ChatPage.js` — Added `useLanguage`, translated all strings
+- `ActionsPage.js` — Translated dialog labels, buttons, filters
+- `FormsPage.js` — Translated form designer labels
+- `DecisionEnginePage.js` — Translated filters, labels
+- `AnalyticsDashboardPage.js` — Translated chart descriptions, filters
+- `SettingsUserManagementPage.js` — Translated user management labels
 
-## Key Technical Details
+### Frontend Code Segmentation
+Extracted large components into modular files:
+- **TaskSchedulerPage** (1361→992 lines, -27%):
+  - `/components/task-scheduler/TemplateDialog.js`
+  - `/components/task-scheduler/PlanDialog.js`
+  - `/components/task-scheduler/ExecutionDialogs.js`
+- **EquipmentManagerPage** (1141→904 lines, -21%):
+  - `/components/equipment/PropertiesPanel.js`
+- **CausalEnginePage** (1054→1001 lines, -5%):
+  - `/components/causal-engine/InvestigationDialogs.js`
 
-### Database Schema (MongoDB)
-- `failure_modes`: `{_id, failure_mode, category, equipment, recommended_actions: [{action, action_type, discipline}]}`
-- `chat_messages`: Chat state and history
-- `threats`: Main observations with risk scores
-- `equipment`: Hierarchical equipment structure
-- `users`: User accounts
+## Prioritized Backlog
 
-### 3rd Party Integrations
-- OpenAI GPT-5.2 (Chat logic & Risk Analysis) — Emergent LLM Key
-- OpenAI Whisper (Voice transcription) — Emergent LLM Key
+### P1 (High Priority)
+- Image analysis for damage detection
+- Report generation (PowerPoint/PDF) for Causal Investigations
 
-### Test Credentials
-- Email: `test@test.com`
-- Password: `test`
+### P2 (Medium Priority)
+- Export equipment hierarchy to PDF/Excel
+- Bulk criticality assignment for equipment
+- Complete remaining multi-language coverage (CausalEnginePage, ReliabilityPerformancePage still have some hardcoded strings)
 
-### Key API Endpoints
-- `POST /api/chat/send` - Send chat message
-- `POST /api/voice/transcribe` - Voice to text
-- `GET/PATCH /api/failure-modes` - FMEA library CRUD
-- `GET/POST /api/threats` - Observations CRUD
-- `GET/POST /api/equipment` - Equipment hierarchy
+### P3 (Low Priority)
+- Further frontend segmentation of remaining large pages
+- Additional analytics and reporting features
 
-## Known Issues
-1. **Post-Login Redirect** - Users not redirected to originally requested URL after login
-2. **Hardcoded Translations** - Pages contain English text instead of using LanguageContext
+## Key Database Collections
+- `users`, `threats`, `central_actions`, `equipment_nodes`, `equipment_types`
+- `investigations`, `task_templates`, `execution_plans`, `task_instances`
+- `form_templates`, `form_submissions`, `decision_rules`, `decision_suggestions`
+- `failure_modes` (in failure_modes_db)
+
+## Test Credentials
+- Email: test@test.com / Password: test

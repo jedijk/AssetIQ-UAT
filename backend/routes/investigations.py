@@ -4,7 +4,6 @@ Investigations routes.
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Header, Response
-from typing import List, Optional
 from datetime import datetime, timezone
 import uuid
 import logging

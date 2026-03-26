@@ -143,7 +143,7 @@ const CauseCard = ({ cause, index, t }) => {
                     {cause.mitigation_actions.map((action, idx) => (
                       <li key={idx} className="text-xs text-slate-600 flex items-start gap-1.5">
                         <Wrench className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                        {action}
+                        {typeof action === 'string' ? action : action.action || JSON.stringify(action)}
                       </li>
                     ))}
                   </ul>
@@ -222,8 +222,9 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
       if (recommendedActions.length > 0) {
         for (let i = 0; i < recommendedActions.length; i++) {
           const action = recommendedActions[i];
+          const actionText = typeof action === 'string' ? action : action.action || '';
           await investigationAPI.createAction(investigation.id, {
-            description: action,
+            description: actionText,
             owner: "",
             priority: i === 0 ? "high" : "medium",
             due_date: "",
