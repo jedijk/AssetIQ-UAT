@@ -45,6 +45,7 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - [x] Backend modular architecture (16 route files)
 
 ### 🔧 Recent Changes (March 26, 2026)
+- **NEW**: Add Recommended Action with Type & Discipline - Users can now manually add recommended actions to observations with `action_type` (CM/PM/PDM) and `discipline` fields. New "Add Recommendation" button in ThreatDetailPage with full form dialog including live preview.
 - Fixed voice chat to support Dutch via auto-language detection (removed hardcoded `language="en"`)
 - Fixed chat "Failed to send message" bug - `NoneType` iteration error in chat_handler_v2.py when suggestions were None
 - Fixed chat 2-step flow bug - `ThreatResponse` Pydantic model now accepts structured `recommended_actions` dicts

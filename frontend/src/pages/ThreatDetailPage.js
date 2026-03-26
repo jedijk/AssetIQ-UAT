@@ -98,6 +98,14 @@ const ThreatDetailPage = () => {
     due_date: "",
   });
 
+  // State for adding recommended action to the threat
+  const [showAddRecommendedDialog, setShowAddRecommendedDialog] = useState(false);
+  const [newRecommendedAction, setNewRecommendedAction] = useState({
+    action: "",
+    action_type: "",
+    discipline: "",
+  });
+
   // Image viewer state
   const [selectedImage, setSelectedImage] = useState(null);
 
@@ -362,6 +370,33 @@ const ThreatDetailPage = () => {
       return;
     }
     createActionMutation.mutate(newActionForm);
+  };
+
+  // Add recommended action to threat mutation
+  const addRecommendedActionMutation = useMutation({
+    mutationFn: (newAction) => {
+      const currentActions = threat?.recommended_actions || [];
+      const updatedActions = [...currentActions, newAction];
+      return threatsAPI.update(id, { recommended_actions: updatedActions });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["threat", id] });
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      toast.success("Recommended action added!");
+      setShowAddRecommendedDialog(false);
+      setNewRecommendedAction({ action: "", action_type: "", discipline: "" });
+    },
+    onError: () => {
+      toast.error("Failed to add recommended action");
+    },
+  });
+
+  const handleAddRecommendedAction = () => {
+    if (!newRecommendedAction.action.trim()) {
+      toast.error("Please enter an action description");
+      return;
+    }
+    addRecommendedActionMutation.mutate(newRecommendedAction);
   };
 
   // Link equipment mutation
@@ -1358,16 +1393,28 @@ const ThreatDetailPage = () => {
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAddActionDialog(true)}
-            className="text-blue-600 border-blue-200 hover:bg-blue-50"
-            data-testid="add-action-button"
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            Add Action
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddRecommendedDialog(true)}
+              className="text-green-600 border-green-200 hover:bg-green-50"
+              data-testid="add-recommended-action-button"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add Recommendation
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddActionDialog(true)}
+              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              data-testid="add-action-button"
+            >
+              <ClipboardList className="w-4 h-4 mr-1" />
+              Create Action
+            </Button>
+          </div>
         </div>
         <div className="space-y-3">
           {threat.recommended_actions.map((action, idx) => {
@@ -1539,6 +1586,146 @@ const ThreatDetailPage = () => {
                 <Plus className="w-4 h-4 mr-2" />
               )}
               Create Action
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Recommended Action Dialog */}
+      <Dialog open={showAddRecommendedDialog} onOpenChange={setShowAddRecommendedDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-green-600" />
+              Add Recommended Action
+            </DialogTitle>
+            <DialogDescription>
+              Add a maintenance recommendation to this observation. Specify the action type and discipline.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rec-action-text">Action Description *</Label>
+              <Textarea
+                id="rec-action-text"
+                value={newRecommendedAction.action}
+                onChange={(e) => setNewRecommendedAction({ ...newRecommendedAction, action: e.target.value })}
+                placeholder="e.g., Replace worn seals and inspect shaft alignment"
+                rows={3}
+                data-testid="rec-action-text-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="rec-action-type">Action Type *</Label>
+                <Select
+                  value={newRecommendedAction.action_type}
+                  onValueChange={(v) => setNewRecommendedAction({ ...newRecommendedAction, action_type: v })}
+                >
+                  <SelectTrigger data-testid="rec-action-type-select">
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CM">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        CM - Corrective
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="PM">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        PM - Preventive
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="PDM">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-500" />
+                        PDM - Predictive
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rec-action-discipline">Discipline *</Label>
+                <Select
+                  value={newRecommendedAction.discipline}
+                  onValueChange={(v) => setNewRecommendedAction({ ...newRecommendedAction, discipline: v })}
+                >
+                  <SelectTrigger data-testid="rec-action-discipline-select">
+                    <SelectValue placeholder="Select discipline..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Mechanical">Mechanical</SelectItem>
+                    <SelectItem value="Electrical">Electrical</SelectItem>
+                    <SelectItem value="Instrumentation">Instrumentation</SelectItem>
+                    <SelectItem value="Process">Process</SelectItem>
+                    <SelectItem value="Civil/Structural">Civil/Structural</SelectItem>
+                    <SelectItem value="Rotating Equipment">Rotating Equipment</SelectItem>
+                    <SelectItem value="Static Equipment">Static Equipment</SelectItem>
+                    <SelectItem value="Piping">Piping</SelectItem>
+                    <SelectItem value="Safety">Safety</SelectItem>
+                    <SelectItem value="Operations">Operations</SelectItem>
+                    <SelectItem value="Multi-discipline">Multi-discipline</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {/* Preview */}
+            {newRecommendedAction.action && (
+              <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="text-xs text-slate-500 mb-2">Preview:</div>
+                <div className="flex items-start gap-3">
+                  {newRecommendedAction.action_type && (
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold ${
+                      newRecommendedAction.action_type === 'CM' ? 'bg-amber-500' :
+                      newRecommendedAction.action_type === 'PM' ? 'bg-blue-500' :
+                      newRecommendedAction.action_type === 'PDM' ? 'bg-purple-500' : 'bg-slate-500'
+                    }`}>
+                      {newRecommendedAction.action_type}
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    {newRecommendedAction.discipline && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium mb-1">
+                        {newRecommendedAction.discipline}
+                      </span>
+                    )}
+                    <p className="text-sm text-slate-700">{newRecommendedAction.action}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddRecommendedDialog(false);
+                setNewRecommendedAction({ action: "", action_type: "", discipline: "" });
+              }}
+              data-testid="cancel-rec-action-button"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddRecommendedAction}
+              disabled={
+                addRecommendedActionMutation.isPending || 
+                !newRecommendedAction.action.trim() ||
+                !newRecommendedAction.action_type ||
+                !newRecommendedAction.discipline
+              }
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="save-rec-action-button"
+            >
+              {addRecommendedActionMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}
+              Add Recommendation
             </Button>
           </DialogFooter>
         </DialogContent>
