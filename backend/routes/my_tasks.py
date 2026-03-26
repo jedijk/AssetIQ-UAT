@@ -36,13 +36,70 @@ def serialize_task(task: dict) -> dict:
         "is_recurring": task.get("is_recurring", False),
         "frequency": task.get("frequency_display", ""),
         "source": task.get("source", "manual"),
+        "source_type": task.get("source_type", "task"),  # 'task' or 'action'
         "assigned_user_id": str(task.get("assigned_user_id", "")) if task.get("assigned_user_id") else None,
         "assigned_team": task.get("assigned_team", ""),
+        "assignee": task.get("assignee", ""),
         "last_completed": task.get("last_completed").isoformat() if task.get("last_completed") else None,
         "form_fields": task.get("form_fields", []),
         "template": task.get("template", {}),
         "estimated_duration_minutes": task.get("estimated_duration_minutes"),
         "can_quick_complete": not task.get("form_fields") and not task.get("template", {}).get("form_fields"),
+        "action_type": task.get("action_type"),  # CM/PM/PDM for actions
+    }
+    
+    return result
+
+
+def serialize_action_as_task(action: dict) -> dict:
+    """Serialize a central action as a task item for the My Tasks list."""
+    if not action:
+        return None
+    
+    # Parse due_date if it's a string
+    due_date = action.get("due_date")
+    if due_date and isinstance(due_date, str):
+        try:
+            due_date = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+        except (ValueError, TypeError):
+            due_date = None
+    
+    # Map action status to task-like status
+    status_map = {
+        "open": "planned",
+        "in_progress": "in_progress",
+        "completed": "completed",
+    }
+    
+    result = {
+        "id": action.get("id", ""),
+        "title": action.get("title", "Untitled Action"),
+        "description": action.get("description", ""),
+        "status": status_map.get(action.get("status", "open"), "planned"),
+        "priority": action.get("priority", "medium"),
+        "due_date": due_date.isoformat() if due_date else None,
+        "scheduled_date": None,
+        "equipment_id": None,
+        "equipment_name": action.get("source_name", ""),  # Use source name as context
+        "asset": action.get("source_name", ""),
+        "mitigation_strategy": action.get("action_type", "corrective"),  # CM/PM/PDM
+        "type": action.get("action_type", "corrective"),
+        "discipline": action.get("discipline", ""),
+        "is_recurring": False,
+        "frequency": "",
+        "source": action.get("source_type", "observation"),  # 'threat' or 'investigation'
+        "source_type": "action",  # Mark as action, not task
+        "source_id": action.get("source_id", ""),
+        "assigned_user_id": None,
+        "assigned_team": "",
+        "assignee": action.get("assignee", ""),
+        "last_completed": None,
+        "form_fields": [],
+        "template": {},
+        "estimated_duration_minutes": None,
+        "can_quick_complete": True,  # Actions can be quick completed
+        "action_type": action.get("action_type"),  # CM/PM/PDM
+        "comments": action.get("comments", ""),
     }
     
     return result
@@ -189,7 +246,68 @@ async def get_my_tasks(
         else:
             task["source"] = "manual"
         
+        task["source_type"] = "task"  # Mark as task instance
         tasks.append(serialize_task(task))
+    
+    # ============================================
+    # FETCH OPEN ACTIONS FROM CENTRAL_ACTIONS
+    # ============================================
+    # Only include actions for non-recurring filter (actions are not recurring)
+    if filter != "recurring":
+        action_query = {
+            "created_by": user_id,
+            "status": {"$in": ["open", "in_progress"]}
+        }
+        
+        # Apply date filter for actions
+        if filter == "today":
+            today_str = today_start.isoformat()
+            tomorrow_str = today_end.isoformat()
+            action_query["$or"] = [
+                {"due_date": {"$gte": today_str, "$lt": tomorrow_str}},
+                {"due_date": None},  # Include actions without due date
+                {"due_date": ""},
+            ]
+        elif filter == "overdue":
+            now_str = now.isoformat()
+            action_query["$and"] = [
+                {"due_date": {"$lt": now_str}},
+                {"due_date": {"$ne": None}},
+                {"due_date": {"$ne": ""}}
+            ]
+        # For 'adhoc' and 'all', include all open actions
+        
+        actions_cursor = db.central_actions.find(action_query, {"_id": 0})
+        async for action in actions_cursor:
+            tasks.append(serialize_action_as_task(action))
+    
+    # Sort combined list: Overdue -> High Priority -> Due Soon
+    def sort_key(item):
+        # Status priority: overdue/in_progress first
+        status_order = {"overdue": 0, "in_progress": 1, "planned": 2, "scheduled": 2}
+        status_val = status_order.get(item.get("status", "planned"), 2)
+        
+        # Priority order
+        priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        priority_val = priority_order.get(item.get("priority", "medium"), 2)
+        
+        # Due date (items with due date come before those without)
+        due_date = item.get("due_date")
+        if due_date:
+            try:
+                due_dt = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+                # Check if overdue
+                if due_dt < now:
+                    status_val = 0  # Treat as overdue
+                due_val = due_dt.timestamp()
+            except (ValueError, TypeError):
+                due_val = float('inf')
+        else:
+            due_val = float('inf')
+        
+        return (status_val, priority_val, due_val)
+    
+    tasks.sort(key=sort_key)
     
     return {
         "tasks": tasks,
@@ -301,3 +419,66 @@ async def start_my_task(
             updated_task["equipment_name"] = equipment.get("name", "Unknown")
     
     return serialize_task(updated_task)
+
+
+@router.post("/my-tasks/action/{action_id}/complete")
+async def complete_my_action(
+    action_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Mark an action as completed from My Tasks."""
+    user_id = current_user["id"]
+    
+    # Find the action
+    action = await db.central_actions.find_one({"id": action_id, "created_by": user_id})
+    
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    
+    # Update action status
+    now = datetime.now(timezone.utc)
+    await db.central_actions.update_one(
+        {"id": action_id},
+        {
+            "$set": {
+                "status": "completed",
+                "completed_at": now.isoformat(),
+                "completed_by": user_id,
+                "updated_at": now.isoformat(),
+            }
+        }
+    )
+    
+    return {"success": True, "message": "Action completed successfully"}
+
+
+@router.post("/my-tasks/action/{action_id}/start")
+async def start_my_action(
+    action_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Mark an action as in-progress from My Tasks."""
+    user_id = current_user["id"]
+    
+    # Find the action
+    action = await db.central_actions.find_one({"id": action_id, "created_by": user_id})
+    
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    
+    # Update action status
+    now = datetime.now(timezone.utc)
+    await db.central_actions.update_one(
+        {"id": action_id},
+        {
+            "$set": {
+                "status": "in_progress",
+                "started_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+        }
+    )
+    
+    # Return updated action
+    updated_action = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
+    return serialize_action_as_task(updated_action)

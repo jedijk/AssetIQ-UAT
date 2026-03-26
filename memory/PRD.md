@@ -44,6 +44,8 @@ Implemented a comprehensive mobile-first task execution interface per the functi
 - Header with Equipment filter, Date picker, and Search
 - Quick filter tabs: Today, Overdue, Recurring, Adhoc
 - Task cards showing: Title, Equipment, Task Type, Priority, Due Time, Recurring indicator, Source
+- **Open Actions integrated** - Shows actions from central_actions alongside task instances
+- Action cards have distinct indigo styling with "Action" badge
 - Stats summary: Total, In Progress, Overdue, Due Today
 - Sorting: Overdue → High Priority → Due Soon → Others
 - Empty state with "View upcoming tasks" button
@@ -55,9 +57,11 @@ Implemented a comprehensive mobile-first task execution interface per the functi
 - Decision prompt when Issue=YES: Create follow-up task / Log observation / Ignore
 
 **Backend API:**
-- `GET /api/my-tasks` - Filtered task list with serialization
+- `GET /api/my-tasks` - Combined task instances + open actions with serialization
 - `GET /api/my-tasks/{id}` - Task details with form fields
 - `POST /api/my-tasks/{id}/start` - Mark task as in-progress
+- `POST /api/my-tasks/action/{id}/complete` - Complete action from My Tasks
+- `POST /api/my-tasks/action/{id}/start` - Start action from My Tasks
 
 **Files Created:**
 - `/app/frontend/src/pages/MyTasksPage.js` - Full task list and execution UI

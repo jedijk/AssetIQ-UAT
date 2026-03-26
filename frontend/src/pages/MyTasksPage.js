@@ -88,8 +88,11 @@ const myTasksAPI = {
     return response.json();
   },
   
-  startTask: async (taskId) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-instances/${taskId}/start`, {
+  startTask: async (taskId, isAction = false) => {
+    const endpoint = isAction 
+      ? `${API_BASE_URL}/api/my-tasks/action/${taskId}/start`
+      : `${API_BASE_URL}/api/task-instances/${taskId}/start`;
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
@@ -97,17 +100,32 @@ const myTasksAPI = {
     return response.json();
   },
   
-  completeTask: async ({ taskId, data }) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-instances/${taskId}/complete`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) throw new Error("Failed to complete task");
-    return response.json();
+  completeTask: async ({ taskId, data, isAction = false }) => {
+    if (isAction) {
+      // Complete action via the action endpoint
+      const response = await fetch(`${API_BASE_URL}/api/my-tasks/action/${taskId}/complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error("Failed to complete action");
+      return response.json();
+    } else {
+      // Complete task instance
+      const response = await fetch(`${API_BASE_URL}/api/task-instances/${taskId}/complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error("Failed to complete task");
+      return response.json();
+    }
   },
   
   getEquipmentList: async () => {
@@ -140,6 +158,8 @@ const taskTypeIcons = {
 const sourceBadges = {
   fmea: { label: "FMEA", color: "bg-purple-100 text-purple-700" },
   observation: { label: "Observation", color: "bg-blue-100 text-blue-700" },
+  investigation: { label: "Investigation", color: "bg-indigo-100 text-indigo-700" },
+  threat: { label: "Threat", color: "bg-orange-100 text-orange-700" },
   manual: { label: "Manual", color: "bg-slate-100 text-slate-700" },
   recurring: { label: "Recurring", color: "bg-emerald-100 text-emerald-700" },
 };
@@ -148,7 +168,10 @@ const sourceBadges = {
 const TaskCard = ({ task, onOpen, onQuickComplete }) => {
   const isOverdue = task.status === "overdue" || (task.due_date && isBefore(parseISO(task.due_date), startOfDay(new Date())));
   const isDueToday = task.due_date && isToday(parseISO(task.due_date));
-  const TypeIcon = taskTypeIcons[task.mitigation_strategy] || ClipboardList;
+  const isAction = task.source_type === "action";
+  const TypeIcon = isAction 
+    ? (task.action_type === "PM" ? Wrench : task.action_type === "PDM" ? Target : AlertTriangle)
+    : (taskTypeIcons[task.mitigation_strategy] || ClipboardList);
   
   return (
     <div
@@ -156,7 +179,8 @@ const TaskCard = ({ task, onOpen, onQuickComplete }) => {
         "bg-white rounded-lg border p-4 cursor-pointer transition-all hover:shadow-md",
         isOverdue && "border-l-4 border-l-red-500 bg-red-50/30",
         isDueToday && !isOverdue && "border-l-4 border-l-blue-500",
-        task.status === "in_progress" && "border-l-4 border-l-amber-500 bg-amber-50/30"
+        task.status === "in_progress" && "border-l-4 border-l-amber-500 bg-amber-50/30",
+        isAction && !isOverdue && task.status !== "in_progress" && "border-l-4 border-l-indigo-400"
       )}
       onClick={() => onOpen(task)}
       data-testid={`task-card-${task.id}`}
@@ -165,14 +189,19 @@ const TaskCard = ({ task, onOpen, onQuickComplete }) => {
         <div className="flex-1 min-w-0">
           {/* Title */}
           <div className="flex items-center gap-2 mb-1">
-            <TypeIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
+            <TypeIcon className={cn("w-4 h-4 flex-shrink-0", isAction ? "text-indigo-500" : "text-slate-500")} />
             <h3 className="font-medium text-slate-900 truncate">{task.title}</h3>
+            {isAction && (
+              <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+                Action
+              </Badge>
+            )}
           </div>
           
           {/* Asset / Location */}
           <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-2">
             <MapPin className="w-3.5 h-3.5" />
-            <span className="truncate">{task.equipment_name || task.asset || "Unknown Asset"}</span>
+            <span className="truncate">{task.equipment_name || task.asset || (isAction ? "From " + (task.source || "observation") : "Unknown Asset")}</span>
           </div>
           
           {/* Tags Row */}
@@ -182,10 +211,26 @@ const TaskCard = ({ task, onOpen, onQuickComplete }) => {
               {task.priority}
             </Badge>
             
-            {/* Task Type */}
-            <Badge variant="outline" className="text-xs bg-slate-50">
-              {task.mitigation_strategy || task.type || "Task"}
-            </Badge>
+            {/* Action Type (CM/PM/PDM) for actions */}
+            {isAction && task.action_type && (
+              <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+                {task.action_type}
+              </Badge>
+            )}
+            
+            {/* Task Type / Discipline */}
+            {!isAction && (
+              <Badge variant="outline" className="text-xs bg-slate-50">
+                {task.mitigation_strategy || task.type || "Task"}
+              </Badge>
+            )}
+            
+            {/* Discipline for actions */}
+            {isAction && task.discipline && (
+              <Badge variant="outline" className="text-xs bg-slate-50">
+                {task.discipline}
+              </Badge>
+            )}
             
             {/* Recurring Indicator */}
             {task.is_recurring && (
@@ -789,7 +834,7 @@ const MyTasksPage = () => {
   
   // Start task mutation
   const startMutation = useMutation({
-    mutationFn: myTasksAPI.startTask,
+    mutationFn: ({ taskId, isAction }) => myTasksAPI.startTask(taskId, isAction),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
       setSelectedTask(data);
@@ -799,17 +844,20 @@ const MyTasksPage = () => {
   // Handle task open
   const handleOpenTask = async (task) => {
     setSelectedTask(task);
+    const isAction = task.source_type === "action";
     // Start task if not already started
     if (task.status !== "in_progress") {
-      startMutation.mutate(task.id);
+      startMutation.mutate({ taskId: task.id, isAction });
     }
     setExecutionDialogOpen(true);
   };
   
   // Handle quick complete
   const handleQuickComplete = async (task) => {
+    const isAction = task.source_type === "action";
     completeMutation.mutate({
       taskId: task.id,
+      isAction,
       data: {
         completion_notes: "Quick completed",
         issues_found: [],
@@ -821,8 +869,10 @@ const MyTasksPage = () => {
   // Handle task completion
   const handleCompleteTask = async (data) => {
     if (!selectedTask) return;
+    const isAction = selectedTask.source_type === "action";
     await completeMutation.mutateAsync({
       taskId: selectedTask.id,
+      isAction,
       data,
     });
   };
