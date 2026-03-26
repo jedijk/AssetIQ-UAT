@@ -453,14 +453,23 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                   </div>
                 </div>
                 
-                <div className="bg-white rounded-lg p-3 border border-slate-200">
+                <div className="bg-white rounded-lg p-3 border border-slate-200 overflow-hidden">
                   <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
                     <Clock className="w-3 h-3" />
                     {t("ai.timeToFailure")}
                   </div>
-                  <div className="text-lg font-bold text-slate-900">
-                    {displayData.time_to_failure_display || t("ai.unknown")}
-                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="text-sm font-bold text-slate-900 line-clamp-2 cursor-default">
+                          {displayData.time_to_failure_display || t("ai.unknown")}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        <p className="text-xs">{displayData.time_to_failure_display || t("ai.unknown")}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 
                 <div className="bg-white rounded-lg p-3 border border-slate-200">
