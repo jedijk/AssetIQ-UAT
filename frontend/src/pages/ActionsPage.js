@@ -423,23 +423,6 @@ export default function ActionsPage() {
                     <Badge className={priority.color}>
                       {priority.label}
                     </Badge>
-                    {/* Risk Score Badge */}
-                    {action.threat_risk_score !== null && action.threat_risk_score !== undefined && (
-                      <Badge className={
-                        action.threat_risk_score >= 70 ? "bg-red-100 text-red-700" :
-                        action.threat_risk_score >= 50 ? "bg-orange-100 text-orange-700" :
-                        action.threat_risk_score >= 30 ? "bg-yellow-100 text-yellow-700" :
-                        "bg-green-100 text-green-700"
-                      }>
-                        Risk: {action.threat_risk_score}
-                      </Badge>
-                    )}
-                    {/* RPN Badge */}
-                    {action.threat_rpn !== null && action.threat_rpn !== undefined && (
-                      <Badge className="bg-purple-100 text-purple-700">
-                        RPN: {action.threat_rpn}
-                      </Badge>
-                    )}
                     {overdue && (
                       <Badge className="bg-red-100 text-red-700">Overdue</Badge>
                     )}
@@ -485,17 +468,48 @@ export default function ActionsPage() {
                   </div>
                 </div>
 
-                {/* Right side - Due date & actions */}
+                {/* Score Column - matching Observations format */}
+                <div className="hidden sm:flex flex-col items-end min-w-[50px]">
+                  <span className="text-xs text-slate-400 font-medium">Score</span>
+                  <span className={`text-lg font-bold ${
+                    action.threat_risk_score >= 70 ? "text-red-600" :
+                    action.threat_risk_score >= 50 ? "text-orange-500" :
+                    action.threat_risk_score >= 30 ? "text-yellow-500" :
+                    action.threat_risk_score ? "text-green-500" : "text-slate-300"
+                  }`}>
+                    {action.threat_risk_score ?? "—"}
+                  </span>
+                </div>
+
+                {/* RPN Column - matching Observations format */}
+                <div className="hidden sm:flex flex-col items-end min-w-[50px]">
+                  <span className="text-xs text-slate-400 font-medium">RPN</span>
+                  <span className={`text-lg font-bold ${
+                    action.threat_rpn >= 200 ? "text-red-600" :
+                    action.threat_rpn >= 100 ? "text-orange-500" :
+                    action.threat_rpn ? "text-blue-500" : "text-slate-300"
+                  }`}>
+                    {action.threat_rpn ?? "—"}
+                  </span>
+                </div>
+
+                {/* Right side - Due date & Status */}
                 <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                   <div className="text-right">
                     <div className={`text-xs sm:text-sm font-medium ${overdue ? "text-red-600" : "text-slate-700"}`}>
                       <Calendar className="w-3 h-3 inline mr-1" />
                       {formatDate(action.due_date)}
                     </div>
-                    <div className="text-xs text-slate-400 hidden sm:block">
-                      {statusConfig[action.status]?.label}
-                    </div>
                   </div>
+                  
+                  {/* Status Badge - matching Observations format */}
+                  <Badge className={
+                    action.status === "completed" ? "bg-green-100 text-green-700" :
+                    action.status === "in_progress" ? "bg-blue-100 text-blue-700" :
+                    "bg-slate-100 text-slate-700"
+                  }>
+                    {statusConfig[action.status]?.label || "Open"}
+                  </Badge>
                   
                   {/* Actions menu */}
                   <DropdownMenu>
