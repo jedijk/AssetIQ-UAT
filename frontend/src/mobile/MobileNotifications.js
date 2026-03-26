@@ -1,7 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { actionsAPI, threatsAPI } from "../lib/api";
-import { Bell, AlertTriangle, CheckCircle, Clock, Info } from "lucide-react";
+import { Bell, AlertTriangle } from "lucide-react";
 
 const MobileNotifications = () => {
   const { data: overdueData = {} } = useQuery({
@@ -26,7 +26,8 @@ const MobileNotifications = () => {
       message: action.title || action.description,
       time: action.due_date,
       icon: AlertTriangle,
-      color: "#ef4444",
+      color: "#dc2626",
+      bgColor: "#fef2f2",
     })),
     // High risk observations
     ...threats
@@ -39,7 +40,8 @@ const MobileNotifications = () => {
         message: threat.title,
         time: threat.created_at,
         icon: AlertTriangle,
-        color: threat.risk_level === "Critical" ? "#ef4444" : "#f97316",
+        color: threat.risk_level === "Critical" ? "#dc2626" : "#ea580c",
+        bgColor: threat.risk_level === "Critical" ? "#fef2f2" : "#fff7ed",
       })),
     // Recent observations
     ...threats.slice(0, 3).map((threat) => ({
@@ -50,6 +52,7 @@ const MobileNotifications = () => {
       time: threat.created_at,
       icon: Bell,
       color: "#3b82f6",
+      bgColor: "#eff6ff",
     })),
   ];
 
@@ -74,7 +77,10 @@ const MobileNotifications = () => {
   return (
     <div className="mobile-notifications" data-testid="mobile-notifications">
       <header className="mobile-header">
-        <h1>Notifications</h1>
+        <div>
+          <h1>Notifications</h1>
+          <p className="subtitle">Alerts and updates</p>
+        </div>
         {overdueActions.length > 0 && (
           <span className="alert-badge">{overdueActions.length}</span>
         )}
@@ -82,7 +88,7 @@ const MobileNotifications = () => {
 
       <div className="notifications-list">
         {notifications.length === 0 ? (
-          <div className="empty">
+          <div className="empty-card">
             <Bell size={40} className="empty-icon" />
             <p>No notifications</p>
             <p className="hint">You're all caught up!</p>
@@ -98,7 +104,7 @@ const MobileNotifications = () => {
               >
                 <div
                   className="notif-icon"
-                  style={{ backgroundColor: `${notif.color}20`, color: notif.color }}
+                  style={{ backgroundColor: notif.bgColor, color: notif.color }}
                 >
                   <Icon size={18} />
                 </div>
@@ -118,86 +124,96 @@ const MobileNotifications = () => {
       <style>{`
         .mobile-notifications {
           min-height: 100%;
+          background: #f1f5f9;
         }
 
         .mobile-header {
-          position: sticky;
-          top: 0;
-          background: #0a0a0a;
-          padding: 16px;
-          border-bottom: 1px solid #333;
+          background: #ffffff;
+          padding: 20px 16px;
+          border-bottom: 1px solid #e2e8f0;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          z-index: 10;
         }
 
         .mobile-header h1 {
-          font-size: 20px;
-          font-weight: 600;
+          font-size: 24px;
+          font-weight: 700;
           margin: 0;
+          color: #0f172a;
+        }
+
+        .mobile-header .subtitle {
+          font-size: 13px;
+          color: #64748b;
+          margin: 2px 0 0 0;
         }
 
         .alert-badge {
-          background: #ef4444;
+          background: #dc2626;
           color: #fff;
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 600;
-          min-width: 20px;
-          height: 20px;
-          border-radius: 10px;
+          min-width: 24px;
+          height: 24px;
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 0 6px;
+          padding: 0 8px;
         }
 
         .notifications-list {
-          padding: 8px;
+          padding: 12px;
         }
 
-        .empty {
+        .empty-card {
           text-align: center;
           padding: 60px 20px;
-          color: #888;
+          background: #ffffff;
+          border-radius: 16px;
         }
 
         .empty-icon {
-          color: #444;
+          color: #cbd5e1;
           margin-bottom: 16px;
         }
 
-        .empty p {
+        .empty-card p {
           margin: 0;
+          color: #64748b;
+          font-weight: 500;
         }
 
-        .empty .hint {
+        .empty-card .hint {
           font-size: 13px;
-          color: #666;
+          color: #94a3b8;
           margin-top: 4px;
+          font-weight: 400;
         }
 
         .notification-card {
           display: flex;
-          gap: 12px;
-          padding: 14px;
-          background: #1a1a1a;
-          border-radius: 12px;
-          margin-bottom: 8px;
+          gap: 14px;
+          padding: 16px;
+          background: #ffffff;
+          border-radius: 16px;
+          margin-bottom: 10px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
         .notification-card.overdue {
-          border-left: 3px solid #ef4444;
+          border-left: 4px solid #dc2626;
         }
 
         .notification-card.high_risk {
-          border-left: 3px solid #f97316;
+          border-left: 4px solid #ea580c;
         }
 
         .notif-icon {
-          width: 36px;
-          height: 36px;
-          border-radius: 10px;
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -210,8 +226,8 @@ const MobileNotifications = () => {
         }
 
         .notif-title {
-          font-size: 12px;
-          font-weight: 600;
+          font-size: 11px;
+          font-weight: 700;
           margin: 0 0 4px 0;
           text-transform: uppercase;
           letter-spacing: 0.3px;
@@ -219,14 +235,15 @@ const MobileNotifications = () => {
 
         .notif-message {
           font-size: 14px;
-          color: #fff;
+          font-weight: 500;
+          color: #0f172a;
           margin: 0 0 6px 0;
           line-height: 1.3;
         }
 
         .notif-time {
           font-size: 11px;
-          color: #666;
+          color: #94a3b8;
         }
       `}</style>
     </div>

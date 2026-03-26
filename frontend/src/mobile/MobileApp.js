@@ -69,10 +69,10 @@ const MobileApp = () => {
             >
               {isPost ? (
                 <div className="post-icon-wrapper">
-                  <Icon size={24} />
+                  <Icon size={22} />
                 </div>
               ) : (
-                <Icon size={24} />
+                <Icon size={22} />
               )}
               <span>{tab.label}</span>
             </button>
@@ -85,9 +85,9 @@ const MobileApp = () => {
           display: flex;
           flex-direction: column;
           height: 100vh;
-          background: #0a0a0a;
-          color: #ffffff;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: #f1f5f9;
+          color: #1e293b;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
         .mobile-content {
@@ -104,11 +104,12 @@ const MobileApp = () => {
           display: flex;
           justify-content: space-around;
           align-items: center;
-          background: #1a1a1a;
-          border-top: 1px solid #333;
+          background: #ffffff;
+          border-top: 1px solid #e2e8f0;
           padding: 8px 0;
           padding-bottom: max(8px, env(safe-area-inset-bottom));
           z-index: 100;
+          box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
         }
 
         .mobile-nav-item {
@@ -118,8 +119,9 @@ const MobileApp = () => {
           gap: 4px;
           background: none;
           border: none;
-          color: #888;
+          color: #94a3b8;
           font-size: 10px;
+          font-weight: 500;
           padding: 4px 12px;
           cursor: pointer;
           transition: color 0.2s;
@@ -134,24 +136,21 @@ const MobileApp = () => {
         }
 
         .post-icon-wrapper {
-          background: #3b82f6;
-          border-radius: 8px;
-          padding: 8px 16px;
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          border-radius: 12px;
+          padding: 10px 20px;
           display: flex;
           align-items: center;
           justify-content: center;
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
         }
 
-        .mobile-nav-item:hover {
+        .mobile-nav-item:hover:not(.post-btn) {
           color: #3b82f6;
         }
 
-        .mobile-nav-item.post-btn:hover {
-          color: #fff;
-        }
-
         .mobile-nav-item.post-btn:hover .post-icon-wrapper {
-          background: #2563eb;
+          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
         }
       `}</style>
     </div>

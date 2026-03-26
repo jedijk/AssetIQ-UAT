@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { threatsAPI } from "../lib/api";
-import { AlertTriangle, Clock, ChevronRight, Filter } from "lucide-react";
+import { AlertTriangle, Clock, ChevronRight } from "lucide-react";
 
 const MobileObservations = () => {
   const [filter, setFilter] = useState("all");
@@ -20,12 +20,12 @@ const MobileObservations = () => {
 
   const getRiskColor = (level) => {
     const colors = {
-      Critical: "#ef4444",
-      High: "#f97316",
-      Medium: "#eab308",
-      Low: "#22c55e",
+      Critical: { bg: "#fef2f2", text: "#dc2626" },
+      High: { bg: "#fff7ed", text: "#ea580c" },
+      Medium: { bg: "#fefce8", text: "#ca8a04" },
+      Low: { bg: "#f0fdf4", text: "#16a34a" },
     };
-    return colors[level] || "#6b7280";
+    return colors[level] || { bg: "#f1f5f9", text: "#64748b" };
   };
 
   const formatDate = (dateStr) => {
@@ -44,7 +44,10 @@ const MobileObservations = () => {
   return (
     <div className="mobile-observations" data-testid="mobile-observations">
       <header className="mobile-header">
-        <h1>Observations</h1>
+        <div>
+          <h1>Observations</h1>
+          <p className="subtitle">Risk management status</p>
+        </div>
         <span className="obs-count">{filteredObs.length}</span>
       </header>
 
@@ -70,78 +73,89 @@ const MobileObservations = () => {
         {isLoading ? (
           <div className="loading">Loading observations...</div>
         ) : filteredObs.length === 0 ? (
-          <div className="empty">No observations found</div>
+          <div className="empty-card">
+            <p>No observations found</p>
+          </div>
         ) : (
-          filteredObs.map((obs) => (
-            <div 
-              key={obs.id} 
-              className="observation-card"
-              data-testid={`observation-${obs.id}`}
-            >
-              <div className="obs-header">
-                <span 
-                  className="risk-badge"
-                  style={{ backgroundColor: getRiskColor(obs.risk_level) }}
-                >
-                  {obs.risk_level}
-                </span>
-                <span className="obs-rank">#{obs.rank}</span>
-              </div>
-              
-              <h3 className="obs-title">{obs.title}</h3>
-              
-              <div className="obs-details">
-                <span className="obs-asset">
-                  <AlertTriangle size={12} />
-                  {obs.asset}
-                </span>
-                <span className="obs-time">
-                  <Clock size={12} />
-                  {formatDate(obs.created_at)}
-                </span>
-              </div>
+          filteredObs.map((obs) => {
+            const riskColors = getRiskColor(obs.risk_level);
+            return (
+              <div 
+                key={obs.id} 
+                className="observation-card"
+                data-testid={`observation-${obs.id}`}
+              >
+                <div className="obs-header">
+                  <span 
+                    className="risk-badge"
+                    style={{ backgroundColor: riskColors.bg, color: riskColors.text }}
+                  >
+                    {obs.risk_level}
+                  </span>
+                  <span className="obs-rank">#{obs.rank}</span>
+                </div>
+                
+                <h3 className="obs-title">{obs.title}</h3>
+                
+                <div className="obs-details">
+                  <span className="obs-asset">
+                    <AlertTriangle size={12} />
+                    {obs.asset}
+                  </span>
+                  <span className="obs-time">
+                    <Clock size={12} />
+                    {formatDate(obs.created_at)}
+                  </span>
+                </div>
 
-              <div className="obs-footer">
-                <span className="obs-score">Score: {obs.risk_score}</span>
-                <span className={`obs-status ${obs.status.toLowerCase()}`}>
-                  {obs.status}
-                </span>
-              </div>
+                <div className="obs-footer">
+                  <span className="obs-score">Score: {obs.risk_score}</span>
+                  <span className={`obs-status ${obs.status.toLowerCase()}`}>
+                    {obs.status}
+                  </span>
+                </div>
 
-              <ChevronRight className="obs-chevron" size={20} />
-            </div>
-          ))
+                <ChevronRight className="obs-chevron" size={18} />
+              </div>
+            );
+          })
         )}
       </div>
 
       <style>{`
         .mobile-observations {
           min-height: 100%;
+          background: #f1f5f9;
         }
 
         .mobile-header {
-          position: sticky;
-          top: 0;
-          background: #0a0a0a;
-          padding: 16px;
-          border-bottom: 1px solid #333;
+          background: #ffffff;
+          padding: 20px 16px;
+          border-bottom: 1px solid #e2e8f0;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          z-index: 10;
         }
 
         .mobile-header h1 {
-          font-size: 20px;
-          font-weight: 600;
+          font-size: 24px;
+          font-weight: 700;
           margin: 0;
+          color: #0f172a;
+        }
+
+        .mobile-header .subtitle {
+          font-size: 13px;
+          color: #64748b;
+          margin: 2px 0 0 0;
         }
 
         .obs-count {
-          font-size: 14px;
-          color: #888;
-          background: #222;
-          padding: 4px 12px;
+          font-size: 18px;
+          font-weight: 700;
+          color: #3b82f6;
+          background: #eff6ff;
+          padding: 8px 16px;
           border-radius: 12px;
         }
 
@@ -149,18 +163,19 @@ const MobileObservations = () => {
           display: flex;
           gap: 8px;
           padding: 12px 16px;
-          background: #111;
-          border-bottom: 1px solid #222;
+          background: #ffffff;
+          border-bottom: 1px solid #e2e8f0;
           overflow-x: auto;
         }
 
         .filter-tab {
           padding: 8px 16px;
           border-radius: 20px;
-          border: 1px solid #333;
-          background: none;
-          color: #888;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+          color: #64748b;
           font-size: 13px;
+          font-weight: 500;
           white-space: nowrap;
           cursor: pointer;
           transition: all 0.2s;
@@ -172,56 +187,63 @@ const MobileObservations = () => {
           color: #fff;
         }
 
+        .filter-tab:hover:not(.active) {
+          border-color: #3b82f6;
+          color: #3b82f6;
+        }
+
         .observations-list {
-          padding: 8px;
+          padding: 12px;
         }
 
         .observation-card {
           position: relative;
-          background: #1a1a1a;
-          border-radius: 12px;
+          background: #ffffff;
+          border-radius: 16px;
           padding: 16px;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
           cursor: pointer;
-          transition: background 0.2s;
+          transition: box-shadow 0.2s;
         }
 
         .observation-card:hover {
-          background: #222;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .obs-header {
           display: flex;
           align-items: center;
-          gap: 8px;
-          margin-bottom: 8px;
+          gap: 10px;
+          margin-bottom: 10px;
         }
 
         .risk-badge {
           font-size: 11px;
           font-weight: 600;
-          padding: 4px 8px;
-          border-radius: 4px;
-          color: #fff;
+          padding: 4px 10px;
+          border-radius: 6px;
         }
 
         .obs-rank {
           font-size: 12px;
-          color: #888;
+          color: #94a3b8;
+          font-weight: 500;
         }
 
         .obs-title {
           font-size: 15px;
-          font-weight: 500;
-          margin: 0 0 8px 0;
-          color: #fff;
+          font-weight: 600;
+          margin: 0 0 10px 0;
+          color: #0f172a;
           padding-right: 24px;
+          line-height: 1.3;
         }
 
         .obs-details {
           display: flex;
           gap: 16px;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
         }
 
         .obs-asset, .obs-time {
@@ -229,7 +251,7 @@ const MobileObservations = () => {
           align-items: center;
           gap: 4px;
           font-size: 12px;
-          color: #888;
+          color: #64748b;
         }
 
         .obs-footer {
@@ -240,38 +262,41 @@ const MobileObservations = () => {
 
         .obs-score {
           font-size: 12px;
-          color: #666;
+          color: #94a3b8;
+          font-weight: 500;
         }
 
         .obs-status {
           font-size: 11px;
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-weight: 500;
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-weight: 600;
         }
 
         .obs-status.open {
-          background: #1e3a5f;
-          color: #60a5fa;
+          background: #eff6ff;
+          color: #3b82f6;
         }
 
         .obs-status.resolved {
-          background: #14532d;
-          color: #86efac;
+          background: #f0fdf4;
+          color: #16a34a;
         }
 
         .obs-chevron {
           position: absolute;
-          right: 12px;
+          right: 14px;
           top: 50%;
           transform: translateY(-50%);
-          color: #444;
+          color: #cbd5e1;
         }
 
-        .loading, .empty {
+        .loading, .empty-card {
           text-align: center;
           padding: 40px 20px;
-          color: #888;
+          color: #64748b;
+          background: #ffffff;
+          border-radius: 16px;
         }
       `}</style>
     </div>

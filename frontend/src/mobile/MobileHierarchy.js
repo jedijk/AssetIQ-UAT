@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { equipmentHierarchyAPI } from "../lib/api";
-import { ChevronRight, ChevronDown, Layers, AlertTriangle, Settings } from "lucide-react";
+import { ChevronRight, ChevronDown, Layers, Settings, Circle } from "lucide-react";
 
 const MobileHierarchy = () => {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
@@ -39,13 +39,7 @@ const MobileHierarchy = () => {
       subunit: "#3b82f6",
       component: "#8b5cf6",
     };
-    return colors[level] || "#6b7280";
-  };
-
-  const getLevelIcon = (level) => {
-    if (level === "site" || level === "area") return <Layers size={16} />;
-    if (level === "equipment" || level === "subunit") return <Settings size={16} />;
-    return <AlertTriangle size={16} />;
+    return colors[level] || "#94a3b8";
   };
 
   const renderNode = (node, depth = 0) => {
@@ -62,7 +56,7 @@ const MobileHierarchy = () => {
             if (hasChildren) toggleExpand(node.id);
           }}
           className={`node-button ${isSelected ? "selected" : ""}`}
-          style={{ paddingLeft: `${depth * 16 + 12}px` }}
+          style={{ paddingLeft: `${depth * 16 + 16}px` }}
           data-testid={`hierarchy-node-${node.id}`}
         >
           <span className="expand-icon">
@@ -73,18 +67,16 @@ const MobileHierarchy = () => {
             )}
           </span>
           <span 
-            className="level-indicator" 
+            className="level-dot" 
             style={{ backgroundColor: getLevelColor(node.level) }}
-          >
-            {getLevelIcon(node.level)}
-          </span>
+          />
           <div className="node-info">
             <span className="node-name">{node.name}</span>
             {node.tag && <span className="node-tag">{node.tag}</span>}
           </div>
           {node.criticality?.level && (
             <span className={`criticality-badge ${node.criticality.level.toLowerCase()}`}>
-              {node.criticality.level[0]}
+              {node.criticality.level}
             </span>
           )}
         </button>
@@ -103,53 +95,71 @@ const MobileHierarchy = () => {
   return (
     <div className="mobile-hierarchy" data-testid="mobile-hierarchy">
       <header className="mobile-header">
-        <h1>Equipment Hierarchy</h1>
+        <div>
+          <h1>Hierarchy</h1>
+          <p className="subtitle">Equipment structure</p>
+        </div>
         <span className="node-count">{nodes.length} items</span>
       </header>
 
-      <div className="hierarchy-list">
-        {isLoading ? (
-          <div className="loading">Loading hierarchy...</div>
-        ) : rootNodes.length === 0 ? (
-          <div className="empty">No equipment found</div>
-        ) : (
-          rootNodes.map((node) => renderNode(node))
-        )}
+      <div className="hierarchy-container">
+        <div className="hierarchy-card">
+          {isLoading ? (
+            <div className="loading">Loading hierarchy...</div>
+          ) : rootNodes.length === 0 ? (
+            <div className="empty">No equipment found</div>
+          ) : (
+            rootNodes.map((node) => renderNode(node))
+          )}
+        </div>
       </div>
 
       <style>{`
         .mobile-hierarchy {
           min-height: 100%;
+          background: #f1f5f9;
         }
 
         .mobile-header {
-          position: sticky;
-          top: 0;
-          background: #0a0a0a;
-          padding: 16px;
-          border-bottom: 1px solid #333;
+          background: #ffffff;
+          padding: 20px 16px;
+          border-bottom: 1px solid #e2e8f0;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          z-index: 10;
         }
 
         .mobile-header h1 {
-          font-size: 20px;
-          font-weight: 600;
+          font-size: 24px;
+          font-weight: 700;
           margin: 0;
+          color: #0f172a;
+        }
+
+        .mobile-header .subtitle {
+          font-size: 13px;
+          color: #64748b;
+          margin: 2px 0 0 0;
         }
 
         .node-count {
           font-size: 12px;
-          color: #888;
-          background: #222;
-          padding: 4px 8px;
-          border-radius: 12px;
+          font-weight: 500;
+          color: #3b82f6;
+          background: #eff6ff;
+          padding: 6px 12px;
+          border-radius: 20px;
         }
 
-        .hierarchy-list {
-          padding: 8px 0;
+        .hierarchy-container {
+          padding: 12px;
+        }
+
+        .hierarchy-card {
+          background: #ffffff;
+          border-radius: 16px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+          overflow: hidden;
         }
 
         .hierarchy-node {
@@ -160,38 +170,35 @@ const MobileHierarchy = () => {
           width: 100%;
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 12px;
+          gap: 10px;
+          padding: 14px 16px;
           background: none;
           border: none;
-          color: #fff;
+          border-bottom: 1px solid #f1f5f9;
+          color: #1e293b;
           text-align: left;
           cursor: pointer;
           transition: background 0.2s;
         }
 
         .node-button:hover {
-          background: #1a1a1a;
+          background: #f8fafc;
         }
 
         .node-button.selected {
-          background: #1e3a5f;
+          background: #eff6ff;
         }
 
         .expand-icon {
-          color: #666;
+          color: #94a3b8;
           display: flex;
           align-items: center;
         }
 
-        .level-indicator {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 28px;
-          height: 28px;
-          border-radius: 6px;
-          color: #fff;
+        .level-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
           flex-shrink: 0;
         }
 
@@ -206,6 +213,7 @@ const MobileHierarchy = () => {
         .node-name {
           font-size: 14px;
           font-weight: 500;
+          color: #1e293b;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -213,31 +221,30 @@ const MobileHierarchy = () => {
 
         .node-tag {
           font-size: 11px;
-          color: #888;
+          color: #64748b;
         }
 
         .criticality-badge {
           font-size: 10px;
           font-weight: 600;
           padding: 4px 8px;
-          border-radius: 4px;
+          border-radius: 6px;
           flex-shrink: 0;
         }
 
-        .criticality-badge.critical { background: #7f1d1d; color: #fca5a5; }
-        .criticality-badge.high { background: #7c2d12; color: #fdba74; }
-        .criticality-badge.medium { background: #713f12; color: #fcd34d; }
-        .criticality-badge.low { background: #14532d; color: #86efac; }
+        .criticality-badge.critical { background: #fef2f2; color: #dc2626; }
+        .criticality-badge.high { background: #fff7ed; color: #ea580c; }
+        .criticality-badge.medium { background: #fefce8; color: #ca8a04; }
+        .criticality-badge.low { background: #f0fdf4; color: #16a34a; }
 
         .node-children {
-          border-left: 1px solid #333;
-          margin-left: 24px;
+          background: #fafafa;
         }
 
         .loading, .empty {
           text-align: center;
           padding: 40px 20px;
-          color: #888;
+          color: #64748b;
         }
       `}</style>
     </div>

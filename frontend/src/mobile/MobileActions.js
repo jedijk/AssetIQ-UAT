@@ -11,19 +11,19 @@ const MobileActions = () => {
 
   const actions = actionsData.actions || [];
 
-  const getPriorityColor = (priority) => {
-    const colors = {
-      High: "#ef4444",
-      Medium: "#f97316",
-      Low: "#22c55e",
+  const getPriorityStyle = (priority) => {
+    const styles = {
+      High: { bg: "#fef2f2", text: "#dc2626" },
+      Medium: { bg: "#fff7ed", text: "#ea580c" },
+      Low: { bg: "#f0fdf4", text: "#16a34a" },
     };
-    return colors[priority] || "#6b7280";
+    return styles[priority] || { bg: "#f1f5f9", text: "#64748b" };
   };
 
   const getStatusIcon = (status) => {
-    if (status === "Completed") return <CheckCircle size={16} className="status-icon completed" />;
-    if (status === "Overdue") return <AlertCircle size={16} className="status-icon overdue" />;
-    return <Clock size={16} className="status-icon pending" />;
+    if (status === "Completed") return <CheckCircle size={18} className="status-icon completed" />;
+    if (status === "Overdue") return <AlertCircle size={18} className="status-icon overdue" />;
+    return <Clock size={18} className="status-icon pending" />;
   };
 
   const getActionTypeLabel = (type) => {
@@ -47,55 +47,58 @@ const MobileActions = () => {
   return (
     <div className="mobile-actions" data-testid="mobile-actions">
       <header className="mobile-header">
-        <h1>Actions</h1>
+        <div>
+          <h1>Actions</h1>
+          <p className="subtitle">Task management</p>
+        </div>
         <span className="action-count">{openActions.length} open</span>
       </header>
 
       <div className="actions-list">
         {isLoading ? (
-          <div className="loading">Loading actions...</div>
+          <div className="loading-card">Loading actions...</div>
         ) : actions.length === 0 ? (
-          <div className="empty">No actions yet</div>
+          <div className="empty-card">No actions yet</div>
         ) : (
           <>
             {openActions.length > 0 && (
               <div className="action-section">
                 <h2 className="section-title">Open Actions</h2>
-                {openActions.map((action) => (
-                  <div 
-                    key={action.id} 
-                    className="action-card"
-                    data-testid={`action-${action.id}`}
-                  >
-                    <div className="action-left">
-                      {getStatusIcon(action.status)}
-                      <div className="action-info">
-                        <p className="action-title">{action.title || action.description}</p>
-                        <div className="action-meta">
-                          <span 
-                            className="action-type"
-                            style={{ borderColor: getPriorityColor(action.priority) }}
-                          >
-                            {getActionTypeLabel(action.action_type)}
-                          </span>
-                          {action.discipline && (
-                            <span className="action-discipline">{action.discipline}</span>
-                          )}
+                {openActions.map((action) => {
+                  const priorityStyle = getPriorityStyle(action.priority);
+                  return (
+                    <div 
+                      key={action.id} 
+                      className="action-card"
+                      data-testid={`action-${action.id}`}
+                    >
+                      <div className="action-left">
+                        {getStatusIcon(action.status)}
+                        <div className="action-info">
+                          <p className="action-title">{action.title || action.description}</p>
+                          <div className="action-meta">
+                            <span className="action-type">
+                              {getActionTypeLabel(action.action_type)}
+                            </span>
+                            {action.discipline && (
+                              <span className="action-discipline">{action.discipline}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
+                      <div className="action-right">
+                        <span 
+                          className="priority-badge"
+                          style={{ backgroundColor: priorityStyle.bg, color: priorityStyle.text }}
+                        >
+                          {action.priority}
+                        </span>
+                        <span className="due-date">{formatDate(action.due_date)}</span>
+                      </div>
+                      <ChevronRight className="action-chevron" size={18} />
                     </div>
-                    <div className="action-right">
-                      <span 
-                        className="priority-badge"
-                        style={{ backgroundColor: getPriorityColor(action.priority) }}
-                      >
-                        {action.priority}
-                      </span>
-                      <span className="due-date">{formatDate(action.due_date)}</span>
-                    </div>
-                    <ChevronRight className="action-chevron" size={18} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -125,62 +128,69 @@ const MobileActions = () => {
       <style>{`
         .mobile-actions {
           min-height: 100%;
+          background: #f1f5f9;
         }
 
         .mobile-header {
-          position: sticky;
-          top: 0;
-          background: #0a0a0a;
-          padding: 16px;
-          border-bottom: 1px solid #333;
+          background: #ffffff;
+          padding: 20px 16px;
+          border-bottom: 1px solid #e2e8f0;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          z-index: 10;
         }
 
         .mobile-header h1 {
-          font-size: 20px;
-          font-weight: 600;
+          font-size: 24px;
+          font-weight: 700;
           margin: 0;
+          color: #0f172a;
+        }
+
+        .mobile-header .subtitle {
+          font-size: 13px;
+          color: #64748b;
+          margin: 2px 0 0 0;
         }
 
         .action-count {
           font-size: 12px;
-          color: #f97316;
-          background: rgba(249, 115, 22, 0.15);
-          padding: 4px 10px;
-          border-radius: 12px;
+          font-weight: 600;
+          color: #ea580c;
+          background: #fff7ed;
+          padding: 6px 12px;
+          border-radius: 20px;
         }
 
         .actions-list {
-          padding: 8px;
+          padding: 12px;
         }
 
         .action-section {
-          margin-bottom: 24px;
+          margin-bottom: 20px;
         }
 
         .section-title {
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 600;
-          color: #888;
+          color: #64748b;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          padding: 8px 8px 12px;
+          padding: 8px 4px 12px;
           margin: 0;
         }
 
         .action-card {
           position: relative;
-          background: #1a1a1a;
-          border-radius: 12px;
-          padding: 14px;
-          margin-bottom: 8px;
+          background: #ffffff;
+          border-radius: 16px;
+          padding: 16px;
+          margin-bottom: 10px;
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
           gap: 12px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
         .action-card.completed {
@@ -211,64 +221,66 @@ const MobileActions = () => {
 
         .action-title {
           font-size: 14px;
-          font-weight: 500;
+          font-weight: 600;
           margin: 0 0 6px 0;
-          color: #fff;
+          color: #0f172a;
           line-height: 1.3;
         }
 
         .action-meta {
           display: flex;
-          gap: 8px;
+          gap: 10px;
           flex-wrap: wrap;
         }
 
         .action-type {
           font-size: 11px;
-          padding: 2px 6px;
-          border: 1px solid;
+          font-weight: 500;
+          padding: 3px 8px;
+          background: #f1f5f9;
           border-radius: 4px;
-          color: #888;
+          color: #64748b;
         }
 
         .action-discipline {
           font-size: 11px;
-          color: #666;
+          color: #94a3b8;
         }
 
         .action-right {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 4px;
-          padding-right: 20px;
+          gap: 6px;
+          padding-right: 24px;
         }
 
         .priority-badge {
           font-size: 10px;
           font-weight: 600;
-          padding: 3px 6px;
-          border-radius: 4px;
-          color: #fff;
+          padding: 4px 8px;
+          border-radius: 6px;
         }
 
         .due-date {
           font-size: 11px;
-          color: #888;
+          color: #94a3b8;
         }
 
         .action-chevron {
           position: absolute;
-          right: 10px;
+          right: 14px;
           top: 50%;
           transform: translateY(-50%);
-          color: #444;
+          color: #cbd5e1;
         }
 
-        .loading, .empty {
+        .loading-card, .empty-card {
           text-align: center;
           padding: 40px 20px;
-          color: #888;
+          color: #64748b;
+          background: #ffffff;
+          border-radius: 16px;
         }
       `}</style>
     </div>

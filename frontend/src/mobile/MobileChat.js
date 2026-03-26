@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { chatAPI, voiceAPI } from "../lib/api";
-import { X, Send, Mic, MicOff, Image, Loader2 } from "lucide-react";
+import { X, Send, Mic, MicOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const MobileChat = ({ onClose }) => {
@@ -141,7 +141,10 @@ const MobileChat = ({ onClose }) => {
         <button onClick={onClose} className="close-btn" data-testid="close-chat">
           <X size={24} />
         </button>
-        <h1>Report Observation</h1>
+        <div className="header-text">
+          <h1>Report Observation</h1>
+          <p>Describe the issue you observed</p>
+        </div>
         <div style={{ width: 40 }} />
       </header>
 
@@ -149,7 +152,8 @@ const MobileChat = ({ onClose }) => {
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-empty">
-            <p>Describe the issue you observed</p>
+            <div className="empty-icon">💬</div>
+            <p>Start a conversation</p>
             <p className="hint">e.g., "pump is leaking" or "motor overheating"</p>
           </div>
         ) : (
@@ -197,7 +201,7 @@ const MobileChat = ({ onClose }) => {
         .mobile-chat {
           position: fixed;
           inset: 0;
-          background: #0a0a0a;
+          background: #f1f5f9;
           display: flex;
           flex-direction: column;
           z-index: 200;
@@ -207,23 +211,40 @@ const MobileChat = ({ onClose }) => {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 12px 16px;
-          background: #1a1a1a;
-          border-bottom: 1px solid #333;
+          padding: 16px;
+          background: #ffffff;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .header-text {
+          text-align: center;
         }
 
         .chat-header h1 {
           font-size: 18px;
-          font-weight: 600;
+          font-weight: 700;
           margin: 0;
+          color: #0f172a;
+        }
+
+        .chat-header p {
+          font-size: 12px;
+          color: #64748b;
+          margin: 2px 0 0 0;
         }
 
         .close-btn {
           background: none;
           border: none;
-          color: #fff;
+          color: #64748b;
           padding: 8px;
           cursor: pointer;
+          border-radius: 8px;
+        }
+
+        .close-btn:hover {
+          background: #f1f5f9;
+          color: #0f172a;
         }
 
         .chat-messages {
@@ -235,13 +256,24 @@ const MobileChat = ({ onClose }) => {
         .chat-empty {
           text-align: center;
           padding: 60px 20px;
-          color: #888;
+          color: #64748b;
+        }
+
+        .empty-icon {
+          font-size: 48px;
+          margin-bottom: 16px;
+        }
+
+        .chat-empty p {
+          margin: 0;
+          font-weight: 500;
         }
 
         .chat-empty .hint {
           font-size: 13px;
-          color: #666;
+          color: #94a3b8;
           margin-top: 8px;
+          font-weight: 400;
         }
 
         .chat-message {
@@ -259,18 +291,21 @@ const MobileChat = ({ onClose }) => {
 
         .message-bubble {
           max-width: 85%;
-          padding: 12px 16px;
-          border-radius: 16px;
+          padding: 14px 16px;
+          border-radius: 18px;
         }
 
         .chat-message.user .message-bubble {
-          background: #3b82f6;
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          color: #ffffff;
           border-bottom-right-radius: 4px;
         }
 
         .chat-message.assistant .message-bubble {
-          background: #1a1a1a;
+          background: #ffffff;
+          color: #0f172a;
           border-bottom-left-radius: 4px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
 
         .message-bubble p {
@@ -287,33 +322,36 @@ const MobileChat = ({ onClose }) => {
         }
 
         .suggestion-btn {
-          padding: 8px 12px;
-          background: #222;
-          border: 1px solid #444;
-          border-radius: 8px;
-          color: #fff;
+          padding: 8px 14px;
+          background: #f1f5f9;
+          border: 1px solid #e2e8f0;
+          border-radius: 20px;
+          color: #1e293b;
           font-size: 13px;
+          font-weight: 500;
           cursor: pointer;
           transition: all 0.2s;
         }
 
         .suggestion-btn:hover {
-          background: #333;
+          background: #e2e8f0;
           border-color: #3b82f6;
+          color: #3b82f6;
         }
 
         .threat-card {
           margin-top: 12px;
-          padding: 12px;
-          background: #14532d;
-          border-radius: 8px;
+          padding: 14px;
+          background: #f0fdf4;
+          border-radius: 12px;
+          border: 1px solid #bbf7d0;
         }
 
         .threat-header {
           display: flex;
           align-items: center;
           gap: 8px;
-          color: #86efac;
+          color: #16a34a;
           font-weight: 600;
           font-size: 13px;
           margin-bottom: 8px;
@@ -333,51 +371,57 @@ const MobileChat = ({ onClose }) => {
 
         .threat-title {
           font-size: 14px;
-          font-weight: 500;
+          font-weight: 600;
           margin: 0 0 8px 0;
-          color: #fff;
+          color: #166534;
         }
 
         .threat-meta {
           display: flex;
           gap: 12px;
           font-size: 12px;
-          color: #86efac;
+          color: #16a34a;
         }
 
         .chat-input-container {
           padding: 12px 16px;
-          padding-bottom: max(12px, env(safe-area-inset-bottom));
-          background: #1a1a1a;
-          border-top: 1px solid #333;
+          padding-bottom: max(16px, env(safe-area-inset-bottom));
+          background: #ffffff;
+          border-top: 1px solid #e2e8f0;
         }
 
         .chat-input {
           display: flex;
           align-items: center;
           gap: 8px;
-          background: #222;
-          border-radius: 24px;
-          padding: 4px 8px 4px 16px;
+          background: #f1f5f9;
+          border-radius: 28px;
+          padding: 6px 8px 6px 18px;
+          border: 1px solid #e2e8f0;
+        }
+
+        .chat-input:focus-within {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
         .chat-input input {
           flex: 1;
           background: none;
           border: none;
-          color: #fff;
+          color: #0f172a;
           font-size: 15px;
-          padding: 12px 0;
+          padding: 10px 0;
           outline: none;
         }
 
         .chat-input input::placeholder {
-          color: #666;
+          color: #94a3b8;
         }
 
         .voice-btn, .send-btn {
-          width: 40px;
-          height: 40px;
+          width: 42px;
+          height: 42px;
           border-radius: 50%;
           border: none;
           display: flex;
@@ -388,24 +432,37 @@ const MobileChat = ({ onClose }) => {
         }
 
         .voice-btn {
-          background: #333;
-          color: #fff;
+          background: #f1f5f9;
+          color: #64748b;
+        }
+
+        .voice-btn:hover {
+          background: #e2e8f0;
+          color: #3b82f6;
         }
 
         .voice-btn.recording {
-          background: #ef4444;
+          background: #fef2f2;
+          color: #ef4444;
           animation: pulse 1s infinite;
         }
 
         .send-btn {
-          background: #3b82f6;
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
           color: #fff;
+          box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+        }
+
+        .send-btn:hover {
+          transform: scale(1.05);
         }
 
         .send-btn:disabled {
-          background: #333;
-          color: #666;
+          background: #e2e8f0;
+          color: #94a3b8;
+          box-shadow: none;
           cursor: not-allowed;
+          transform: none;
         }
 
         @keyframes pulse {
