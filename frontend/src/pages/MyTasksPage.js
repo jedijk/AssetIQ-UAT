@@ -31,7 +31,6 @@ import {
   Zap,
   Target,
   Eye,
-  User,
   Users,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -72,7 +71,6 @@ const myTasksAPI = {
     const queryParams = new URLSearchParams();
     if (params.filter) queryParams.append("filter", params.filter);
     if (params.date) queryParams.append("date", params.date);
-    if (params.equipment_id) queryParams.append("equipment_id", params.equipment_id);
     if (params.status) queryParams.append("status", params.status);
     if (params.discipline) queryParams.append("discipline", params.discipline);
     
@@ -129,14 +127,6 @@ const myTasksAPI = {
       if (!response.ok) throw new Error("Failed to complete task");
       return response.json();
     }
-  },
-  
-  getEquipmentList: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/equipment?limit=500`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-    });
-    if (!response.ok) throw new Error("Failed to fetch equipment");
-    return response.json();
   },
 };
 
@@ -798,7 +788,6 @@ const MyTasksPage = () => {
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState("today");
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedEquipment, setSelectedEquipment] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
   const [executionDialogOpen, setExecutionDialogOpen] = useState(false);
@@ -817,20 +806,13 @@ const MyTasksPage = () => {
   
   // Fetch tasks
   const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useQuery({
-    queryKey: ["my-tasks", activeFilter, selectedDate, selectedEquipment, selectedDiscipline],
+    queryKey: ["my-tasks", activeFilter, selectedDate, selectedDiscipline],
     queryFn: () => myTasksAPI.getTasks({
       filter: activeFilter,
       date: activeFilter === "today" ? format(selectedDate, "yyyy-MM-dd") : undefined,
-      equipment_id: selectedEquipment || undefined,
       discipline: selectedDiscipline || undefined,
     }),
     refetchInterval: 30000, // Refresh every 30 seconds
-  });
-  
-  // Fetch equipment list for filter
-  const { data: equipmentData } = useQuery({
-    queryKey: ["equipment-list"],
-    queryFn: myTasksAPI.getEquipmentList,
   });
   
   // Complete task mutation
@@ -931,8 +913,6 @@ const MyTasksPage = () => {
     inProgress: tasks.filter(t => t.status === "in_progress").length,
   };
   
-  const equipment = equipmentData?.equipment || [];
-  
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">
       {/* Header */}
@@ -943,22 +923,6 @@ const MyTasksPage = () => {
       
       {/* Filters Row */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        {/* Equipment Filter */}
-        <Select value={selectedEquipment || "all"} onValueChange={(v) => setSelectedEquipment(v === "all" ? "" : v)}>
-          <SelectTrigger className="w-full sm:w-[200px]" data-testid="equipment-filter">
-            <MapPin className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder="All Equipment" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Equipment</SelectItem>
-            {equipment.map((eq) => (
-              <SelectItem key={eq.id} value={eq.id}>
-                {eq.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
         {/* Discipline/Role Filter */}
         <Select value={selectedDiscipline || "all"} onValueChange={(v) => setSelectedDiscipline(v === "all" ? "" : v)}>
           <SelectTrigger className="w-full sm:w-[180px]" data-testid="discipline-filter">
