@@ -296,7 +296,7 @@ const SettingsUserManagementPage = () => {
             <SelectValue placeholder="Filter by role" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="all">{t("userManagement.allRoles")}</SelectItem>
             {Object.entries(roles).map(([roleKey, roleInfo]) => (
               <SelectItem key={roleKey} value={roleKey}>{roleInfo.name}</SelectItem>
             ))}
@@ -312,7 +312,7 @@ const SettingsUserManagementPage = () => {
       ) : users.length === 0 ? (
         <div className="text-center py-12 text-slate-500">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>No users found</p>
+          <p>{t("userManagement.noUsersFound")}</p>
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
@@ -420,18 +420,18 @@ const SettingsUserManagementPage = () => {
       <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit User Profile</DialogTitle>
+            <DialogTitle>{t("userManagement.editUserProfile")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Name</Label>
+              <Label>{t("common.name")}</Label>
               <Input
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               />
             </div>
             <div>
-              <Label>Department</Label>
+              <Label>{t("userManagement.department")}</Label>
               <Input
                 value={editForm.department}
                 onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
@@ -439,7 +439,7 @@ const SettingsUserManagementPage = () => {
               />
             </div>
             <div>
-              <Label>Position</Label>
+              <Label>{t("userManagement.position")}</Label>
               <Input
                 value={editForm.position}
                 onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
@@ -447,7 +447,7 @@ const SettingsUserManagementPage = () => {
               />
             </div>
             <div>
-              <Label>Phone</Label>
+              <Label>{t("userManagement.phone")}</Label>
               <Input
                 value={editForm.phone}
                 onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
@@ -456,7 +456,7 @@ const SettingsUserManagementPage = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setEditingUser(null)}>{t("common.cancel")}</Button>
             <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
               {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
@@ -468,7 +468,7 @@ const SettingsUserManagementPage = () => {
       <Dialog open={!!changeRoleUser} onOpenChange={() => setChangeRoleUser(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change User Role</DialogTitle>
+            <DialogTitle>{t("userManagement.changeUserRole")}</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-slate-600 mb-4">
@@ -503,7 +503,7 @@ const SettingsUserManagementPage = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setChangeRoleUser(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setChangeRoleUser(null)}>{t("common.cancel")}</Button>
             <Button 
               onClick={handleConfirmRoleChange} 
               disabled={updateRoleMutation.isPending || selectedRole === changeRoleUser?.role}

@@ -215,7 +215,7 @@ const RuleCard = ({ rule, onToggle, onConfigure }) => {
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>This rule executes automatically</p>
+                        <p>{t("decisionEngine.autoExecuteNote")}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -588,11 +588,11 @@ const DecisionEnginePage = () => {
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="executed">Executed</SelectItem>
+                  <SelectItem value="all">{t("decisionEngine.allStatus")}</SelectItem>
+                  <SelectItem value="pending">{t("decisionEngine.pending")}</SelectItem>
+                  <SelectItem value="approved">{t("decisionEngine.approved")}</SelectItem>
+                  <SelectItem value="rejected">{t("decisionEngine.rejected")}</SelectItem>
+                  <SelectItem value="executed">{t("decisionEngine.executed")}</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -600,10 +600,10 @@ const DecisionEnginePage = () => {
                   <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Priority</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="all">{t("decisionEngine.allPriority")}</SelectItem>
+                  <SelectItem value="high">{t("common.high")}</SelectItem>
+                  <SelectItem value="medium">{t("common.medium")}</SelectItem>
+                  <SelectItem value="low">{t("common.low")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -766,7 +766,7 @@ const DecisionEnginePage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Notes (optional)</Label>
+              <Label>{t("decisionEngine.notesOptional")}</Label>
               <Textarea
                 value={approvalNotes}
                 onChange={(e) => setApprovalNotes(e.target.value)}
@@ -807,7 +807,7 @@ const DecisionEnginePage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Reason (optional)</Label>
+              <Label>{t("decisionEngine.reasonOptional")}</Label>
               <Textarea
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}

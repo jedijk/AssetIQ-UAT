@@ -17,8 +17,10 @@ import {
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import ThreatCard from "../components/ThreatCard";
+import { useLanguage } from "../contexts/LanguageContext";
 
 const ChatPage = () => {
+  const { t } = useLanguage();
   const [message, setMessage] = useState("");
   const [imageBase64, setImageBase64] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -173,7 +175,7 @@ const ChatPage = () => {
         {isFollowUp && !msg.threat_id && (
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-blue-600 text-sm">
             <HelpCircle className="w-4 h-4" />
-            <span>Please provide more details</span>
+            <span>{t("chat.provideMoreDetails")}</span>
           </div>
         )}
       </div>
@@ -198,13 +200,13 @@ const ChatPage = () => {
               <AlertTriangle className="w-10 h-10 text-blue-600" />
             </div>
             <h3 className="text-xl font-semibold text-slate-800 mb-2">
-              Start Capturing Threats
+              {t("chat.startCapturing")}
             </h3>
             <p className="text-slate-500 max-w-sm text-center">
-              Describe any equipment failure or issue. I'll analyze it and help you prioritize.
+              {t("chat.startCapturingDesc")}
             </p>
             <div className="mt-6 space-y-2 text-left bg-slate-100 rounded-xl p-4 text-sm text-slate-600">
-              <p className="font-medium text-slate-700">Try saying:</p>
+              <p className="font-medium text-slate-700">{t("chat.trySaying")}</p>
               <p>"Pump P-104 is leaking from the mechanical seal"</p>
               <p>"Bearing noise on compressor C-201"</p>
               <p>"Heat exchanger HX-301 showing reduced efficiency"</p>
@@ -304,7 +306,7 @@ const ChatPage = () => {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyPress}
-            placeholder="Describe the failure or issue..."
+            placeholder={t("chat.describeIssue")}
             className="flex-1 min-h-[44px] max-h-32 resize-none rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500"
             rows={1}
             data-testid="chat-message-input"

@@ -442,7 +442,7 @@ export default function ActionsPage() {
             <SelectValue placeholder="Priority" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Priority</SelectItem>
+            <SelectItem value="all">{t("decisionEngine.allPriority") || "All Priority"}</SelectItem>
             {PRIORITY_OPTIONS.map((p) => (
               <SelectItem key={p.value} value={p.value}>
                 <span className="flex items-center gap-2">
@@ -461,7 +461,7 @@ export default function ActionsPage() {
             <SelectValue placeholder="Risk Level" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Risk Levels</SelectItem>
+            <SelectItem value="all">{t("actionsPage.allStatus") || "All Risk Levels"}</SelectItem>
             {RISK_OPTIONS.map((r) => (
               <SelectItem key={r.value} value={r.value}>
                 <span className="flex items-center gap-2">
@@ -510,7 +510,7 @@ export default function ActionsPage() {
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
             <CheckCircle className="w-8 h-8 text-slate-400" />
           </div>
-          <h3 className="text-xl font-semibold text-slate-700 mb-2">No actions yet</h3>
+          <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("actionsPage.noActions")}</h3>
           <p className="text-slate-500">
             Click "Act" on threat recommendations or investigation actions to track them here.
           </p>
@@ -580,7 +580,7 @@ export default function ActionsPage() {
                       </Badge>
                     )}
                     {overdue && (
-                      <Badge className="bg-red-100 text-red-700">Overdue</Badge>
+                      <Badge className="bg-red-100 text-red-700">{t("taskScheduler.overdue")}</Badge>
                     )}
                   </div>
                   <div className="text-xs sm:text-sm text-slate-500 flex items-center gap-2 flex-wrap">
@@ -620,7 +620,7 @@ export default function ActionsPage() {
 
                 {/* Score Column - matching Observations format */}
                 <div className="hidden sm:flex flex-col items-end min-w-[50px]">
-                  <span className="text-xs text-slate-400 font-medium">Score</span>
+                  <span className="text-xs text-slate-400 font-medium">{t("observations.riskScore")}</span>
                   <span className={`text-lg font-bold ${
                     action.threat_risk_score >= 70 ? "text-red-600" :
                     action.threat_risk_score >= 50 ? "text-orange-500" :
@@ -691,79 +691,79 @@ export default function ActionsPage() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit Action</DialogTitle>
+            <DialogTitle>{t("common.edit")} {t("actionsPage.title")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-sm font-medium text-slate-700">Title</label>
+              <label className="text-sm font-medium text-slate-700">{t("threatDetail.actionTitle")}</label>
               <Input
                 value={editForm.title}
                 onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                placeholder="Action title"
+                placeholder={t("threatDetail.actionTitle")}
                 data-testid="edit-action-title"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Description</label>
+              <label className="text-sm font-medium text-slate-700">{t("common.description")}</label>
               <textarea
                 value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                placeholder="Action description"
+                placeholder={t("common.description")}
                 className="w-full min-h-[80px] px-3 py-2 border border-slate-300 rounded-md text-sm"
                 data-testid="edit-action-description"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-slate-700">Status</label>
+                <label className="text-sm font-medium text-slate-700">{t("common.status")}</label>
                 <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
                   <SelectTrigger data-testid="edit-action-status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="open">{t("common.open")}</SelectItem>
+                    <SelectItem value="in_progress">{t("common.inProgress")}</SelectItem>
+                    <SelectItem value="completed">{t("actionsPage.completedActions")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700">Priority</label>
+                <label className="text-sm font-medium text-slate-700">{t("common.priority")}</label>
                 <Select value={editForm.priority} onValueChange={(v) => setEditForm({ ...editForm, priority: v })}>
                   <SelectTrigger data-testid="edit-action-priority">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="critical">Critical</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="critical">{t("common.critical")}</SelectItem>
+                    <SelectItem value="high">{t("common.high")}</SelectItem>
+                    <SelectItem value="medium">{t("common.medium")}</SelectItem>
+                    <SelectItem value="low">{t("common.low")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-slate-700">Assignee</label>
+                <label className="text-sm font-medium text-slate-700">{t("threatDetail.actionAssignee")}</label>
                 <Input
                   value={editForm.assignee}
                   onChange={(e) => setEditForm({ ...editForm, assignee: e.target.value })}
-                  placeholder="Person name"
+                  placeholder={t("threatDetail.actionAssignee")}
                   data-testid="edit-action-assignee"
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700">Discipline</label>
+                <label className="text-sm font-medium text-slate-700">{t("library.discipline")}</label>
                 <Input
                   value={editForm.discipline}
                   onChange={(e) => setEditForm({ ...editForm, discipline: e.target.value })}
-                  placeholder="e.g. Mechanical, Electrical"
+                  placeholder={t("library.discipline")}
                   data-testid="edit-action-discipline"
                 />
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Due Date</label>
+              <label className="text-sm font-medium text-slate-700">{t("common.dueDate")}</label>
               <Input
                 type="date"
                 value={editForm.due_date}
@@ -773,7 +773,7 @@ export default function ActionsPage() {
             </div>
             {editForm.status === "completed" && (
               <div>
-                <label className="text-sm font-medium text-slate-700">Completion Notes</label>
+                <label className="text-sm font-medium text-slate-700">{t("taskScheduler.completionNotes")}</label>
                 <textarea
                   value={editForm.completion_notes}
                   onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
@@ -786,10 +786,10 @@ export default function ActionsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSaveEdit} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              {updateMutation.isPending ? t("taskScheduler.saving") : t("taskScheduler.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -799,18 +799,18 @@ export default function ActionsPage() {
       <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Action</AlertDialogTitle>
+            <AlertDialogTitle>{t("common.delete")} {t("actionsPage.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteConfirm?.title}"? This action can be undone.
+              {t("threatDetail.deleteWarning")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteMutation.mutate(deleteConfirm.id)}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

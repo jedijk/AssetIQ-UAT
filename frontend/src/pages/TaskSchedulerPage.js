@@ -50,34 +50,15 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "../components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "../components/ui/alert-dialog";
-import { Label } from "../components/ui/label";
-import { Textarea } from "../components/ui/textarea";
-import { Calendar } from "../components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
-import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
+import { TemplateDialog } from "../components/task-scheduler/TemplateDialog";
+import { PlanDialog } from "../components/task-scheduler/PlanDialog";
+import { CompleteDialog, DeleteExecutionDialog } from "../components/task-scheduler/ExecutionDialogs";
 
 // Get base URL without /api suffix
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
@@ -573,8 +554,8 @@ const TaskSchedulerPage = () => {
             <CalendarIcon className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Execution Scheduler</h1>
-            <p className="text-sm text-slate-500">Manage work execution and schedules</p>
+            <h1 className="text-2xl font-bold text-slate-900">{t("taskScheduler.title")}</h1>
+            <p className="text-sm text-slate-500">{t("taskScheduler.subtitle")}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -585,11 +566,11 @@ const TaskSchedulerPage = () => {
             disabled={generateInstancesMutation.isPending}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${generateInstancesMutation.isPending ? "animate-spin" : ""}`} />
-            Generate Executions
+            {t("taskScheduler.generateExecutions")}
           </Button>
           <Button size="sm" onClick={() => setShowTemplateDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            New Template
+            {t("taskScheduler.newTemplate")}
           </Button>
         </div>
       </div>
@@ -604,7 +585,7 @@ const TaskSchedulerPage = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.total || 0}</p>
-                <p className="text-xs text-slate-500">Total Executions</p>
+                <p className="text-xs text-slate-500">{t("taskScheduler.totalExecutions")}</p>
               </div>
             </div>
           </CardContent>
@@ -617,7 +598,7 @@ const TaskSchedulerPage = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.by_status?.planned || 0}</p>
-                <p className="text-xs text-slate-500">Planned</p>
+                <p className="text-xs text-slate-500">{t("taskScheduler.planned")}</p>
               </div>
             </div>
           </CardContent>
@@ -630,7 +611,7 @@ const TaskSchedulerPage = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.by_status?.in_progress || 0}</p>
-                <p className="text-xs text-slate-500">In Progress</p>
+                <p className="text-xs text-slate-500">{t("common.inProgress")}</p>
               </div>
             </div>
           </CardContent>
@@ -643,7 +624,7 @@ const TaskSchedulerPage = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.by_status?.completed || 0}</p>
-                <p className="text-xs text-slate-500">Completed</p>
+                <p className="text-xs text-slate-500">{t("actionsPage.completedActions")}</p>
               </div>
             </div>
           </CardContent>
@@ -656,7 +637,7 @@ const TaskSchedulerPage = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.by_status?.overdue || 0}</p>
-                <p className="text-xs text-slate-500">Overdue</p>
+                <p className="text-xs text-slate-500">{t("taskScheduler.overdue")}</p>
               </div>
             </div>
           </CardContent>
@@ -669,15 +650,15 @@ const TaskSchedulerPage = () => {
           <TabsList>
             <TabsTrigger value="instances" className="gap-2">
               <ClipboardList className="w-4 h-4" />
-              Executions
+              {t("taskScheduler.executions")}
             </TabsTrigger>
             <TabsTrigger value="plans" className="gap-2">
               <CalendarDays className="w-4 h-4" />
-              Plans
+              {t("taskScheduler.plans")}
             </TabsTrigger>
             <TabsTrigger value="templates" className="gap-2">
               <FileText className="w-4 h-4" />
-              Templates
+              {t("taskScheduler.templates")}
             </TabsTrigger>
           </TabsList>
           
@@ -689,11 +670,11 @@ const TaskSchedulerPage = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="planned">Planned</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="all">{t("taskScheduler.allStatus")}</SelectItem>
+                  <SelectItem value="planned">{t("taskScheduler.planned")}</SelectItem>
+                  <SelectItem value="in_progress">{t("common.inProgress")}</SelectItem>
+                  <SelectItem value="completed">{t("actionsPage.completedActions")}</SelectItem>
+                  <SelectItem value="overdue">{t("taskScheduler.overdue")}</SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -702,7 +683,7 @@ const TaskSchedulerPage = () => {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Search templates..."
+                    placeholder={t("taskScheduler.searchTemplates")}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-10 w-[200px]"
@@ -713,12 +694,12 @@ const TaskSchedulerPage = () => {
                     <SelectValue placeholder="Discipline" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Disciplines</SelectItem>
-                    <SelectItem value="operations">Operations</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                    <SelectItem value="laboratory">Laboratory</SelectItem>
-                    <SelectItem value="inspection">Inspection</SelectItem>
-                    <SelectItem value="engineering">Engineering</SelectItem>
+                    <SelectItem value="all">{t("taskScheduler.allDisciplines")}</SelectItem>
+                    <SelectItem value="operations">{t("taskScheduler.operations")}</SelectItem>
+                    <SelectItem value="maintenance">{t("taskScheduler.maintenance")}</SelectItem>
+                    <SelectItem value="laboratory">{t("taskScheduler.laboratory")}</SelectItem>
+                    <SelectItem value="inspection">{t("taskScheduler.inspection")}</SelectItem>
+                    <SelectItem value="engineering">{t("taskScheduler.engineering")}</SelectItem>
                   </SelectContent>
                 </Select>
               </>
@@ -735,9 +716,9 @@ const TaskSchedulerPage = () => {
           ) : instances.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
               <ClipboardList className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p className="text-slate-500">No executions found</p>
+              <p className="text-slate-500">{t("taskScheduler.noExecutionsFound")}</p>
               <Button variant="link" onClick={() => generateInstancesMutation.mutate()}>
-                Generate from plans
+                {t("taskScheduler.generateFromPlans")}
               </Button>
             </div>
           ) : (
@@ -746,11 +727,11 @@ const TaskSchedulerPage = () => {
                 <table className="w-full">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">Execution</th>
-                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">Equipment</th>
-                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600 hidden md:table-cell">Scheduled</th>
-                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">Status</th>
-                      <th className="text-right px-4 py-3 text-sm font-semibold text-slate-600">Actions</th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">{t("taskScheduler.execution")}</th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">{t("taskScheduler.equipment")}</th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600 hidden md:table-cell">{t("taskScheduler.scheduled")}</th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">{t("common.status")}</th>
+                      <th className="text-right px-4 py-3 text-sm font-semibold text-slate-600">{t("actionsPage.title")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -773,12 +754,12 @@ const TaskSchedulerPage = () => {
                           <div className="flex items-center justify-end gap-2">
                             {instance.status === "planned" && (
                               <Button size="sm" variant="outline" onClick={() => handleStartTask(instance)}>
-                                <PlayCircle className="w-4 h-4 mr-1" /> Start
+                                <PlayCircle className="w-4 h-4 mr-1" /> {t("taskScheduler.start")}
                               </Button>
                             )}
                             {instance.status === "in_progress" && (
                               <Button size="sm" onClick={() => handleCompleteTask(instance)}>
-                                <CheckCircle2 className="w-4 h-4 mr-1" /> Complete
+                                <CheckCircle2 className="w-4 h-4 mr-1" /> {t("taskScheduler.complete")}
                               </Button>
                             )}
                             <Button 
@@ -806,7 +787,7 @@ const TaskSchedulerPage = () => {
           <div className="flex justify-end mb-4">
             <Button onClick={() => setShowPlanDialog(true)} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="w-4 h-4 mr-2" />
-              New Plan
+              {t("taskScheduler.newPlan")}
             </Button>
           </div>
           {plansLoading ? (
@@ -816,11 +797,11 @@ const TaskSchedulerPage = () => {
           ) : plans.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
               <CalendarDays className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p className="text-slate-500">No execution plans created yet</p>
-              <p className="text-sm text-slate-400 mt-1">Create plans from templates to schedule recurring executions</p>
+              <p className="text-slate-500">{t("taskScheduler.noPlansYet")}</p>
+              <p className="text-sm text-slate-400 mt-1">{t("taskScheduler.createPlansDesc")}</p>
               <Button onClick={() => setShowPlanDialog(true)} className="mt-4 bg-blue-600 hover:bg-blue-700">
                 <Plus className="w-4 h-4 mr-2" />
-                Create First Plan
+                {t("taskScheduler.createFirstPlan")}
               </Button>
             </div>
           ) : (
@@ -835,7 +816,7 @@ const TaskSchedulerPage = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge className={plan.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}>
-                          {plan.is_active ? "Active" : "Inactive"}
+                          {plan.is_active ? t("taskScheduler.active") : t("taskScheduler.inactive")}
                         </Badge>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -849,7 +830,7 @@ const TaskSchedulerPage = () => {
                               onClick={() => deletePlanMutation.mutate(plan.id)}
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
-                              Delete Plan
+                              {t("taskScheduler.deletePlan")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -864,12 +845,12 @@ const TaskSchedulerPage = () => {
                       </div>
                       <div className="flex items-center gap-2 text-slate-600">
                         <CalendarIcon className="w-4 h-4" />
-                        Next: {formatDate(plan.next_due_date)}
+                        {t("taskScheduler.next")}: {formatDate(plan.next_due_date)}
                       </div>
                       {plan.form_template_id && (
                         <div className="flex items-center gap-2 text-blue-600">
                           <FileText className="w-4 h-4" />
-                          <span className="truncate">{plan.form_template_name || "Linked Form"}</span>
+                          <span className="truncate">{plan.form_template_name || t("taskScheduler.linkedForm")}</span>
                         </div>
                       )}
                     </div>
@@ -889,9 +870,9 @@ const TaskSchedulerPage = () => {
           ) : templates.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
               <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p className="text-slate-500">No task templates found</p>
+              <p className="text-slate-500">{t("taskScheduler.noTemplatesFound")}</p>
               <Button variant="link" onClick={() => setShowTemplateDialog(true)}>
-                Create your first template
+                {t("taskScheduler.createFirstTemplate")}
               </Button>
             </div>
           ) : (
@@ -909,7 +890,7 @@ const TaskSchedulerPage = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleEditTemplate(template)} data-testid={`template-edit-${template.id}`}>
-                            <Edit className="w-4 h-4 mr-2" /> Edit
+                            <Edit className="w-4 h-4 mr-2" /> {t("common.edit")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
@@ -917,12 +898,12 @@ const TaskSchedulerPage = () => {
                             onClick={() => deleteTemplateMutation.mutate(template.id)}
                             data-testid={`template-delete-${template.id}`}
                           >
-                            <Trash2 className="w-4 h-4 mr-2" /> Delete
+                            <Trash2 className="w-4 h-4 mr-2" /> {t("common.delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                    <CardDescription className="line-clamp-2">{template.description || "No description"}</CardDescription>
+                    <CardDescription className="line-clamp-2">{template.description || t("taskScheduler.noDescription")}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -939,7 +920,7 @@ const TaskSchedulerPage = () => {
                       )}
                     </div>
                     <div className="mt-3 text-xs text-slate-500">
-                      Used in {template.usage_count || 0} plans
+                      {t("taskScheduler.usedInPlans")} {template.usage_count || 0} {t("taskScheduler.plans").toLowerCase()}
                     </div>
                   </CardContent>
                 </Card>
@@ -950,410 +931,60 @@ const TaskSchedulerPage = () => {
       </Tabs>
 
       {/* Create/Edit Template Dialog */}
-      <Dialog open={showTemplateDialog} onOpenChange={(open) => {
-        setShowTemplateDialog(open);
-        if (!open) {
+      <TemplateDialog
+        open={showTemplateDialog}
+        onOpenChange={(open) => {
+          setShowTemplateDialog(open);
+          if (!open) {
+            setEditingTemplate(null);
+            resetTemplateForm();
+          }
+        }}
+        editingTemplate={editingTemplate}
+        templateForm={templateForm}
+        setTemplateForm={setTemplateForm}
+        onSubmit={handleCreateTemplate}
+        isPending={createTemplateMutation.isPending || updateTemplateMutation.isPending}
+        onClose={() => {
+          setShowTemplateDialog(false);
           setEditingTemplate(null);
           resetTemplateForm();
-        }
-      }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingTemplate ? "Edit Execution Template" : "Create Execution Template"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-            <div>
-              <Label>Name *</Label>
-              <Input
-                value={templateForm.name}
-                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
-                placeholder="e.g., Bearing Inspection"
-              />
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea
-                value={templateForm.description}
-                onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
-                placeholder="Describe the task..."
-                rows={3}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Discipline *</Label>
-                <Select 
-                  value={templateForm.discipline} 
-                  onValueChange={(v) => setTemplateForm({ ...templateForm, discipline: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="operations">Operations</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                    <SelectItem value="laboratory">Laboratory</SelectItem>
-                    <SelectItem value="inspection">Inspection</SelectItem>
-                    <SelectItem value="engineering">Engineering</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Strategy</Label>
-                <Select 
-                  value={templateForm.mitigation_strategy} 
-                  onValueChange={(v) => setTemplateForm({ ...templateForm, mitigation_strategy: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="preventive">Preventive</SelectItem>
-                    <SelectItem value="predictive">Predictive</SelectItem>
-                    <SelectItem value="detective">Detective</SelectItem>
-                    <SelectItem value="corrective">Corrective</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <Label>Default Interval</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    value={templateForm.default_interval}
-                    onChange={(e) => setTemplateForm({ ...templateForm, default_interval: parseInt(e.target.value) || 1 })}
-                    min={1}
-                  />
-                  <Select 
-                    value={templateForm.default_unit} 
-                    onValueChange={(v) => setTemplateForm({ ...templateForm, default_unit: v })}
-                  >
-                    <SelectTrigger className="w-[100px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="days">Days</SelectItem>
-                      <SelectItem value="weeks">Weeks</SelectItem>
-                      <SelectItem value="months">Months</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label>Duration (min)</Label>
-                <Input
-                  type="number"
-                  value={templateForm.estimated_duration_minutes}
-                  onChange={(e) => setTemplateForm({ ...templateForm, estimated_duration_minutes: parseInt(e.target.value) || 0 })}
-                  min={0}
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowTemplateDialog(false);
-              setEditingTemplate(null);
-              resetTemplateForm();
-            }}>Cancel</Button>
-            <Button 
-              onClick={handleCreateTemplate} 
-              disabled={!templateForm.name || createTemplateMutation.isPending || updateTemplateMutation.isPending}
-            >
-              {(createTemplateMutation.isPending || updateTemplateMutation.isPending) 
-                ? (editingTemplate ? "Saving..." : "Creating...") 
-                : (editingTemplate ? "Save Changes" : "Create Template")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        }}
+      />
 
       {/* Complete Execution Dialog */}
-      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Complete Execution</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-slate-600">
-              Completing: <strong>{selectedInstance?.task_template_name}</strong>
-            </p>
-            <div>
-              <Label>Completion Notes</Label>
-              <Textarea
-                value={completeForm.notes}
-                onChange={(e) => setCompleteForm({ ...completeForm, notes: e.target.value })}
-                placeholder="Any observations or notes..."
-                rows={3}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="needsFollowUp"
-                checked={completeForm.needs_follow_up}
-                onChange={(e) => setCompleteForm({ ...completeForm, needs_follow_up: e.target.checked })}
-                className="rounded border-slate-300"
-              />
-              <Label htmlFor="needsFollowUp" className="text-sm font-normal cursor-pointer">
-                Needs follow-up action
-              </Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>Cancel</Button>
-            <Button 
-              onClick={handleConfirmComplete}
-              disabled={completeInstanceMutation.isPending}
-            >
-              {completeInstanceMutation.isPending ? "Completing..." : "Mark Complete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CompleteDialog
+        open={showCompleteDialog}
+        onOpenChange={setShowCompleteDialog}
+        selectedInstance={selectedInstance}
+        completeForm={completeForm}
+        setCompleteForm={setCompleteForm}
+        onSubmit={handleConfirmComplete}
+        isPending={completeInstanceMutation.isPending}
+      />
 
       {/* Delete Execution Confirmation Dialog */}
-      <AlertDialog open={!!deleteInstanceId} onOpenChange={(open) => !open && setDeleteInstanceId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Execution</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this execution? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteInstanceId(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteInstanceMutation.mutate(deleteInstanceId)}
-              className="bg-red-600 hover:bg-red-700"
-              disabled={deleteInstanceMutation.isPending}
-            >
-              {deleteInstanceMutation.isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteExecutionDialog
+        open={!!deleteInstanceId}
+        onOpenChange={(open) => !open && setDeleteInstanceId(null)}
+        onConfirm={() => deleteInstanceMutation.mutate(deleteInstanceId)}
+        isPending={deleteInstanceMutation.isPending}
+      />
 
       {/* Create Plan Dialog */}
-      <Dialog open={showPlanDialog} onOpenChange={setShowPlanDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create Execution Plan</DialogTitle>
-            <DialogDescription>Schedule recurring executions for equipment</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>Execution Template *</Label>
-              <Select 
-                value={planForm.task_template_id} 
-                onValueChange={handleTemplateSelect}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a template" />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Equipment *</Label>
-              <Select 
-                value={planForm.equipment_id} 
-                onValueChange={(v) => setPlanForm({ ...planForm, equipment_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select equipment" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(equipmentData?.nodes || []).map((eq) => (
-                    <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="flex items-center justify-between">
-                <span>Interval</span>
-                {planForm.task_template_id && (planForm.interval_value === null) && (
-                  <span className="text-xs text-slate-400 font-normal">Inherited from template</span>
-                )}
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  value={planForm.interval_value ?? inheritedInterval.value}
-                  onChange={(e) => setPlanForm({ ...planForm, interval_value: parseInt(e.target.value) || 1 })}
-                  min={1}
-                  className={`w-20 ${planForm.interval_value === null ? 'text-slate-400 bg-slate-50' : ''}`}
-                  placeholder={inheritedInterval.value.toString()}
-                />
-                <Select 
-                  value={planForm.interval_unit ?? inheritedInterval.unit} 
-                  onValueChange={(v) => setPlanForm({ ...planForm, interval_unit: v })}
-                >
-                  <SelectTrigger className={`w-[100px] ${planForm.interval_unit === null ? 'text-slate-400 bg-slate-50' : ''}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="days">Days</SelectItem>
-                    <SelectItem value="weeks">Weeks</SelectItem>
-                    <SelectItem value="months">Months</SelectItem>
-                  </SelectContent>
-                </Select>
-                {(planForm.interval_value !== null || planForm.interval_unit !== null) && (
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setPlanForm({ ...planForm, interval_value: null, interval_unit: null })}
-                    className="text-xs text-slate-500"
-                  >
-                    Reset
-                  </Button>
-                )}
-              </div>
-              {planForm.task_template_id && planForm.interval_value === null && (
-                <p className="text-xs text-slate-400 mt-1">
-                  Template default: {inheritedInterval.value} {inheritedInterval.unit}
-                </p>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Begin Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={`w-full justify-start text-left font-normal ${!planForm.effective_from ? "text-muted-foreground" : ""}`}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {planForm.effective_from ? format(planForm.effective_from, "PPP") : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={planForm.effective_from}
-                      onSelect={(date) => setPlanForm({ ...planForm, effective_from: date })}
-                      initialFocus
-                    />
-                    <div className="p-3 border-t border-slate-200 flex justify-between">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setPlanForm({ ...planForm, effective_from: new Date() })}
-                      >
-                        Today
-                      </Button>
-                      {planForm.effective_from && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setPlanForm({ ...planForm, effective_from: null })}
-                          className="text-red-500"
-                        >
-                          Clear
-                        </Button>
-                      )}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-                <p className="text-xs text-slate-400 mt-1">When to start scheduling</p>
-              </div>
-              <div>
-                <Label>End Date (Optional)</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={`w-full justify-start text-left font-normal ${!planForm.effective_until ? "text-muted-foreground" : ""}`}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {planForm.effective_until ? format(planForm.effective_until, "PPP") : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={planForm.effective_until}
-                      onSelect={(date) => setPlanForm({ ...planForm, effective_until: date })}
-                      initialFocus
-                      disabled={(date) => planForm.effective_from && date < planForm.effective_from}
-                    />
-                    <div className="p-3 border-t border-slate-200 flex justify-between">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setPlanForm({ ...planForm, effective_until: new Date() })}
-                      >
-                        Today
-                      </Button>
-                      {planForm.effective_until && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setPlanForm({ ...planForm, effective_until: null })}
-                          className="text-red-500"
-                        >
-                          Clear
-                        </Button>
-                      )}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-                <p className="text-xs text-slate-400 mt-1">When to stop scheduling</p>
-              </div>
-            </div>
-            <div>
-              <Label>Linked Form (Optional)</Label>
-              <Select 
-                value={planForm.form_template_id} 
-                onValueChange={(v) => setPlanForm({ ...planForm, form_template_id: v === "none" ? "" : v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a form template" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No form</SelectItem>
-                  {(formTemplatesData?.templates || []).map((form) => (
-                    <SelectItem key={form.id} value={form.id}>
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-slate-400" />
-                        {form.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-slate-500 mt-1">Link a form to be filled during execution</p>
-            </div>
-            <div>
-              <Label>Notes</Label>
-              <Textarea 
-                value={planForm.notes}
-                onChange={(e) => setPlanForm({ ...planForm, notes: e.target.value })}
-                placeholder="Optional notes about this plan"
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPlanDialog(false)}>Cancel</Button>
-            <Button 
-              onClick={() => createPlanMutation.mutate(planForm)}
-              disabled={!planForm.task_template_id || !planForm.equipment_id || createPlanMutation.isPending}
-            >
-              {createPlanMutation.isPending ? "Creating..." : "Create Plan"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PlanDialog
+        open={showPlanDialog}
+        onOpenChange={setShowPlanDialog}
+        planForm={planForm}
+        setPlanForm={setPlanForm}
+        templates={templates}
+        equipmentData={equipmentData}
+        formTemplatesData={formTemplatesData}
+        inheritedInterval={inheritedInterval}
+        onTemplateSelect={handleTemplateSelect}
+        onSubmit={() => createPlanMutation.mutate(planForm)}
+        isPending={createPlanMutation.isPending}
+      />
     </div>
   );
 };

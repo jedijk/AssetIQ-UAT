@@ -1,0 +1,144 @@
+import { useLanguage } from "../../contexts/LanguageContext";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Textarea } from "../ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+
+export const TemplateDialog = ({
+  open,
+  onOpenChange,
+  editingTemplate,
+  templateForm,
+  setTemplateForm,
+  onSubmit,
+  isPending,
+  onClose,
+}) => {
+  const { t } = useLanguage();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{editingTemplate ? t("taskScheduler.editTemplate") : t("taskScheduler.createTemplate")}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+          <div>
+            <Label>{t("common.name")} *</Label>
+            <Input
+              value={templateForm.name}
+              onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+              placeholder="e.g., Bearing Inspection"
+            />
+          </div>
+          <div>
+            <Label>{t("common.description")}</Label>
+            <Textarea
+              value={templateForm.description}
+              onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
+              placeholder="Describe the task..."
+              rows={3}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>{t("library.discipline")} *</Label>
+              <Select 
+                value={templateForm.discipline} 
+                onValueChange={(v) => setTemplateForm({ ...templateForm, discipline: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="operations">{t("taskScheduler.operations")}</SelectItem>
+                  <SelectItem value="maintenance">{t("taskScheduler.maintenance")}</SelectItem>
+                  <SelectItem value="laboratory">{t("taskScheduler.laboratory")}</SelectItem>
+                  <SelectItem value="inspection">{t("taskScheduler.inspection")}</SelectItem>
+                  <SelectItem value="engineering">{t("taskScheduler.engineering")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{t("taskScheduler.strategy")}</Label>
+              <Select 
+                value={templateForm.mitigation_strategy} 
+                onValueChange={(v) => setTemplateForm({ ...templateForm, mitigation_strategy: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="preventive">{t("taskScheduler.preventive")}</SelectItem>
+                  <SelectItem value="predictive">{t("taskScheduler.predictive")}</SelectItem>
+                  <SelectItem value="detective">{t("taskScheduler.detective")}</SelectItem>
+                  <SelectItem value="corrective">{t("taskScheduler.corrective")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2">
+              <Label>{t("taskScheduler.defaultInterval")}</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  value={templateForm.default_interval}
+                  onChange={(e) => setTemplateForm({ ...templateForm, default_interval: parseInt(e.target.value) || 1 })}
+                  min={1}
+                />
+                <Select 
+                  value={templateForm.default_unit} 
+                  onValueChange={(v) => setTemplateForm({ ...templateForm, default_unit: v })}
+                >
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">{t("taskScheduler.days")}</SelectItem>
+                    <SelectItem value="weeks">{t("taskScheduler.weeks")}</SelectItem>
+                    <SelectItem value="months">{t("taskScheduler.months")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>{t("taskScheduler.durationMin")}</Label>
+              <Input
+                type="number"
+                value={templateForm.estimated_duration_minutes}
+                onChange={(e) => setTemplateForm({ ...templateForm, estimated_duration_minutes: parseInt(e.target.value) || 0 })}
+                min={0}
+              />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button 
+            onClick={onSubmit} 
+            disabled={!templateForm.name || isPending}
+          >
+            {isPending 
+              ? (editingTemplate ? t("taskScheduler.saving") : t("common.creating")) 
+              : (editingTemplate ? t("taskScheduler.saveChanges") : t("taskScheduler.createTemplate"))}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

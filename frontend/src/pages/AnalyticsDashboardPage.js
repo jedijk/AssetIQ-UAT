@@ -200,9 +200,9 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="7">{t("analyticsDashboard.last7Days")}</SelectItem>
+                <SelectItem value="30">{t("analyticsDashboard.last30Days")}</SelectItem>
+                <SelectItem value="90">{t("analyticsDashboard.last90Days")}</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
@@ -223,9 +223,9 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="7">{t("analyticsDashboard.last7Days")}</SelectItem>
+                <SelectItem value="30">{t("analyticsDashboard.last30Days")}</SelectItem>
+                <SelectItem value="90">{t("analyticsDashboard.last90Days")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -311,7 +311,7 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg">Top Risks by RPN</CardTitle>
-                <CardDescription>Equipment Failure Modes with highest risk</CardDescription>
+                <CardDescription>{t("analyticsDashboard.topRisksDesc")}</CardDescription>
               </div>
               <Badge variant="outline" className="gap-1">
                 <Zap className="w-3 h-3" /> Top 10
@@ -322,7 +322,7 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
             {topRisks.length === 0 ? (
               <div className="text-center py-8 text-slate-400">
                 <Shield className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p>No risk data available</p>
+                <p>{t("analyticsDashboard.noRiskData")}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -361,7 +361,7 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg">Failure Mode Pareto</CardTitle>
-                <CardDescription>Most observed failure modes</CardDescription>
+                <CardDescription>{t("analyticsDashboard.failureModeParetoDesc")}</CardDescription>
               </div>
               <Badge variant="outline">
                 {failureModePareto?.total_observations || 0} observations
@@ -372,7 +372,7 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
             {(failureModePareto?.failure_modes || []).length === 0 ? (
               <div className="text-center py-8 text-slate-400">
                 <Layers className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p>No observation data</p>
+                <p>{t("analyticsDashboard.noObservationData")}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -405,13 +405,13 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Equipment Risk Ranking</CardTitle>
-            <CardDescription>Equipment by aggregated failure mode risk</CardDescription>
+            <CardDescription>{t("analyticsDashboard.equipmentRiskDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             {equipmentRiskRanking.length === 0 ? (
               <div className="text-center py-8 text-slate-400">
                 <Layers className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p>No equipment data</p>
+                <p>{t("analyticsDashboard.noEquipmentData")}</p>
               </div>
             ) : (
               <SimpleBarChart
@@ -430,7 +430,7 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Detection Effectiveness</CardTitle>
-            <CardDescription>Task templates by issue detection rate</CardDescription>
+            <CardDescription>{t("analyticsDashboard.detectionEffectivenessDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -479,7 +479,7 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg">Task Workload</CardTitle>
-              <CardDescription>Upcoming 7-day task distribution</CardDescription>
+              <CardDescription>{t("analyticsDashboard.taskWorkloadDesc")}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -487,7 +487,7 @@ const AnalyticsDashboardPage = ({ embedded = false }) => {
           {taskWorkload.length === 0 ? (
             <div className="text-center py-8 text-slate-400">
               <Calendar className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p>No scheduled tasks</p>
+              <p>{t("analyticsDashboard.noScheduledTasks")}</p>
             </div>
           ) : (
             <div className="grid grid-cols-7 gap-2">

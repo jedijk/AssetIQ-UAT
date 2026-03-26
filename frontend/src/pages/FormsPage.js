@@ -670,10 +670,10 @@ const FormsPage = () => {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {newTemplate.id ? "Edit Form Template" : "Create Form Template"}
+              {newTemplate.id ? t("common.edit") + " " + t("forms.templates") : t("forms.title")}
             </DialogTitle>
             <DialogDescription>
-              Design a reusable form for data collection
+              {t("forms.subtitle")}
             </DialogDescription>
           </DialogHeader>
 
@@ -681,7 +681,7 @@ const FormsPage = () => {
             {/* Basic Info */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="template-name">Name *</Label>
+                <Label htmlFor="template-name">{t("forms.templateName")} *</Label>
                 <Input
                   id="template-name"
                   value={newTemplate.name}
@@ -691,7 +691,7 @@ const FormsPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="template-description">Description</Label>
+                <Label htmlFor="template-description">{t("forms.templateDescription")}</Label>
                 <Textarea
                   id="template-description"
                   value={newTemplate.description}
@@ -702,32 +702,32 @@ const FormsPage = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Discipline</Label>
+                  <Label>{t("forms.discipline")}</Label>
                   <Select
                     value={newTemplate.discipline}
                     onValueChange={(v) => setNewTemplate(prev => ({ ...prev, discipline: v }))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select discipline" />
+                      <SelectValue placeholder={t("forms.discipline")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="operations">Operations</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="inspection">Inspection</SelectItem>
-                      <SelectItem value="lab">Lab</SelectItem>
+                      <SelectItem value="operations">{t("forms.operations")}</SelectItem>
+                      <SelectItem value="maintenance">{t("forms.maintenance")}</SelectItem>
+                      <SelectItem value="inspection">{t("forms.inspection")}</SelectItem>
+                      <SelectItem value="lab">{t("forms.lab")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label>Require Signature</Label>
+                    <Label>{t("forms.requireSignature")}</Label>
                     <Switch
                       checked={newTemplate.require_signature}
                       onCheckedChange={(v) => setNewTemplate(prev => ({ ...prev, require_signature: v }))}
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label>Allow Partial Submit</Label>
+                    <Label>{t("forms.allowPartialSubmit")}</Label>
                     <Switch
                       checked={newTemplate.allow_partial_submission}
                       onCheckedChange={(v) => setNewTemplate(prev => ({ ...prev, allow_partial_submission: v }))}
@@ -740,7 +740,7 @@ const FormsPage = () => {
             {/* Fields Section */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-medium">Form Fields</Label>
+                <Label className="text-base font-medium">{t("forms.formFields")}</Label>
                 <Button
                   variant="outline"
                   size="sm"
@@ -756,8 +756,8 @@ const FormsPage = () => {
 
               {newTemplate.fields.length === 0 ? (
                 <div className="text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                  <p className="text-sm text-slate-500">No fields added yet</p>
-                  <p className="text-xs text-slate-400 mt-1">Click "Add Field" to start building your form</p>
+                  <p className="text-sm text-slate-500">{t("forms.noFieldsYet")}</p>
+                  <p className="text-xs text-slate-400 mt-1">{t("forms.addFieldHint")}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -790,7 +790,7 @@ const FormsPage = () => {
               disabled={createTemplateMutation.isPending}
               data-testid="save-template-btn"
             >
-              {createTemplateMutation.isPending ? "Saving..." : "Save Template"}
+              {createTemplateMutation.isPending ? t("taskScheduler.saving") : t("taskScheduler.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -800,12 +800,12 @@ const FormsPage = () => {
       <Dialog open={showFieldDialog} onOpenChange={setShowFieldDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingField ? "Edit Field" : "Add Field"}</DialogTitle>
+            <DialogTitle>{editingField ? t("common.edit") : t("common.add")} {t("forms.label")}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Label *</Label>
+              <Label>{t("forms.label")} *</Label>
               <Input
                 value={newField.label}
                 onChange={(e) => setNewField(prev => ({ ...prev, label: e.target.value }))}
@@ -815,7 +815,7 @@ const FormsPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Field Type</Label>
+              <Label>{t("forms.fieldType")}</Label>
               <Select
                 value={newField.field_type}
                 onValueChange={(v) => setNewField(prev => ({ ...prev, field_type: v }))}
@@ -932,7 +932,7 @@ const FormsPage = () => {
       <Dialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete Template</DialogTitle>
+            <DialogTitle>{t("common.delete")} {t("forms.templates")}</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete "{showDeleteConfirm?.name}"? This action cannot be undone.
             </DialogDescription>
@@ -946,7 +946,7 @@ const FormsPage = () => {
               onClick={() => deleteTemplateMutation.mutate(showDeleteConfirm.id)}
               disabled={deleteTemplateMutation.isPending}
             >
-              {deleteTemplateMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteTemplateMutation.isPending ? t("taskScheduler.deleting") : t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>
