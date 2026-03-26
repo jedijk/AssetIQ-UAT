@@ -241,7 +241,7 @@ async def process_chat_message(
     # STATE: AWAITING EQUIPMENT SELECTION
     # ============================================
     if current_state == ChatState.AWAITING_EQUIPMENT:
-        prev_suggestions = conv_state.get("equipment_suggestions", [])
+        prev_suggestions = conv_state.get("equipment_suggestions") or []
         
         # Check if user selected one of the suggested equipment
         message_normalized = normalize_text(message_content)
@@ -432,7 +432,7 @@ async def process_chat_message(
     # STATE: AWAITING FAILURE MODE SELECTION
     # ============================================
     if current_state == ChatState.AWAITING_FAILURE_MODE:
-        prev_suggestions = conv_state.get("failure_mode_suggestions", [])
+        prev_suggestions = conv_state.get("failure_mode_suggestions") or []
         
         # Check if user selected one of the suggested failure modes
         message_text = message_content
