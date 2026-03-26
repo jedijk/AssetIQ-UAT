@@ -1375,24 +1375,58 @@ const ThreatDetailPage = () => {
             const actionText = isObj ? (action.action || action.description || '') : action;
             const actionType = isObj ? action.action_type : null;
             const discipline = isObj ? action.discipline : null;
+            
+            // Action type styling
+            const typeStyles = {
+              CM: { bg: 'bg-amber-500', text: 'text-white', label: 'CM', fullLabel: 'Corrective' },
+              PM: { bg: 'bg-blue-500', text: 'text-white', label: 'PM', fullLabel: 'Preventive' },
+              PDM: { bg: 'bg-purple-500', text: 'text-white', label: 'PDM', fullLabel: 'Predictive' },
+            };
+            const typeStyle = actionType ? typeStyles[actionType] || { bg: 'bg-slate-500', text: 'text-white', label: actionType } : null;
+            
             return (
             <div
               key={idx}
-              className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg group"
+              className="flex items-start gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-200 hover:shadow-sm transition-all group"
               data-testid={`action-item-${idx}`}
             >
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-medium">
-                {idx + 1}
-              </div>
-              <div className="flex-1">
-                {(actionType || discipline) && (
-                  <div className="flex items-center gap-2 mb-1">
-                    {actionType && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${actionType === 'PM' ? 'bg-blue-100 text-blue-700' : actionType === 'CM' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>{actionType}</span>}
-                    {discipline && <span className="text-xs text-slate-500">{discipline}</span>}
+              {/* Action Type Badge */}
+              <div className="flex-shrink-0">
+                {typeStyle ? (
+                  <div className={`w-12 h-12 rounded-lg ${typeStyle.bg} ${typeStyle.text} flex flex-col items-center justify-center shadow-sm`}>
+                    <span className="text-xs font-bold">{typeStyle.label}</span>
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center">
+                    <span className="text-lg font-semibold">{idx + 1}</span>
                   </div>
                 )}
-                <p className="text-slate-700">{actionText}</p>
               </div>
+              
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                {/* Discipline Tag */}
+                {discipline && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                      </svg>
+                      {discipline}
+                    </span>
+                    {actionType && (
+                      <span className="text-xs text-slate-400">
+                        {typeStyle?.fullLabel} Maintenance
+                      </span>
+                    )}
+                  </div>
+                )}
+                
+                {/* Action Text */}
+                <p className="text-slate-700 leading-relaxed">{actionText}</p>
+              </div>
+              
+              {/* Act Button */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -1402,11 +1436,11 @@ const ThreatDetailPage = () => {
                   discipline: discipline
                 })}
                 disabled={promoteToActionMutation.isPending}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                className="opacity-0 group-hover:opacity-100 transition-all text-blue-600 hover:text-white hover:bg-blue-600 rounded-lg px-4"
                 title="Add to action tracker"
                 data-testid={`promote-action-${idx}`}
               >
-                <ClipboardList className="w-4 h-4 mr-1" />
+                <ClipboardList className="w-4 h-4 mr-1.5" />
                 Act
               </Button>
             </div>
