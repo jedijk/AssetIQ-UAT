@@ -188,17 +188,18 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-slate-200 p-6 relative">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 relative overflow-hidden">
         {/* Info Button - Top Right */}
         <button
           onClick={() => setShowInfoDialog(true)}
-          className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 transition-colors"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 rounded-full hover:bg-slate-100 transition-colors z-10"
           title="View framework methodology"
         >
           <HelpCircle className="w-5 h-5 text-slate-400 hover:text-slate-600" />
         </button>
         
-        <svg width={size} height={size} className="mx-auto" style={{ overflow: 'visible' }}>
+        <div className="w-full max-w-[320px] mx-auto">
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="w-full h-auto mx-auto" style={{ overflow: 'visible', maxWidth: '100%' }}>
           {/* Background */}
           <circle cx={centerX} cy={centerY} r={radius + 10} fill="#f8fafc" />
           
@@ -252,12 +253,13 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
           <text x={centerX} y={centerY - 8} textAnchor="middle" fontSize="28" fontWeight="bold" fill="#EAB308">{overall}</text>
           <text x={centerX} y={centerY + 14} textAnchor="middle" fontSize="10" fill="#94a3b8">SCORE</text>
         </svg>
+        </div>
         
         <p className="text-center mt-3 text-sm text-slate-600">{getAssessment(overall)}</p>
         
         {/* Bottom stats */}
-        <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-slate-100">
-          <span className="text-sm text-slate-500">{itemCount} equipment</span>
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 mt-4 pt-4 border-t border-slate-100">
+          <span className="text-xs sm:text-sm text-slate-500">{itemCount} equipment</span>
           {alerts > 0 && (
             <span className="flex items-center gap-1 px-2 py-0.5 bg-red-50 rounded-full">
               <AlertTriangle className="w-3 h-3 text-red-500" />

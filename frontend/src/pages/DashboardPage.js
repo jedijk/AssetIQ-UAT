@@ -258,18 +258,19 @@ export default function DashboardPage() {
         
         {/* Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
-            <TabsTrigger value="operational" className="flex items-center gap-2" data-testid="operational-tab">
-              <Activity className="w-4 h-4" />
-              {t("dashboard.operational") || "Operational"}
+          <TabsList className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-full sm:w-auto overflow-x-auto">
+            <TabsTrigger value="operational" className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 whitespace-nowrap" data-testid="operational-tab">
+              <Activity className="w-4 h-4 flex-shrink-0" />
+              <span className="text-xs sm:text-sm">{t("dashboard.operational") || "Operational"}</span>
             </TabsTrigger>
-            <TabsTrigger value="reliability" className="flex items-center gap-2" data-testid="reliability-tab">
-              <Gauge className="w-4 h-4" />
-              {t("dashboard.reliabilityPerformance") || "Reliability"}
+            <TabsTrigger value="reliability" className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 whitespace-nowrap" data-testid="reliability-tab">
+              <Gauge className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline text-sm">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</span>
+              <span className="sm:hidden text-xs">Reliability</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2" data-testid="analytics-tab">
-              <BarChart3 className="w-4 h-4" />
-              {t("dashboard.analytics") || "Analytics"}
+            <TabsTrigger value="analytics" className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 whitespace-nowrap" data-testid="analytics-tab">
+              <BarChart3 className="w-4 h-4 flex-shrink-0" />
+              <span className="text-xs sm:text-sm">{t("dashboard.analytics") || "Analytics"}</span>
             </TabsTrigger>
           </TabsList>
           
