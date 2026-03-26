@@ -354,8 +354,8 @@ async def transcribe_audio_with_ai(audio_base64: str) -> str:
             response = await stt.transcribe(
                 file=audio_file,
                 model="whisper-1",
-                response_format="json",
-                language="en"
+                response_format="json"
+                # Language auto-detection enabled (supports Dutch, English, and 50+ languages)
             )
 
         return response.text
