@@ -63,6 +63,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import BackButton from "../components/BackButton";
 
 // Status options with colors and icons - matching Observations
@@ -556,9 +557,20 @@ export default function ActionsPage() {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
-                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-1">
-                      {action.title}
-                    </h3>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <h3 className="font-semibold text-slate-900 text-sm sm:text-base truncate max-w-[300px] sm:max-w-[400px] lg:max-w-[500px] cursor-default">
+                            {action.title}
+                          </h3>
+                        </TooltipTrigger>
+                        {action.title && action.title.length > 40 && (
+                          <TooltipContent side="bottom" className="max-w-sm">
+                            <p className="text-xs">{action.title}</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                     <Badge className={priority.color}>
                       {priority.label}
                     </Badge>
