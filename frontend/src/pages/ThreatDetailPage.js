@@ -1393,28 +1393,16 @@ const ThreatDetailPage = () => {
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAddRecommendedDialog(true)}
-              className="text-green-600 border-green-200 hover:bg-green-50"
-              data-testid="add-recommended-action-button"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Add Recommendation
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAddActionDialog(true)}
-              className="text-blue-600 border-blue-200 hover:bg-blue-50"
-              data-testid="add-action-button"
-            >
-              <ClipboardList className="w-4 h-4 mr-1" />
-              Create Action
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAddRecommendedDialog(true)}
+            className="text-green-600 border-green-200 hover:bg-green-50"
+            data-testid="add-recommended-action-button"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Add Recommendation
+          </Button>
         </div>
         <div className="space-y-3">
           {threat.recommended_actions.map((action, idx) => {
