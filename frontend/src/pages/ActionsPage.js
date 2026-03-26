@@ -90,6 +90,7 @@ export default function ActionsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [riskScoreFilter, setRiskScoreFilter] = useState("all");
   const [editingAction, setEditingAction] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -220,16 +221,31 @@ export default function ActionsPage() {
     });
   };
 
-  // Filter actions by search
+  // Filter actions by search and risk score
   const filteredActions = actions.filter((action) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      action.title?.toLowerCase().includes(query) ||
-      action.description?.toLowerCase().includes(query) ||
-      action.assignee?.toLowerCase().includes(query) ||
-      action.action_number?.toLowerCase().includes(query)
-    );
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = (
+        action.title?.toLowerCase().includes(query) ||
+        action.description?.toLowerCase().includes(query) ||
+        action.assignee?.toLowerCase().includes(query) ||
+        action.action_number?.toLowerCase().includes(query)
+      );
+      if (!matchesSearch) return false;
+    }
+    
+    // Risk score filter
+    if (riskScoreFilter !== "all") {
+      const riskScore = action.threat_risk_score;
+      if (riskScoreFilter === "critical" && (riskScore === null || riskScore < 70)) return false;
+      if (riskScoreFilter === "high" && (riskScore === null || riskScore < 50 || riskScore >= 70)) return false;
+      if (riskScoreFilter === "medium" && (riskScore === null || riskScore < 30 || riskScore >= 50)) return false;
+      if (riskScoreFilter === "low" && (riskScore === null || riskScore >= 30)) return false;
+      if (riskScoreFilter === "none" && riskScore !== null) return false;
+    }
+    
+    return true;
   });
 
   // Check if action is overdue
@@ -328,6 +344,20 @@ export default function ActionsPage() {
             <SelectItem value="investigation">From Investigations</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={riskScoreFilter} onValueChange={setRiskScoreFilter}>
+          <SelectTrigger className="w-full sm:w-44 h-11" data-testid="risk-score-filter">
+            <AlertTriangle className="w-4 h-4 mr-2 text-slate-400" />
+            <SelectValue placeholder="Risk Score" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Risk Scores</SelectItem>
+            <SelectItem value="critical">Critical (70+)</SelectItem>
+            <SelectItem value="high">High (50-69)</SelectItem>
+            <SelectItem value="medium">Medium (30-49)</SelectItem>
+            <SelectItem value="low">Low (&lt;30)</SelectItem>
+            <SelectItem value="none">No Risk Data</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Actions List - matching ThreatsPage priority-list style */}
@@ -393,6 +423,23 @@ export default function ActionsPage() {
                     <Badge className={priority.color}>
                       {priority.label}
                     </Badge>
+                    {/* Risk Score Badge */}
+                    {action.threat_risk_score !== null && action.threat_risk_score !== undefined && (
+                      <Badge className={
+                        action.threat_risk_score >= 70 ? "bg-red-100 text-red-700" :
+                        action.threat_risk_score >= 50 ? "bg-orange-100 text-orange-700" :
+                        action.threat_risk_score >= 30 ? "bg-yellow-100 text-yellow-700" :
+                        "bg-green-100 text-green-700"
+                      }>
+                        Risk: {action.threat_risk_score}
+                      </Badge>
+                    )}
+                    {/* RPN Badge */}
+                    {action.threat_rpn !== null && action.threat_rpn !== undefined && (
+                      <Badge className="bg-purple-100 text-purple-700">
+                        RPN: {action.threat_rpn}
+                      </Badge>
+                    )}
                     {overdue && (
                       <Badge className="bg-red-100 text-red-700">Overdue</Badge>
                     )}

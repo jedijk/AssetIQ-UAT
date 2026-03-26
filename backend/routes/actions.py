@@ -63,6 +63,30 @@ async def get_all_actions(
     
     actions = await db.central_actions.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     
+    # Enrich actions with threat data (RPN and risk score)
+    enriched_actions = []
+    for action in actions:
+        enriched_action = dict(action)
+        enriched_action["threat_rpn"] = None
+        enriched_action["threat_risk_score"] = None
+        enriched_action["threat_risk_level"] = None
+        
+        # If action is linked to a threat, fetch the threat data
+        if action.get("source_type") == "threat" and action.get("source_id"):
+            try:
+                threat = await db.threats.find_one(
+                    {"id": action["source_id"]}, 
+                    {"_id": 0, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1}
+                )
+                if threat:
+                    enriched_action["threat_rpn"] = threat.get("fmea_rpn")
+                    enriched_action["threat_risk_score"] = threat.get("risk_score")
+                    enriched_action["threat_risk_level"] = threat.get("risk_level")
+            except Exception as e:
+                logger.error(f"Error fetching threat data: {e}")
+        
+        enriched_actions.append(enriched_action)
+    
     # Get stats
     total = await db.central_actions.count_documents({"created_by": current_user["id"]})
     open_count = await db.central_actions.count_documents({"created_by": current_user["id"], "status": "open"})
@@ -75,7 +99,7 @@ async def get_all_actions(
     })
     
     return {
-        "actions": actions,
+        "actions": enriched_actions,
         "stats": {
             "total": total,
             "open": open_count,
