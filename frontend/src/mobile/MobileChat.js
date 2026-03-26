@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { chatAPI, voiceAPI } from "../lib/api";
-import { X, Send, Mic, MicOff, Loader2 } from "lucide-react";
+import { X, Send, Mic, MicOff, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const MobileChat = ({ onClose }) => {
@@ -25,6 +25,17 @@ const MobileChat = ({ onClose }) => {
     },
     onError: (error) => {
       toast.error(error.response?.data?.detail || "Failed to send");
+    },
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: () => chatAPI.clearHistory(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+      toast.success("Chat cleared");
+    },
+    onError: () => {
+      toast.error("Failed to clear chat");
     },
   });
 
@@ -145,7 +156,18 @@ const MobileChat = ({ onClose }) => {
           <h1>Report Observation</h1>
           <p>Describe the issue you observed</p>
         </div>
-        <div style={{ width: 40 }} />
+        {messages.length > 0 ? (
+          <button 
+            onClick={() => clearMutation.mutate()} 
+            className="clear-btn"
+            disabled={clearMutation.isPending}
+            data-testid="clear-chat"
+          >
+            <Trash2 size={20} />
+          </button>
+        ) : (
+          <div style={{ width: 40 }} />
+        )}
       </header>
 
       {/* Messages */}
@@ -245,6 +267,26 @@ const MobileChat = ({ onClose }) => {
         .close-btn:hover {
           background: #f1f5f9;
           color: #0f172a;
+        }
+
+        .clear-btn {
+          background: none;
+          border: none;
+          color: #94a3b8;
+          padding: 8px;
+          cursor: pointer;
+          border-radius: 8px;
+          transition: all 0.2s;
+        }
+
+        .clear-btn:hover {
+          background: #fef2f2;
+          color: #ef4444;
+        }
+
+        .clear-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .chat-messages {

@@ -30,6 +30,11 @@ export const chatAPI = {
     const response = await api.get(`/chat/history?limit=${limit}`);
     return response.data;
   },
+  
+  clearHistory: async () => {
+    const response = await api.delete("/chat/clear");
+    return response.data;
+  },
 };
 
 // Voice API

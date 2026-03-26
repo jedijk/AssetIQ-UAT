@@ -86,6 +86,18 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     },
   });
 
+  // Clear chat history mutation
+  const clearChatMutation = useMutation({
+    mutationFn: () => chatAPI.clearHistory(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+      toast.success("Chat history cleared");
+    },
+    onError: () => {
+      toast.error("Failed to clear chat");
+    },
+  });
+
   // Scroll to bottom when chat opens (instant) and on new messages (smooth)
   useEffect(() => {
     if (isOpen && messagesEndRef.current) {
@@ -495,15 +507,30 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               <p className="text-xs text-slate-500">Describe the failure</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
-            data-testid="close-chat-sidebar"
-          >
-            <X className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => clearChatMutation.mutate()}
+                disabled={clearChatMutation.isPending}
+                className="text-slate-400 hover:text-red-500 hover:bg-red-50"
+                title="Clear chat history"
+                data-testid="clear-chat-btn"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-600"
+              data-testid="close-chat-sidebar"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Messages */}

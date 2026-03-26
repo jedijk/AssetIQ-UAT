@@ -234,6 +234,27 @@ async def get_chat_history(
     ).sort("created_at", -1).limit(limit).to_list(limit)
     return list(reversed(messages))
 
+
+@router.delete("/chat/clear")
+async def clear_chat_history(
+    current_user: dict = Depends(get_current_user)
+):
+    """Clear all chat messages and conversation state for the current user."""
+    user_id = current_user["id"]
+    
+    # Delete all chat messages for this user
+    result = await db.chat_messages.delete_many({"user_id": user_id})
+    
+    # Also clear the conversation state
+    await db.chat_conversations.delete_many({"user_id": user_id})
+    
+    return {
+        "success": True,
+        "deleted_messages": result.deleted_count,
+        "message": "Chat history cleared"
+    }
+
+
 # ============= VOICE ENDPOINT =============
 
 @router.post("/voice/transcribe", response_model=VoiceTranscriptionResponse)
