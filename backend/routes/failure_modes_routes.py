@@ -3,7 +3,7 @@ Failure Modes routes.
 """
 from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime, timezone
 import uuid
 import logging
@@ -157,8 +157,8 @@ class FailureModeCreate(BaseModel):
     severity: int = Field(ge=1, le=10)
     occurrence: int = Field(ge=1, le=10)
     detectability: int = Field(ge=1, le=10)
-    recommended_actions: List[str] = []
-    equipment_type_ids: List[str] = []  # Link to multiple equipment types
+    recommended_actions: List[Any] = []
+    equipment_type_ids: List[str] = []
 
 
 class FailureModeUpdate(BaseModel):
@@ -169,7 +169,7 @@ class FailureModeUpdate(BaseModel):
     severity: Optional[int] = Field(None, ge=1, le=10)
     occurrence: Optional[int] = Field(None, ge=1, le=10)
     detectability: Optional[int] = Field(None, ge=1, le=10)
-    recommended_actions: Optional[List[str]] = None
+    recommended_actions: Optional[List[Any]] = None
     equipment_type_ids: Optional[List[str]] = None
     # Validation fields
     is_validated: Optional[bool] = None
