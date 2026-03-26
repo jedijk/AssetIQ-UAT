@@ -132,6 +132,7 @@ const en = {
     assigning: "Assigning...",
     add: "Add",
     notLinked: "Not linked",
+    discipline: "Discipline",
   },
   
   // Threats page
@@ -1036,6 +1037,7 @@ const nl = {
     assigning: "Toewijzen...",
     add: "Toevoegen",
     notLinked: "Niet gekoppeld",
+    discipline: "Discipline",
   },
   
   // Threats page

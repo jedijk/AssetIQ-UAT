@@ -74,7 +74,7 @@ export default function CausalEnginePage() {
   const [eventForm, setEventForm] = useState({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" });
   const [failureForm, setFailureForm] = useState({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" });
   const [causeForm, setCauseForm] = useState({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" });
-  const [actionForm, setActionForm] = useState({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" });
+  const [actionForm, setActionForm] = useState({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" });
   const [localNotes, setLocalNotes] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -343,7 +343,7 @@ export default function CausalEnginePage() {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
       setShowActionDialog(false);
       setEditingItem(null);
-      setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" });
+      setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" });
       toast.success("Action added");
     },
   });
@@ -354,7 +354,7 @@ export default function CausalEnginePage() {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
       setShowActionDialog(false);
       setEditingItem(null);
-      setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" });
+      setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" });
       toast.success("Action updated");
     },
   });
@@ -374,6 +374,8 @@ export default function CausalEnginePage() {
       source_name: investigation?.title || "Unknown Investigation",
       priority: action.priority || "medium",
       assignee: action.owner || "",
+      action_type: action.action_type || "",
+      discipline: action.discipline || "",
       due_date: action.due_date || null,
     }),
     onSuccess: () => {
@@ -819,7 +821,7 @@ export default function CausalEnginePage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div><h2 className="text-lg font-semibold">Corrective Actions</h2><p className="text-sm text-slate-500">Track actions to prevent recurrence</p></div>
-                  <Button onClick={() => { setEditingItem(null); setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, comment: "" }); setShowActionDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-action-btn"><Plus className="w-4 h-4 mr-2" />Add Action</Button>
+                  <Button onClick={() => { setEditingItem(null); setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" }); setShowActionDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-action-btn"><Plus className="w-4 h-4 mr-2" />Add Action</Button>
                 </div>
                 
                 {actionItems.length === 0 ? (
@@ -864,6 +866,21 @@ export default function CausalEnginePage() {
                                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${priority?.bgClass || "bg-slate-100 text-slate-700"}`}>
                                   {priority?.label || action.priority}
                                 </span>
+                                {action.action_type && (
+                                  <span className={`text-xs px-2.5 py-1 rounded-full font-bold text-white ${
+                                    action.action_type === 'CM' ? 'bg-amber-500' :
+                                    action.action_type === 'PM' ? 'bg-blue-500' :
+                                    action.action_type === 'PDM' ? 'bg-purple-500' :
+                                    'bg-slate-500'
+                                  }`}>
+                                    {action.action_type}
+                                  </span>
+                                )}
+                                {action.discipline && (
+                                  <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-slate-100 text-slate-700">
+                                    {action.discipline}
+                                  </span>
+                                )}
                                 <Select value={action.status} onValueChange={(v) => updateActionMutation.mutate({ actionId: action.id, data: { status: v } })}>
                                   <SelectTrigger className={`h-7 w-28 text-xs border-0 ${
                                     action.status === 'completed' ? 'bg-green-100 text-green-700' :
@@ -921,7 +938,7 @@ export default function CausalEnginePage() {
                                 className="h-8 w-8 text-slate-500 hover:text-slate-700" 
                                 onClick={() => { 
                                   setEditingItem({ type: "action", data: action }); 
-                                  setActionForm({ description: action.description, owner: action.owner || "", priority: action.priority, due_date: action.due_date || "", linked_cause_id: action.linked_cause_id || null, comment: action.comment || "" }); 
+                                  setActionForm({ description: action.description, owner: action.owner || "", priority: action.priority, due_date: action.due_date || "", linked_cause_id: action.linked_cause_id || null, action_type: action.action_type || "", discipline: action.discipline || "", comment: action.comment || "" }); 
                                   setShowActionDialog(true); 
                                 }}
                               >

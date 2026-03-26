@@ -23,6 +23,12 @@ const ACTION_PRIORITIES = [
   { value: "low", label: "Low" },
 ];
 
+const ACTION_TYPES = [
+  { value: "CM", label: "CM - Corrective" },
+  { value: "PM", label: "PM - Preventive" },
+  { value: "PDM", label: "PDM - Predictive" },
+];
+
 export const NewInvestigationDialog = ({ open, onOpenChange, form, setForm, onSubmit, isPending }) => {
   const { t } = useLanguage();
   return (
@@ -130,6 +136,10 @@ export const ActionDialog = ({ open, onOpenChange, editingItem, form, setForm, o
         <DialogHeader><DialogTitle>{editingItem?.type === "action" ? t("causal.editAction") : t("causal.addAction")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-4">
           <div><label className="text-sm font-medium">{t("common.description")} *</label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What to do?" rows={2} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="text-sm font-medium">{t("common.type") || "Type"}</label><Select value={form.action_type || "none"} onValueChange={(v) => setForm({ ...form, action_type: v === "none" ? "" : v })}><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger><SelectContent><SelectItem value="none">No type</SelectItem>{ACTION_TYPES.map(at => <SelectItem key={at.value} value={at.value}>{at.label}</SelectItem>)}</SelectContent></Select></div>
+            <div><label className="text-sm font-medium">{t("common.discipline") || "Discipline"}</label><Input value={form.discipline || ""} onChange={(e) => setForm({ ...form, discipline: e.target.value })} placeholder="e.g. Mechanical, Electrical" /></div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="text-sm font-medium">{t("common.owner")}</label><Input value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} placeholder="Person" /></div>
             <div><label className="text-sm font-medium">{t("common.priority")}</label><Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ACTION_PRIORITIES.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent></Select></div>

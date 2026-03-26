@@ -155,6 +155,8 @@ class ActionItemCreate(BaseModel):
     priority: ActionPriority = ActionPriority.MEDIUM
     due_date: Optional[str] = None
     linked_cause_id: Optional[str] = None  # Link to root cause
+    action_type: Optional[str] = None  # CM, PM, PDM
+    discipline: Optional[str] = None
     comment: Optional[str] = None
 
 
@@ -164,6 +166,8 @@ class ActionItemUpdate(BaseModel):
     priority: Optional[ActionPriority] = None
     due_date: Optional[str] = None
     status: Optional[ActionStatus] = None
+    action_type: Optional[str] = None  # CM, PM, PDM
+    discipline: Optional[str] = None
     completion_notes: Optional[str] = None
     comment: Optional[str] = None
 

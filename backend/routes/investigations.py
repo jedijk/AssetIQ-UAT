@@ -431,6 +431,8 @@ async def create_action_item(
         "due_date": data.due_date or "",
         "status": ActionStatus.OPEN.value,
         "linked_cause_id": data.linked_cause_id,
+        "action_type": data.action_type or "",
+        "discipline": data.discipline or "",
         "comment": data.comment or "",
         "completion_notes": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
