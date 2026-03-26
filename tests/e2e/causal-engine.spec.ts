@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 
-const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://threat-capture-ai.preview.emergentagent.com';
+const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://fmea-capture.preview.emergentagent.com';
 
 test.describe('Causal Engine - Investigation Management', () => {
   // Store investigation IDs for cleanup
