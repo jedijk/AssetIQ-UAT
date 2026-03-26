@@ -25,6 +25,10 @@ import {
   Brain,
   ExternalLink,
   AlertTriangle,
+  ChevronDown,
+  Check,
+  BarChart3,
+  Activity,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -61,6 +65,29 @@ import {
 } from "../components/ui/alert-dialog";
 import BackButton from "../components/BackButton";
 
+// Status options with colors and icons - matching Observations
+const STATUS_OPTIONS = [
+  { value: "open", label: "Open", color: "bg-blue-500", textColor: "text-blue-700", bgColor: "bg-blue-100" },
+  { value: "in_progress", label: "In Progress", color: "bg-amber-500", textColor: "text-amber-700", bgColor: "bg-amber-100" },
+  { value: "completed", label: "Completed", color: "bg-green-500", textColor: "text-green-700", bgColor: "bg-green-100" },
+];
+
+// Priority options with colors
+const PRIORITY_OPTIONS = [
+  { value: "critical", label: "Critical", color: "bg-red-500" },
+  { value: "high", label: "High", color: "bg-orange-500" },
+  { value: "medium", label: "Medium", color: "bg-yellow-500" },
+  { value: "low", label: "Low", color: "bg-green-500" },
+];
+
+// Risk level options with colors - matching Observations
+const RISK_OPTIONS = [
+  { value: "Critical", label: "Critical", color: "bg-red-500" },
+  { value: "High", label: "High", color: "bg-orange-500" },
+  { value: "Medium", label: "Medium", color: "bg-yellow-500" },
+  { value: "Low", label: "Low", color: "bg-green-500" },
+];
+
 const statusConfig = {
   open: { label: "Open", color: "bg-blue-100 text-blue-700", icon: Clock },
   in_progress: { label: "In Progress", color: "bg-amber-100 text-amber-700", icon: AlertCircle },
@@ -87,13 +114,36 @@ export default function ActionsPage() {
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState([]); // Multi-select: array of selected statuses
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
-  const [riskScoreFilter, setRiskScoreFilter] = useState("all");
+  const [riskLevelFilter, setRiskLevelFilter] = useState("all"); // Filter by risk level (Critical/High/Medium/Low)
+  const [sortBy, setSortBy] = useState("risk_score"); // Sort by risk_score or rpn
   const [editingAction, setEditingAction] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // Toggle status in multi-select
+  const toggleStatus = (status) => {
+    setStatusFilter(prev => 
+      prev.includes(status) 
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  // Clear all status filters
+  const clearStatusFilter = () => {
+    setStatusFilter([]);
+  };
+
+  // Get display text for status filter button
+  const getStatusDisplayText = () => {
+    if (statusFilter.length === 0) return "All Status";
+    if (statusFilter.length === 1) return STATUS_OPTIONS.find(s => s.value === statusFilter[0])?.label || statusFilter[0];
+    return `${statusFilter.length} selected`;
+  };
 
   // Form state for editing
   const [editForm, setEditForm] = useState({
@@ -107,14 +157,10 @@ export default function ActionsPage() {
     completion_notes: "",
   });
 
-  // Fetch actions
+  // Fetch actions (fetch all, filter client-side for multi-select)
   const { data, isLoading } = useQuery({
-    queryKey: ["actions", statusFilter, priorityFilter, sourceFilter],
-    queryFn: () => actionsAPI.getAll({
-      status: statusFilter !== "all" ? statusFilter : undefined,
-      priority: priorityFilter !== "all" ? priorityFilter : undefined,
-      source_type: sourceFilter !== "all" ? sourceFilter : undefined,
-    }),
+    queryKey: ["actions"],
+    queryFn: () => actionsAPI.getAll(),
   });
 
   const actions = data?.actions || [];
@@ -221,7 +267,7 @@ export default function ActionsPage() {
     });
   };
 
-  // Filter actions by search and risk score
+  // Filter actions by search, status, priority, source, and risk level
   const filteredActions = actions.filter((action) => {
     // Search filter
     if (searchQuery) {
@@ -235,17 +281,42 @@ export default function ActionsPage() {
       if (!matchesSearch) return false;
     }
     
-    // Risk score filter
-    if (riskScoreFilter !== "all") {
-      const riskScore = action.threat_risk_score;
-      if (riskScoreFilter === "critical" && (riskScore === null || riskScore < 70)) return false;
-      if (riskScoreFilter === "high" && (riskScore === null || riskScore < 50 || riskScore >= 70)) return false;
-      if (riskScoreFilter === "medium" && (riskScore === null || riskScore < 30 || riskScore >= 50)) return false;
-      if (riskScoreFilter === "low" && (riskScore === null || riskScore >= 30)) return false;
-      if (riskScoreFilter === "none" && riskScore !== null) return false;
+    // Status filter (multi-select)
+    if (statusFilter.length > 0) {
+      if (!statusFilter.includes(action.status)) return false;
+    }
+    
+    // Priority filter
+    if (priorityFilter !== "all") {
+      if (action.priority !== priorityFilter) return false;
+    }
+    
+    // Source filter
+    if (sourceFilter !== "all") {
+      if (action.source_type !== sourceFilter) return false;
+    }
+    
+    // Risk level filter
+    if (riskLevelFilter !== "all") {
+      if (action.threat_risk_level !== riskLevelFilter) return false;
     }
     
     return true;
+  });
+
+  // Sort actions based on selected sort method
+  const sortedActions = [...filteredActions].sort((a, b) => {
+    if (sortBy === "rpn") {
+      // Sort by RPN (higher first)
+      const rpnA = a.threat_rpn || 0;
+      const rpnB = b.threat_rpn || 0;
+      return rpnB - rpnA;
+    } else {
+      // Default: sort by risk score (higher first)
+      const scoreA = a.threat_risk_score || 0;
+      const scoreB = b.threat_risk_score || 0;
+      return scoreB - scoreA;
+    }
   });
 
   // Check if action is overdue
@@ -298,7 +369,7 @@ export default function ActionsPage() {
         ))}
       </div>
 
-      {/* Filters - matching ThreatsPage */}
+      {/* Filters - matching Observations page */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6" data-testid="actions-filters">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -310,52 +381,117 @@ export default function ActionsPage() {
             data-testid="actions-search"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48 h-11" data-testid="status-filter">
-            <Filter className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder={t("common.status")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("actionsPage.allStatus")}</SelectItem>
-            <SelectItem value="open">{t("common.open")}</SelectItem>
-            <SelectItem value="in_progress">{t("common.inProgress")}</SelectItem>
-            <SelectItem value="completed">{t("actionsPage.completed")}</SelectItem>
-          </SelectContent>
-        </Select>
+        
+        {/* Multi-select Status Filter - matching Observations */}
+        <div className="relative">
+          {statusDropdownOpen && (
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setStatusDropdownOpen(false)}
+            />
+          )}
+          
+          <button
+            onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+            className="flex items-center justify-between w-full sm:w-48 h-11 px-3 bg-white border border-slate-200 rounded-md text-sm hover:bg-slate-50 transition-colors"
+            data-testid="status-filter-select"
+          >
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <span className={statusFilter.length > 0 ? "text-slate-900" : "text-slate-500"}>
+                {getStatusDisplayText()}
+              </span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {statusDropdownOpen && (
+            <div className="absolute top-full left-0 mt-1 w-full sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+              {statusFilter.length > 0 && (
+                <button
+                  onClick={clearStatusFilter}
+                  className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 border-b border-slate-100"
+                >
+                  Clear all filters
+                </button>
+              )}
+              
+              {STATUS_OPTIONS.map((status) => (
+                <button
+                  key={status.value}
+                  onClick={() => toggleStatus(status.value)}
+                  className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                  data-testid={`status-option-${status.value}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${status.color}`}></span>
+                    <span className="text-sm text-slate-700">{status.label}</span>
+                  </div>
+                  {statusFilter.includes(status.value) && (
+                    <Check className="w-4 h-4 text-blue-600" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Priority Filter */}
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
           <SelectTrigger className="w-full sm:w-40 h-11" data-testid="priority-filter">
-            <SelectValue placeholder={t("common.priority")} />
+            <SelectValue placeholder="Priority" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Priority</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
+            {PRIORITY_OPTIONS.map((p) => (
+              <SelectItem key={p.value} value={p.value}>
+                <span className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${p.color}`}></span>
+                  {p.label}
+                </span>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-full sm:w-44 h-11" data-testid="source-filter">
-            <SelectValue placeholder="Source" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Sources</SelectItem>
-            <SelectItem value="threat">From Threats</SelectItem>
-            <SelectItem value="investigation">From Investigations</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={riskScoreFilter} onValueChange={setRiskScoreFilter}>
-          <SelectTrigger className="w-full sm:w-44 h-11" data-testid="risk-score-filter">
+        
+        {/* Risk Level Filter - matching Observations */}
+        <Select value={riskLevelFilter} onValueChange={setRiskLevelFilter}>
+          <SelectTrigger className="w-full sm:w-40 h-11" data-testid="risk-level-filter">
             <AlertTriangle className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder="Risk Score" />
+            <SelectValue placeholder="Risk Level" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Risk Scores</SelectItem>
-            <SelectItem value="critical">Critical (70+)</SelectItem>
-            <SelectItem value="high">High (50-69)</SelectItem>
-            <SelectItem value="medium">Medium (30-49)</SelectItem>
-            <SelectItem value="low">Low (&lt;30)</SelectItem>
-            <SelectItem value="none">No Risk Data</SelectItem>
+            <SelectItem value="all">All Risk Levels</SelectItem>
+            {RISK_OPTIONS.map((r) => (
+              <SelectItem key={r.value} value={r.value}>
+                <span className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${r.color}`}></span>
+                  {r.label}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Sort By - matching Observations */}
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full sm:w-44 h-11" data-testid="sort-by-select">
+            <BarChart3 className="w-4 h-4 mr-2 text-slate-400" />
+            <SelectValue placeholder="Sort By" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="risk_score">
+              <span className="flex items-center gap-2">
+                <Target className="w-3.5 h-3.5 text-purple-500" />
+                Risk Score
+              </span>
+            </SelectItem>
+            <SelectItem value="rpn">
+              <span className="flex items-center gap-2">
+                <Activity className="w-3.5 h-3.5 text-blue-500" />
+                RPN
+              </span>
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -369,7 +505,7 @@ export default function ActionsPage() {
             <span></span>
           </div>
         </div>
-      ) : filteredActions.length === 0 ? (
+      ) : sortedActions.length === 0 ? (
         <div className="empty-state py-16" data-testid="no-actions-message">
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
             <CheckCircle className="w-8 h-8 text-slate-400" />
@@ -381,7 +517,7 @@ export default function ActionsPage() {
         </div>
       ) : (
         <div className="priority-list" data-testid="actions-list">
-          {filteredActions.map((action, idx) => {
+          {sortedActions.map((action, idx) => {
             const StatusIcon = statusConfig[action.status]?.icon || Clock;
             const SourceIcon = sourceConfig[action.source_type]?.icon || FileText;
             const priority = priorityConfig[action.priority] || priorityConfig.medium;
