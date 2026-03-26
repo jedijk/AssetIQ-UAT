@@ -111,7 +111,7 @@ async def get_my_tasks(
     date: Optional[str] = Query(None, description="Date for filtering (YYYY-MM-DD)"),
     equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
     status: Optional[str] = Query(None, description="Filter by status"),
-    assignee: Optional[str] = Query(None, description="Filter by assignee name"),
+    discipline: Optional[str] = Query(None, description="Filter by discipline (Mechanical, Electrical, etc.)"),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -126,35 +126,26 @@ async def get_my_tasks(
     """
     user_id = current_user["id"]
     
-    # Build query - handle both ObjectId and UUID user IDs
-    # If assignee filter is set, filter by that instead of current user
-    if assignee:
-        # Filter by specific assignee
-        query = {
-            "$or": [
-                {"assignee": {"$regex": assignee, "$options": "i"}},
-                {"assigned_team": {"$regex": assignee, "$options": "i"}},
-            ],
-            "status": {"$nin": ["completed", "cancelled"]}
-        }
-    else:
-        # Default: show tasks for current user or unassigned
-        user_id_query = []
-        try:
-            user_id_query.append({"assigned_user_id": ObjectId(user_id)})
-        except Exception:
-            # User ID might be a UUID string
-            user_id_query.append({"assigned_user_id": user_id})
-        
-        user_id_query.extend([
-            {"assigned_user_id": None},  # Unassigned tasks
-            {"assigned_user_id": {"$exists": False}},
-        ])
-        
-        query = {
-            "$or": user_id_query,
-            "status": {"$nin": ["completed", "cancelled"]}
-        }
+    # Build base query for tasks
+    user_id_query = []
+    try:
+        user_id_query.append({"assigned_user_id": ObjectId(user_id)})
+    except Exception:
+        user_id_query.append({"assigned_user_id": user_id})
+    
+    user_id_query.extend([
+        {"assigned_user_id": None},
+        {"assigned_user_id": {"$exists": False}},
+    ])
+    
+    query = {
+        "$or": user_id_query,
+        "status": {"$nin": ["completed", "cancelled"]}
+    }
+    
+    # Filter by discipline if specified
+    if discipline:
+        query["discipline"] = {"$regex": discipline, "$options": "i"}
     
     # Apply filters
     now = datetime.now(timezone.utc)
@@ -266,17 +257,15 @@ async def get_my_tasks(
     # ============================================
     # Only include actions for non-recurring filter (actions are not recurring)
     if filter != "recurring":
-        # Build action query based on assignee filter
-        if assignee:
-            action_query = {
-                "assignee": {"$regex": assignee, "$options": "i"},
-                "status": {"$in": ["open", "in_progress"]}
-            }
-        else:
-            action_query = {
-                "created_by": user_id,
-                "status": {"$in": ["open", "in_progress"]}
-            }
+        # Build action query
+        action_query = {
+            "created_by": user_id,
+            "status": {"$in": ["open", "in_progress"]}
+        }
+        
+        # Filter by discipline if specified
+        if discipline:
+            action_query["discipline"] = {"$regex": discipline, "$options": "i"}
         
         # Apply date filter for actions
         if filter == "today":
