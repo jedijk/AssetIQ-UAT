@@ -127,7 +127,6 @@ export default function ActionsPage() {
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [editingAction, setEditingAction] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [viewingAction, setViewingAction] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Toggle status in multi-select
@@ -269,7 +268,6 @@ export default function ActionsPage() {
       comments: action.comments || "",
       completion_notes: action.completion_notes || "",
     });
-    setViewingAction(null);
     setIsEditDialogOpen(true);
   };
 
@@ -574,7 +572,7 @@ export default function ActionsPage() {
                 transition={{ delay: idx * 0.05 }}
                 className={`priority-item group cursor-pointer ${overdue ? "border-l-4 border-l-red-400" : ""}`}
                 data-testid={`action-row-${action.id}`}
-                onClick={() => setViewingAction(action)}
+                onClick={() => openEditDialog(action)}
               >
                 {/* Status Icon */}
                 <button
@@ -725,9 +723,6 @@ export default function ActionsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setViewingAction(action)}>
-                        <Eye className="w-4 h-4 mr-2" /> View
-                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => openEditDialog(action)}>
                         <Edit2 className="w-4 h-4 mr-2" /> Edit
                       </DropdownMenuItem>
@@ -746,308 +741,217 @@ export default function ActionsPage() {
         </div>
       )}
 
-      {/* Edit Dialog */}
+      {/* Action Detail / Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{t("common.edit")} {t("actionsPage.title")}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4 max-h-[65vh] overflow-y-auto pr-1">
-            <div>
-              <label className="text-sm font-medium text-slate-700">{t("threatDetail.actionTitle")}</label>
-              <Input
-                value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                placeholder={t("threatDetail.actionTitle")}
-                data-testid="edit-action-title"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700">{t("common.description")}</label>
-              <Textarea
-                value={editForm.description}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                placeholder={t("common.description")}
-                rows={2}
-                data-testid="edit-action-description"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-slate-700">{t("common.type") || "Type"}</label>
-                <Select value={editForm.action_type || "none"} onValueChange={(v) => setEditForm({ ...editForm, action_type: v === "none" ? "" : v })}>
-                  <SelectTrigger data-testid="edit-action-type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No type</SelectItem>
-                    <SelectItem value="CM">CM - Corrective</SelectItem>
-                    <SelectItem value="PM">PM - Preventive</SelectItem>
-                    <SelectItem value="PDM">PDM - Predictive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700">{t("common.discipline") || "Discipline"}</label>
-                <Input
-                  value={editForm.discipline}
-                  onChange={(e) => setEditForm({ ...editForm, discipline: e.target.value })}
-                  placeholder="e.g. Mechanical, Electrical"
-                  data-testid="edit-action-discipline"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-slate-700">{t("common.status")}</label>
-                <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
-                  <SelectTrigger data-testid="edit-action-status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="open">{t("common.open")}</SelectItem>
-                    <SelectItem value="in_progress">{t("common.inProgress")}</SelectItem>
-                    <SelectItem value="completed">{t("actionsPage.completedActions")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700">{t("common.priority")}</label>
-                <Select value={editForm.priority} onValueChange={(v) => setEditForm({ ...editForm, priority: v })}>
-                  <SelectTrigger data-testid="edit-action-priority">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="critical">{t("common.critical")}</SelectItem>
-                    <SelectItem value="high">{t("common.high")}</SelectItem>
-                    <SelectItem value="medium">{t("common.medium")}</SelectItem>
-                    <SelectItem value="low">{t("common.low")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-slate-700">{t("threatDetail.actionAssignee")}</label>
-                <Select value={editForm.assignee || "unassigned"} onValueChange={(v) => setEditForm({ ...editForm, assignee: v === "unassigned" ? "" : v })}>
-                  <SelectTrigger data-testid="edit-action-assignee">
-                    <SelectValue placeholder="Select assignee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {usersList.map((u) => (
-                      <SelectItem key={u.id} value={u.name || u.email}>
-                        <span className="flex items-center gap-2">
-                          <User className="w-3 h-3" />
-                          {u.name || u.email}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700">{t("common.dueDate")}</label>
-                <Input
-                  type="date"
-                  value={editForm.due_date}
-                  onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
-                  data-testid="edit-action-due-date"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700">{t("common.comment") || "Comments"}</label>
-              <Textarea
-                value={editForm.comments}
-                onChange={(e) => setEditForm({ ...editForm, comments: e.target.value })}
-                placeholder="Add comments or notes..."
-                rows={3}
-                data-testid="edit-action-comments"
-              />
-            </div>
-            {editForm.status === "completed" && (
-              <div>
-                <label className="text-sm font-medium text-slate-700">{t("taskScheduler.completionNotes")}</label>
-                <Textarea
-                  value={editForm.completion_notes}
-                  onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
-                  placeholder="Notes on how the action was completed"
-                  rows={2}
-                  data-testid="edit-action-notes"
-                />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={handleSaveEdit} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? t("taskScheduler.saving") : t("taskScheduler.saveChanges")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* View Action Dialog */}
-      <Dialog open={!!viewingAction} onOpenChange={(open) => { if (!open) setViewingAction(null); }}>
-        <DialogContent className="max-w-lg">
-          {viewingAction && (() => {
-            const va = viewingAction;
-            const vaPriority = priorityConfig[va.priority] || priorityConfig.medium;
-            const vaOverdue = isOverdue(va);
-            const VaSourceIcon = sourceConfig[va.source_type]?.icon || FileText;
+          {editingAction && (() => {
+            const ea = editingAction;
+            const EaSourceIcon = sourceConfig[ea.source_type]?.icon || FileText;
             return (
               <>
                 <DialogHeader>
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center px-2 py-1 bg-slate-100 rounded-md text-xs font-mono text-slate-500">
-                      {va.action_number}
+                    <div className="flex items-center justify-center px-2.5 py-1 bg-slate-100 rounded-md text-xs font-mono text-slate-500">
+                      {ea.action_number}
                     </div>
-                    <DialogTitle className="text-lg">{va.title}</DialogTitle>
+                    <DialogTitle className="text-base">{ea.title}</DialogTitle>
                   </div>
-                </DialogHeader>
-                <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1">
-                  {/* Badges row */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className={vaPriority.color}>{vaPriority.label}</Badge>
-                    <Badge className={
-                      va.status === "completed" ? "bg-green-100 text-green-700" :
-                      va.status === "in_progress" ? "bg-blue-100 text-blue-700" :
-                      "bg-slate-100 text-slate-700"
-                    }>
-                      {statusConfig[va.status]?.label || "Open"}
-                    </Badge>
-                    {va.action_type && (
-                      <Badge className={
-                        va.action_type === 'CM' ? 'bg-amber-100 text-amber-700' :
-                        va.action_type === 'PM' ? 'bg-blue-100 text-blue-700' :
-                        va.action_type === 'PDM' ? 'bg-purple-100 text-purple-700' :
-                        'bg-slate-100 text-slate-700'
-                      }>{va.action_type}</Badge>
-                    )}
-                    {va.discipline && (
-                      <Badge className="bg-slate-100 text-slate-600">{va.discipline}</Badge>
-                    )}
-                    {vaOverdue && (
-                      <Badge className="bg-red-100 text-red-700">Overdue</Badge>
-                    )}
-                  </div>
-
-                  {/* Description */}
-                  {va.description && (
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("common.description")}</label>
-                      <p className="text-sm text-slate-800 mt-1 leading-relaxed">{va.description}</p>
-                    </div>
+                  {/* Source link */}
+                  {ea.source_type && ea.source_id && (
+                    <button
+                      onClick={() => {
+                        if (ea.source_type === "investigation") navigate(`/causal-engine?inv=${ea.source_id}`);
+                        else if (ea.source_type === "threat" || ea.source_type === "ai_recommendation") navigate(`/threats/${ea.source_id}`);
+                        setIsEditDialogOpen(false);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors text-xs text-slate-600 w-fit mt-1"
+                      data-testid="action-source-link"
+                    >
+                      <EaSourceIcon className={`w-3.5 h-3.5 ${sourceConfig[ea.source_type]?.color}`} />
+                      <span className="font-medium">{sourceConfig[ea.source_type]?.label}</span>
+                      <span className="text-slate-300">-</span>
+                      <span className="truncate max-w-[200px]">{ea.source_name || "Unknown"}</span>
+                      <ExternalLink className="w-3 h-3 text-slate-400" />
+                    </button>
                   )}
-
-                  {/* Details grid */}
+                </DialogHeader>
+                <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-1">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">{t("threatDetail.actionTitle")}</label>
+                    <Input
+                      value={editForm.title}
+                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      placeholder={t("threatDetail.actionTitle")}
+                      data-testid="edit-action-title"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">{t("common.description")}</label>
+                    <Textarea
+                      value={editForm.description}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      placeholder={t("common.description")}
+                      rows={2}
+                      data-testid="edit-action-description"
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("threatDetail.actionAssignee")}</label>
-                      <p className="text-sm text-slate-800 mt-1 flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-slate-400" />
-                        {va.assignee || <span className="text-slate-400 italic">Unassigned</span>}
-                      </p>
+                      <label className="text-sm font-medium text-slate-700">{t("common.type") || "Type"}</label>
+                      <Select value={editForm.action_type || "none"} onValueChange={(v) => setEditForm({ ...editForm, action_type: v === "none" ? "" : v })}>
+                        <SelectTrigger data-testid="edit-action-type">
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No type</SelectItem>
+                          <SelectItem value="CM">CM - Corrective</SelectItem>
+                          <SelectItem value="PM">PM - Preventive</SelectItem>
+                          <SelectItem value="PDM">PDM - Predictive</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("common.dueDate")}</label>
-                      <p className={`text-sm mt-1 flex items-center gap-1.5 ${vaOverdue ? "text-red-600 font-medium" : "text-slate-800"}`}>
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        {formatDate(va.due_date)}
-                      </p>
+                      <label className="text-sm font-medium text-slate-700">{t("common.discipline") || "Discipline"}</label>
+                      <Input
+                        value={editForm.discipline}
+                        onChange={(e) => setEditForm({ ...editForm, discipline: e.target.value })}
+                        placeholder="e.g. Mechanical, Electrical"
+                        data-testid="edit-action-discipline"
+                      />
                     </div>
                   </div>
-
-                  {/* Source */}
-                  {va.source_type && va.source_id && (
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("actionsPage.source") || "Source"}</label>
-                      <button
-                        onClick={() => {
-                          if (va.source_type === "investigation") navigate(`/causal-engine?inv=${va.source_id}`);
-                          else if (va.source_type === "threat" || va.source_type === "ai_recommendation") navigate(`/threats/${va.source_id}`);
-                          setViewingAction(null);
-                        }}
-                        className="mt-1 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors text-sm text-slate-700"
-                        data-testid="view-action-source-link"
-                      >
-                        <VaSourceIcon className={`w-4 h-4 ${sourceConfig[va.source_type]?.color}`} />
-                        <span className="font-medium">{sourceConfig[va.source_type]?.label}</span>
-                        <span className="text-slate-400">-</span>
-                        <span className="truncate max-w-[200px]">{va.source_name || "Unknown"}</span>
-                        <ExternalLink className="w-3 h-3 text-slate-400" />
-                      </button>
+                      <label className="text-sm font-medium text-slate-700">{t("common.status")}</label>
+                      <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                        <SelectTrigger data-testid="edit-action-status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="open">{t("common.open")}</SelectItem>
+                          <SelectItem value="in_progress">{t("common.inProgress")}</SelectItem>
+                          <SelectItem value="completed">{t("actionsPage.completedActions")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">{t("common.priority")}</label>
+                      <Select value={editForm.priority} onValueChange={(v) => setEditForm({ ...editForm, priority: v })}>
+                        <SelectTrigger data-testid="edit-action-priority">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="critical">{t("common.critical")}</SelectItem>
+                          <SelectItem value="high">{t("common.high")}</SelectItem>
+                          <SelectItem value="medium">{t("common.medium")}</SelectItem>
+                          <SelectItem value="low">{t("common.low")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">{t("threatDetail.actionAssignee")}</label>
+                      <Select value={editForm.assignee || "unassigned"} onValueChange={(v) => setEditForm({ ...editForm, assignee: v === "unassigned" ? "" : v })}>
+                        <SelectTrigger data-testid="edit-action-assignee">
+                          <SelectValue placeholder="Select assignee" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {usersList.map((u) => (
+                            <SelectItem key={u.id} value={u.name || u.email}>
+                              <span className="flex items-center gap-2">
+                                <User className="w-3 h-3" />
+                                {u.name || u.email}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">{t("common.dueDate")}</label>
+                      <Input
+                        type="date"
+                        value={editForm.due_date}
+                        onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
+                        data-testid="edit-action-due-date"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">{t("common.comment") || "Comments"}</label>
+                    <Textarea
+                      value={editForm.comments}
+                      onChange={(e) => setEditForm({ ...editForm, comments: e.target.value })}
+                      placeholder="Add comments or notes..."
+                      rows={3}
+                      data-testid="edit-action-comments"
+                    />
+                  </div>
+                  {editForm.status === "completed" && (
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">{t("taskScheduler.completionNotes")}</label>
+                      <Textarea
+                        value={editForm.completion_notes}
+                        onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
+                        placeholder="Notes on how the action was completed"
+                        rows={2}
+                        data-testid="edit-action-notes"
+                      />
                     </div>
                   )}
 
-                  {/* Risk scores */}
-                  {(va.threat_risk_score || va.threat_rpn) && (
-                    <div className="grid grid-cols-2 gap-4">
-                      {va.threat_risk_score != null && (
+                  {/* Risk Scores */}
+                  {(ea.threat_risk_score != null || ea.threat_rpn != null) && (
+                    <div className="grid grid-cols-2 gap-4 p-3 bg-slate-50 rounded-lg">
+                      {ea.threat_risk_score != null && (
                         <div>
                           <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Risk Score</label>
-                          <p className={`text-lg font-bold mt-1 ${
-                            va.threat_risk_score >= 70 ? "text-red-600" :
-                            va.threat_risk_score >= 50 ? "text-orange-500" :
+                          <p className={`text-lg font-bold mt-0.5 ${
+                            ea.threat_risk_score >= 70 ? "text-red-600" :
+                            ea.threat_risk_score >= 50 ? "text-orange-500" :
                             "text-green-500"
-                          }`}>{va.threat_risk_score}</p>
+                          }`}>{ea.threat_risk_score}</p>
                         </div>
                       )}
-                      {va.threat_rpn != null && (
+                      {ea.threat_rpn != null && (
                         <div>
                           <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">RPN</label>
-                          <p className={`text-lg font-bold mt-1 ${
-                            va.threat_rpn >= 200 ? "text-red-600" :
-                            va.threat_rpn >= 100 ? "text-orange-500" :
+                          <p className={`text-lg font-bold mt-0.5 ${
+                            ea.threat_rpn >= 200 ? "text-red-600" :
+                            ea.threat_rpn >= 100 ? "text-orange-500" :
                             "text-blue-500"
-                          }`}>{va.threat_rpn}</p>
+                          }`}>{ea.threat_rpn}</p>
                         </div>
                       )}
-                    </div>
-                  )}
-
-                  {/* Comments */}
-                  {va.comments && (
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide flex items-center gap-1">
-                        <MessageSquare className="w-3 h-3" />
-                        {t("common.comment") || "Comments"}
-                      </label>
-                      <p className="text-sm text-slate-700 mt-1 bg-slate-50 rounded-lg p-3 leading-relaxed">{va.comments}</p>
-                    </div>
-                  )}
-
-                  {/* Completion Notes */}
-                  {va.completion_notes && (
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("taskScheduler.completionNotes")}</label>
-                      <p className="text-sm text-slate-700 mt-1 bg-green-50 rounded-lg p-3 leading-relaxed">{va.completion_notes}</p>
                     </div>
                   )}
 
                   {/* Timestamps */}
                   <div className="text-xs text-slate-400 flex items-center gap-4 pt-2 border-t border-slate-100">
-                    {va.created_at && <span>Created: {new Date(va.created_at).toLocaleString()}</span>}
-                    {va.updated_at && <span>Updated: {new Date(va.updated_at).toLocaleString()}</span>}
+                    {ea.created_at && <span>Created: {new Date(ea.created_at).toLocaleString()}</span>}
+                    {ea.updated_at && <span>Updated: {new Date(ea.updated_at).toLocaleString()}</span>}
                   </div>
                 </div>
-                <DialogFooter className="gap-2">
+                <DialogFooter className="gap-2 sm:justify-between">
                   <Button
                     variant="outline"
                     className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                    onClick={() => { setDeleteConfirm(va); setViewingAction(null); }}
-                    data-testid="view-action-delete-btn"
+                    onClick={() => { setDeleteConfirm(ea); setIsEditDialogOpen(false); }}
+                    data-testid="action-delete-btn"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     {t("common.delete")}
                   </Button>
-                  <Button onClick={() => openEditDialog(va)} data-testid="view-action-edit-btn">
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    {t("common.edit")}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                      {t("common.cancel")}
+                    </Button>
+                    <Button onClick={handleSaveEdit} disabled={updateMutation.isPending} data-testid="action-save-btn">
+                      {updateMutation.isPending ? t("taskScheduler.saving") : t("taskScheduler.saveChanges")}
+                    </Button>
+                  </div>
                 </DialogFooter>
               </>
             );
