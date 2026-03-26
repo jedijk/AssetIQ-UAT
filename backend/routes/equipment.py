@@ -1,211 +1,55 @@
 """
-Equipment Hierarchy Routes - ISO 14224 compliant equipment management
+Equipment Hierarchy routes.
 """
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
+from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timezone
 import uuid
-
-from .deps import db, get_current_user, logger
+import json
+import logging
+import base64
+from database import db, efm_service, EMERGENT_LLM_KEY
+from auth import get_current_user
+from services.threat_score_service import recalculate_threat_scores_for_asset
 from iso14224_models import (
     ISOLevel, ISO_LEVEL_ORDER, EQUIPMENT_TYPES, CRITICALITY_PROFILES, Discipline,
     get_valid_parent_level, get_valid_child_levels, is_valid_parent_child, normalize_level,
-    ISO_LEVEL_LABELS
+    EquipmentNodeCreate, EquipmentNodeUpdate, CriticalityAssignment, MoveNodeRequest,
+    UnstructuredItemCreate, ParseEquipmentListRequest, AssignToHierarchyRequest,
+    detect_equipment_type, EquipmentTypeCreate, EquipmentTypeUpdate
 )
+from emergentintegrations.llm.chat import LlmChat, UserMessage
+logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/equipment-hierarchy", tags=["Equipment Hierarchy"])
+router = APIRouter(tags=["Equipment Hierarchy"])
 
+# ============= ISO 14224 EQUIPMENT HIERARCHY ENDPOINTS =============
 
-# ============= PYDANTIC MODELS =============
-
-class EquipmentTypeCreate(BaseModel):
-    id: str
-    name: str
-    iso_class: str
-    discipline: str
-    icon: Optional[str] = "Cog"
-
-
-class EquipmentTypeUpdate(BaseModel):
-    name: Optional[str] = None
-    iso_class: Optional[str] = None
-    discipline: Optional[str] = None
-    icon: Optional[str] = None
-
-
-class EquipmentNodeCreate(BaseModel):
-    name: str
-    level: ISOLevel
-    parent_id: Optional[str] = None
-    equipment_type_id: Optional[str] = None
-    description: Optional[str] = None
-
-
-class EquipmentNodeUpdate(BaseModel):
-    name: Optional[str] = None
-    parent_id: Optional[str] = None
-    equipment_type_id: Optional[str] = None
-    description: Optional[str] = None
-    tag: Optional[str] = None
-
-
-class CriticalityUpdate(BaseModel):
-    safety_impact: Optional[int] = Field(None, ge=1, le=5)
-    production_impact: Optional[int] = Field(None, ge=1, le=5)
-    environmental_impact: Optional[int] = Field(None, ge=1, le=5)
-    reputation_impact: Optional[int] = Field(None, ge=1, le=5)
-
-
-class NodeReorderRequest(BaseModel):
-    direction: str = Field(..., pattern="^(up|down)$")
-
-
-class NodeReorderToRequest(BaseModel):
-    target_id: str
-    position: str = Field(..., pattern="^(before|after)$")
-
-
-class NodeMoveRequest(BaseModel):
-    new_parent_id: Optional[str] = None
-
-
-class NodeLevelChangeRequest(BaseModel):
-    new_level: ISOLevel
-    force: bool = False
-
-
-class UnstructuredItem(BaseModel):
-    text: str
-    source: Optional[str] = None
-
-
-class ParseListRequest(BaseModel):
-    items: List[str]
-
-
-class AssignUnstructuredRequest(BaseModel):
-    parent_id: str
-    level: ISOLevel
-    equipment_type_id: Optional[str] = None
-
-
-# ============= HELPER FUNCTIONS =============
-
-async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new_criticality: dict = None, equipment_node_id: str = None):
-    """Recalculate risk scores for all threats linked to a specific asset."""
-    from failure_modes import FAILURE_MODES_LIBRARY
-    
-    query_conditions = [{"asset": asset_name, "created_by": user_id}]
-    if equipment_node_id:
-        query_conditions.append({"linked_equipment_id": equipment_node_id, "created_by": user_id})
-    
-    threats = await db.threats.find({"$or": query_conditions}).to_list(1000)
-    
-    if not threats:
-        return 0
-    
-    if new_criticality:
-        safety_impact = new_criticality.get("safety_impact", 0) or 0
-        production_impact = new_criticality.get("production_impact", 0) or 0
-        environmental_impact = new_criticality.get("environmental_impact", 0) or 0
-        reputation_impact = new_criticality.get("reputation_impact", 0) or 0
-        
-        criticality_score = (
-            (safety_impact * 25) + 
-            (production_impact * 20) + 
-            (environmental_impact * 15) + 
-            (reputation_impact * 10)
-        ) / 3.5
-        criticality_score = min(100, int(criticality_score))
-        
-        max_impact = max(safety_impact, production_impact, environmental_impact, reputation_impact)
-        if max_impact >= 5:
-            criticality_level = "safety_critical"
-        elif max_impact >= 4:
-            criticality_level = "production_critical"
-        elif max_impact >= 3:
-            criticality_level = "medium"
-        else:
-            criticality_level = "low"
-        
-        criticality_data = {
-            "safety_impact": safety_impact,
-            "production_impact": production_impact,
-            "environmental_impact": environmental_impact,
-            "reputation_impact": reputation_impact,
-            "level": criticality_level,
-            "criticality_score": criticality_score
-        }
-    else:
-        criticality_score = 0
-        criticality_level = "low"
-        criticality_data = None
-    
-    updated_count = 0
-    for threat in threats:
-        fmea_score = threat.get("fmea_score", threat.get("base_risk_score", 50))
-        
-        failure_mode_name = threat.get("failure_mode")
-        if failure_mode_name and failure_mode_name != "Unknown":
-            for fm in FAILURE_MODES_LIBRARY:
-                if fm["failure_mode"].lower() == failure_mode_name.lower():
-                    fmea_score = min(100, int(fm["rpn"] / 10))
-                    break
-        
-        final_risk_score = int((criticality_score * 0.75) + (fmea_score * 0.25))
-        final_risk_score = min(100, max(0, final_risk_score))
-        
-        if final_risk_score >= 70:
-            risk_level = "Critical"
-        elif final_risk_score >= 50:
-            risk_level = "High"
-        elif final_risk_score >= 30:
-            risk_level = "Medium"
-        else:
-            risk_level = "Low"
-        
-        update_data = {
-            "risk_score": final_risk_score,
-            "criticality_score": criticality_score,
-            "fmea_score": fmea_score,
-            "base_risk_score": fmea_score,
-            "risk_level": risk_level,
-            "equipment_criticality": criticality_level,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
-        
-        if criticality_data:
-            update_data["equipment_criticality_data"] = criticality_data
-        
-        await db.threats.update_one({"id": threat["id"]}, {"$set": update_data})
-        updated_count += 1
-    
-    return updated_count
-
-
-# ============= EQUIPMENT TYPES ROUTES =============
-
-@router.get("/types")
-async def get_iso_equipment_types(current_user: dict = Depends(get_current_user)):
+@router.get("/equipment-hierarchy/types")
+async def get_iso_equipment_types(
+    current_user: dict = Depends(get_current_user)
+):
     """Get all equipment types - merged from defaults and user-custom types."""
+    # Get user's custom equipment types
     custom_types = await db.custom_equipment_types.find(
         {"created_by": current_user["id"]},
         {"_id": 0}
     ).to_list(100)
     
+    # Merge: custom types override defaults by ID
     custom_ids = {t["id"] for t in custom_types}
     merged_types = [t for t in EQUIPMENT_TYPES if t["id"] not in custom_ids] + custom_types
     
     return {"equipment_types": merged_types}
 
-
-@router.post("/types")
+@router.post("/equipment-hierarchy/types")
 async def create_equipment_type(
     type_data: EquipmentTypeCreate,
     current_user: dict = Depends(get_current_user)
 ):
     """Create a custom equipment type."""
+    # Check if ID already exists for this user
     existing = await db.custom_equipment_types.find_one(
         {"id": type_data.id, "created_by": current_user["id"]}
     )
@@ -227,23 +71,25 @@ async def create_equipment_type(
     type_doc.pop("_id", None)
     return type_doc
 
-
-@router.patch("/types/{type_id}")
+@router.patch("/equipment-hierarchy/types/{type_id}")
 async def update_equipment_type(
     type_id: str,
     update: EquipmentTypeUpdate,
     current_user: dict = Depends(get_current_user)
 ):
     """Update a custom equipment type."""
+    # Check if it's a custom type
     existing = await db.custom_equipment_types.find_one(
         {"id": type_id, "created_by": current_user["id"]}
     )
     
     if not existing:
+        # It might be a default type - create a custom override
         default_type = next((t for t in EQUIPMENT_TYPES if t["id"] == type_id), None)
         if not default_type:
             raise HTTPException(status_code=404, detail="Equipment type not found")
         
+        # Create custom override
         type_doc = {
             **default_type,
             "is_custom": True,
@@ -270,8 +116,7 @@ async def update_equipment_type(
     )
     return updated
 
-
-@router.delete("/types/{type_id}")
+@router.delete("/equipment-hierarchy/types/{type_id}")
 async def delete_equipment_type(
     type_id: str,
     current_user: dict = Depends(get_current_user)
@@ -281,30 +126,27 @@ async def delete_equipment_type(
         {"id": type_id, "created_by": current_user["id"]}
     )
     if result.deleted_count == 0:
+        # Check if it's a default type
         default_type = next((t for t in EQUIPMENT_TYPES if t["id"] == type_id), None)
         if default_type:
             raise HTTPException(status_code=400, detail="Cannot delete default equipment types")
         raise HTTPException(status_code=404, detail="Equipment type not found")
     return {"message": "Equipment type deleted"}
 
-
-# ============= REFERENCE DATA ROUTES =============
-
-@router.get("/disciplines")
+@router.get("/equipment-hierarchy/disciplines")
 async def get_disciplines():
     """Get all disciplines."""
     return {"disciplines": [d.value for d in Discipline]}
 
-
-@router.get("/criticality-profiles")
+@router.get("/equipment-hierarchy/criticality-profiles")
 async def get_criticality_profiles():
     """Get all criticality profiles."""
     return {"profiles": CRITICALITY_PROFILES}
 
-
-@router.get("/iso-levels")
+@router.get("/equipment-hierarchy/iso-levels")
 async def get_iso_levels():
     """Get ISO 14224 hierarchy levels with labels."""
+    from iso14224_models import ISO_LEVEL_LABELS
     return {
         "levels": [level.value for level in ISO_LEVEL_ORDER],
         "labels": {level.value: ISO_LEVEL_LABELS.get(level, level.value) for level in ISO_LEVEL_ORDER},
@@ -318,20 +160,18 @@ async def get_iso_levels():
         }
     }
 
-
-# ============= EQUIPMENT NODES ROUTES =============
-
-@router.get("/nodes")
-async def get_equipment_nodes(current_user: dict = Depends(get_current_user)):
-    """Get all equipment hierarchy nodes for the current user."""
+@router.get("/equipment-hierarchy/nodes")
+async def get_equipment_nodes(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all equipment hierarchy nodes for the current user, sorted by sort_order."""
     nodes = await db.equipment_nodes.find(
         {"created_by": current_user["id"]},
         {"_id": 0}
     ).sort("sort_order", 1).to_list(1000)
     return {"nodes": nodes}
 
-
-@router.get("/nodes/{node_id}")
+@router.get("/equipment-hierarchy/nodes/{node_id}")
 async def get_equipment_node(
     node_id: str,
     current_user: dict = Depends(get_current_user)
@@ -345,13 +185,13 @@ async def get_equipment_node(
         raise HTTPException(status_code=404, detail="Equipment node not found")
     return node
 
-
-@router.post("/nodes")
+@router.post("/equipment-hierarchy/nodes")
 async def create_equipment_node(
     node_data: EquipmentNodeCreate,
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new equipment hierarchy node with ISO 14224 validation."""
+    # Check for duplicate name under the same parent
     existing = await db.equipment_nodes.find_one({
         "name": node_data.name,
         "parent_id": node_data.parent_id,
@@ -364,6 +204,7 @@ async def create_equipment_node(
             detail=f"A node with name '{node_data.name}' already exists {parent_info}"
         )
     
+    # Validate parent-child relationship if parent specified
     if node_data.parent_id:
         parent = await db.equipment_nodes.find_one(
             {"id": node_data.parent_id, "created_by": current_user["id"]},
@@ -380,11 +221,16 @@ async def create_equipment_node(
                 detail=f"Invalid parent-child relationship. {parent_level.value} can only have {[c.value for c in valid_children]} as children"
             )
     else:
+        # Root nodes must be installations
         if node_data.level != ISOLevel.INSTALLATION:
-            raise HTTPException(status_code=400, detail="Root nodes must be of level 'installation'")
+            raise HTTPException(
+                status_code=400, 
+                detail="Root nodes must be of level 'installation'"
+            )
     
     node_id = str(uuid.uuid4())
     
+    # Calculate sort_order - get max sort_order for siblings and add 1
     max_sort = await db.equipment_nodes.find_one(
         {"parent_id": node_data.parent_id, "created_by": current_user["id"]},
         sort=[("sort_order", -1)],
@@ -408,11 +254,25 @@ async def create_equipment_node(
     }
     
     await db.equipment_nodes.insert_one(node_doc)
+    
+    # Auto-generate EFMs if equipment_type_id is specified
+    if node_data.equipment_type_id:
+        try:
+            efms = await efm_service.generate_efms_for_equipment(
+                equipment_id=node_id,
+                equipment_name=node_data.name,
+                equipment_type_id=node_data.equipment_type_id
+            )
+            node_doc["efms_generated"] = len(efms)
+            logger.info(f"Auto-generated {len(efms)} EFMs for equipment {node_id}")
+        except Exception as e:
+            logger.error(f"Failed to generate EFMs for {node_id}: {e}")
+    
+    # Remove MongoDB's _id before returning
     node_doc.pop("_id", None)
     return node_doc
 
-
-@router.patch("/nodes/{node_id}")
+@router.patch("/equipment-hierarchy/nodes/{node_id}")
 async def update_equipment_node(
     node_id: str,
     update: EquipmentNodeUpdate,
@@ -425,6 +285,7 @@ async def update_equipment_node(
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
+    # Validate new parent if changing parent
     if update.parent_id is not None and update.parent_id != node.get("parent_id"):
         if update.parent_id:
             new_parent = await db.equipment_nodes.find_one(
@@ -437,8 +298,12 @@ async def update_equipment_node(
             parent_level = ISOLevel(new_parent["level"])
             child_level = ISOLevel(node["level"])
             if not is_valid_parent_child(parent_level, child_level):
-                raise HTTPException(status_code=400, detail="Invalid parent-child relationship per ISO 14224")
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Invalid parent-child relationship per ISO 14224"
+                )
             
+            # Check for circular references
             current_parent = update.parent_id
             while current_parent:
                 if current_parent == node_id:
@@ -446,85 +311,487 @@ async def update_equipment_node(
                 parent_node = await db.equipment_nodes.find_one({"id": current_parent})
                 current_parent = parent_node.get("parent_id") if parent_node else None
         else:
+            # Removing parent - node must be installation level
             if node["level"] != ISOLevel.INSTALLATION.value:
-                raise HTTPException(status_code=400, detail="Only installations can be root nodes")
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Only installations can be root nodes"
+                )
     
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-        await db.equipment_nodes.update_one({"id": node_id}, {"$set": update_data})
+        await db.equipment_nodes.update_one(
+            {"id": node_id},
+            {"$set": update_data}
+        )
+        
+        # Sync EFMs if equipment_type_id changed
+        if update.equipment_type_id is not None:
+            old_type = node.get("equipment_type_id")
+            new_type = update.equipment_type_id
+            if old_type != new_type:
+                try:
+                    sync_result = await efm_service.sync_efms_for_equipment(
+                        equipment_id=node_id,
+                        equipment_name=node.get("name"),
+                        new_equipment_type_id=new_type,
+                        old_equipment_type_id=old_type
+                    )
+                    logger.info(f"Synced EFMs for {node_id}: {sync_result}")
+                except Exception as e:
+                    logger.error(f"Failed to sync EFMs for {node_id}: {e}")
     
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
     return updated
 
-
-@router.delete("/nodes/{node_id}")
+@router.delete("/equipment-hierarchy/nodes/{node_id}")
 async def delete_equipment_node(
     node_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete an equipment hierarchy node and all its children."""
+    """Delete an equipment node and optionally its children."""
     node = await db.equipment_nodes.find_one(
         {"id": node_id, "created_by": current_user["id"]}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
-    async def delete_descendants(parent_id: str):
+    # Get all children recursively
+    async def get_children_ids(parent_id):
         children = await db.equipment_nodes.find(
-            {"parent_id": parent_id, "created_by": current_user["id"]}
-        ).to_list(100)
+            {"parent_id": parent_id, "created_by": current_user["id"]},
+            {"_id": 0, "id": 1}
+        ).to_list(1000)
+        all_ids = [c["id"] for c in children]
         for child in children:
-            await delete_descendants(child["id"])
-            await db.equipment_nodes.delete_one({"id": child["id"]})
+            all_ids.extend(await get_children_ids(child["id"]))
+        return all_ids
     
-    await delete_descendants(node_id)
-    await db.equipment_nodes.delete_one({"id": node_id})
+    children_ids = await get_children_ids(node_id)
+    all_ids = [node_id] + children_ids
     
-    return {"message": "Equipment node and children deleted"}
+    result = await db.equipment_nodes.delete_many(
+        {"id": {"$in": all_ids}, "created_by": current_user["id"]}
+    )
+    
+    return {"message": f"Deleted {result.deleted_count} nodes", "deleted_ids": all_ids}
 
 
-@router.post("/nodes/{node_id}/criticality")
-async def set_node_criticality(
+class ChangeLevelRequest(BaseModel):
+    new_level: ISOLevel
+    new_parent_id: Optional[str] = None  # Required when demoting, optional when promoting
+
+
+@router.post("/equipment-hierarchy/nodes/{node_id}/change-level")
+async def change_node_level(
     node_id: str,
-    criticality: CriticalityUpdate,
+    request: ChangeLevelRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    """Set criticality for an equipment node with 4-dimension model."""
+    """Change the hierarchy level of a node (promote or demote)."""
     node = await db.equipment_nodes.find_one(
         {"id": node_id, "created_by": current_user["id"]}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
-    safety = criticality.safety_impact or 0
-    production = criticality.production_impact or 0
-    environmental = criticality.environmental_impact or 0
-    reputation = criticality.reputation_impact or 0
+    current_level = normalize_level(ISOLevel(node["level"]))
+    new_level = normalize_level(request.new_level)
     
-    criticality_score = (
-        (safety * 25) + (production * 20) + (environmental * 15) + (reputation * 10)
-    ) / 3.5
-    criticality_score = min(100, int(criticality_score))
+    current_idx = ISO_LEVEL_ORDER.index(current_level)
+    new_idx = ISO_LEVEL_ORDER.index(new_level)
     
+    # Validate level change
+    if new_idx == current_idx:
+        raise HTTPException(status_code=400, detail="Node is already at this level")
+    
+    is_promoting = new_idx < current_idx  # Moving up in hierarchy
+    is_demoting = new_idx > current_idx   # Moving down in hierarchy
+    
+    # Get current parent
+    current_parent = None
+    if node.get("parent_id"):
+        current_parent = await db.equipment_nodes.find_one(
+            {"id": node["parent_id"], "created_by": current_user["id"]}
+        )
+    
+    if is_promoting:
+        # When promoting, the node becomes a sibling of its current parent
+        # The new parent is the grandparent (parent of current parent)
+        if not current_parent:
+            raise HTTPException(status_code=400, detail="Cannot promote a root node")
+        
+        new_parent_id = current_parent.get("parent_id")  # Grandparent (can be None for installation)
+        
+        # Validate the new level is correct for the new parent
+        if new_parent_id:
+            grandparent = await db.equipment_nodes.find_one(
+                {"id": new_parent_id, "created_by": current_user["id"]}
+            )
+            if grandparent:
+                grandparent_level = normalize_level(ISOLevel(grandparent["level"]))
+                if not is_valid_parent_child(grandparent_level, new_level):
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Cannot promote to {new_level.value}. Invalid parent-child relationship."
+                    )
+        else:
+            # Promoting to root level - must be installation
+            if new_level != ISOLevel.INSTALLATION:
+                raise HTTPException(status_code=400, detail="Only installations can be root nodes")
+        
+    else:  # is_demoting
+        # When demoting, user must specify a new parent
+        if not request.new_parent_id:
+            raise HTTPException(status_code=400, detail="Must specify new_parent_id when demoting")
+        
+        new_parent = await db.equipment_nodes.find_one(
+            {"id": request.new_parent_id, "created_by": current_user["id"]}
+        )
+        if not new_parent:
+            raise HTTPException(status_code=400, detail="New parent node not found")
+        
+        parent_level = normalize_level(ISOLevel(new_parent["level"]))
+        if not is_valid_parent_child(parent_level, new_level):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot demote to {new_level.value} under {parent_level.value}"
+            )
+        
+        new_parent_id = request.new_parent_id
+    
+    # Check for duplicate name at new location
+    existing = await db.equipment_nodes.find_one({
+        "name": node["name"],
+        "parent_id": new_parent_id,
+        "created_by": current_user["id"],
+        "id": {"$ne": node_id}
+    })
+    if existing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"A node with name '{node['name']}' already exists at the target location"
+        )
+    
+    # Update the node
+    await db.equipment_nodes.update_one(
+        {"id": node_id},
+        {"$set": {
+            "level": new_level.value,
+            "parent_id": new_parent_id,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # If promoting, also need to update children's parent to maintain hierarchy
+    # Children of this node stay as children
+    
+    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    action = "promoted" if is_promoting else "demoted"
+    return {
+        "message": f"Node {action} to {new_level.value}",
+        "node": updated
+    }
+
+
+class ReorderRequest(BaseModel):
+    direction: str  # "up" or "down"
+
+
+@router.post("/equipment-hierarchy/nodes/{node_id}/reorder")
+async def reorder_equipment_node(
+    node_id: str,
+    request: ReorderRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Reorder a node among its siblings (move up or down in the list)."""
+    if request.direction not in ["up", "down"]:
+        raise HTTPException(status_code=400, detail="Direction must be 'up' or 'down'")
+    
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    current_sort = node.get("sort_order", 0)
+    
+    # Get all siblings (same parent)
+    siblings = await db.equipment_nodes.find(
+        {"parent_id": node["parent_id"], "created_by": current_user["id"]},
+        {"_id": 0}
+    ).sort("sort_order", 1).to_list(1000)
+    
+    if len(siblings) <= 1:
+        raise HTTPException(status_code=400, detail="No siblings to reorder with")
+    
+    # Find current index
+    current_idx = next((i for i, s in enumerate(siblings) if s["id"] == node_id), -1)
+    if current_idx == -1:
+        raise HTTPException(status_code=400, detail="Node not found in siblings")
+    
+    # Calculate target index
+    if request.direction == "up":
+        if current_idx == 0:
+            raise HTTPException(status_code=400, detail="Already at the top")
+        target_idx = current_idx - 1
+    else:  # down
+        if current_idx == len(siblings) - 1:
+            raise HTTPException(status_code=400, detail="Already at the bottom")
+        target_idx = current_idx + 1
+    
+    # Swap sort_order values
+    target_node = siblings[target_idx]
+    target_sort = target_node.get("sort_order", target_idx)
+    
+    # Update both nodes
+    await db.equipment_nodes.update_one(
+        {"id": node_id},
+        {"$set": {"sort_order": target_sort, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    await db.equipment_nodes.update_one(
+        {"id": target_node["id"]},
+        {"$set": {"sort_order": current_sort, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"message": f"Node moved {request.direction}", "new_sort_order": target_sort}
+
+
+class ReorderToPositionRequest(BaseModel):
+    target_node_id: str  # The node to position relative to
+    position: str  # "before" or "after"
+    new_parent_id: Optional[str] = None  # If moving to a different parent
+
+
+@router.post("/equipment-hierarchy/nodes/{node_id}/reorder-to")
+async def reorder_node_to_position(
+    node_id: str,
+    request: ReorderToPositionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Reorder a node to a specific position relative to another node via drag-and-drop."""
+    if request.position not in ["before", "after"]:
+        raise HTTPException(status_code=400, detail="Position must be 'before' or 'after'")
+    
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    
+    target = await db.equipment_nodes.find_one(
+        {"id": request.target_node_id, "created_by": current_user["id"]}
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Target node not found")
+    
+    # Determine the new parent - use target's parent if not specified
+    new_parent_id = request.new_parent_id if request.new_parent_id is not None else target.get("parent_id")
+    
+    # If moving to a different parent, validate the level relationship
+    if new_parent_id != node.get("parent_id"):
+        if new_parent_id:
+            new_parent = await db.equipment_nodes.find_one(
+                {"id": new_parent_id, "created_by": current_user["id"]}
+            )
+            if not new_parent:
+                raise HTTPException(status_code=400, detail="New parent not found")
+            
+            parent_level = ISOLevel(new_parent["level"])
+            child_level = ISOLevel(node["level"])
+            if not is_valid_parent_child(parent_level, child_level):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot place {child_level.value} under {parent_level.value}"
+                )
+        else:
+            # Moving to root level - must be installation
+            if node["level"] != "installation":
+                raise HTTPException(status_code=400, detail="Only installations can be at root level")
+    
+    # Get all siblings at the target location (same parent as target)
+    siblings = await db.equipment_nodes.find(
+        {"parent_id": new_parent_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    ).sort("sort_order", 1).to_list(1000)
+    
+    # Remove the dragged node from siblings if it's in the same parent
+    siblings = [s for s in siblings if s["id"] != node_id]
+    
+    # Find target's position
+    target_idx = next((i for i, s in enumerate(siblings) if s["id"] == request.target_node_id), -1)
+    
+    if target_idx == -1:
+        # Target not in siblings (was the dragged node itself), just append
+        insert_idx = len(siblings)
+    elif request.position == "before":
+        insert_idx = target_idx
+    else:  # after
+        insert_idx = target_idx + 1
+    
+    # Reassign sort_order for all siblings
+    for i, sibling in enumerate(siblings):
+        new_sort = i if i < insert_idx else i + 1
+        if sibling.get("sort_order", 0) != new_sort:
+            await db.equipment_nodes.update_one(
+                {"id": sibling["id"]},
+                {"$set": {"sort_order": new_sort, "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+    
+    # Update the moved node with new sort_order and possibly new parent
+    await db.equipment_nodes.update_one(
+        {"id": node_id},
+        {"$set": {
+            "sort_order": insert_idx,
+            "parent_id": new_parent_id,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    return {
+        "message": f"Node moved {request.position} target",
+        "node": updated
+    }
+
+
+@router.post("/equipment-hierarchy/nodes/{node_id}/move")
+async def move_equipment_node(
+    node_id: str,
+    move_request: MoveNodeRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Move a node to a new parent with ISO 14224 validation."""
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    new_parent = await db.equipment_nodes.find_one(
+        {"id": move_request.new_parent_id, "created_by": current_user["id"]}
+    )
+    if not new_parent:
+        raise HTTPException(status_code=400, detail="New parent node not found")
+    
+    # Check for duplicate name under the new parent
+    existing = await db.equipment_nodes.find_one({
+        "name": node["name"],
+        "parent_id": move_request.new_parent_id,
+        "created_by": current_user["id"],
+        "id": {"$ne": node_id}  # Exclude the node itself
+    })
+    if existing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"A node with name '{node['name']}' already exists under the target parent"
+        )
+    
+    # Validate the move per ISO 14224
+    parent_level = ISOLevel(new_parent["level"])
+    child_level = ISOLevel(node["level"])
+    
+    if not is_valid_parent_child(parent_level, child_level):
+        valid_children = get_valid_child_levels(parent_level)
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot move {child_level.value} under {parent_level.value}. Valid children: {[c.value for c in valid_children]}"
+        )
+    
+    # Update the node
+    await db.equipment_nodes.update_one(
+        {"id": node_id},
+        {"$set": {
+            "parent_id": move_request.new_parent_id,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    return updated
+
+@router.post("/equipment-hierarchy/nodes/{node_id}/criticality")
+async def assign_criticality(
+    node_id: str,
+    assignment: CriticalityAssignment,
+    current_user: dict = Depends(get_current_user)
+):
+    """Assign criticality to an equipment node using 4-dimension model (Safety, Production, Environmental, Reputation)."""
+    node = await db.equipment_nodes.find_one(
+        {"id": node_id, "created_by": current_user["id"]}
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    # Check if all 4 dimensions are None/0 - if so, clear criticality
+    has_any_dimension = (
+        (assignment.safety_impact and assignment.safety_impact > 0) or
+        (assignment.production_impact and assignment.production_impact > 0) or
+        (assignment.environmental_impact and assignment.environmental_impact > 0) or
+        (assignment.reputation_impact and assignment.reputation_impact > 0)
+    )
+    
+    if not has_any_dimension:
+        await db.equipment_nodes.update_one(
+            {"id": node_id},
+            {"$set": {
+                "criticality": None,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+        return updated
+    
+    # Build 4-dimension criticality data
+    safety = assignment.safety_impact or 0
+    production = assignment.production_impact or 0
+    environmental = assignment.environmental_impact or 0
+    reputation = assignment.reputation_impact or 0
+    
+    # Calculate overall criticality level based on max dimension
     max_impact = max(safety, production, environmental, reputation)
-    if max_impact >= 5:
+    
+    # Determine legacy level for backwards compatibility
+    if safety >= 4 or max_impact == 5:
         level = "safety_critical"
-    elif max_impact >= 4:
+        color = "#EF4444"  # Red
+    elif production >= 4 or max_impact >= 4:
         level = "production_critical"
+        color = "#F97316"  # Orange
     elif max_impact >= 3:
         level = "medium"
+        color = "#EAB308"  # Yellow
     else:
         level = "low"
+        color = "#22C55E"  # Green
     
     criticality_data = {
+        # 4-dimension model
         "safety_impact": safety,
         "production_impact": production,
         "environmental_impact": environmental,
         "reputation_impact": reputation,
+        # Derived values for backwards compatibility
         "level": level,
-        "criticality_score": criticality_score
+        "color": color,
+        "max_impact": max_impact,
+        # Legacy fields preserved
+        "profile_id": assignment.profile_id,
+        "fatality_risk": assignment.fatality_risk or 0,
+        "production_loss_per_day": assignment.production_loss_per_day or 0,
+        "failure_probability": assignment.failure_probability or 0,
+        "downtime_days": assignment.downtime_days or 0,
     }
+    
+    # Calculate risk score weighted by dimensions
+    risk_score = (
+        (safety * 25) +  # Safety has highest weight
+        (production * 20) +
+        (environmental * 15) +
+        (reputation * 10)
+    )
+    criticality_data["risk_score"] = round(risk_score, 2)
     
     await db.equipment_nodes.update_one(
         {"id": node_id},
@@ -534,35 +801,44 @@ async def set_node_criticality(
         }}
     )
     
+    # Recalculate risk scores for all threats linked to this asset
     asset_name = node.get("name")
     updated_threats = 0
     if asset_name:
         updated_threats = await recalculate_threat_scores_for_asset(
-            asset_name, current_user["id"], criticality_data, node_id
+            asset_name, 
+            current_user["id"], 
+            criticality_data,
+            node_id  # Pass node_id to also find threats by linked_equipment_id
         )
         logger.info(f"Updated {updated_threats} threat scores after criticality change for {asset_name}")
     
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
-    updated["threats_updated"] = updated_threats
+    # Include count of updated threats in response
+    updated["threats_updated"] = updated_threats if asset_name else 0
     return updated
 
-
-@router.post("/nodes/{node_id}/discipline")
-async def set_node_discipline(
+@router.post("/equipment-hierarchy/nodes/{node_id}/discipline")
+async def assign_discipline(
     node_id: str,
-    discipline_data: dict,
+    discipline: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Set discipline for an equipment node."""
+    """Assign discipline to an equipment node."""
     node = await db.equipment_nodes.find_one(
         {"id": node_id, "created_by": current_user["id"]}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
-    discipline = discipline_data.get("discipline")
-    if discipline and discipline not in [d.value for d in Discipline]:
-        raise HTTPException(status_code=400, detail=f"Invalid discipline. Must be one of: {[d.value for d in Discipline]}")
+    # Validate discipline
+    try:
+        Discipline(discipline)  # Validate discipline enum
+    except ValueError:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid discipline. Valid options: {[d.value for d in Discipline]}"
+        )
     
     await db.equipment_nodes.update_one(
         {"id": node_id},
@@ -575,279 +851,332 @@ async def set_node_discipline(
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
     return updated
 
-
-@router.post("/nodes/{node_id}/reorder")
-async def reorder_node(
-    node_id: str,
-    request: NodeReorderRequest,
+@router.get("/equipment-hierarchy/stats")
+async def get_hierarchy_stats(
     current_user: dict = Depends(get_current_user)
 ):
-    """Reorder a node up or down among its siblings."""
-    node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]}
-    )
-    if not node:
-        raise HTTPException(status_code=404, detail="Equipment node not found")
+    """Get statistics about the equipment hierarchy."""
+    user_id = current_user["id"]
     
-    siblings = await db.equipment_nodes.find(
-        {"parent_id": node["parent_id"], "created_by": current_user["id"]}
-    ).sort("sort_order", 1).to_list(100)
+    total_nodes = await db.equipment_nodes.count_documents({"created_by": user_id})
     
-    current_index = next((i for i, s in enumerate(siblings) if s["id"] == node_id), -1)
-    if current_index == -1:
-        raise HTTPException(status_code=500, detail="Node not found in siblings")
-    
-    if request.direction == "up":
-        if current_index == 0:
-            raise HTTPException(status_code=400, detail="Node is already at the top")
-        swap_index = current_index - 1
-    else:
-        if current_index == len(siblings) - 1:
-            raise HTTPException(status_code=400, detail="Node is already at the bottom")
-        swap_index = current_index + 1
-    
-    current_sort = siblings[current_index].get("sort_order", current_index)
-    swap_sort = siblings[swap_index].get("sort_order", swap_index)
-    
-    await db.equipment_nodes.update_one(
-        {"id": node_id},
-        {"$set": {"sort_order": swap_sort}}
-    )
-    await db.equipment_nodes.update_one(
-        {"id": siblings[swap_index]["id"]},
-        {"$set": {"sort_order": current_sort}}
-    )
-    
-    return {"message": f"Node moved {request.direction}"}
-
-
-@router.post("/nodes/{node_id}/move")
-async def move_node(
-    node_id: str,
-    request: NodeMoveRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    """Move a node to a different parent."""
-    node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]}
-    )
-    if not node:
-        raise HTTPException(status_code=404, detail="Equipment node not found")
-    
-    if request.new_parent_id:
-        new_parent = await db.equipment_nodes.find_one(
-            {"id": request.new_parent_id, "created_by": current_user["id"]}
-        )
-        if not new_parent:
-            raise HTTPException(status_code=400, detail="New parent not found")
-        
-        parent_level = ISOLevel(new_parent["level"])
-        child_level = ISOLevel(node["level"])
-        if not is_valid_parent_child(parent_level, child_level):
-            raise HTTPException(status_code=400, detail="Invalid parent-child relationship")
-        
-        current_parent = request.new_parent_id
-        while current_parent:
-            if current_parent == node_id:
-                raise HTTPException(status_code=400, detail="Cannot move node under itself")
-            parent_node = await db.equipment_nodes.find_one({"id": current_parent})
-            current_parent = parent_node.get("parent_id") if parent_node else None
-    else:
-        if node["level"] != ISOLevel.INSTALLATION.value:
-            raise HTTPException(status_code=400, detail="Only installations can be root nodes")
-    
-    max_sort = await db.equipment_nodes.find_one(
-        {"parent_id": request.new_parent_id, "created_by": current_user["id"]},
-        sort=[("sort_order", -1)],
-        projection={"sort_order": 1}
-    )
-    new_sort_order = (max_sort.get("sort_order", 0) if max_sort else 0) + 1
-    
-    await db.equipment_nodes.update_one(
-        {"id": node_id},
-        {"$set": {
-            "parent_id": request.new_parent_id,
-            "sort_order": new_sort_order,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-    
-    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
-    return updated
-
-
-@router.get("/stats")
-async def get_equipment_stats(current_user: dict = Depends(get_current_user)):
-    """Get equipment hierarchy statistics."""
-    nodes = await db.equipment_nodes.find(
-        {"created_by": current_user["id"]},
-        {"_id": 0}
-    ).to_list(1000)
-    
+    # Count by level
     level_counts = {}
-    discipline_counts = {}
-    criticality_counts = {"safety_critical": 0, "production_critical": 0, "medium": 0, "low": 0, "unassigned": 0}
+    for level in ISO_LEVEL_ORDER:
+        count = await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "level": level.value}
+        )
+        level_counts[level.value] = count
     
-    for node in nodes:
-        level = node.get("level", "unknown")
-        level_counts[level] = level_counts.get(level, 0) + 1
-        
-        discipline = node.get("discipline") or "unassigned"
-        discipline_counts[discipline] = discipline_counts.get(discipline, 0) + 1
-        
-        crit = node.get("criticality")
-        if crit:
-            crit_level = crit.get("level", "low")
-            criticality_counts[crit_level] = criticality_counts.get(crit_level, 0) + 1
-        else:
-            criticality_counts["unassigned"] += 1
+    # Count by criticality
+    criticality_counts = {
+        "safety_critical": await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "criticality.level": "safety_critical"}
+        ),
+        "production_critical": await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "criticality.level": "production_critical"}
+        ),
+        "medium": await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "criticality.level": "medium"}
+        ),
+        "low": await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "criticality.level": "low"}
+        ),
+        "unassigned": await db.equipment_nodes.count_documents(
+            {"created_by": user_id, "criticality": None}
+        )
+    }
     
     return {
-        "total_nodes": len(nodes),
+        "total_nodes": total_nodes,
         "by_level": level_counts,
-        "by_discipline": discipline_counts,
         "by_criticality": criticality_counts
     }
 
+# ============= EQUIPMENT FAILURE MODES (EFM) ENDPOINTS =============
 
-# ============= UNSTRUCTURED DATA ROUTES =============
-
-@router.get("/unstructured")
-async def get_unstructured_items(current_user: dict = Depends(get_current_user)):
-    """Get unassigned/unstructured equipment items."""
-    items = await db.unstructured_equipment.find(
-        {"created_by": current_user["id"]},
-        {"_id": 0}
-    ).to_list(500)
-    return {"items": items}
-
-
-@router.post("/unstructured")
-async def add_unstructured_item(
-    item: UnstructuredItem,
+@router.get("/equipment-hierarchy/unstructured")
+async def get_unstructured_items(
     current_user: dict = Depends(get_current_user)
 ):
-    """Add an unstructured equipment item for later assignment."""
+    """Get all unstructured (unassigned) equipment items."""
+    items = await db.unstructured_items.find(
+        {"created_by": current_user["id"]},
+        {"_id": 0}
+    ).to_list(1000)
+    return {"items": items}
+
+@router.post("/equipment-hierarchy/unstructured")
+async def create_unstructured_item(
+    item_data: UnstructuredItemCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a single unstructured equipment item."""
+    # Detect equipment type if not provided
+    detected = detect_equipment_type(item_data.name)
+    
+    item_id = str(uuid.uuid4())
     item_doc = {
-        "id": str(uuid.uuid4()),
-        "text": item.text,
-        "source": item.source,
+        "id": item_id,
+        "name": item_data.name,
+        "detected_type_id": item_data.detected_type_id or (detected["id"] if detected else None),
+        "detected_type_name": detected["name"] if detected else None,
+        "detected_discipline": item_data.detected_discipline or (detected["discipline"] if detected else None),
+        "detected_icon": detected["icon"] if detected else None,
+        "source": item_data.source or "manual",
         "created_by": current_user["id"],
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.unstructured_equipment.insert_one(item_doc)
+    
+    await db.unstructured_items.insert_one(item_doc)
     item_doc.pop("_id", None)
     return item_doc
 
-
-@router.post("/parse-list")
+@router.post("/equipment-hierarchy/parse-list")
 async def parse_equipment_list(
-    request: ParseListRequest,
+    request: ParseEquipmentListRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    """Parse a list of equipment items and add them as unstructured."""
-    added = []
-    for text in request.items:
-        text = text.strip()
-        if not text:
-            continue
+    """Parse a text list and create unstructured items with auto-detection."""
+    import re
+    
+    content = request.content.strip()
+    
+    # Split by common delimiters: newlines, commas, semicolons, tabs
+    items = re.split(r'[\n\r,;\t]+', content)
+    
+    # Clean and deduplicate
+    seen = set()
+    unique_items = []
+    for item in items:
+        cleaned = item.strip()
+        # Remove common list prefixes like "1.", "- ", "• ", etc.
+        cleaned = re.sub(r'^[\d]+[.\)]\s*', '', cleaned)
+        cleaned = re.sub(r'^[-•*]\s*', '', cleaned)
+        cleaned = cleaned.strip()
         
-        existing = await db.unstructured_equipment.find_one({
-            "text": text,
-            "created_by": current_user["id"]
-        })
-        if existing:
-            continue
+        if cleaned and len(cleaned) > 1 and cleaned.lower() not in seen:
+            seen.add(cleaned.lower())
+            unique_items.append(cleaned)
+    
+    # Create unstructured items
+    created_items = []
+    for name in unique_items:
+        detected = detect_equipment_type(name)
         
+        item_id = str(uuid.uuid4())
         item_doc = {
-            "id": str(uuid.uuid4()),
-            "text": text,
-            "source": "list_import",
+            "id": item_id,
+            "name": name,
+            "detected_type_id": detected["id"] if detected else None,
+            "detected_type_name": detected["name"] if detected else None,
+            "detected_discipline": detected["discipline"] if detected else None,
+            "detected_icon": detected["icon"] if detected else None,
+            "source": request.source,
             "created_by": current_user["id"],
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        await db.unstructured_equipment.insert_one(item_doc)
+        
+        await db.unstructured_items.insert_one(item_doc)
         item_doc.pop("_id", None)
-        added.append(item_doc)
+        created_items.append(item_doc)
     
-    return {"added": added, "count": len(added)}
+    return {
+        "parsed_count": len(created_items),
+        "items": created_items
+    }
 
-
-@router.post("/unstructured/{item_id}/assign")
-async def assign_unstructured_item(
-    item_id: str,
-    request: AssignUnstructuredRequest,
+@router.post("/equipment-hierarchy/parse-file")
+async def parse_equipment_file(
+    file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Assign an unstructured item to the hierarchy."""
-    item = await db.unstructured_equipment.find_one(
+    """Parse an uploaded file (Excel, PDF, CSV, TXT) and extract equipment items."""
+    import io
+    
+    filename = file.filename.lower()
+    content = await file.read()
+    
+    extracted_items = []
+    
+    try:
+        if filename.endswith('.csv') or filename.endswith('.txt'):
+            # Plain text or CSV
+            text_content = content.decode('utf-8', errors='ignore')
+            items = text_content.strip().split('\n')
+            extracted_items = [item.strip() for item in items if item.strip()]
+            
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            # Excel file
+            import pandas as pd
+            df = pd.read_excel(io.BytesIO(content), header=None)
+            # Get all non-empty cells from first column (or all columns)
+            for col in df.columns:
+                for val in df[col].dropna():
+                    if isinstance(val, str) and val.strip():
+                        extracted_items.append(val.strip())
+                    elif not pd.isna(val):
+                        extracted_items.append(str(val).strip())
+                        
+        elif filename.endswith('.pdf'):
+            # PDF file - use PyPDF2 or pdfplumber
+            try:
+                import pdfplumber
+                with pdfplumber.open(io.BytesIO(content)) as pdf:
+                    for page in pdf.pages:
+                        text = page.extract_text()
+                        if text:
+                            lines = text.split('\n')
+                            extracted_items.extend([l.strip() for l in lines if l.strip()])
+            except ImportError:
+                # Fallback to PyPDF2
+                import PyPDF2
+                reader = PyPDF2.PdfReader(io.BytesIO(content))
+                for page in reader.pages:
+                    text = page.extract_text()
+                    if text:
+                        lines = text.split('\n')
+                        extracted_items.extend([l.strip() for l in lines if l.strip()])
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type. Use .txt, .csv, .xlsx, .xls, or .pdf")
+    
+    except Exception as e:
+        logger.error(f"File parsing error: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
+    
+    # Clean and deduplicate
+    import re
+    seen = set()
+    unique_items = []
+    for item in extracted_items:
+        cleaned = item.strip()
+        cleaned = re.sub(r'^[\d]+[.\)]\s*', '', cleaned)
+        cleaned = re.sub(r'^[-•*]\s*', '', cleaned)
+        cleaned = cleaned.strip()
+        
+        if cleaned and len(cleaned) > 1 and cleaned.lower() not in seen:
+            seen.add(cleaned.lower())
+            unique_items.append(cleaned)
+    
+    # Create unstructured items
+    created_items = []
+    for name in unique_items[:100]:  # Limit to 100 items per file
+        detected = detect_equipment_type(name)
+        
+        item_id = str(uuid.uuid4())
+        item_doc = {
+            "id": item_id,
+            "name": name,
+            "detected_type_id": detected["id"] if detected else None,
+            "detected_type_name": detected["name"] if detected else None,
+            "detected_discipline": detected["discipline"] if detected else None,
+            "detected_icon": detected["icon"] if detected else None,
+            "source": "file",
+            "created_by": current_user["id"],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.unstructured_items.insert_one(item_doc)
+        item_doc.pop("_id", None)
+        created_items.append(item_doc)
+    
+    return {
+        "filename": file.filename,
+        "parsed_count": len(created_items),
+        "items": created_items
+    }
+
+@router.post("/equipment-hierarchy/unstructured/{item_id}/assign")
+async def assign_unstructured_to_hierarchy(
+    item_id: str,
+    assignment: AssignToHierarchyRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Move an unstructured item into the ISO hierarchy."""
+    # Get the unstructured item
+    item = await db.unstructured_items.find_one(
         {"id": item_id, "created_by": current_user["id"]}
     )
     if not item:
         raise HTTPException(status_code=404, detail="Unstructured item not found")
     
+    # Check for duplicate name under the same parent
+    existing = await db.equipment_nodes.find_one({
+        "name": item["name"],
+        "parent_id": assignment.parent_id,
+        "created_by": current_user["id"]
+    })
+    if existing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"A node with name '{item['name']}' already exists under this parent"
+        )
+    
+    # Validate parent exists
     parent = await db.equipment_nodes.find_one(
-        {"id": request.parent_id, "created_by": current_user["id"]}
+        {"id": assignment.parent_id, "created_by": current_user["id"]},
+        {"_id": 0}
     )
     if not parent:
         raise HTTPException(status_code=400, detail="Parent node not found")
     
+    # Validate ISO level relationship
+    try:
+        target_level = ISOLevel(assignment.level)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid ISO level: {assignment.level}")
+    
     parent_level = ISOLevel(parent["level"])
-    if not is_valid_parent_child(parent_level, request.level):
+    if not is_valid_parent_child(parent_level, target_level):
         valid_children = get_valid_child_levels(parent_level)
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid level for this parent. Valid options: {[c.value for c in valid_children]}"
+            detail=f"Cannot add {target_level.value} under {parent_level.value}. Valid: {[c.value for c in valid_children]}"
         )
     
+    # Create the equipment node
     node_id = str(uuid.uuid4())
-    max_sort = await db.equipment_nodes.find_one(
-        {"parent_id": request.parent_id, "created_by": current_user["id"]},
-        sort=[("sort_order", -1)],
-        projection={"sort_order": 1}
-    )
-    next_sort_order = (max_sort.get("sort_order", 0) if max_sort else 0) + 1
-    
     node_doc = {
         "id": node_id,
-        "name": item["text"],
-        "level": request.level.value,
-        "parent_id": request.parent_id,
-        "equipment_type_id": request.equipment_type_id,
-        "description": f"Imported from unstructured: {item.get('source', 'manual')}",
+        "name": item["name"],
+        "level": target_level.value,
+        "parent_id": assignment.parent_id,
+        "equipment_type_id": item.get("detected_type_id"),
+        "description": f"Imported from unstructured list (source: {item.get('source', 'unknown')})",
         "criticality": None,
-        "discipline": None,
-        "sort_order": next_sort_order,
+        "discipline": item.get("detected_discipline"),
         "created_by": current_user["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.equipment_nodes.insert_one(node_doc)
-    await db.unstructured_equipment.delete_one({"id": item_id})
-    
     node_doc.pop("_id", None)
+    
+    # Delete the unstructured item
+    await db.unstructured_items.delete_one({"id": item_id})
+    
     return node_doc
 
-
-@router.delete("/unstructured/{item_id}")
+@router.delete("/equipment-hierarchy/unstructured/{item_id}")
 async def delete_unstructured_item(
     item_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """Delete an unstructured item."""
-    result = await db.unstructured_equipment.delete_one(
+    result = await db.unstructured_items.delete_one(
         {"id": item_id, "created_by": current_user["id"]}
     )
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Item not found")
     return {"message": "Item deleted"}
 
-
-@router.delete("/unstructured")
-async def clear_unstructured_items(current_user: dict = Depends(get_current_user)):
-    """Clear all unstructured items for the user."""
-    result = await db.unstructured_equipment.delete_many(
+@router.delete("/equipment-hierarchy/unstructured")
+async def clear_unstructured_items(
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete all unstructured items for the current user."""
+    result = await db.unstructured_items.delete_many(
         {"created_by": current_user["id"]}
     )
     return {"message": f"Deleted {result.deleted_count} items"}

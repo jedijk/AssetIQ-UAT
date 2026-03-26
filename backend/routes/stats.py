@@ -1,17 +1,19 @@
 """
-Stats and Reliability Performance routes
+Stats routes.
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, Query
 from typing import Optional
-
-from .deps import db, get_current_user
+import logging
+import json
+from database import db
+from auth import get_current_user
+from failure_modes import FAILURE_MODES_LIBRARY
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Stats"])
 
-
 @router.get("/stats")
 async def get_stats(current_user: dict = Depends(get_current_user)):
-    """Get dashboard statistics"""
     user_id = current_user["id"]
     
     total = await db.threats.count_documents({"created_by": user_id})
@@ -26,6 +28,7 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
         "high_count": high
     }
 
+# ============= RELIABILITY PERFORMANCE SCORES =============
 
 @router.get("/reliability-scores")
 async def get_reliability_scores(
@@ -41,18 +44,31 @@ async def get_reliability_scores(
     4. Maintenance - Active maintenance plans and spares
     5. Reactions - Clear reaction plans (resources, support, downtime)
     6. Threats - Unmitigated threat management
+    
+    Returns scores per equipment and aggregated by hierarchy level.
     """
     user_id = current_user["id"]
     
-    # Get all data
+    # Get all hierarchy nodes (from equipment_nodes collection)
     nodes = await db.equipment_nodes.find({"created_by": user_id}, {"_id": 0}).to_list(1000)
+    
+    # Get all threats
     threats = await db.threats.find({"created_by": user_id}).to_list(1000)
+    
+    # Get all investigations
     investigations = await db.investigations.find({"created_by": user_id}).to_list(1000)
+    
+    # Get all actions
     actions = await db.actions.find({"created_by": user_id}).to_list(1000)
+    
+    # Get maintenance strategies
     strategies = await db.maintenance_strategies.find({}).to_list(1000)
+    
+    # Get equipment types
     equipment_types = await db.equipment_types.find({}).to_list(1000)
     eq_type_ids = {et["id"] for et in equipment_types}
     
+    # Calculate scores for each equipment node
     def calculate_node_scores(node):
         node_id = node["id"]
         node_name = node.get("name", "")
@@ -60,7 +76,10 @@ async def get_reliability_scores(
         equipment_type = node.get("equipment_type")
         criticality = node.get("criticality")
         
-        # 1. Criticality Score
+        # 1. Criticality Score (0-100)
+        # - Has criticality assigned: +50
+        # - Has equipment type assigned: +30
+        # - Has description: +20
         criticality_score = 0
         if criticality:
             criticality_score += 50
@@ -69,16 +88,19 @@ async def get_reliability_scores(
         if node.get("description"):
             criticality_score += 20
         
-        # 2. Incidents Score
+        # 2. Incidents Score (0-100)
+        # Based on threats recorded for this asset
         node_threats = [t for t in threats if t.get("asset_name", "").lower() == node_name.lower()]
         closed_threats = [t for t in node_threats if t.get("status") == "Closed"]
         
         if len(node_threats) > 0:
             incidents_score = min(100, 50 + (len(closed_threats) / len(node_threats)) * 50)
         else:
-            incidents_score = 60
+            # No incidents could be good (no failures) or bad (no monitoring)
+            incidents_score = 60  # Neutral baseline
         
-        # 3. Investigations Score
+        # 3. Investigations Score (0-100)
+        # Cross-asset analysis coverage
         node_investigations = [inv for inv in investigations 
                               if node_name.lower() in (inv.get("description", "") + inv.get("title", "")).lower()]
         completed_investigations = [inv for inv in node_investigations if inv.get("status") == "completed"]
@@ -86,17 +108,20 @@ async def get_reliability_scores(
         if len(node_investigations) > 0:
             investigations_score = min(100, 40 + (len(completed_investigations) / len(node_investigations)) * 60)
         else:
-            investigations_score = 50
+            investigations_score = 50  # Neutral baseline
         
-        # 4. Maintenance Score
+        # 4. Maintenance Score (0-100)
+        # Based on maintenance strategies for the equipment type
         maintenance_score = 0
         if equipment_type and equipment_type in eq_type_ids:
             type_strategies = [s for s in strategies if s.get("equipment_type_id") == equipment_type]
             if len(type_strategies) > 0:
                 strategy = type_strategies[0]
                 content = strategy.get("strategies_by_criticality", {})
+                # Check if strategy has all required components
                 if content:
-                    maintenance_score = 70
+                    maintenance_score = 70  # Has strategy
+                    # Bonus for completeness
                     for crit_level, crit_content in content.items():
                         if crit_content.get("operator_rounds"):
                             maintenance_score += 5
@@ -108,26 +133,28 @@ async def get_reliability_scores(
                             maintenance_score += 5
                     maintenance_score = min(100, maintenance_score)
             else:
-                maintenance_score = 30
+                maintenance_score = 30  # Equipment type exists but no strategy
         else:
-            maintenance_score = 20
+            maintenance_score = 20  # No equipment type assigned
         
-        # 5. Reactions Score
+        # 5. Reactions Score (0-100)
+        # Based on action plans and their completion
         node_actions = [a for a in actions if node_name.lower() in (a.get("description", "") + a.get("source", "")).lower()]
         completed_actions = [a for a in node_actions if a.get("status") == "completed"]
         
         if len(node_actions) > 0:
             reactions_score = min(100, 40 + (len(completed_actions) / len(node_actions)) * 60)
         else:
-            reactions_score = 50
+            reactions_score = 50  # Neutral baseline
         
-        # 6. Threats Score
+        # 6. Threats Score (0-100)
+        # Inverse of unmitigated threats (fewer open threats = higher score)
         open_threats = [t for t in node_threats if t.get("status") == "Open"]
         critical_threats = [t for t in open_threats if t.get("risk_level") in ["Critical", "High"]]
         
         threats_score = 100
         threats_score -= len(open_threats) * 10
-        threats_score -= len(critical_threats) * 15
+        threats_score -= len(critical_threats) * 15  # Extra penalty for critical
         threats_score = max(0, threats_score)
         
         return {
@@ -151,6 +178,7 @@ async def get_reliability_scores(
             ),
         }
     
+    # Calculate scores for all nodes
     all_scores = [calculate_node_scores(node) for node in nodes]
     
     # Build hierarchy map
@@ -162,6 +190,7 @@ async def get_reliability_scores(
                 children_map[parent_id] = []
             children_map[parent_id].append(score)
     
+    # Function to aggregate scores up the hierarchy
     def aggregate_children_scores(node_score):
         node_id = node_score["node_id"]
         children = children_map.get(node_id, [])
@@ -169,7 +198,10 @@ async def get_reliability_scores(
         if not children:
             return node_score
         
+        # First, ensure all children are aggregated
         aggregated_children = [aggregate_children_scores(child) for child in children]
+        
+        # Calculate aggregated score including self and children
         all_entities = [node_score] + aggregated_children
         
         aggregated = {
@@ -187,11 +219,12 @@ async def get_reliability_scores(
         
         return node_score
     
+    # Find root nodes and aggregate
     root_nodes = [s for s in all_scores if not s.get("parent_id")]
     for root in root_nodes:
         aggregate_children_scores(root)
     
-    # Calculate global scores
+    # Calculate global aggregated scores
     if all_scores:
         global_scores = {
             "criticality": sum(s["scores"]["criticality"] for s in all_scores) / len(all_scores),
@@ -204,16 +237,25 @@ async def get_reliability_scores(
         global_scores = {k: round(v) for k, v in global_scores.items()}
         global_overall = round(sum(global_scores.values()) / 6)
     else:
-        global_scores = {"criticality": 0, "incidents": 0, "investigations": 0, "maintenance": 0, "reactions": 0, "threats": 0}
+        global_scores = {
+            "criticality": 0, "incidents": 0, "investigations": 0,
+            "maintenance": 0, "reactions": 0, "threats": 0
+        }
         global_overall = 0
     
+    # Filter by node_id if specified
     if node_id:
         matching = [s for s in all_scores if s["node_id"] == node_id]
         if matching:
-            return {"node": matching[0], "global_scores": global_scores, "global_overall": global_overall}
+            return {
+                "node": matching[0],
+                "global_scores": global_scores,
+                "global_overall": global_overall,
+            }
         else:
             raise HTTPException(status_code=404, detail="Node not found")
     
+    # Group by level if specified
     if level:
         level_nodes = [s for s in all_scores if s["node_level"] == level]
         level_avg = {}
@@ -235,6 +277,7 @@ async def get_reliability_scores(
             "global_overall": global_overall,
         }
     
+    # Return all data
     return {
         "nodes": all_scores,
         "global_scores": global_scores,
@@ -249,3 +292,10 @@ async def get_reliability_scores(
             "total_actions": len(actions),
         }
     }
+
+# ============= ROOT ENDPOINT =============
+
+@router.get("/")
+async def root():
+    return {"message": "ThreatBase API", "version": "1.0.0"}
+

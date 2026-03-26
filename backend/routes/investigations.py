@@ -1,164 +1,40 @@
 """
-Investigations Routes - Causal Engine / Root Cause Analysis
+Investigations routes.
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Header, Response
 from typing import List, Optional
 from datetime import datetime, timezone
-from enum import Enum
 import uuid
-import os
-import aiofiles
+import logging
+from database import db
+from auth import get_current_user
+from storage import put_object, get_object, MIME_TYPES, APP_NAME
+from investigation_models import (
+    InvestigationCreate, InvestigationUpdate, InvestigationStatus,
+    TimelineEventCreate, TimelineEventUpdate, EventCategory, ConfidenceLevel,
+    FailureIdentificationCreate, FailureIdentificationUpdate,
+    CauseNodeCreate, CauseNodeUpdate, CauseCategory,
+    ActionItemCreate, ActionItemUpdate, ActionPriority, ActionStatus,
+    EvidenceCreate
+)
+logger = logging.getLogger(__name__)
 
-from .deps import db, get_current_user, logger
+router = APIRouter(tags=["Investigations"])
 
-router = APIRouter(prefix="/investigations", tags=["Investigations"])
-
-
-# ============= ENUMS =============
-
-class InvestigationStatus(str, Enum):
-    DRAFT = "draft"
-    IN_PROGRESS = "in_progress"
-    REVIEW = "review"
-    COMPLETE = "complete"
-    ARCHIVED = "archived"
-
-
-class CauseType(str, Enum):
-    ROOT = "root"
-    CONTRIBUTING = "contributing"
-    SYMPTOM = "symptom"
-
-
-class ActionPriority(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
-class ActionStatus(str, Enum):
-    PROPOSED = "proposed"
-    APPROVED = "approved"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-
-
-# ============= PYDANTIC MODELS =============
-
-class InvestigationCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    asset_id: Optional[str] = None
-    asset_name: Optional[str] = None
-    location: Optional[str] = None
-    incident_date: Optional[str] = None
-    investigation_leader: Optional[str] = None
-    team_members: List[str] = []
-    threat_id: Optional[str] = None
-
-
-class InvestigationUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[InvestigationStatus] = None
-    investigation_leader: Optional[str] = None
-    team_members: Optional[List[str]] = None
-    conclusions: Optional[str] = None
-    recommendations: Optional[str] = None
-
-
-class TimelineEventCreate(BaseModel):
-    event_time: str
-    title: str
-    description: Optional[str] = None
-    event_type: Optional[str] = "observation"
-    comment: Optional[str] = None
-
-
-class TimelineEventUpdate(BaseModel):
-    event_time: Optional[str] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
-    event_type: Optional[str] = None
-    comment: Optional[str] = None
-
-
-class FailureCreate(BaseModel):
-    failure_mode: str
-    functional_failure: Optional[str] = None
-    detected_by: Optional[str] = None
-    detection_method: Optional[str] = None
-    comment: Optional[str] = None
-
-
-class FailureUpdate(BaseModel):
-    failure_mode: Optional[str] = None
-    functional_failure: Optional[str] = None
-    detected_by: Optional[str] = None
-    detection_method: Optional[str] = None
-    comment: Optional[str] = None
-
-
-class CauseCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    cause_type: CauseType = CauseType.CONTRIBUTING
-    parent_id: Optional[str] = None
-    comment: Optional[str] = None
-
-
-class CauseUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    cause_type: Optional[CauseType] = None
-    parent_id: Optional[str] = None
-    comment: Optional[str] = None
-
-
-class ActionItemCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    action_type: Optional[str] = "corrective"
-    priority: ActionPriority = ActionPriority.MEDIUM
-    assigned_to: Optional[str] = None
-    due_date: Optional[str] = None
-    cause_id: Optional[str] = None
-    comment: Optional[str] = None
-
-
-class ActionItemUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[ActionStatus] = None
-    priority: Optional[ActionPriority] = None
-    assigned_to: Optional[str] = None
-    due_date: Optional[str] = None
-    completion_notes: Optional[str] = None
-    comment: Optional[str] = None
-
-
-class EvidenceCreate(BaseModel):
-    title: str
-    evidence_type: str = "document"
-    description: Optional[str] = None
-    file_url: Optional[str] = None
-
-
-# ============= HELPER FUNCTIONS =============
 
 async def generate_case_number(user_id: str) -> str:
-    """Generate a unique case number."""
     count = await db.investigations.count_documents({"created_by": user_id})
-    year = datetime.now().year
+    year = datetime.now(timezone.utc).strftime("%Y")
     return f"INV-{year}-{count + 1:04d}"
 
 
-# ============= INVESTIGATION ROUTES =============
+async def generate_action_number(investigation_id: str) -> str:
+    count = await db.action_items.count_documents({"investigation_id": investigation_id})
+    return f"ACT-{count + 1:03d}"
 
-@router.post("")
+@router.post("/investigations")
 async def create_investigation(
     data: InvestigationCreate,
     current_user: dict = Depends(get_current_user)
@@ -190,7 +66,7 @@ async def create_investigation(
     return inv_doc
 
 
-@router.get("")
+@router.get("/investigations")
 async def get_investigations(
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
@@ -206,7 +82,7 @@ async def get_investigations(
     return {"investigations": investigations}
 
 
-@router.get("/{inv_id}")
+@router.get("/investigations/{inv_id}")
 async def get_investigation(
     inv_id: str,
     current_user: dict = Depends(get_current_user)
@@ -219,6 +95,7 @@ async def get_investigation(
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
+    # Get related data
     events = await db.timeline_events.find(
         {"investigation_id": inv_id}, {"_id": 0}
     ).sort("event_time", 1).to_list(500)
@@ -249,7 +126,7 @@ async def get_investigation(
     }
 
 
-@router.patch("/{inv_id}")
+@router.patch("/investigations/{inv_id}")
 async def update_investigation(
     inv_id: str,
     update: InvestigationUpdate,
@@ -274,7 +151,7 @@ async def update_investigation(
     return updated
 
 
-@router.delete("/{inv_id}")
+@router.delete("/investigations/{inv_id}")
 async def delete_investigation(
     inv_id: str,
     current_user: dict = Depends(get_current_user)
@@ -299,8 +176,8 @@ async def delete_investigation(
 
 # ============= TIMELINE EVENTS =============
 
-@router.post("/{inv_id}/events")
-async def add_timeline_event(
+@router.post("/investigations/{inv_id}/events")
+async def create_timeline_event(
     inv_id: str,
     data: TimelineEventCreate,
     current_user: dict = Depends(get_current_user)
@@ -312,14 +189,16 @@ async def add_timeline_event(
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
+    event_id = str(uuid.uuid4())
     event_doc = {
-        "id": str(uuid.uuid4()),
+        "id": event_id,
         "investigation_id": inv_id,
         "event_time": data.event_time,
-        "title": data.title,
         "description": data.description,
-        "event_type": data.event_type,
-        "comment": data.comment,
+        "category": data.category.value,
+        "evidence_source": data.evidence_source,
+        "confidence": data.confidence.value,
+        "notes": data.notes,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -328,7 +207,7 @@ async def add_timeline_event(
     return event_doc
 
 
-@router.patch("/{inv_id}/events/{event_id}")
+@router.patch("/investigations/{inv_id}/events/{event_id}")
 async def update_timeline_event(
     inv_id: str,
     event_id: str,
@@ -341,6 +220,11 @@ async def update_timeline_event(
         raise HTTPException(status_code=404, detail="Event not found")
     
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    if "category" in update_data and isinstance(update_data["category"], EventCategory):
+        update_data["category"] = update_data["category"].value
+    if "confidence" in update_data and isinstance(update_data["confidence"], ConfidenceLevel):
+        update_data["confidence"] = update_data["confidence"].value
+    
     if update_data:
         await db.timeline_events.update_one({"id": event_id}, {"$set": update_data})
     
@@ -348,7 +232,7 @@ async def update_timeline_event(
     return updated
 
 
-@router.delete("/{inv_id}/events/{event_id}")
+@router.delete("/investigations/{inv_id}/events/{event_id}")
 async def delete_timeline_event(
     inv_id: str,
     event_id: str,
@@ -363,27 +247,31 @@ async def delete_timeline_event(
 
 # ============= FAILURE IDENTIFICATIONS =============
 
-@router.post("/{inv_id}/failures")
-async def add_failure_identification(
+@router.post("/investigations/{inv_id}/failures")
+async def create_failure_identification(
     inv_id: str,
-    data: FailureCreate,
+    data: FailureIdentificationCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Add a failure identification."""
+    """Add a failure identification to an investigation."""
     inv = await db.investigations.find_one(
         {"id": inv_id, "created_by": current_user["id"]}
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
+    failure_id = str(uuid.uuid4())
     failure_doc = {
-        "id": str(uuid.uuid4()),
+        "id": failure_id,
         "investigation_id": inv_id,
-        "failure_mode": data.failure_mode,
-        "functional_failure": data.functional_failure,
-        "detected_by": data.detected_by,
-        "detection_method": data.detection_method,
-        "comment": data.comment,
+        "asset_name": data.asset_name or "",
+        "subsystem": data.subsystem or "",
+        "component": data.component or "",
+        "failure_mode": data.failure_mode or "",
+        "degradation_mechanism": data.degradation_mechanism or "",
+        "evidence": data.evidence or "",
+        "failure_mode_id": data.failure_mode_id,
+        "comment": data.comment or "",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -392,17 +280,17 @@ async def add_failure_identification(
     return failure_doc
 
 
-@router.patch("/{inv_id}/failures/{failure_id}")
+@router.patch("/investigations/{inv_id}/failures/{failure_id}")
 async def update_failure_identification(
     inv_id: str,
     failure_id: str,
-    update: FailureUpdate,
+    update: FailureIdentificationUpdate,
     current_user: dict = Depends(get_current_user)
 ):
     """Update a failure identification."""
     failure = await db.failure_identifications.find_one({"id": failure_id, "investigation_id": inv_id})
     if not failure:
-        raise HTTPException(status_code=404, detail="Failure not found")
+        raise HTTPException(status_code=404, detail="Failure identification not found")
     
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     if update_data:
@@ -412,7 +300,7 @@ async def update_failure_identification(
     return updated
 
 
-@router.delete("/{inv_id}/failures/{failure_id}")
+@router.delete("/investigations/{inv_id}/failures/{failure_id}")
 async def delete_failure_identification(
     inv_id: str,
     failure_id: str,
@@ -421,38 +309,42 @@ async def delete_failure_identification(
     """Delete a failure identification."""
     result = await db.failure_identifications.delete_one({"id": failure_id, "investigation_id": inv_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Failure not found")
-    return {"message": "Failure deleted"}
+        raise HTTPException(status_code=404, detail="Failure identification not found")
+    return {"message": "Failure identification deleted"}
 
 
-# ============= CAUSE NODES =============
+# ============= CAUSE NODES (CAUSAL TREE) =============
 
-@router.post("/{inv_id}/causes")
-async def add_cause_node(
+@router.post("/investigations/{inv_id}/causes")
+async def create_cause_node(
     inv_id: str,
-    data: CauseCreate,
+    data: CauseNodeCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Add a cause node."""
+    """Add a cause node to the causal tree."""
     inv = await db.investigations.find_one(
         {"id": inv_id, "created_by": current_user["id"]}
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
+    # Validate parent exists if specified
     if data.parent_id:
         parent = await db.cause_nodes.find_one({"id": data.parent_id, "investigation_id": inv_id})
         if not parent:
-            raise HTTPException(status_code=400, detail="Parent cause not found")
+            raise HTTPException(status_code=400, detail="Parent cause node not found")
     
+    cause_id = str(uuid.uuid4())
     cause_doc = {
-        "id": str(uuid.uuid4()),
+        "id": cause_id,
         "investigation_id": inv_id,
-        "title": data.title,
         "description": data.description,
-        "cause_type": data.cause_type.value if isinstance(data.cause_type, CauseType) else data.cause_type,
+        "category": data.category.value,
         "parent_id": data.parent_id,
-        "comment": data.comment,
+        "is_root_cause": data.is_root_cause,
+        "evidence": data.evidence,
+        "linked_event_id": data.linked_event_id,
+        "linked_failure_id": data.linked_failure_id,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -461,21 +353,21 @@ async def add_cause_node(
     return cause_doc
 
 
-@router.patch("/{inv_id}/causes/{cause_id}")
+@router.patch("/investigations/{inv_id}/causes/{cause_id}")
 async def update_cause_node(
     inv_id: str,
     cause_id: str,
-    update: CauseUpdate,
+    update: CauseNodeUpdate,
     current_user: dict = Depends(get_current_user)
 ):
     """Update a cause node."""
     cause = await db.cause_nodes.find_one({"id": cause_id, "investigation_id": inv_id})
     if not cause:
-        raise HTTPException(status_code=404, detail="Cause not found")
+        raise HTTPException(status_code=404, detail="Cause node not found")
     
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
-    if "cause_type" in update_data and isinstance(update_data["cause_type"], CauseType):
-        update_data["cause_type"] = update_data["cause_type"].value
+    if "category" in update_data and isinstance(update_data["category"], CauseCategory):
+        update_data["category"] = update_data["category"].value
     
     if update_data:
         await db.cause_nodes.update_one({"id": cause_id}, {"$set": update_data})
@@ -484,63 +376,66 @@ async def update_cause_node(
     return updated
 
 
-@router.delete("/{inv_id}/causes/{cause_id}")
+@router.delete("/investigations/{inv_id}/causes/{cause_id}")
 async def delete_cause_node(
     inv_id: str,
     cause_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """Delete a cause node and its children."""
-    cause = await db.cause_nodes.find_one({"id": cause_id, "investigation_id": inv_id})
-    if not cause:
-        raise HTTPException(status_code=404, detail="Cause not found")
-    
-    # Delete children recursively
-    async def delete_children(parent_id):
-        children = await db.cause_nodes.find({"parent_id": parent_id}).to_list(100)
+    # Get all children recursively
+    async def get_children_ids(parent_id):
+        children = await db.cause_nodes.find(
+            {"parent_id": parent_id, "investigation_id": inv_id},
+            {"_id": 0, "id": 1}
+        ).to_list(100)
+        all_ids = [c["id"] for c in children]
         for child in children:
-            await delete_children(child["id"])
-            await db.cause_nodes.delete_one({"id": child["id"]})
+            all_ids.extend(await get_children_ids(child["id"]))
+        return all_ids
     
-    await delete_children(cause_id)
-    await db.cause_nodes.delete_one({"id": cause_id})
+    children_ids = await get_children_ids(cause_id)
+    all_ids = [cause_id] + children_ids
     
-    return {"message": "Cause and children deleted"}
+    result = await db.cause_nodes.delete_many({"id": {"$in": all_ids}})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Cause node not found")
+    
+    return {"message": f"Deleted {result.deleted_count} cause nodes"}
 
 
 # ============= ACTION ITEMS =============
 
-@router.post("/{inv_id}/actions")
-async def add_action_item(
+@router.post("/investigations/{inv_id}/actions")
+async def create_action_item(
     inv_id: str,
     data: ActionItemCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Add an action item."""
+    """Add an action item to an investigation."""
     inv = await db.investigations.find_one(
         {"id": inv_id, "created_by": current_user["id"]}
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
-    # Generate action number
-    count = await db.action_items.count_documents({"investigation_id": inv_id})
+    action_id = str(uuid.uuid4())
+    action_number = await generate_action_number(inv_id)
     
     action_doc = {
-        "id": str(uuid.uuid4()),
+        "id": action_id,
         "investigation_id": inv_id,
-        "action_number": count + 1,
-        "title": data.title,
+        "action_number": action_number,
         "description": data.description,
-        "action_type": data.action_type,
-        "priority": data.priority.value if isinstance(data.priority, ActionPriority) else data.priority,
-        "status": ActionStatus.PROPOSED.value,
-        "assigned_to": data.assigned_to,
-        "due_date": data.due_date,
-        "cause_id": data.cause_id,
-        "comment": data.comment,
-        "created_by": current_user["id"],
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "owner": data.owner or "",
+        "priority": data.priority.value if hasattr(data.priority, 'value') else data.priority,
+        "due_date": data.due_date or "",
+        "status": ActionStatus.OPEN.value,
+        "linked_cause_id": data.linked_cause_id,
+        "comment": data.comment or "",
+        "completion_notes": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.action_items.insert_one(action_doc)
@@ -548,7 +443,7 @@ async def add_action_item(
     return action_doc
 
 
-@router.patch("/{inv_id}/actions/{action_id}")
+@router.patch("/investigations/{inv_id}/actions/{action_id}")
 async def update_action_item(
     inv_id: str,
     action_id: str,
@@ -558,13 +453,13 @@ async def update_action_item(
     """Update an action item."""
     action = await db.action_items.find_one({"id": action_id, "investigation_id": inv_id})
     if not action:
-        raise HTTPException(status_code=404, detail="Action not found")
+        raise HTTPException(status_code=404, detail="Action item not found")
     
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
-    if "status" in update_data and isinstance(update_data["status"], ActionStatus):
-        update_data["status"] = update_data["status"].value
     if "priority" in update_data and isinstance(update_data["priority"], ActionPriority):
         update_data["priority"] = update_data["priority"].value
+    if "status" in update_data and isinstance(update_data["status"], ActionStatus):
+        update_data["status"] = update_data["status"].value
     
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -574,7 +469,7 @@ async def update_action_item(
     return updated
 
 
-@router.delete("/{inv_id}/actions/{action_id}")
+@router.delete("/investigations/{inv_id}/actions/{action_id}")
 async def delete_action_item(
     inv_id: str,
     action_id: str,
@@ -583,13 +478,13 @@ async def delete_action_item(
     """Delete an action item."""
     result = await db.action_items.delete_one({"id": action_id, "investigation_id": inv_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Action not found")
-    return {"message": "Action deleted"}
+        raise HTTPException(status_code=404, detail="Action item not found")
+    return {"message": "Action item deleted"}
 
 
 # ============= EVIDENCE =============
 
-@router.post("/{inv_id}/evidence")
+@router.post("/investigations/{inv_id}/evidence")
 async def add_evidence(
     inv_id: str,
     data: EvidenceCreate,
@@ -602,13 +497,16 @@ async def add_evidence(
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
+    evidence_id = str(uuid.uuid4())
     evidence_doc = {
-        "id": str(uuid.uuid4()),
+        "id": evidence_id,
         "investigation_id": inv_id,
-        "title": data.title,
+        "name": data.name,
         "evidence_type": data.evidence_type,
         "description": data.description,
         "file_url": data.file_url,
+        "linked_event_id": data.linked_event_id,
+        "linked_cause_id": data.linked_cause_id,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -617,7 +515,7 @@ async def add_evidence(
     return evidence_doc
 
 
-@router.delete("/{inv_id}/evidence/{evidence_id}")
+@router.delete("/investigations/{inv_id}/evidence/{evidence_id}")
 async def delete_evidence(
     inv_id: str,
     evidence_id: str,
@@ -630,109 +528,286 @@ async def delete_evidence(
     return {"message": "Evidence deleted"}
 
 
-@router.post("/{inv_id}/upload")
-async def upload_evidence_file(
+@router.post("/investigations/{inv_id}/upload")
+async def upload_investigation_file(
     inv_id: str,
     file: UploadFile = File(...),
+    description: str = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
-    """Upload an evidence file."""
+    """Upload a file to an investigation."""
+    # Verify investigation exists
     inv = await db.investigations.find_one(
         {"id": inv_id, "created_by": current_user["id"]}
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
-    # Create uploads directory
-    upload_dir = f"/app/backend/uploads/investigations/{inv_id}"
-    os.makedirs(upload_dir, exist_ok=True)
+    # Validate file
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
     
-    # Generate unique filename
+    # Get file extension and content type
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
+    content_type = file.content_type or MIME_TYPES.get(ext, "application/octet-stream")
+    
+    # Determine evidence type based on file extension
+    image_exts = ["jpg", "jpeg", "png", "gif", "webp"]
+    doc_exts = ["pdf", "doc", "docx", "xls", "xlsx", "txt", "csv"]
+    if ext in image_exts:
+        evidence_type = "photo"
+    elif ext in doc_exts:
+        evidence_type = "document"
+    else:
+        evidence_type = "file"
+    
+    # Read file data
+    file_data = await file.read()
+    file_size = len(file_data)
+    
+    # Check file size (max 10MB)
+    if file_size > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB")
+    
+    # Generate storage path
     file_id = str(uuid.uuid4())
-    file_ext = os.path.splitext(file.filename)[1] if file.filename else ""
-    stored_filename = f"{file_id}{file_ext}"
-    file_path = os.path.join(upload_dir, stored_filename)
+    storage_path = f"{APP_NAME}/investigations/{inv_id}/{file_id}.{ext}"
     
-    # Save file
-    async with aiofiles.open(file_path, 'wb') as f:
-        content = await file.read()
-        await f.write(content)
-    
-    # Create evidence record
-    evidence_doc = {
-        "id": file_id,
-        "investigation_id": inv_id,
-        "title": file.filename or "Uploaded file",
-        "evidence_type": "file",
-        "description": f"Uploaded file: {file.filename}",
-        "file_url": f"/api/files/investigations/{inv_id}/{stored_filename}",
-        "original_filename": file.filename,
-        "file_size": len(content),
-        "mime_type": file.content_type,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    await db.evidence_items.insert_one(evidence_doc)
-    evidence_doc.pop("_id", None)
-    return evidence_doc
+    try:
+        # Upload to object storage
+        result = put_object(storage_path, file_data, content_type)
+        
+        # Create evidence record
+        evidence_doc = {
+            "id": file_id,
+            "investigation_id": inv_id,
+            "name": file.filename,
+            "evidence_type": evidence_type,
+            "description": description,
+            "storage_path": result["path"],
+            "content_type": content_type,
+            "file_size": file_size,
+            "original_filename": file.filename,
+            "is_deleted": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.evidence_items.insert_one(evidence_doc)
+        evidence_doc.pop("_id", None)
+        
+        return evidence_doc
+        
+    except Exception as e:
+        logger.error(f"File upload failed: {e}")
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
 
-# ============= STATISTICS =============
-
-@router.get("/{inv_id}/stats")
-async def get_investigation_stats(
-    inv_id: str,
+@router.get("/files/{path:path}")
+async def download_file(
+    path: str,
+    authorization: str = Header(None),
+    auth: str = Query(None),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get statistics for an investigation."""
-    inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
-    )
-    if not inv:
-        raise HTTPException(status_code=404, detail="Investigation not found")
+    """Download a file from storage."""
+    # Find file record
+    record = await db.evidence_items.find_one({"storage_path": path, "is_deleted": {"$ne": True}})
+    if not record:
+        raise HTTPException(status_code=404, detail="File not found")
     
-    events_count = await db.timeline_events.count_documents({"investigation_id": inv_id})
-    failures_count = await db.failure_identifications.count_documents({"investigation_id": inv_id})
-    causes_count = await db.cause_nodes.count_documents({"investigation_id": inv_id})
+    try:
+        data, content_type = get_object(path)
+        return Response(
+            content=data, 
+            media_type=record.get("content_type", content_type),
+            headers={
+                "Content-Disposition": f'inline; filename="{record.get("original_filename", "download")}"'
+            }
+        )
+    except Exception as e:
+        logger.error(f"File download failed: {e}")
+        raise HTTPException(status_code=500, detail="File download failed")
+
+
+# ============= CENTRALIZED ACTIONS MANAGEMENT =============
+
+class CentralActionCreate(BaseModel):
+    """Model for creating a centralized action."""
+    title: str
+    description: str
+    source_type: str  # 'threat' or 'investigation'
+    source_id: str
+    source_name: str  # threat title or investigation title for reference
+    priority: str = "medium"
+    assignee: Optional[str] = None
+    discipline: Optional[str] = None
+    due_date: Optional[str] = None
+
+
+class CentralActionUpdate(BaseModel):
+    """Model for updating a centralized action."""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    assignee: Optional[str] = None
+    discipline: Optional[str] = None
+    due_date: Optional[str] = None
+    status: Optional[str] = None
+    completion_notes: Optional[str] = None
+
+
+@router.get("/actions")
+async def get_all_actions(
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    assignee: Optional[str] = None,
+    source_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all centralized actions with optional filters."""
+    query = {"created_by": current_user["id"]}
     
-    # Root causes
-    root_causes = await db.cause_nodes.count_documents({
-        "investigation_id": inv_id,
-        "cause_type": "root"
+    if status and status != "all":
+        query["status"] = status
+    if priority and priority != "all":
+        query["priority"] = priority
+    if assignee:
+        query["assignee"] = {"$regex": assignee, "$options": "i"}
+    if source_type and source_type != "all":
+        query["source_type"] = source_type
+    
+    actions = await db.central_actions.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    # Get stats
+    total = await db.central_actions.count_documents({"created_by": current_user["id"]})
+    open_count = await db.central_actions.count_documents({"created_by": current_user["id"], "status": "open"})
+    in_progress_count = await db.central_actions.count_documents({"created_by": current_user["id"], "status": "in_progress"})
+    completed_count = await db.central_actions.count_documents({"created_by": current_user["id"], "status": "completed"})
+    overdue_count = await db.central_actions.count_documents({
+        "created_by": current_user["id"],
+        "status": {"$in": ["open", "in_progress"]},
+        "due_date": {"$lt": datetime.now(timezone.utc).isoformat(), "$ne": None}
     })
     
-    # Actions by status
-    actions = await db.action_items.find({"investigation_id": inv_id}).to_list(100)
-    action_stats = {"total": len(actions), "by_status": {}, "by_priority": {}}
-    
-    for action in actions:
-        status = action.get("status", "unknown")
-        priority = action.get("priority", "unknown")
-        action_stats["by_status"][status] = action_stats["by_status"].get(status, 0) + 1
-        action_stats["by_priority"][priority] = action_stats["by_priority"].get(priority, 0) + 1
-    
-    # Evidence count
-    evidence_count = await db.evidence_items.count_documents({"investigation_id": inv_id})
-    
-    # Calculate completion percentage
-    total_items = events_count + failures_count + causes_count + len(actions)
-    completed_actions = action_stats["by_status"].get("completed", 0)
-    
     return {
-        "investigation_id": inv_id,
-        "status": inv.get("status"),
-        "timeline_events": events_count,
-        "failure_identifications": failures_count,
-        "causes": {
-            "total": causes_count,
-            "root_causes": root_causes
-        },
-        "actions": action_stats,
-        "evidence": evidence_count,
-        "completion": {
-            "total_items": total_items,
-            "completed_actions": completed_actions,
-            "has_root_cause": root_causes > 0,
-            "has_actions": len(actions) > 0
+        "actions": actions,
+        "stats": {
+            "total": total,
+            "open": open_count,
+            "in_progress": in_progress_count,
+            "completed": completed_count,
+            "overdue": overdue_count
         }
     }
+
+
+@router.get("/actions/overdue")
+async def get_overdue_actions(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all overdue actions for notifications."""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    overdue_actions = await db.central_actions.find({
+        "created_by": current_user["id"],
+        "status": {"$in": ["open", "in_progress"]},
+        "due_date": {"$lt": now, "$ne": None, "$ne": ""}
+    }, {"_id": 0}).sort("due_date", 1).to_list(50)
+    
+    return {
+        "overdue_actions": overdue_actions,
+        "count": len(overdue_actions)
+    }
+
+
+@router.post("/actions")
+async def create_central_action(
+    data: CentralActionCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new centralized action (promote from threat or investigation)."""
+    action_id = str(uuid.uuid4())
+    
+    # Generate action number
+    count = await db.central_actions.count_documents({"created_by": current_user["id"]})
+    action_number = f"ACT-{count + 1:04d}"
+    
+    action_doc = {
+        "id": action_id,
+        "action_number": action_number,
+        "title": data.title,
+        "description": data.description,
+        "source_type": data.source_type,
+        "source_id": data.source_id,
+        "source_name": data.source_name,
+        "priority": data.priority,
+        "assignee": data.assignee,
+        "discipline": data.discipline,
+        "due_date": data.due_date,
+        "status": "open",
+        "completion_notes": None,
+        "created_by": current_user["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.central_actions.insert_one(action_doc)
+    action_doc.pop("_id", None)
+    return action_doc
+
+
+@router.get("/actions/{action_id}")
+async def get_central_action(
+    action_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific centralized action."""
+    action = await db.central_actions.find_one(
+        {"id": action_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    )
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    return action
+
+
+@router.patch("/actions/{action_id}")
+async def update_central_action(
+    action_id: str,
+    data: CentralActionUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a centralized action."""
+    action = await db.central_actions.find_one(
+        {"id": action_id, "created_by": current_user["id"]}
+    )
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    
+    update_data = {k: v for k, v in data.dict().items() if v is not None}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.central_actions.update_one(
+        {"id": action_id},
+        {"$set": update_data}
+    )
+    
+    updated = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
+    return updated
+
+
+@router.delete("/actions/{action_id}")
+async def delete_central_action(
+    action_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a centralized action."""
+    result = await db.central_actions.delete_one(
+        {"id": action_id, "created_by": current_user["id"]}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Action not found")
+    return {"message": "Action deleted"}
+
+
+

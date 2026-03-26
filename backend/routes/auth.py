@@ -1,59 +1,18 @@
 """
-Authentication routes
+Authentication routes.
 """
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
-from datetime import datetime, timezone, timedelta
+from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timezone
 import uuid
-import jwt
-import bcrypt
+from database import db
+from auth import hash_password, verify_password, create_token, get_current_user
+from models.api_models import UserCreate, UserLogin, UserResponse, TokenResponse
 
-from .deps import db, JWT_SECRET, JWT_ALGORITHM, security, UserResponse, TokenResponse, get_current_user
+router = APIRouter(tags=["Authentication"])
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
-
-JWT_EXPIRATION_HOURS = 24
-
-
-# ============= MODELS =============
-
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-    name: str
-
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-
-# ============= UTILITY FUNCTIONS =============
-
-def hash_password(password: str) -> str:
-    """Hash password using bcrypt"""
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-
-def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash"""
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-
-
-def create_token(user_id: str) -> str:
-    """Create JWT token"""
-    payload = {
-        "user_id": user_id,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-
-# ============= ENDPOINTS =============
-
-@router.post("/register", response_model=TokenResponse)
+@router.post("/auth/register", response_model=TokenResponse)
 async def register(user_data: UserCreate):
-    """Register a new user"""
+    # Check if email exists
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -79,10 +38,8 @@ async def register(user_data: UserCreate):
         )
     )
 
-
-@router.post("/login", response_model=TokenResponse)
+@router.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
-    """Login with email and password"""
     user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
     if not user or not verify_password(credentials.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -98,13 +55,12 @@ async def login(credentials: UserLogin):
         )
     )
 
-
-@router.get("/me", response_model=UserResponse)
+@router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
-    """Get current user info"""
     return UserResponse(
         id=current_user["id"],
         email=current_user["email"],
         name=current_user["name"],
         created_at=current_user["created_at"]
     )
+
