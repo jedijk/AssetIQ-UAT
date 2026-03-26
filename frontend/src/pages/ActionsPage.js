@@ -545,8 +545,11 @@ export default function ActionsPage() {
                   <StatusIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${priority.iconColor}`} />
                 </button>
 
-                {/* Action Number */}
-                <div className="priority-rank text-xs text-slate-400 font-medium min-w-[55px]" data-testid={`action-number-${action.id}`}>
+                {/* Action Number Badge */}
+                <div 
+                  className="flex items-center justify-center px-2 py-1 bg-slate-100 rounded-md text-xs font-mono text-slate-500 min-w-[60px]" 
+                  data-testid={`action-number-${action.id}`}
+                >
                   {action.action_number}
                 </div>
 
