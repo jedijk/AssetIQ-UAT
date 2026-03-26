@@ -46,11 +46,14 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 
 ### 🔧 Recent Changes (March 26, 2026)
 - **FIXED**: Post-Login Redirect Bug (Recurring 5x) - Users now correctly land on their intended page after login. Implemented `location.state` to preserve the original URL during redirect to login.
-- **NEW**: Frontend Code Segmentation - Extracted components from ThreatDetailPage.js:
-  - `RecommendedActionsSection.jsx` (326 lines) - Handles recommended actions list and add dialog
-  - `RiskScoreCard.jsx` (198 lines) - Risk score display with popup calculator
-  - `ThreatHeader.jsx` (177 lines) - Header with title, status, and action buttons
-  - Reduced ThreatDetailPage.js from 1738 to 1304 lines (25% reduction)
+- **NEW**: Frontend Code Segmentation - Major refactoring completed:
+  - **ThreatDetailPage.js**: 1738 → 1304 lines (25% reduction)
+    - `RecommendedActionsSection.jsx` (326 lines)
+    - `RiskScoreCard.jsx` (198 lines)
+    - `ThreatHeader.jsx` (177 lines)
+  - **FailureModesPage.js**: 1964 → 1411 lines (28% reduction)
+    - `FailureModeViewPanel.jsx` (581 lines)
+    - `EquipmentTypeItem.jsx` (46 lines)
 - **NEW**: Add Recommended Action with Type & Discipline - Users can now manually add recommended actions to observations with `action_type` (CM/PM/PDM) and `discipline` fields. New "Add Recommendation" button in ThreatDetailPage with full form dialog including live preview.
 - **NEW**: AI Risk Analysis now generates structured recommendations with `action_type` (CM/PM/PDM) and `discipline` fields. Updated AI prompts and frontend panel to display badges and discipline tags.
 - Removed "Create Action" button from Recommended Actions section (redundant with "Act" buttons on each action)
