@@ -450,7 +450,7 @@ const en = {
 
   // Hierarchy context menu
   hierarchy: {
-    addThreat: "Add Threat",
+    addThreat: "Add Observation",
     rightClickHint: "Right-click for options",
     showDetails: "Show Details",
     equipmentType: "Equipment Type",
@@ -1163,7 +1163,7 @@ const nl = {
 
   // Hierarchy context menu
   hierarchy: {
-    addThreat: "Dreiging toevoegen",
+    addThreat: "Observatie toevoegen",
     rightClickHint: "Rechtsklik voor opties",
     showDetails: "Details tonen",
     equipmentType: "Apparatuurtype",

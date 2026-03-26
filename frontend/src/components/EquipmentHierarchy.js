@@ -224,7 +224,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
             data-testid="context-menu-add-threat"
           >
             <Plus className="w-4 h-4" />
-            {t ? t("hierarchy.addThreat") : "Add Threat"}
+            {t ? t("hierarchy.addThreat") : "Add Observation"}
           </button>
         </div>
       )}
