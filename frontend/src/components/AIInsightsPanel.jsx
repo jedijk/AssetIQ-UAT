@@ -522,15 +522,55 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
                   </h5>
                   <div className="space-y-2">
                     {displayRecommendations.map((rec, idx) => {
-                      const isAdded = addedRecommendations.has(rec) || 
-                        (threatData?.recommended_actions || []).includes(rec);
+                      // Handle both string and structured object recommendations
+                      const isStructured = typeof rec === 'object' && rec !== null;
+                      const actionText = isStructured ? (rec.action || rec.description || '') : rec;
+                      const actionType = isStructured ? rec.action_type : null;
+                      const discipline = isStructured ? rec.discipline : null;
+                      
+                      // For comparison, use the full object or string
+                      const recKey = isStructured ? JSON.stringify(rec) : rec;
+                      const isAdded = addedRecommendations.has(recKey) || 
+                        (threatData?.recommended_actions || []).some(existing => {
+                          if (typeof existing === 'object' && isStructured) {
+                            return existing.action === rec.action;
+                          }
+                          return existing === rec;
+                        });
+                      
+                      // Action type badge styling
+                      const typeStyles = {
+                        CM: { bg: 'bg-amber-500', label: 'CM' },
+                        PM: { bg: 'bg-blue-500', label: 'PM' },
+                        PDM: { bg: 'bg-purple-500', label: 'PDM' },
+                      };
+                      const typeStyle = actionType ? typeStyles[actionType] : null;
+                      
                       return (
                         <div 
                           key={idx} 
-                          className="flex items-start gap-2 p-2 bg-white rounded-lg border border-slate-100 group hover:border-green-200 transition-colors"
+                          className="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-100 group hover:border-green-200 transition-colors"
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-400 mt-2 flex-shrink-0" />
-                          <p className="text-sm text-slate-700 flex-1">{rec}</p>
+                          {/* Type Badge */}
+                          {typeStyle ? (
+                            <div className={`w-10 h-10 rounded-lg ${typeStyle.bg} text-white flex items-center justify-center flex-shrink-0`}>
+                              <span className="text-xs font-bold">{typeStyle.label}</span>
+                            </div>
+                          ) : (
+                            <span className="w-2 h-2 rounded-full bg-green-400 mt-2 flex-shrink-0" />
+                          )}
+                          
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            {discipline && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium mb-1">
+                                {discipline}
+                              </span>
+                            )}
+                            <p className="text-sm text-slate-700">{actionText}</p>
+                          </div>
+                          
+                          {/* Add Button */}
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>

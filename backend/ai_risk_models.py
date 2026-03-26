@@ -57,7 +57,7 @@ class RiskInsight(BaseModel):
     dynamic_risk: DynamicRiskScore
     forecasts: List[RiskForecast] = Field(default_factory=list)
     key_insights: List[str] = Field(default_factory=list)
-    recommendations: List[str] = Field(default_factory=list)
+    recommendations: List[Any] = Field(default_factory=list)  # Can be strings or structured dicts with action, action_type, discipline
     similar_past_incidents: List[Dict[str, Any]] = Field(default_factory=list)
 
 
@@ -72,7 +72,7 @@ class ProbableCause(BaseModel):
     probability_level: CauseProbability
     evidence: List[str] = Field(default_factory=list)
     supporting_data: List[str] = Field(default_factory=list)
-    mitigation_actions: List[str] = Field(default_factory=list)
+    mitigation_actions: List[Any] = Field(default_factory=list)  # Can be strings or structured dicts with action, action_type, discipline
 
 
 class CausalExplanation(BaseModel):
@@ -129,7 +129,8 @@ class RecommendedAction(BaseModel):
     """AI-recommended action with ROI analysis"""
     id: str
     description: str
-    action_type: str  # "immediate", "short_term", "long_term", "preventive"
+    action_type: str  # "CM" (Corrective), "PM" (Preventive), "PDM" (Predictive)
+    discipline: Optional[str] = None  # "Mechanical", "Electrical", "Instrumentation", etc.
     expected_risk_reduction: float = Field(ge=0, le=100, description="Expected % risk reduction")
     estimated_cost: Optional[float] = None
     cost_currency: str = "EUR"

@@ -55,6 +55,11 @@ Given the threat details, provide:
 7. Forecasts for next 7/14/30 days using the SAME FMEA scale (10-250)
    - Start from the current risk score and project changes
 
+8. Recommendations - IMPORTANT: Each recommendation must be a structured object with:
+   - action: The recommended action description
+   - action_type: One of "CM" (Corrective Maintenance), "PM" (Preventive Maintenance), or "PDM" (Predictive Maintenance)
+   - discipline: One of "Mechanical", "Electrical", "Instrumentation", "Process", "Operations", "Safety", "Rotating Equipment", "Static Equipment", "Piping", "Multi-discipline"
+
 RESPOND IN THIS EXACT JSON FORMAT:
 {
   "risk_score": <use_the_threats_current_score>,
@@ -66,7 +71,11 @@ RESPOND IN THIS EXACT JSON FORMAT:
   "trend_delta": 10,
   "factors": ["factor1", "factor2", "factor3"],
   "key_insights": ["insight1", "insight2"],
-  "recommendations": ["recommendation1", "recommendation2"],
+  "recommendations": [
+    {"action": "Perform vibration analysis on bearings", "action_type": "PDM", "discipline": "Mechanical"},
+    {"action": "Replace worn seals during next shutdown", "action_type": "PM", "discipline": "Mechanical"},
+    {"action": "Repair damaged component immediately", "action_type": "CM", "discipline": "Rotating Equipment"}
+  ],
   "forecasts": [
     {"days_ahead": 7, "predicted_risk_score": 70, "predicted_probability": 70.0, "confidence": "medium"},
     {"days_ahead": 14, "predicted_risk_score": 80, "predicted_probability": 75.0, "confidence": "low"},
@@ -83,7 +92,10 @@ For the given threat, identify:
 2. Category for each cause: technical_cause, human_factor, maintenance_issue, design_issue, organizational_factor, external_condition
 3. Probability percentage for each cause (total can exceed 100% as causes may combine)
 4. Supporting evidence indicators
-5. Recommended mitigation actions for each cause
+5. Recommended mitigation actions for each cause - IMPORTANT: Each action must be a structured object with:
+   - action: The recommended action description
+   - action_type: One of "CM" (Corrective Maintenance), "PM" (Preventive Maintenance), or "PDM" (Predictive Maintenance)
+   - discipline: One of "Mechanical", "Electrical", "Instrumentation", "Process", "Operations", "Safety", "Rotating Equipment", "Static Equipment", "Piping", "Multi-discipline"
 
 RESPOND IN THIS EXACT JSON FORMAT:
 {
@@ -97,7 +109,10 @@ RESPOND IN THIS EXACT JSON FORMAT:
       "probability_level": "very_likely",
       "evidence": ["evidence1", "evidence2"],
       "supporting_data": ["data point 1", "data point 2"],
-      "mitigation_actions": ["action1", "action2"]
+      "mitigation_actions": [
+        {"action": "Replace worn bearings", "action_type": "CM", "discipline": "Mechanical"},
+        {"action": "Implement vibration monitoring", "action_type": "PDM", "discipline": "Rotating Equipment"}
+      ]
     }
   ],
   "contributing_factors": ["factor1", "factor2"],
@@ -197,11 +212,15 @@ IMPORTANT: Respond ONLY with valid JSON. No markdown, no explanations outside th
 
 For the threat and its causes, recommend:
 1. At least 3 actions ranked by ROI (risk reduction per cost)
-2. Action types: immediate, short_term, long_term, preventive
-3. Expected risk reduction percentage
-4. Estimated cost in EUR
-5. Downtime impact in hours
-6. Urgency level: critical, high, medium, low
+2. Maintenance type (action_type): 
+   - "CM" for Corrective Maintenance (fix after failure)
+   - "PM" for Preventive Maintenance (scheduled maintenance to prevent failure)
+   - "PDM" for Predictive Maintenance (condition-based monitoring)
+3. Discipline: One of "Mechanical", "Electrical", "Instrumentation", "Process", "Operations", "Safety", "Rotating Equipment", "Static Equipment", "Piping", "Multi-discipline"
+4. Expected risk reduction percentage
+5. Estimated cost in EUR
+6. Downtime impact in hours
+7. Urgency level: critical, high, medium, low
 
 RESPOND IN THIS EXACT JSON FORMAT:
 {
@@ -209,7 +228,8 @@ RESPOND IN THIS EXACT JSON FORMAT:
     {
       "id": "act_1",
       "description": "Detailed action description",
-      "action_type": "immediate",
+      "action_type": "PM",
+      "discipline": "Mechanical",
       "expected_risk_reduction": 25.0,
       "estimated_cost": 500.0,
       "cost_currency": "EUR",
