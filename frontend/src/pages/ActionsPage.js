@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import { actionsAPI } from "../lib/api";
+import { actionsAPI, usersAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -29,9 +29,12 @@ import {
   Check,
   BarChart3,
   Activity,
+  Eye,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import {
   Select,
@@ -124,6 +127,7 @@ export default function ActionsPage() {
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [editingAction, setEditingAction] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [viewingAction, setViewingAction] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Toggle status in multi-select
@@ -154,8 +158,10 @@ export default function ActionsPage() {
     priority: "medium",
     assignee: "",
     discipline: "",
+    action_type: "",
     due_date: "",
     status: "open",
+    comments: "",
     completion_notes: "",
   });
 
@@ -170,6 +176,14 @@ export default function ActionsPage() {
 
   // Compute unique disciplines for filter
   const uniqueDisciplines = [...new Set(actions.map(a => a.discipline).filter(Boolean))].sort();
+
+  // Fetch users for assignee lookup
+  const { data: usersData } = useQuery({
+    queryKey: ["rbac-users"],
+    queryFn: usersAPI.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+  const usersList = usersData?.users || [];
 
   // Update mutation
   const updateMutation = useMutation({
@@ -249,10 +263,13 @@ export default function ActionsPage() {
       priority: action.priority || "medium",
       assignee: action.assignee || "",
       discipline: action.discipline || "",
+      action_type: action.action_type || "",
       due_date: action.due_date ? action.due_date.split("T")[0] : "",
       status: action.status || "open",
+      comments: action.comments || "",
       completion_notes: action.completion_notes || "",
     });
+    setViewingAction(null);
     setIsEditDialogOpen(true);
   };
 
@@ -555,12 +572,14 @@ export default function ActionsPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className={`priority-item group ${overdue ? "border-l-4 border-l-red-400" : ""}`}
+                className={`priority-item group cursor-pointer ${overdue ? "border-l-4 border-l-red-400" : ""}`}
                 data-testid={`action-row-${action.id}`}
+                onClick={() => setViewingAction(action)}
               >
                 {/* Status Icon */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     const nextStatus = action.status === "open" ? "in_progress" : 
                       action.status === "in_progress" ? "completed" : "open";
                     quickStatusUpdate(action, nextStatus);
@@ -701,11 +720,14 @@ export default function ActionsPage() {
                   {/* Actions menu */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                         <MoreVertical className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setViewingAction(action)}>
+                        <Eye className="w-4 h-4 mr-2" /> View
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => openEditDialog(action)}>
                         <Edit2 className="w-4 h-4 mr-2" /> Edit
                       </DropdownMenuItem>
@@ -730,7 +752,7 @@ export default function ActionsPage() {
           <DialogHeader>
             <DialogTitle>{t("common.edit")} {t("actionsPage.title")}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 max-h-[65vh] overflow-y-auto pr-1">
             <div>
               <label className="text-sm font-medium text-slate-700">{t("threatDetail.actionTitle")}</label>
               <Input
@@ -742,13 +764,38 @@ export default function ActionsPage() {
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700">{t("common.description")}</label>
-              <textarea
+              <Textarea
                 value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                 placeholder={t("common.description")}
-                className="w-full min-h-[80px] px-3 py-2 border border-slate-300 rounded-md text-sm"
+                rows={2}
                 data-testid="edit-action-description"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700">{t("common.type") || "Type"}</label>
+                <Select value={editForm.action_type || "none"} onValueChange={(v) => setEditForm({ ...editForm, action_type: v === "none" ? "" : v })}>
+                  <SelectTrigger data-testid="edit-action-type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No type</SelectItem>
+                    <SelectItem value="CM">CM - Corrective</SelectItem>
+                    <SelectItem value="PM">PM - Preventive</SelectItem>
+                    <SelectItem value="PDM">PDM - Predictive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700">{t("common.discipline") || "Discipline"}</label>
+                <Input
+                  value={editForm.discipline}
+                  onChange={(e) => setEditForm({ ...editForm, discipline: e.target.value })}
+                  placeholder="e.g. Mechanical, Electrical"
+                  data-testid="edit-action-discipline"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -782,40 +829,51 @@ export default function ActionsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-slate-700">{t("threatDetail.actionAssignee")}</label>
-                <Input
-                  value={editForm.assignee}
-                  onChange={(e) => setEditForm({ ...editForm, assignee: e.target.value })}
-                  placeholder={t("threatDetail.actionAssignee")}
-                  data-testid="edit-action-assignee"
-                />
+                <Select value={editForm.assignee || "unassigned"} onValueChange={(v) => setEditForm({ ...editForm, assignee: v === "unassigned" ? "" : v })}>
+                  <SelectTrigger data-testid="edit-action-assignee">
+                    <SelectValue placeholder="Select assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {usersList.map((u) => (
+                      <SelectItem key={u.id} value={u.name || u.email}>
+                        <span className="flex items-center gap-2">
+                          <User className="w-3 h-3" />
+                          {u.name || u.email}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700">{t("library.discipline")}</label>
+                <label className="text-sm font-medium text-slate-700">{t("common.dueDate")}</label>
                 <Input
-                  value={editForm.discipline}
-                  onChange={(e) => setEditForm({ ...editForm, discipline: e.target.value })}
-                  placeholder={t("library.discipline")}
-                  data-testid="edit-action-discipline"
+                  type="date"
+                  value={editForm.due_date}
+                  onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
+                  data-testid="edit-action-due-date"
                 />
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">{t("common.dueDate")}</label>
-              <Input
-                type="date"
-                value={editForm.due_date}
-                onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
-                data-testid="edit-action-due-date"
+              <label className="text-sm font-medium text-slate-700">{t("common.comment") || "Comments"}</label>
+              <Textarea
+                value={editForm.comments}
+                onChange={(e) => setEditForm({ ...editForm, comments: e.target.value })}
+                placeholder="Add comments or notes..."
+                rows={3}
+                data-testid="edit-action-comments"
               />
             </div>
             {editForm.status === "completed" && (
               <div>
                 <label className="text-sm font-medium text-slate-700">{t("taskScheduler.completionNotes")}</label>
-                <textarea
+                <Textarea
                   value={editForm.completion_notes}
                   onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
                   placeholder="Notes on how the action was completed"
-                  className="w-full min-h-[60px] px-3 py-2 border border-slate-300 rounded-md text-sm"
+                  rows={2}
                   data-testid="edit-action-notes"
                 />
               </div>
@@ -829,6 +887,171 @@ export default function ActionsPage() {
               {updateMutation.isPending ? t("taskScheduler.saving") : t("taskScheduler.saveChanges")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Action Dialog */}
+      <Dialog open={!!viewingAction} onOpenChange={(open) => { if (!open) setViewingAction(null); }}>
+        <DialogContent className="max-w-lg">
+          {viewingAction && (() => {
+            const va = viewingAction;
+            const vaPriority = priorityConfig[va.priority] || priorityConfig.medium;
+            const vaOverdue = isOverdue(va);
+            const VaSourceIcon = sourceConfig[va.source_type]?.icon || FileText;
+            return (
+              <>
+                <DialogHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center px-2 py-1 bg-slate-100 rounded-md text-xs font-mono text-slate-500">
+                      {va.action_number}
+                    </div>
+                    <DialogTitle className="text-lg">{va.title}</DialogTitle>
+                  </div>
+                </DialogHeader>
+                <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1">
+                  {/* Badges row */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className={vaPriority.color}>{vaPriority.label}</Badge>
+                    <Badge className={
+                      va.status === "completed" ? "bg-green-100 text-green-700" :
+                      va.status === "in_progress" ? "bg-blue-100 text-blue-700" :
+                      "bg-slate-100 text-slate-700"
+                    }>
+                      {statusConfig[va.status]?.label || "Open"}
+                    </Badge>
+                    {va.action_type && (
+                      <Badge className={
+                        va.action_type === 'CM' ? 'bg-amber-100 text-amber-700' :
+                        va.action_type === 'PM' ? 'bg-blue-100 text-blue-700' :
+                        va.action_type === 'PDM' ? 'bg-purple-100 text-purple-700' :
+                        'bg-slate-100 text-slate-700'
+                      }>{va.action_type}</Badge>
+                    )}
+                    {va.discipline && (
+                      <Badge className="bg-slate-100 text-slate-600">{va.discipline}</Badge>
+                    )}
+                    {vaOverdue && (
+                      <Badge className="bg-red-100 text-red-700">Overdue</Badge>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  {va.description && (
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("common.description")}</label>
+                      <p className="text-sm text-slate-800 mt-1 leading-relaxed">{va.description}</p>
+                    </div>
+                  )}
+
+                  {/* Details grid */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("threatDetail.actionAssignee")}</label>
+                      <p className="text-sm text-slate-800 mt-1 flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-slate-400" />
+                        {va.assignee || <span className="text-slate-400 italic">Unassigned</span>}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("common.dueDate")}</label>
+                      <p className={`text-sm mt-1 flex items-center gap-1.5 ${vaOverdue ? "text-red-600 font-medium" : "text-slate-800"}`}>
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        {formatDate(va.due_date)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Source */}
+                  {va.source_type && va.source_id && (
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("actionsPage.source") || "Source"}</label>
+                      <button
+                        onClick={() => {
+                          if (va.source_type === "investigation") navigate(`/causal-engine?inv=${va.source_id}`);
+                          else if (va.source_type === "threat" || va.source_type === "ai_recommendation") navigate(`/threats/${va.source_id}`);
+                          setViewingAction(null);
+                        }}
+                        className="mt-1 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors text-sm text-slate-700"
+                        data-testid="view-action-source-link"
+                      >
+                        <VaSourceIcon className={`w-4 h-4 ${sourceConfig[va.source_type]?.color}`} />
+                        <span className="font-medium">{sourceConfig[va.source_type]?.label}</span>
+                        <span className="text-slate-400">-</span>
+                        <span className="truncate max-w-[200px]">{va.source_name || "Unknown"}</span>
+                        <ExternalLink className="w-3 h-3 text-slate-400" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Risk scores */}
+                  {(va.threat_risk_score || va.threat_rpn) && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {va.threat_risk_score != null && (
+                        <div>
+                          <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Risk Score</label>
+                          <p className={`text-lg font-bold mt-1 ${
+                            va.threat_risk_score >= 70 ? "text-red-600" :
+                            va.threat_risk_score >= 50 ? "text-orange-500" :
+                            "text-green-500"
+                          }`}>{va.threat_risk_score}</p>
+                        </div>
+                      )}
+                      {va.threat_rpn != null && (
+                        <div>
+                          <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">RPN</label>
+                          <p className={`text-lg font-bold mt-1 ${
+                            va.threat_rpn >= 200 ? "text-red-600" :
+                            va.threat_rpn >= 100 ? "text-orange-500" :
+                            "text-blue-500"
+                          }`}>{va.threat_rpn}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Comments */}
+                  {va.comments && (
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                        <MessageSquare className="w-3 h-3" />
+                        {t("common.comment") || "Comments"}
+                      </label>
+                      <p className="text-sm text-slate-700 mt-1 bg-slate-50 rounded-lg p-3 leading-relaxed">{va.comments}</p>
+                    </div>
+                  )}
+
+                  {/* Completion Notes */}
+                  {va.completion_notes && (
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("taskScheduler.completionNotes")}</label>
+                      <p className="text-sm text-slate-700 mt-1 bg-green-50 rounded-lg p-3 leading-relaxed">{va.completion_notes}</p>
+                    </div>
+                  )}
+
+                  {/* Timestamps */}
+                  <div className="text-xs text-slate-400 flex items-center gap-4 pt-2 border-t border-slate-100">
+                    {va.created_at && <span>Created: {new Date(va.created_at).toLocaleString()}</span>}
+                    {va.updated_at && <span>Updated: {new Date(va.updated_at).toLocaleString()}</span>}
+                  </div>
+                </div>
+                <DialogFooter className="gap-2">
+                  <Button
+                    variant="outline"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                    onClick={() => { setDeleteConfirm(va); setViewingAction(null); }}
+                    data-testid="view-action-delete-btn"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    {t("common.delete")}
+                  </Button>
+                  <Button onClick={() => openEditDialog(va)} data-testid="view-action-edit-btn">
+                    <Edit2 className="w-4 h-4 mr-2" />
+                    {t("common.edit")}
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

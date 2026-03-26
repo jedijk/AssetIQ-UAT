@@ -28,6 +28,7 @@ class CentralActionCreate(BaseModel):
     action_type: Optional[str] = None  # CM, PM, PDM
     discipline: Optional[str] = None
     due_date: Optional[str] = None
+    comments: Optional[str] = None
 
 
 class CentralActionUpdate(BaseModel):
@@ -41,6 +42,7 @@ class CentralActionUpdate(BaseModel):
     due_date: Optional[str] = None
     status: Optional[str] = None
     completion_notes: Optional[str] = None
+    comments: Optional[str] = None
 
 
 @router.get("/actions")
@@ -157,6 +159,7 @@ async def create_central_action(
         "discipline": data.discipline,
         "due_date": data.due_date,
         "status": "open",
+        "comments": data.comments or "",
         "completion_notes": None,
         "created_by": current_user["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),

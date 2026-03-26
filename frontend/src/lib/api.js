@@ -656,4 +656,11 @@ export const maintenanceStrategyAPI = {
   },
 };
 
+export const usersAPI = {
+  getAll: async () => {
+    const response = await api.get('/rbac/users');
+    return response.data;
+  },
+};
+
 export default api;
