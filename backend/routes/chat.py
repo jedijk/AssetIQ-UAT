@@ -219,9 +219,10 @@ async def send_chat_message(
     return ChatResponse(
         message=result["response_text"],
         follow_up_question=result["response_text"] if result["state"] != ChatState.COMPLETE else None,
-        question_type="asset" if result.get("equipment_suggestions") else ("failure" if result.get("failure_mode_suggestions") else None),
+        question_type="asset" if result.get("equipment_suggestions") else ("failure" if result.get("failure_mode_suggestions") is not None else None),
         equipment_suggestions=result.get("equipment_suggestions"),
-        failure_mode_suggestions=result.get("failure_mode_suggestions")
+        failure_mode_suggestions=result.get("failure_mode_suggestions"),
+        show_new_failure_mode_option=result.get("show_new_failure_mode_option")
     )
 @router.get("/chat/history")
 async def get_chat_history(

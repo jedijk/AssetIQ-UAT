@@ -37,7 +37,23 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 
 ## Completed in This Session (Mar 26, 2026)
 
-### Bug Fix
+### New Feature: "New Failure Mode" Option in Chat
+When creating observations via chat, users can now specify custom failure modes:
+- Added clickable "New Failure Mode" button with green styling when failure mode suggestions are shown
+- Users can click to open an input field to type a custom failure mode name
+- Minimum 3 characters required for validation
+- Works in both scenarios: when failure modes are suggested OR when no matches found
+- Backend handles "New failure mode: [name]" messages to create observations with custom failure modes
+- Multi-language support added (EN/NL translations)
+
+**Files Modified:**
+- `/app/backend/chat_handler_v2.py` - Added AWAITING_NEW_FAILURE_MODE state, handles custom failure mode input
+- `/app/backend/routes/chat.py` - Added `show_new_failure_mode_option` to response
+- `/app/backend/models/api_models.py` - Added `show_new_failure_mode_option` field to ChatResponse
+- `/app/frontend/src/components/ChatSidebar.js` - Added UI for New Failure Mode button and input form
+- `/app/frontend/src/contexts/LanguageContext.js` - Added translation keys for newFailureMode, specifyFailureMode, enterFailureModeName
+
+### Previous Session Fixes
 - **Fixed "Objects not valid as React child" error**: `CausalIntelligencePanel.jsx` was rendering structured `{action, action_type, discipline}` objects directly in JSX. Fixed to extract `.action` property for display.
 - **Fixed `handleAddRecommendation` in CausalIntelligencePanel**: Was passing entire action object as description string to investigation actions.
 

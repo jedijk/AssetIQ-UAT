@@ -91,6 +91,7 @@ class ChatResponse(BaseModel):
     question_type: Optional[str] = None
     equipment_suggestions: Optional[List[dict]] = None
     failure_mode_suggestions: Optional[List[dict]] = None
+    show_new_failure_mode_option: Optional[bool] = None
 
 
 class VoiceTranscriptionResponse(BaseModel):

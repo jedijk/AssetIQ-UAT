@@ -21,6 +21,7 @@ class ChatState:
     INITIAL = "initial"  # Fresh start
     AWAITING_EQUIPMENT = "awaiting_equipment"  # User needs to select equipment
     AWAITING_FAILURE_MODE = "awaiting_failure_mode"  # User needs to select failure mode
+    AWAITING_NEW_FAILURE_MODE = "awaiting_new_failure_mode"  # User is specifying a new failure mode
     COMPLETE = "complete"  # Ready to create observation
 
 
@@ -321,12 +322,13 @@ async def process_chat_message(
                 }
             
             elif len(fm_matches) > 1:
-                # Multiple matches - ask user to select
+                # Multiple matches - ask user to select, also show new failure mode option
                 return {
                     "response_text": "What type of failure is it? Please select:",
                     "state": ChatState.AWAITING_FAILURE_MODE,
                     "equipment_suggestions": None,
                     "failure_mode_suggestions": fm_matches,
+                    "show_new_failure_mode_option": True,
                     "create_observation": False,
                     "observation_data": None,
                     "pending_data": pending_data,
@@ -334,15 +336,15 @@ async def process_chat_message(
                 }
             
             else:
-                # No failure mode matches - create with "Unknown" or ask
-                pending_data["failure_mode_name"] = "Unknown"
+                # No failure mode matches - ask user to specify or create new
                 return {
-                    "response_text": "Observation recorded successfully.",
-                    "state": ChatState.COMPLETE,
+                    "response_text": "No matching failure mode found. Would you like to specify the failure mode?",
+                    "state": ChatState.AWAITING_FAILURE_MODE,
                     "equipment_suggestions": None,
-                    "failure_mode_suggestions": None,
-                    "create_observation": True,
-                    "observation_data": pending_data,
+                    "failure_mode_suggestions": [],
+                    "show_new_failure_mode_option": True,
+                    "create_observation": False,
+                    "observation_data": None,
                     "pending_data": pending_data,
                     "original_message": original_message
                 }
@@ -436,6 +438,37 @@ async def process_chat_message(
         
         # Check if user selected one of the suggested failure modes
         message_text = message_content
+        
+        # Handle "New failure mode: X" pattern - user is specifying a custom failure mode
+        if message_text.lower().startswith("new failure mode:"):
+            custom_failure_mode = message_text.split(":", 1)[1].strip()
+            if custom_failure_mode and len(custom_failure_mode) >= 3:
+                pending_data["failure_mode_name"] = custom_failure_mode
+                pending_data["is_custom_failure_mode"] = True
+                
+                return {
+                    "response_text": "Observation recorded successfully.",
+                    "state": ChatState.COMPLETE,
+                    "equipment_suggestions": None,
+                    "failure_mode_suggestions": None,
+                    "create_observation": True,
+                    "observation_data": pending_data,
+                    "pending_data": pending_data,
+                    "original_message": original_message
+                }
+            else:
+                return {
+                    "response_text": "Please provide a valid failure mode name (at least 3 characters):",
+                    "state": ChatState.AWAITING_FAILURE_MODE,
+                    "equipment_suggestions": None,
+                    "failure_mode_suggestions": prev_suggestions,
+                    "show_new_failure_mode_option": True,
+                    "create_observation": False,
+                    "observation_data": None,
+                    "pending_data": pending_data,
+                    "original_message": original_message
+                }
+        
         # Handle "Failure mode: X" pattern from frontend buttons
         if message_text.lower().startswith("failure mode:"):
             message_text = message_text.split(":", 1)[1].strip()
@@ -456,7 +489,7 @@ async def process_chat_message(
                 message_normalized in fm_name_normalized
             ):
                 selected_fm = fm
-                logger.info(f"  -> MATCHED!")
+                logger.info("  -> MATCHED!")
                 break
         
         if selected_fm:
@@ -508,6 +541,7 @@ async def process_chat_message(
                     "state": ChatState.AWAITING_FAILURE_MODE,
                     "equipment_suggestions": None,
                     "failure_mode_suggestions": fm_matches,
+                    "show_new_failure_mode_option": True,
                     "create_observation": False,
                     "observation_data": None,
                     "pending_data": pending_data,
@@ -515,18 +549,56 @@ async def process_chat_message(
                 }
             
             else:
-                # Still no match - use what they typed or "Unknown"
-                pending_data["failure_mode_name"] = message_content if len(message_content) < 100 else "Unknown"
+                # No match - ask user to specify the failure mode
                 return {
-                    "response_text": "Observation recorded successfully.",
-                    "state": ChatState.COMPLETE,
+                    "response_text": "No matching failure mode found. Would you like to specify the failure mode?",
+                    "state": ChatState.AWAITING_FAILURE_MODE,
                     "equipment_suggestions": None,
-                    "failure_mode_suggestions": None,
-                    "create_observation": True,
-                    "observation_data": pending_data,
+                    "failure_mode_suggestions": [],
+                    "show_new_failure_mode_option": True,
+                    "create_observation": False,
+                    "observation_data": None,
                     "pending_data": pending_data,
                     "original_message": original_message
                 }
+    
+    # ============================================
+    # STATE: AWAITING NEW FAILURE MODE (User specifying custom failure mode)
+    # ============================================
+    if current_state == ChatState.AWAITING_NEW_FAILURE_MODE:
+        # User is specifying a new/custom failure mode name
+        custom_failure_mode = message_content.strip()
+        
+        # Handle the "New failure mode:" prefix if frontend sends it
+        if custom_failure_mode.lower().startswith("new failure mode:"):
+            custom_failure_mode = custom_failure_mode.split(":", 1)[1].strip()
+        
+        if custom_failure_mode and len(custom_failure_mode) >= 3:
+            pending_data["failure_mode_name"] = custom_failure_mode
+            pending_data["is_custom_failure_mode"] = True
+            
+            return {
+                "response_text": "Observation recorded successfully.",
+                "state": ChatState.COMPLETE,
+                "equipment_suggestions": None,
+                "failure_mode_suggestions": None,
+                "create_observation": True,
+                "observation_data": pending_data,
+                "pending_data": pending_data,
+                "original_message": original_message
+            }
+        else:
+            return {
+                "response_text": "Please provide a valid failure mode name (at least 3 characters):",
+                "state": ChatState.AWAITING_NEW_FAILURE_MODE,
+                "equipment_suggestions": None,
+                "failure_mode_suggestions": None,
+                "show_new_failure_mode_option": False,
+                "create_observation": False,
+                "observation_data": None,
+                "pending_data": pending_data,
+                "original_message": original_message
+            }
     
     # ============================================
     # STATE: INITIAL - Fresh message
@@ -592,6 +664,7 @@ async def process_chat_message(
                 "state": ChatState.AWAITING_FAILURE_MODE,
                 "equipment_suggestions": None,
                 "failure_mode_suggestions": fm_matches,
+                "show_new_failure_mode_option": True,
                 "create_observation": False,
                 "observation_data": None,
                 "pending_data": pending_data,
@@ -599,15 +672,15 @@ async def process_chat_message(
             }
         
         else:
-            # No failure mode match - create with "Unknown"
-            pending_data["failure_mode_name"] = "Unknown"
+            # No failure mode match - ask user to specify
             return {
-                "response_text": "Observation recorded successfully.",
-                "state": ChatState.COMPLETE,
+                "response_text": f"Issue reported for {selected_equipment.get('name')}. No matching failure mode found. Would you like to specify the failure mode?",
+                "state": ChatState.AWAITING_FAILURE_MODE,
                 "equipment_suggestions": None,
-                "failure_mode_suggestions": None,
-                "create_observation": True,
-                "observation_data": pending_data,
+                "failure_mode_suggestions": [],
+                "show_new_failure_mode_option": True,
+                "create_observation": False,
+                "observation_data": None,
                 "pending_data": pending_data,
                 "original_message": message_content
             }

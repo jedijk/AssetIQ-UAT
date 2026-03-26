@@ -23,7 +23,8 @@ import {
   Trash2,
   Pause,
   Play,
-  Square
+  Square,
+  Plus
 } from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -38,10 +39,13 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [showNewFailureModeInput, setShowNewFailureModeInput] = useState(false);
+  const [newFailureModeName, setNewFailureModeName] = useState("");
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const recordingTimerRef = useRef(null);
+  const newFailureModeInputRef = useRef(null);
   const queryClient = useQueryClient();
 
   // Pre-fill message when equipment is provided
@@ -76,6 +80,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
       setMessage("");
       setImageBase64(null);
       setImagePreview(null);
+      setShowNewFailureModeInput(false);
+      setNewFailureModeName("");
     },
     onError: (error) => {
       const errorMsg = error.response?.data?.detail || "Failed to send message";
@@ -452,10 +458,35 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               </button>
             ))}
             
+            {/* New Failure Mode option */}
+            <button
+              onClick={() => {
+                setShowNewFailureModeInput(true);
+                setNewFailureModeName("");
+                setTimeout(() => {
+                  newFailureModeInputRef.current?.focus();
+                }, 100);
+              }}
+              disabled={isSending}
+              className="w-full text-left p-2.5 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="new-failure-mode-option"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-green-600" />
+                  <span className="font-medium text-green-900 text-sm">New Failure Mode</span>
+                </div>
+                <ArrowRight className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" />
+              </div>
+              <span className="text-xs text-green-600 ml-6">Specify a custom failure mode</span>
+            </button>
+            
             {/* Cancel option for failure modes */}
             <button
               onClick={() => {
                 setMessage("");
+                setShowNewFailureModeInput(false);
+                setNewFailureModeName("");
                 if (textareaRef.current) {
                   textareaRef.current.focus();
                 }
@@ -469,7 +500,92 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           </div>
         )}
         
-        {isFollowUp && !msg.threat_id && !msg.equipment_suggestions && !msg.failure_mode_suggestions && (
+        {/* New Failure Mode Input - shown when user clicks "New Failure Mode" */}
+        {showNewFailureModeInput && (
+          <div className="mt-3 space-y-2">
+            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+              <label className="block text-sm font-medium text-green-800 mb-2">
+                Enter failure mode name:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  ref={newFailureModeInputRef}
+                  type="text"
+                  value={newFailureModeName}
+                  onChange={(e) => setNewFailureModeName(e.target.value)}
+                  placeholder="e.g., Bearing wear, Seal leak..."
+                  className="flex-1 px-3 py-2 text-sm border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newFailureModeName.trim().length >= 3) {
+                      sendMutation.mutate({ content: `New failure mode: ${newFailureModeName.trim()}`, image: null });
+                      setShowNewFailureModeInput(false);
+                      setNewFailureModeName("");
+                    }
+                  }}
+                  disabled={isSending}
+                  data-testid="new-failure-mode-input"
+                />
+                <button
+                  onClick={() => {
+                    if (newFailureModeName.trim().length >= 3) {
+                      sendMutation.mutate({ content: `New failure mode: ${newFailureModeName.trim()}`, image: null });
+                      setShowNewFailureModeInput(false);
+                      setNewFailureModeName("");
+                    } else {
+                      toast.error("Failure mode name must be at least 3 characters");
+                    }
+                  }}
+                  disabled={isSending || newFailureModeName.trim().length < 3}
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  data-testid="submit-new-failure-mode"
+                >
+                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-green-600 mt-1">Min. 3 characters required</p>
+            </div>
+            <button
+              onClick={() => {
+                setShowNewFailureModeInput(false);
+                setNewFailureModeName("");
+              }}
+              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
+            >
+              <X className="w-3.5 h-3.5 inline mr-1" />
+              Cancel
+            </button>
+          </div>
+        )}
+        
+        {/* Show "New Failure Mode" option when no failure modes found (empty array) */}
+        {msg.failure_mode_suggestions && msg.failure_mode_suggestions.length === 0 && !showNewFailureModeInput && (
+          <div className="mt-3 space-y-2">
+            <p className="text-sm text-amber-700">No matching failure modes found in the library.</p>
+            <button
+              onClick={() => {
+                setShowNewFailureModeInput(true);
+                setNewFailureModeName("");
+                setTimeout(() => {
+                  newFailureModeInputRef.current?.focus();
+                }, 100);
+              }}
+              disabled={isSending}
+              className="w-full text-left p-2.5 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="new-failure-mode-empty-option"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-green-600" />
+                  <span className="font-medium text-green-900 text-sm">New Failure Mode</span>
+                </div>
+                <ArrowRight className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" />
+              </div>
+              <span className="text-xs text-green-600 ml-6">Specify the failure mode name</span>
+            </button>
+          </div>
+        )}
+        
+        {isFollowUp && !msg.threat_id && !msg.equipment_suggestions && !msg.failure_mode_suggestions && !showNewFailureModeInput && (
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1 text-blue-600 text-xs">
             <HelpCircle className="w-3 h-3" />
             <span>Please provide more details</span>

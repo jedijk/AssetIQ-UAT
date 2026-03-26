@@ -477,6 +477,9 @@ const en = {
     provideMoreDetails: "Please provide more details",
     voiceTranscribed: "Voice transcribed!",
     describeIssue: "Describe the failure or issue...",
+    newFailureMode: "New Failure Mode",
+    specifyFailureMode: "Specify the failure mode name:",
+    enterFailureModeName: "Enter failure mode name...",
   },
   
   // Info dialog
@@ -1384,6 +1387,9 @@ const nl = {
     provideMoreDetails: "Geef meer details",
     voiceTranscribed: "Spraak getranscribeerd!",
     describeIssue: "Beschrijf de storing of het probleem...",
+    newFailureMode: "Nieuwe storingsmodus",
+    specifyFailureMode: "Geef de naam van de storingsmodus op:",
+    enterFailureModeName: "Voer naam storingsmodus in...",
   },
   
   // Info dialog

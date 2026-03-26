@@ -12,10 +12,13 @@ import {
   Loader2,
   AlertTriangle,
   ArrowRight,
-  HelpCircle
+  HelpCircle,
+  Plus,
+  Settings
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
+import { Input } from "../components/ui/input";
 import ThreatCard from "../components/ThreatCard";
 import { useLanguage } from "../contexts/LanguageContext";
 
@@ -26,6 +29,8 @@ const ChatPage = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [showNewFailureModeInput, setShowNewFailureModeInput] = useState(false);
+  const [newFailureModeName, setNewFailureModeName] = useState("");
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
@@ -138,6 +143,29 @@ const ChatPage = () => {
     }
   };
 
+  // Handle clicking on a suggestion (equipment or failure mode)
+  const handleSuggestionClick = (suggestionText) => {
+    setShowNewFailureModeInput(false);
+    setNewFailureModeName("");
+    sendMutation.mutate({ content: suggestionText, image: null });
+  };
+
+  // Handle new failure mode submission
+  const handleNewFailureModeSubmit = () => {
+    if (newFailureModeName.trim().length >= 3) {
+      sendMutation.mutate({ content: `New failure mode: ${newFailureModeName.trim()}`, image: null });
+      setShowNewFailureModeInput(false);
+      setNewFailureModeName("");
+    } else {
+      toast.error("Failure mode name must be at least 3 characters");
+    }
+  };
+
+  // Handle clicking "New Failure Mode" button
+  const handleNewFailureModeClick = () => {
+    setShowNewFailureModeInput(true);
+  };
+
   // Render message content
   const renderMessageContent = (msg) => {
     if (msg.role === "user") {
@@ -156,10 +184,105 @@ const ChatPage = () => {
 
     // AI message - check if it's a follow-up question
     const isFollowUp = msg.question_type || msg.content.includes("?");
+    const hasEquipmentSuggestions = msg.equipment_suggestions && msg.equipment_suggestions.length > 0;
+    const hasFailureModeSuggestions = msg.failure_mode_suggestions && msg.failure_mode_suggestions.length > 0;
+    const showNewFailureModeOption = msg.failure_mode_suggestions !== undefined || msg.chat_state === "awaiting_failure_mode";
     
     return (
       <div className={`chat-bubble-ai ${isFollowUp ? "border-l-4 border-l-blue-400" : ""}`}>
         <p className="whitespace-pre-wrap">{msg.content}</p>
+        
+        {/* Equipment Suggestions */}
+        {hasEquipmentSuggestions && (
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-sm text-slate-500 mb-2">Select equipment:</p>
+            <div className="flex flex-wrap gap-2">
+              {msg.equipment_suggestions.map((eq, idx) => (
+                <Button
+                  key={idx}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSuggestionClick(eq.tag ? `${eq.name} (${eq.tag})` : eq.name)}
+                  className="text-left justify-start text-blue-600 hover:bg-blue-50 border-blue-200"
+                  data-testid={`equipment-suggestion-${idx}`}
+                >
+                  <Settings className="w-3 h-3 mr-1" />
+                  {eq.name}
+                  {eq.tag && <span className="ml-1 text-slate-400">({eq.tag})</span>}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Failure Mode Suggestions */}
+        {hasFailureModeSuggestions && (
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-sm text-slate-500 mb-2">Select failure mode:</p>
+            <div className="flex flex-wrap gap-2">
+              {msg.failure_mode_suggestions.map((fm, idx) => (
+                <Button
+                  key={idx}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSuggestionClick(`Failure mode: ${fm.failure_mode}`)}
+                  className="text-left justify-start text-blue-600 hover:bg-blue-50 border-blue-200"
+                  data-testid={`failure-mode-suggestion-${idx}`}
+                >
+                  {fm.failure_mode}
+                  {fm.rpn && <span className="ml-1 text-xs text-slate-400">(RPN: {fm.rpn})</span>}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* New Failure Mode Option */}
+        {showNewFailureModeOption && !hasEquipmentSuggestions && (
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            {!showNewFailureModeInput ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNewFailureModeClick}
+                className="text-left justify-start text-green-600 hover:bg-green-50 border-green-200"
+                data-testid="new-failure-mode-btn"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                {t("chat.newFailureMode")}
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-slate-600">{t("chat.specifyFailureMode")}</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newFailureModeName}
+                    onChange={(e) => setNewFailureModeName(e.target.value)}
+                    placeholder={t("chat.enterFailureModeName")}
+                    className="flex-1"
+                    data-testid="new-failure-mode-input"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleNewFailureModeSubmit();
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleNewFailureModeSubmit}
+                    disabled={newFailureModeName.trim().length < 3}
+                    className="bg-green-600 hover:bg-green-700"
+                    data-testid="submit-new-failure-mode-btn"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
         {msg.threat_id && (
           <div className="mt-3 pt-3 border-t border-slate-100">
             <a 
@@ -172,7 +295,7 @@ const ChatPage = () => {
             </a>
           </div>
         )}
-        {isFollowUp && !msg.threat_id && (
+        {isFollowUp && !msg.threat_id && !hasEquipmentSuggestions && !hasFailureModeSuggestions && !showNewFailureModeOption && (
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-blue-600 text-sm">
             <HelpCircle className="w-4 h-4" />
             <span>{t("chat.provideMoreDetails")}</span>
