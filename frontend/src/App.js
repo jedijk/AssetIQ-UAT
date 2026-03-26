@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -34,6 +34,7 @@ const queryClient = new QueryClient({
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) {
     return (
@@ -48,7 +49,8 @@ const ProtectedRoute = ({ children }) => {
   }
   
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // Save the intended destination for post-login redirect
+    return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
   }
   
   return children;
@@ -56,6 +58,7 @@ const ProtectedRoute = ({ children }) => {
 
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) {
     return (
@@ -70,7 +73,9 @@ const PublicRoute = ({ children }) => {
   }
   
   if (user) {
-    return <Navigate to="/" replace />;
+    // Redirect to the saved destination or default to dashboard
+    const from = location.state?.from || "/";
+    return <Navigate to={from} replace />;
   }
   
   return children;
@@ -79,6 +84,7 @@ const PublicRoute = ({ children }) => {
 // Mobile Layout wrapper with auth
 const MobileLayout = () => {
   const { user, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) {
     return (
@@ -96,7 +102,7 @@ const MobileLayout = () => {
   }
   
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
   
   return <MobileApp />;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -11,9 +11,14 @@ import { Loader2 } from "lucide-react";
 const LoginPage = () => {
   const { login } = useAuth();
   const { t } = useLanguage();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Get the redirect destination from state (set by ProtectedRoute)
+  const from = location.state?.from || "/";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,6 +27,8 @@ const LoginPage = () => {
     try {
       await login(email, password);
       toast.success(t("chat.welcomeMessage").split("!")[0] + "!");
+      // Navigate to the intended destination after successful login
+      navigate(from, { replace: true });
     } catch (error) {
       const message = error.response?.data?.detail || "Login failed. Please try again.";
       toast.error(message);

@@ -45,6 +45,7 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - [x] Backend modular architecture (16 route files)
 
 ### 🔧 Recent Changes (March 26, 2026)
+- **FIXED**: Post-Login Redirect Bug (Recurring 5x) - Users now correctly land on their intended page after login. Implemented `location.state` to preserve the original URL during redirect to login.
 - **NEW**: Frontend Code Segmentation - Extracted components from ThreatDetailPage.js:
   - `RecommendedActionsSection.jsx` (326 lines) - Handles recommended actions list and add dialog
   - `RiskScoreCard.jsx` (198 lines) - Risk score display with popup calculator
