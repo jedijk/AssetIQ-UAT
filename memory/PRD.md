@@ -45,6 +45,11 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - [x] Backend modular architecture (16 route files)
 
 ### 🔧 Recent Changes (March 26, 2026)
+- **NEW**: Frontend Code Segmentation - Extracted components from ThreatDetailPage.js:
+  - `RecommendedActionsSection.jsx` (326 lines) - Handles recommended actions list and add dialog
+  - `RiskScoreCard.jsx` (198 lines) - Risk score display with popup calculator
+  - `ThreatHeader.jsx` (177 lines) - Header with title, status, and action buttons
+  - Reduced ThreatDetailPage.js from 1738 to 1304 lines (25% reduction)
 - **NEW**: Add Recommended Action with Type & Discipline - Users can now manually add recommended actions to observations with `action_type` (CM/PM/PDM) and `discipline` fields. New "Add Recommendation" button in ThreatDetailPage with full form dialog including live preview.
 - **NEW**: AI Risk Analysis now generates structured recommendations with `action_type` (CM/PM/PDM) and `discipline` fields. Updated AI prompts and frontend panel to display badges and discipline tags.
 - Removed "Create Action" button from Recommended Actions section (redundant with "Act" buttons on each action)
