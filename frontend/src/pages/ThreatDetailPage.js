@@ -306,14 +306,16 @@ const ThreatDetailPage = () => {
 
   // Promote to action mutation
   const promoteToActionMutation = useMutation({
-    mutationFn: (actionText) => actionsAPI.create({
-      title: actionText.substring(0, 100),
-      description: actionText,
+    mutationFn: (actionData) => actionsAPI.create({
+      title: actionData.text.substring(0, 100),
+      description: actionData.text,
       source_type: "threat",
       source_id: id,
       source_name: threat?.title || "Unknown Threat",
       priority: threat?.risk_level === "Critical" ? "critical" : 
                threat?.risk_level === "High" ? "high" : "medium",
+      action_type: actionData.action_type || null,
+      discipline: actionData.discipline || null,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
@@ -1394,7 +1396,11 @@ const ThreatDetailPage = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => promoteToActionMutation.mutate(actionText)}
+                onClick={() => promoteToActionMutation.mutate({
+                  text: actionText,
+                  action_type: actionType,
+                  discipline: discipline
+                })}
                 disabled={promoteToActionMutation.isPending}
                 className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                 title="Add to action tracker"

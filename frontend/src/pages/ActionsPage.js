@@ -559,6 +559,23 @@ export default function ActionsPage() {
                     <Badge className={priority.color}>
                       {priority.label}
                     </Badge>
+                    {/* Action Type Badge (CM/PM/PDM) */}
+                    {action.action_type && (
+                      <Badge className={
+                        action.action_type === 'PM' ? 'bg-blue-100 text-blue-700' :
+                        action.action_type === 'CM' ? 'bg-amber-100 text-amber-700' :
+                        action.action_type === 'PDM' ? 'bg-purple-100 text-purple-700' :
+                        'bg-slate-100 text-slate-700'
+                      }>
+                        {action.action_type}
+                      </Badge>
+                    )}
+                    {/* Discipline Badge */}
+                    {action.discipline && (
+                      <Badge className="bg-slate-100 text-slate-600">
+                        {action.discipline}
+                      </Badge>
+                    )}
                     {overdue && (
                       <Badge className="bg-red-100 text-red-700">Overdue</Badge>
                     )}
@@ -593,12 +610,6 @@ export default function ActionsPage() {
                         <span className="mx-1">•</span>
                         <User className="w-3 h-3" />
                         <span>{action.assignee}</span>
-                      </>
-                    )}
-                    {action.discipline && (
-                      <>
-                        <span className="mx-1">•</span>
-                        <span>{action.discipline}</span>
                       </>
                     )}
                   </div>

@@ -25,6 +25,7 @@ class CentralActionCreate(BaseModel):
     source_name: str  # threat title or investigation title for reference
     priority: str = "medium"
     assignee: Optional[str] = None
+    action_type: Optional[str] = None  # CM, PM, PDM
     discipline: Optional[str] = None
     due_date: Optional[str] = None
 
@@ -35,6 +36,7 @@ class CentralActionUpdate(BaseModel):
     description: Optional[str] = None
     priority: Optional[str] = None
     assignee: Optional[str] = None
+    action_type: Optional[str] = None  # CM, PM, PDM
     discipline: Optional[str] = None
     due_date: Optional[str] = None
     status: Optional[str] = None
@@ -151,6 +153,7 @@ async def create_central_action(
         "source_name": data.source_name,
         "priority": data.priority,
         "assignee": data.assignee,
+        "action_type": data.action_type,
         "discipline": data.discipline,
         "due_date": data.due_date,
         "status": "open",
