@@ -121,6 +121,7 @@ export default function ActionsPage() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [riskLevelFilter, setRiskLevelFilter] = useState("all"); // Filter by risk level (Critical/High/Medium/Low)
   const [sortBy, setSortBy] = useState("risk_score"); // Sort by risk_score or rpn
+  const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [editingAction, setEditingAction] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -166,6 +167,9 @@ export default function ActionsPage() {
 
   const actions = data?.actions || [];
   const stats = data?.stats || { total: 0, open: 0, in_progress: 0, completed: 0, overdue: 0 };
+
+  // Compute unique disciplines for filter
+  const uniqueDisciplines = [...new Set(actions.map(a => a.discipline).filter(Boolean))].sort();
 
   // Update mutation
   const updateMutation = useMutation({
@@ -300,6 +304,11 @@ export default function ActionsPage() {
     // Risk level filter
     if (riskLevelFilter !== "all") {
       if (action.threat_risk_level !== riskLevelFilter) return false;
+    }
+    
+    // Discipline filter
+    if (disciplineFilter !== "all") {
+      if ((action.discipline || "") !== disciplineFilter) return false;
     }
     
     return true;
@@ -473,6 +482,22 @@ export default function ActionsPage() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* Discipline Filter */}
+        {uniqueDisciplines.length > 0 && (
+          <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
+            <SelectTrigger className="w-full sm:w-44 h-11" data-testid="discipline-filter">
+              <Briefcase className="w-4 h-4 mr-2 text-slate-400" />
+              <SelectValue placeholder={t("common.discipline") || "Discipline"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("actionsPage.allDisciplines") || "All Disciplines"}</SelectItem>
+              {uniqueDisciplines.map((d) => (
+                <SelectItem key={d} value={d}>{d}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Sort By - matching Observations */}
         <Select value={sortBy} onValueChange={setSortBy}>

@@ -313,6 +313,7 @@ const en = {
     noSourceLinked: "No source linked",
     linkedToInvestigation: "Linked to Investigation",
     linkedToThreat: "Linked to Threat",
+    allDisciplines: "All Disciplines",
   },
   
   // Library page
@@ -1218,6 +1219,7 @@ const nl = {
     noSourceLinked: "Geen bron gekoppeld",
     linkedToInvestigation: "Gekoppeld aan onderzoek",
     linkedToThreat: "Gekoppeld aan dreiging",
+    allDisciplines: "Alle disciplines",
   },
   
   // Library page
