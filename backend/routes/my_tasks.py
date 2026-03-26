@@ -1,12 +1,15 @@
 """
 My Tasks routes - User-centric task execution endpoints.
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 from database import db
 from auth import get_current_user
 from bson import ObjectId
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["My Tasks"])
 
@@ -42,6 +45,7 @@ def serialize_task(task: dict) -> dict:
         "assignee": task.get("assignee", ""),
         "last_completed": task.get("last_completed").isoformat() if task.get("last_completed") else None,
         "form_fields": task.get("form_fields", []),
+        "form_template_name": task.get("form_template_name", ""),
         "template": task.get("template", {}),
         "estimated_duration_minutes": task.get("estimated_duration_minutes"),
         "can_quick_complete": not task.get("form_fields") and not task.get("template", {}).get("form_fields"),
@@ -209,8 +213,19 @@ async def get_my_tasks(
                 task["equipment_name"] = equipment.get("name", "Unknown")
         
         # Get plan details for recurring info
-        if task.get("task_plan_id"):
-            plan = await db.task_plans.find_one({"_id": task["task_plan_id"]})
+        task_plan_id = task.get("task_plan_id")
+        if task_plan_id:
+            # Handle both string and ObjectId task_plan_id
+            try:
+                if isinstance(task_plan_id, str):
+                    plan_oid = ObjectId(task_plan_id)
+                else:
+                    plan_oid = task_plan_id
+                plan = await db.task_plans.find_one({"_id": plan_oid})
+            except Exception:
+                plan = None
+            
+            template = None  # Initialize template variable
             if plan:
                 task["is_recurring"] = True
                 interval = plan.get("interval_value", 0)
@@ -232,12 +247,19 @@ async def get_my_tasks(
                         }
                         task["mitigation_strategy"] = template.get("mitigation_strategy", "")
                 
-                # Get form template if linked
-                form_template_id = plan.get("form_template_id") or (template.get("form_template_id") if template else None)
+                # Get form template if linked - check plan first, then template
+                form_template_id = plan.get("form_template_id")
+                if not form_template_id and template:
+                    form_template_id = template.get("form_template_id")
+                
                 if form_template_id:
-                    form_template = await db.form_templates.find_one({"_id": ObjectId(form_template_id)})
-                    if form_template:
-                        task["form_fields"] = form_template.get("fields", [])
+                    try:
+                        form_template = await db.form_templates.find_one({"_id": ObjectId(str(form_template_id))})
+                        if form_template:
+                            task["form_fields"] = form_template.get("fields", [])
+                            task["form_template_name"] = form_template.get("name", "")
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch form template {form_template_id}: {e}")
         
         # Determine source - check after is_recurring is set
         if task.get("created_from_observation"):
@@ -425,6 +447,43 @@ async def start_my_task(
         equipment = await db.equipment.find_one({"_id": updated_task["equipment_id"]})
         if equipment:
             updated_task["equipment_name"] = equipment.get("name", "Unknown")
+    
+    # Enrich with form fields from plan
+    task_plan_id = updated_task.get("task_plan_id")
+    if task_plan_id:
+        try:
+            if isinstance(task_plan_id, str):
+                plan_oid = ObjectId(task_plan_id)
+            else:
+                plan_oid = task_plan_id
+            plan = await db.task_plans.find_one({"_id": plan_oid})
+            if plan:
+                updated_task["is_recurring"] = True
+                interval = plan.get("interval_value", 0)
+                unit = plan.get("interval_unit", "days")
+                updated_task["frequency_display"] = f"Every {interval} {unit}"
+                
+                # Get template name
+                if plan.get("task_template_id"):
+                    template = await db.task_templates.find_one({"_id": plan["task_template_id"]})
+                    if template:
+                        if not updated_task.get("title"):
+                            updated_task["title"] = template.get("name", "")
+                        updated_task["task_template_name"] = template.get("name", "")
+                        updated_task["mitigation_strategy"] = template.get("mitigation_strategy", "")
+                
+                # Get form template
+                form_template_id = plan.get("form_template_id")
+                if form_template_id:
+                    try:
+                        form_template = await db.form_templates.find_one({"_id": ObjectId(str(form_template_id))})
+                        if form_template:
+                            updated_task["form_fields"] = form_template.get("fields", [])
+                            updated_task["form_template_name"] = form_template.get("name", "")
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch form template: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch plan for task: {e}")
     
     return serialize_task(updated_task)
 

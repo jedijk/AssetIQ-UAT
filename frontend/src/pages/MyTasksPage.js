@@ -310,17 +310,22 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
   const validateForm = () => {
     const errors = {};
     formFields.forEach(field => {
-      if (field.required && !formData[field.id]) {
+      const fieldType = field.type || field.field_type;
+      if (field.required && !formData[field.id] && formData[field.id] !== false) {
         errors[field.id] = "This field is required";
       }
       // Check thresholds for numeric fields
-      if (field.type === "numeric" && formData[field.id]) {
+      if (fieldType === "numeric" && formData[field.id]) {
         const value = parseFloat(formData[field.id]);
-        if (field.min_threshold && value < field.min_threshold) {
-          errors[field.id] = `Value below minimum threshold (${field.min_threshold})`;
+        const thresholds = field.thresholds || {};
+        const minThreshold = field.min_threshold ?? thresholds.critical_low ?? thresholds.warning_low;
+        const maxThreshold = field.max_threshold ?? thresholds.critical_high ?? thresholds.warning_high;
+        
+        if (minThreshold != null && value < minThreshold) {
+          errors[field.id] = `Value below minimum threshold (${minThreshold})`;
         }
-        if (field.max_threshold && value > field.max_threshold) {
-          errors[field.id] = `Value exceeds maximum threshold (${field.max_threshold})`;
+        if (maxThreshold != null && value > maxThreshold) {
+          errors[field.id] = `Value exceeds maximum threshold (${maxThreshold})`;
         }
       }
     });
@@ -332,10 +337,15 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
   const checkThresholds = () => {
     let exceeded = false;
     formFields.forEach(field => {
-      if (field.type === "numeric" && formData[field.id]) {
+      const fieldType = field.type || field.field_type;
+      if (fieldType === "numeric" && formData[field.id]) {
         const value = parseFloat(formData[field.id]);
-        if ((field.min_threshold && value < field.min_threshold) ||
-            (field.max_threshold && value > field.max_threshold)) {
+        const thresholds = field.thresholds || {};
+        const minThreshold = field.min_threshold ?? thresholds.critical_low ?? thresholds.warning_low;
+        const maxThreshold = field.max_threshold ?? thresholds.critical_high ?? thresholds.warning_high;
+        
+        if ((minThreshold != null && value < minThreshold) ||
+            (maxThreshold != null && value > maxThreshold)) {
           exceeded = true;
         }
       }
@@ -415,7 +425,38 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
     const hasError = validationErrors[field.id];
     const value = formData[field.id];
     
-    switch (field.type) {
+    // Handle both 'type' and 'field_type' from different sources
+    const fieldType = field.type || field.field_type;
+    
+    // Handle thresholds - can be object or individual fields
+    const thresholds = field.thresholds || {};
+    const minThreshold = field.min_threshold ?? thresholds.critical_low ?? thresholds.warning_low;
+    const maxThreshold = field.max_threshold ?? thresholds.critical_high ?? thresholds.warning_high;
+    
+    switch (fieldType) {
+      case "boolean":
+        // Single checkbox/toggle for boolean fields
+        return (
+          <div key={field.id} className="space-y-2">
+            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+              <Checkbox
+                id={field.id}
+                checked={value === true}
+                onCheckedChange={(checked) => handleFieldChange(field.id, checked)}
+              />
+              <div className="flex-1">
+                <label htmlFor={field.id} className={cn("text-sm font-medium cursor-pointer", hasError && "text-red-600")}>
+                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                </label>
+                {field.description && (
+                  <p className="text-xs text-slate-500 mt-0.5">{field.description}</p>
+                )}
+              </div>
+            </div>
+            {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+          </div>
+        );
+      
       case "checklist":
         return (
           <div key={field.id} className="space-y-2">
@@ -440,8 +481,8 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
         
       case "numeric":
         const isExceeded = value && (
-          (field.max_threshold && parseFloat(value) > field.max_threshold) ||
-          (field.min_threshold && parseFloat(value) < field.min_threshold)
+          (maxThreshold != null && parseFloat(value) > maxThreshold) ||
+          (minThreshold != null && parseFloat(value) < minThreshold)
         );
         return (
           <div key={field.id} className="space-y-2">
@@ -452,19 +493,24 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
             <Input
               type="number"
               value={value || ""}
-              onChange={(e) => handleNumericChange(field.id, e.target.value, field)}
+              onChange={(e) => handleNumericChange(field.id, e.target.value, { ...field, min_threshold: minThreshold, max_threshold: maxThreshold })}
               placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
               className={cn(isExceeded && "border-red-500 bg-red-50")}
             />
-            {field.min_threshold !== undefined && field.max_threshold !== undefined && (
+            {(minThreshold != null || maxThreshold != null) && (
               <p className="text-xs text-slate-500">
-                Threshold: {field.min_threshold} - {field.max_threshold} {field.unit}
+                {minThreshold != null && maxThreshold != null 
+                  ? `Range: ${minThreshold} - ${maxThreshold}` 
+                  : minThreshold != null 
+                    ? `Min: ${minThreshold}` 
+                    : `Max: ${maxThreshold}`
+                } {field.unit}
               </p>
             )}
             {isExceeded && (
               <p className="text-xs text-red-600 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
-                Value exceeds threshold - issue detected
+                Value outside threshold - issue detected
               </p>
             )}
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
@@ -472,6 +518,7 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
         );
         
       case "text":
+      case "textarea":
         return (
           <div key={field.id} className="space-y-2">
             <Label className={cn(hasError && "text-red-600")}>
@@ -487,6 +534,7 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
           </div>
         );
         
+      case "select":
       case "multiple_choice":
         return (
           <div key={field.id} className="space-y-2">
@@ -494,28 +542,33 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
             <div className="flex flex-wrap gap-2">
-              {(field.options || ["Good", "Warning", "Bad"]).map((option) => (
-                <Button
-                  key={option}
-                  type="button"
-                  variant={value === option ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleFieldChange(field.id, option)}
-                  className={cn(
-                    value === option && option === "Good" && "bg-green-600 hover:bg-green-700",
-                    value === option && option === "Warning" && "bg-amber-500 hover:bg-amber-600",
-                    value === option && option === "Bad" && "bg-red-600 hover:bg-red-700"
-                  )}
-                >
-                  {option}
-                </Button>
-              ))}
+              {(field.options || ["Good", "Warning", "Bad"]).map((option) => {
+                const optionValue = typeof option === 'object' ? option.value : option;
+                const optionLabel = typeof option === 'object' ? option.label : option;
+                return (
+                  <Button
+                    key={optionValue}
+                    type="button"
+                    variant={value === optionValue ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleFieldChange(field.id, optionValue)}
+                    className={cn(
+                      value === optionValue && optionLabel === "Good" && "bg-green-600 hover:bg-green-700",
+                      value === optionValue && optionLabel === "Warning" && "bg-amber-500 hover:bg-amber-600",
+                      value === optionValue && optionLabel === "Bad" && "bg-red-600 hover:bg-red-700"
+                    )}
+                  >
+                    {optionLabel}
+                  </Button>
+                );
+              })}
             </div>
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
           </div>
         );
         
       case "photo":
+      case "file":
         return (
           <div key={field.id} className="space-y-2">
             <Label className={cn(hasError && "text-red-600")}>
@@ -560,9 +613,10 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
         );
         
       default:
+        // Default to text input for unknown types
         return (
           <div key={field.id} className="space-y-2">
-            <Label>{field.label}</Label>
+            <Label>{field.label} {field.required && <span className="text-red-500">*</span>}</Label>
             <Input
               value={value || ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
