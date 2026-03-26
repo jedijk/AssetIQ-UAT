@@ -20,6 +20,7 @@ import SettingsUserManagementPage from "./pages/SettingsUserManagementPage";
 import FormsPage from "./pages/FormsPage";
 import DecisionEnginePage from "./pages/DecisionEnginePage";
 import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
+import MobileApp from "./mobile/MobileApp";
 import "@/App.css";
 
 const queryClient = new QueryClient({
@@ -75,6 +76,32 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+// Mobile Layout wrapper with auth
+const MobileLayout = () => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: '#0a0a0a',
+        color: '#fff'
+      }}>
+        Loading...
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return <MobileApp />;
+};
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -93,6 +120,7 @@ function App() {
               }}
             />
             <Routes>
+              <Route path="/mobile" element={<MobileLayout />} />
               <Route path="/login" element={
                 <PublicRoute>
                   <LoginPage />
