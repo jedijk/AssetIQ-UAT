@@ -47,6 +47,7 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 ### 🔧 Recent Changes (March 26, 2026)
 - Fixed voice chat to support Dutch via auto-language detection (removed hardcoded `language="en"`)
 - Fixed chat "Failed to send message" bug - `NoneType` iteration error in chat_handler_v2.py when suggestions were None
+- Fixed chat 2-step flow bug - `ThreatResponse` Pydantic model now accepts structured `recommended_actions` dicts
 - Backend fully refactored from monolithic server.py to modular routes
 
 ## Pending Items

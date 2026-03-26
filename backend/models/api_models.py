@@ -2,7 +2,7 @@
 Shared API Pydantic models for request/response validation.
 """
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Any
 
 
 class UserCreate(BaseModel):
@@ -54,7 +54,7 @@ class ThreatResponse(BaseModel):
     rank: int
     total_threats: int
     status: str
-    recommended_actions: List[str]
+    recommended_actions: List[Any]  # Can be strings or structured dicts
     created_by: str
     created_at: str
     occurrence_count: int
@@ -80,7 +80,7 @@ class ThreatUpdate(BaseModel):
     detectability: Optional[str] = None
     location: Optional[str] = None
     status: Optional[str] = None
-    recommended_actions: Optional[List[str]] = None
+    recommended_actions: Optional[List[Any]] = None  # Can be strings or structured dicts
     linked_equipment_id: Optional[str] = None
 
 
