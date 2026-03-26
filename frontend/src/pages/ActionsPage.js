@@ -546,7 +546,7 @@ export default function ActionsPage() {
                 </button>
 
                 {/* Action Number */}
-                <div className="priority-rank text-sm sm:text-base" data-testid={`action-number-${action.id}`}>
+                <div className="priority-rank text-xs text-slate-400 font-medium min-w-[55px]" data-testid={`action-number-${action.id}`}>
                   {action.action_number}
                 </div>
 
