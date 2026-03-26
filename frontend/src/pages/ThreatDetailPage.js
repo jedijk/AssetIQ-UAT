@@ -1368,7 +1368,12 @@ const ThreatDetailPage = () => {
           </Button>
         </div>
         <div className="space-y-3">
-          {threat.recommended_actions.map((action, idx) => (
+          {threat.recommended_actions.map((action, idx) => {
+            const isObj = typeof action === 'object';
+            const actionText = isObj ? (action.action || action.description || '') : action;
+            const actionType = isObj ? action.action_type : null;
+            const discipline = isObj ? action.discipline : null;
+            return (
             <div
               key={idx}
               className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg group"
@@ -1377,11 +1382,19 @@ const ThreatDetailPage = () => {
               <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-medium">
                 {idx + 1}
               </div>
-              <p className="text-slate-700 flex-1">{action}</p>
+              <div className="flex-1">
+                {(actionType || discipline) && (
+                  <div className="flex items-center gap-2 mb-1">
+                    {actionType && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${actionType === 'PM' ? 'bg-blue-100 text-blue-700' : actionType === 'CM' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>{actionType}</span>}
+                    {discipline && <span className="text-xs text-slate-500">{discipline}</span>}
+                  </div>
+                )}
+                <p className="text-slate-700">{actionText}</p>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => promoteToActionMutation.mutate(action)}
+                onClick={() => promoteToActionMutation.mutate(actionText)}
                 disabled={promoteToActionMutation.isPending}
                 className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                 title="Add to action tracker"
@@ -1391,7 +1404,8 @@ const ThreatDetailPage = () => {
                 Act
               </Button>
             </div>
-          ))}
+            );
+          })}
         </div>
       </motion.div>
 

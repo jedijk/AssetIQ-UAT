@@ -492,7 +492,7 @@ function FailureModeViewPanel({
             {(isEditing ? formData?.recommended_actions : fm.recommended_actions)?.map((action, idx) => {
               // Handle both old string format and new object format
               const isObject = typeof action === 'object';
-              const description = isObject ? action.description : action;
+              const description = isObject ? (action.action || action.description) : action;
               const discipline = isObject ? action.discipline : null;
               const actionType = isObject ? action.action_type : null;
               
@@ -1561,7 +1561,7 @@ const FailureModesPage = () => {
                 {newFm.recommended_actions.map((action, i) => {
                   // Handle both old string format and new object format
                   const isObject = typeof action === 'object';
-                  const description = isObject ? action.description : action;
+                  const description = isObject ? (action.action || action.description) : action;
                   const discipline = isObject ? action.discipline : null;
                   const type = isObject ? action.action_type : null;
                   const typeConfig = ACTION_TYPE_OPTIONS.find(t => t.value === type);
