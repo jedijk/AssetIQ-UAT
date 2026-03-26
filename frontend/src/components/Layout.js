@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -100,6 +100,7 @@ const Layout = () => {
   const navItems = [
     { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { path: "/threats", label: t("nav.observations"), icon: AlertTriangle },
+    { path: "/my-tasks", label: t("nav.myTasks") || "My Tasks", icon: ClipboardCheck },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
     { path: "/library", label: t("nav.library"), icon: BookOpen },

@@ -37,6 +37,44 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 
 ## Completed in This Session (Mar 26, 2026)
 
+### New Feature: My Tasks Page - Task Execution Front-End
+Implemented a comprehensive mobile-first task execution interface per the functional spec:
+
+**Screen 1: My Tasks (Task List)**
+- Header with Equipment filter, Date picker, and Search
+- Quick filter tabs: Today, Overdue, Recurring, Adhoc
+- Task cards showing: Title, Equipment, Task Type, Priority, Due Time, Recurring indicator, Source
+- Stats summary: Total, In Progress, Overdue, Due Today
+- Sorting: Overdue → High Priority → Due Soon → Others
+- Empty state with "View upcoming tasks" button
+
+**Screen 2: Task Execution Dialog**
+- Context block: Asset/Location, Last completed, Task type, Frequency
+- Dynamic form renderer supporting: Checklist, Numeric (with thresholds), Text, Photo upload, Multiple choice
+- Issue toggle (Yes/No) with auto-detect from threshold violations
+- Decision prompt when Issue=YES: Create follow-up task / Log observation / Ignore
+
+**Backend API:**
+- `GET /api/my-tasks` - Filtered task list with serialization
+- `GET /api/my-tasks/{id}` - Task details with form fields
+- `POST /api/my-tasks/{id}/start` - Mark task as in-progress
+
+**Files Created:**
+- `/app/frontend/src/pages/MyTasksPage.js` - Full task list and execution UI
+- `/app/backend/routes/my_tasks.py` - My Tasks API endpoints
+
+**Files Modified:**
+- `/app/frontend/src/App.js` - Added route `/my-tasks`
+- `/app/frontend/src/components/Layout.js` - Added "My Tasks" to main navigation
+- `/app/backend/routes/__init__.py` - Registered my_tasks_router
+- `/app/frontend/src/contexts/LanguageContext.js` - Added EN/NL translations for myTasks
+
+### Mobile Dashboard Fix
+Fixed "Reliability Performance" tabs overlapping on mobile:
+- Changed tabs from `grid grid-cols-3` to `inline-flex` with scroll support
+- Shortened "Reliability Performance" to "Reliability" on mobile
+- Made snowflake radar chart responsive with proper viewBox scaling
+
 ### New Feature: "New Failure Mode" Option in Chat
 When creating observations via chat, users can now specify custom failure modes:
 - Added clickable "New Failure Mode" button with green styling when failure mode suggestions are shown
@@ -84,9 +122,15 @@ Extracted large components into modular files:
 
 ## Prioritized Backlog
 
-### P1 (High Priority)
+### P0 (Critical)
 - Image analysis for damage detection
 - Report generation (PowerPoint/PDF) for Causal Investigations
+
+### P1 (High Priority)
+- My Tasks: Offline support with local storage
+- My Tasks: Form template integration for task execution
+- My Tasks: Photo upload during task execution
+- Recurring task auto-generation on completion
 
 ### P2 (Medium Priority)
 - Export equipment hierarchy to PDF/Excel

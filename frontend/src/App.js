@@ -15,6 +15,7 @@ import EquipmentManagerPage from "./pages/EquipmentManagerPage";
 import CausalEnginePage from "./pages/CausalEnginePage";
 import ActionsPage from "./pages/ActionsPage";
 import TaskSchedulerPage from "./pages/TaskSchedulerPage";
+import MyTasksPage from "./pages/MyTasksPage";
 import AnalyticsDashboardPage from "./pages/AnalyticsDashboardPage";
 import SettingsUserManagementPage from "./pages/SettingsUserManagementPage";
 import FormsPage from "./pages/FormsPage";
@@ -151,6 +152,7 @@ function App() {
                 <Route path="equipment-manager" element={<EquipmentManagerPage />} />
                 <Route path="causal-engine" element={<CausalEnginePage />} />
                 <Route path="tasks" element={<TaskSchedulerPage />} />
+                <Route path="my-tasks" element={<MyTasksPage />} />
                 <Route path="analytics" element={<AnalyticsDashboardPage />} />
                 <Route path="forms" element={<FormsPage />} />
                 <Route path="decision-engine" element={<DecisionEnginePage />} />

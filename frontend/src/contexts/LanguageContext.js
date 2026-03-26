@@ -8,6 +8,7 @@ const en = {
   nav: {
     dashboard: "Dashboard",
     observations: "Observations",
+    myTasks: "My Tasks",
     causalEngine: "Causal Engine",
     actions: "Actions",
     library: "Library",
@@ -917,6 +918,7 @@ const nl = {
   nav: {
     dashboard: "Dashboard",
     observations: "Observaties",
+    myTasks: "Mijn Taken",
     causalEngine: "Oorzaakanalyse",
     actions: "Acties",
     library: "Bibliotheek",
