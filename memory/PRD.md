@@ -118,6 +118,35 @@ Enhanced the My Tasks page to provide optimal mobile experience:
 - Photo: Larger camera icon, "Take photo" prompt on mobile
 - Issue Toggle: Full-width Yes/No buttons with icons
 
+### Feature: AI-Powered Image Analysis for Damage Detection
+Implemented AI vision analysis for equipment photos:
+
+**Backend:**
+- New service: `/app/backend/services/image_analysis_service.py`
+- Uses OpenAI GPT Vision via emergentintegrations
+- Structured JSON response with damage findings
+
+**API Endpoints:**
+- `POST /api/image-analysis/analyze` - Analyze single image
+- `POST /api/image-analysis/analyze-multiple` - Analyze up to 5 images
+- `GET /api/image-analysis/health` - Service health check
+
+**Analysis Capabilities:**
+- Detects: corrosion, cracks, wear, dents, leaks, discoloration, misalignment
+- Returns: severity (none/minor/moderate/severe/critical), confidence level
+- Provides: findings list, recommended actions, immediate attention flag
+
+**Frontend Integration:**
+- Added "AI Analyze" button to photo fields in task execution
+- Shows analysis results with color-coded severity
+- Auto-sets "Issue Found" flag when damage detected
+- Toast notifications for analysis results
+
+**Files Created:**
+- `/app/backend/services/image_analysis_service.py`
+- `/app/backend/routes/image_analysis.py`
+- `/app/frontend/src/lib/api.js` (added imageAnalysisAPI)
+
 **Files Created:**
 - `/app/backend/models/feedback_models.py` - Pydantic models for feedback
 - `/app/backend/services/feedback_service.py` - Feedback service layer

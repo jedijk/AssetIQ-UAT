@@ -34,6 +34,8 @@ import {
   Users,
   Trash2,
   ChevronUp,
+  Sparkles,
+  ScanEye,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -73,6 +75,7 @@ import {
 } from "../components/ui/popover";
 import { cn } from "../lib/utils";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { imageAnalysisAPI } from "../lib/api";
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -346,6 +349,8 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
   const [showIssuePrompt, setShowIssuePrompt] = useState(false);
   const [issueAction, setIssueAction] = useState(null);
   const [expandedContext, setExpandedContext] = useState(!isMobile);
+  const [imageAnalysis, setImageAnalysis] = useState({}); // Store analysis results per field
+  const [analyzingImage, setAnalyzingImage] = useState(null); // Currently analyzing field id
   
   // Reset form when task changes
   useEffect(() => {
@@ -357,6 +362,8 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
       setValidationErrors({});
       setShowIssuePrompt(false);
       setIssueAction(null);
+      setImageAnalysis({});
+      setAnalyzingImage(null);
     }
   }, [task?.id]);
   
@@ -661,26 +668,184 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
         
       case "photo":
       case "file":
+        const analysis = imageAnalysis[field.id];
+        const isAnalyzing = analyzingImage === field.id;
+        
+        const handleAnalyzeImage = async () => {
+          if (!value) return;
+          
+          setAnalyzingImage(field.id);
+          try {
+            const result = await imageAnalysisAPI.analyze(
+              value,
+              `Inspecting ${task?.equipment_name || 'equipment'} - ${field.label}`,
+              task?.equipment_type
+            );
+            setImageAnalysis(prev => ({ ...prev, [field.id]: result }));
+            
+            // If damage detected, automatically set issue found
+            if (result.damage_detected) {
+              setIssueFound(true);
+              if (result.severity === 'severe' || result.severity === 'critical') {
+                toast.warning(`${result.severity.toUpperCase()} damage detected!`, {
+                  description: result.overall_assessment
+                });
+              } else {
+                toast.info("Potential issue detected", {
+                  description: result.overall_assessment
+                });
+              }
+            } else {
+              toast.success("No damage detected");
+            }
+          } catch (error) {
+            toast.error("Failed to analyze image");
+            console.error("Image analysis error:", error);
+          } finally {
+            setAnalyzingImage(null);
+          }
+        };
+        
         return (
           <div key={field.id} className="space-y-2">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
             <div className={cn(
-              "border-2 border-dashed border-slate-300 rounded-xl text-center",
+              "border-2 border-dashed rounded-xl text-center",
+              analysis?.damage_detected ? "border-red-300 bg-red-50" : "border-slate-300",
               isMobile ? "p-6" : "p-4"
             )}>
               {value ? (
                 <div className="space-y-3">
                   <img src={value} alt="Uploaded" className="max-h-40 mx-auto rounded-lg" />
-                  <Button
-                    variant="outline"
-                    size={isMobile ? "lg" : "sm"}
-                    onClick={() => handleFieldChange(field.id, null)}
-                    className={cn(isMobile && "h-12 text-base")}
-                  >
-                    <X className="w-4 h-4 mr-2" /> Remove
-                  </Button>
+                  <div className={cn("flex gap-2 justify-center", isMobile && "flex-col")}>
+                    <Button
+                      variant="outline"
+                      size={isMobile ? "lg" : "sm"}
+                      onClick={() => {
+                        handleFieldChange(field.id, null);
+                        setImageAnalysis(prev => {
+                          const updated = { ...prev };
+                          delete updated[field.id];
+                          return updated;
+                        });
+                      }}
+                      className={cn(isMobile && "h-12 text-base")}
+                    >
+                      <X className="w-4 h-4 mr-2" /> Remove
+                    </Button>
+                    <Button
+                      variant={analysis ? "outline" : "default"}
+                      size={isMobile ? "lg" : "sm"}
+                      onClick={handleAnalyzeImage}
+                      disabled={isAnalyzing}
+                      className={cn(
+                        isMobile && "h-12 text-base",
+                        !analysis && "bg-purple-600 hover:bg-purple-700"
+                      )}
+                      data-testid={`analyze-image-${field.id}`}
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          {analysis ? "Re-analyze" : "AI Analyze"}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {/* Analysis Results */}
+                  {analysis && (
+                    <div className={cn(
+                      "mt-4 p-3 rounded-lg text-left",
+                      analysis.damage_detected 
+                        ? analysis.severity === 'critical' || analysis.severity === 'severe'
+                          ? "bg-red-100 border border-red-300"
+                          : "bg-amber-100 border border-amber-300"
+                        : "bg-green-100 border border-green-300"
+                    )}>
+                      <div className="flex items-center gap-2 mb-2">
+                        {analysis.damage_detected ? (
+                          <AlertTriangle className={cn(
+                            "w-5 h-5",
+                            analysis.severity === 'critical' || analysis.severity === 'severe'
+                              ? "text-red-600"
+                              : "text-amber-600"
+                          )} />
+                        ) : (
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        )}
+                        <span className={cn(
+                          "font-semibold",
+                          isMobile ? "text-base" : "text-sm"
+                        )}>
+                          {analysis.damage_detected 
+                            ? `Damage Detected (${analysis.severity})`
+                            : "No Damage Detected"
+                          }
+                        </span>
+                        <Badge className={cn(
+                          "ml-auto",
+                          analysis.confidence === 'high' ? "bg-blue-100 text-blue-700" :
+                          analysis.confidence === 'medium' ? "bg-slate-100 text-slate-700" :
+                          "bg-slate-50 text-slate-500"
+                        )}>
+                          {analysis.confidence} confidence
+                        </Badge>
+                      </div>
+                      
+                      <p className={cn("text-slate-700", isMobile ? "text-sm" : "text-xs")}>
+                        {analysis.overall_assessment}
+                      </p>
+                      
+                      {analysis.findings?.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <p className={cn("font-medium text-slate-800", isMobile ? "text-sm" : "text-xs")}>
+                            Findings:
+                          </p>
+                          {analysis.findings.map((finding, idx) => (
+                            <div key={idx} className={cn(
+                              "flex items-start gap-2 pl-2",
+                              isMobile ? "text-sm" : "text-xs"
+                            )}>
+                              <span className="text-slate-400">•</span>
+                              <span>
+                                <strong>{finding.type}</strong>
+                                {finding.location && ` at ${finding.location}`}
+                                : {finding.description}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {analysis.recommended_actions?.length > 0 && (
+                        <div className="mt-2">
+                          <p className={cn("font-medium text-slate-800", isMobile ? "text-sm" : "text-xs")}>
+                            Recommended Actions:
+                          </p>
+                          <ul className={cn("list-disc pl-5 text-slate-600", isMobile ? "text-sm" : "text-xs")}>
+                            {analysis.recommended_actions.map((action, idx) => (
+                              <li key={idx}>{action}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {analysis.requires_immediate_attention && (
+                        <div className="mt-2 flex items-center gap-2 text-red-700 font-semibold">
+                          <AlertCircle className="w-4 h-4" />
+                          <span className={isMobile ? "text-sm" : "text-xs"}>Requires Immediate Attention</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <label className="cursor-pointer block">
