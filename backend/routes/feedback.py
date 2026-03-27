@@ -9,6 +9,7 @@ from auth import get_current_user
 from models.feedback_models import (
     FeedbackCreate,
     FeedbackUpdate,
+    FeedbackUserUpdate,
     FeedbackResponse,
     FeedbackListResponse,
 )
@@ -19,6 +20,8 @@ from services.feedback_service import (
     get_all_feedback,
     update_feedback_status,
     delete_feedback,
+    update_user_feedback,
+    delete_user_feedback,
 )
 from storage import put_object, MIME_TYPES
 
@@ -33,13 +36,13 @@ async def submit_feedback(
     """Submit new feedback."""
     result = await create_feedback(
         user_id=current_user["id"],
+        user_name=current_user.get("name", "Unknown"),
         feedback_type=feedback.type,
         message=feedback.message,
         severity=feedback.severity,
         screenshot_url=feedback.screenshot_url,
         module=feedback.module,
     )
-    result["user_name"] = current_user.get("name")
     return result
 
 
@@ -84,8 +87,40 @@ async def get_feedback_detail(
     item = await get_feedback_by_id(feedback_id, user_id=current_user["id"])
     if not item:
         raise HTTPException(status_code=404, detail="Feedback not found")
-    item["user_name"] = current_user.get("name")
     return item
+
+
+@router.put("/{feedback_id}", response_model=FeedbackResponse)
+async def update_my_feedback(
+    feedback_id: str,
+    update: FeedbackUserUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update user's own feedback (message, type, severity, status)."""
+    result = await update_user_feedback(
+        feedback_id=feedback_id,
+        user_id=current_user["id"],
+        message=update.message,
+        feedback_type=update.type,
+        severity=update.severity,
+        screenshot_url=update.screenshot_url,
+        status=update.status,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Feedback not found or not owned by user")
+    return result
+
+
+@router.delete("/{feedback_id}")
+async def delete_my_feedback(
+    feedback_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete user's own feedback."""
+    success = await delete_user_feedback(feedback_id, current_user["id"])
+    if not success:
+        raise HTTPException(status_code=404, detail="Feedback not found or not owned by user")
+    return {"status": "deleted", "id": feedback_id}
 
 
 # ===== Admin Endpoints =====

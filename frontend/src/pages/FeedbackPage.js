@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { useLanguage } from "../contexts/LanguageContext";
 import { feedbackAPI } from "../lib/api";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import {
@@ -15,6 +14,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "../components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import {
   Sheet,
   SheetContent,
@@ -30,6 +39,13 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import {
   AlertCircle,
   Lightbulb,
   MessageCircle,
@@ -40,9 +56,11 @@ import {
   CheckCircle2,
   Circle,
   Loader2,
-  Upload,
-  Image as ImageIcon,
   MessageSquare,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  User,
 } from "lucide-react";
 
 // Format relative time (e.g., "2d ago")
@@ -100,8 +118,11 @@ const FeedbackPage = () => {
 
   // State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingFeedback, setEditingFeedback] = useState(null);
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   
   // Form state
   const [feedbackType, setFeedbackType] = useState("general");
@@ -120,7 +141,7 @@ const FeedbackPage = () => {
   // Mutation: Submit feedback
   const submitMutation = useMutation({
     mutationFn: async (data) => {
-      let screenshotUrl = null;
+      let screenshotUrl = data.screenshot_url || null;
       
       // Upload screenshot first if present
       if (screenshotFile) {
@@ -152,6 +173,71 @@ const FeedbackPage = () => {
     },
   });
 
+  // Mutation: Update feedback
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }) => {
+      let screenshotUrl = data.screenshot_url;
+      
+      // Upload new screenshot if present
+      if (screenshotFile) {
+        setIsUploading(true);
+        try {
+          const uploadResult = await feedbackAPI.uploadScreenshot(screenshotFile);
+          screenshotUrl = uploadResult.url;
+        } catch (error) {
+          throw new Error("Failed to upload screenshot");
+        }
+        setIsUploading(false);
+      }
+      
+      return feedbackAPI.update(id, {
+        ...data,
+        screenshot_url: screenshotUrl,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["my-feedback"]);
+      toast.success(t("feedback.updated") || "Feedback updated successfully");
+      resetForm();
+      setIsModalOpen(false);
+      setIsEditMode(false);
+      setEditingFeedback(null);
+      setIsSheetOpen(false);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update feedback");
+      setIsUploading(false);
+    },
+  });
+
+  // Mutation: Delete feedback
+  const deleteMutation = useMutation({
+    mutationFn: (id) => feedbackAPI.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["my-feedback"]);
+      toast.success(t("feedback.deleted") || "Feedback deleted");
+      setDeleteConfirmId(null);
+      setIsSheetOpen(false);
+      setSelectedFeedback(null);
+    },
+    onError: () => {
+      toast.error("Failed to delete feedback");
+    },
+  });
+
+  // Mutation: Update status
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }) => feedbackAPI.update(id, { status }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["my-feedback"]);
+      setSelectedFeedback(data);
+      toast.success(t("feedback.statusUpdated") || "Status updated");
+    },
+    onError: () => {
+      toast.error("Failed to update status");
+    },
+  });
+
   const resetForm = () => {
     setFeedbackType("general");
     setMessage("");
@@ -172,24 +258,54 @@ const FeedbackPage = () => {
       severity: feedbackType === "issue" ? severity || "medium" : null,
     };
 
-    submitMutation.mutate(data);
+    if (isEditMode && editingFeedback) {
+      updateMutation.mutate({ id: editingFeedback.id, data });
+    } else {
+      submitMutation.mutate(data);
+    }
+  };
+
+  const handleEdit = (feedback, e) => {
+    if (e) e.stopPropagation();
+    setEditingFeedback(feedback);
+    setFeedbackType(feedback.type);
+    setMessage(feedback.message);
+    setSeverity(feedback.severity || "");
+    setScreenshotPreview(feedback.screenshot_url);
+    setIsEditMode(true);
+    setIsModalOpen(true);
+    setIsSheetOpen(false);
+  };
+
+  const handleDelete = (id, e) => {
+    if (e) e.stopPropagation();
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmId) {
+      deleteMutation.mutate(deleteConfirmId);
+    }
+  };
+
+  const handleStatusChange = (status) => {
+    if (selectedFeedback) {
+      updateStatusMutation.mutate({ id: selectedFeedback.id, status });
+    }
   };
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         toast.error("Please select an image file");
         return;
       }
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         toast.error("Image must be less than 5MB");
         return;
       }
       setScreenshotFile(file);
-      // Create preview
       const reader = new FileReader();
       reader.onload = (e) => setScreenshotPreview(e.target.result);
       reader.readAsDataURL(file);
@@ -209,6 +325,13 @@ const FeedbackPage = () => {
     setIsSheetOpen(true);
   };
 
+  const openNewFeedbackModal = () => {
+    resetForm();
+    setIsEditMode(false);
+    setEditingFeedback(null);
+    setIsModalOpen(true);
+  };
+
   const feedbackItems = feedbackData?.items || [];
 
   return (
@@ -226,7 +349,7 @@ const FeedbackPage = () => {
           </div>
           {feedbackItems.length > 0 && (
             <Button
-              onClick={() => setIsModalOpen(true)}
+              onClick={openNewFeedbackModal}
               className="bg-blue-600 hover:bg-blue-700"
               data-testid="add-feedback-btn"
             >
@@ -256,7 +379,7 @@ const FeedbackPage = () => {
               {t("feedback.noFeedbackDesc") || "Share your thoughts, report issues, or suggest improvements."}
             </p>
             <Button
-              onClick={() => setIsModalOpen(true)}
+              onClick={openNewFeedbackModal}
               className="bg-blue-600 hover:bg-blue-700"
               data-testid="send-feedback-btn"
             >
@@ -276,26 +399,36 @@ const FeedbackPage = () => {
               return (
                 <div
                   key={item.id}
-                  onClick={() => openFeedbackDetail(item)}
-                  className="bg-white rounded-xl border border-slate-200 p-4 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all duration-150"
+                  className="bg-white rounded-xl border border-slate-200 p-4 hover:border-slate-300 hover:shadow-sm transition-all duration-150"
                   data-testid={`feedback-item-${item.id}`}
                 >
                   <div className="flex items-start gap-3">
                     {/* Type Icon */}
-                    <div className={`mt-0.5 ${typeColors[item.type]}`}>
+                    <div 
+                      className={`mt-0.5 ${typeColors[item.type]} cursor-pointer`}
+                      onClick={() => openFeedbackDetail(item)}
+                    >
                       <TypeIcon className="w-5 h-5" />
                     </div>
                     
                     {/* Content */}
-                    <div className="flex-1 min-w-0">
+                    <div 
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => openFeedbackDetail(item)}
+                    >
                       <p className="text-slate-800 line-clamp-2 text-sm">
                         {item.message}
                       </p>
-                      <div className="flex items-center gap-3 mt-2">
+                      <div className="flex items-center gap-3 mt-2 flex-wrap">
                         {/* Status indicator */}
                         <div className="flex items-center gap-1.5">
                           <span className={`w-2 h-2 rounded-full ${statusCfg.color}`} />
                           <span className="text-xs text-slate-500">{statusCfg.label}</span>
+                        </div>
+                        {/* Submitted by */}
+                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                          <User className="w-3 h-3" />
+                          <span>{item.user_name || "Unknown"}</span>
                         </div>
                         {/* Timestamp */}
                         <span className="text-xs text-slate-400">
@@ -303,6 +436,34 @@ const FeedbackPage = () => {
                         </span>
                       </div>
                     </div>
+
+                    {/* Actions Menu */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                          data-testid={`feedback-menu-${item.id}`}
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => handleEdit(item, e)}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          {t("common.edit") || "Edit"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={(e) => handleDelete(item.id, e)}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          {t("common.delete") || "Delete"}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               );
@@ -311,13 +472,28 @@ const FeedbackPage = () => {
         )}
       </div>
 
-      {/* Submit Feedback Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      {/* Submit/Edit Feedback Modal */}
+      <Dialog open={isModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          resetForm();
+          setIsEditMode(false);
+          setEditingFeedback(null);
+        }
+        setIsModalOpen(open);
+      }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t("feedback.newFeedback") || "Send Feedback"}</DialogTitle>
+            <DialogTitle>
+              {isEditMode 
+                ? (t("feedback.editFeedback") || "Edit Feedback")
+                : (t("feedback.newFeedback") || "Send Feedback")
+              }
+            </DialogTitle>
             <DialogDescription>
-              {t("feedback.newFeedbackDesc") || "Share your thoughts, report an issue, or suggest an improvement."}
+              {isEditMode
+                ? (t("feedback.editFeedbackDesc") || "Update your feedback details.")
+                : (t("feedback.newFeedbackDesc") || "Share your thoughts, report an issue, or suggest an improvement.")
+              }
             </DialogDescription>
           </DialogHeader>
 
@@ -429,6 +605,8 @@ const FeedbackPage = () => {
               variant="outline"
               onClick={() => {
                 resetForm();
+                setIsEditMode(false);
+                setEditingFeedback(null);
                 setIsModalOpen(false);
               }}
             >
@@ -436,18 +614,45 @@ const FeedbackPage = () => {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitMutation.isPending || isUploading}
+              disabled={submitMutation.isPending || updateMutation.isPending || isUploading}
               className="bg-blue-600 hover:bg-blue-700"
               data-testid="submit-feedback-btn"
             >
-              {(submitMutation.isPending || isUploading) && (
+              {(submitMutation.isPending || updateMutation.isPending || isUploading) && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
-              {t("feedback.submit") || "Submit"}
+              {isEditMode 
+                ? (t("common.save") || "Save")
+                : (t("feedback.submit") || "Submit")
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("feedback.deleteConfirm") || "Delete Feedback?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("feedback.deleteConfirmDesc") || "This action cannot be undone. This will permanently delete your feedback."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel") || "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
+              {t("common.delete") || "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Feedback Detail Sheet (Bottom Sheet) */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -455,46 +660,102 @@ const FeedbackPage = () => {
           {selectedFeedback && (
             <>
               <SheetHeader className="pb-4 border-b border-slate-200">
-                <div className="flex items-center gap-3">
-                  {/* Type Icon */}
-                  {(() => {
-                    const TypeIcon = typeIcons[selectedFeedback.type] || MessageCircle;
-                    return (
-                      <div className={`${typeColors[selectedFeedback.type]} p-2 bg-slate-100 rounded-lg`}>
-                        <TypeIcon className="w-5 h-5" />
-                      </div>
-                    );
-                  })()}
-                  <div>
-                    <SheetTitle className="text-left capitalize">
-                      {selectedFeedback.type} Feedback
-                    </SheetTitle>
-                    <SheetDescription className="text-left">
-                      {formatRelativeTime(selectedFeedback.timestamp)}
-                    </SheetDescription>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {/* Type Icon */}
+                    {(() => {
+                      const TypeIcon = typeIcons[selectedFeedback.type] || MessageCircle;
+                      return (
+                        <div className={`${typeColors[selectedFeedback.type]} p-2 bg-slate-100 rounded-lg`}>
+                          <TypeIcon className="w-5 h-5" />
+                        </div>
+                      );
+                    })()}
+                    <div>
+                      <SheetTitle className="text-left capitalize">
+                        {selectedFeedback.type} Feedback
+                      </SheetTitle>
+                      <SheetDescription className="text-left">
+                        {formatRelativeTime(selectedFeedback.timestamp)}
+                      </SheetDescription>
+                    </div>
+                  </div>
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(selectedFeedback)}
+                      data-testid="sheet-edit-btn"
+                    >
+                      <Pencil className="w-4 h-4 mr-1" />
+                      {t("common.edit") || "Edit"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(selectedFeedback.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      data-testid="sheet-delete-btn"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      {t("common.delete") || "Delete"}
+                    </Button>
                   </div>
                 </div>
               </SheetHeader>
 
               <div className="py-6 space-y-6 overflow-y-auto">
-                {/* Status Badge */}
+                {/* Submitted by */}
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-slate-600">Status:</span>
-                  {(() => {
-                    const statusCfg = statusConfig[selectedFeedback.status] || statusConfig.new;
-                    return (
-                      <Badge variant="outline" className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${statusCfg.color}`} />
-                        {statusCfg.label}
-                      </Badge>
-                    );
-                  })()}
+                  <span className="text-sm font-medium text-slate-600">{t("feedback.submittedBy") || "Submitted by"}:</span>
+                  <div className="flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm text-slate-800">{selectedFeedback.user_name || "Unknown"}</span>
+                  </div>
+                </div>
+
+                {/* Status with change option */}
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-slate-600">{t("common.status") || "Status"}:</span>
+                  <Select 
+                    value={selectedFeedback.status} 
+                    onValueChange={handleStatusChange}
+                  >
+                    <SelectTrigger className="w-40" data-testid="status-select">
+                      <SelectValue>
+                        {(() => {
+                          const statusCfg = statusConfig[selectedFeedback.status] || statusConfig.new;
+                          return (
+                            <div className="flex items-center gap-1.5">
+                              <span className={`w-2 h-2 rounded-full ${statusCfg.color}`} />
+                              <span>{statusCfg.label}</span>
+                            </div>
+                          );
+                        })()}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-slate-400" />
+                          New
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="resolved">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                          Resolved
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Severity (if issue) */}
                 {selectedFeedback.type === "issue" && selectedFeedback.severity && (
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-slate-600">Severity:</span>
+                    <span className="text-sm font-medium text-slate-600">{t("feedback.severity") || "Severity"}:</span>
                     <Badge className={severityColors[selectedFeedback.severity]}>
                       {selectedFeedback.severity.charAt(0).toUpperCase() + selectedFeedback.severity.slice(1)}
                     </Badge>
@@ -503,7 +764,7 @@ const FeedbackPage = () => {
 
                 {/* Full Message */}
                 <div>
-                  <h4 className="text-sm font-medium text-slate-600 mb-2">Message</h4>
+                  <h4 className="text-sm font-medium text-slate-600 mb-2">{t("feedback.message") || "Message"}</h4>
                   <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">
                     {selectedFeedback.message}
                   </p>
@@ -512,7 +773,7 @@ const FeedbackPage = () => {
                 {/* Screenshot */}
                 {selectedFeedback.screenshot_url && (
                   <div>
-                    <h4 className="text-sm font-medium text-slate-600 mb-2">Screenshot</h4>
+                    <h4 className="text-sm font-medium text-slate-600 mb-2">{t("feedback.screenshot") || "Screenshot"}</h4>
                     <img
                       src={selectedFeedback.screenshot_url}
                       alt="Feedback screenshot"
@@ -524,7 +785,7 @@ const FeedbackPage = () => {
                 {/* System Response */}
                 {selectedFeedback.user_visible_response && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-blue-800 mb-2">Response</h4>
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">{t("feedback.response") || "Response"}</h4>
                     <p className="text-blue-700 text-sm leading-relaxed">
                       {selectedFeedback.user_visible_response}
                     </p>

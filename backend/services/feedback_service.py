@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 async def create_feedback(
     user_id: str,
+    user_name: str,
     feedback_type: str,
     message: str,
     severity: Optional[str] = None,
@@ -23,6 +24,7 @@ async def create_feedback(
     feedback_doc = {
         "id": feedback_id,
         "user_id": user_id,
+        "user_name": user_name,
         "type": feedback_type,
         "message": message,
         "status": "new",
@@ -33,7 +35,7 @@ async def create_feedback(
         "module": module,
     }
     await db.feedback.insert_one(feedback_doc)
-    logger.info(f"Feedback created: {feedback_id} by user {user_id}")
+    logger.info(f"Feedback created: {feedback_id} by user {user_name} ({user_id})")
     return {k: v for k, v in feedback_doc.items() if k != "_id"}
 
 
@@ -111,5 +113,58 @@ async def delete_feedback(feedback_id: str) -> bool:
     result = await db.feedback.delete_one({"id": feedback_id})
     if result.deleted_count > 0:
         logger.info(f"Feedback {feedback_id} deleted")
+        return True
+    return False
+
+
+async def update_user_feedback(
+    feedback_id: str,
+    user_id: str,
+    message: Optional[str] = None,
+    feedback_type: Optional[str] = None,
+    severity: Optional[str] = None,
+    screenshot_url: Optional[str] = None,
+    status: Optional[str] = None
+) -> Optional[dict]:
+    """User: Update their own feedback."""
+    # First verify ownership
+    existing = await db.feedback.find_one({"id": feedback_id, "user_id": user_id})
+    if not existing:
+        return None
+    
+    update_fields = {}
+    if message is not None:
+        update_fields["message"] = message
+    if feedback_type is not None:
+        update_fields["type"] = feedback_type
+    if severity is not None:
+        update_fields["severity"] = severity
+    if screenshot_url is not None:
+        update_fields["screenshot_url"] = screenshot_url
+    if status is not None:
+        update_fields["status"] = status
+    
+    if not update_fields:
+        return {k: v for k, v in existing.items() if k != "_id"}
+    
+    update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.feedback.find_one_and_update(
+        {"id": feedback_id, "user_id": user_id},
+        {"$set": update_fields},
+        return_document=True
+    )
+    
+    if result:
+        result.pop("_id", None)
+        logger.info(f"Feedback {feedback_id} updated by user {user_id}: {list(update_fields.keys())}")
+    return result
+
+
+async def delete_user_feedback(feedback_id: str, user_id: str) -> bool:
+    """User: Delete their own feedback."""
+    result = await db.feedback.delete_one({"id": feedback_id, "user_id": user_id})
+    if result.deleted_count > 0:
+        logger.info(f"Feedback {feedback_id} deleted by user {user_id}")
         return True
     return False

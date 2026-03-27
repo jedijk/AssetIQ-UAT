@@ -21,6 +21,15 @@ class FeedbackUpdate(BaseModel):
     user_visible_response: Optional[str] = None
 
 
+class FeedbackUserUpdate(BaseModel):
+    """Request model for user to update their own feedback."""
+    type: Optional[Literal["issue", "improvement", "general"]] = None
+    message: Optional[str] = None
+    severity: Optional[Literal["low", "medium", "high", "critical"]] = None
+    screenshot_url: Optional[str] = None
+    status: Optional[Literal["new", "resolved"]] = None  # Users can only set to new or resolved
+
+
 class FeedbackResponse(BaseModel):
     """Response model for feedback items."""
     id: str
@@ -34,6 +43,7 @@ class FeedbackResponse(BaseModel):
     module: Optional[str] = None
     user_id: str
     user_name: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class FeedbackListResponse(BaseModel):

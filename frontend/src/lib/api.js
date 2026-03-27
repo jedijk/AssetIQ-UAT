@@ -692,6 +692,18 @@ export const feedbackAPI = {
     const response = await api.get(`/feedback/${feedbackId}`);
     return response.data;
   },
+  
+  // Update feedback
+  update: async (feedbackId, data) => {
+    const response = await api.put(`/feedback/${feedbackId}`, data);
+    return response.data;
+  },
+  
+  // Delete feedback
+  delete: async (feedbackId) => {
+    const response = await api.delete(`/feedback/${feedbackId}`);
+    return response.data;
+  },
 };
 
 export default api;
