@@ -1129,15 +1129,10 @@ const TaskSchedulerPage = () => {
                           {t("taskScheduler.every")} {plan.interval_value} {plan.interval_unit}
                         </div>
                       )}
-                      {plan.next_due_date ? (
+                      {!plan.is_adhoc && plan.next_due_date && (
                         <div className="flex items-center gap-2 text-slate-600">
                           <CalendarIcon className="w-4 h-4" />
                           {t("taskScheduler.next")}: {formatDate(plan.next_due_date)}
-                        </div>
-                      ) : plan.is_adhoc && (
-                        <div className="flex items-center gap-2 text-slate-500">
-                          <CalendarIcon className="w-4 h-4" />
-                          {t("taskScheduler.next")}: -
                         </div>
                       )}
                       {plan.form_template_id && (
