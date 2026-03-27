@@ -2,6 +2,7 @@
 Equipment Hierarchy routes.
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ import uuid
 import json
 import logging
 import base64
+import io
 from database import db, efm_service, EMERGENT_LLM_KEY
 from auth import get_current_user
 from services.threat_score_service import recalculate_threat_scores_for_asset
@@ -17,7 +19,7 @@ from iso14224_models import (
     get_valid_parent_level, get_valid_child_levels, is_valid_parent_child, normalize_level,
     EquipmentNodeCreate, EquipmentNodeUpdate, CriticalityAssignment, MoveNodeRequest,
     UnstructuredItemCreate, ParseEquipmentListRequest, AssignToHierarchyRequest,
-    detect_equipment_type, EquipmentTypeCreate, EquipmentTypeUpdate
+    detect_equipment_type, EquipmentTypeCreate, EquipmentTypeUpdate, ISO_LEVEL_LABELS
 )
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 logger = logging.getLogger(__name__)
@@ -170,6 +172,165 @@ async def get_equipment_nodes(
         {"_id": 0}
     ).sort("sort_order", 1).to_list(1000)
     return {"nodes": nodes}
+
+
+@router.get("/equipment-hierarchy/export")
+async def export_equipment_hierarchy_excel(
+    current_user: dict = Depends(get_current_user)
+):
+    """Export equipment hierarchy to an Excel file."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    
+    # Fetch all nodes
+    nodes = await db.equipment_nodes.find(
+        {"created_by": current_user["id"]},
+        {"_id": 0}
+    ).sort("sort_order", 1).to_list(5000)
+    
+    # Fetch equipment types for lookup
+    equipment_types = await db.custom_equipment_types.find(
+        {"created_by": current_user["id"]},
+        {"_id": 0}
+    ).to_list(100)
+    
+    # Merge with defaults
+    all_types = {t["id"]: t["name"] for t in EQUIPMENT_TYPES}
+    for t in equipment_types:
+        all_types[t["id"]] = t["name"]
+    
+    # Build parent lookup for path generation
+    node_lookup = {n["id"]: n for n in nodes}
+    
+    def get_path(node):
+        """Generate full path from root to node."""
+        path_parts = [node["name"]]
+        current = node
+        while current.get("parent_id") and current["parent_id"] in node_lookup:
+            current = node_lookup[current["parent_id"]]
+            path_parts.insert(0, current["name"])
+        return " > ".join(path_parts)
+    
+    def get_criticality_score(node):
+        """Calculate total criticality score."""
+        crit = node.get("criticality") or {}
+        return sum([
+            crit.get("safety", 0),
+            crit.get("production", 0),
+            crit.get("environmental", 0),
+            crit.get("reputation", 0)
+        ])
+    
+    # Create workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Equipment Hierarchy"
+    
+    # Define headers
+    headers = [
+        "ID", "Name", "Level", "Parent", "Full Path", "Equipment Type",
+        "Discipline", "Process Step", "Description",
+        "Safety", "Production", "Environmental", "Reputation", "Total Criticality",
+        "Created At"
+    ]
+    
+    # Styles
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="059669", end_color="059669", fill_type="solid")  # Green
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Level colors for visual hierarchy
+    level_colors = {
+        "installation": "E8F5E9",
+        "plant_unit": "C8E6C9",
+        "section_system": "A5D6A7",
+        "equipment_unit": "81C784",
+        "equipment": "66BB6A",
+        "subunit": "4CAF50",
+        "maintainable_item": "43A047"
+    }
+    
+    # Write headers
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = thin_border
+    
+    # Write data rows
+    for row_idx, node in enumerate(nodes, 2):
+        parent_name = ""
+        if node.get("parent_id") and node["parent_id"] in node_lookup:
+            parent_name = node_lookup[node["parent_id"]]["name"]
+        
+        equipment_type_name = ""
+        if node.get("equipment_type_id"):
+            equipment_type_name = all_types.get(node["equipment_type_id"], "")
+        
+        criticality = node.get("criticality") or {}
+        level_label = ISO_LEVEL_LABELS.get(ISOLevel(node["level"]), node["level"]) if node.get("level") else ""
+        
+        row_data = [
+            node.get("id", ""),
+            node.get("name", ""),
+            level_label,
+            parent_name,
+            get_path(node),
+            equipment_type_name,
+            (node.get("discipline") or "").replace("_", " ").title(),
+            node.get("process_step", ""),
+            node.get("description", ""),
+            criticality.get("safety", 0),
+            criticality.get("production", 0),
+            criticality.get("environmental", 0),
+            criticality.get("reputation", 0),
+            get_criticality_score(node),
+            node.get("created_at", "")[:10] if node.get("created_at") else ""
+        ]
+        
+        # Apply level-based coloring
+        level_color = level_colors.get(node.get("level"), "FFFFFF")
+        row_fill = PatternFill(start_color=level_color, end_color=level_color, fill_type="solid")
+        
+        for col, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_idx, column=col, value=value)
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+            # Apply level coloring to first 3 columns
+            if col <= 3:
+                cell.fill = row_fill
+    
+    # Adjust column widths
+    column_widths = [38, 25, 18, 20, 50, 20, 15, 20, 30, 8, 10, 12, 10, 14, 12]
+    for col, width in enumerate(column_widths, 1):
+        ws.column_dimensions[get_column_letter(col)].width = width
+    
+    # Freeze header row
+    ws.freeze_panes = "A2"
+    
+    # Save to buffer
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"equipment_hierarchy_{timestamp}.xlsx"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 
 @router.get("/equipment-hierarchy/nodes/{node_id}")
 async def get_equipment_node(

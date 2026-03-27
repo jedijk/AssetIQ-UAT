@@ -471,6 +471,9 @@ const en = {
     processStepPlaceholder: "e.g., Extrusion, Compounding, Mixing",
     processStepHint: "Inherited by child items",
     selectEquipment: "Select an equipment item",
+    exportExcel: "Export Excel",
+    exportSuccess: "Hierarchy exported successfully",
+    exportError: "Failed to export hierarchy",
   },
 
   // Hierarchy context menu
@@ -1520,6 +1523,9 @@ const nl = {
     processStepPlaceholder: "bijv., Extrusie, Compounding, Mengen",
     processStepHint: "Wordt overgenomen door onderliggende items",
     selectEquipment: "Selecteer een apparatuuritem",
+    exportExcel: "Exporteer Excel",
+    exportSuccess: "Hiërarchie succesvol geëxporteerd",
+    exportError: "Exporteren van hiërarchie mislukt",
   },
 
   // Hierarchy context menu

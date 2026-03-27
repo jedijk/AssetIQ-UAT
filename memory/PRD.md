@@ -222,6 +222,28 @@ Added downloadable Excel export for failure modes FMEA library.
 - `/app/frontend/src/pages/FailureModesPage.js` - Added export button and handler
 - `/app/frontend/src/contexts/LanguageContext.js` - Added export translations
 
+### Feature: Equipment Hierarchy Excel Export (Mar 27, 2026)
+Added downloadable Excel export for equipment hierarchy.
+
+**Backend:**
+- New endpoint: `GET /api/equipment-hierarchy/export`
+- Generates Excel file (.xlsx) with full equipment hierarchy
+- 15 columns: ID, Name, Level, Parent, Full Path, Equipment Type, Discipline, Process Step, Description, Safety, Production, Environmental, Reputation, Total Criticality, Created At
+- Level-based row coloring (green gradient) for visual hierarchy
+- Green header styling, borders, auto-width columns, frozen header row
+
+**Frontend:**
+- Added "Export Excel" button to Equipment Manager toolbar
+- Placed between "Import List" and "Add Installation" buttons
+- Shows download icon, disabled when no nodes exist
+- Loading state with "Exporting..." text
+- Success/error toast notifications
+
+**Files Modified:**
+- `/app/backend/routes/equipment.py` - Added export endpoint
+- `/app/frontend/src/pages/EquipmentManagerPage.js` - Added export button and handler
+- `/app/frontend/src/contexts/LanguageContext.js` - Added equipment export translations
+
 ### Feature: Process Step Mapping in Equipment Manager (Mar 27, 2026)
 Added Process Step mapping to equipment hierarchy nodes:
 

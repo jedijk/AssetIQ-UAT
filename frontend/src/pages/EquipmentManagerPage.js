@@ -9,6 +9,7 @@ import {
   ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
   Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, Move, ArrowRight, ArrowUp, ArrowDown,
+  Download,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -637,6 +638,39 @@ export default function EquipmentManagerPage() {
   const handleFileUpload = (e) => { const file = e.target.files?.[0]; if (file) { parseFileMutation.mutate(file); e.target.value = ""; } };
   const getNextLevel = level => { const normalizedLevel = normalizeLevel(level); const idx = LEVEL_ORDER.indexOf(normalizedLevel); return idx >= 0 && idx < LEVEL_ORDER.length - 1 ? LEVEL_ORDER[idx + 1] : null; };
   const handleAddChild = () => { if (selectedNode) { const next = getNextLevel(selectedNode.level); if (next) { setNewNode({ name: "", level: next, parent_id: selectedNode.id }); setIsCreateOpen(true); } else toast.error("Cannot add children to maintainable items"); } };
+  
+  // Export hierarchy to Excel
+  const [isExporting, setIsExporting] = useState(false);
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/equipment-hierarchy/export`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const contentDisposition = response.headers.get('content-disposition');
+      let filename = 'equipment_hierarchy.xlsx';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename=(.+)/);
+        if (match) filename = match[1].replace(/"/g, '');
+      }
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(t("equipment.exportSuccess") || "Hierarchy exported successfully");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error(t("equipment.exportError") || "Failed to export hierarchy");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   if (isLoading) return <div className="flex items-center justify-center h-[calc(100vh-64px)]"><div className="loading-dots"><span></span><span></span><span></span></div></div>;
 
@@ -682,6 +716,9 @@ export default function EquipmentManagerPage() {
             </span>
           )}
           <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
+          <Button onClick={handleExportExcel} size="sm" variant="outline" disabled={isExporting || nodes.length === 0} data-testid="export-excel-btn">
+            <Download className="w-4 h-4 mr-1" />{isExporting ? (t("common.exporting") || "Exporting...") : (t("equipment.exportExcel") || "Export Excel")}
+          </Button>
           <Button onClick={() => { setNewNode({ name: "", level: "installation", parent_id: null }); setIsCreateOpen(true); }} size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="add-installation-btn"><Plus className="w-4 h-4 mr-1" />{t("equipment.addInstallation")}</Button>
           {selectedNode && !movingNode && (
             <>
