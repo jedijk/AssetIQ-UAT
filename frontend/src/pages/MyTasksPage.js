@@ -857,7 +857,7 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
 const MyTasksPage = () => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
-  const [activeFilter, setActiveFilter] = useState("pending");
+  const [activeFilter, setActiveFilter] = useState("open");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
@@ -880,7 +880,7 @@ const MyTasksPage = () => {
     queryKey: ["my-tasks", activeFilter, selectedDate, selectedDiscipline],
     queryFn: () => myTasksAPI.getTasks({
       filter: activeFilter,
-      date: activeFilter === "pending" ? format(selectedDate, "yyyy-MM-dd") : undefined,
+      date: activeFilter === "open" ? format(selectedDate, "yyyy-MM-dd") : undefined,
       discipline: selectedDiscipline || undefined,
     }),
     refetchInterval: 30000, // Refresh every 30 seconds
@@ -1075,9 +1075,9 @@ const MyTasksPage = () => {
       {/* Quick Filter Tabs */}
       <Tabs value={activeFilter} onValueChange={setActiveFilter} className="mb-4">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="pending" className="flex items-center gap-1.5" data-testid="filter-pending">
+          <TabsTrigger value="open" className="flex items-center gap-1.5" data-testid="filter-open">
             <Clock className="w-4 h-4" />
-            <span className="hidden sm:inline">Pending</span>
+            <span className="hidden sm:inline">Open</span>
             {stats.today > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5">{stats.today}</Badge>
             )}
@@ -1116,7 +1116,7 @@ const MyTasksPage = () => {
         </div>
         <div className="bg-blue-50 rounded-lg p-2 text-center">
           <div className="text-lg font-bold text-blue-600">{stats.today}</div>
-          <div className="text-xs text-slate-500">Pending</div>
+          <div className="text-xs text-slate-500">Open</div>
         </div>
       </div>
       
@@ -1228,8 +1228,8 @@ const MyTasksPage = () => {
               <CheckCircle2 className="w-12 h-12 mx-auto text-green-400 mb-3" />
               <h3 className="text-lg font-medium text-slate-900 mb-1">No tasks for {activeFilter}</h3>
               <p className="text-slate-500 mb-4">You're all caught up!</p>
-              <Button variant="outline" onClick={() => setActiveFilter("pending")}>
-                View pending tasks
+              <Button variant="outline" onClick={() => setActiveFilter("open")}>
+                View open tasks
               </Button>
             </div>
           ) : (
