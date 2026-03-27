@@ -32,6 +32,7 @@ import {
   Target,
   Eye,
   Users,
+  Trash2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -145,6 +146,15 @@ const myTasksAPI = {
       return response.json();
     }
   },
+  
+  deleteTask: async (taskId) => {
+    const response = await fetch(`${API_BASE_URL}/api/task-instances/${taskId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    if (!response.ok) throw new Error("Failed to delete task");
+    return response.json();
+  },
 };
 
 // Priority colors
@@ -175,10 +185,12 @@ const sourceBadges = {
 };
 
 // Task Card Component
-const TaskCard = ({ task, onOpen, onQuickComplete }) => {
+const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
   const isOverdue = task.status === "overdue" || (task.due_date && isBefore(parseISO(task.due_date), startOfDay(new Date())));
   const isDueToday = task.due_date && isToday(parseISO(task.due_date));
   const isAction = task.source_type === "action";
+  const isTask = task.source_type === "task";
+  const canDelete = isTask && task.status === "in_progress";
   const TypeIcon = isAction 
     ? (task.action_type === "PM" ? Wrench : task.action_type === "PDM" ? Target : AlertTriangle)
     : (taskTypeIcons[task.mitigation_strategy] || ClipboardList);
@@ -288,6 +300,22 @@ const TaskCard = ({ task, onOpen, onQuickComplete }) => {
               data-testid={`quick-complete-${task.id}`}
             >
               <Check className="w-4 h-4" />
+            </Button>
+          )}
+          
+          {/* Delete Button for in-progress tasks */}
+          {canDelete && onDelete && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(task);
+              }}
+              data-testid={`delete-task-${task.id}`}
+            >
+              <Trash2 className="w-4 h-4" />
             </Button>
           )}
         </div>
@@ -934,6 +962,30 @@ const MyTasksPage = () => {
     },
   });
   
+  // Delete task state and mutation
+  const [deleteTaskId, setDeleteTaskId] = useState(null);
+  const [deleteTaskName, setDeleteTaskName] = useState("");
+  
+  const deleteMutation = useMutation({
+    mutationFn: (taskId) => myTasksAPI.deleteTask(taskId),
+    onSuccess: () => {
+      toast.success("Task deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task-instances"] });
+      setDeleteTaskId(null);
+      setDeleteTaskName("");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete task");
+    },
+  });
+  
+  // Handle delete task
+  const handleDeleteTask = (task) => {
+    setDeleteTaskId(task.id);
+    setDeleteTaskName(task.title);
+  };
+  
   // Handle task open
   const handleOpenTask = async (task) => {
     setSelectedTask(task);
@@ -1239,6 +1291,7 @@ const MyTasksPage = () => {
                 task={task}
                 onOpen={handleOpenTask}
                 onQuickComplete={handleQuickComplete}
+                onDelete={handleDeleteTask}
               />
             ))
           )
@@ -1255,6 +1308,44 @@ const MyTasksPage = () => {
         }}
         onComplete={handleCompleteTask}
       />
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTaskId} onOpenChange={(open) => !open && setDeleteTaskId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Task</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deleteTaskName}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteTaskId(null)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => deleteMutation.mutate(deleteTaskId)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
