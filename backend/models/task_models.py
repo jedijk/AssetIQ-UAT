@@ -28,6 +28,7 @@ class FrequencyType(str, Enum):
     TIME_BASED = "time_based"       # Fixed intervals (days, weeks, months)
     USAGE_BASED = "usage_based"     # Based on operating hours/cycles
     CONDITION_BASED = "condition_based"  # Triggered by thresholds/observations
+    ADHOC = "adhoc"                 # No recurring schedule, triggered manually
 
 
 class FrequencyUnit(str, Enum):
@@ -175,6 +176,20 @@ class TaskInstanceCreate(BaseModel):
     assigned_team: Optional[str] = None
     assigned_user_id: Optional[str] = None
     notes: Optional[str] = None
+
+
+class AdhocTaskCreate(BaseModel):
+    """Create an ad-hoc task instance directly from a template (no plan required)."""
+    task_template_id: str
+    equipment_id: Optional[str] = None  # Optional equipment link
+    equipment_name: Optional[str] = None
+    scheduled_date: Optional[datetime] = None  # Defaults to now
+    due_date: Optional[datetime] = None  # Defaults to scheduled + 1 day
+    priority: TaskPriority = TaskPriority.MEDIUM
+    assigned_team: Optional[str] = None
+    assigned_user_id: Optional[str] = None
+    notes: Optional[str] = None
+
 
 
 class TaskInstanceUpdate(BaseModel):

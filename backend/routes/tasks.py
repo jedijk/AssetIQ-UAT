@@ -3,12 +3,14 @@ Tasks routes.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 from database import db, task_service
 from auth import get_current_user
 from models.task_models import (
     TaskTemplateCreate, TaskTemplateUpdate,
     TaskPlanCreate, TaskPlanUpdate,
-    TaskInstanceCreate, TaskInstanceUpdate, TaskExecutionSubmit
+    TaskInstanceCreate, TaskInstanceUpdate, TaskExecutionSubmit,
+    AdhocTaskCreate
 )
 
 router = APIRouter(tags=["Tasks"])
@@ -219,6 +221,17 @@ async def create_task_instance(
     """Manually create a task instance."""
     try:
         return await task_service.create_instance(data.model_dump(), current_user["id"])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/task-instances/adhoc")
+async def create_adhoc_task(
+    data: AdhocTaskCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create an ad-hoc task instance directly from a template (no plan/schedule required)."""
+    try:
+        return await task_service.create_adhoc_instance(data.model_dump(), current_user["id"])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

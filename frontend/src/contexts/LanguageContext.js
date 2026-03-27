@@ -134,6 +134,7 @@ const en = {
     add: "Add",
     notLinked: "Not linked",
     discipline: "Discipline",
+    optional: "Optional",
   },
   
   // Threats page
@@ -810,6 +811,18 @@ const en = {
     noForm: "No form",
     linkFormDesc: "Link a form to be filled during execution",
     optionalNotes: "Optional notes about this plan",
+    // Ad-hoc execution
+    executeNow: "Execute Now",
+    executeAdhocTitle: "Create Ad-hoc Execution",
+    executeAdhocDesc: "Create a one-time task execution from this template without a recurring schedule",
+    selectedTemplate: "Selected Template",
+    noEquipment: "No specific equipment",
+    priority: "Priority",
+    notes: "Notes",
+    adhocNotesPlaceholder: "Optional notes about this ad-hoc execution...",
+    createAdhocTask: "Create Execution",
+    adhocTaskCreated: "Ad-hoc execution created successfully",
+    template: "Template",
   },
 
   // Forms
@@ -1044,6 +1057,7 @@ const nl = {
     add: "Toevoegen",
     notLinked: "Niet gekoppeld",
     discipline: "Discipline",
+    optional: "Optioneel",
   },
   
   // Threats page
@@ -1721,6 +1735,18 @@ const nl = {
     noForm: "Geen formulier",
     linkFormDesc: "Koppel een formulier om in te vullen tijdens uitvoering",
     optionalNotes: "Optionele notities over dit plan",
+    // Ad-hoc execution
+    executeNow: "Nu uitvoeren",
+    executeAdhocTitle: "Ad-hoc uitvoering aanmaken",
+    executeAdhocDesc: "Maak een eenmalige taakuitvoering van dit sjabloon zonder terugkerend schema",
+    selectedTemplate: "Geselecteerd sjabloon",
+    noEquipment: "Geen specifieke apparatuur",
+    priority: "Prioriteit",
+    notes: "Notities",
+    adhocNotesPlaceholder: "Optionele notities over deze ad-hoc uitvoering...",
+    createAdhocTask: "Uitvoering aanmaken",
+    adhocTaskCreated: "Ad-hoc uitvoering succesvol aangemaakt",
+    template: "Sjabloon",
   },
 
   // Forms

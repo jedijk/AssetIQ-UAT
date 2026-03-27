@@ -389,6 +389,86 @@ class TaskService:
         
         return self._serialize_instance(doc)
     
+    async def create_adhoc_instance(self, data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
+        """Create an ad-hoc task instance directly from a template (no plan required)."""
+        now = datetime.now(timezone.utc)
+        
+        # Get template details
+        template = await self.get_template_by_id(data["task_template_id"])
+        if not template:
+            raise ValueError("Task template not found")
+        
+        # Set default dates
+        scheduled_date = data.get("scheduled_date") or now
+        if isinstance(scheduled_date, str):
+            scheduled_date = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
+        
+        due_date = data.get("due_date")
+        if due_date:
+            if isinstance(due_date, str):
+                due_date = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+        else:
+            # Default: 1 day after scheduled date
+            due_date = scheduled_date + timedelta(days=1)
+        
+        # Get equipment name if equipment_id provided
+        equipment_name = data.get("equipment_name")
+        if data.get("equipment_id") and not equipment_name:
+            equipment = await self.equipment.find_one({"id": data["equipment_id"]})
+            if equipment:
+                equipment_name = equipment.get("name", "Unknown")
+        
+        # Get form template if linked to template
+        form_fields = []
+        form_template_name = None
+        if template.get("form_template_id"):
+            try:
+                form_template = await self.db.form_templates.find_one({"_id": ObjectId(str(template["form_template_id"]))})
+                if form_template:
+                    form_fields = form_template.get("fields", [])
+                    form_template_name = form_template.get("name", "")
+            except Exception as e:
+                logger.warning(f"Failed to fetch form template: {e}")
+        
+        doc = {
+            "task_plan_id": None,  # No plan for ad-hoc tasks
+            "task_template_id": data["task_template_id"],
+            "task_template_name": template["name"],
+            "equipment_id": data.get("equipment_id"),
+            "equipment_name": equipment_name,
+            "efm_id": None,
+            "scheduled_date": scheduled_date,
+            "due_date": due_date,
+            "status": "planned",
+            "priority": data.get("priority", "medium"),
+            "assigned_team": data.get("assigned_team"),
+            "assigned_user_id": data.get("assigned_user_id"),
+            "discipline": template.get("discipline"),
+            "mitigation_strategy": template.get("mitigation_strategy"),
+            "estimated_duration_minutes": template.get("estimated_duration_minutes"),
+            "form_fields": form_fields,
+            "form_template_name": form_template_name,
+            "started_at": None,
+            "completed_at": None,
+            "actual_duration_minutes": None,
+            "completion_notes": None,
+            "issues_found": [],
+            "follow_up_required": False,
+            "follow_up_notes": None,
+            "form_data": None,
+            "notes": data.get("notes"),
+            "is_adhoc": True,  # Mark as ad-hoc task
+            "source": "adhoc",
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now,
+        }
+        
+        result = await self.instances.insert_one(doc)
+        doc["_id"] = result.inserted_id
+        
+        return self._serialize_instance(doc)
+    
     async def get_instances(
         self,
         equipment_id: Optional[str] = None,

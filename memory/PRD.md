@@ -65,6 +65,23 @@ Completed the missing backend logic for My Tasks task completion:
 - `POST /api/task-instances/{id}/complete` - Now accepts: `form_data`, `create_observation`, `issue_severity`
 - `POST /api/my-tasks/action/{id}/complete` - Now accepts full completion payload with observation creation
 
+### Feature: Ad-hoc Task Execution
+Added ability to execute task templates without a recurring schedule:
+- **New API Endpoint**: `POST /api/task-instances/adhoc` creates one-time task instances from templates
+- **UI Integration**: Added "Execute Now" option in template dropdown menu
+- **Ad-hoc Dialog**: Modal form allowing selection of:
+  - Equipment (optional)
+  - Priority (low/medium/high)
+  - Notes
+- **Task Properties**: Created tasks have `is_adhoc: true` and `source: "adhoc"` flags
+
+**Files Modified:**
+- `/app/backend/models/task_models.py` - Added `AdhocTaskCreate` model, `ADHOC` frequency type
+- `/app/backend/services/task_service.py` - Added `create_adhoc_instance()` method
+- `/app/backend/routes/tasks.py` - Added `POST /api/task-instances/adhoc` endpoint
+- `/app/frontend/src/pages/TaskSchedulerPage.js` - Added adhoc dialog, mutation, and menu option
+- `/app/frontend/src/contexts/LanguageContext.js` - Added EN/NL translations for adhoc UI
+
 ## Completed in Previous Session (Mar 26, 2026)
 
 ### New Feature: My Tasks Page - Task Execution Front-End
