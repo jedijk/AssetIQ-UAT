@@ -1167,7 +1167,14 @@ const ThreatDetailPage = () => {
                 />
               )
             ) : (
-              <div className="font-semibold text-slate-900">{item.value}</div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-900">{item.value}</span>
+                {item.field === "failure_mode" && threat.is_new_failure_mode && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                    NEW
+                  </span>
+                )}
+              </div>
             )}
           </div>
         ))}

@@ -142,10 +142,36 @@ Implemented AI vision analysis for equipment photos:
 - Auto-sets "Issue Found" flag when damage detected
 - Toast notifications for analysis results
 
-**Files Created:**
-- `/app/backend/services/image_analysis_service.py`
-- `/app/backend/routes/image_analysis.py`
-- `/app/frontend/src/lib/api.js` (added imageAnalysisAPI)
+### Feature: New Failure Mode Label & Create Action
+When an observation has a new/custom failure mode not in the FMEA library:
+
+**Backend Changes:**
+- Added `is_new_failure_mode` field to threats model
+- Set automatically when creating observations with custom failure modes
+- Added fields to ThreatUpdate/ThreatResponse: `is_new_failure_mode`, `fmea_rpn`, `failure_mode_data`
+- Extended failure mode create endpoint with `description`, `source`, `linked_threat_id` fields
+
+**Frontend - ThreatDetailPage:**
+- Shows green **"NEW"** badge next to Failure Mode when `is_new_failure_mode` is true
+- Located in the info items section
+
+**Frontend - RecommendedActionsSection:**
+- Added prominent "Create Failure Mode in FMEA Library" action card when `is_new_failure_mode` is true
+- Card includes: sparkles icon, "NEW FAILURE MODE" badge, description, "+ Create" button
+- Clicking "Create" opens RPN Scoring dialog with:
+  - Severity slider (1-10)
+  - Occurrence slider (1-10)
+  - Detection slider (1-10)
+  - Live RPN calculation display
+  - Recommended actions list builder
+- On save: Creates failure mode in FMEA library, links it to observation, clears the `is_new_failure_mode` flag
+
+**Files Modified:**
+- `/app/backend/routes/chat.py` - Set `is_new_failure_mode` on threat creation
+- `/app/backend/models/api_models.py` - Added new fields to ThreatUpdate/ThreatResponse
+- `/app/backend/routes/failure_modes_routes.py` - Extended FailureModeCreate model
+- `/app/frontend/src/pages/ThreatDetailPage.js` - Added NEW badge to failure mode display
+- `/app/frontend/src/components/threat-detail/RecommendedActionsSection.jsx` - Added Create FM action and dialog
 
 **Files Created:**
 - `/app/backend/models/feedback_models.py` - Pydantic models for feedback

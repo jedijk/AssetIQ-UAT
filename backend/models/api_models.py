@@ -39,8 +39,9 @@ class ThreatResponse(BaseModel):
     asset: str
     equipment_type: str
     failure_mode: str
-    failure_mode_id: Optional[int] = None
+    failure_mode_id: Optional[Any] = None  # Can be int or str
     failure_mode_data: Optional[dict] = None
+    is_new_failure_mode: Optional[bool] = None
     cause: Optional[str] = None
     impact: str
     frequency: str
@@ -49,6 +50,7 @@ class ThreatResponse(BaseModel):
     risk_level: str
     risk_score: int
     fmea_score: Optional[int] = None
+    fmea_rpn: Optional[int] = None
     criticality_score: Optional[int] = None
     base_risk_score: Optional[int] = None
     rank: int
@@ -72,7 +74,8 @@ class ThreatUpdate(BaseModel):
     asset: Optional[str] = None
     equipment_type: Optional[str] = None
     failure_mode: Optional[str] = None
-    failure_mode_id: Optional[int] = None
+    failure_mode_id: Optional[Any] = None  # Can be int or str
+    failure_mode_data: Optional[dict] = None
     cause: Optional[str] = None
     impact: Optional[str] = None
     frequency: Optional[str] = None
@@ -82,6 +85,8 @@ class ThreatUpdate(BaseModel):
     status: Optional[str] = None
     recommended_actions: Optional[List[Any]] = None  # Can be strings or structured dicts
     linked_equipment_id: Optional[str] = None
+    is_new_failure_mode: Optional[bool] = None
+    fmea_rpn: Optional[int] = None
 
 
 class ChatResponse(BaseModel):

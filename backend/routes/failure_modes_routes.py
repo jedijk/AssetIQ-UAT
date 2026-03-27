@@ -159,6 +159,9 @@ class FailureModeCreate(BaseModel):
     detectability: int = Field(ge=1, le=10)
     recommended_actions: List[Any] = []
     equipment_type_ids: List[str] = []
+    description: Optional[str] = None
+    source: Optional[str] = None  # e.g., "observation", "manual", "import"
+    linked_threat_id: Optional[str] = None
 
 
 class FailureModeUpdate(BaseModel):
@@ -259,6 +262,9 @@ async def create_failure_mode(
                 "detectability": data.detectability,
                 "recommended_actions": data.recommended_actions,
                 "equipment_type_ids": equipment_type_ids,
+                "description": data.description,
+                "source": data.source,
+                "linked_threat_id": data.linked_threat_id,
             },
             created_by=current_user["id"]
         )

@@ -3,11 +3,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { threatsAPI, actionsAPI } from "../../lib/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Plus, ClipboardList, Loader2 } from "lucide-react";
+import { Plus, ClipboardList, Loader2, Sparkles, AlertTriangle, Settings } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
+import { Badge } from "../ui/badge";
+import { Slider } from "../ui/slider";
 import {
   Select,
   SelectContent,
@@ -53,11 +55,25 @@ const TYPE_STYLES = {
 export const RecommendedActionsSection = ({ threat, threatId }) => {
   const queryClient = useQueryClient();
   const [showAddRecommendedDialog, setShowAddRecommendedDialog] = useState(false);
+  const [showCreateFMDialog, setShowCreateFMDialog] = useState(false);
   const [newRecommendedAction, setNewRecommendedAction] = useState({
     action: "",
     action_type: "",
     discipline: "",
   });
+  
+  // RPN Scoring state for new failure mode
+  const [fmData, setFmData] = useState({
+    severity: 5,
+    occurrence: 5,
+    detection: 5,
+    recommended_actions: [],
+  });
+  const [newFmAction, setNewFmAction] = useState("");
+
+  const rpn = fmData.severity * fmData.occurrence * fmData.detection;
+  const rpnLevel = rpn >= 300 ? "Critical" : rpn >= 200 ? "High" : rpn >= 100 ? "Medium" : "Low";
+  const rpnColor = rpn >= 300 ? "text-red-600" : rpn >= 200 ? "text-orange-600" : rpn >= 100 ? "text-yellow-600" : "text-green-600";
 
   // Promote to action mutation
   const promoteToActionMutation = useMutation({
@@ -98,6 +114,77 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     },
   });
 
+  // Create failure mode mutation
+  const createFailureModeMutation = useMutation({
+    mutationFn: async () => {
+      // Create failure mode in FMEA library
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/failure-modes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          category: threat.equipment_type || "General",
+          equipment: threat.equipment_type || threat.asset || "Equipment",
+          failure_mode: threat.failure_mode,
+          keywords: [threat.failure_mode?.toLowerCase()].filter(Boolean),
+          severity: fmData.severity,
+          occurrence: fmData.occurrence,
+          detectability: fmData.detection,
+          recommended_actions: fmData.recommended_actions,
+          description: `Created from observation: ${threat.title}`,
+          source: "observation",
+          linked_threat_id: threatId,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create failure mode');
+      }
+      
+      const newFm = await response.json();
+      
+      // Update the threat to link to the new failure mode and clear is_new_failure_mode flag
+      await threatsAPI.update(threatId, {
+        failure_mode_id: newFm.id,
+        is_new_failure_mode: false,
+        fmea_rpn: fmData.severity * fmData.occurrence * fmData.detection,
+        failure_mode_data: newFm,
+      });
+      
+      return newFm;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["failure-modes"] });
+      toast.success("Failure mode created and linked to FMEA library!");
+      setShowCreateFMDialog(false);
+      setFmData({ severity: 5, occurrence: 5, detection: 5, recommended_actions: [] });
+    },
+    onError: () => {
+      toast.error("Failed to create failure mode");
+    },
+  });
+
+  const addFmAction = () => {
+    if (newFmAction.trim()) {
+      setFmData(prev => ({
+        ...prev,
+        recommended_actions: [...prev.recommended_actions, newFmAction.trim()]
+      }));
+      setNewFmAction("");
+    }
+  };
+
+  const removeFmAction = (index) => {
+    setFmData(prev => ({
+      ...prev,
+      recommended_actions: prev.recommended_actions.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleAddRecommendedAction = () => {
     if (!newRecommendedAction.action.trim()) {
       toast.error("Please enter an action description");
@@ -129,6 +216,46 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
           </Button>
         </div>
         <div className="space-y-3">
+          {/* Create Failure Mode Action - Show when is_new_failure_mode is true */}
+          {threat.is_new_failure_mode && (
+            <div
+              className="flex items-start gap-4 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-xl shadow-sm"
+              data-testid="create-failure-mode-action"
+            >
+              {/* Icon */}
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 rounded-lg bg-emerald-500 text-white flex flex-col items-center justify-center shadow-sm">
+                  <Settings className="w-5 h-5" />
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    NEW FAILURE MODE
+                  </Badge>
+                </div>
+                <h4 className="font-semibold text-slate-900 mb-1">Create Failure Mode in FMEA Library</h4>
+                <p className="text-sm text-slate-600">
+                  This observation has a new failure mode "{threat.failure_mode}" that doesn't exist in the FMEA library. 
+                  Add it with RPN scoring to track future occurrences.
+                </p>
+              </div>
+
+              {/* Create Button */}
+              <Button
+                onClick={() => setShowCreateFMDialog(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4"
+                data-testid="create-failure-mode-button"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Create
+              </Button>
+            </div>
+          )}
+          
           {(threat.recommended_actions || []).map((action, idx) => {
             const isObj = typeof action === "object";
             const actionText = isObj ? action.action || action.description || "" : action;
@@ -315,6 +442,172 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                 <Plus className="w-4 h-4 mr-2" />
               )}
               Add Recommendation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Failure Mode Dialog with RPN Scoring */}
+      <Dialog open={showCreateFMDialog} onOpenChange={setShowCreateFMDialog}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-emerald-600" />
+              Create Failure Mode
+            </DialogTitle>
+            <DialogDescription>
+              Add "{threat.failure_mode}" to the FMEA library with RPN scoring.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* Failure Mode Info */}
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-slate-500">Name:</span>
+                  <span className="ml-2 font-medium">{threat.failure_mode}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Equipment:</span>
+                  <span className="ml-2 font-medium">{threat.equipment_type}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* RPN Scoring */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
+                <div>
+                  <div className="text-sm font-medium text-slate-600">Risk Priority Number (RPN)</div>
+                  <div className="text-xs text-slate-500">Severity × Occurrence × Detection</div>
+                </div>
+                <div className={`text-4xl font-bold ${rpnColor}`}>
+                  {rpn}
+                </div>
+              </div>
+
+              {/* Severity */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Severity</Label>
+                  <Badge variant="outline" className="text-sm">
+                    {fmData.severity}/10
+                  </Badge>
+                </div>
+                <Slider
+                  value={[fmData.severity]}
+                  onValueChange={([v]) => setFmData(prev => ({ ...prev, severity: v }))}
+                  min={1}
+                  max={10}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>Minor</span>
+                  <span>Critical</span>
+                </div>
+              </div>
+
+              {/* Occurrence */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Occurrence</Label>
+                  <Badge variant="outline" className="text-sm">
+                    {fmData.occurrence}/10
+                  </Badge>
+                </div>
+                <Slider
+                  value={[fmData.occurrence]}
+                  onValueChange={([v]) => setFmData(prev => ({ ...prev, occurrence: v }))}
+                  min={1}
+                  max={10}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>Rare</span>
+                  <span>Frequent</span>
+                </div>
+              </div>
+
+              {/* Detection */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Detection</Label>
+                  <Badge variant="outline" className="text-sm">
+                    {fmData.detection}/10
+                  </Badge>
+                </div>
+                <Slider
+                  value={[fmData.detection]}
+                  onValueChange={([v]) => setFmData(prev => ({ ...prev, detection: v }))}
+                  min={1}
+                  max={10}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>Easy to detect</span>
+                  <span>Hard to detect</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Recommended Actions for FM */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Recommended Actions</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={newFmAction}
+                  onChange={(e) => setNewFmAction(e.target.value)}
+                  placeholder="Add a recommended action..."
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFmAction())}
+                />
+                <Button variant="outline" onClick={addFmAction} disabled={!newFmAction.trim()}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              {fmData.recommended_actions.length > 0 && (
+                <div className="space-y-2">
+                  {fmData.recommended_actions.map((action, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg text-sm">
+                      <span>{action}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFmAction(idx)}
+                        className="h-6 w-6 p-0 text-slate-400 hover:text-red-500"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateFMDialog(false);
+                setFmData({ severity: 5, occurrence: 5, detection: 5, recommended_actions: [] });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createFailureModeMutation.mutate()}
+              disabled={createFailureModeMutation.isPending}
+              className="bg-emerald-600 hover:bg-emerald-700"
+              data-testid="save-failure-mode-button"
+            >
+              {createFailureModeMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}
+              Create Failure Mode
             </Button>
           </DialogFooter>
         </DialogContent>

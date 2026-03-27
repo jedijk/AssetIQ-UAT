@@ -149,6 +149,7 @@ async def send_chat_message(
             "failure_mode": failure_mode_name,
             "failure_mode_id": obs_data.get("failure_mode_id"),
             "failure_mode_data": fmea_data if fmea_data else None,
+            "is_new_failure_mode": obs_data.get("is_custom_failure_mode", False),  # Track if this is a new/custom failure mode
             "cause": None,
             "impact": "Equipment Damage",
             "frequency": "First Time",
