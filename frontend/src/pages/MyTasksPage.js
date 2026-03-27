@@ -1058,6 +1058,7 @@ const MyTasksPage = () => {
     overdue: tasks.filter(t => t.status === "overdue").length,
     today: tasks.filter(t => t.due_date && isToday(parseISO(t.due_date))).length,
     inProgress: tasks.filter(t => t.status === "in_progress").length,
+    open: tasks.filter(t => t.source_type === "action" || (t.source_type === "task" && t.status === "in_progress")).length,
   };
   
   return (
@@ -1167,7 +1168,7 @@ const MyTasksPage = () => {
           <div className="text-xs text-slate-500">Overdue</div>
         </div>
         <div className="bg-blue-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-blue-600">{stats.today}</div>
+          <div className="text-lg font-bold text-blue-600">{stats.open}</div>
           <div className="text-xs text-slate-500">Open</div>
         </div>
       </div>
