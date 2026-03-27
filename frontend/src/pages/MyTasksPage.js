@@ -81,6 +81,23 @@ const myTasksAPI = {
     return response.json();
   },
   
+  getAdhocPlans: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/adhoc-plans`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    if (!response.ok) throw new Error("Failed to fetch ad-hoc plans");
+    return response.json();
+  },
+  
+  executeAdhocPlan: async (planId) => {
+    const response = await fetch(`${API_BASE_URL}/api/adhoc-plans/${planId}/execute`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    if (!response.ok) throw new Error("Failed to execute ad-hoc plan");
+    return response.json();
+  },
+  
   getTaskDetail: async (taskId) => {
     const response = await fetch(`${API_BASE_URL}/api/my-tasks/${taskId}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -893,6 +910,30 @@ const MyTasksPage = () => {
     },
   });
   
+  // Fetch ad-hoc plans (only when adhoc tab is active)
+  const { data: adhocPlansData, isLoading: adhocPlansLoading } = useQuery({
+    queryKey: ["adhoc-plans"],
+    queryFn: () => myTasksAPI.getAdhocPlans(),
+    enabled: activeFilter === "adhoc",
+    refetchInterval: 30000,
+  });
+  
+  // Execute ad-hoc plan mutation
+  const executeAdhocMutation = useMutation({
+    mutationFn: (planId) => myTasksAPI.executeAdhocPlan(planId),
+    onSuccess: (newTask) => {
+      toast.success("Task started! Redirecting to execution...");
+      queryClient.invalidateQueries({ queryKey: ["adhoc-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+      // Open the new task for execution
+      setSelectedTask(newTask);
+      setExecutionDialogOpen(true);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to execute ad-hoc plan");
+    },
+  });
+  
   // Handle task open
   const handleOpenTask = async (task) => {
     setSelectedTask(task);
@@ -1079,36 +1120,128 @@ const MyTasksPage = () => {
         </div>
       </div>
       
-      {/* Task List */}
+      {/* Task List or Ad-hoc Plans */}
       <div className="space-y-3">
-        {tasksLoading ? (
-          <div className="text-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400 mb-2" />
-            <p className="text-slate-500">Loading tasks...</p>
-          </div>
-        ) : tasksError ? (
-          <div className="text-center py-12">
-            <AlertCircle className="w-8 h-8 mx-auto text-red-400 mb-2" />
-            <p className="text-red-600">Failed to load tasks</p>
-          </div>
-        ) : sortedTasks.length === 0 ? (
-          <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-            <CheckCircle2 className="w-12 h-12 mx-auto text-green-400 mb-3" />
-            <h3 className="text-lg font-medium text-slate-900 mb-1">No tasks for {activeFilter}</h3>
-            <p className="text-slate-500 mb-4">You're all caught up!</p>
-            <Button variant="outline" onClick={() => setActiveFilter("today")}>
-              View upcoming tasks
-            </Button>
-          </div>
+        {activeFilter === "adhoc" ? (
+          // Ad-hoc Plans View
+          adhocPlansLoading ? (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400 mb-2" />
+              <p className="text-slate-500">Loading ad-hoc plans...</p>
+            </div>
+          ) : (adhocPlansData?.plans || []).length === 0 ? (
+            <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+              <Zap className="w-12 h-12 mx-auto text-amber-400 mb-3" />
+              <h3 className="text-lg font-medium text-slate-900 mb-1">No ad-hoc plans available</h3>
+              <p className="text-slate-500 mb-4">Create ad-hoc task plans in the Task Planner</p>
+              <Button variant="outline" onClick={() => setActiveFilter("today")}>
+                View scheduled tasks
+              </Button>
+            </div>
+          ) : (
+            (adhocPlansData?.plans || []).map((plan) => (
+              <div
+                key={plan.id}
+                className="bg-white rounded-lg border border-amber-200 p-4 hover:shadow-md transition-all"
+                data-testid={`adhoc-plan-${plan.id}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    {/* Title */}
+                    <div className="flex items-center gap-2 mb-1">
+                      <Zap className="w-4 h-4 flex-shrink-0 text-amber-500" />
+                      <h3 className="font-medium text-slate-900 truncate">{plan.title}</h3>
+                      <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                        Ad-hoc
+                      </Badge>
+                    </div>
+                    
+                    {/* Equipment */}
+                    <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-2">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span className="truncate">{plan.equipment_name}</span>
+                    </div>
+                    
+                    {/* Tags Row */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {plan.discipline && (
+                        <Badge variant="outline" className="text-xs bg-slate-50">
+                          {plan.discipline}
+                        </Badge>
+                      )}
+                      {plan.has_form && (
+                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                          <FileText className="w-3 h-3 mr-1" />
+                          Form
+                        </Badge>
+                      )}
+                      {plan.execution_count > 0 && (
+                        <span className="text-xs text-slate-400">
+                          Executed {plan.execution_count}x
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Right Side - Execute Button */}
+                  <div className="flex flex-col items-end gap-2">
+                    <Button
+                      size="sm"
+                      className="bg-amber-500 hover:bg-amber-600 text-white"
+                      onClick={() => executeAdhocMutation.mutate(plan.id)}
+                      disabled={executeAdhocMutation.isPending}
+                      data-testid={`execute-adhoc-${plan.id}`}
+                    >
+                      {executeAdhocMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 mr-1" />
+                          Execute
+                        </>
+                      )}
+                    </Button>
+                    {plan.last_executed_at && (
+                      <span className="text-xs text-slate-400">
+                        Last: {format(parseISO(plan.last_executed_at), "MMM d")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )
         ) : (
-          sortedTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onOpen={handleOpenTask}
-              onQuickComplete={handleQuickComplete}
-            />
-          ))
+          // Regular Tasks View
+          tasksLoading ? (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400 mb-2" />
+              <p className="text-slate-500">Loading tasks...</p>
+            </div>
+          ) : tasksError ? (
+            <div className="text-center py-12">
+              <AlertCircle className="w-8 h-8 mx-auto text-red-400 mb-2" />
+              <p className="text-red-600">Failed to load tasks</p>
+            </div>
+          ) : sortedTasks.length === 0 ? (
+            <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+              <CheckCircle2 className="w-12 h-12 mx-auto text-green-400 mb-3" />
+              <h3 className="text-lg font-medium text-slate-900 mb-1">No tasks for {activeFilter}</h3>
+              <p className="text-slate-500 mb-4">You're all caught up!</p>
+              <Button variant="outline" onClick={() => setActiveFilter("today")}>
+                View upcoming tasks
+              </Button>
+            </div>
+          ) : (
+            sortedTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onOpen={handleOpenTask}
+                onQuickComplete={handleQuickComplete}
+              />
+            ))
+          )
         )}
       </div>
       

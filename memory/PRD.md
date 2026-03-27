@@ -94,6 +94,17 @@ Added full edit functionality for execution plans:
 - `/app/frontend/src/components/task-scheduler/PlanDialog.js` - Added `editingPlan` prop, edit mode UI (disabled fields, status toggle, Save Changes button)
 - `/app/frontend/src/contexts/LanguageContext.js` - Added `editPlan`, `editPlanDesc`, `planStatus`, `planStatusDesc` translations (EN/NL)
 
+### Feature: Ad-hoc Plans in My Tasks with Execution
+Added ability to view and execute ad-hoc plans directly from the My Tasks page:
+- **Adhoc tab** now shows active ad-hoc plans (not task instances)
+- Each plan card displays: Title, Equipment, Discipline, Form badge, Execution count, Last executed date
+- **Execute button** creates a new task instance and opens the execution dialog immediately
+- Backend endpoints: `GET /api/adhoc-plans` (fetch active ad-hoc plans), `POST /api/adhoc-plans/{id}/execute` (create and start task)
+
+**Files Modified:**
+- `/app/backend/routes/my_tasks.py` - Added `get_adhoc_plans` and `execute_adhoc_plan` endpoints
+- `/app/frontend/src/pages/MyTasksPage.js` - Added `getAdhocPlans` and `executeAdhocPlan` API functions, query for adhoc plans, conditional rendering for adhoc tab with plan cards
+
 ---
 
 ## Completed in Previous Session (Mar 27, 2026)

@@ -594,3 +594,152 @@ async def start_my_action(
     # Return updated action
     updated_action = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
     return serialize_action_as_task(updated_action)
+
+
+@router.get("/adhoc-plans")
+async def get_adhoc_plans(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all active ad-hoc plans that can be executed on-demand."""
+    
+    # Find all active plans that are ad-hoc
+    query = {
+        "is_active": True,
+        "is_adhoc": True
+    }
+    
+    plans_cursor = db.task_plans.find(query).sort("created_at", -1)
+    
+    plans = []
+    async for plan in plans_cursor:
+        # Get template details
+        template_name = plan.get("task_template_name", "Unknown Task")
+        template = None
+        if plan.get("task_template_id"):
+            try:
+                template = await db.task_templates.find_one({"_id": ObjectId(plan["task_template_id"])})
+            except Exception:
+                pass
+        
+        # Get equipment details
+        equipment_name = plan.get("equipment_name", "Unknown Equipment")
+        if plan.get("equipment_id") and not equipment_name:
+            equipment = await db.equipment.find_one({"id": plan["equipment_id"]})
+            if equipment:
+                equipment_name = equipment.get("name", "Unknown Equipment")
+        
+        # Get form template details
+        form_template = None
+        if plan.get("form_template_id"):
+            form_template = await db.form_templates.find_one({"id": plan["form_template_id"]})
+        
+        plans.append({
+            "id": str(plan["_id"]),
+            "title": template_name,
+            "description": template.get("description", "") if template else "",
+            "equipment_id": plan.get("equipment_id"),
+            "equipment_name": equipment_name,
+            "task_template_id": str(plan.get("task_template_id", "")),
+            "task_template_name": template_name,
+            "discipline": template.get("discipline", "") if template else "",
+            "form_template_id": plan.get("form_template_id"),
+            "form_template_name": plan.get("form_template_name") or (form_template.get("name") if form_template else None),
+            "has_form": bool(plan.get("form_template_id")),
+            "assigned_team": plan.get("assigned_team"),
+            "assigned_user_id": plan.get("assigned_user_id"),
+            "notes": plan.get("notes"),
+            "last_executed_at": plan.get("last_executed_at").isoformat() if plan.get("last_executed_at") else None,
+            "execution_count": plan.get("execution_count", 0),
+            "created_at": plan.get("created_at").isoformat() if plan.get("created_at") else None,
+        })
+    
+    return {
+        "plans": plans,
+        "count": len(plans)
+    }
+
+
+@router.post("/adhoc-plans/{plan_id}/execute")
+async def execute_adhoc_plan(
+    plan_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a task instance from an ad-hoc plan for immediate execution."""
+    
+    # Find the plan
+    try:
+        plan = await db.task_plans.find_one({"_id": ObjectId(plan_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid plan ID")
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    
+    if not plan.get("is_adhoc"):
+        raise HTTPException(status_code=400, detail="This is not an ad-hoc plan")
+    
+    if not plan.get("is_active"):
+        raise HTTPException(status_code=400, detail="This plan is inactive")
+    
+    # Get template details
+    template = None
+    if plan.get("task_template_id"):
+        try:
+            template = await db.task_templates.find_one({"_id": ObjectId(plan["task_template_id"])})
+        except Exception:
+            pass
+    
+    # Get form template and its fields
+    form_fields = []
+    form_template = None
+    if plan.get("form_template_id"):
+        form_template = await db.form_templates.find_one({"id": plan["form_template_id"]})
+        if form_template:
+            form_fields = form_template.get("fields", [])
+    
+    # Create a new task instance
+    now = datetime.now(timezone.utc)
+    
+    task_instance = {
+        "task_plan_id": plan["_id"],
+        "task_template_id": plan.get("task_template_id"),
+        "task_template_name": plan.get("task_template_name", "Ad-hoc Task"),
+        "title": plan.get("task_template_name", "Ad-hoc Task"),
+        "description": template.get("description", "") if template else "",
+        "equipment_id": plan.get("equipment_id"),
+        "equipment_name": plan.get("equipment_name"),
+        "discipline": template.get("discipline", "") if template else "",
+        "mitigation_strategy": template.get("discipline", "") if template else "",
+        "form_template_id": plan.get("form_template_id"),
+        "form_template_name": plan.get("form_template_name") or (form_template.get("name") if form_template else None),
+        "form_fields": form_fields,
+        "status": "in_progress",  # Start immediately
+        "priority": template.get("priority", "medium") if template else "medium",
+        "due_date": now,  # Due immediately
+        "scheduled_date": now,
+        "started_at": now,
+        "assigned_team": plan.get("assigned_team"),
+        "assigned_user_id": plan.get("assigned_user_id") or current_user.get("user_id"),
+        "assignee": current_user.get("name", ""),
+        "source": "adhoc",
+        "source_type": "task",
+        "is_adhoc": True,
+        "created_by": current_user.get("user_id"),
+        "created_at": now,
+        "updated_at": now,
+    }
+    
+    result = await db.task_instances.insert_one(task_instance)
+    task_instance["_id"] = result.inserted_id
+    
+    # Update plan's last_executed_at and execution_count
+    await db.task_plans.update_one(
+        {"_id": plan["_id"]},
+        {
+            "$set": {"last_executed_at": now, "updated_at": now},
+            "$inc": {"execution_count": 1}
+        }
+    )
+    
+    return serialize_task(task_instance)
+
