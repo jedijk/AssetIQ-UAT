@@ -82,8 +82,8 @@ class TaskTemplateCreate(BaseModel):
     
     # Default frequency settings
     frequency_type: FrequencyType = FrequencyType.TIME_BASED
-    default_interval: int = 30  # Default interval value
-    default_unit: FrequencyUnit = FrequencyUnit.DAYS
+    default_interval: Optional[int] = 30  # Default interval value, None for adhoc
+    default_unit: Optional[FrequencyUnit] = FrequencyUnit.DAYS  # None for adhoc
     
     # Estimated duration
     estimated_duration_minutes: Optional[int] = None
