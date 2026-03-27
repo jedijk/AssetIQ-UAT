@@ -43,6 +43,24 @@ Changed "Forms" to "Form Designer" in the Settings menu. Also ensured all menu i
 **Files Modified:**
 - `/app/frontend/src/components/Layout.js` - Updated settings menu to use `t("forms.title")`, `t("taskScheduler.execution")`, `t("decisionEngine.title")` instead of hardcoded labels
 
+### Feature: Enhanced Document Viewer (PDF, DOCX, XLS/XLSX Support)
+Added in-app document viewing support for multiple file formats:
+- **PDF** - Rendered via iframe with native browser PDF viewer
+- **DOCX/DOC** - Parsed using `mammoth` library and rendered as styled HTML with proper heading, list, and table formatting
+- **XLS/XLSX/CSV** - Parsed using `xlsx` (SheetJS) library and displayed as interactive tables with:
+  - Row numbers for easy reference
+  - Sheet navigation for multi-sheet workbooks
+  - Proper cell formatting and alternating row colors
+  - Empty sheet handling
+
+**Dependencies Added:**
+- `mammoth@1.12.0` - Word document to HTML conversion
+- `xlsx@0.18.5` - Excel/CSV file parsing
+
+**Files Modified:**
+- `/app/frontend/src/components/DocumentViewer.js` - Complete rewrite with loading states, error handling, and file-specific renderers
+- `/app/frontend/src/index.css` - Added `.docx-content` styling for proper document appearance
+
 ---
 
 ## Completed in Previous Session (Mar 27, 2026)
