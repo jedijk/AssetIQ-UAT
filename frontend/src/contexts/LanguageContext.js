@@ -16,7 +16,7 @@ const en = {
     settings: "Settings",
     logout: "Logout",
     userManagement: "User Management",
-    statistics: "Statistics",
+    statistics: "User Statistics",
     criticalityDefinitions: "Criticality Definitions",
   },
   
@@ -24,8 +24,8 @@ const en = {
   settings: {
     userManagement: "User Management",
     userManagementDesc: "Manage users, roles, and permissions",
-    statistics: "Statistics",
-    statisticsDesc: "View system statistics and analytics",
+    statistics: "User Statistics",
+    statisticsDesc: "View user statistics and analytics",
     criticalityDefinitions: "Criticality Definitions",
     criticalityDefinitionsDesc: "Define and customize criticality scales",
     underDevelopment: "Under Development",
@@ -965,7 +965,7 @@ const nl = {
     settings: "Instellingen",
     logout: "Uitloggen",
     userManagement: "Gebruikersbeheer",
-    statistics: "Statistieken",
+    statistics: "Gebruikersstatistieken",
     criticalityDefinitions: "Kriticiteitsdefinities",
   },
   
@@ -973,8 +973,8 @@ const nl = {
   settings: {
     userManagement: "Gebruikersbeheer",
     userManagementDesc: "Beheer gebruikers, rollen en rechten",
-    statistics: "Statistieken",
-    statisticsDesc: "Bekijk systeemstatistieken en analyses",
+    statistics: "Gebruikersstatistieken",
+    statisticsDesc: "Bekijk gebruikersstatistieken en analyses",
     criticalityDefinitions: "Kriticiteitsdefinities",
     criticalityDefinitionsDesc: "Definieer en pas kriticiteitsschalen aan",
     underDevelopment: "In ontwikkeling",
