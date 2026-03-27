@@ -748,6 +748,7 @@ class FormService:
             "equipment_type_ids": doc.get("equipment_type_ids", []),
             "fields": doc.get("fields", []),
             "field_count": len(doc.get("fields", [])),
+            "documents": doc.get("documents", []),  # Reference documents
             "allow_partial_submission": doc.get("allow_partial_submission", False),
             "require_signature": doc.get("require_signature", False),
             "tags": doc.get("tags", []),

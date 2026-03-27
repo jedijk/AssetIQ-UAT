@@ -870,6 +870,7 @@ const en = {
     aiDocumentSearch: "AI Document Search",
     searchDocumentsPlaceholder: "Ask a question about the attached documents...",
     askAI: "Ask AI",
+    documentUploaded: "Document uploaded successfully",
   },
 
   // Decision Engine
@@ -1812,6 +1813,7 @@ const nl = {
     aiDocumentSearch: "AI Documentzoeken",
     searchDocumentsPlaceholder: "Stel een vraag over de bijgevoegde documenten...",
     askAI: "Vraag AI",
+    documentUploaded: "Document succesvol geüpload",
   },
 
   // Decision Engine

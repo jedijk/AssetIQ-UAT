@@ -836,10 +836,41 @@ const FormsPage = () => {
                     type="file"
                     className="hidden"
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.jpg,.jpeg,.png"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
-                      if (file) {
-                        // Add to pending documents (will be uploaded when template is saved/created)
+                      if (!file) return;
+                      
+                      // If editing existing template, upload immediately
+                      if (newTemplate.id) {
+                        const docId = `uploading_${Date.now()}`;
+                        // Show uploading state
+                        setNewTemplate(prev => ({
+                          ...prev,
+                          pendingDocuments: [
+                            ...(prev.pendingDocuments || []),
+                            { id: docId, name: file.name, type: file.name.split('.').pop().toLowerCase(), uploading: true }
+                          ]
+                        }));
+                        
+                        try {
+                          const result = await formAPI.uploadDocument(newTemplate.id, file, "");
+                          // Replace pending with actual document
+                          setNewTemplate(prev => ({
+                            ...prev,
+                            pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== docId),
+                            documents: [...(prev.documents || []), result.document]
+                          }));
+                          toast.success(t("forms.documentUploaded"));
+                        } catch (error) {
+                          // Remove failed upload from pending
+                          setNewTemplate(prev => ({
+                            ...prev,
+                            pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== docId)
+                          }));
+                          toast.error(error.message || "Upload failed");
+                        }
+                      } else {
+                        // For new templates, stage the document for later upload
                         const docId = `pending_${Date.now()}`;
                         setNewTemplate(prev => ({
                           ...prev,
@@ -877,10 +908,25 @@ const FormsPage = () => {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-red-600"
-                        onClick={() => setNewTemplate(prev => ({
-                          ...prev,
-                          documents: prev.documents?.filter(d => d.id !== doc.id)
-                        }))}
+                        onClick={async () => {
+                          if (newTemplate.id && doc.id) {
+                            try {
+                              await formAPI.deleteDocument(newTemplate.id, doc.id);
+                              setNewTemplate(prev => ({
+                                ...prev,
+                                documents: prev.documents?.filter(d => d.id !== doc.id)
+                              }));
+                              toast.success("Document deleted");
+                            } catch (error) {
+                              toast.error("Failed to delete document");
+                            }
+                          } else {
+                            setNewTemplate(prev => ({
+                              ...prev,
+                              documents: prev.documents?.filter(d => d.id !== doc.id)
+                            }));
+                          }
+                        }}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
@@ -889,23 +935,31 @@ const FormsPage = () => {
                   {newTemplate.pendingDocuments?.map((doc) => (
                     <div key={doc.id} className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
                       <div className="h-8 w-8 rounded bg-white border flex items-center justify-center">
-                        <Upload className="w-4 h-4 text-amber-600" />
+                        {doc.uploading ? (
+                          <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4 text-amber-600" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm truncate">{doc.name}</div>
-                        <div className="text-xs text-amber-600">{t("forms.pendingUpload")}</div>
+                        <div className="text-xs text-amber-600">
+                          {doc.uploading ? t("common.uploading") : t("forms.pendingUpload")}
+                        </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-red-600"
-                        onClick={() => setNewTemplate(prev => ({
-                          ...prev,
-                          pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== doc.id)
-                        }))}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
+                      {!doc.uploading && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-red-600"
+                          onClick={() => setNewTemplate(prev => ({
+                            ...prev,
+                            pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== doc.id)
+                          }))}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>

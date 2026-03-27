@@ -233,6 +233,8 @@ async def upload_form_document(
     current_user: dict = Depends(get_current_user)
 ):
     """Upload a reference document to a form template."""
+    from bson import ObjectId
+    
     # Verify template exists
     template = await form_service.get_template_by_id(template_id)
     if not template:
@@ -279,9 +281,9 @@ async def upload_form_document(
         "uploaded_at": datetime.utcnow().isoformat(),
     }
     
-    # Add document to template
+    # Add document to template using ObjectId
     await db.form_templates.update_one(
-        {"_id": template["_id"]},
+        {"_id": ObjectId(template_id)},
         {"$push": {"documents": doc_metadata}}
     )
     
@@ -295,13 +297,15 @@ async def delete_form_document(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete a document from a form template."""
+    from bson import ObjectId
+    
     template = await form_service.get_template_by_id(template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Form template not found")
     
-    # Remove document from template
+    # Remove document from template using ObjectId
     result = await db.form_templates.update_one(
-        {"_id": template["_id"]},
+        {"_id": ObjectId(template_id)},
         {"$pull": {"documents": {"id": document_id}}}
     )
     
