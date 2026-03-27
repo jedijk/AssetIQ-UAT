@@ -823,6 +823,11 @@ const en = {
     createAdhocTask: "Create Execution",
     adhocTaskCreated: "Ad-hoc execution created successfully",
     template: "Template",
+    // Ad-hoc template creation
+    adhocOnly: "Ad-hoc Only",
+    adhocOnlyDesc: "No recurring schedule - execute manually when needed",
+    adhocLabel: "Ad-hoc",
+    adhocTemplateHint: "Execute manually via 'Execute Now'",
   },
 
   // Forms
@@ -1747,6 +1752,11 @@ const nl = {
     createAdhocTask: "Uitvoering aanmaken",
     adhocTaskCreated: "Ad-hoc uitvoering succesvol aangemaakt",
     template: "Sjabloon",
+    // Ad-hoc template creation
+    adhocOnly: "Alleen ad-hoc",
+    adhocOnlyDesc: "Geen terugkerend schema - voer handmatig uit wanneer nodig",
+    adhocLabel: "Ad-hoc",
+    adhocTemplateHint: "Voer handmatig uit via 'Nu uitvoeren'",
   },
 
   // Forms

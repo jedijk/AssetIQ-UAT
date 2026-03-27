@@ -311,6 +311,7 @@ const TaskSchedulerPage = () => {
     estimated_duration_minutes: 60,
     procedure_steps: [],
     safety_requirements: [],
+    is_adhoc: false,
   });
   const [completeForm, setCompleteForm] = useState({
     notes: "",
@@ -518,6 +519,7 @@ const TaskSchedulerPage = () => {
       estimated_duration_minutes: 60,
       procedure_steps: [],
       safety_requirements: [],
+      is_adhoc: false,
     });
   };
 
@@ -541,6 +543,7 @@ const TaskSchedulerPage = () => {
       estimated_duration_minutes: template.estimated_duration_minutes || 60,
       procedure_steps: template.procedure_steps || [],
       safety_requirements: template.safety_requirements || [],
+      is_adhoc: template.is_adhoc || false,
     });
     setShowTemplateDialog(true);
   };
@@ -963,10 +966,17 @@ const TaskSchedulerPage = () => {
                   <CardContent>
                     <div className="flex items-center gap-2 flex-wrap">
                       <DisciplineBadge discipline={template.discipline} />
-                      <Badge variant="outline" className="gap-1">
-                        <Repeat className="w-3 h-3" />
-                        {template.default_interval} {template.default_unit}
-                      </Badge>
+                      {template.is_adhoc ? (
+                        <Badge className="gap-1 bg-amber-100 text-amber-700 border-amber-200">
+                          <Zap className="w-3 h-3" />
+                          {t("taskScheduler.adhocLabel")}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1">
+                          <Repeat className="w-3 h-3" />
+                          {template.default_interval} {template.default_unit}
+                        </Badge>
+                      )}
                       {template.estimated_duration_minutes && (
                         <Badge variant="outline" className="gap-1">
                           <Timer className="w-3 h-3" />
@@ -975,7 +985,10 @@ const TaskSchedulerPage = () => {
                       )}
                     </div>
                     <div className="mt-3 text-xs text-slate-500">
-                      {t("taskScheduler.usedInPlans")} {template.usage_count || 0} {t("taskScheduler.plans").toLowerCase()}
+                      {template.is_adhoc 
+                        ? t("taskScheduler.adhocTemplateHint")
+                        : `${t("taskScheduler.usedInPlans")} ${template.usage_count || 0} ${t("taskScheduler.plans").toLowerCase()}`
+                      }
                     </div>
                   </CardContent>
                 </Card>

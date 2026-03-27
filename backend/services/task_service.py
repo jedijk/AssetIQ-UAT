@@ -34,6 +34,9 @@ class TaskService:
         """Create a new task template."""
         now = datetime.now(timezone.utc)
         
+        # Determine if ad-hoc
+        is_adhoc = data.get("is_adhoc", False)
+        
         doc = {
             "name": data["name"],
             "description": data.get("description"),
@@ -41,9 +44,9 @@ class TaskService:
             "mitigation_strategy": data["mitigation_strategy"],
             "equipment_type_ids": data.get("equipment_type_ids", []),
             "failure_mode_ids": data.get("failure_mode_ids", []),
-            "frequency_type": data.get("frequency_type", "time_based"),
-            "default_interval": data.get("default_interval", 30),
-            "default_unit": data.get("default_unit", "days"),
+            "frequency_type": "adhoc" if is_adhoc else data.get("frequency_type", "time_based"),
+            "default_interval": 0 if is_adhoc else data.get("default_interval", 30),
+            "default_unit": None if is_adhoc else data.get("default_unit", "days"),
             "estimated_duration_minutes": data.get("estimated_duration_minutes"),
             "procedure_steps": data.get("procedure_steps", []),
             "safety_requirements": data.get("safety_requirements", []),
@@ -51,6 +54,7 @@ class TaskService:
             "spare_parts": data.get("spare_parts", []),
             "form_template_id": data.get("form_template_id"),
             "tags": data.get("tags", []),
+            "is_adhoc": is_adhoc,
             "is_active": True,
             "usage_count": 0,  # Track how many plans use this template
             "created_by": created_by,
@@ -128,7 +132,7 @@ class TaskService:
             "equipment_type_ids", "failure_mode_ids", "frequency_type",
             "default_interval", "default_unit", "estimated_duration_minutes",
             "procedure_steps", "safety_requirements", "tools_required",
-            "spare_parts", "form_template_id", "tags", "is_active"
+            "spare_parts", "form_template_id", "tags", "is_active", "is_adhoc"
         ]
         
         for field in allowed_fields:
@@ -984,6 +988,7 @@ class TaskService:
             "spare_parts": doc.get("spare_parts", []),
             "form_template_id": doc.get("form_template_id"),
             "tags": doc.get("tags", []),
+            "is_adhoc": doc.get("is_adhoc", False),
             "is_active": doc.get("is_active", True),
             "usage_count": doc.get("usage_count", 0),
             "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,

@@ -99,6 +99,9 @@ class TaskTemplateCreate(BaseModel):
     
     # Tagging
     tags: List[str] = Field(default_factory=list)
+    
+    # Ad-hoc flag (no recurring schedule)
+    is_adhoc: bool = False
 
 
 class TaskTemplateUpdate(BaseModel):
@@ -120,6 +123,7 @@ class TaskTemplateUpdate(BaseModel):
     form_template_id: Optional[str] = None
     tags: Optional[List[str]] = None
     is_active: Optional[bool] = None
+    is_adhoc: Optional[bool] = None
 
 
 # ============= TASK PLAN MODELS =============

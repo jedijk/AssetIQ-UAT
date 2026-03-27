@@ -82,6 +82,24 @@ Added ability to execute task templates without a recurring schedule:
 - `/app/frontend/src/pages/TaskSchedulerPage.js` - Added adhoc dialog, mutation, and menu option
 - `/app/frontend/src/contexts/LanguageContext.js` - Added EN/NL translations for adhoc UI
 
+### Feature: Ad-hoc Template Creation
+Added ability to create templates specifically designed for ad-hoc execution:
+- **"Ad-hoc Only" Toggle**: New switch in template creation dialog that:
+  - Hides the interval/frequency fields when enabled
+  - Sets `frequency_type: "adhoc"` and `default_interval: 0`
+  - Shows only Duration field for ad-hoc templates
+- **Template Card Display**: Ad-hoc templates show:
+  - Amber "Ad-hoc" badge with lightning icon instead of interval
+  - "Execute manually via 'Execute Now'" hint instead of plan count
+- **Backend Support**: Templates store `is_adhoc: true` flag
+
+**Files Modified:**
+- `/app/backend/models/task_models.py` - Added `is_adhoc` field to `TaskTemplateCreate` and `TaskTemplateUpdate`
+- `/app/backend/services/task_service.py` - Updated `create_template()` and `_serialize_template()` to handle `is_adhoc`
+- `/app/frontend/src/components/task-scheduler/TemplateDialog.js` - Added ad-hoc toggle with conditional interval fields
+- `/app/frontend/src/pages/TaskSchedulerPage.js` - Updated template card display for ad-hoc templates
+- `/app/frontend/src/contexts/LanguageContext.js` - Added EN/NL translations for ad-hoc template UI
+
 ## Completed in Previous Session (Mar 26, 2026)
 
 ### New Feature: My Tasks Page - Task Execution Front-End

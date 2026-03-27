@@ -3,6 +3,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
+import { Switch } from "../ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { Zap } from "lucide-react";
 
 export const TemplateDialog = ({
   open,
@@ -43,6 +45,7 @@ export const TemplateDialog = ({
               value={templateForm.name}
               onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
               placeholder="e.g., Bearing Inspection"
+              data-testid="template-name-input"
             />
           </div>
           <div>
@@ -91,32 +94,71 @@ export const TemplateDialog = ({
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
-              <Label>{t("taskScheduler.defaultInterval")}</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  value={templateForm.default_interval}
-                  onChange={(e) => setTemplateForm({ ...templateForm, default_interval: parseInt(e.target.value) || 1 })}
-                  min={1}
-                />
-                <Select 
-                  value={templateForm.default_unit} 
-                  onValueChange={(v) => setTemplateForm({ ...templateForm, default_unit: v })}
-                >
-                  <SelectTrigger className="w-[100px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="days">{t("taskScheduler.days")}</SelectItem>
-                    <SelectItem value="weeks">{t("taskScheduler.weeks")}</SelectItem>
-                    <SelectItem value="months">{t("taskScheduler.months")}</SelectItem>
-                  </SelectContent>
-                </Select>
+          
+          {/* Ad-hoc Toggle */}
+          <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-600" />
+              <div>
+                <Label className="text-sm font-medium">{t("taskScheduler.adhocOnly")}</Label>
+                <p className="text-xs text-slate-500">{t("taskScheduler.adhocOnlyDesc")}</p>
               </div>
             </div>
-            <div>
+            <Switch
+              checked={templateForm.is_adhoc || false}
+              onCheckedChange={(checked) => setTemplateForm({ 
+                ...templateForm, 
+                is_adhoc: checked,
+                // Reset interval if switching to adhoc
+                default_interval: checked ? 0 : (templateForm.default_interval || 30),
+                default_unit: checked ? null : (templateForm.default_unit || "days")
+              })}
+              data-testid="adhoc-toggle"
+            />
+          </div>
+
+          {/* Interval fields - hidden when ad-hoc */}
+          {!templateForm.is_adhoc && (
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <Label>{t("taskScheduler.defaultInterval")}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={templateForm.default_interval}
+                    onChange={(e) => setTemplateForm({ ...templateForm, default_interval: parseInt(e.target.value) || 1 })}
+                    min={1}
+                  />
+                  <Select 
+                    value={templateForm.default_unit} 
+                    onValueChange={(v) => setTemplateForm({ ...templateForm, default_unit: v })}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="days">{t("taskScheduler.days")}</SelectItem>
+                      <SelectItem value="weeks">{t("taskScheduler.weeks")}</SelectItem>
+                      <SelectItem value="months">{t("taskScheduler.months")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label>{t("taskScheduler.durationMin")}</Label>
+                <Input
+                  type="number"
+                  value={templateForm.estimated_duration_minutes}
+                  onChange={(e) => setTemplateForm({ ...templateForm, estimated_duration_minutes: parseInt(e.target.value) || 0 })}
+                  min={0}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Duration field when ad-hoc (still useful) */}
+          {templateForm.is_adhoc && (
+            <div className="w-1/3">
               <Label>{t("taskScheduler.durationMin")}</Label>
               <Input
                 type="number"
@@ -125,13 +167,14 @@ export const TemplateDialog = ({
                 min={0}
               />
             </div>
-          </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
           <Button 
             onClick={onSubmit} 
             disabled={!templateForm.name || isPending}
+            data-testid="template-submit-btn"
           >
             {isPending 
               ? (editingTemplate ? t("taskScheduler.saving") : t("common.creating")) 
