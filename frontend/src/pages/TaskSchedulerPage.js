@@ -818,6 +818,12 @@ const TaskSchedulerPage = () => {
                         <CardDescription>{plan.equipment_name}</CardDescription>
                       </div>
                       <div className="flex items-center gap-2">
+                        {plan.is_adhoc && (
+                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                            <Zap className="w-3 h-3 mr-1" />
+                            {t("taskScheduler.adhocLabel")}
+                          </Badge>
+                        )}
                         <Badge className={plan.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}>
                           {plan.is_active ? t("taskScheduler.active") : t("taskScheduler.inactive")}
                         </Badge>
@@ -842,14 +848,28 @@ const TaskSchedulerPage = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Repeat className="w-4 h-4" />
-                        Every {plan.interval_value} {plan.interval_unit}
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <CalendarIcon className="w-4 h-4" />
-                        {t("taskScheduler.next")}: {formatDate(plan.next_due_date)}
-                      </div>
+                      {plan.is_adhoc && !plan.interval_value ? (
+                        <div className="flex items-center gap-2 text-amber-600">
+                          <Zap className="w-4 h-4" />
+                          {t("taskScheduler.adhocTemplateHint")}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <Repeat className="w-4 h-4" />
+                          {t("taskScheduler.every")} {plan.interval_value} {plan.interval_unit}
+                        </div>
+                      )}
+                      {plan.next_due_date ? (
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <CalendarIcon className="w-4 h-4" />
+                          {t("taskScheduler.next")}: {formatDate(plan.next_due_date)}
+                        </div>
+                      ) : plan.is_adhoc && (
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <CalendarIcon className="w-4 h-4" />
+                          {t("taskScheduler.next")}: -
+                        </div>
+                      )}
                       {plan.form_template_id && (
                         <div className="flex items-center gap-2 text-blue-600">
                           <FileText className="w-4 h-4" />

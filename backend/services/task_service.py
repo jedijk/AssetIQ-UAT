@@ -198,8 +198,15 @@ class TaskService:
         
         # Get frequency settings (use template defaults if not overridden)
         frequency_type = data.get("frequency_type") or template["frequency_type"]
-        interval_value = data.get("interval_value") or template.get("default_interval")
-        interval_unit = data.get("interval_unit") or template.get("default_unit")
+        
+        # For ad-hoc templates, only use interval if explicitly provided by user
+        # For regular templates, fall back to template defaults
+        if is_adhoc_template:
+            interval_value = data.get("interval_value")  # None if not provided
+            interval_unit = data.get("interval_unit") if data.get("interval_value") else None
+        else:
+            interval_value = data.get("interval_value") or template.get("default_interval")
+            interval_unit = data.get("interval_unit") or template.get("default_unit")
         
         # Calculate next due date (or None for ad-hoc without interval)
         effective_from = data.get("effective_from") or now
