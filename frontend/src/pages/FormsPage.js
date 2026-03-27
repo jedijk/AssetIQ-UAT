@@ -31,6 +31,8 @@ import {
   Clock,
   Layers,
   RefreshCw,
+  Smartphone,
+  Monitor,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -350,6 +352,7 @@ const FormsPage = () => {
   const [showFieldDialog, setShowFieldDialog] = useState(false);
   const [editingField, setEditingField] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [previewMode, setPreviewMode] = useState("desktop"); // "desktop" or "mobile"
 
   // Form state for new template
   const [newTemplate, setNewTemplate] = useState({
@@ -953,20 +956,45 @@ const FormsPage = () => {
       </Dialog>
 
       {/* View Template Dialog */}
-      <Dialog open={!!selectedTemplate} onOpenChange={() => setSelectedTemplate(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!selectedTemplate} onOpenChange={() => { setSelectedTemplate(null); setPreviewMode("desktop"); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-indigo-600" />
-              {selectedTemplate?.name}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedTemplate?.description || "No description"}
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-600" />
+                  {selectedTemplate?.name}
+                </DialogTitle>
+                <DialogDescription>
+                  {selectedTemplate?.description || "No description"}
+                </DialogDescription>
+              </div>
+              {/* Preview Mode Toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <Button
+                  variant={previewMode === "desktop" ? "default" : "ghost"}
+                  size="sm"
+                  className={`h-8 px-3 ${previewMode === "desktop" ? "bg-white shadow-sm" : ""}`}
+                  onClick={() => setPreviewMode("desktop")}
+                  data-testid="preview-desktop-btn"
+                >
+                  <Monitor className="w-4 h-4 mr-1" /> Desktop
+                </Button>
+                <Button
+                  variant={previewMode === "mobile" ? "default" : "ghost"}
+                  size="sm"
+                  className={`h-8 px-3 ${previewMode === "mobile" ? "bg-white shadow-sm" : ""}`}
+                  onClick={() => setPreviewMode("mobile")}
+                  data-testid="preview-mobile-btn"
+                >
+                  <Smartphone className="w-4 h-4 mr-1" /> Mobile
+                </Button>
+              </div>
+            </div>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div className="flex flex-wrap gap-2">
+          <div className="py-4">
+            <div className="flex flex-wrap gap-2 mb-4">
               <Badge variant="outline">Version {selectedTemplate?.version}</Badge>
               {selectedTemplate?.discipline && (
                 <Badge className="bg-blue-50 text-blue-700 border-blue-200">{selectedTemplate.discipline}</Badge>
@@ -978,32 +1006,170 @@ const FormsPage = () => {
               )}
             </div>
 
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-slate-700">Fields ({selectedTemplate?.fields?.length || 0})</h4>
+            {/* Desktop View */}
+            {previewMode === "desktop" && (
               <div className="space-y-2">
-                {selectedTemplate?.fields?.map((field, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <div className="h-8 w-8 rounded bg-white border flex items-center justify-center">
-                      <FieldTypeIcon type={field.field_type} />
+                <h4 className="font-medium text-sm text-slate-700">Fields ({selectedTemplate?.fields?.length || 0})</h4>
+                <div className="space-y-2">
+                  {selectedTemplate?.fields?.map((field, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                      <div className="h-8 w-8 rounded bg-white border flex items-center justify-center">
+                        <FieldTypeIcon type={field.field_type} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{field.label}</span>
+                          {field.required && <span className="text-red-500 text-xs">*</span>}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {FIELD_TYPES.find(f => f.value === field.field_type)?.label}
+                          {field.unit && ` (${field.unit})`}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm">{field.label}</span>
-                        {field.required && <span className="text-red-500 text-xs">*</span>}
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Mobile Preview */}
+            {previewMode === "mobile" && (
+              <div className="flex justify-center">
+                {/* iPhone-style Device Frame */}
+                <div className="relative">
+                  {/* Phone Outer Frame */}
+                  <div className="w-[320px] h-[640px] bg-slate-900 rounded-[40px] p-3 shadow-2xl">
+                    {/* Phone Inner Frame */}
+                    <div className="w-full h-full bg-white rounded-[32px] overflow-hidden relative">
+                      {/* Status Bar */}
+                      <div className="h-11 bg-slate-50 flex items-center justify-between px-6 border-b">
+                        <span className="text-xs font-medium">9:41</span>
+                        <div className="absolute left-1/2 -translate-x-1/2 w-20 h-6 bg-slate-900 rounded-full" />
+                        <div className="flex items-center gap-1">
+                          <div className="w-4 h-2 border border-slate-400 rounded-sm">
+                            <div className="w-2/3 h-full bg-slate-400 rounded-sm" />
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-500">
-                        {FIELD_TYPES.find(f => f.value === field.field_type)?.label}
-                        {field.unit && ` (${field.unit})`}
+                      
+                      {/* App Header */}
+                      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3">
+                        <h3 className="text-white font-semibold text-sm truncate">{selectedTemplate?.name}</h3>
+                        <p className="text-white/70 text-xs">Fill out the form below</p>
                       </div>
+
+                      {/* Form Content */}
+                      <div className="p-4 space-y-4 overflow-y-auto h-[480px]">
+                        {selectedTemplate?.fields?.map((field, idx) => (
+                          <div key={idx} className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-700 flex items-center gap-1">
+                              {field.label}
+                              {field.required && <span className="text-red-500">*</span>}
+                            </label>
+                            {field.description && (
+                              <p className="text-[10px] text-slate-400">{field.description}</p>
+                            )}
+                            {/* Render field based on type */}
+                            {field.field_type === "text" && (
+                              <div className="h-9 bg-slate-100 rounded-lg border border-slate-200 px-3 flex items-center">
+                                <span className="text-xs text-slate-400">Enter text...</span>
+                              </div>
+                            )}
+                            {field.field_type === "textarea" && (
+                              <div className="h-20 bg-slate-100 rounded-lg border border-slate-200 p-2">
+                                <span className="text-xs text-slate-400">Enter description...</span>
+                              </div>
+                            )}
+                            {field.field_type === "numeric" && (
+                              <div className="h-9 bg-slate-100 rounded-lg border border-slate-200 px-3 flex items-center justify-between">
+                                <span className="text-xs text-slate-400">0</span>
+                                {field.unit && <span className="text-xs text-slate-500">{field.unit}</span>}
+                              </div>
+                            )}
+                            {field.field_type === "boolean" && (
+                              <div className="flex items-center gap-2">
+                                <div className="w-10 h-5 bg-slate-200 rounded-full relative">
+                                  <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow" />
+                                </div>
+                                <span className="text-xs text-slate-500">No</span>
+                              </div>
+                            )}
+                            {field.field_type === "dropdown" && (
+                              <div className="h-9 bg-slate-100 rounded-lg border border-slate-200 px-3 flex items-center justify-between">
+                                <span className="text-xs text-slate-400">Select option...</span>
+                                <ChevronDown className="w-3 h-3 text-slate-400" />
+                              </div>
+                            )}
+                            {field.field_type === "multi_select" && (
+                              <div className="h-9 bg-slate-100 rounded-lg border border-slate-200 px-3 flex items-center justify-between">
+                                <span className="text-xs text-slate-400">Select options...</span>
+                                <ChevronDown className="w-3 h-3 text-slate-400" />
+                              </div>
+                            )}
+                            {field.field_type === "date" && (
+                              <div className="h-9 bg-slate-100 rounded-lg border border-slate-200 px-3 flex items-center justify-between">
+                                <span className="text-xs text-slate-400">Select date...</span>
+                                <Calendar className="w-3 h-3 text-slate-400" />
+                              </div>
+                            )}
+                            {field.field_type === "datetime" && (
+                              <div className="h-9 bg-slate-100 rounded-lg border border-slate-200 px-3 flex items-center justify-between">
+                                <span className="text-xs text-slate-400">Select date & time...</span>
+                                <Calendar className="w-3 h-3 text-slate-400" />
+                              </div>
+                            )}
+                            {field.field_type === "file" && (
+                              <div className="h-16 bg-slate-100 rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center">
+                                <Upload className="w-4 h-4 text-slate-400" />
+                                <span className="text-[10px] text-slate-400 mt-1">Tap to upload</span>
+                              </div>
+                            )}
+                            {field.field_type === "image" && (
+                              <div className="h-20 bg-slate-100 rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center">
+                                <Upload className="w-4 h-4 text-slate-400" />
+                                <span className="text-[10px] text-slate-400 mt-1">Tap to add image</span>
+                              </div>
+                            )}
+                            {field.field_type === "signature" && (
+                              <div className="h-24 bg-slate-50 rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center">
+                                <Signature className="w-5 h-5 text-slate-400" />
+                                <span className="text-[10px] text-slate-400 mt-1">Tap to sign</span>
+                              </div>
+                            )}
+                            {field.field_type === "range" && (
+                              <div className="space-y-1">
+                                <div className="h-2 bg-slate-200 rounded-full relative">
+                                  <div className="absolute left-0 top-0 h-full w-1/3 bg-indigo-500 rounded-full" />
+                                  <div className="absolute left-1/3 top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-indigo-500 rounded-full shadow" />
+                                </div>
+                                <div className="flex justify-between text-[10px] text-slate-400">
+                                  <span>Min</span>
+                                  <span>Max</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Submit Button */}
+                        <div className="pt-4 pb-2">
+                          <div className="h-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
+                            <span className="text-white text-sm font-medium">Submit</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Home Indicator */}
+                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-slate-300 rounded-full" />
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedTemplate(null)}>
+            <Button variant="outline" onClick={() => { setSelectedTemplate(null); setPreviewMode("desktop"); }}>
               Close
             </Button>
           </DialogFooter>
