@@ -944,7 +944,7 @@ const TaskSchedulerPage = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2 text-sm">
-                      {plan.is_adhoc && !plan.interval_value ? (
+                      {plan.is_adhoc ? (
                         <div className="flex items-center gap-2 text-amber-600">
                           <Zap className="w-4 h-4" />
                           {t("taskScheduler.adhocTemplateHint")}
