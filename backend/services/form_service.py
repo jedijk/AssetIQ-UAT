@@ -200,6 +200,11 @@ class FormService:
             
             result = await self.templates.insert_one(new_doc)
             new_doc["_id"] = result.inserted_id
+            new_template_id = str(result.inserted_id)
+            
+            # Update all associated task plans to link to the new version
+            old_template_id = template_id
+            await self._update_linked_tasks(old_template_id, new_template_id, new_doc.get("name"))
             
             return self._serialize_template(new_doc)
         else:
@@ -225,9 +230,43 @@ class FormService:
                 return_document=True
             )
             
+            # Update linked task names if form name changed
+            if result and "name" in data:
+                await self._update_linked_task_names(template_id, data["name"])
+            
             if result:
                 return self._serialize_template(result)
             return None
+    
+    async def _update_linked_tasks(self, old_template_id: str, new_template_id: str, new_name: str = None):
+        """Update all task plans and task templates that reference this form template to use the new version."""
+        # Update task_plans collection
+        update_data = {"form_template_id": new_template_id}
+        if new_name:
+            update_data["form_template_name"] = new_name
+        
+        await self.db.task_plans.update_many(
+            {"form_template_id": old_template_id},
+            {"$set": update_data}
+        )
+        
+        # Also update task_templates that have this form linked
+        await self.db.task_templates.update_many(
+            {"form_template_id": old_template_id},
+            {"$set": update_data}
+        )
+    
+    async def _update_linked_task_names(self, template_id: str, new_name: str):
+        """Update form_template_name in linked tasks when form name changes."""
+        await self.db.task_plans.update_many(
+            {"form_template_id": template_id},
+            {"$set": {"form_template_name": new_name}}
+        )
+        
+        await self.db.task_templates.update_many(
+            {"form_template_id": template_id},
+            {"$set": {"form_template_name": new_name}}
+        )
     
     async def delete_template(self, template_id: str) -> bool:
         """Deactivate a form template."""
