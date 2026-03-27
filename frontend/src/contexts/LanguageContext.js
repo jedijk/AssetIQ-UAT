@@ -857,6 +857,19 @@ const en = {
     label: "Label",
     fieldType: "Field Type",
     notes: "Notes",
+    // Documents
+    documents: "Documents",
+    referenceDocuments: "Reference Documents",
+    referenceDocumentsHint: "Add manuals, SOPs, or guides that can be searched with AI during execution",
+    addDocument: "Add Document",
+    pendingUpload: "Pending upload",
+    noDocuments: "No documents attached",
+    noDocumentsHint: "Upload PDFs, manuals, or reference materials",
+    attachedDocuments: "Attached Documents",
+    noDocumentsAttached: "No documents attached to this form",
+    aiDocumentSearch: "AI Document Search",
+    searchDocumentsPlaceholder: "Ask a question about the attached documents...",
+    askAI: "Ask AI",
   },
 
   // Decision Engine
@@ -1786,6 +1799,19 @@ const nl = {
     label: "Label",
     fieldType: "Veldtype",
     notes: "Notities",
+    // Documents
+    documents: "Documenten",
+    referenceDocuments: "Referentiedocumenten",
+    referenceDocumentsHint: "Voeg handleidingen, SOP's of gidsen toe die met AI kunnen worden doorzocht tijdens uitvoering",
+    addDocument: "Document toevoegen",
+    pendingUpload: "Wachtend op upload",
+    noDocuments: "Geen documenten bijgevoegd",
+    noDocumentsHint: "Upload PDF's, handleidingen of referentiemateriaal",
+    attachedDocuments: "Bijgevoegde documenten",
+    noDocumentsAttached: "Geen documenten aan dit formulier gekoppeld",
+    aiDocumentSearch: "AI Documentzoeken",
+    searchDocumentsPlaceholder: "Stel een vraag over de bijgevoegde documenten...",
+    askAI: "Vraag AI",
   },
 
   // Decision Engine

@@ -22,7 +22,7 @@ Build an AI-Powered Threat Capture & Prioritization Platform named "ThreatBase" 
 - Causal Intelligence Analysis
 - Action Tracker with central management
 - Decision Engine with automated rules
-- Form Designer
+- Form Designer with document attachments and AI search
 - Task/Execution Scheduler
 - Analytics Dashboard
 - Reliability Performance tracking

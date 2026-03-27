@@ -148,6 +148,9 @@ class FormTemplateCreate(BaseModel):
     # Fields
     fields: List[FormFieldDefinition] = Field(default_factory=list)
     
+    # Reference Documents (for AI-powered search during execution)
+    documents: List[Dict[str, Any]] = Field(default_factory=list)  # [{name, url, type, description}]
+    
     # Settings
     allow_partial_submission: bool = False
     require_signature: bool = False
@@ -164,6 +167,7 @@ class FormTemplateUpdate(BaseModel):
     failure_mode_ids: Optional[List[str]] = None
     equipment_type_ids: Optional[List[str]] = None
     fields: Optional[List[FormFieldDefinition]] = None
+    documents: Optional[List[Dict[str, Any]]] = None  # Reference documents
     allow_partial_submission: Optional[bool] = None
     require_signature: Optional[bool] = None
     tags: Optional[List[str]] = None

@@ -3,15 +3,20 @@ Forms routes.
 """
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
-from database import db, form_service
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from datetime import datetime
+from database import db, form_service, EMERGENT_LLM_KEY
 from auth import get_current_user
 from models.form_models import (
     FormTemplateCreate, FormTemplateUpdate,
     FormFieldDefinition, FormFieldUpdate,
     FormSubmission
 )
+from storage import put_object, get_object, MIME_TYPES
+import logging
+import uuid
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Forms"])
 
@@ -216,6 +221,192 @@ async def get_form_analytics(
     to_dt = datetime.fromisoformat(to_date) if to_date else None
     
     return await form_service.get_form_analytics(template_id, from_dt, to_dt)
+
+
+# --- Document Management ---
+
+@router.post("/form-templates/{template_id}/documents")
+async def upload_form_document(
+    template_id: str,
+    file: UploadFile = File(...),
+    description: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload a reference document to a form template."""
+    # Verify template exists
+    template = await form_service.get_template_by_id(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Form template not found")
+    
+    # Get file extension and validate
+    filename = file.filename or "document"
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "bin"
+    allowed_extensions = ["pdf", "doc", "docx", "xls", "xlsx", "txt", "csv", "jpg", "jpeg", "png"]
+    
+    if ext not in allowed_extensions:
+        raise HTTPException(status_code=400, detail=f"File type .{ext} not allowed. Allowed: {allowed_extensions}")
+    
+    # Read file data
+    file_data = await file.read()
+    max_size = 25 * 1024 * 1024  # 25MB limit
+    if len(file_data) > max_size:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 25MB")
+    
+    # Generate storage path
+    doc_id = str(uuid.uuid4())
+    storage_path = f"forms/{template_id}/documents/{doc_id}.{ext}"
+    content_type = MIME_TYPES.get(ext, "application/octet-stream")
+    
+    # Upload to object storage
+    try:
+        result = put_object(storage_path, file_data, content_type)
+        doc_url = result.get("url", storage_path)
+    except Exception as e:
+        logger.error(f"Failed to upload document: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload document")
+    
+    # Create document metadata
+    doc_metadata = {
+        "id": doc_id,
+        "name": filename,
+        "url": doc_url,
+        "storage_path": storage_path,
+        "type": ext,
+        "content_type": content_type,
+        "size_bytes": len(file_data),
+        "description": description or "",
+        "uploaded_by": current_user["id"],
+        "uploaded_at": datetime.utcnow().isoformat(),
+    }
+    
+    # Add document to template
+    await db.form_templates.update_one(
+        {"_id": template["_id"]},
+        {"$push": {"documents": doc_metadata}}
+    )
+    
+    return {"message": "Document uploaded successfully", "document": doc_metadata}
+
+
+@router.delete("/form-templates/{template_id}/documents/{document_id}")
+async def delete_form_document(
+    template_id: str,
+    document_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a document from a form template."""
+    template = await form_service.get_template_by_id(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Form template not found")
+    
+    # Remove document from template
+    result = await db.form_templates.update_one(
+        {"_id": template["_id"]},
+        {"$pull": {"documents": {"id": document_id}}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    return {"message": "Document deleted successfully"}
+
+
+@router.get("/form-templates/{template_id}/documents")
+async def get_form_documents(
+    template_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all documents attached to a form template."""
+    template = await form_service.get_template_by_id(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Form template not found")
+    
+    return {"documents": template.get("documents", [])}
+
+
+class DocumentSearchRequest(BaseModel):
+    query: str
+    document_ids: Optional[List[str]] = None  # Specific docs to search, or all if None
+
+
+@router.post("/form-templates/{template_id}/documents/search")
+async def search_form_documents(
+    template_id: str,
+    request: DocumentSearchRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """AI-powered search across form template documents."""
+    template = await form_service.get_template_by_id(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Form template not found")
+    
+    documents = template.get("documents", [])
+    if not documents:
+        return {"results": [], "message": "No documents attached to this form template"}
+    
+    # Filter to specific documents if requested
+    if request.document_ids:
+        documents = [d for d in documents if d["id"] in request.document_ids]
+    
+    if not documents:
+        return {"results": [], "message": "No matching documents found"}
+    
+    # Use AI to search documents
+    try:
+        from emergentintegrations.llm.chat import chat, UserMessage
+        
+        # Build context from documents
+        doc_context = "\n\n".join([
+            f"Document: {d['name']}\nDescription: {d.get('description', 'No description')}\nType: {d['type']}"
+            for d in documents
+        ])
+        
+        system_prompt = f"""You are a helpful assistant that searches reference documents for a form.
+The user is filling out a form and needs help finding information in the attached documents.
+
+Available Documents:
+{doc_context}
+
+Provide helpful, concise answers based on the document names, descriptions and types available.
+If a specific document would be most relevant, mention its name.
+If you cannot find relevant information, say so clearly and suggest which document type might help."""
+        
+        response = await chat(
+            api_key=EMERGENT_LLM_KEY,
+            model="gpt-4o-mini",
+            system_prompt=system_prompt,
+            messages=[UserMessage(content=request.query)],
+            temperature=0.3
+        )
+        
+        return {
+            "query": request.query,
+            "answer": response.content if hasattr(response, 'content') else str(response),
+            "relevant_documents": [
+                {"id": d["id"], "name": d["name"], "url": d["url"], "type": d["type"]}
+                for d in documents
+            ],
+            "source": "ai"
+        }
+        
+    except Exception as e:
+        logger.error(f"AI document search failed: {e}")
+        # Fallback: return documents with simple keyword matching
+        query_lower = request.query.lower()
+        relevant = [
+            d for d in documents
+            if query_lower in d["name"].lower() or query_lower in d.get("description", "").lower()
+        ]
+        
+        return {
+            "query": request.query,
+            "answer": f"Found {len(relevant)} potentially relevant document(s). AI search unavailable.",
+            "relevant_documents": [
+                {"id": d["id"], "name": d["name"], "url": d["url"], "type": d["type"]}
+                for d in (relevant if relevant else documents)
+            ],
+            "source": "keyword"
+        }
 
 # ============= OBSERVATION ENGINE ENDPOINTS =============
 
