@@ -121,6 +121,11 @@ class FailureModesService:
             return self._serialize(doc)
         return None
     
+    # Alias for find_by_name for semantic clarity
+    async def find_by_name(self, failure_mode_name: str) -> Optional[Dict[str, Any]]:
+        """Alias for get_by_name - checks if a failure mode with this name exists."""
+        return await self.get_by_name(failure_mode_name)
+    
     async def search_by_keywords(self, keywords: List[str]) -> List[Dict[str, Any]]:
         """Find failure modes matching any of the provided keywords."""
         query = {
@@ -207,6 +212,11 @@ class FailureModesService:
             "recommended_actions": data.get("recommended_actions", []),
             "equipment_type_ids": data.get("equipment_type_ids", []),
             "mechanism": data.get("mechanism", "UNK - Unknown"),
+            # New fields for failure mode enhancements
+            "process": data.get("process"),
+            "potential_effects": data.get("potential_effects"),
+            "potential_causes": data.get("potential_causes"),
+            "iso14224_mechanism": data.get("iso14224_mechanism"),
             "is_validated": False,
             "validated_by_name": None,
             "validated_by_position": None,
@@ -249,7 +259,9 @@ class FailureModesService:
         allowed_fields = [
             "category", "equipment", "failure_mode", "keywords",
             "severity", "occurrence", "detectability",
-            "recommended_actions", "equipment_type_ids", "mechanism"
+            "recommended_actions", "equipment_type_ids", "mechanism",
+            # New fields for failure mode enhancements
+            "process", "potential_effects", "potential_causes", "iso14224_mechanism"
         ]
         
         for field in allowed_fields:
@@ -516,6 +528,11 @@ class FailureModesService:
             "recommended_actions": doc.get("recommended_actions", []),
             "equipment_type_ids": doc.get("equipment_type_ids", []),
             "mechanism": doc.get("mechanism", "UNK - Unknown"),
+            # New fields for failure mode enhancements
+            "process": doc.get("process"),
+            "potential_effects": doc.get("potential_effects"),
+            "potential_causes": doc.get("potential_causes"),
+            "iso14224_mechanism": doc.get("iso14224_mechanism"),
             "is_validated": doc.get("is_validated", False),
             "validated_by_name": doc.get("validated_by_name"),
             "validated_by_position": doc.get("validated_by_position"),

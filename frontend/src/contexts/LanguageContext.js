@@ -386,6 +386,18 @@ const en = {
     validationAdded: "Validation added successfully",
     validationRemoved: "Validation removed",
     mechanism: "ISO 14224 Mechanism",
+    iso14224Mechanism: "ISO 14224 Mechanism",
+    pendingValidation: "Pending Validation",
+    noKeywords: "No keywords",
+    selectCategory: "Select category",
+    // New failure mode fields
+    process: "Process",
+    processPlaceholder: "e.g., Extrusion, Compounding",
+    potentialEffects: "Potential Effects",
+    potentialEffectsPlaceholder: "e.g., Production loss, safety hazard",
+    potentialCauses: "Potential Causes",
+    potentialCausesPlaceholder: "e.g., Wear, contamination, incorrect settings",
+    duplicateNameError: "A failure mode with this name already exists",
   },
   
   // Equipment Manager
@@ -1414,6 +1426,18 @@ const nl = {
     validationAdded: "Validatie succesvol toegevoegd",
     validationRemoved: "Validatie verwijderd",
     mechanism: "ISO 14224 Mechanisme",
+    iso14224Mechanism: "ISO 14224 Mechanisme",
+    pendingValidation: "In Afwachting van Validatie",
+    noKeywords: "Geen trefwoorden",
+    selectCategory: "Selecteer categorie",
+    // New failure mode fields
+    process: "Proces",
+    processPlaceholder: "bijv., Extrusie, Compounding",
+    potentialEffects: "Potentiële Effecten",
+    potentialEffectsPlaceholder: "bijv., Productieverlies, veiligheidsrisico",
+    potentialCauses: "Potentiële Oorzaken",
+    potentialCausesPlaceholder: "bijv., Slijtage, vervuiling, verkeerde instellingen",
+    duplicateNameError: "Er bestaat al een faalmodus met deze naam",
   },
   
   // Equipment Manager

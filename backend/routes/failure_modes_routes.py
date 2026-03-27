@@ -10,9 +10,30 @@ import logging
 from database import db, failure_modes_service, efm_service
 from auth import get_current_user
 from services.threat_score_service import recalculate_threat_scores_for_failure_mode
+from failure_modes import FAILURE_MODES_LIBRARY
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Failure Modes"])
+
+
+# Helper functions for fallback data
+def get_all_categories():
+    """Get unique categories from static library."""
+    categories = set()
+    for fm in FAILURE_MODES_LIBRARY:
+        if fm.get("category"):
+            categories.add(fm["category"])
+    return sorted(list(categories))
+
+
+def get_all_equipment_types():
+    """Get unique equipment types from static library."""
+    equipment_types = set()
+    for fm in FAILURE_MODES_LIBRARY:
+        if fm.get("equipment"):
+            equipment_types.add(fm["equipment"])
+    return sorted(list(equipment_types))
+
 
 @router.get("/failure-modes")
 async def get_failure_modes(
@@ -261,6 +282,14 @@ async def create_failure_mode(
     equipment_type_ids = data.equipment_type_ids if data.equipment_type_ids else auto_link_equipment_types(data.equipment)
     
     try:
+        # Check for duplicate failure mode name
+        existing = await failure_modes_service.find_by_name(data.failure_mode)
+        if existing:
+            raise HTTPException(
+                status_code=400, 
+                detail="A failure mode with this name already exists"
+            )
+        
         new_fm = await failure_modes_service.create(
             data={
                 "category": data.category,
@@ -275,10 +304,16 @@ async def create_failure_mode(
                 "description": data.description,
                 "source": data.source,
                 "linked_threat_id": data.linked_threat_id,
+                "process": data.process,
+                "potential_effects": data.potential_effects,
+                "potential_causes": data.potential_causes,
+                "iso14224_mechanism": data.iso14224_mechanism,
             },
             created_by=current_user["id"]
         )
         return new_fm
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating failure mode in MongoDB: {e}")
         # Fallback to in-memory (will be lost on restart)
@@ -297,6 +332,10 @@ async def create_failure_mode(
             "rpn": data.severity * data.occurrence * data.detectability,
             "recommended_actions": data.recommended_actions,
             "equipment_type_ids": equipment_type_ids,
+            "process": data.process,
+            "potential_effects": data.potential_effects,
+            "potential_causes": data.potential_causes,
+            "iso14224_mechanism": data.iso14224_mechanism,
             "is_custom": True,
             "created_by": current_user["id"]
         }
@@ -337,6 +376,15 @@ async def update_failure_mode(
             update_data["recommended_actions"] = data.recommended_actions
         if data.equipment_type_ids is not None:
             update_data["equipment_type_ids"] = data.equipment_type_ids
+        # New fields
+        if data.process is not None:
+            update_data["process"] = data.process
+        if data.potential_effects is not None:
+            update_data["potential_effects"] = data.potential_effects
+        if data.potential_causes is not None:
+            update_data["potential_causes"] = data.potential_causes
+        if data.iso14224_mechanism is not None:
+            update_data["iso14224_mechanism"] = data.iso14224_mechanism
         
         result = await failure_modes_service.update(
             mode_id, 

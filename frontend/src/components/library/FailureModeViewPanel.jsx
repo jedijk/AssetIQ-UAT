@@ -327,15 +327,64 @@ export function FailureModeViewPanel({
           <div>
             <Label className="text-xs text-slate-500 mb-2 block">{t("library.equipment")}</Label>
             {isEditing ? (
-              <Input
-                value={formData?.equipment || ""}
-                onChange={(e) => setFormData({ ...formData, equipment: e.target.value })}
-                placeholder={t("library.equipmentPlaceholder")}
-              />
+              <Select 
+                value={formData?.equipment || ""} 
+                onValueChange={(v) => setFormData({ ...formData, equipment: v })}
+              >
+                <SelectTrigger><SelectValue placeholder={t("library.equipmentPlaceholder")} /></SelectTrigger>
+                <SelectContent>
+                  {/* Show unique equipment values from existing failure modes or use equipment types */}
+                  {equipmentTypes.map(et => (
+                    <SelectItem key={et.id} value={et.name}>{et.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ) : (
               <span className="text-sm text-slate-700">{fm.equipment || "—"}</span>
             )}
           </div>
+        </div>
+
+        {/* Process */}
+        <div>
+          <Label className="text-xs text-slate-500 mb-2 block">{t("library.process")}</Label>
+          {isEditing ? (
+            <Input
+              value={formData?.process || ""}
+              onChange={(e) => setFormData({ ...formData, process: e.target.value })}
+              placeholder={t("library.processPlaceholder")}
+            />
+          ) : (
+            <span className="text-sm text-slate-700">{fm.process || "—"}</span>
+          )}
+        </div>
+
+        {/* Potential Effects */}
+        <div>
+          <Label className="text-xs text-slate-500 mb-2 block">{t("library.potentialEffects")}</Label>
+          {isEditing ? (
+            <Input
+              value={formData?.potential_effects || ""}
+              onChange={(e) => setFormData({ ...formData, potential_effects: e.target.value })}
+              placeholder={t("library.potentialEffectsPlaceholder")}
+            />
+          ) : (
+            <span className="text-sm text-slate-700">{fm.potential_effects || "—"}</span>
+          )}
+        </div>
+
+        {/* Potential Causes */}
+        <div>
+          <Label className="text-xs text-slate-500 mb-2 block">{t("library.potentialCauses")}</Label>
+          {isEditing ? (
+            <Input
+              value={formData?.potential_causes || ""}
+              onChange={(e) => setFormData({ ...formData, potential_causes: e.target.value })}
+              placeholder={t("library.potentialCausesPlaceholder")}
+            />
+          ) : (
+            <span className="text-sm text-slate-700">{fm.potential_causes || "—"}</span>
+          )}
         </div>
 
         {/* ISO 14224 Mechanism */}

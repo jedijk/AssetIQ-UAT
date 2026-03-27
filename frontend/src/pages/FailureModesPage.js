@@ -134,7 +134,11 @@ const FailureModesPage = () => {
     occurrence: 5,
     detectability: 5,
     recommended_actions: [],
-    equipment_type_ids: []
+    equipment_type_ids: [],
+    process: "",
+    potential_effects: "",
+    potential_causes: "",
+    iso14224_mechanism: ""
   });
   const [keywordInput, setKeywordInput] = useState("");
   const [actionInput, setActionInput] = useState("");
@@ -168,7 +172,11 @@ const FailureModesPage = () => {
       occurrence: 5,
       detectability: 5,
       recommended_actions: [],
-      equipment_type_ids: []
+      equipment_type_ids: [],
+      process: "",
+      potential_effects: "",
+      potential_causes: "",
+      iso14224_mechanism: ""
     });
     setKeywordInput("");
     setActionInput("");
@@ -427,7 +435,11 @@ const FailureModesPage = () => {
       occurrence: fm.occurrence,
       detectability: fm.detectability,
       recommended_actions: fm.recommended_actions || [],
-      equipment_type_ids: fm.equipment_type_ids || []
+      equipment_type_ids: fm.equipment_type_ids || [],
+      process: fm.process || "",
+      potential_effects: fm.potential_effects || "",
+      potential_causes: fm.potential_causes || "",
+      iso14224_mechanism: fm.iso14224_mechanism || ""
     });
     setIsFmDialogOpen(true);
   };
@@ -451,7 +463,11 @@ const FailureModesPage = () => {
         occurrence: selectedFm.occurrence,
         detectability: selectedFm.detectability,
         recommended_actions: selectedFm.recommended_actions || [],
-        equipment_type_ids: selectedFm.equipment_type_ids || []
+        equipment_type_ids: selectedFm.equipment_type_ids || [],
+        process: selectedFm.process || "",
+        potential_effects: selectedFm.potential_effects || "",
+        potential_causes: selectedFm.potential_causes || "",
+        iso14224_mechanism: selectedFm.iso14224_mechanism || ""
       });
       setIsViewPanelEditing(true);
     }
@@ -861,12 +877,19 @@ const FailureModesPage = () => {
               </div>
               <div>
                 <Label>{t("library.equipment")} *</Label>
-                <Input 
+                <Select 
                   value={newFm.equipment} 
-                  onChange={e => handleEquipmentChange(e.target.value)} 
-                  placeholder="e.g., Pump, Compressor, Valve" 
-                  data-testid="fm-equipment-input"
-                />
+                  onValueChange={v => handleEquipmentChange(v)}
+                >
+                  <SelectTrigger data-testid="fm-equipment-input">
+                    <SelectValue placeholder={t("library.equipmentPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {equipmentTypes.map(et => (
+                      <SelectItem key={et.id} value={et.name}>{et.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -878,6 +901,36 @@ const FailureModesPage = () => {
                 onChange={e => setNewFm({ ...newFm, failure_mode: e.target.value })} 
                 placeholder="e.g., Seal Failure, Bearing Damage" 
                 data-testid="fm-name-input"
+              />
+            </div>
+
+            {/* Process Field */}
+            <div>
+              <Label>{t("library.process")}</Label>
+              <Input 
+                value={newFm.process || ""} 
+                onChange={e => setNewFm({ ...newFm, process: e.target.value })} 
+                placeholder={t("library.processPlaceholder")}
+              />
+            </div>
+
+            {/* Potential Effects */}
+            <div>
+              <Label>{t("library.potentialEffects")}</Label>
+              <Input 
+                value={newFm.potential_effects || ""} 
+                onChange={e => setNewFm({ ...newFm, potential_effects: e.target.value })} 
+                placeholder={t("library.potentialEffectsPlaceholder")}
+              />
+            </div>
+
+            {/* Potential Causes */}
+            <div>
+              <Label>{t("library.potentialCauses")}</Label>
+              <Input 
+                value={newFm.potential_causes || ""} 
+                onChange={e => setNewFm({ ...newFm, potential_causes: e.target.value })} 
+                placeholder={t("library.potentialCausesPlaceholder")}
               />
             </div>
 
