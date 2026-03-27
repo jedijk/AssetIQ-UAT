@@ -1,146 +1,120 @@
 {
-  "project_name": "ThreatBase",
-  "design_philosophy": {
-    "identity": "The Industrial Precision Tool",
-    "core_principles": [
-      "Clarity over Style: If it doesn't help the engineer make a decision, delete it.",
-      "Traffic Light Protocol: Risk colors (Red/Orange/Yellow/Green) are sacred. Never use them for decoration.",
-      "Mobile-First Ergonomics: Buttons must be thumb-accessible (48px+ touch targets).",
-      "Progressive Disclosure: Show the threat title and risk level first. Reveal details on tap."
-    ],
-    "mood": "Clinical, Reliable, Fast, Industrial",
-    "theme_strategy": "Light Mode Only (Engineering Environment Standard)"
+  "theme_and_archetype": {
+    "theme": "Light",
+    "archetype": "4 (Swiss & High-Contrast)",
+    "reasoning": "A premium analytics dashboard requires authority, clarity, and precision. A high-contrast light theme with stark borders, reduced text sizing, and rigorous typographic hierarchy feels high-end and functional."
   },
   "typography": {
-    "font_family_primary": "Inter",
-    "font_family_secondary": "JetBrains Mono",
-    "font_family_display": "Manrope",
-    "scale": {
-      "display": "text-4xl font-extrabold tracking-tight lg:text-5xl",
-      "h1": "text-3xl font-bold tracking-tight",
-      "h2": "text-2xl font-semibold tracking-tight",
-      "h3": "text-xl font-semibold",
-      "body_large": "text-lg leading-relaxed",
-      "body": "text-base leading-normal",
-      "small": "text-sm font-medium text-muted-foreground",
-      "mono": "font-mono text-sm tracking-wide"
+    "headings": {
+      "family": "Manrope",
+      "weights": ["Medium", "SemiBold", "Bold", "ExtraBold"],
+      "usage": "Use for all page titles, section titles, KPI values, and tab names. Ensure tracking is tight (`tracking-tight`)."
+    },
+    "body": {
+      "family": "IBM Plex Sans",
+      "weights": ["Regular", "Medium", "SemiBold"],
+      "usage": "Use for body text, data tables, subtitles, and labels."
+    },
+    "kpi_cards": {
+      "label": "text-[10px] uppercase font-bold tracking-[0.2em] text-slate-500",
+      "value": "text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900",
+      "subtitle": "text-xs text-slate-400 mt-1",
+      "trend": "text-xs font-medium flex items-center gap-1 mt-2"
     }
   },
   "colors": {
-    "background": {
-      "default": "bg-slate-50",
-      "surface": "bg-white",
-      "subtle": "bg-slate-100",
-      "active": "bg-blue-50"
+    "base": {
+      "background": "#FFFFFF",
+      "surface": "#F8FAFC",
+      "border": "#E2E8F0"
     },
     "text": {
-      "primary": "text-slate-900",
-      "secondary": "text-slate-500",
-      "tertiary": "text-slate-400",
-      "inverse": "text-white"
+      "primary": "#0F172A",
+      "secondary": "#64748B",
+      "muted": "#94A3B8"
     },
-    "border": {
-      "default": "border-slate-200",
-      "active": "border-blue-200",
-      "focus": "ring-blue-500"
+    "accents": {
+      "primary": "#0F172A",
+      "success": "#059669",
+      "warning": "#D97706",
+      "danger": "#DC2626",
+      "highlight": "#3B82F6"
     },
-    "brand": {
-      "primary": "bg-blue-600 hover:bg-blue-700 text-white",
-      "secondary": "bg-slate-900 hover:bg-slate-800 text-white",
-      "outline": "border-2 border-slate-200 hover:bg-slate-50 text-slate-900"
-    },
-    "risk_levels": {
-      "critical": {
-        "bg": "bg-red-50",
-        "text": "text-red-700",
-        "border": "border-red-200",
-        "badge": "bg-red-100 text-red-700 hover:bg-red-200",
-        "indicator": "bg-red-500"
+    "charts": {
+      "palette": [
+        "#0F172A",
+        "#334155",
+        "#475569",
+        "#64748B",
+        "#94A3B8",
+        "#CBD5E1"
+      ],
+      "area_gradient": {
+        "start": "#0F172A",
+        "end": "#FFFFFF"
       },
-      "high": {
-        "bg": "bg-orange-50",
-        "text": "text-orange-700",
-        "border": "border-orange-200",
-        "badge": "bg-orange-100 text-orange-700 hover:bg-orange-200",
-        "indicator": "bg-orange-500"
-      },
-      "medium": {
-        "bg": "bg-yellow-50",
-        "text": "text-yellow-700",
-        "border": "border-yellow-200",
-        "badge": "bg-yellow-100 text-yellow-700 hover:bg-yellow-200",
-        "indicator": "bg-yellow-500"
-      },
-      "low": {
-        "bg": "bg-green-50",
-        "text": "text-green-700",
-        "border": "border-green-200",
-        "badge": "bg-green-100 text-green-700 hover:bg-green-200",
-        "indicator": "bg-green-500"
-      }
+      "description": "Use a sophisticated monochromatic slate/obsidian palette for premium data visualization, replacing the default rainbow colors. Use highlight colors sparsely to draw attention to specific data points."
     }
   },
-  "layout_strategy": {
-    "container": "container mx-auto px-4 md:px-6 max-w-7xl",
-    "section_spacing": "py-8 md:py-12",
-    "grid": {
-      "dashboard": "grid grid-cols-1 md:grid-cols-12 gap-6",
-      "cards": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+  "layout_and_spacing": {
+    "grid": "Control Room Grid (Mode B)",
+    "container": "Use max-w-7xl mx-auto p-6 lg:p-8",
+    "gaps": "Tight gaps (gap-4 to gap-6) for widget density",
+    "padding": "Generous padding inside cards (p-6)"
+  },
+  "surface_strategy": {
+    "kpi_cards": {
+      "style": "Neumorphism & Grid Borders",
+      "classes": "bg-white border border-slate-200/80 shadow-sm rounded-xl hover:shadow-md hover:border-slate-300 transition-all duration-200 group",
+      "icon_treatment": "Remove heavy gradients behind icons. Use subtle off-white squares (`bg-slate-50 border border-slate-100`) with sleek slate icons (`text-slate-700`)."
     },
-    "dashboard_bento": {
-      "kpi_row": "col-span-12 grid grid-cols-2 md:grid-cols-4 gap-4",
-      "main_chart": "col-span-12 md:col-span-8 h-[400px]",
-      "feed": "col-span-12 md:col-span-4 h-[400px] overflow-y-auto"
+    "charts_and_tables": {
+      "style": "Clean, flat cards",
+      "classes": "bg-white border border-slate-200/80 shadow-sm rounded-xl overflow-hidden"
+    },
+    "header_icon": {
+      "style": "Premium minimal",
+      "classes": "h-10 w-10 rounded-lg bg-slate-900 flex items-center justify-center text-white"
     }
   },
-  "components": {
-    "cards": {
-      "style": "bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200",
-      "header": "p-5 border-b border-slate-100 flex items-center justify-between",
-      "content": "p-5"
-    },
-    "buttons": {
-      "primary": "rounded-lg font-semibold h-11 px-6 shadow-sm active:scale-95 transition-all",
-      "fab": "fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 z-50"
-    },
-    "chat": {
-      "container": "flex flex-col h-[calc(100vh-64px)] bg-slate-50",
-      "message_list": "flex-1 overflow-y-auto p-4 space-y-6",
-      "input_area": "bg-white border-t border-slate-200 p-4 pb-8 md:pb-4 shadow-lg z-10",
-      "bubble_user": "bg-blue-600 text-white rounded-2xl rounded-tr-sm p-4 max-w-[85%] self-end shadow-sm",
-      "bubble_ai": "bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm p-4 max-w-[85%] self-start shadow-sm",
-      "bubble_system": "bg-slate-100 text-slate-500 text-xs rounded-full px-3 py-1 self-center my-2"
-    },
-    "threat_card": {
-      "wrapper": "group relative flex flex-col justify-between space-y-4 rounded-xl border p-6 shadow-sm transition-all hover:shadow-md",
-      "risk_badge": "absolute right-4 top-4",
-      "title": "font-bold text-lg pr-8 line-clamp-1"
-    }
+  "components_modifications": {
+    "kpi_card": [
+      "Change title to overline style: `text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500`.",
+      "Reduce value font size from `text-3xl font-bold` to `text-2xl font-semibold tracking-tight text-slate-900`.",
+      "Remove heavy color gradients from the icon background (`bg-gradient-to-br from-...`). Use a minimalist square icon wrapper with `bg-slate-50 border border-slate-100 text-slate-700 h-10 w-10 rounded-lg`.",
+      "Add a subtle group hover effect on the card to slightly lift it (`hover:-translate-y-0.5`)."
+    ],
+    "header": [
+      "Remove violet gradient from the header icon (`bg-gradient-to-br from-violet-500...`). Use `bg-slate-900 text-white`.",
+      "Ensure title uses the heading font (`font-family: Manrope`, `tracking-tight`)."
+    ],
+    "tabs": [
+      "Update TabsList to look sharper, utilizing `bg-slate-100/50` for the track and crisp white active states with subtle shadows."
+    ],
+    "charts": [
+      "Change default colored CartesianGrid lines to very subtle dashed lines (`stroke='#F1F5F9' strokeDasharray='3 3'`).",
+      "Use CustomTooltip with a clean, sharp background (`bg-white border border-slate-200 shadow-xl rounded-lg p-3`) and sharp text.",
+      "Replace rainbow pie/bar chart colors with a sophisticated monochromatic palette (e.g., Slate 900, 700, 500, etc.).",
+      "For the Area chart (Daily Active Users), use a sleek dark gradient or a sharp `#0F172A` stroke with a subtle opacity fill."
+    ],
+    "tables": [
+      "Table header text should be slightly smaller and tracked out: `text-xs uppercase tracking-wider font-semibold text-slate-500`.",
+      "Use subtle row hover states (`hover:bg-slate-50/50`)."
+    ]
   },
-  "visual_enhancers": {
-    "glass_panel": "backdrop-blur-xl bg-white/80 border border-white/20 shadow-sm",
-    "gradients": "bg-gradient-to-b from-slate-50 to-white",
-    "noise": "bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"
+  "motion_and_interactions": {
+    "hover_states": "All interactive elements (cards, buttons) should have subtle transform/lifts (`-translate-y-[1px]`) and smooth transitions (`transition-all duration-200 ease-in-out`).",
+    "buttons": "Primary buttons should be stark black (`bg-slate-900 hover:bg-slate-800 text-white`). Filter selects and secondary buttons should be crisp outlines (`border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700`)."
   },
-  "image_urls": {
-    "logos": {
-      "brand": "https://placehold.co/120x40/2563EB/FFFFFF?text=ThreatBase",
-      "partner_1": "https://placehold.co/100x40/FFFFFF/94A3B8?text=CLIENT+A",
-      "partner_2": "https://placehold.co/100x40/FFFFFF/94A3B8?text=CLIENT+B"
-    },
-    "placeholders": {
-      "user_avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Engineer",
-      "empty_state_threats": "https://placehold.co/400x300/F1F5F9/64748B?text=No+Active+Threats",
-      "facility_bg": "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80"
-    }
-  },
-  "universal_guidelines": [
-    "Use 'Inter' for all UI text and 'JetBrains Mono' for IDs, codes, and logs.",
-    "Buttons must have a specialized 'loading' state.",
-    "All cards must have a 1px border. No borderless cards in this engineering context.",
-    "Use 'Sonner' for all toast notifications.",
-    "For charts, use 'Recharts' within Shadcn cards. Keep them simple: Bar, Line, or Area only.",
-    "Accessibility: Ensure all text has a contrast ratio of at least 4.5:1.",
-    "Animations: Use 'Framer Motion' for entering lists (staggered fade-in)."
-  ]
+  "instructions_to_main_agent": [
+    "Update frontend/src/pages/UserStatisticsPage.js to implement these guidelines.",
+    "Add font imports for 'Manrope' and 'IBM Plex Sans' to `index.css` or the page wrapper, and apply them using custom Tailwind classes or style props.",
+    "Rewrite the `KpiCard` component inside the file to match the `components_modifications.kpi_card` rules.",
+    "Refactor the `CHART_COLORS` array to use the premium monochromatic slate palette defined in `colors.charts.palette`.",
+    "Update Recharts components (Tooltip, CartesianGrid, Area, Bar, Pie, Line) to use the new colors, clean tooltips, and sharp lines.",
+    "Update the page header to remove the violet gradient and apply a premium stark look.",
+    "Ensure the `KpiCard` uses `data-testid` attributes on its outer container and key elements for testing robustness.",
+    "Ensure Tab elements and Filter Selects have the specified premium crisp look."
+  ],
+  "image_urls": {}
 }
