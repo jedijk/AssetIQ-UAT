@@ -147,6 +147,23 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
             </>
           )}
           
+          {/* Process Step - only for subunit and maintainable_item levels */}
+          {(node.level === "subunit" || node.level === "maintainable_item") && (
+            <div>
+              <Label className="text-xs text-slate-500 mb-1">{t("equipment.processStep") || "Process Step"}</Label>
+              <Input 
+                value={node.process_step || ""} 
+                onChange={e => onUpdate(node.id, { process_step: e.target.value })} 
+                placeholder={t("equipment.processStepPlaceholder") || "e.g., Extrusion, Compounding, Mixing"} 
+                className="h-9 text-sm"
+                data-testid="process-step-input"
+              />
+              {node.process_step && (
+                <p className="text-xs text-slate-400 mt-1">{t("equipment.processStepHint") || "Inherited by child items"}</p>
+              )}
+            </div>
+          )}
+          
           <div>
             <Label className="text-xs text-slate-500 mb-2">{t("equipment.criticality") || "Criticality Assessment"}</Label>
             <div className="space-y-3 bg-slate-50 p-3 rounded-lg">

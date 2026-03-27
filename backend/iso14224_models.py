@@ -187,12 +187,14 @@ class EquipmentNodeCreate(BaseModel):
     parent_id: Optional[str] = None
     equipment_type_id: Optional[str] = None
     description: Optional[str] = None
+    process_step: Optional[str] = None  # Process step mapping (editable at subunit and maintainable_item levels)
 
 class EquipmentNodeUpdate(BaseModel):
     name: Optional[str] = None
     parent_id: Optional[str] = None
     equipment_type_id: Optional[str] = None
     description: Optional[str] = None
+    process_step: Optional[str] = None  # Process step mapping
 
 class CriticalityAssignment(BaseModel):
     profile_id: Optional[str] = None

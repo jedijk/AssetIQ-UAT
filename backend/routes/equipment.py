@@ -238,6 +238,16 @@ async def create_equipment_node(
     )
     next_sort_order = (max_sort.get("sort_order", 0) if max_sort else 0) + 1
     
+    # Inherit process_step from parent if not provided and at subunit/maintainable_item level
+    inherited_process_step = node_data.process_step
+    if not inherited_process_step and node_data.parent_id and node_data.level in [ISOLevel.SUBUNIT, ISOLevel.MAINTAINABLE_ITEM]:
+        parent = await db.equipment_nodes.find_one(
+            {"id": node_data.parent_id, "created_by": current_user["id"]},
+            {"process_step": 1}
+        )
+        if parent and parent.get("process_step"):
+            inherited_process_step = parent["process_step"]
+    
     node_doc = {
         "id": node_id,
         "name": node_data.name,
@@ -245,6 +255,7 @@ async def create_equipment_node(
         "parent_id": node_data.parent_id,
         "equipment_type_id": node_data.equipment_type_id,
         "description": node_data.description,
+        "process_step": inherited_process_step,
         "criticality": None,
         "discipline": None,
         "sort_order": next_sort_order,

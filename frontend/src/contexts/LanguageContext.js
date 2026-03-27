@@ -463,6 +463,10 @@ const en = {
     createFirst: "first",
     moving: "Moving",
     clickTarget: "Click on a green highlighted target",
+    processStep: "Process Step",
+    processStepPlaceholder: "e.g., Extrusion, Compounding, Mixing",
+    processStepHint: "Inherited by child items",
+    selectEquipment: "Select an equipment item",
   },
 
   // Hierarchy context menu
@@ -1504,6 +1508,10 @@ const nl = {
     createFirst: "eerst",
     moving: "Verplaatsen",
     clickTarget: "Klik op een groen gemarkeerd doel",
+    processStep: "Processtap",
+    processStepPlaceholder: "bijv., Extrusie, Compounding, Mengen",
+    processStepHint: "Wordt overgenomen door onderliggende items",
+    selectEquipment: "Selecteer een apparatuuritem",
   },
 
   // Hierarchy context menu
