@@ -186,6 +186,9 @@ class TaskService:
         if not template:
             raise ValueError("Task template not found")
         
+        # Check if template is ad-hoc
+        is_adhoc_template = template.get("is_adhoc", False)
+        
         # Lookup form template name if provided
         form_template_name = None
         if data.get("form_template_id"):
@@ -195,12 +198,20 @@ class TaskService:
         
         # Get frequency settings (use template defaults if not overridden)
         frequency_type = data.get("frequency_type") or template["frequency_type"]
-        interval_value = data.get("interval_value") or template["default_interval"]
-        interval_unit = data.get("interval_unit") or template["default_unit"]
+        interval_value = data.get("interval_value") or template.get("default_interval")
+        interval_unit = data.get("interval_unit") or template.get("default_unit")
         
-        # Calculate next due date
+        # Calculate next due date (or None for ad-hoc without interval)
         effective_from = data.get("effective_from") or now
-        next_due = self._calculate_next_due(effective_from, interval_value, interval_unit)
+        next_due = None
+        if interval_value and interval_unit:
+            next_due = self._calculate_next_due(effective_from, interval_value, interval_unit)
+        elif is_adhoc_template:
+            # For ad-hoc templates, next_due can be None (execute manually)
+            next_due = None
+        else:
+            # Default to 30 days if somehow no interval is set
+            next_due = self._calculate_next_due(effective_from, 30, "days")
         
         doc = {
             "equipment_id": data["equipment_id"],
@@ -223,6 +234,7 @@ class TaskService:
             "execution_count": 0,
             "notes": data.get("notes"),
             "is_active": True,
+            "is_adhoc": is_adhoc_template,
             "created_by": created_by,
             "created_at": now,
             "updated_at": now,
@@ -1007,8 +1019,8 @@ class TaskService:
             "form_template_name": doc.get("form_template_name"),
             "efm_id": doc.get("efm_id"),
             "frequency_type": doc["frequency_type"],
-            "interval_value": doc["interval_value"],
-            "interval_unit": doc["interval_unit"],
+            "interval_value": doc.get("interval_value"),
+            "interval_unit": doc.get("interval_unit"),
             "trigger_condition": doc.get("trigger_condition"),
             "assigned_team": doc.get("assigned_team"),
             "assigned_user_id": doc.get("assigned_user_id"),
@@ -1019,6 +1031,7 @@ class TaskService:
             "execution_count": doc.get("execution_count", 0),
             "notes": doc.get("notes"),
             "is_active": doc.get("is_active", True),
+            "is_adhoc": doc.get("is_adhoc", False),
             "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
             "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
         }

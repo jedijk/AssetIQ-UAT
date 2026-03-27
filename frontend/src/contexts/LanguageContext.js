@@ -728,8 +728,8 @@ const en = {
 
   // Task Scheduler
   taskScheduler: {
-    title: "Execution Scheduler",
-    subtitle: "Manage work execution and schedules",
+    title: "Task Planner",
+    subtitle: "Manage task templates, plans, and schedules",
     generateExecutions: "Generate Executions",
     newTemplate: "New Template",
     totalExecutions: "Total Executions",
@@ -828,6 +828,8 @@ const en = {
     adhocOnlyDesc: "No recurring schedule - execute manually when needed",
     adhocLabel: "Ad-hoc",
     adhocTemplateHint: "Execute manually via 'Execute Now'",
+    adhocPlanDesc: "This is an ad-hoc template - no recurring schedule needed",
+    intervalOptional: "Interval (Optional for ad-hoc)",
   },
 
   // Forms
@@ -1671,8 +1673,8 @@ const nl = {
 
   // Task Scheduler
   taskScheduler: {
-    title: "Uitvoeringsplanner",
-    subtitle: "Beheer werkuitvoering en schema's",
+    title: "Taakplanner",
+    subtitle: "Beheer taaksjablonen, plannen en schema's",
     generateExecutions: "Genereer uitvoeringen",
     newTemplate: "Nieuw sjabloon",
     totalExecutions: "Totaal uitvoeringen",
@@ -1771,6 +1773,8 @@ const nl = {
     adhocOnlyDesc: "Geen terugkerend schema - voer handmatig uit wanneer nodig",
     adhocLabel: "Ad-hoc",
     adhocTemplateHint: "Voer handmatig uit via 'Nu uitvoeren'",
+    adhocPlanDesc: "Dit is een ad-hoc sjabloon - geen terugkerend schema nodig",
+    intervalOptional: "Interval (Optioneel voor ad-hoc)",
   },
 
   // Forms

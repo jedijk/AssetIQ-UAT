@@ -61,6 +61,26 @@ Added in-app document viewing support for multiple file formats:
 - `/app/frontend/src/components/DocumentViewer.js` - Complete rewrite with loading states, error handling, and file-specific renderers
 - `/app/frontend/src/index.css` - Added `.docx-content` styling for proper document appearance
 
+### UI: Renamed "Execution Scheduler" to "Task Planner"
+Updated the page title and translations for better clarity:
+- English: "Execution Scheduler" → "Task Planner"
+- Dutch: "Uitvoeringsplanner" → "Taakplanner"
+
+**Files Modified:**
+- `/app/frontend/src/contexts/LanguageContext.js` - Updated `taskScheduler.title` for both EN and NL
+
+### Feature: Ad-hoc Template Support in Plan Creation
+Enhanced the Plan Dialog to properly support ad-hoc task templates:
+- Templates marked as ad-hoc now show an **Ad-hoc** badge in the dropdown
+- When an ad-hoc template is selected, a message displays: "This is an ad-hoc template - no recurring schedule needed"
+- **Interval becomes optional** for ad-hoc templates (label changes to "Interval (Optional for ad-hoc)")
+- Backend updated to handle plans without intervals for ad-hoc tasks
+
+**Files Modified:**
+- `/app/frontend/src/components/task-scheduler/PlanDialog.js` - Added ad-hoc template detection, badge display, and optional interval handling
+- `/app/frontend/src/contexts/LanguageContext.js` - Added `adhocPlanDesc` and `intervalOptional` translations
+- `/app/backend/services/task_service.py` - Updated `create_plan()` to handle ad-hoc templates with optional intervals, added `is_adhoc` to plan serialization
+
 ---
 
 ## Completed in Previous Session (Mar 27, 2026)

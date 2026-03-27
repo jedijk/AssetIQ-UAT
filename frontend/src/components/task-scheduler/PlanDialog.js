@@ -1,11 +1,12 @@
 import { useLanguage } from "../../contexts/LanguageContext";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, FileText } from "lucide-react";
+import { Calendar as CalendarIcon, FileText, Zap } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Calendar } from "../ui/calendar";
+import { Badge } from "../ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
   Dialog,
@@ -37,6 +38,10 @@ export const PlanDialog = ({
   isPending,
 }) => {
   const { t } = useLanguage();
+  
+  // Find selected template to check if it's ad-hoc
+  const selectedTemplate = templates.find(tmpl => tmpl.id === planForm.task_template_id);
+  const isAdhocTemplate = selectedTemplate?.is_adhoc || false;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,10 +62,26 @@ export const PlanDialog = ({
               </SelectTrigger>
               <SelectContent>
                 {templates.map((tmpl) => (
-                  <SelectItem key={tmpl.id} value={tmpl.id}>{tmpl.name}</SelectItem>
+                  <SelectItem key={tmpl.id} value={tmpl.id}>
+                    <div className="flex items-center gap-2">
+                      {tmpl.name}
+                      {tmpl.is_adhoc && (
+                        <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                          <Zap className="w-3 h-3 mr-1" />
+                          {t("taskScheduler.adhocLabel")}
+                        </Badge>
+                      )}
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {isAdhocTemplate && (
+              <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                <Zap className="w-3 h-3" />
+                {t("taskScheduler.adhocPlanDesc")}
+              </p>
+            )}
           </div>
           <div>
             <Label>{t("taskScheduler.equipment")} *</Label>
@@ -80,25 +101,28 @@ export const PlanDialog = ({
           </div>
           <div>
             <Label className="flex items-center justify-between">
-              <span>{t("taskScheduler.interval")}</span>
-              {planForm.task_template_id && (planForm.interval_value === null) && (
+              <span>
+                {isAdhocTemplate ? t("taskScheduler.intervalOptional") : t("taskScheduler.interval")}
+              </span>
+              {!isAdhocTemplate && planForm.task_template_id && (planForm.interval_value === null) && (
                 <span className="text-xs text-slate-400 font-normal">{t("taskScheduler.inheritedFromTemplate")}</span>
               )}
             </Label>
             <div className="flex gap-2">
               <Input
                 type="number"
-                value={planForm.interval_value ?? inheritedInterval.value}
-                onChange={(e) => setPlanForm({ ...planForm, interval_value: parseInt(e.target.value) || 1 })}
+                value={planForm.interval_value ?? (isAdhocTemplate ? '' : inheritedInterval.value)}
+                onChange={(e) => setPlanForm({ ...planForm, interval_value: e.target.value ? parseInt(e.target.value) : null })}
                 min={1}
                 className={`w-20 ${planForm.interval_value === null ? 'text-slate-400 bg-slate-50' : ''}`}
-                placeholder={inheritedInterval.value.toString()}
+                placeholder={isAdhocTemplate ? "-" : inheritedInterval.value.toString()}
               />
               <Select 
-                value={planForm.interval_unit ?? inheritedInterval.unit} 
+                value={planForm.interval_unit ?? (isAdhocTemplate ? "days" : inheritedInterval.unit)} 
                 onValueChange={(v) => setPlanForm({ ...planForm, interval_unit: v })}
+                disabled={isAdhocTemplate && !planForm.interval_value}
               >
-                <SelectTrigger className={`w-[100px] ${planForm.interval_unit === null ? 'text-slate-400 bg-slate-50' : ''}`}>
+                <SelectTrigger className={`w-[100px] ${(planForm.interval_unit === null || (isAdhocTemplate && !planForm.interval_value)) ? 'text-slate-400 bg-slate-50' : ''}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -107,7 +131,7 @@ export const PlanDialog = ({
                   <SelectItem value="months">{t("taskScheduler.months")}</SelectItem>
                 </SelectContent>
               </Select>
-              {(planForm.interval_value !== null || planForm.interval_unit !== null) && (
+              {(planForm.interval_value !== null || planForm.interval_unit !== null) && !isAdhocTemplate && (
                 <Button 
                   type="button" 
                   variant="ghost" 
@@ -119,7 +143,7 @@ export const PlanDialog = ({
                 </Button>
               )}
             </div>
-            {planForm.task_template_id && planForm.interval_value === null && (
+            {!isAdhocTemplate && planForm.task_template_id && planForm.interval_value === null && (
               <p className="text-xs text-slate-400 mt-1">
                 {t("taskScheduler.templateDefault")}: {inheritedInterval.value} {inheritedInterval.unit}
               </p>
