@@ -112,7 +112,7 @@ def serialize_action_as_task(action: dict) -> dict:
 
 @router.get("/my-tasks")
 async def get_my_tasks(
-    filter: str = Query("today", description="Filter: today, overdue, recurring, adhoc, all"),
+    filter: str = Query("pending", description="Filter: pending, overdue, recurring, adhoc, all"),
     date: Optional[str] = Query(None, description="Date for filtering (YYYY-MM-DD)"),
     equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
     status: Optional[str] = Query(None, description="Filter by status"),
@@ -123,7 +123,7 @@ async def get_my_tasks(
     Get tasks for the current user based on filters.
     
     Filters:
-    - today: Tasks due today
+    - pending: All pending tasks (not completed/cancelled)
     - overdue: Tasks past due date
     - recurring: Recurring tasks only
     - adhoc: One-time/manual tasks
@@ -157,7 +157,8 @@ async def get_my_tasks(
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
     
-    if filter == "today":
+    if filter == "pending":
+        # Pending: all non-completed tasks, optionally filtered by date
         if date:
             try:
                 filter_date = datetime.fromisoformat(date)
@@ -165,9 +166,8 @@ async def get_my_tasks(
                 day_end = day_start + timedelta(days=1)
                 query["due_date"] = {"$gte": day_start, "$lt": day_end}
             except ValueError:
-                query["due_date"] = {"$gte": today_start, "$lt": today_end}
-        else:
-            query["due_date"] = {"$gte": today_start, "$lt": today_end}
+                pass  # No date filter if invalid
+        # Base query already filters for non-completed tasks
     
     elif filter == "overdue":
         query["$or"] = [
