@@ -43,6 +43,32 @@ const en = {
     overdueByDays: "Overdue by {days} days",
   },
   
+  // Definitions Page (FMEA SOD)
+  definitions: {
+    pageDescription: "FMEA Rating Scales for Severity, Occurrence, and Detection (SOD)",
+    rpnInfo: "Risk Priority Number (RPN)",
+    rpnFormula: "RPN = Severity × Occurrence × Detection. Use these tables to assign consistent ratings during FMEA analysis. The final customer should always be considered first. If both effects occur, use the higher of two Severities.",
+    severity: "Severity",
+    occurrence: "Occurrence",
+    detection: "Detection",
+    severityTitle: "Severity Evaluation Criteria",
+    severityDesc: "Severity is the ranking associated with the most serious effect for a given failure mode.",
+    occurrenceTitle: "Occurrence Evaluation Criteria",
+    occurrenceDesc: "Occurrence is the likelihood that a specific cause/mechanism will occur, based on failure rates.",
+    detectionTitle: "Detection Evaluation Criteria",
+    detectionDesc: "Detection is a ranking of the ability of current controls to detect the cause/mechanism or failure mode before product reaches the customer.",
+    ranking: "Rank",
+    effect: "Effect",
+    customerEffect: "Customer Effect (End User)",
+    manufacturingEffect: "Manufacturing / Assembly Effect",
+    probability: "Probability",
+    description: "Description",
+    failureRate: "Possible Failure Rate",
+    criteria: "Criteria",
+    likelihood: "Likelihood",
+    detectionMethod: "Suggested Detection Method",
+  },
+  
   // Dashboard
   dashboard: {
     title: "Dashboard",
@@ -1092,6 +1118,32 @@ const nl = {
     dueToday: "Vandaag verschuldigd",
     overdueBy1Day: "1 dag achterstallig",
     overdueByDays: "{days} dagen achterstallig",
+  },
+  
+  // Definitions Page (FMEA SOD)
+  definitions: {
+    pageDescription: "FMEA Beoordelingsschalen voor Ernst, Frequentie en Detectie (SOD)",
+    rpnInfo: "Risico Prioriteitsnummer (RPN)",
+    rpnFormula: "RPN = Ernst × Frequentie × Detectie. Gebruik deze tabellen om consistente beoordelingen toe te kennen tijdens FMEA-analyse. De eindklant moet altijd eerst worden overwogen. Als beide effecten optreden, gebruik de hogere van twee Ernstniveaus.",
+    severity: "Ernst",
+    occurrence: "Frequentie",
+    detection: "Detectie",
+    severityTitle: "Ernst Evaluatiecriteria",
+    severityDesc: "Ernst is de rangschikking gekoppeld aan het meest ernstige effect voor een bepaalde faalwijze.",
+    occurrenceTitle: "Frequentie Evaluatiecriteria",
+    occurrenceDesc: "Frequentie is de waarschijnlijkheid dat een specifieke oorzaak/mechanisme zal optreden, gebaseerd op faalpercentages.",
+    detectionTitle: "Detectie Evaluatiecriteria",
+    detectionDesc: "Detectie is een rangschikking van het vermogen van huidige controles om de oorzaak/mechanisme of faalwijze te detecteren voordat het product de klant bereikt.",
+    ranking: "Rang",
+    effect: "Effect",
+    customerEffect: "Klanteffect (Eindgebruiker)",
+    manufacturingEffect: "Productie / Assemblage Effect",
+    probability: "Waarschijnlijkheid",
+    description: "Beschrijving",
+    failureRate: "Mogelijke Faalpercentage",
+    criteria: "Criteria",
+    likelihood: "Waarschijnlijkheid",
+    detectionMethod: "Voorgestelde Detectiemethode",
   },
   
   // Dashboard

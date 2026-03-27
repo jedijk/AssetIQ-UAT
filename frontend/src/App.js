@@ -23,6 +23,7 @@ import DecisionEnginePage from "./pages/DecisionEnginePage";
 import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
 import UserStatisticsPage from "./pages/UserStatisticsPage";
 import FeedbackPage from "./pages/FeedbackPage";
+import DefinitionsPage from "./pages/DefinitionsPage";
 import MobileApp from "./mobile/MobileApp";
 import "@/App.css";
 
@@ -161,7 +162,7 @@ function App() {
                 <Route path="settings/user-management" element={<SettingsUserManagementPage />} />
                 <Route path="settings/statistics" element={<UserStatisticsPage />} />
                 <Route path="user-statistics" element={<UserStatisticsPage />} />
-                <Route path="settings/criticality-definitions" element={<UnderDevelopmentPage />} />
+                <Route path="settings/criticality-definitions" element={<DefinitionsPage />} />
                 <Route path="settings/feedback" element={<FeedbackPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
