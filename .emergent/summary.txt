@@ -1,31 +1,25 @@
 <analysis>**original_problem_statement**: 
-The user wants to build an AI-Powered Threat Capture & Prioritization Platform named ThreatBase (AssetIQ). The scope includes user authentication, a chat-based threat capture system, risk prioritization, an Equipment Hierarchy FMEA Library, and a Causal Engine.
-PRODUCT REQUIREMENTS: 
-- Fix UI issues on mobile dashboard.
-- Add custom failure mode creation capability in the chat interface.
-- Build a new comprehensive, mobile-first My Tasks execution frontend with discipline filtering, combining task instances and centralized actions.
-- Allow dynamic forms linked to task plans to be rendered and executed.
-- Reorder UI layout in the Observation Details screen.
+The user wants to build an AI-Powered Threat Capture & Prioritization Platform named ThreatBase (AssetIQ). The scope includes user authentication, a chat-based threat capture system, risk prioritization, an Equipment Hierarchy FMEA Library, and a Causal Engine. Recent focus has been on finalizing the application for deployment by refining the UI terminology, fixing ad-hoc task scheduling logic, optimizing the My Tasks view to handle both standard tasks and central actions, and running deployment readiness checks.
 
 **User's preferred language**: English (INSTRUCT next agent to respond in English only)
 
 **what currently exists?** 
-A mature full-stack MVP featuring User Auth, FastAPI backend, state-machine Chatbot, Equipment Manager, Causal Engine, AI Risk Insights, FMEA Library, and a My Tasks execution dashboard. Task forms can now be fully executed with data successfully saving to the backend and triggering new Observations if issues are flagged. The Form Designer supports realistic Mobile/Desktop previews, Form versioning, ad-hoc template capabilities, Document Uploads (via Object Storage), and an AI-powered Document Search interface that utilizes the Emergent LLM Key.
+A mature, full-stack React/FastAPI/MongoDB application. Features include User Auth, Chatbot, Equipment Manager, AI Risk Insights, robust ad-hoc task execution, visual calendar task scheduling, form versioning, and document viewing. The app has successfully passed deployment readiness health checks.
 
 **Last working item**: 
-    - Last item agent was working: Fixing the AI Document Search to utilize the updated   API syntax and creating an in-app  component with a back button.
+    - Last item agent was working: Renaming Statistics to User Statistics in the settings menu navigation and dropdowns.
     - Status: USER VERIFICATION PENDING
     - Agent Testing Done: Y
-    - Which testing method agent to use? NA (already done via screenshot tool and bash scripts)
+    - Which testing method agent to use? NA (Already validated via screenshot tool)
     - User Testing Done: N
 
 **All Pending/In progress Issue list**: 
-  None currently active. All requested fixes and features from the session were successfully implemented and tested.
+  None active. All requested bug fixes and UI refinements from the user were successfully implemented and verified.
 
 **In progress Task List**: 
-  None.
+  None active.
 
-**Upcoming and Future Tasks**:
+**Upcoming and Future Tasks**
     Upcoming Tasks:
     - P0: Implement Image analysis for damage detection.
     - P1: Implement Offline support with local storage for My Tasks execution.
@@ -35,88 +29,90 @@ A mature full-stack MVP featuring User Auth, FastAPI backend, state-machine Chat
     - P2: Export equipment hierarchy to PDF/Excel.
     - P2: Implement bulk criticality assignment for equipment.
     - P3: Refactor / Extract  component from  to improve maintainability.
+    - P3: Refactor  and  to extract modular components.
 
 **Completed work in this session**
-- Reordered UI layout in  so the metadata Info Grid sits above the AI Risk Analysis sections. (DONE)
-- Implemented backend task completion logic () to save  and trigger Observation creation when . (DONE)
-- Created ad-hoc task template option (templates without recurrence/intervals) and fixed related Pydantic enum validation errors. (DONE)
-- Removed Execute Now functionality from template dropdowns per user request. (DONE)
-- Added Mobile and Desktop device preview frames to the Form Designer View Dialog, alongside toggle button fixes. (DONE)
-- Integrated Document Uploads to Form Templates, resolving a backend  bug during the upload process. (DONE)
-- Fixed Form Versioning so it correctly increments versions on edit and copies existing documents to the new version. (DONE)
-- Implemented AI Document Search during form execution using  and an in-app . (DONE)
+- Removed the Next Date display for ad-hoc plans in the  UI (DONE).
+- Renamed Generate Executions to Generate Schedule in  and UI (DONE).
+- Added UI functionality to delete individual tasks directly from the calendar schedule view (DONE).
+- Fixed a 500 Internal Server Error during schedule generation caused by  serialization on  in  (DONE).
+- Ran the Deployer Agent health check; the application passed and was confirmed ready for deployment (DONE).
+- Updated the Open tab in  to strictly show only open/in-progress actions and in-progress tasks (DONE).
+- Implemented a delete capability (with confirmation dialog) for in-progress tasks directly inside  (DONE).
+- Fixed the stat counter in  so the Open badge accurately counts open actions rather than today's tasks (DONE).
+- Updated action visibility in the Open tab to ensure actions remain visible until formally completed (DONE).
+- Renamed Statistics to User Statistics in the settings menu via  (DONE).
 
 **Earlier issues found/mentioned but not fixed**
    None.
 
 **Known issue recurrence from previous fork**
-  - Issue recurrence in previous fork: None
-  - Recurrence count: 0
+  - Issue recurrence in previous fork:  serialization errors crashing backend endpoints.
+  - Recurrence count: 1 (Happened this session in  during task instance fetching).
   - Status: RESOLVED
+  Note: Always ensure  or any relational ID (like ) is cast to a string when returning MongoDB documents to the frontend.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
 - Full-stack app: React frontend + FastAPI backend + MongoDB
-- UI Library: Tailwind CSS, Radix UI (Shadcn patterns)
-- I18n: React Context API () dynamically maps English and Dutch strings.
-- Emergent Integrations: Uses  for RAG-like document Q&A.
-- Object Storage: Integrated for storing and serving reference documents linked to form templates.
+- I18n: React Context API () dynamically maps English and Dutch strings. ANY text changes must happen here.
+- Data Aggregation:  combines data from  (tasks) and  (actions) into a unified frontend view.
 
 **key DB schema**
-  - : Now contains  array and  (boolean) fields.  is optional.
-  - : Stores executable tasks; linked to forms and now persists .
-  - : Observations are successfully being pushed here dynamically from task completions.
+  - : Stores executable tasks; heavily reliant on  (planned, in_progress, completed, overdue).
+  - : Stores standalone actions; uses  (open, completed).
 
 **changes in tech stack**
-  - None, but deepened dependency on  for document AI querying ().
+  - None
 
 **All files of reference** 
-  - : Updated extensively with Desktop/Mobile toggles, Document Upload interfaces, and AI Search UI.
-  - : Created to render files inside the app instead of launching external tabs.
-  - : Appended endpoints for  and . 
-  -  & : Completion endpoints fully mapped to MongoDB saving functions.
+  - 
+  - 
+  - 
+  - 
+  - 
 
 **Areas that need refactoring**: 
--  has grown past 1,600 lines. The Mobile/Desktop UI frames and Document Management Tabs should be separated into their own components inside .
--  would benefit from having its internal  split into an isolated file.
+- , , and  have all grown significantly (>1,000 lines). Sub-components like  and execution dialogs should be extracted to .
 
 **key api endpoints**
--  (Accepts , , )
--  (Upload document via Object Storage)
--  (AI Search through documents using )
+-  (Deletes a task instance)
+-  (Generates schedule items)
+-  (Fetches aggregated tasks and actions based on status filters)
 
 **Critical Info for New Agent** 
-- ** LlmChat Usage:** The syntax for the chat integration has changed. Do not use legacy methods. Use: . Ensure  is used, not .
-- **MongoDB  Access:** When working with serialized dictionaries, remember that  has often been converted to the string uid=0(root) gid=0(root) groups=0(root). If fetching raw from the DB to make updates, explicitly cast via .
-- **I18n Strictness:** The application enforces EN/NL translations. Any new text added to the UI MUST be populated through  and wrapped in . Do not hardcode raw strings.
+- **I18n Strictness:** The application enforces EN/NL translations. Any new text added to the UI MUST be populated through  and wrapped in . Do not hardcode raw strings into JSX.
+- **My Tasks Aggregation:** The  combines two different database collections ( and ). When dealing with statuses, remember that actions use  and tasks use .
+- **ObjectId Serialization:** When building new backend endpoints or editing services, explicitly cast nested MongoDB ObjectIds (like ) to strings before returning them to avoid 500 FastAPI encoder errors.
 
 **documents and test reports created in this job** 
-  -  (Successfully updated during the session)
+  - 
 
 **Last 10 User Messages and any pending HUMAN messages** 
- - User: fix ai document search and document viewing in app with back button (COMPLETED)
- - User: Fix versioning when editing forms (COMPLETED)
- - User: file are not uploading (COMPLETED)
- - User: fix toggle button view-ability desktop mobile and truly show the real preview on desktop (COMPLETED)
- - User: allow adding documents in forms designed but also view/search those document with AI them during form execution (COMPLETED)
- - User: In form designer allow previewing in mobile device (COMPLETED)
- - User: Error failed to create template when adhoc toggle is on (COMPLETED)
- - User: Remove execute now from templates (COMPLETED)
- - User: Create adhoc template creation option (COMPLETED)
- - User: allow creation of executing template that do not have a recurrence and get called adhoc only (COMPLETED)
+ - User: in plans do not show a next date when adhoc (COMPLETED)
+ - User: change generate execution button to generate schedule and allow individual task to be deleted from the schedule (COMPLETED)
+ - User: gnerste schedule does not work (COMPLETED - Fixed 500 error)
+ - User: Call Deployer Agent and Run Health Check to Check for Readiness for Deployment (COMPLETED)
+ - User: In my task open show only open actions and in progress tasks (COMPLETED)
+ - User: allow deletion of in progress task in my tasks (COMPLETED)
+ - User: I do not see the actions in open (COMPLETED - Fixed stat counter UI bug)
+ - User: export to github (COMPLETED - Guided user to built-in button)
+ - User: can run this code on any server without emergent (COMPLETED - Explained requirements)
+ - User: keep action showing in my tasks until completed (COMPLETED)
+ - User: change statistics to user statistics in settings menu (COMPLETED)
 
 **Project Health Check:**
-- All clear. Previous file upload, integration syntax, and Pydantic validation bugs were resolved.
+- All clear. Ready for deployment.
 
 **3rd Party Integrations** 
 - Object Storage — uses Emergent infrastructure.
 - OpenAI Whisper (Audio processing) — uses Emergent LLM Key.
-- OpenAI GPT-5.2 (AI Risk Analysis, Chatbot, AI Document Search via ) — uses Emergent LLM Key.
+- OpenAI GPT-5.2 (AI Risk Analysis, Chatbot, AI Document Search) — uses Emergent LLM Key.
 
 **Testing status**
-  - Testing agent used after significant changes: NO (Heavy manual iteration using Bash cURL requests and Screenshot Tools).
+  - Testing agent used after significant changes: NO (Heavy manual iteration using bash scripts and screenshot tools).
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None
   - Known regressions: None
@@ -126,4 +122,4 @@ Email:
 Password: 
 
 **What agent forgot to execute**
-- The agent properly satisfied all tasks from the user's stream of requests. Nothing was overlooked. PRD.md remains updated.</analysis>
+- The agent effectively handled all requests in the queue. No tasks were forgotten. Testing was done entirely via screenshot tools rather than the testing subagent, but functionality was thoroughly verified.</analysis>

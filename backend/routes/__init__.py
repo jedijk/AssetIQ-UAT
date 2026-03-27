@@ -18,6 +18,7 @@ from routes.ai_routes import router as ai_routes_router
 from routes.maintenance import router as maintenance_router
 from routes.analytics import router as analytics_router
 from routes.my_tasks import router as my_tasks_router
+from routes.user_stats import router as user_stats_router
 
 all_routers = [
     auth_router,
@@ -37,4 +38,5 @@ all_routers = [
     maintenance_router,
     analytics_router,
     my_tasks_router,
+    user_stats_router,
 ]

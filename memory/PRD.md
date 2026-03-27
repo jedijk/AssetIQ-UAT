@@ -44,7 +44,48 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 - `action_type` (CM/PM/PDM): Corrective/Preventive/Predictive Maintenance
 - `discipline` (string): e.g., Mechanical, Electrical
 
-## Completed in This Session (Dec 2025)
+## Completed in This Session (Mar 27, 2026)
+
+### Feature: User Statistics Page
+Implemented a comprehensive User Statistics page per the functional spec:
+
+**Backend:**
+- New `user_events` MongoDB collection for event tracking
+- Event ingestion API: `POST /api/user-stats/track` and batch `POST /api/user-stats/track/batch`
+- Statistics retrieval APIs with date filtering and role-based access
+- Session management with 15-minute inactivity timeout
+- Pre-aggregation support for daily stats
+
+**Frontend Components:**
+- `UserStatisticsPage.js` - Full page with KPIs, charts, and tables
+- `useAnalyticsTracking.js` - Hook for automatic page view tracking
+
+**Features:**
+- **KPI Summary**: Active Users, Total Sessions, Total Views, Avg Duration, Most/Least Used Module
+- **Module Usage Tab**: Bar chart, pie chart, detailed table with views/unique users/percentage/avg time
+- **User Activity Tab**: User table with role, last active, sessions, actions, most used module
+- **Actions Tab**: Feature usage tracking with total count and unique users
+- **Daily Trends**: Area chart for daily active users, line chart for daily views
+- **Date Filters**: Today, Last 7 days, Last 30 days
+- **Role-Based Access**: Admin (full), Manager (limited), Operator (no access)
+- **Automatic Tracking**: Page views tracked automatically via Layout integration
+
+**Files Created:**
+- `/app/backend/models/user_stats_models.py` - Event tracking models
+- `/app/backend/services/user_stats_service.py` - Statistics service
+- `/app/backend/routes/user_stats.py` - API endpoints
+- `/app/frontend/src/pages/UserStatisticsPage.js` - Full page component
+- `/app/frontend/src/hooks/useAnalyticsTracking.js` - Tracking hook
+
+**Files Modified:**
+- `/app/backend/routes/__init__.py` - Added user_stats_router
+- `/app/frontend/src/App.js` - Added routes `/settings/statistics` and `/user-statistics`
+- `/app/frontend/src/components/Layout.js` - Integrated usePageTracking hook
+- `/app/frontend/src/contexts/LanguageContext.js` - Added EN/NL translations for userStatistics
+
+---
+
+## Previously Completed (Mar 27, 2026)
 
 ### UI: Settings Menu Label Update
 Changed "Forms" to "Form Designer" in the Settings menu. Also ensured all menu items use proper i18n translation keys instead of hardcoded strings.
@@ -283,6 +324,8 @@ Extracted large components into modular files:
 - Recurring task auto-generation on completion
 
 ### P2 (Medium Priority)
+- User Statistics: Workflow funnel analysis (optional feature from spec)
+- User Statistics: Module detail slide-over panel (deferred from MVP)
 - Export equipment hierarchy to PDF/Excel
 - Bulk criticality assignment for equipment
 - Complete remaining multi-language coverage (CausalEnginePage, ReliabilityPerformancePage still have some hardcoded strings)
@@ -296,6 +339,7 @@ Extracted large components into modular files:
 - `investigations`, `task_templates`, `execution_plans`, `task_instances`
 - `form_templates`, `form_submissions`, `decision_rules`, `decision_suggestions`
 - `failure_modes` (in failure_modes_db)
+- `user_events`, `user_stats_daily` (User Statistics tracking)
 
 ## Test Credentials
 - Email: test@test.com / Password: test

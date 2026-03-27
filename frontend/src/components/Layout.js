@@ -30,6 +30,7 @@ import ChatSidebar from "./ChatSidebar";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 import { actionsAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
+import { usePageTracking } from "../hooks/useAnalyticsTracking";
 
 const Layout = () => {
   const { user, logout } = useAuth();
@@ -43,6 +44,9 @@ const Layout = () => {
   const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
   const [hierarchyOpen, setHierarchyOpen] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
+
+  // Track page views for user statistics
+  usePageTracking();
 
   // Query overdue actions for notification bell
   const { data: overdueData } = useQuery({
