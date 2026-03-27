@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, isSameMonth, addMonths, subMonths, parseISO } from "date-fns";
 import {
   Calendar as CalendarIcon,
   ClipboardList,
@@ -17,6 +17,7 @@ import {
   MoreVertical,
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
   Wrench,
   Zap,
   Target,
@@ -30,6 +31,8 @@ import {
   RefreshCw,
   ArrowRight,
   X,
+  List,
+  LayoutGrid,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -279,6 +282,9 @@ const TaskSchedulerPage = () => {
   const [showPlanDialog, setShowPlanDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState(null);
+  const [scheduleView, setScheduleView] = useState("calendar"); // "calendar" or "list"
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(null);
   const [planForm, setPlanForm] = useState({
     equipment_id: "",
     task_template_id: "",
@@ -801,13 +807,126 @@ const TaskSchedulerPage = () => {
           </div>
         </div>
 
-        {/* Executions Tab */}
+        {/* Schedule Tab - Calendar View */}
         <TabsContent value="instances">
+          {/* View Toggle */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+              <Button
+                size="sm"
+                variant={scheduleView === "calendar" ? "default" : "ghost"}
+                onClick={() => setScheduleView("calendar")}
+                className="gap-2"
+              >
+                <LayoutGrid className="w-4 h-4" />
+                Calendar
+              </Button>
+              <Button
+                size="sm"
+                variant={scheduleView === "list" ? "default" : "ghost"}
+                onClick={() => setScheduleView("list")}
+                className="gap-2"
+              >
+                <List className="w-4 h-4" />
+                List
+              </Button>
+            </div>
+            {scheduleView === "calendar" && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="font-medium text-slate-900 min-w-[140px] text-center">
+                  {format(currentMonth, "MMMM yyyy")}
+                </span>
+                <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date())}>
+                  Today
+                </Button>
+              </div>
+            )}
+          </div>
+
           {instancesLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
             </div>
+          ) : scheduleView === "calendar" ? (
+            /* Calendar View */
+            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+              {/* Calendar Header */}
+              <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                  <div key={day} className="px-2 py-3 text-center text-sm font-semibold text-slate-600">
+                    {day}
+                  </div>
+                ))}
+              </div>
+              {/* Calendar Days */}
+              <div className="grid grid-cols-7">
+                {(() => {
+                  const monthStart = startOfMonth(currentMonth);
+                  const monthEnd = endOfMonth(currentMonth);
+                  const startDate = new Date(monthStart);
+                  startDate.setDate(startDate.getDate() - startDate.getDay());
+                  const endDate = new Date(monthEnd);
+                  endDate.setDate(endDate.getDate() + (6 - endDate.getDay()));
+                  
+                  const days = eachDayOfInterval({ start: startDate, end: endDate });
+                  
+                  return days.map((day) => {
+                    const dayInstances = instances.filter((inst) => {
+                      if (!inst.scheduled_date && !inst.due_date) return false;
+                      const instDate = parseISO(inst.scheduled_date || inst.due_date);
+                      return isSameDay(instDate, day);
+                    });
+                    
+                    const isCurrentMonth = isSameMonth(day, currentMonth);
+                    const isSelected = selectedDate && isSameDay(day, selectedDate);
+                    
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        className={`min-h-[100px] border-b border-r border-slate-100 p-1 cursor-pointer transition-colors
+                          ${!isCurrentMonth ? "bg-slate-50 text-slate-400" : "bg-white"}
+                          ${isToday(day) ? "bg-blue-50" : ""}
+                          ${isSelected ? "ring-2 ring-blue-500 ring-inset" : ""}
+                          hover:bg-slate-50`}
+                        onClick={() => setSelectedDate(day)}
+                      >
+                        <div className={`text-sm font-medium mb-1 ${isToday(day) ? "text-blue-600" : ""}`}>
+                          {format(day, "d")}
+                        </div>
+                        <div className="space-y-1">
+                          {dayInstances.slice(0, 3).map((inst) => (
+                            <div
+                              key={inst.id}
+                              className={`text-xs px-1.5 py-0.5 rounded truncate cursor-pointer
+                                ${inst.status === "completed" ? "bg-green-100 text-green-700" :
+                                  inst.status === "in_progress" ? "bg-amber-100 text-amber-700" :
+                                  inst.status === "overdue" ? "bg-red-100 text-red-700" :
+                                  "bg-slate-100 text-slate-700"}`}
+                              title={inst.task_template_name}
+                            >
+                              {inst.task_template_name}
+                            </div>
+                          ))}
+                          {dayInstances.length > 3 && (
+                            <div className="text-xs text-slate-500 px-1">
+                              +{dayInstances.length - 3} more
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
           ) : instances.length === 0 ? (
+            /* List View - Empty State */
             <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
               <ClipboardList className="w-12 h-12 mx-auto mb-3 text-slate-300" />
               <p className="text-slate-500">{t("taskScheduler.noExecutionsFound")}</p>
@@ -816,6 +935,7 @@ const TaskSchedulerPage = () => {
               </Button>
             </div>
           ) : (
+            /* List View - Table */
             <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -872,6 +992,57 @@ const TaskSchedulerPage = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Selected Date Tasks Panel */}
+          {scheduleView === "calendar" && selectedDate && (
+            <div className="mt-4 bg-white rounded-lg border border-slate-200 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-slate-900">
+                  {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                </h3>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedDate(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              {(() => {
+                const dayInstances = instances.filter((inst) => {
+                  if (!inst.scheduled_date && !inst.due_date) return false;
+                  const instDate = parseISO(inst.scheduled_date || inst.due_date);
+                  return isSameDay(instDate, selectedDate);
+                });
+                
+                if (dayInstances.length === 0) {
+                  return <p className="text-slate-500 text-sm">No tasks scheduled for this day</p>;
+                }
+                
+                return (
+                  <div className="space-y-2">
+                    {dayInstances.map((instance) => (
+                      <div key={instance.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div>
+                          <div className="font-medium text-slate-900">{instance.task_template_name}</div>
+                          <div className="text-sm text-slate-500">{instance.equipment_name || "-"}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={instance.status} />
+                          {instance.status === "planned" && (
+                            <Button size="sm" variant="outline" onClick={() => handleStartTask(instance)}>
+                              <PlayCircle className="w-4 h-4 mr-1" /> Start
+                            </Button>
+                          )}
+                          {instance.status === "in_progress" && (
+                            <Button size="sm" onClick={() => handleCompleteTask(instance)}>
+                              <CheckCircle2 className="w-4 h-4 mr-1" /> Complete
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </TabsContent>
