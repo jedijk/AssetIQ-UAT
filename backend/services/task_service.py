@@ -555,8 +555,68 @@ class TaskService:
                         "$inc": {"execution_count": 1}}
                     )
             
+            # Create observation if issue was found and flagged for observation
+            if data.get("create_observation") and data.get("issues_found"):
+                await self._create_observation_from_task(instance, data, now)
+            
             return self._serialize_instance(result)
         return None
+    
+    async def _create_observation_from_task(
+        self,
+        task_instance: Dict[str, Any],
+        completion_data: Dict[str, Any],
+        timestamp: datetime
+    ) -> Optional[str]:
+        """Create an observation/threat from a completed task with issues."""
+        import uuid
+        
+        # Build observation title from task and issue
+        issues = completion_data.get("issues_found", [])
+        issue_text = issues[0] if issues else "Issue found during task execution"
+        task_title = task_instance.get("task_template_name") or "Task"
+        equipment_name = task_instance.get("equipment_name") or "Unknown Equipment"
+        
+        # Map severity to risk/impact levels
+        severity = completion_data.get("issue_severity", "medium")
+        severity_map = {
+            "low": {"impact": "Minor", "likelihood": "Unlikely", "risk_level": "Low"},
+            "medium": {"impact": "Moderate", "likelihood": "Possible", "risk_level": "Medium"},
+            "high": {"impact": "Major", "likelihood": "Likely", "risk_level": "High"},
+        }
+        risk_data = severity_map.get(severity, severity_map["medium"])
+        
+        # Create the observation/threat document
+        observation_doc = {
+            "id": str(uuid.uuid4()),
+            "title": f"Issue: {issue_text[:100]}",
+            "description": f"Issue discovered during task execution.\n\nTask: {task_title}\nEquipment: {equipment_name}\n\nDetails: {issue_text}",
+            "status": "Open",
+            "priority": "high" if severity == "high" else "medium",
+            "asset": equipment_name,
+            "equipment_type": task_instance.get("discipline", ""),
+            "failure_mode": "",
+            "impact": risk_data["impact"],
+            "likelihood": risk_data["likelihood"],
+            "frequency": "Once",
+            "detectability": "Moderate",
+            "risk_level": risk_data["risk_level"],
+            "risk_score": 40 if severity == "low" else (60 if severity == "medium" else 80),
+            "cause": completion_data.get("follow_up_notes") or completion_data.get("completion_notes") or "",
+            "source": "task_execution",
+            "source_task_id": str(task_instance.get("_id", "")),
+            "created_at": timestamp,
+            "updated_at": timestamp,
+            "created_by_task": True,
+        }
+        
+        try:
+            await self.db.threats.insert_one(observation_doc)
+            logger.info(f"Created observation from task: {observation_doc['id']}")
+            return observation_doc["id"]
+        except Exception as e:
+            logger.error(f"Failed to create observation from task: {e}")
+            return None
     
     async def delete_instance(self, instance_id: str) -> bool:
         """Delete a task instance."""

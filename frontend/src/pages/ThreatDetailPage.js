@@ -1119,25 +1119,11 @@ const ThreatDetailPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* AI Intelligence Section */}
+      {/* Info Grid - Moved above AI sections */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6"
-      >
-        {/* AI Risk Analysis Panel */}
-        <AIInsightsPanel threatId={id} threatData={threat} />
-        
-        {/* Causal Intelligence Panel */}
-        <CausalIntelligencePanel threatId={id} threatData={threat} />
-      </motion.div>
-
-      {/* Info Grid */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
         className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"
         data-testid="threat-info-grid"
       >
@@ -1185,6 +1171,20 @@ const ThreatDetailPage = () => {
             )}
           </div>
         ))}
+      </motion.div>
+
+      {/* AI Intelligence Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6"
+      >
+        {/* AI Risk Analysis Panel */}
+        <AIInsightsPanel threatId={id} threatData={threat} />
+        
+        {/* Causal Intelligence Panel */}
+        <CausalIntelligencePanel threatId={id} threatData={threat} />
       </motion.div>
 
       {/* Attachments / Images - Moved right after scoring grid */}

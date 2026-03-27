@@ -2,7 +2,8 @@
 My Tasks routes - User-centric task execution endpoints.
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 from database import db
@@ -491,6 +492,7 @@ async def start_my_task(
 @router.post("/my-tasks/action/{action_id}/complete")
 async def complete_my_action(
     action_id: str,
+    data: Optional[dict] = Body(default=None),
     current_user: dict = Depends(get_current_user)
 ):
     """Mark an action as completed from My Tasks."""
@@ -504,17 +506,60 @@ async def complete_my_action(
     
     # Update action status
     now = datetime.now(timezone.utc)
+    update_data = {
+        "status": "completed",
+        "completed_at": now.isoformat(),
+        "completed_by": user_id,
+        "updated_at": now.isoformat(),
+    }
+    
+    # Add completion notes if provided
+    if data and data.get("completion_notes"):
+        update_data["completion_notes"] = data["completion_notes"]
+    
     await db.central_actions.update_one(
         {"id": action_id},
-        {
-            "$set": {
-                "status": "completed",
-                "completed_at": now.isoformat(),
-                "completed_by": user_id,
-                "updated_at": now.isoformat(),
-            }
-        }
+        {"$set": update_data}
     )
+    
+    # Create observation if issue was found
+    if data and data.get("create_observation") and data.get("issues_found"):
+        issues = data.get("issues_found", [])
+        issue_text = issues[0] if issues else "Issue found during action execution"
+        severity = data.get("issue_severity", "medium")
+        
+        severity_map = {
+            "low": {"impact": "Minor", "likelihood": "Unlikely", "risk_level": "Low", "score": 40},
+            "medium": {"impact": "Moderate", "likelihood": "Possible", "risk_level": "Medium", "score": 60},
+            "high": {"impact": "Major", "likelihood": "Likely", "risk_level": "High", "score": 80},
+        }
+        risk_data = severity_map.get(severity, severity_map["medium"])
+        
+        observation_doc = {
+            "id": str(uuid.uuid4()),
+            "title": f"Issue: {issue_text[:100]}",
+            "description": f"Issue discovered during action execution.\n\nAction: {action.get('title', 'Unknown')}\n\nDetails: {issue_text}",
+            "status": "Open",
+            "priority": "high" if severity == "high" else "medium",
+            "asset": action.get("source_name", ""),
+            "equipment_type": "",
+            "failure_mode": "",
+            "impact": risk_data["impact"],
+            "likelihood": risk_data["likelihood"],
+            "frequency": "Once",
+            "detectability": "Moderate",
+            "risk_level": risk_data["risk_level"],
+            "risk_score": risk_data["score"],
+            "cause": data.get("follow_up_notes") or data.get("completion_notes") or "",
+            "source": "action_execution",
+            "source_action_id": action_id,
+            "created_at": now,
+            "updated_at": now,
+            "created_by_action": True,
+        }
+        
+        await db.threats.insert_one(observation_doc)
+        logger.info(f"Created observation from action: {observation_doc['id']}")
     
     return {"success": True, "message": "Action completed successfully"}
 

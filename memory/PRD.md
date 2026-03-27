@@ -35,7 +35,37 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 - `action_type` (CM/PM/PDM): Corrective/Preventive/Predictive Maintenance
 - `discipline` (string): e.g., Mechanical, Electrical
 
-## Completed in This Session (Mar 26, 2026)
+## Completed in This Session (Mar 27, 2026)
+
+### P0 Fix: ThreatDetailPage Layout Reordering
+Reordered the Observation Details page (`ThreatDetailPage.js`) per user request:
+- **Moved Info Grid** (Equipment Type, Failure Mode, Impact, Frequency, Likelihood, Detectability, Location) to appear **above** the AI Risk Analysis / Causal Intelligence panels
+- Maintains visual hierarchy: Risk Score Card → Equipment Card → **Info Grid** → AI Panels → Attachments → Cause → Actions
+
+**Files Modified:**
+- `/app/frontend/src/pages/ThreatDetailPage.js` - Swapped order of Info Grid and AI sections
+
+### P0 Fix: Task Execution Form Saving & Observation Creation
+Completed the missing backend logic for My Tasks task completion:
+- **Form Data Persistence**: Task completion endpoint now properly saves `form_data` to task instances
+- **Observation Creation**: When `Issue = YES` is toggled during task completion:
+  - User can choose: Create follow-up task / Log observation / Ignore
+  - If observation is created, a new threat is generated with:
+    - Title from issue description
+    - Risk level mapped from severity (low/medium/high)
+    - Source tracking (`source: "action_execution"` or `source: "task_execution"`)
+    - Linked back to source task/action via `source_task_id` or `source_action_id`
+
+**Files Modified:**
+- `/app/backend/models/task_models.py` - Added `create_observation`, `issue_severity` fields to `TaskExecutionSubmit`
+- `/app/backend/services/task_service.py` - Added `_create_observation_from_task()` method, updated `complete_task()` to call it
+- `/app/backend/routes/my_tasks.py` - Updated action completion endpoint to accept full body with `form_data`, `create_observation`, etc.
+
+**API Updates:**
+- `POST /api/task-instances/{id}/complete` - Now accepts: `form_data`, `create_observation`, `issue_severity`
+- `POST /api/my-tasks/action/{id}/complete` - Now accepts full completion payload with observation creation
+
+## Completed in Previous Session (Mar 26, 2026)
 
 ### New Feature: My Tasks Page - Task Execution Front-End
 Implemented a comprehensive mobile-first task execution interface per the functional spec:

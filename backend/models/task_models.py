@@ -198,5 +198,8 @@ class TaskExecutionSubmit(BaseModel):
     issues_found: List[str] = Field(default_factory=list)
     follow_up_required: bool = False
     follow_up_notes: Optional[str] = None
-    # Form data will be added in Phase 3
+    # Form data for dynamic forms
     form_data: Optional[dict] = None
+    # Observation creation fields (when Issue = YES)
+    create_observation: bool = False
+    issue_severity: Optional[str] = None  # low, medium, high
