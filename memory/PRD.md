@@ -94,6 +94,30 @@ Added device tracking (Desktop/Mobile/Tablet) to User Statistics:
   - Percentage badges
   - Device Distribution pie chart
 
+### Feature: Mobile-Friendly Task Execution Forms
+Enhanced the My Tasks page to provide optimal mobile experience:
+
+**New Hook:**
+- Created `useIsMobile.js` hook for responsive device detection
+
+**Mobile Optimizations:**
+- **Full-screen Sheet**: Task execution uses bottom Sheet on mobile (95% height) instead of Dialog
+- **Larger Touch Targets**: All inputs, buttons, and checkboxes increased in size (h-12, h-14)
+- **Touch-friendly selectors**: Multiple choice options stack vertically with checkmarks
+- **Collapsible context**: Asset/location info collapses to save space, expandable on tap
+- **Fixed footer**: Cancel/Complete buttons fixed at bottom for thumb-friendly access
+- **Camera capture**: Photo fields use `capture="environment"` for direct camera access
+- **Responsive spacing**: Increased padding and margins for touch accuracy
+- **Large text**: Form labels and inputs use text-base (16px) on mobile
+
+**Form Field Improvements:**
+- Boolean: Larger checkbox with tap-friendly container
+- Checklist: Full-width items with larger checkboxes
+- Numeric: Number keyboard with `inputMode="decimal"`
+- Select/Multiple Choice: Vertical stacking with selection indicators
+- Photo: Larger camera icon, "Take photo" prompt on mobile
+- Issue Toggle: Full-width Yes/No buttons with icons
+
 **Files Created:**
 - `/app/backend/models/feedback_models.py` - Pydantic models for feedback
 - `/app/backend/services/feedback_service.py` - Feedback service layer

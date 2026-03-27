@@ -33,6 +33,7 @@ import {
   Eye,
   Users,
   Trash2,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -54,6 +55,14 @@ import {
   DialogFooter,
   DialogDescription,
 } from "../components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "../components/ui/sheet";
 import { Label } from "../components/ui/label";
 import { Checkbox } from "../components/ui/checkbox";
 import { Calendar } from "../components/ui/calendar";
@@ -63,6 +72,7 @@ import {
   PopoverTrigger,
 } from "../components/ui/popover";
 import { cn } from "../lib/utils";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -324,8 +334,9 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
   );
 };
 
-// Task Execution Dialog Component
+// Task Execution Dialog Component - Mobile Responsive
 const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
+  const isMobile = useIsMobile();
   const [formData, setFormData] = useState({});
   const [issueFound, setIssueFound] = useState(false);
   const [issueDetails, setIssueDetails] = useState({ severity: "medium", description: "", photo: null });
@@ -334,6 +345,7 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
   const [validationErrors, setValidationErrors] = useState({});
   const [showIssuePrompt, setShowIssuePrompt] = useState(false);
   const [issueAction, setIssueAction] = useState(null);
+  const [expandedContext, setExpandedContext] = useState(!isMobile);
   
   // Reset form when task changes
   useEffect(() => {
@@ -465,7 +477,7 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
     }
   };
   
-  // Render form field based on type
+  // Render form field based on type - Mobile Optimized
   const renderField = (field) => {
     const hasError = validationErrors[field.id];
     const value = formData[field.id];
@@ -478,23 +490,36 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
     const minThreshold = field.min_threshold ?? thresholds.critical_low ?? thresholds.warning_low;
     const maxThreshold = field.max_threshold ?? thresholds.critical_high ?? thresholds.warning_high;
     
+    // Mobile-friendly input classes
+    const mobileInputClass = isMobile ? "h-12 text-base" : "";
+    const mobileLabelClass = isMobile ? "text-base mb-2" : "";
+    const mobileTextareaRows = isMobile ? 4 : 3;
+    
     switch (fieldType) {
       case "boolean":
-        // Single checkbox/toggle for boolean fields
+        // Single checkbox/toggle for boolean fields - larger on mobile
         return (
           <div key={field.id} className="space-y-2">
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+            <div className={cn(
+              "flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200",
+              isMobile && "min-h-[60px]"
+            )}>
               <Checkbox
                 id={field.id}
                 checked={value === true}
                 onCheckedChange={(checked) => handleFieldChange(field.id, checked)}
+                className={cn(isMobile && "h-6 w-6")}
               />
               <div className="flex-1">
-                <label htmlFor={field.id} className={cn("text-sm font-medium cursor-pointer", hasError && "text-red-600")}>
+                <label htmlFor={field.id} className={cn(
+                  "font-medium cursor-pointer",
+                  hasError && "text-red-600",
+                  isMobile ? "text-base" : "text-sm"
+                )}>
                   {field.label} {field.required && <span className="text-red-500">*</span>}
                 </label>
                 {field.description && (
-                  <p className="text-xs text-slate-500 mt-0.5">{field.description}</p>
+                  <p className={cn("text-slate-500 mt-0.5", isMobile ? "text-sm" : "text-xs")}>{field.description}</p>
                 )}
               </div>
             </div>
@@ -504,19 +529,31 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
       
       case "checklist":
         return (
-          <div key={field.id} className="space-y-2">
-            <Label className={cn(hasError && "text-red-600")}>
+          <div key={field.id} className="space-y-3">
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
-            <div className="space-y-2 pl-1">
+            <div className="space-y-2">
               {(field.items || []).map((item, idx) => (
-                <div key={idx} className="flex items-center gap-2">
+                <div 
+                  key={idx} 
+                  className={cn(
+                    "flex items-center gap-4 p-3 bg-slate-50 rounded-lg border border-slate-200",
+                    isMobile && "min-h-[52px]"
+                  )}
+                >
                   <Checkbox
                     id={`${field.id}-${idx}`}
                     checked={value?.[idx] || false}
                     onCheckedChange={() => handleChecklistToggle(field.id, idx, field.items)}
+                    className={cn(isMobile && "h-6 w-6")}
                   />
-                  <label htmlFor={`${field.id}-${idx}`} className="text-sm">{item}</label>
+                  <label 
+                    htmlFor={`${field.id}-${idx}`} 
+                    className={cn("flex-1 cursor-pointer", isMobile ? "text-base" : "text-sm")}
+                  >
+                    {item}
+                  </label>
                 </div>
               ))}
             </div>
@@ -531,19 +568,23 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
         );
         return (
           <div key={field.id} className="space-y-2">
-            <Label className={cn((hasError || isExceeded) && "text-red-600")}>
+            <Label className={cn((hasError || isExceeded) && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
               {field.unit && <span className="text-slate-400 font-normal ml-1">({field.unit})</span>}
             </Label>
             <Input
               type="number"
+              inputMode="decimal"
               value={value || ""}
               onChange={(e) => handleNumericChange(field.id, e.target.value, { ...field, min_threshold: minThreshold, max_threshold: maxThreshold })}
               placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
-              className={cn(isExceeded && "border-red-500 bg-red-50")}
+              className={cn(
+                isExceeded && "border-red-500 bg-red-50",
+                mobileInputClass
+              )}
             />
             {(minThreshold != null || maxThreshold != null) && (
-              <p className="text-xs text-slate-500">
+              <p className={cn("text-slate-500", isMobile ? "text-sm" : "text-xs")}>
                 {minThreshold != null && maxThreshold != null 
                   ? `Range: ${minThreshold} - ${maxThreshold}` 
                   : minThreshold != null 
@@ -553,8 +594,8 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
               </p>
             )}
             {isExceeded && (
-              <p className="text-xs text-red-600 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
+              <p className="text-sm text-red-600 flex items-center gap-1 bg-red-50 p-2 rounded-lg">
+                <AlertTriangle className="w-4 h-4" />
                 Value outside threshold - issue detected
               </p>
             )}
@@ -566,14 +607,15 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
       case "textarea":
         return (
           <div key={field.id} className="space-y-2">
-            <Label className={cn(hasError && "text-red-600")}>
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
             <Textarea
               value={value || ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
               placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
-              rows={3}
+              rows={mobileTextareaRows}
+              className={cn(isMobile && "text-base")}
             />
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
           </div>
@@ -582,11 +624,14 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
       case "select":
       case "multiple_choice":
         return (
-          <div key={field.id} className="space-y-2">
-            <Label className={cn(hasError && "text-red-600")}>
+          <div key={field.id} className="space-y-3">
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
-            <div className="flex flex-wrap gap-2">
+            <div className={cn(
+              "grid gap-2",
+              isMobile ? "grid-cols-1" : "flex flex-wrap"
+            )}>
               {(field.options || ["Good", "Warning", "Bad"]).map((option) => {
                 const optionValue = typeof option === 'object' ? option.value : option;
                 const optionLabel = typeof option === 'object' ? option.label : option;
@@ -595,14 +640,16 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
                     key={optionValue}
                     type="button"
                     variant={value === optionValue ? "default" : "outline"}
-                    size="sm"
+                    size={isMobile ? "lg" : "sm"}
                     onClick={() => handleFieldChange(field.id, optionValue)}
                     className={cn(
+                      isMobile && "h-14 text-base justify-start px-4",
                       value === optionValue && optionLabel === "Good" && "bg-green-600 hover:bg-green-700",
                       value === optionValue && optionLabel === "Warning" && "bg-amber-500 hover:bg-amber-600",
                       value === optionValue && optionLabel === "Bad" && "bg-red-600 hover:bg-red-700"
                     )}
                   >
+                    {value === optionValue && <Check className="w-4 h-4 mr-2" />}
                     {optionLabel}
                   </Button>
                 );
@@ -616,26 +663,31 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
       case "file":
         return (
           <div key={field.id} className="space-y-2">
-            <Label className={cn(hasError && "text-red-600")}>
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
-            <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
+            <div className={cn(
+              "border-2 border-dashed border-slate-300 rounded-xl text-center",
+              isMobile ? "p-6" : "p-4"
+            )}>
               {value ? (
-                <div className="space-y-2">
-                  <img src={value} alt="Uploaded" className="max-h-32 mx-auto rounded" />
+                <div className="space-y-3">
+                  <img src={value} alt="Uploaded" className="max-h-40 mx-auto rounded-lg" />
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobile ? "lg" : "sm"}
                     onClick={() => handleFieldChange(field.id, null)}
+                    className={cn(isMobile && "h-12 text-base")}
                   >
-                    <X className="w-4 h-4 mr-1" /> Remove
+                    <X className="w-4 h-4 mr-2" /> Remove
                   </Button>
                 </div>
               ) : (
-                <label className="cursor-pointer">
+                <label className="cursor-pointer block">
                   <input
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -646,9 +698,12 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
                       }
                     }}
                   />
-                  <div className="py-4">
-                    <Camera className="w-8 h-8 mx-auto text-slate-400 mb-2" />
-                    <p className="text-sm text-slate-600">Tap to add photo</p>
+                  <div className={cn("py-6", isMobile && "py-8")}>
+                    <Camera className={cn("mx-auto text-slate-400 mb-3", isMobile ? "w-12 h-12" : "w-8 h-8")} />
+                    <p className={cn("text-slate-600 font-medium", isMobile ? "text-base" : "text-sm")}>
+                      {isMobile ? "Tap to take photo" : "Tap to add photo"}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">or choose from gallery</p>
                   </div>
                 </label>
               )}
@@ -661,11 +716,14 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
         // Default to text input for unknown types
         return (
           <div key={field.id} className="space-y-2">
-            <Label>{field.label} {field.required && <span className="text-red-500">*</span>}</Label>
+            <Label className={mobileLabelClass}>
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </Label>
             <Input
               value={value || ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
               placeholder={field.placeholder}
+              className={mobileInputClass}
             />
           </div>
         );
@@ -674,8 +732,146 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
   
   if (!task) return null;
   
-  // Issue Decision Prompt
+  // Issue Decision Prompt - Mobile Optimized
   if (showIssuePrompt) {
+    const IssuePromptContent = (
+      <>
+        <div className={cn("space-y-4", isMobile && "pb-20")}>
+          {!isMobile && (
+            <p className="text-sm text-slate-600">
+              An issue was found during task execution. What would you like to do?
+            </p>
+          )}
+          
+          <div className="space-y-3">
+            <Button
+              variant={issueAction === "create_task" ? "default" : "outline"}
+              className={cn("w-full justify-start h-auto", isMobile ? "py-4 px-4" : "py-3")}
+              onClick={() => setIssueAction("create_task")}
+            >
+              <div className="text-left">
+                <div className={cn("font-medium flex items-center gap-2", isMobile && "text-base")}>
+                  <Plus className="w-4 h-4" />
+                  Create follow-up task
+                </div>
+                <p className={cn("text-muted-foreground font-normal mt-1", isMobile ? "text-sm" : "text-xs")}>
+                  Create a corrective task and log observation
+                </p>
+              </div>
+            </Button>
+            
+            <Button
+              variant={issueAction === "log_observation" ? "default" : "outline"}
+              className={cn("w-full justify-start h-auto", isMobile ? "py-4 px-4" : "py-3")}
+              onClick={() => setIssueAction("log_observation")}
+            >
+              <div className="text-left">
+                <div className={cn("font-medium flex items-center gap-2", isMobile && "text-base")}>
+                  <FileText className="w-4 h-4" />
+                  Log observation only
+                </div>
+                <p className={cn("text-muted-foreground font-normal mt-1", isMobile ? "text-sm" : "text-xs")}>
+                  Record the issue without creating a task
+                </p>
+              </div>
+            </Button>
+            
+            <Button
+              variant={issueAction === "ignore" ? "default" : "outline"}
+              className={cn("w-full justify-start h-auto", isMobile ? "py-4 px-4" : "py-3")}
+              onClick={() => setIssueAction("ignore")}
+            >
+              <div className="text-left">
+                <div className={cn("font-medium flex items-center gap-2", isMobile && "text-base")}>
+                  <X className="w-4 h-4" />
+                  Ignore
+                </div>
+                <p className={cn("text-muted-foreground font-normal mt-1", isMobile ? "text-sm" : "text-xs")}>
+                  Complete without logging the issue
+                </p>
+              </div>
+            </Button>
+          </div>
+          
+          {/* Issue Details */}
+          {(issueAction === "create_task" || issueAction === "log_observation") && (
+            <div className="space-y-4 border-t pt-4">
+              <div className="space-y-2">
+                <Label className={isMobile ? "text-base" : ""}>Severity</Label>
+                <Select
+                  value={issueDetails.severity}
+                  onValueChange={(v) => setIssueDetails(prev => ({ ...prev, severity: v }))}
+                >
+                  <SelectTrigger className={isMobile ? "h-12 text-base" : ""}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className={isMobile ? "text-base" : ""}>
+                  Description <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  value={issueDetails.description}
+                  onChange={(e) => setIssueDetails(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Describe the issue..."
+                  rows={isMobile ? 4 : 3}
+                  className={isMobile ? "text-base" : ""}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Footer Actions */}
+        <div className={cn(
+          "flex gap-3",
+          isMobile ? "fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200" : "mt-6"
+        )}>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowIssuePrompt(false)}
+            className={cn("flex-1", isMobile && "h-12 text-base")}
+          >
+            Back
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || ((issueAction === "create_task" || issueAction === "log_observation") && !issueDetails.description)}
+            className={cn("flex-1", isMobile && "h-12 text-base")}
+          >
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Complete Task
+          </Button>
+        </div>
+      </>
+    );
+    
+    if (isMobile) {
+      return (
+        <Sheet open={open} onOpenChange={onClose}>
+          <SheetContent side="bottom" className="h-[90vh] rounded-t-2xl overflow-y-auto p-6">
+            <SheetHeader className="text-left mb-4">
+              <SheetTitle className="flex items-center gap-2 text-amber-600 text-xl">
+                <AlertTriangle className="w-6 h-6" />
+                Issue Detected
+              </SheetTitle>
+              <SheetDescription>
+                An issue was found during task execution. What would you like to do?
+              </SheetDescription>
+            </SheetHeader>
+            {IssuePromptContent}
+          </SheetContent>
+        </Sheet>
+      );
+    }
+    
     return (
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-w-md">
@@ -688,194 +884,169 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
               An issue was found during task execution. What would you like to do?
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="space-y-3 py-4">
-            <Button
-              variant={issueAction === "create_task" ? "default" : "outline"}
-              className="w-full justify-start h-auto py-3"
-              onClick={() => setIssueAction("create_task")}
-            >
-              <div className="text-left">
-                <div className="font-medium flex items-center gap-2">
-                  <Plus className="w-4 h-4" />
-                  Create follow-up task
-                </div>
-                <p className="text-xs text-muted-foreground font-normal mt-1">
-                  Create a corrective task and log observation
-                </p>
-              </div>
-            </Button>
-            
-            <Button
-              variant={issueAction === "log_observation" ? "default" : "outline"}
-              className="w-full justify-start h-auto py-3"
-              onClick={() => setIssueAction("log_observation")}
-            >
-              <div className="text-left">
-                <div className="font-medium flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Log observation only
-                </div>
-                <p className="text-xs text-muted-foreground font-normal mt-1">
-                  Record the issue without creating a task
-                </p>
-              </div>
-            </Button>
-            
-            <Button
-              variant={issueAction === "ignore" ? "default" : "outline"}
-              className="w-full justify-start h-auto py-3"
-              onClick={() => setIssueAction("ignore")}
-            >
-              <div className="text-left">
-                <div className="font-medium flex items-center gap-2">
-                  <X className="w-4 h-4" />
-                  Ignore
-                </div>
-                <p className="text-xs text-muted-foreground font-normal mt-1">
-                  Complete without logging the issue
-                </p>
-              </div>
-            </Button>
-          </div>
-          
-          {/* Issue Details (required for create_task and log_observation) */}
-          {(issueAction === "create_task" || issueAction === "log_observation") && (
-            <div className="space-y-4 border-t pt-4">
-              <div className="space-y-2">
-                <Label>Severity</Label>
-                <Select
-                  value={issueDetails.severity}
-                  onValueChange={(v) => setIssueDetails(prev => ({ ...prev, severity: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Description <span className="text-red-500">*</span></Label>
-                <Textarea
-                  value={issueDetails.description}
-                  onChange={(e) => setIssueDetails(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Describe the issue..."
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowIssuePrompt(false)}>
-              Back
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || ((issueAction === "create_task" || issueAction === "log_observation") && !issueDetails.description)}
-            >
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Complete Task
-            </Button>
-          </DialogFooter>
+          {IssuePromptContent}
         </DialogContent>
       </Dialog>
     );
   }
   
+  // Main Task Execution Form Content
+  const TaskFormContent = (
+    <>
+      {/* Context Block - Collapsible on mobile */}
+      <div className={cn(
+        "bg-slate-50 rounded-xl border border-slate-200",
+        isMobile ? "p-4" : "p-3"
+      )}>
+        {isMobile ? (
+          <button 
+            className="w-full flex items-center justify-between"
+            onClick={() => setExpandedContext(!expandedContext)}
+          >
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-slate-500" />
+              <span className="font-medium text-slate-700">{task.equipment_name || task.asset}</span>
+            </div>
+            {expandedContext ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+          </button>
+        ) : (
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-500">Asset / Location</span>
+            <span className="font-medium">{task.equipment_name || task.asset}</span>
+          </div>
+        )}
+        
+        {(expandedContext || !isMobile) && (
+          <div className={cn("space-y-2", isMobile ? "mt-4 pt-4 border-t border-slate-200 text-sm" : "text-sm mt-2")}>
+            {task.last_completed && (
+              <div className="flex justify-between">
+                <span className="text-slate-500">Last completed</span>
+                <span>{format(parseISO(task.last_completed), "MMM d, yyyy")}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-slate-500">Task type</span>
+              <span className="capitalize">{task.mitigation_strategy || task.type}</span>
+            </div>
+            {task.frequency && (
+              <div className="flex justify-between">
+                <span className="text-slate-500">Frequency</span>
+                <span>{task.frequency}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* Form Fields */}
+      <div className={cn("space-y-5", isMobile && "pb-28")}>
+        {formFields.length > 0 ? (
+          <>
+            <h4 className={cn("font-semibold text-slate-900", isMobile ? "text-lg" : "text-base")}>
+              Execution Form
+            </h4>
+            {formFields.map(renderField)}
+          </>
+        ) : (
+          <div className="space-y-3">
+            <Label className={isMobile ? "text-base" : ""}>Completion Notes</Label>
+            <Textarea
+              value={completionNotes}
+              onChange={(e) => setCompletionNotes(e.target.value)}
+              placeholder="Enter any notes about the task execution..."
+              rows={isMobile ? 5 : 4}
+              className={isMobile ? "text-base" : ""}
+            />
+          </div>
+        )}
+        
+        {/* Issue Toggle - More touch-friendly on mobile */}
+        <div className={cn(
+          "flex items-center justify-between p-4 bg-amber-50 rounded-xl border border-amber-200",
+          isMobile && "flex-col gap-4 items-stretch"
+        )}>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className={cn("text-amber-600", isMobile ? "w-6 h-6" : "w-5 h-5")} />
+            <span className={cn("font-medium text-amber-900", isMobile && "text-base")}>Issue Found?</span>
+          </div>
+          <div className={cn("flex gap-2", isMobile && "w-full")}>
+            <Button
+              variant={!issueFound ? "default" : "outline"}
+              size={isMobile ? "lg" : "sm"}
+              onClick={() => setIssueFound(false)}
+              className={cn(
+                !issueFound ? "bg-green-600 hover:bg-green-700" : "",
+                isMobile && "flex-1 h-12 text-base"
+              )}
+            >
+              <Check className="w-4 h-4 mr-1" /> No
+            </Button>
+            <Button
+              variant={issueFound ? "default" : "outline"}
+              size={isMobile ? "lg" : "sm"}
+              onClick={() => setIssueFound(true)}
+              className={cn(
+                issueFound ? "bg-red-600 hover:bg-red-700" : "",
+                isMobile && "flex-1 h-12 text-base"
+              )}
+            >
+              <AlertCircle className="w-4 h-4 mr-1" /> Yes
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Footer Actions */}
+      <div className={cn(
+        "flex gap-3",
+        isMobile ? "fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-lg" : "mt-6"
+      )}>
+        <Button 
+          variant="outline" 
+          onClick={onClose}
+          className={cn("flex-1", isMobile && "h-12 text-base")}
+        >
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleSubmit} 
+          disabled={isSubmitting}
+          className={cn("flex-1", isMobile && "h-12 text-base")}
+        >
+          {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+          Complete Task
+        </Button>
+      </div>
+    </>
+  );
+  
+  // Render as Sheet on mobile, Dialog on desktop
+  if (isMobile) {
+    return (
+      <Sheet open={open} onOpenChange={onClose}>
+        <SheetContent 
+          side="bottom" 
+          className="h-[95vh] rounded-t-2xl overflow-y-auto"
+          data-testid="task-execution-sheet"
+        >
+          <SheetHeader className="text-left mb-4">
+            <SheetTitle className="text-xl">{task.title}</SheetTitle>
+            <SheetDescription>{task.equipment_name || task.asset}</SheetDescription>
+          </SheetHeader>
+          {TaskFormContent}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+  
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="task-execution-dialog">
         <DialogHeader>
           <DialogTitle>{task.title}</DialogTitle>
           <DialogDescription>{task.equipment_name || task.asset}</DialogDescription>
         </DialogHeader>
-        
-        {/* Context Block */}
-        <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-slate-500">Asset / Location</span>
-            <span className="font-medium">{task.equipment_name || task.asset}</span>
-          </div>
-          {task.last_completed && (
-            <div className="flex justify-between">
-              <span className="text-slate-500">Last completed</span>
-              <span>{format(parseISO(task.last_completed), "MMM d, yyyy")}</span>
-            </div>
-          )}
-          <div className="flex justify-between">
-            <span className="text-slate-500">Task type</span>
-            <span className="capitalize">{task.mitigation_strategy || task.type}</span>
-          </div>
-          {task.frequency && (
-            <div className="flex justify-between">
-              <span className="text-slate-500">Frequency</span>
-              <span>{task.frequency}</span>
-            </div>
-          )}
-        </div>
-        
-        {/* Form Fields */}
-        {formFields.length > 0 ? (
-          <div className="space-y-4">
-            <h4 className="font-medium text-slate-900">Execution Form</h4>
-            {formFields.map(renderField)}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Default simple form when no form template */}
-            <div className="space-y-2">
-              <Label>Completion Notes</Label>
-              <Textarea
-                value={completionNotes}
-                onChange={(e) => setCompletionNotes(e.target.value)}
-                placeholder="Enter any notes about the task execution..."
-                rows={4}
-              />
-            </div>
-          </div>
-        )}
-        
-        {/* Issue Toggle */}
-        <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-600" />
-            <span className="font-medium text-amber-900">Issue Found?</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={!issueFound ? "default" : "outline"}
-              size="sm"
-              onClick={() => setIssueFound(false)}
-              className={!issueFound ? "bg-green-600 hover:bg-green-700" : ""}
-            >
-              No
-            </Button>
-            <Button
-              variant={issueFound ? "default" : "outline"}
-              size="sm"
-              onClick={() => setIssueFound(true)}
-              className={issueFound ? "bg-red-600 hover:bg-red-700" : ""}
-            >
-              Yes
-            </Button>
-          </div>
-        </div>
-        
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
-            Complete Task
-          </Button>
-        </DialogFooter>
+        {TaskFormContent}
       </DialogContent>
     </Dialog>
   );
