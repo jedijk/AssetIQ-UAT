@@ -1,11 +1,23 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { equipmentHierarchyAPI } from "../lib/api";
-import { ChevronRight, ChevronDown, Layers, Settings, Circle } from "lucide-react";
+import { 
+  ChevronRight, 
+  ChevronDown, 
+  Search, 
+  Building2, 
+  Factory, 
+  Layers, 
+  Cpu, 
+  Settings,
+  CircleDot,
+  Filter
+} from "lucide-react";
 
 const MobileHierarchy = () => {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [selectedNode, setSelectedNode] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: nodesData = {}, isLoading } = useQuery({
     queryKey: ["equipmentNodes"],
@@ -14,7 +26,8 @@ const MobileHierarchy = () => {
 
   const nodes = nodesData.nodes || [];
 
-  const toggleExpand = (nodeId) => {
+  const toggleExpand = (nodeId, e) => {
+    e.stopPropagation();
     const newExpanded = new Set(expandedNodes);
     if (newExpanded.has(nodeId)) {
       newExpanded.delete(nodeId);
@@ -27,57 +40,67 @@ const MobileHierarchy = () => {
   const buildTree = (nodes, parentId = null) => {
     return nodes
       .filter((n) => n.parent_id === parentId)
-      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || (a.name || "").localeCompare(b.name || ""));
   };
 
-  const getLevelColor = (level) => {
-    const colors = {
-      site: "#ef4444",
-      area: "#f97316",
-      unit: "#eab308",
-      equipment: "#22c55e",
-      subunit: "#3b82f6",
-      component: "#8b5cf6",
+  const getLevelConfig = (level) => {
+    const configs = {
+      installation: { icon: Building2, color: "#8b5cf6", bg: "#f5f3ff", label: "Installation" },
+      plant_unit: { icon: Factory, color: "#3b82f6", bg: "#eff6ff", label: "Plant Unit" },
+      section_system: { icon: Layers, color: "#06b6d4", bg: "#ecfeff", label: "Section" },
+      equipment_unit: { icon: Settings, color: "#f59e0b", bg: "#fffbeb", label: "Equipment" },
+      equipment: { icon: Cpu, color: "#22c55e", bg: "#f0fdf4", label: "Equipment" },
+      subunit: { icon: CircleDot, color: "#ec4899", bg: "#fdf2f8", label: "Subunit" },
+      maintainable_item: { icon: CircleDot, color: "#64748b", bg: "#f8fafc", label: "M. Item" },
     };
-    return colors[level] || "#94a3b8";
+    return configs[level] || configs.equipment;
   };
+
+  const filteredNodes = searchQuery
+    ? nodes.filter(n => n.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : nodes;
 
   const renderNode = (node, depth = 0) => {
     const children = buildTree(nodes, node.id);
     const hasChildren = children.length > 0;
     const isExpanded = expandedNodes.has(node.id);
     const isSelected = selectedNode === node.id;
+    const config = getLevelConfig(node.level);
+    const Icon = config.icon;
 
     return (
       <div key={node.id} className="hierarchy-node">
         <button
-          onClick={() => {
-            setSelectedNode(node.id);
-            if (hasChildren) toggleExpand(node.id);
-          }}
+          onClick={() => setSelectedNode(isSelected ? null : node.id)}
           className={`node-button ${isSelected ? "selected" : ""}`}
-          style={{ paddingLeft: `${depth * 16 + 16}px` }}
+          style={{ paddingLeft: `${depth * 20 + 16}px` }}
           data-testid={`hierarchy-node-${node.id}`}
         >
-          <span className="expand-icon">
+          <span 
+            className="expand-icon"
+            onClick={(e) => hasChildren && toggleExpand(node.id, e)}
+          >
             {hasChildren ? (
               isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />
             ) : (
               <span style={{ width: 18 }} />
             )}
           </span>
-          <span 
-            className="level-dot" 
-            style={{ backgroundColor: getLevelColor(node.level) }}
-          />
+          
+          <div 
+            className="level-icon"
+            style={{ backgroundColor: config.bg }}
+          >
+            <Icon size={16} color={config.color} />
+          </div>
+          
           <div className="node-info">
             <span className="node-name">{node.name}</span>
-            {node.tag && <span className="node-tag">{node.tag}</span>}
+            <span className="node-level" style={{ color: config.color }}>{config.label}</span>
           </div>
-          {node.criticality?.level && (
-            <span className={`criticality-badge ${node.criticality.level.toLowerCase()}`}>
-              {node.criticality.level}
-            </span>
+          
+          {node.process_step && (
+            <span className="process-badge">{node.process_step}</span>
           )}
         </button>
 
@@ -90,76 +113,227 @@ const MobileHierarchy = () => {
     );
   };
 
-  const rootNodes = buildTree(nodes, null);
+  const rootNodes = buildTree(searchQuery ? filteredNodes : nodes, null);
+  const flatResults = searchQuery ? filteredNodes : [];
 
   return (
     <div className="mobile-hierarchy" data-testid="mobile-hierarchy">
+      {/* Header */}
       <header className="mobile-header">
-        <div>
-          <h1>Hierarchy</h1>
-          <p className="subtitle">Equipment structure</p>
+        <div className="header-content">
+          <h1>Equipment</h1>
+          <p className="subtitle">Asset Hierarchy</p>
         </div>
-        <span className="node-count">{nodes.length} items</span>
+        <div className="header-badge">
+          <span className="badge-count">{nodes.length}</span>
+          <span className="badge-label">Assets</span>
+        </div>
       </header>
 
-      <div className="hierarchy-container">
-        <div className="hierarchy-card">
-          {isLoading ? (
-            <div className="loading">Loading hierarchy...</div>
-          ) : rootNodes.length === 0 ? (
-            <div className="empty">No equipment found</div>
-          ) : (
-            rootNodes.map((node) => renderNode(node))
-          )}
+      {/* Search Bar */}
+      <div className="search-section">
+        <div className="search-wrapper">
+          <Search size={18} className="search-icon" />
+          <input
+            type="text"
+            placeholder="Search equipment..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
         </div>
+        <button className="filter-btn">
+          <Filter size={18} />
+        </button>
       </div>
+
+      {/* Hierarchy Tree */}
+      <div className="hierarchy-container">
+        {isLoading ? (
+          <div className="loading-state">
+            <div className="loading-spinner" />
+            <span>Loading hierarchy...</span>
+          </div>
+        ) : searchQuery && flatResults.length > 0 ? (
+          <div className="search-results">
+            {flatResults.map((node) => {
+              const config = getLevelConfig(node.level);
+              const Icon = config.icon;
+              return (
+                <button
+                  key={node.id}
+                  className={`search-result-item ${selectedNode === node.id ? "selected" : ""}`}
+                  onClick={() => setSelectedNode(node.id)}
+                >
+                  <div className="level-icon" style={{ backgroundColor: config.bg }}>
+                    <Icon size={16} color={config.color} />
+                  </div>
+                  <div className="result-info">
+                    <span className="node-name">{node.name}</span>
+                    <span className="node-level" style={{ color: config.color }}>{config.label}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : rootNodes.length === 0 ? (
+          <div className="empty-state">
+            <Building2 size={48} className="empty-icon" />
+            <p>No equipment found</p>
+            <span>Add equipment from the web app</span>
+          </div>
+        ) : (
+          <div className="hierarchy-tree">
+            {rootNodes.map((node) => renderNode(node))}
+          </div>
+        )}
+      </div>
+
+      {/* Selected Node Details */}
+      {selectedNode && (
+        <div className="node-details-panel">
+          {(() => {
+            const node = nodes.find(n => n.id === selectedNode);
+            if (!node) return null;
+            const config = getLevelConfig(node.level);
+            return (
+              <>
+                <div className="details-header" style={{ borderColor: config.color }}>
+                  <span className="details-level" style={{ color: config.color }}>{config.label}</span>
+                  <h3>{node.name}</h3>
+                </div>
+                <div className="details-body">
+                  {node.process_step && (
+                    <div className="detail-row">
+                      <span className="detail-label">Process Step</span>
+                      <span className="detail-value">{node.process_step}</span>
+                    </div>
+                  )}
+                  {node.description && (
+                    <div className="detail-row">
+                      <span className="detail-label">Description</span>
+                      <span className="detail-value">{node.description}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       <style>{`
         .mobile-hierarchy {
           min-height: 100%;
-          background: #f1f5f9;
+          background: #fafafa;
+          padding-bottom: 80px;
         }
 
         .mobile-header {
-          background: #ffffff;
-          padding: 20px 16px;
-          border-bottom: 1px solid #e2e8f0;
+          background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+          padding: 24px 20px;
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          align-items: flex-start;
+          color: white;
         }
 
-        .mobile-header h1 {
-          font-size: 24px;
+        .header-content h1 {
+          font-size: 26px;
           font-weight: 700;
           margin: 0;
-          color: #0f172a;
+          letter-spacing: -0.5px;
         }
 
-        .mobile-header .subtitle {
+        .header-content .subtitle {
           font-size: 13px;
-          color: #64748b;
-          margin: 2px 0 0 0;
+          opacity: 0.85;
+          margin: 4px 0 0 0;
+          font-weight: 400;
         }
 
-        .node-count {
-          font-size: 12px;
-          font-weight: 500;
-          color: #3b82f6;
-          background: #eff6ff;
-          padding: 6px 12px;
-          border-radius: 20px;
+        .header-badge {
+          background: rgba(255,255,255,0.2);
+          border-radius: 12px;
+          padding: 10px 14px;
+          text-align: center;
+          backdrop-filter: blur(10px);
+        }
+
+        .badge-count {
+          display: block;
+          font-size: 20px;
+          font-weight: 700;
+        }
+
+        .badge-label {
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          opacity: 0.9;
+        }
+
+        .search-section {
+          display: flex;
+          gap: 10px;
+          padding: 16px;
+          background: #ffffff;
+          border-bottom: 1px solid #f0f0f0;
+        }
+
+        .search-wrapper {
+          flex: 1;
+          position: relative;
+        }
+
+        .search-icon {
+          position: absolute;
+          left: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #9ca3af;
+        }
+
+        .search-input {
+          width: 100%;
+          padding: 12px 12px 12px 44px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          font-size: 15px;
+          background: #f9fafb;
+          color: #1f2937;
+          transition: all 0.2s;
+        }
+
+        .search-input:focus {
+          outline: none;
+          border-color: #8b5cf6;
+          background: #ffffff;
+          box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+
+        .search-input::placeholder {
+          color: #9ca3af;
+        }
+
+        .filter-btn {
+          padding: 12px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          background: #ffffff;
+          color: #6b7280;
+          cursor: pointer;
         }
 
         .hierarchy-container {
           padding: 12px;
         }
 
-        .hierarchy-card {
+        .hierarchy-tree {
           background: #ffffff;
           border-radius: 16px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
           overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
 
         .hierarchy-node {
@@ -170,35 +344,40 @@ const MobileHierarchy = () => {
           width: 100%;
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
           padding: 14px 16px;
           background: none;
           border: none;
-          border-bottom: 1px solid #f1f5f9;
-          color: #1e293b;
+          border-bottom: 1px solid #f5f5f5;
+          color: #1f2937;
           text-align: left;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: background 0.15s;
         }
 
-        .node-button:hover {
-          background: #f8fafc;
+        .node-button:active {
+          background: #f9fafb;
         }
 
         .node-button.selected {
-          background: #eff6ff;
+          background: #f5f3ff;
         }
 
         .expand-icon {
-          color: #94a3b8;
+          color: #9ca3af;
           display: flex;
           align-items: center;
+          padding: 4px;
+          margin: -4px;
         }
 
-        .level-dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 50%;
+        .level-icon {
+          width: 32px;
+          height: 32px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           flex-shrink: 0;
         }
 
@@ -212,39 +391,158 @@ const MobileHierarchy = () => {
 
         .node-name {
           font-size: 14px;
-          font-weight: 500;
-          color: #1e293b;
+          font-weight: 600;
+          color: #1f2937;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
 
-        .node-tag {
+        .node-level {
           font-size: 11px;
-          color: #64748b;
+          font-weight: 500;
         }
 
-        .criticality-badge {
+        .process-badge {
           font-size: 10px;
           font-weight: 600;
-          padding: 4px 8px;
-          border-radius: 6px;
+          padding: 4px 10px;
+          background: #fef3c7;
+          color: #b45309;
+          border-radius: 20px;
           flex-shrink: 0;
         }
-
-        .criticality-badge.critical { background: #fef2f2; color: #dc2626; }
-        .criticality-badge.high { background: #fff7ed; color: #ea580c; }
-        .criticality-badge.medium { background: #fefce8; color: #ca8a04; }
-        .criticality-badge.low { background: #f0fdf4; color: #16a34a; }
 
         .node-children {
           background: #fafafa;
         }
 
-        .loading, .empty {
+        .search-results {
+          background: #ffffff;
+          border-radius: 16px;
+          overflow: hidden;
+        }
+
+        .search-result-item {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px 16px;
+          background: none;
+          border: none;
+          border-bottom: 1px solid #f5f5f5;
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .search-result-item.selected {
+          background: #f5f3ff;
+        }
+
+        .result-info {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .loading-state, .empty-state {
           text-align: center;
-          padding: 40px 20px;
-          color: #64748b;
+          padding: 60px 20px;
+          color: #6b7280;
+        }
+
+        .loading-spinner {
+          width: 32px;
+          height: 32px;
+          border: 3px solid #e5e7eb;
+          border-top-color: #8b5cf6;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .empty-icon {
+          color: #d1d5db;
+          margin-bottom: 12px;
+        }
+
+        .empty-state p {
+          font-weight: 600;
+          color: #374151;
+          margin: 0 0 4px 0;
+        }
+
+        .empty-state span {
+          font-size: 13px;
+        }
+
+        .node-details-panel {
+          position: fixed;
+          bottom: 70px;
+          left: 12px;
+          right: 12px;
+          background: #ffffff;
+          border-radius: 16px;
+          box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+          overflow: hidden;
+          animation: slideUp 0.25s ease-out;
+        }
+
+        @keyframes slideUp {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        .details-header {
+          padding: 16px;
+          border-left: 4px solid;
+        }
+
+        .details-level {
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .details-header h3 {
+          font-size: 16px;
+          font-weight: 700;
+          margin: 4px 0 0 0;
+          color: #1f2937;
+        }
+
+        .details-body {
+          padding: 0 16px 16px;
+        }
+
+        .detail-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 10px 0;
+          border-top: 1px solid #f5f5f5;
+        }
+
+        .detail-label {
+          font-size: 13px;
+          color: #6b7280;
+        }
+
+        .detail-value {
+          font-size: 13px;
+          font-weight: 600;
+          color: #1f2937;
         }
       `}</style>
     </div>

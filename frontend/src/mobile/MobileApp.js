@@ -1,10 +1,17 @@
 import React, { useState } from "react";
-import { Home, Network, Plus, Bell, Briefcase } from "lucide-react";
+import { 
+  Home, 
+  ClipboardList, 
+  Plus, 
+  AlertTriangle, 
+  CheckSquare,
+  User
+} from "lucide-react";
 import MobileHierarchy from "./MobileHierarchy";
+import MobileMyTasks from "./MobileMyTasks";
 import MobileObservations from "./MobileObservations";
-import MobileChat from "./MobileChat";
 import MobileActions from "./MobileActions";
-import MobileNotifications from "./MobileNotifications";
+import MobileChat from "./MobileChat";
 
 const MobileApp = () => {
   const [activeTab, setActiveTab] = useState("home");
@@ -12,10 +19,10 @@ const MobileApp = () => {
 
   const tabs = [
     { id: "home", label: "Hierarchy", icon: Home },
-    { id: "network", label: "Observations", icon: Network },
+    { id: "tasks", label: "My Tasks", icon: ClipboardList },
     { id: "post", label: "Report", icon: Plus },
-    { id: "notifications", label: "Actions", icon: Bell },
-    { id: "jobs", label: "Alerts", icon: Briefcase },
+    { id: "observations", label: "Observations", icon: AlertTriangle },
+    { id: "actions", label: "Actions", icon: CheckSquare },
   ];
 
   const handleTabClick = (tabId) => {
@@ -30,12 +37,12 @@ const MobileApp = () => {
     switch (activeTab) {
       case "home":
         return <MobileHierarchy />;
-      case "network":
+      case "tasks":
+        return <MobileMyTasks />;
+      case "observations":
         return <MobileObservations />;
-      case "notifications":
+      case "actions":
         return <MobileActions />;
-      case "jobs":
-        return <MobileNotifications />;
       default:
         return <MobileHierarchy />;
     }
@@ -43,6 +50,22 @@ const MobileApp = () => {
 
   return (
     <div className="mobile-app" data-testid="mobile-app">
+      {/* Status Bar Simulation */}
+      <div className="status-bar">
+        <span className="time">9:41</span>
+        <div className="status-icons">
+          <svg width="17" height="10" viewBox="0 0 17 10" fill="currentColor">
+            <path d="M0 3a2 2 0 012-2h1a2 2 0 012 2v4a2 2 0 01-2 2H2a2 2 0 01-2-2V3zm5 0a2 2 0 012-2h1a2 2 0 012 2v4a2 2 0 01-2 2H7a2 2 0 01-2-2V3zm5 0a2 2 0 012-2h1a2 2 0 012 2v4a2 2 0 01-2 2h-1a2 2 0 01-2-2V3z"/>
+          </svg>
+          <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor">
+            <path d="M7.5 2.5l6 6H1.5l6-6z"/>
+          </svg>
+          <div className="battery">
+            <div className="battery-level"></div>
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className="mobile-content">
         {renderContent()}
@@ -53,7 +76,7 @@ const MobileApp = () => {
         <MobileChat onClose={() => setShowChat(false)} />
       )}
 
-      {/* Bottom Navigation */}
+      {/* LinkedIn-style Bottom Navigation */}
       <nav className="mobile-nav" data-testid="mobile-nav">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -69,12 +92,15 @@ const MobileApp = () => {
             >
               {isPost ? (
                 <div className="post-icon-wrapper">
-                  <Icon size={22} />
+                  <Icon size={20} strokeWidth={2.5} />
                 </div>
               ) : (
-                <Icon size={22} />
+                <>
+                  <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                  <span className="nav-label">{tab.label}</span>
+                  {isActive && <div className="active-indicator" />}
+                </>
               )}
-              <span>{tab.label}</span>
             </button>
           );
         })}
@@ -85,17 +111,69 @@ const MobileApp = () => {
           display: flex;
           flex-direction: column;
           height: 100vh;
-          background: #f1f5f9;
-          color: #1e293b;
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          height: 100dvh;
+          background: #fafafa;
+          color: #1a1a1a;
+          font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+          position: relative;
+          overflow: hidden;
         }
 
+        /* Status Bar */
+        .status-bar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 24px 8px;
+          background: #ffffff;
+          font-size: 14px;
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+
+        .status-icons {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .battery {
+          width: 22px;
+          height: 10px;
+          border: 1.5px solid #1a1a1a;
+          border-radius: 3px;
+          padding: 1px;
+          position: relative;
+        }
+
+        .battery::after {
+          content: '';
+          position: absolute;
+          right: -4px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 2px;
+          height: 5px;
+          background: #1a1a1a;
+          border-radius: 0 1px 1px 0;
+        }
+
+        .battery-level {
+          width: 100%;
+          height: 100%;
+          background: #22c55e;
+          border-radius: 1px;
+        }
+
+        /* Main Content */
         .mobile-content {
           flex: 1;
           overflow-y: auto;
-          padding-bottom: 70px;
+          overflow-x: hidden;
+          -webkit-overflow-scrolling: touch;
         }
 
+        /* Bottom Navigation - LinkedIn Style */
         .mobile-nav {
           position: fixed;
           bottom: 0;
@@ -103,54 +181,76 @@ const MobileApp = () => {
           right: 0;
           display: flex;
           justify-content: space-around;
-          align-items: center;
+          align-items: flex-end;
           background: #ffffff;
-          border-top: 1px solid #e2e8f0;
-          padding: 8px 0;
-          padding-bottom: max(8px, env(safe-area-inset-bottom));
+          border-top: 1px solid #e5e5e5;
+          padding: 6px 0 0 0;
+          padding-bottom: max(6px, env(safe-area-inset-bottom));
           z-index: 100;
-          box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+          height: 70px;
         }
 
         .mobile-nav-item {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 4px;
+          gap: 2px;
           background: none;
           border: none;
-          color: #94a3b8;
+          color: #666666;
           font-size: 10px;
           font-weight: 500;
-          padding: 4px 12px;
+          padding: 8px 16px;
           cursor: pointer;
-          transition: color 0.2s;
+          transition: all 0.2s ease;
+          position: relative;
+          min-width: 60px;
         }
 
         .mobile-nav-item.active {
-          color: #3b82f6;
+          color: #0a66c2;
+        }
+
+        .mobile-nav-item .nav-label {
+          margin-top: 2px;
+          font-weight: 500;
+        }
+
+        .mobile-nav-item.active .nav-label {
+          font-weight: 600;
+        }
+
+        .active-indicator {
+          position: absolute;
+          top: 0;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 28px;
+          height: 2px;
+          background: #0a66c2;
+          border-radius: 0 0 2px 2px;
         }
 
         .mobile-nav-item.post-btn {
           color: #fff;
+          padding: 0;
         }
 
         .post-icon-wrapper {
-          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-          border-radius: 12px;
-          padding: 10px 20px;
+          background: linear-gradient(145deg, #f59e0b 0%, #d97706 100%);
+          border-radius: 14px;
+          padding: 12px 24px;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+          box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+          margin-bottom: 16px;
+          transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .mobile-nav-item:hover:not(.post-btn) {
-          color: #3b82f6;
-        }
-
-        .mobile-nav-item.post-btn:hover .post-icon-wrapper {
-          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        .mobile-nav-item.post-btn:active .post-icon-wrapper {
+          transform: scale(0.95);
+          box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
         }
       `}</style>
     </div>
