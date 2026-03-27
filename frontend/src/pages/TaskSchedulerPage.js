@@ -30,7 +30,6 @@ import {
   RefreshCw,
   ArrowRight,
   X,
-  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -60,16 +59,6 @@ import {
 import { TemplateDialog } from "../components/task-scheduler/TemplateDialog";
 import { PlanDialog } from "../components/task-scheduler/PlanDialog";
 import { CompleteDialog, DeleteExecutionDialog } from "../components/task-scheduler/ExecutionDialogs";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../components/ui/dialog";
-import { Label } from "../components/ui/label";
-import { Textarea } from "../components/ui/textarea";
 
 // Get base URL without /api suffix
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
@@ -218,21 +207,6 @@ const taskAPI = {
     if (!response.ok) throw new Error("Failed to delete execution");
     return response.json();
   },
-  createAdhocTask: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-instances/adhoc`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || "Failed to create ad-hoc task");
-    }
-    return response.json();
-  },
   getStats: async () => {
     const response = await fetch(`${API_BASE_URL}/api/tasks/stats`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -320,13 +294,6 @@ const TaskSchedulerPage = () => {
   });
   const [editingTemplate, setEditingTemplate] = useState(null); // For editing templates
   const [deleteInstanceId, setDeleteInstanceId] = useState(null); // For delete confirmation
-  const [showAdhocDialog, setShowAdhocDialog] = useState(false); // For ad-hoc task creation
-  const [adhocForm, setAdhocForm] = useState({
-    task_template_id: "",
-    equipment_id: "",
-    priority: "medium",
-    notes: ""
-  });
 
   // Queries
   const { data: statsData } = useQuery({
@@ -358,7 +325,7 @@ const TaskSchedulerPage = () => {
       if (!response.ok) throw new Error("Failed to fetch equipment");
       return response.json();
     },
-    enabled: showPlanDialog || showAdhocDialog
+    enabled: showPlanDialog
   });
 
   const { data: formTemplatesData } = useQuery({
@@ -488,19 +455,6 @@ const TaskSchedulerPage = () => {
       setDeleteInstanceId(null);
     },
     onError: () => toast.error("Failed to delete execution")
-  });
-
-  const createAdhocMutation = useMutation({
-    mutationFn: taskAPI.createAdhocTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries(["task-instances"]);
-      queryClient.invalidateQueries(["task-stats"]);
-      queryClient.invalidateQueries(["my-tasks"]);
-      toast.success(t("taskScheduler.adhocTaskCreated"));
-      setShowAdhocDialog(false);
-      setAdhocForm({ task_template_id: "", equipment_id: "", priority: "medium", notes: "" });
-    },
-    onError: (error) => toast.error(error.message || "Failed to create ad-hoc task")
   });
 
   const templates = templatesData?.templates || [];
@@ -938,15 +892,6 @@ const TaskSchedulerPage = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              setAdhocForm({ ...adhocForm, task_template_id: template.id });
-                              setShowAdhocDialog(true);
-                            }}
-                            data-testid={`template-execute-${template.id}`}
-                          >
-                            <PlayCircle className="w-4 h-4 mr-2" /> {t("taskScheduler.executeNow")}
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEditTemplate(template)} data-testid={`template-edit-${template.id}`}>
                             <Edit className="w-4 h-4 mr-2" /> {t("common.edit")}
                           </DropdownMenuItem>
@@ -1053,125 +998,6 @@ const TaskSchedulerPage = () => {
         onSubmit={() => createPlanMutation.mutate(planForm)}
         isPending={createPlanMutation.isPending}
       />
-
-      {/* Ad-hoc Task Dialog */}
-      <Dialog open={showAdhocDialog} onOpenChange={setShowAdhocDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PlayCircle className="w-5 h-5 text-blue-600" />
-              {t("taskScheduler.executeAdhocTitle")}
-            </DialogTitle>
-            <DialogDescription>
-              {t("taskScheduler.executeAdhocDesc")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {/* Template Selection (if not pre-selected) */}
-            {!adhocForm.task_template_id && (
-              <div className="space-y-2">
-                <Label>{t("taskScheduler.template")} *</Label>
-                <Select 
-                  value={adhocForm.task_template_id} 
-                  onValueChange={(v) => setAdhocForm({ ...adhocForm, task_template_id: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("taskScheduler.selectTemplate")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            
-            {/* Show selected template name */}
-            {adhocForm.task_template_id && (
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm font-medium text-blue-800">
-                  {t("taskScheduler.selectedTemplate")}: {templates.find(t => t.id === adhocForm.task_template_id)?.name || adhocForm.task_template_id}
-                </p>
-              </div>
-            )}
-
-            {/* Equipment (Optional) */}
-            <div className="space-y-2">
-              <Label>{t("taskScheduler.equipment")} ({t("common.optional")})</Label>
-              <Select 
-                value={adhocForm.equipment_id} 
-                onValueChange={(v) => setAdhocForm({ ...adhocForm, equipment_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("taskScheduler.selectEquipment")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t("taskScheduler.noEquipment")}</SelectItem>
-                  {equipmentData?.nodes?.map((eq) => (
-                    <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Priority */}
-            <div className="space-y-2">
-              <Label>{t("taskScheduler.priority")}</Label>
-              <Select 
-                value={adhocForm.priority} 
-                onValueChange={(v) => setAdhocForm({ ...adhocForm, priority: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">{t("common.low")}</SelectItem>
-                  <SelectItem value="medium">{t("common.medium")}</SelectItem>
-                  <SelectItem value="high">{t("common.high")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label>{t("taskScheduler.notes")}</Label>
-              <Textarea
-                value={adhocForm.notes}
-                onChange={(e) => setAdhocForm({ ...adhocForm, notes: e.target.value })}
-                placeholder={t("taskScheduler.adhocNotesPlaceholder")}
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowAdhocDialog(false);
-              setAdhocForm({ task_template_id: "", equipment_id: "", priority: "medium", notes: "" });
-            }}>
-              {t("common.cancel")}
-            </Button>
-            <Button 
-              onClick={() => {
-                const data = { ...adhocForm };
-                // Remove equipment_id if "none" selected
-                if (data.equipment_id === "none") {
-                  delete data.equipment_id;
-                }
-                createAdhocMutation.mutate(data);
-              }}
-              disabled={!adhocForm.task_template_id || createAdhocMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {createAdhocMutation.isPending ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t("common.creating")}</>
-              ) : (
-                <><PlayCircle className="w-4 h-4 mr-2" /> {t("taskScheduler.createAdhocTask")}</>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
