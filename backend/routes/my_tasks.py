@@ -286,11 +286,8 @@ async def get_my_tasks(
             "created_by": user_id,
         }
         
-        # For "open" filter, only show "open" status actions (not in_progress)
-        if filter == "open":
-            action_query["status"] = "open"
-        else:
-            action_query["status"] = {"$in": ["open", "in_progress"]}
+        # Show actions until completed (both "open" and "in_progress" status)
+        action_query["status"] = {"$in": ["open", "in_progress"]}
         
         # Filter by discipline if specified
         if discipline:
