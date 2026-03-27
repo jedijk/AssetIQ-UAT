@@ -136,6 +136,7 @@ const en = {
     notLinked: "Not linked",
     discipline: "Discipline",
     optional: "Optional",
+    exporting: "Exporting...",
   },
   
   // Threats page
@@ -398,6 +399,9 @@ const en = {
     potentialCauses: "Potential Causes",
     potentialCausesPlaceholder: "e.g., Wear, contamination, incorrect settings",
     duplicateNameError: "A failure mode with this name already exists",
+    exportExcel: "Export Excel",
+    exportSuccess: "Failure modes exported successfully",
+    exportError: "Failed to export failure modes",
   },
   
   // Equipment Manager
@@ -1180,6 +1184,7 @@ const nl = {
     notLinked: "Niet gekoppeld",
     discipline: "Discipline",
     optional: "Optioneel",
+    exporting: "Exporteren...",
   },
   
   // Threats page
@@ -1442,6 +1447,9 @@ const nl = {
     potentialCauses: "Potentiële Oorzaken",
     potentialCausesPlaceholder: "bijv., Slijtage, vervuiling, verkeerde instellingen",
     duplicateNameError: "Er bestaat al een faalmodus met deze naam",
+    exportExcel: "Exporteer Excel",
+    exportSuccess: "Faalmodi succesvol geëxporteerd",
+    exportError: "Exporteren van faalmodi mislukt",
   },
   
   // Equipment Manager

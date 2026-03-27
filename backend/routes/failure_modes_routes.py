@@ -2,11 +2,13 @@
 Failure Modes routes.
 """
 from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
 from datetime import datetime, timezone
 import uuid
 import logging
+import io
 from database import db, failure_modes_service, efm_service
 from auth import get_current_user
 from services.threat_score_service import recalculate_threat_scores_for_failure_mode
@@ -129,6 +131,125 @@ async def get_mechanisms():
     except Exception as e:
         logger.error(f"Error fetching mechanisms: {e}")
         return {"mechanisms": []}
+
+
+@router.get("/failure-modes/export")
+async def export_failure_modes_excel(
+    current_user: dict = Depends(get_current_user)
+):
+    """Export all failure modes to an Excel file."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    
+    try:
+        # Fetch all failure modes
+        result = await failure_modes_service.get_all(skip=0, limit=10000)
+        failure_modes = result.get("failure_modes", []) if isinstance(result, dict) else []
+        if not failure_modes:
+            # Fallback to static library
+            failure_modes = FAILURE_MODES_LIBRARY.copy()
+    except Exception as e:
+        logger.error(f"Error fetching failure modes for export: {e}")
+        failure_modes = FAILURE_MODES_LIBRARY.copy()
+    
+    # Create workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Failure Modes"
+    
+    # Define headers
+    headers = [
+        "ID", "Category", "Equipment", "Failure Mode", "Process",
+        "Potential Effects", "Potential Causes", "ISO 14224 Mechanism",
+        "Severity", "Occurrence", "Detectability", "RPN",
+        "Keywords", "Recommended Actions", "Validated", "Source"
+    ]
+    
+    # Styles
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Write headers
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = thin_border
+    
+    # Write data rows
+    for row_idx, fm in enumerate(failure_modes, 2):
+        # Format keywords as comma-separated string
+        keywords = fm.get("keywords", [])
+        keywords_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords or "")
+        
+        # Format recommended actions
+        actions = fm.get("recommended_actions", [])
+        if isinstance(actions, list):
+            if actions and isinstance(actions[0], dict):
+                actions_str = "\n".join([
+                    f"• {a.get('action', a)}" + (f" ({a.get('action_type', '')})" if a.get('action_type') else "")
+                    for a in actions
+                ])
+            else:
+                actions_str = "\n".join([f"• {a}" for a in actions])
+        else:
+            actions_str = str(actions or "")
+        
+        row_data = [
+            str(fm.get("id", "")),
+            fm.get("category", ""),
+            fm.get("equipment", ""),
+            fm.get("failure_mode", ""),
+            fm.get("process", ""),
+            fm.get("potential_effects", ""),
+            fm.get("potential_causes", ""),
+            fm.get("iso14224_mechanism", ""),
+            fm.get("severity", 0),
+            fm.get("occurrence", 0),
+            fm.get("detectability", 0),
+            fm.get("rpn", 0),
+            keywords_str,
+            actions_str,
+            "Yes" if fm.get("is_validated") else "No",
+            fm.get("source", "library")
+        ]
+        
+        for col, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_idx, column=col, value=value)
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+    
+    # Adjust column widths
+    column_widths = [10, 15, 18, 30, 20, 30, 30, 20, 10, 10, 12, 8, 25, 40, 10, 12]
+    for col, width in enumerate(column_widths, 1):
+        ws.column_dimensions[get_column_letter(col)].width = width
+    
+    # Freeze header row
+    ws.freeze_panes = "A2"
+    
+    # Save to buffer
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"failure_modes_{timestamp}.xlsx"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 @router.get("/failure-modes/high-risk")
 async def get_high_risk_modes(threshold: int = 150):

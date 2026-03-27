@@ -30,7 +30,8 @@ import {
   Link,
   X,
   CheckCircle,
-  ChevronRight
+  ChevronRight,
+  Download
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -558,6 +559,46 @@ const FailureModesPage = () => {
     });
   };
 
+  // Export failure modes to Excel
+  const [isExporting, setIsExporting] = useState(false);
+  
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const response = await api.get('/failure-modes/export', {
+        responseType: 'blob'
+      });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Extract filename from content-disposition header or use default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'failure_modes.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename=(.+)/);
+        if (filenameMatch) {
+          filename = filenameMatch[1].replace(/"/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success(t("library.exportSuccess") || "Failure modes exported successfully");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error(t("library.exportError") || "Failed to export failure modes");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="failure-modes-page">
       {/* Back Button - shown when navigated from another page */}
@@ -623,6 +664,16 @@ const FailureModesPage = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Button 
+              onClick={handleExportExcel} 
+              variant="outline" 
+              className="h-11" 
+              disabled={isExporting}
+              data-testid="export-excel-btn"
+            >
+              <Download className="w-4 h-4 mr-1" /> 
+              {isExporting ? (t("common.exporting") || "Exporting...") : (t("library.exportExcel") || "Export Excel")}
+            </Button>
             <Button onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-mode-btn">
               <Plus className="w-4 h-4 mr-1" /> {t("library.addFailureMode")}
             </Button>

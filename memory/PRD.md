@@ -199,6 +199,29 @@ Fixed and enhanced the Failure Modes module per user feedback:
 - `/app/frontend/src/pages/FailureModesPage.js`
 - `/app/frontend/src/contexts/LanguageContext.js`
 
+### Feature: Failure Modes Excel Export (Mar 27, 2026)
+Added downloadable Excel export for failure modes FMEA library.
+
+**Backend:**
+- New endpoint: `GET /api/failure-modes/export`
+- Generates Excel file (.xlsx) with all failure modes
+- Includes 16 columns: ID, Category, Equipment, Failure Mode, Process, Potential Effects, Potential Causes, ISO 14224 Mechanism, Severity, Occurrence, Detectability, RPN, Keywords, Recommended Actions, Validated, Source
+- Professional styling: blue header, borders, auto-width columns, frozen header row
+- Uses openpyxl library for Excel generation
+- Dynamic filename with timestamp (e.g., `failure_modes_20260327_175106.xlsx`)
+
+**Frontend:**
+- Added "Export Excel" button to Failure Modes page header (next to Add button)
+- Shows download icon with text
+- Displays "Exporting..." during download
+- Success/error toast notifications
+- Translations in EN and NL
+
+**Files Modified:**
+- `/app/backend/routes/failure_modes_routes.py` - Added export endpoint
+- `/app/frontend/src/pages/FailureModesPage.js` - Added export button and handler
+- `/app/frontend/src/contexts/LanguageContext.js` - Added export translations
+
 ### Feature: Process Step Mapping in Equipment Manager (Mar 27, 2026)
 Added Process Step mapping to equipment hierarchy nodes:
 
