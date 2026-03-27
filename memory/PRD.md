@@ -81,6 +81,19 @@ Enhanced the Plan Dialog to properly support ad-hoc task templates:
 - `/app/frontend/src/contexts/LanguageContext.js` - Added `adhocPlanDesc` and `intervalOptional` translations
 - `/app/backend/services/task_service.py` - Updated `create_plan()` to handle ad-hoc templates with optional intervals, added `is_adhoc` to plan serialization
 
+### Feature: Plan Card Editing
+Added full edit functionality for execution plans:
+- **Edit button** added to plan card dropdown menu
+- **Edit dialog** opens with pre-filled plan data
+- Editable fields: Interval, Begin/End dates, Linked form, Notes, Plan status (Active/Inactive toggle)
+- Non-editable fields: Template and Equipment (grayed out in edit mode)
+- Backend PATCH endpoint already existed at `/api/task-plans/{plan_id}`
+
+**Files Modified:**
+- `/app/frontend/src/pages/TaskSchedulerPage.js` - Added `updatePlan` API, `updatePlanMutation`, `handleEditPlan`, `handlePlanSubmit` functions, Edit menu item
+- `/app/frontend/src/components/task-scheduler/PlanDialog.js` - Added `editingPlan` prop, edit mode UI (disabled fields, status toggle, Save Changes button)
+- `/app/frontend/src/contexts/LanguageContext.js` - Added `editPlan`, `editPlanDesc`, `planStatus`, `planStatusDesc` translations (EN/NL)
+
 ---
 
 ## Completed in Previous Session (Mar 27, 2026)

@@ -36,8 +36,11 @@ export const PlanDialog = ({
   onTemplateSelect,
   onSubmit,
   isPending,
+  editingPlan = null, // New prop for edit mode
 }) => {
   const { t } = useLanguage();
+  
+  const isEditMode = !!editingPlan;
   
   // Find selected template to check if it's ad-hoc
   const selectedTemplate = templates.find(tmpl => tmpl.id === planForm.task_template_id);
@@ -45,10 +48,10 @@ export const PlanDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t("taskScheduler.createPlan")}</DialogTitle>
-          <DialogDescription>{t("taskScheduler.createPlanDesc")}</DialogDescription>
+          <DialogTitle>{isEditMode ? t("taskScheduler.editPlan") : t("taskScheduler.createPlan")}</DialogTitle>
+          <DialogDescription>{isEditMode ? t("taskScheduler.editPlanDesc") : t("taskScheduler.createPlanDesc")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div>
@@ -56,6 +59,7 @@ export const PlanDialog = ({
             <Select 
               value={planForm.task_template_id} 
               onValueChange={onTemplateSelect}
+              disabled={isEditMode} // Can't change template in edit mode
             >
               <SelectTrigger>
                 <SelectValue placeholder={t("taskScheduler.selectTemplate")} />
@@ -88,8 +92,9 @@ export const PlanDialog = ({
             <Select 
               value={planForm.equipment_id} 
               onValueChange={(v) => setPlanForm({ ...planForm, equipment_id: v })}
+              disabled={isEditMode} // Can't change equipment in edit mode
             >
-              <SelectTrigger>
+              <SelectTrigger className={isEditMode ? "opacity-60" : ""}>
                 <SelectValue placeholder={t("taskScheduler.selectEquipment")} />
               </SelectTrigger>
               <SelectContent>
@@ -198,6 +203,29 @@ export const PlanDialog = ({
               rows={2}
             />
           </div>
+          {isEditMode && (
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div>
+                <Label className="text-sm font-medium">{t("taskScheduler.planStatus")}</Label>
+                <p className="text-xs text-slate-500">{t("taskScheduler.planStatusDesc")}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={planForm.is_active !== false}
+                onClick={() => setPlanForm({ ...planForm, is_active: !planForm.is_active })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  planForm.is_active !== false ? 'bg-green-500' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    planForm.is_active !== false ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
@@ -205,7 +233,7 @@ export const PlanDialog = ({
             onClick={onSubmit}
             disabled={!planForm.task_template_id || !planForm.equipment_id || isPending}
           >
-            {isPending ? t("common.creating") : t("taskScheduler.createPlan")}
+            {isPending ? (isEditMode ? t("common.saving") : t("common.creating")) : (isEditMode ? t("common.saveChanges") : t("taskScheduler.createPlan"))}
           </Button>
         </DialogFooter>
       </DialogContent>

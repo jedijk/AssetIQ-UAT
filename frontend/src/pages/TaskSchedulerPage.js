@@ -151,6 +151,21 @@ const taskAPI = {
     }
     return response.json();
   },
+  updatePlan: async (id, data) => {
+    const response = await fetch(`${API_BASE_URL}/api/task-plans/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Failed to update plan");
+    }
+    return response.json();
+  },
 
   // Instances
   getInstances: async (params = {}) => {
@@ -293,6 +308,7 @@ const TaskSchedulerPage = () => {
     needs_follow_up: false
   });
   const [editingTemplate, setEditingTemplate] = useState(null); // For editing templates
+  const [editingPlan, setEditingPlan] = useState(null); // For editing plans
   const [deleteInstanceId, setDeleteInstanceId] = useState(null); // For delete confirmation
 
   // Queries
@@ -400,6 +416,26 @@ const TaskSchedulerPage = () => {
       setInheritedInterval({ value: 30, unit: "days" });
     },
     onError: (error) => toast.error(error.message || "Failed to create plan")
+  });
+
+  const updatePlanMutation = useMutation({
+    mutationFn: ({ id, data }) => {
+      const submitData = {
+        ...data,
+        effective_from: data.effective_from ? (data.effective_from instanceof Date ? data.effective_from.toISOString() : data.effective_from) : null,
+        effective_until: data.effective_until ? (data.effective_until instanceof Date ? data.effective_until.toISOString() : data.effective_until) : null,
+      };
+      return taskAPI.updatePlan(id, submitData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["task-plans"]);
+      queryClient.invalidateQueries(["task-stats"]);
+      toast.success("Plan updated");
+      setShowPlanDialog(false);
+      setEditingPlan(null);
+      setPlanForm({ equipment_id: "", task_template_id: "", form_template_id: "", interval_value: null, interval_unit: null, effective_from: null, effective_until: null, notes: "" });
+    },
+    onError: (error) => toast.error(error.message || "Failed to update plan")
   });
 
   const startInstanceMutation = useMutation({
@@ -517,6 +553,61 @@ const TaskSchedulerPage = () => {
       });
     } else {
       setPlanForm({ ...planForm, task_template_id: templateId });
+    }
+  };
+
+  const handleEditPlan = (plan) => {
+    // Find the template to get inherited values
+    const template = templates.find(t => t.id === plan.task_template_id);
+    if (template) {
+      setInheritedInterval({
+        value: template.default_interval || 30,
+        unit: template.default_unit || "days"
+      });
+    }
+    
+    setEditingPlan(plan);
+    setPlanForm({
+      equipment_id: plan.equipment_id || "",
+      task_template_id: plan.task_template_id || "",
+      form_template_id: plan.form_template_id || "",
+      interval_value: plan.interval_value,
+      interval_unit: plan.interval_unit,
+      effective_from: plan.effective_from ? new Date(plan.effective_from) : null,
+      effective_until: plan.effective_until ? new Date(plan.effective_until) : null,
+      notes: plan.notes || "",
+      is_active: plan.is_active !== false,
+    });
+    setShowPlanDialog(true);
+  };
+
+  const handlePlanDialogClose = (open) => {
+    if (!open) {
+      setEditingPlan(null);
+      setPlanForm({ equipment_id: "", task_template_id: "", form_template_id: "", interval_value: null, interval_unit: null, effective_from: null, effective_until: null, notes: "" });
+      setInheritedInterval({ value: 30, unit: "days" });
+    }
+    setShowPlanDialog(open);
+  };
+
+  const handlePlanSubmit = () => {
+    if (editingPlan) {
+      // Update existing plan
+      updatePlanMutation.mutate({
+        id: editingPlan.id,
+        data: {
+          interval_value: planForm.interval_value,
+          interval_unit: planForm.interval_unit,
+          effective_from: planForm.effective_from,
+          effective_until: planForm.effective_until,
+          form_template_id: planForm.form_template_id || null,
+          notes: planForm.notes,
+          is_active: planForm.is_active,
+        }
+      });
+    } else {
+      // Create new plan
+      createPlanMutation.mutate(planForm);
     }
   };
 
@@ -834,6 +925,11 @@ const TaskSchedulerPage = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditPlan(plan)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              {t("common.edit")}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               className="text-red-600"
                               onClick={() => deletePlanMutation.mutate(plan.id)}
@@ -1007,7 +1103,7 @@ const TaskSchedulerPage = () => {
       {/* Create Plan Dialog */}
       <PlanDialog
         open={showPlanDialog}
-        onOpenChange={setShowPlanDialog}
+        onOpenChange={handlePlanDialogClose}
         planForm={planForm}
         setPlanForm={setPlanForm}
         templates={templates}
@@ -1015,8 +1111,9 @@ const TaskSchedulerPage = () => {
         formTemplatesData={formTemplatesData}
         inheritedInterval={inheritedInterval}
         onTemplateSelect={handleTemplateSelect}
-        onSubmit={() => createPlanMutation.mutate(planForm)}
-        isPending={createPlanMutation.isPending}
+        onSubmit={handlePlanSubmit}
+        isPending={createPlanMutation.isPending || updatePlanMutation.isPending}
+        editingPlan={editingPlan}
       />
     </div>
   );

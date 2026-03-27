@@ -830,6 +830,10 @@ const en = {
     adhocTemplateHint: "Execute manually via 'Execute Now'",
     adhocPlanDesc: "This is an ad-hoc template - no recurring schedule needed",
     intervalOptional: "Interval (Optional for ad-hoc)",
+    editPlan: "Edit Execution Plan",
+    editPlanDesc: "Modify plan settings and scheduling",
+    planStatus: "Plan Status",
+    planStatusDesc: "Enable or disable this plan",
   },
 
   // Forms
@@ -1775,6 +1779,10 @@ const nl = {
     adhocTemplateHint: "Voer handmatig uit via 'Nu uitvoeren'",
     adhocPlanDesc: "Dit is een ad-hoc sjabloon - geen terugkerend schema nodig",
     intervalOptional: "Interval (Optioneel voor ad-hoc)",
+    editPlan: "Uitvoeringsplan bewerken",
+    editPlanDesc: "Wijzig planinstellingen en planning",
+    planStatus: "Planstatus",
+    planStatusDesc: "Schakel dit plan in of uit",
   },
 
   // Forms
