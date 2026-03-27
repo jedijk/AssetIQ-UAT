@@ -35,7 +35,17 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 - `action_type` (CM/PM/PDM): Corrective/Preventive/Predictive Maintenance
 - `discipline` (string): e.g., Mechanical, Electrical
 
-## Completed in This Session (Mar 27, 2026)
+## Completed in This Session (Dec 2025)
+
+### UI: Settings Menu Label Update
+Changed "Forms" to "Form Designer" in the Settings menu. Also ensured all menu items use proper i18n translation keys instead of hardcoded strings.
+
+**Files Modified:**
+- `/app/frontend/src/components/Layout.js` - Updated settings menu to use `t("forms.title")`, `t("taskScheduler.execution")`, `t("decisionEngine.title")` instead of hardcoded labels
+
+---
+
+## Completed in Previous Session (Mar 27, 2026)
 
 ### P0 Fix: ThreatDetailPage Layout Reordering
 Reordered the Observation Details page (`ThreatDetailPage.js`) per user request:

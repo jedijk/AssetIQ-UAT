@@ -109,9 +109,9 @@ const Layout = () => {
   // Settings menu items (including Execution, Forms, AI Engine)
   const settingsMenuItems = [
     { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2 },
-    { path: "/tasks", label: "Execution", icon: Calendar },
-    { path: "/forms", label: "Forms", icon: FileText },
-    { path: "/decision-engine", label: "AI Engine", icon: Brain },
+    { path: "/tasks", label: t("taskScheduler.execution"), icon: Calendar },
+    { path: "/forms", label: t("forms.title"), icon: FileText },
+    { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders },

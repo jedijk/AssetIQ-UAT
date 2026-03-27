@@ -1,55 +1,56 @@
 <analysis>**original_problem_statement**: 
-The user wants to build an AI-Powered Threat Capture & Prioritization Platform named ThreatBase. The scope includes user authentication, a chat-based threat capture system, risk prioritization, an Equipment Hierarchy FMEA Library, and a Causal Engine.
-PRODUCT REQUIREMENTS: Clean up code and create segmentations (Refactor Monolithic frontend files). Fix deep-linking redirect issues. Complete Multi-language support. Refine the FMEA failure mode library and action tracking capabilities with structured data (CM/PM/PDM action types and disciplines) for both manual entries and AI-generated outputs.
+The user wants to build an AI-Powered Threat Capture & Prioritization Platform named ThreatBase (AssetIQ). The scope includes user authentication, a chat-based threat capture system, risk prioritization, an Equipment Hierarchy FMEA Library, and a Causal Engine.
+PRODUCT REQUIREMENTS: 
+- Fix UI issues on mobile dashboard.
+- Add custom failure mode creation capability in the chat interface.
+- Build a new comprehensive, mobile-first My Tasks execution frontend with discipline filtering, combining task instances and centralized actions.
+- Allow dynamic forms linked to task plans to be rendered and executed.
+- Reorder UI layout in the Observation Details screen.
 
 **User's preferred language**: English (INSTRUCT next agent to respond in English only)
 
 **what currently exists?** 
-A mature full-stack MVP featuring User Auth, modular FastAPI backend, state-machine Chatbot, Equipment Manager, Causal Engine, AI Risk Insights, and an FMEA Library. Multi-language (English/Dutch) is fully integrated. Action tracking has been significantly refined: Central Actions and Causal Engine Actions now consistently support  (CM/PM/PDM), , , and a dynamic  lookup mapped to actual registered users. The UI is responsive, utilizing unified View/Edit dialogs and robust text-truncation for long content.
+A mature full-stack MVP featuring User Auth, FastAPI backend, state-machine Chatbot, Equipment Manager, Causal Engine, AI Risk Insights, FMEA Library, and a My Tasks execution dashboard. Task forms can now be fully executed with data successfully saving to the backend and triggering new Observations if issues are flagged. The Form Designer supports realistic Mobile/Desktop previews, Form versioning, ad-hoc template capabilities, Document Uploads (via Object Storage), and an AI-powered Document Search interface that utilizes the Emergent LLM Key.
 
 **Last working item**: 
-    - Last item agent was working: Unifying the View and Edit screens into a single dialog on the Actions page. This dialog now comprehensively handles viewing details, editing fields (including new  and user-lookup ), checking risk/source info, and deleting actions.
+    - Last item agent was working: Fixing the AI Document Search to utilize the updated   API syntax and creating an in-app  component with a back button.
     - Status: USER VERIFICATION PENDING
     - Agent Testing Done: Y
-    - Which testing method agent to use? NA (already done via screenshot tool)
+    - Which testing method agent to use? NA (already done via screenshot tool and bash scripts)
     - User Testing Done: N
 
 **All Pending/In progress Issue list**: 
-  Issue 1: Synchronize  (P1)
-     - Attempted fixes: The agent attempted to use  to update  but failed due to a string mismatch, and subsequently forgot to update the file at the end of the session.
-     - Next debug checklist: Read the current  and append/update the completed tasks (Action filtering, action dialog unifications, Causal Engine action types) using parallel  or rewriting the file.
-     - Why fix this issue and what will be achieved with the fix? Keeps the platform's state source of truth accurate.
-     - Status: NOT STARTED
-     - Is recurring issue? N
-     - Should Test frontend/backend/both after fix? NA
-     - Blocked on other issue: None
+  None currently active. All requested fixes and features from the session were successfully implemented and tested.
 
 **In progress Task List**: 
-  None. All assigned tasks from this session were successfully completed.
+  None.
 
-**Upcoming and Future Tasks**
+**Upcoming and Future Tasks**:
     Upcoming Tasks:
     - P0: Implement Image analysis for damage detection.
+    - P1: Implement Offline support with local storage for My Tasks execution.
     - P1: Implement report generation (PowerPoint/PDF) for Causal Investigations.
     
     Future Tasks:
     - P2: Export equipment hierarchy to PDF/Excel.
     - P2: Implement bulk criticality assignment for equipment.
+    - P3: Refactor / Extract  component from  to improve maintainability.
 
 **Completed work in this session**
-- Fixed text overflow in AI Risk Analysis Time to Failure box by applying  and tooltips (). (DONE)
-- Applied text truncation and tooltips to long action titles on the Actions Page (). (DONE)
-- Added  and  fields to Causal Engine corrective actions, aligning them with observations (, ). (DONE)
-- Added a Discipline filter dropdown to the Actions page (). (DONE)
-- Added dynamic user-lookup for Assignees using the RBAC API, and introduced a  field for centralized actions (, ). (DONE)
-- Created a Unified View/Edit Action Dialog on the Actions page (). (DONE)
-- Added missing EN/NL translation keys for newly added UI elements (). (DONE)
+- Reordered UI layout in  so the metadata Info Grid sits above the AI Risk Analysis sections. (DONE)
+- Implemented backend task completion logic () to save  and trigger Observation creation when . (DONE)
+- Created ad-hoc task template option (templates without recurrence/intervals) and fixed related Pydantic enum validation errors. (DONE)
+- Removed Execute Now functionality from template dropdowns per user request. (DONE)
+- Added Mobile and Desktop device preview frames to the Form Designer View Dialog, alongside toggle button fixes. (DONE)
+- Integrated Document Uploads to Form Templates, resolving a backend  bug during the upload process. (DONE)
+- Fixed Form Versioning so it correctly increments versions on edit and copies existing documents to the new version. (DONE)
+- Implemented AI Document Search during form execution using  and an in-app . (DONE)
 
 **Earlier issues found/mentioned but not fixed**
    None.
 
 **Known issue recurrence from previous fork**
-  - Issue recurrence in previous fork: None active. (Previous multi-language omissions were successfully addressed in this session).
+  - Issue recurrence in previous fork: None
   - Recurrence count: 0
   - Status: RESOLVED
 
@@ -58,56 +59,64 @@ A mature full-stack MVP featuring User Auth, modular FastAPI backend, state-mach
 
 **Key Technical Concepts**
 - Full-stack app: React frontend + FastAPI backend + MongoDB
+- UI Library: Tailwind CSS, Radix UI (Shadcn patterns)
 - I18n: React Context API () dynamically maps English and Dutch strings.
-- API Data Fetching: Relies on  for fetching RBAC Users and Actions, allowing seamless dropdown population for assignees.
+- Emergent Integrations: Uses  for RAG-like document Q&A.
+- Object Storage: Integrated for storing and serving reference documents linked to form templates.
 
 **key DB schema**
-  - : Added  (string) field.
-  -  (under investigations): Added  (string) and  (string).
-  - : Fetched via  for Assignee lookup dropdowns.
+  - : Now contains  array and  (boolean) fields.  is optional.
+  - : Stores executable tasks; linked to forms and now persists .
+  - : Observations are successfully being pushed here dynamically from task completions.
 
 **changes in tech stack**
-  - None.
+  - None, but deepened dependency on  for document AI querying ().
 
 **All files of reference** 
-  - : Completely refactored to include unified View/Edit dialog, user-lookup mapping, new filters, and tooltips.
-  -  & : Backend data models expanded to accommodate new action metadata.
-  - : Exported  to allow frontend to fetch users for the Assignee dropdowns.
-  - : Added discipline and type to the investigation task creation flow.
-  
+  - : Updated extensively with Desktop/Mobile toggles, Document Upload interfaces, and AI Search UI.
+  - : Created to render files inside the app instead of launching external tabs.
+  - : Appended endpoints for  and . 
+  -  & : Completion endpoints fully mapped to MongoDB saving functions.
+
 **Areas that need refactoring**: 
--  has grown in complexity with the unified dialog. It functions perfectly, but future updates might benefit from extracting the Unified Action Dialog into its own component inside  to maintain the ongoing segmentation strategy.
+-  has grown past 1,600 lines. The Mobile/Desktop UI frames and Document Management Tabs should be separated into their own components inside .
+-  would benefit from having its internal  split into an isolated file.
 
 **key api endpoints**
--  (Fetches users for the Assignee dropdowns)
--  (Now accepts , )
--  (Now accepts )
+-  (Accepts , , )
+-  (Upload document via Object Storage)
+-  (AI Search through documents using )
 
 **Critical Info for New Agent** 
-- **Object Rendering Hazards**: The system relies heavily on structured objects for actions. Ensure you never render the payload array directly in React, map the keys instead.
-- **Assignee Implementation**: Assignees are no longer free-text. They are strictly populated using the user list fetched from .
-- **Language Support Enforcement**: Multi-language is completely enforced. Do not implement any new features using raw hardcoded text strings in React. ALWAYS use the  wrapper from .
+- ** LlmChat Usage:** The syntax for the chat integration has changed. Do not use legacy methods. Use: . Ensure  is used, not .
+- **MongoDB  Access:** When working with serialized dictionaries, remember that  has often been converted to the string uid=0(root) gid=0(root) groups=0(root). If fetching raw from the DB to make updates, explicitly cast via .
+- **I18n Strictness:** The application enforces EN/NL translations. Any new text added to the UI MUST be populated through  and wrapped in . Do not hardcode raw strings.
 
 **documents and test reports created in this job** 
-  -  (Update failed during the run, requires manual synchronization by the next agent).
+  -  (Successfully updated during the session)
 
 **Last 10 User Messages and any pending HUMAN messages** 
- - User: make the view and edit screen the same thing (COMPLETED)
- - User: Allow adding comments to actions in the edit field, allow assignment the be a look-up from the users in user management. Create a window to view the action and fro there edit and delete (COMPLETED)
- - User: apply filter per discipline in actions (COMPLETED)
- - User: make the corrective action in the causal engine the same as the actions from observations including type and discipline (COMPLETED)
- - User: implement a similar thing for long action text in action page (COMPLETED)
- - User: fix ai risk analysis time to failure text to big and not fitting in box (COMPLETED)
+ - User: fix ai document search and document viewing in app with back button (COMPLETED)
+ - User: Fix versioning when editing forms (COMPLETED)
+ - User: file are not uploading (COMPLETED)
+ - User: fix toggle button view-ability desktop mobile and truly show the real preview on desktop (COMPLETED)
+ - User: allow adding documents in forms designed but also view/search those document with AI them during form execution (COMPLETED)
+ - User: In form designer allow previewing in mobile device (COMPLETED)
+ - User: Error failed to create template when adhoc toggle is on (COMPLETED)
+ - User: Remove execute now from templates (COMPLETED)
+ - User: Create adhoc template creation option (COMPLETED)
+ - User: allow creation of executing template that do not have a recurrence and get called adhoc only (COMPLETED)
 
 **Project Health Check:**
-- All clear. UI overflow bugs have been fixed and action feature parity across different views has been achieved.
+- All clear. Previous file upload, integration syntax, and Pydantic validation bugs were resolved.
 
 **3rd Party Integrations** 
+- Object Storage — uses Emergent infrastructure.
 - OpenAI Whisper (Audio processing) — uses Emergent LLM Key.
-- OpenAI GPT-5.2 (AI Risk Analysis & Chat) — uses Emergent LLM Key.
+- OpenAI GPT-5.2 (AI Risk Analysis, Chatbot, AI Document Search via ) — uses Emergent LLM Key.
 
 **Testing status**
-  - Testing agent used after significant changes: NO (Agent conducted extensive manual UI tests utilizing the screenshot tool and validating backend routes).
+  - Testing agent used after significant changes: NO (Heavy manual iteration using Bash cURL requests and Screenshot Tools).
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None
   - Known regressions: None
@@ -117,4 +126,4 @@ Email:
 Password: 
 
 **What agent forgot to execute**
-- The agent failed to update  due to a string replacement mismatch error and did not attempt a retry. Ensure PRD.md reflects the newly added UI filters, dialog unifications, and causal action properties.</analysis>
+- The agent properly satisfied all tasks from the user's stream of requests. Nothing was overlooked. PRD.md remains updated.</analysis>
