@@ -693,7 +693,14 @@ async def execute_adhoc_plan(
     form_fields = []
     form_template = None
     if plan.get("form_template_id"):
+        # Try finding by 'id' field first (string ID)
         form_template = await db.form_templates.find_one({"id": plan["form_template_id"]})
+        # If not found, try by ObjectId
+        if not form_template:
+            try:
+                form_template = await db.form_templates.find_one({"_id": ObjectId(plan["form_template_id"])})
+            except Exception:
+                pass
         if form_template:
             form_fields = form_template.get("fields", [])
     
