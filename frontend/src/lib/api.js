@@ -663,4 +663,35 @@ export const usersAPI = {
   },
 };
 
+// Feedback API
+export const feedbackAPI = {
+  // Submit new feedback
+  submit: async (data) => {
+    const response = await api.post('/feedback', data);
+    return response.data;
+  },
+  
+  // Upload screenshot for feedback
+  uploadScreenshot: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/feedback/upload-screenshot', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  
+  // Get user's own feedback
+  getMyFeedback: async () => {
+    const response = await api.get('/feedback/my');
+    return response.data;
+  },
+  
+  // Get single feedback detail
+  getById: async (feedbackId) => {
+    const response = await api.get(`/feedback/${feedbackId}`);
+    return response.data;
+  },
+};
+
 export default api;

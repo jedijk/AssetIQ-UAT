@@ -18,6 +18,7 @@ const en = {
     userManagement: "User Management",
     statistics: "User Statistics",
     criticalityDefinitions: "Criticality Definitions",
+    feedback: "Feedback",
   },
   
   // Settings pages
@@ -989,6 +990,35 @@ const en = {
     last7Days: "Last 7 days",
     last30Days: "Last 30 days",
   },
+
+  // Feedback
+  feedback: {
+    title: "Feedback",
+    subtitle: "Your submissions",
+    noFeedbackYet: "No feedback yet",
+    noFeedbackDesc: "Share your thoughts, report issues, or suggest improvements.",
+    sendFeedback: "Send feedback",
+    newFeedback: "Send Feedback",
+    newFeedbackDesc: "Share your thoughts, report an issue, or suggest an improvement.",
+    type: "Type",
+    typeIssue: "Issue",
+    typeImprovement: "Improvement",
+    typeGeneral: "General",
+    severity: "Severity",
+    selectSeverity: "Select severity",
+    message: "Message",
+    messagePlaceholder: "Describe your feedback...",
+    messageRequired: "Please enter a message",
+    screenshot: "Screenshot",
+    attachScreenshot: "Attach screenshot",
+    submit: "Submit",
+    submitted: "Feedback submitted successfully",
+    statusNew: "New",
+    statusInReview: "In Review",
+    statusResolved: "Resolved",
+    statusPlanned: "Planned",
+    statusWontFix: "Won't Fix",
+  },
 };
 
 // Dutch translations
@@ -1007,6 +1037,7 @@ const nl = {
     userManagement: "Gebruikersbeheer",
     statistics: "Gebruikersstatistieken",
     criticalityDefinitions: "Kriticiteitsdefinities",
+    feedback: "Feedback",
   },
   
   // Settings pages
@@ -1978,6 +2009,35 @@ const nl = {
     today: "Vandaag",
     last7Days: "Laatste 7 dagen",
     last30Days: "Laatste 30 dagen",
+  },
+
+  // Feedback
+  feedback: {
+    title: "Feedback",
+    subtitle: "Uw inzendingen",
+    noFeedbackYet: "Nog geen feedback",
+    noFeedbackDesc: "Deel uw gedachten, meld problemen of doe suggesties voor verbeteringen.",
+    sendFeedback: "Feedback versturen",
+    newFeedback: "Feedback versturen",
+    newFeedbackDesc: "Deel uw gedachten, meld een probleem of doe een suggestie voor verbetering.",
+    type: "Type",
+    typeIssue: "Probleem",
+    typeImprovement: "Verbetering",
+    typeGeneral: "Algemeen",
+    severity: "Ernst",
+    selectSeverity: "Selecteer ernst",
+    message: "Bericht",
+    messagePlaceholder: "Beschrijf uw feedback...",
+    messageRequired: "Voer een bericht in",
+    screenshot: "Schermafbeelding",
+    attachScreenshot: "Schermafbeelding bijvoegen",
+    submit: "Versturen",
+    submitted: "Feedback succesvol verstuurd",
+    statusNew: "Nieuw",
+    statusInReview: "In behandeling",
+    statusResolved: "Opgelost",
+    statusPlanned: "Gepland",
+    statusWontFix: "Wordt niet opgelost",
   },
 };
 
