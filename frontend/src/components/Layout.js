@@ -128,37 +128,37 @@ const Layout = () => {
       <header className="app-header">
         <div className="header-content max-w-full px-4">
           {/* Left Section - Logo & Nav */}
-          <div className="flex items-center gap-4 lg:gap-8">
+          <div className="flex items-center gap-3 lg:gap-6">
             {/* Hierarchy Toggle - Desktop */}
             <Button
               variant="outline"
               size="icon"
               onClick={() => setHierarchyOpen(!hierarchyOpen)}
-              className="hidden lg:flex h-9 w-9 text-slate-600 hover:text-blue-600 border-slate-300"
+              className="hidden lg:flex h-7 w-7 text-slate-600 hover:text-blue-600 border-slate-300"
               data-testid="hierarchy-toggle"
               title={hierarchyOpen ? "Hide Equipment Panel" : "Show Equipment Panel"}
             >
               {hierarchyOpen ? (
-                <PanelLeftClose className="w-5 h-5" />
+                <PanelLeftClose className="w-4 h-4" />
               ) : (
-                <PanelLeftOpen className="w-5 h-5" />
+                <PanelLeftOpen className="w-4 h-4" />
               )}
             </Button>
 
             {/* Logo */}
-            <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <img 
                 src="/logo.png" 
                 alt="AssetIQ" 
-                className="w-9 h-9 rounded-lg"
+                className="w-8 h-8 rounded-lg"
               />
-              <span className="text-xl font-bold text-slate-900 hidden sm:block" data-testid="app-logo">
+              <span className="text-base font-semibold text-slate-900 hidden sm:block" data-testid="app-logo">
                 AssetIQ
               </span>
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1" data-testid="desktop-nav">
+            <nav className="hidden md:flex items-center gap-0.5" data-testid="desktop-nav">
               {/* All Nav Items (including Dashboard as direct link) */}
               {navItems.map((item) => (
                 <NavLink
@@ -166,7 +166,7 @@ const Layout = () => {
                   to={item.path}
                   end={item.path === "/"}
                   className={({ isActive }) =>
-                    `flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-150 ${
+                    `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150 ${
                       isActive 
                         ? "bg-blue-50 text-blue-700" 
                         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
@@ -174,7 +174,7 @@ const Layout = () => {
                   }
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
-                  <item.icon className="w-4 h-4" />
+                  <item.icon className="w-3.5 h-3.5" />
                   {item.label}
                 </NavLink>
               ))}
@@ -182,7 +182,7 @@ const Layout = () => {
           </div>
 
           {/* Right Side */}
-          <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
+          <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2">
             {/* Info Button - Hidden on small mobile */}
             <TooltipProvider>
               <Tooltip>
@@ -191,10 +191,10 @@ const Layout = () => {
                     variant="outline"
                     size="icon"
                     onClick={() => setInfoOpen(true)}
-                    className="h-8 w-8 sm:h-9 sm:w-9 text-slate-500 border-slate-300 hover:bg-slate-50 hover:text-slate-700 hidden sm:flex"
+                    className="h-7 w-7 sm:h-8 sm:w-8 text-slate-500 border-slate-300 hover:bg-slate-50 hover:text-slate-700 hidden sm:flex"
                     data-testid="info-button"
                   >
-                    <Info className="w-4 h-4" />
+                    <Info className="w-3.5 h-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
@@ -212,16 +212,16 @@ const Layout = () => {
                     size="icon"
                     onClick={undo}
                     disabled={!canUndo || isUndoing}
-                    className={`h-8 w-8 sm:h-9 sm:w-9 relative transition-all duration-200 ${
+                    className={`h-7 w-7 sm:h-8 sm:w-8 relative transition-all duration-200 ${
                       canUndo 
                         ? "text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700" 
                         : "text-slate-300 border-slate-200"
                     }`}
                     data-testid="undo-button"
                   >
-                    <Undo2 className="w-4 h-4" />
+                    <Undo2 className="w-3.5 h-3.5" />
                     {undoCount > 0 && (
-                      <span className="absolute -top-1 -right-1 h-4 w-4 text-[10px] font-bold bg-amber-500 text-white rounded-full flex items-center justify-center">
+                      <span className="absolute -top-1 -right-1 h-3.5 w-3.5 text-[9px] font-bold bg-amber-500 text-white rounded-full flex items-center justify-center">
                         {undoCount}
                       </span>
                     )}
@@ -243,12 +243,12 @@ const Layout = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 sm:h-9 sm:w-9 text-slate-600 hover:text-slate-900 relative"
+                  className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900 relative"
                   data-testid="notifications-button"
                 >
-                  <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   {overdueCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full min-w-[16px] sm:min-w-[18px] h-[16px] sm:h-[18px] flex items-center justify-center px-0.5">
+                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5">
                       {overdueCount > 9 ? "9+" : overdueCount}
                     </span>
                   )}
@@ -322,7 +322,7 @@ const Layout = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`h-8 w-8 sm:h-9 sm:w-9 relative ${
+                    className={`h-7 w-7 sm:h-8 sm:w-8 relative ${
                       isOnline 
                         ? totalPending > 0 ? "text-amber-500 hover:text-amber-600" : "text-green-500 hover:text-green-600"
                         : "text-red-500 hover:text-red-600"
@@ -332,18 +332,18 @@ const Layout = () => {
                     data-testid="offline-status-button"
                   >
                     {isSyncing ? (
-                      <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                      <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
                     ) : isOnline ? (
                       totalPending > 0 ? (
-                        <Cloud className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <Cloud className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       ) : (
-                        <Wifi className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       )
                     ) : (
-                      <WifiOff className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <WifiOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     )}
                     {totalPending > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full min-w-[16px] sm:min-w-[18px] h-[16px] sm:h-[18px] flex items-center justify-center px-0.5">
+                      <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5">
                         {totalPending > 9 ? "9+" : totalPending}
                       </span>
                     )}
@@ -373,10 +373,10 @@ const Layout = () => {
                     variant="outline"
                     size="sm"
                     onClick={toggleLanguage}
-                    className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-800 font-medium"
+                    className="h-7 w-7 sm:h-8 sm:w-auto sm:px-2.5 text-xs text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-800 font-medium"
                     data-testid="language-switcher"
                   >
-                    <Languages className="w-4 h-4 sm:mr-1.5" />
+                    <Languages className="w-3.5 h-3.5 sm:mr-1" />
                     <span className="hidden sm:inline">{language.toUpperCase()}</span>
                   </Button>
                 </TooltipTrigger>
@@ -392,41 +392,41 @@ const Layout = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 sm:h-9 sm:w-9 text-slate-600 hover:text-slate-900"
+                  className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900"
                   data-testid="settings-menu-button"
                 >
-                  <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>{t("nav.settings")}</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel className="text-xs">{t("nav.settings")}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {settingsMenuItems.map((item) => (
                   <DropdownMenuItem 
                     key={item.path}
                     onClick={() => navigate(item.path)}
-                    className="cursor-pointer"
+                    className="cursor-pointer text-sm"
                     data-testid={`settings-${item.path.replace(/\//g, '-').replace(/^-/, '')}-menu-item`}
                   >
-                    <item.icon className="w-4 h-4 mr-2" />
+                    <item.icon className="w-3.5 h-3.5 mr-2" />
                     {item.label}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <span className="hidden lg:block text-sm font-medium text-slate-600" data-testid="user-name">
+            <span className="hidden lg:block text-xs font-medium text-slate-600" data-testid="user-name">
               {user?.name}
             </span>
             <Button
               variant="ghost"
               size="sm"
               onClick={logout}
-              className="h-8 sm:h-9 px-2 sm:px-3 text-slate-500 hover:text-slate-700"
+              className="h-7 sm:h-8 px-2 sm:px-2.5 text-slate-500 hover:text-slate-700 text-xs"
               data-testid="logout-button"
             >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline ml-2">{t("nav.logout")}</span>
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline ml-1.5">{t("nav.logout")}</span>
             </Button>
 
             {/* Mobile Menu Toggle */}
@@ -503,11 +503,11 @@ const Layout = () => {
       </header>
 
       {/* Main Layout with Sidebar */}
-      <div className="flex min-h-[calc(100vh-64px)]">
+      <div className="flex min-h-[calc(100vh-48px)]">
         {/* Equipment Hierarchy Sidebar - Desktop */}
         {hierarchyOpen && (
           <div className="hidden lg:block w-72 flex-shrink-0 border-r border-slate-200 bg-white">
-            <div className="sticky top-16 h-[calc(100vh-64px)]">
+            <div className="sticky top-12 h-[calc(100vh-48px)]">
               <EquipmentHierarchy 
                 isOpen={true} 
                 onClose={() => setHierarchyOpen(false)}

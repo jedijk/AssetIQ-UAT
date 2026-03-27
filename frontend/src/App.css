@@ -11,12 +11,12 @@
 }
 
 .header-content {
-    @apply px-4 h-16 flex items-center justify-between w-full;
+    @apply px-4 h-12 flex items-center justify-between w-full;
 }
 
 /* Navigation */
 .nav-link {
-    @apply px-4 py-2 rounded-lg text-slate-600 font-medium 
+    @apply px-3 py-1.5 rounded-md text-sm text-slate-600 font-medium 
            hover:bg-slate-100 hover:text-slate-900 
            transition-colors duration-150;
 }
@@ -27,7 +27,7 @@
 
 /* Chat Layout */
 .chat-container {
-    @apply flex flex-col h-[calc(100vh-64px)] bg-slate-50;
+    @apply flex flex-col h-[calc(100vh-48px)] bg-slate-50;
 }
 
 .chat-messages {
