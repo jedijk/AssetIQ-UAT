@@ -46,6 +46,46 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 
 ## Completed in This Session (Mar 27, 2026)
 
+### Feature: User Feedback System
+Implemented a comprehensive User Feedback system per the functional spec:
+
+**Backend:**
+- New `feedback` MongoDB collection for storing user feedback
+- Submit feedback API: `POST /api/feedback`
+- Get user's feedback: `GET /api/feedback/my`
+- Get feedback detail: `GET /api/feedback/{id}`
+- Screenshot upload: `POST /api/feedback/upload-screenshot` (uses Object Storage)
+- Admin endpoints (backend-only for v1): `GET /api/feedback/admin/all`, `PUT /api/feedback/admin/{id}`, `DELETE /api/feedback/admin/{id}`
+
+**Frontend Components:**
+- `FeedbackPage.js` - Full feedback review page with submission modal
+- Accessible via Settings dropdown → "Feedback"
+
+**Features:**
+- **Feedback Types**: Issue (red icon), Improvement (amber icon), General (blue icon)
+- **Status Tracking**: New (grey dot), In Review (orange), Resolved (green check), Planned, Won't Fix
+- **Severity** (for Issues only): Low, Medium, High, Critical
+- **Relative Timestamps**: "Just now", "2m ago", "3d ago", etc.
+- **Screenshot Upload**: Optional image attachment via Object Storage
+- **Bottom Sheet Detail View**: Click feedback item to see full message, status, severity, screenshot, and system response
+- **Submission Modal**: Type selector, severity dropdown (for issues), message textarea, screenshot upload
+- **i18n Support**: Full EN/NL translations
+
+**Files Created:**
+- `/app/backend/models/feedback_models.py` - Pydantic models for feedback
+- `/app/backend/services/feedback_service.py` - Feedback service layer
+- `/app/backend/routes/feedback.py` - API endpoints
+- `/app/frontend/src/pages/FeedbackPage.js` - Full page component
+
+**Files Modified:**
+- `/app/backend/routes/__init__.py` - Added feedback_router
+- `/app/frontend/src/App.js` - Added route `/settings/feedback`
+- `/app/frontend/src/components/Layout.js` - Added Feedback to settings menu
+- `/app/frontend/src/lib/api.js` - Added feedbackAPI methods
+- `/app/frontend/src/contexts/LanguageContext.js` - Added EN/NL translations for feedback
+
+---
+
 ### Feature: User Statistics Page
 Implemented a comprehensive User Statistics page per the functional spec:
 
@@ -340,6 +380,7 @@ Extracted large components into modular files:
 - `form_templates`, `form_submissions`, `decision_rules`, `decision_suggestions`
 - `failure_modes` (in failure_modes_db)
 - `user_events`, `user_stats_daily` (User Statistics tracking)
+- `feedback` (User Feedback system)
 
 ## Test Credentials
 - Email: test@test.com / Password: test
