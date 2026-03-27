@@ -1113,29 +1113,6 @@ const FormsPage = () => {
                   {selectedTemplate?.description || "No description"}
                 </DialogDescription>
               </div>
-              {/* Preview Mode Toggle - only for fields view */}
-              {viewTab === "fields" && (
-                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                  <Button
-                    variant={previewMode === "desktop" ? "default" : "ghost"}
-                    size="sm"
-                    className={`h-8 px-3 ${previewMode === "desktop" ? "bg-white shadow-sm" : ""}`}
-                    onClick={() => setPreviewMode("desktop")}
-                    data-testid="preview-desktop-btn"
-                  >
-                    <Monitor className="w-4 h-4 mr-1" /> Desktop
-                  </Button>
-                  <Button
-                    variant={previewMode === "mobile" ? "default" : "ghost"}
-                    size="sm"
-                    className={`h-8 px-3 ${previewMode === "mobile" ? "bg-white shadow-sm" : ""}`}
-                    onClick={() => setPreviewMode("mobile")}
-                    data-testid="preview-mobile-btn"
-                  >
-                    <Smartphone className="w-4 h-4 mr-1" /> Mobile
-                  </Button>
-                </div>
-              )}
             </div>
           </DialogHeader>
 
@@ -1157,58 +1134,192 @@ const FormsPage = () => {
               )}
             </div>
 
-            {/* View Tabs */}
-            <div className="flex gap-2 mb-4 border-b">
-              <button
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                  viewTab === "fields" 
-                    ? "border-indigo-600 text-indigo-600" 
-                    : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-                onClick={() => setViewTab("fields")}
-              >
-                <Layers className="w-4 h-4 inline mr-1" /> {t("forms.formFields")} ({selectedTemplate?.fields?.length || 0})
-              </button>
-              <button
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                  viewTab === "documents" 
-                    ? "border-indigo-600 text-indigo-600" 
-                    : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-                onClick={() => setViewTab("documents")}
-              >
-                <FileText className="w-4 h-4 inline mr-1" /> {t("forms.documents")} ({selectedTemplate?.documents?.length || 0})
-              </button>
+            {/* View Tabs with Preview Mode Toggle */}
+            <div className="flex items-center justify-between mb-4 border-b">
+              <div className="flex gap-2">
+                <button
+                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    viewTab === "fields" 
+                      ? "border-indigo-600 text-indigo-600" 
+                      : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                  onClick={() => setViewTab("fields")}
+                >
+                  <Layers className="w-4 h-4 inline mr-1" /> {t("forms.formFields")} ({selectedTemplate?.fields?.length || 0})
+                </button>
+                <button
+                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    viewTab === "documents" 
+                      ? "border-indigo-600 text-indigo-600" 
+                      : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                  onClick={() => setViewTab("documents")}
+                >
+                  <FileText className="w-4 h-4 inline mr-1" /> {t("forms.documents")} ({selectedTemplate?.documents?.length || 0})
+                </button>
+              </div>
+              
+              {/* Preview Mode Toggle - Always visible on Fields tab */}
+              {viewTab === "fields" && (
+                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                  <Button
+                    variant={previewMode === "desktop" ? "default" : "ghost"}
+                    size="sm"
+                    className={`h-8 px-3 ${previewMode === "desktop" ? "bg-white shadow-sm text-slate-900" : "text-slate-600"}`}
+                    onClick={() => setPreviewMode("desktop")}
+                    data-testid="preview-desktop-btn"
+                  >
+                    <Monitor className="w-4 h-4 mr-1.5" /> Desktop
+                  </Button>
+                  <Button
+                    variant={previewMode === "mobile" ? "default" : "ghost"}
+                    size="sm"
+                    className={`h-8 px-3 ${previewMode === "mobile" ? "bg-white shadow-sm text-slate-900" : "text-slate-600"}`}
+                    onClick={() => setPreviewMode("mobile")}
+                    data-testid="preview-mobile-btn"
+                  >
+                    <Smartphone className="w-4 h-4 mr-1.5" /> Mobile
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Fields Tab */}
             {viewTab === "fields" && (
               <>
-                {/* Desktop View */}
+                {/* Desktop Preview */}
                 {previewMode === "desktop" && (
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm text-slate-700">Fields ({selectedTemplate?.fields?.length || 0})</h4>
-                <div className="space-y-2">
-                  {selectedTemplate?.fields?.map((field, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                      <div className="h-8 w-8 rounded bg-white border flex items-center justify-center">
-                        <FieldTypeIcon type={field.field_type} />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">{field.label}</span>
-                          {field.required && <span className="text-red-500 text-xs">*</span>}
+                  <div className="flex justify-center">
+                    {/* Desktop Browser Frame */}
+                    <div className="w-full max-w-2xl">
+                      {/* Browser Chrome */}
+                      <div className="bg-slate-200 rounded-t-lg px-4 py-2 flex items-center gap-2">
+                        <div className="flex gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-red-400" />
+                          <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                          <div className="w-3 h-3 rounded-full bg-green-400" />
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {FIELD_TYPES.find(f => f.value === field.field_type)?.label}
-                          {field.unit && ` (${field.unit})`}
+                        <div className="flex-1 ml-4">
+                          <div className="bg-white rounded px-3 py-1 text-xs text-slate-500 truncate">
+                            forms.assetiq.com/{selectedTemplate?.name?.toLowerCase().replace(/\s+/g, '-')}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Browser Content */}
+                      <div className="bg-white border-x border-b border-slate-200 rounded-b-lg shadow-lg overflow-hidden">
+                        {/* Form Header */}
+                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
+                          <h3 className="text-white font-semibold text-lg">{selectedTemplate?.name}</h3>
+                          <p className="text-white/70 text-sm">{selectedTemplate?.description || "Fill out the form below"}</p>
+                        </div>
+                        
+                        {/* Form Fields */}
+                        <div className="p-6 space-y-5 max-h-[400px] overflow-y-auto">
+                          {selectedTemplate?.fields?.map((field, idx) => (
+                            <div key={idx} className="space-y-2">
+                              <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
+                                {field.label}
+                                {field.required && <span className="text-red-500">*</span>}
+                              </label>
+                              {field.description && (
+                                <p className="text-xs text-slate-400">{field.description}</p>
+                              )}
+                              
+                              {/* Render realistic field inputs */}
+                              {field.field_type === "text" && (
+                                <div className="h-10 bg-slate-50 rounded-lg border border-slate-200 px-3 flex items-center">
+                                  <span className="text-sm text-slate-400">{field.placeholder || "Enter text..."}</span>
+                                </div>
+                              )}
+                              {field.field_type === "textarea" && (
+                                <div className="h-24 bg-slate-50 rounded-lg border border-slate-200 p-3">
+                                  <span className="text-sm text-slate-400">{field.placeholder || "Enter description..."}</span>
+                                </div>
+                              )}
+                              {field.field_type === "numeric" && (
+                                <div className="h-10 bg-slate-50 rounded-lg border border-slate-200 px-3 flex items-center justify-between">
+                                  <span className="text-sm text-slate-400">0</span>
+                                  {field.unit && <span className="text-sm text-slate-500 font-medium">{field.unit}</span>}
+                                </div>
+                              )}
+                              {field.field_type === "boolean" && (
+                                <div className="flex items-center gap-3">
+                                  <div className="w-12 h-6 bg-slate-200 rounded-full relative cursor-pointer">
+                                    <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform" />
+                                  </div>
+                                  <span className="text-sm text-slate-500">No</span>
+                                </div>
+                              )}
+                              {field.field_type === "dropdown" && (
+                                <div className="h-10 bg-slate-50 rounded-lg border border-slate-200 px-3 flex items-center justify-between cursor-pointer hover:border-slate-300">
+                                  <span className="text-sm text-slate-400">Select an option...</span>
+                                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                                </div>
+                              )}
+                              {field.field_type === "multi_select" && (
+                                <div className="h-10 bg-slate-50 rounded-lg border border-slate-200 px-3 flex items-center justify-between cursor-pointer hover:border-slate-300">
+                                  <span className="text-sm text-slate-400">Select options...</span>
+                                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                                </div>
+                              )}
+                              {field.field_type === "date" && (
+                                <div className="h-10 bg-slate-50 rounded-lg border border-slate-200 px-3 flex items-center justify-between cursor-pointer hover:border-slate-300">
+                                  <span className="text-sm text-slate-400">Select date...</span>
+                                  <Calendar className="w-4 h-4 text-slate-400" />
+                                </div>
+                              )}
+                              {field.field_type === "datetime" && (
+                                <div className="h-10 bg-slate-50 rounded-lg border border-slate-200 px-3 flex items-center justify-between cursor-pointer hover:border-slate-300">
+                                  <span className="text-sm text-slate-400">Select date & time...</span>
+                                  <Calendar className="w-4 h-4 text-slate-400" />
+                                </div>
+                              )}
+                              {field.field_type === "file" && (
+                                <div className="h-20 bg-slate-50 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors">
+                                  <Upload className="w-5 h-5 text-slate-400" />
+                                  <span className="text-xs text-slate-400 mt-1">Click to upload or drag and drop</span>
+                                </div>
+                              )}
+                              {field.field_type === "image" && (
+                                <div className="h-28 bg-slate-50 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors">
+                                  <Upload className="w-6 h-6 text-slate-400" />
+                                  <span className="text-xs text-slate-400 mt-1">Click to upload image</span>
+                                  <span className="text-xs text-slate-300">PNG, JPG up to 10MB</span>
+                                </div>
+                              )}
+                              {field.field_type === "signature" && (
+                                <div className="h-32 bg-slate-50 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400">
+                                  <Signature className="w-6 h-6 text-slate-400" />
+                                  <span className="text-xs text-slate-400 mt-1">Click to sign</span>
+                                </div>
+                              )}
+                              {field.field_type === "range" && (
+                                <div className="space-y-2 pt-1">
+                                  <div className="h-2 bg-slate-200 rounded-full relative">
+                                    <div className="absolute left-0 top-0 h-full w-1/2 bg-indigo-500 rounded-full" />
+                                    <div className="absolute left-1/2 top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 bg-white border-2 border-indigo-500 rounded-full shadow cursor-grab" />
+                                  </div>
+                                  <div className="flex justify-between text-xs text-slate-400">
+                                    <span>{field.range_min || 0}</span>
+                                    <span>{field.range_max || 100}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Submit Button */}
+                          <div className="pt-4">
+                            <div className="h-11 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
+                              <span className="text-white font-medium">Submit Form</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                  </div>
+                )}
 
             {/* Mobile Preview */}
             {previewMode === "mobile" && (
