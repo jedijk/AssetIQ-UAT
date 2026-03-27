@@ -176,7 +176,7 @@ class FormService:
                 {"$set": {"is_latest": False, "updated_at": now}}
             )
             
-            # Create new version
+            # Create new version with all data from existing + updates
             new_doc = {
                 "name": data.get("name", existing["name"]),
                 "description": data.get("description", existing.get("description")),
@@ -184,6 +184,7 @@ class FormService:
                 "failure_mode_ids": data.get("failure_mode_ids", existing.get("failure_mode_ids", [])),
                 "equipment_type_ids": data.get("equipment_type_ids", existing.get("equipment_type_ids", [])),
                 "fields": data.get("fields", existing.get("fields", [])),
+                "documents": data.get("documents", existing.get("documents", [])),  # Copy documents
                 "allow_partial_submission": data.get("allow_partial_submission", existing.get("allow_partial_submission", False)),
                 "require_signature": data.get("require_signature", existing.get("require_signature", False)),
                 "tags": data.get("tags", existing.get("tags", [])),
@@ -202,12 +203,15 @@ class FormService:
             
             return self._serialize_template(new_doc)
         else:
-            # Update in place
-            update = {"updated_at": now}
+            # Update in place - increment version
+            update = {
+                "updated_at": now,
+                "version": existing.get("version", 1) + 1,  # Always increment version on edit
+            }
             
             allowed_fields = [
                 "name", "description", "discipline", "failure_mode_ids",
-                "equipment_type_ids", "fields", "allow_partial_submission",
+                "equipment_type_ids", "fields", "documents", "allow_partial_submission",
                 "require_signature", "tags", "is_active"
             ]
             
