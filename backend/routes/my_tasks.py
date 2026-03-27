@@ -158,7 +158,9 @@ async def get_my_tasks(
     today_end = today_start + timedelta(days=1)
     
     if filter == "open":
-        # Open: all non-completed tasks, optionally filtered by date
+        # Open: show only open actions and in_progress tasks
+        # For tasks: only show those with status "in_progress"
+        query["status"] = "in_progress"
         if date:
             try:
                 filter_date = datetime.fromisoformat(date)
@@ -167,7 +169,6 @@ async def get_my_tasks(
                 query["due_date"] = {"$gte": day_start, "$lt": day_end}
             except ValueError:
                 pass  # No date filter if invalid
-        # Base query already filters for non-completed tasks
     
     elif filter == "overdue":
         query["$or"] = [
@@ -283,8 +284,13 @@ async def get_my_tasks(
         # Build action query
         action_query = {
             "created_by": user_id,
-            "status": {"$in": ["open", "in_progress"]}
         }
+        
+        # For "open" filter, only show "open" status actions (not in_progress)
+        if filter == "open":
+            action_query["status"] = "open"
+        else:
+            action_query["status"] = {"$in": ["open", "in_progress"]}
         
         # Filter by discipline if specified
         if discipline:
