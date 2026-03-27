@@ -166,6 +166,64 @@ When an observation has a new/custom failure mode not in the FMEA library:
   - Recommended actions list builder
 - On save: Creates failure mode in FMEA library, links it to observation, clears the `is_new_failure_mode` flag
 
+### Feature: Failure Modes Module Enhancements (Mar 27, 2026)
+Fixed and enhanced the Failure Modes module per user feedback:
+
+**Translation Fixes:**
+- Added missing translation keys: `pendingValidation`, `iso14224Mechanism`, `noKeywords`, `selectCategory`
+- Added new field translations: `process`, `potentialEffects`, `potentialCauses`, `duplicateNameError`
+- All translations in both EN and NL
+
+**New Fields Added:**
+- `process`: Optional field for process context
+- `potential_effects`: Optional field for failure mode effects
+- `potential_causes`: Optional field for failure mode causes
+
+**Backend Changes:**
+- Updated `FailureModeCreate` and `FailureModeUpdate` Pydantic models with new fields
+- Added `find_by_name()` method to service for duplicate checking
+- Implemented duplicate name check in POST `/api/failure-modes` endpoint
+- Updated create/update routes to handle new fields
+
+**Frontend Changes:**
+- Fixed translation key issues in `FailureModeViewPanel.jsx`
+- Added new fields to view panel (Process, Potential Effects, Potential Causes)
+- Changed Equipment input to dropdown in edit mode
+- Added new fields to create/edit dialog form in `FailureModesPage.js`
+- Updated form state initialization and reset
+
+**Files Modified:**
+- `/app/backend/routes/failure_modes_routes.py`
+- `/app/backend/services/failure_modes_service.py`
+- `/app/frontend/src/components/library/FailureModeViewPanel.jsx`
+- `/app/frontend/src/pages/FailureModesPage.js`
+- `/app/frontend/src/contexts/LanguageContext.js`
+
+### Feature: Process Step Mapping in Equipment Manager (Mar 27, 2026)
+Added Process Step mapping to equipment hierarchy nodes:
+
+**User Requirements:**
+1. Free text input for Process Step value
+2. Editable only at Subunit and Maintainable Item levels
+3. Children inherit parent's Process Step but can change it later
+
+**Backend Changes:**
+- Added `process_step` field to `EquipmentNodeCreate` and `EquipmentNodeUpdate` models
+- Implemented inheritance logic: when creating a subunit/maintainable_item node, if no process_step is provided, inherit from parent
+- Process step can be updated via PATCH endpoint
+
+**Frontend Changes:**
+- Added Process Step input field to `PropertiesPanel.js`
+- Field only visible for nodes with level `subunit` or `maintainable_item`
+- Shows "Inherited by child items" hint when value is set
+- Translations added for EN and NL
+
+**Files Modified:**
+- `/app/backend/iso14224_models.py` - Added process_step to Pydantic models
+- `/app/backend/routes/equipment.py` - Added inheritance logic in create_equipment_node
+- `/app/frontend/src/components/equipment/PropertiesPanel.js` - Added UI for Process Step
+- `/app/frontend/src/contexts/LanguageContext.js` - Added translations
+
 **Files Modified:**
 - `/app/backend/routes/chat.py` - Set `is_new_failure_mode` on threat creation
 - `/app/backend/models/api_models.py` - Added new fields to ThreatUpdate/ThreatResponse
@@ -456,7 +514,6 @@ Extracted large components into modular files:
 ## Prioritized Backlog
 
 ### P0 (Critical)
-- Image analysis for damage detection
 - Report generation (PowerPoint/PDF) for Causal Investigations
 
 ### P1 (High Priority)
