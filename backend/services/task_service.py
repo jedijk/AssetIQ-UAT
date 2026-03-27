@@ -753,6 +753,14 @@ class TaskService:
         if not plan or not plan["is_active"]:
             return []
         
+        # Skip ad-hoc plans - they don't have recurring schedules
+        if plan.get("is_adhoc"):
+            return []
+        
+        # Ensure the plan has the required scheduling fields
+        if not plan.get("next_due_date") or not plan.get("interval_value") or not plan.get("interval_unit"):
+            return []
+        
         now = datetime.now(timezone.utc)
         horizon_end = now + timedelta(days=horizon_days)
         
@@ -1055,9 +1063,14 @@ class TaskService:
     
     def _serialize_instance(self, doc: Dict) -> Dict[str, Any]:
         """Serialize instance document."""
+        # Handle task_plan_id which might be ObjectId or string
+        task_plan_id = doc.get("task_plan_id")
+        if task_plan_id and hasattr(task_plan_id, '__str__'):
+            task_plan_id = str(task_plan_id)
+        
         return {
             "id": str(doc["_id"]),
-            "task_plan_id": doc["task_plan_id"],
+            "task_plan_id": task_plan_id,
             "task_template_id": doc.get("task_template_id"),
             "task_template_name": doc.get("task_template_name"),
             "equipment_id": doc["equipment_id"],
