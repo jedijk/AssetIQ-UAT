@@ -42,6 +42,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { DocumentViewer } from "../components/DocumentViewer";
 import {
   Select,
   SelectContent,
@@ -397,6 +398,7 @@ const FormsPage = () => {
   const [docSearchQuery, setDocSearchQuery] = useState("");
   const [docSearchResult, setDocSearchResult] = useState(null);
   const [isSearchingDocs, setIsSearchingDocs] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState(null); // For document viewer
 
   // Form state for new template
   const [newTemplate, setNewTemplate] = useState({
@@ -1570,17 +1572,15 @@ const FormsPage = () => {
                           {docSearchResult.relevant_documents?.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
                               {docSearchResult.relevant_documents.map((doc) => (
-                                <a
+                                <button
                                   key={doc.id}
-                                  href={doc.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                  onClick={() => setViewingDocument(doc)}
                                   className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded text-xs text-slate-600 hover:bg-slate-200 transition-colors"
                                 >
                                   <FileText className="w-3 h-3" />
                                   {doc.name}
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
+                                  <Eye className="w-3 h-3" />
+                                </button>
                               ))}
                             </div>
                           )}
@@ -1607,16 +1607,14 @@ const FormsPage = () => {
                               {doc.description && ` • ${doc.description}`}
                             </div>
                           </div>
-                          <a
-                            href={doc.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setViewingDocument(doc)}
                             className="text-indigo-600 hover:text-indigo-700"
                           >
-                            <Button variant="outline" size="sm">
-                              <ExternalLink className="w-4 h-4 mr-1" /> {t("common.view")}
-                            </Button>
-                          </a>
+                            <Eye className="w-4 h-4 mr-1" /> {t("common.view")}
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -1644,6 +1642,16 @@ const FormsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Document Viewer */}
+      {viewingDocument && (
+        <DocumentViewer
+          document={viewingDocument}
+          onClose={() => setViewingDocument(null)}
+          onBack={() => setViewingDocument(null)}
+          showBackButton={true}
+        />
+      )}
     </div>
   );
 };

@@ -357,7 +357,7 @@ async def search_form_documents(
     
     # Use AI to search documents
     try:
-        from emergentintegrations.llm.chat import chat, UserMessage
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         # Build context from documents
         doc_context = "\n\n".join([
@@ -375,17 +375,19 @@ Provide helpful, concise answers based on the document names, descriptions and t
 If a specific document would be most relevant, mention its name.
 If you cannot find relevant information, say so clearly and suggest which document type might help."""
         
-        response = await chat(
+        # Create LLM chat with session ID
+        session_id = f"doc_search_{template_id}_{current_user['id']}"
+        llm = LlmChat(
             api_key=EMERGENT_LLM_KEY,
-            model="gpt-4o-mini",
-            system_prompt=system_prompt,
-            messages=[UserMessage(content=request.query)],
-            temperature=0.3
-        )
+            session_id=session_id,
+            system_message=system_prompt
+        ).with_model("openai", "gpt-4o-mini").with_params(temperature=0.3)
+        
+        response = await llm.send_message(UserMessage(text=request.query))
         
         return {
             "query": request.query,
-            "answer": response.content if hasattr(response, 'content') else str(response),
+            "answer": response,
             "relevant_documents": [
                 {"id": d["id"], "name": d["name"], "url": d["url"], "type": d["type"]}
                 for d in documents
