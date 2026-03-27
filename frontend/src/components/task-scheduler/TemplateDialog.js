@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { Zap } from "lucide-react";
+import { Zap, FileText } from "lucide-react";
 
 export const TemplateDialog = ({
   open,
@@ -26,6 +26,7 @@ export const TemplateDialog = ({
   editingTemplate,
   templateForm,
   setTemplateForm,
+  formTemplates = [],
   onSubmit,
   isPending,
   onClose,
@@ -115,6 +116,31 @@ export const TemplateDialog = ({
               })}
               data-testid="adhoc-toggle"
             />
+          </div>
+
+          {/* Linked Form Selection */}
+          <div>
+            <Label className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-blue-500" />
+              {t("taskScheduler.linkedForm")}
+            </Label>
+            <Select 
+              value={templateForm.form_template_id || "none"} 
+              onValueChange={(v) => setTemplateForm({ ...templateForm, form_template_id: v === "none" ? null : v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={t("taskScheduler.selectForm")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t("taskScheduler.noForm")}</SelectItem>
+                {formTemplates.map((form) => (
+                  <SelectItem key={form.id} value={form.id}>
+                    {form.name} {form.version > 1 && `(v${form.version})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-500 mt-1">{t("taskScheduler.linkFormDesc")}</p>
           </div>
 
           {/* Interval fields - hidden when ad-hoc */}

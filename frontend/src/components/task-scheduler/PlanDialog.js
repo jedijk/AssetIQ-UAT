@@ -1,6 +1,6 @@
 import { useLanguage } from "../../contexts/LanguageContext";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, FileText, Zap } from "lucide-react";
+import { Calendar as CalendarIcon, Zap } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -31,7 +31,6 @@ export const PlanDialog = ({
   setPlanForm,
   templates,
   equipmentData,
-  formTemplatesData,
   inheritedInterval,
   onTemplateSelect,
   onSubmit,
@@ -170,29 +169,6 @@ export const PlanDialog = ({
               disabledFn={(date) => planForm.effective_from && date < planForm.effective_from}
               t={t}
             />
-          </div>
-          <div>
-            <Label>{t("taskScheduler.linkedFormOptional")}</Label>
-            <Select 
-              value={planForm.form_template_id} 
-              onValueChange={(v) => setPlanForm({ ...planForm, form_template_id: v === "none" ? "" : v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("taskScheduler.selectFormTemplate")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t("taskScheduler.noForm")}</SelectItem>
-                {(formTemplatesData?.templates || []).map((form) => (
-                  <SelectItem key={form.id} value={form.id}>
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-slate-400" />
-                      {form.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-slate-500 mt-1">{t("taskScheduler.linkFormDesc")}</p>
           </div>
           <div>
             <Label>{t("causal.notes")}</Label>

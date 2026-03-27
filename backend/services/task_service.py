@@ -189,10 +189,20 @@ class TaskService:
         # Check if template is ad-hoc
         is_adhoc_template = template.get("is_adhoc", False)
         
-        # Lookup form template name if provided
+        # Get form_template_id from template if not provided in plan data
+        form_template_id = data.get("form_template_id") or template.get("form_template_id")
+        
+        # Lookup form template name
         form_template_name = None
-        if data.get("form_template_id"):
-            form_template = await self.db.form_templates.find_one({"id": data["form_template_id"]})
+        if form_template_id:
+            # Try finding by 'id' field first (string ID)
+            form_template = await self.db.form_templates.find_one({"id": form_template_id})
+            # If not found, try by ObjectId
+            if not form_template:
+                try:
+                    form_template = await self.db.form_templates.find_one({"_id": ObjectId(form_template_id)})
+                except Exception:
+                    pass
             if form_template:
                 form_template_name = form_template.get("name")
         
@@ -225,7 +235,7 @@ class TaskService:
             "equipment_name": equipment.get("name"),
             "task_template_id": data["task_template_id"],
             "task_template_name": template["name"],
-            "form_template_id": data.get("form_template_id"),
+            "form_template_id": form_template_id,
             "form_template_name": form_template_name,
             "efm_id": data.get("efm_id"),
             "frequency_type": frequency_type,

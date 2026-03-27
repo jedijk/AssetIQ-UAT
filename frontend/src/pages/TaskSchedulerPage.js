@@ -307,6 +307,7 @@ const TaskSchedulerPage = () => {
     procedure_steps: [],
     safety_requirements: [],
     is_adhoc: false,
+    form_template_id: null,
   });
   const [completeForm, setCompleteForm] = useState({
     notes: "",
@@ -359,7 +360,7 @@ const TaskSchedulerPage = () => {
       if (!response.ok) throw new Error("Failed to fetch form templates");
       return response.json();
     },
-    enabled: showPlanDialog
+    enabled: showPlanDialog || showTemplateDialog
   });
 
   const { data: instancesData, isLoading: instancesLoading, refetch: refetchInstances } = useQuery({
@@ -516,6 +517,7 @@ const TaskSchedulerPage = () => {
       procedure_steps: [],
       safety_requirements: [],
       is_adhoc: false,
+      form_template_id: null,
     });
   };
 
@@ -540,6 +542,7 @@ const TaskSchedulerPage = () => {
       procedure_steps: template.procedure_steps || [],
       safety_requirements: template.safety_requirements || [],
       is_adhoc: template.is_adhoc || false,
+      form_template_id: template.form_template_id || null,
     });
     setShowTemplateDialog(true);
   };
@@ -1243,6 +1246,7 @@ const TaskSchedulerPage = () => {
         editingTemplate={editingTemplate}
         templateForm={templateForm}
         setTemplateForm={setTemplateForm}
+        formTemplates={formTemplatesData?.templates || formTemplatesData || []}
         onSubmit={handleCreateTemplate}
         isPending={createTemplateMutation.isPending || updateTemplateMutation.isPending}
         onClose={() => {
@@ -1279,7 +1283,6 @@ const TaskSchedulerPage = () => {
         setPlanForm={setPlanForm}
         templates={templates}
         equipmentData={equipmentData}
-        formTemplatesData={formTemplatesData}
         inheritedInterval={inheritedInterval}
         onTemplateSelect={handleTemplateSelect}
         onSubmit={handlePlanSubmit}
