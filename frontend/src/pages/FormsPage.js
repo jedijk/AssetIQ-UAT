@@ -441,15 +441,21 @@ const FormsPage = () => {
 
   // Create template mutation
   const createTemplateMutation = useMutation({
-    mutationFn: formAPI.createTemplate,
-    onSuccess: () => {
-      toast.success("Form template created");
+    mutationFn: async (template) => {
+      // If template has an ID, it's an update, otherwise create new
+      if (template.id) {
+        return formAPI.updateTemplate({ id: template.id, data: template });
+      }
+      return formAPI.createTemplate(template);
+    },
+    onSuccess: (data, variables) => {
+      toast.success(variables.id ? "Form template updated" : "Form template created");
       queryClient.invalidateQueries({ queryKey: ["form-templates"] });
       setShowCreateDialog(false);
       resetNewTemplate();
     },
     onError: (error) => {
-      toast.error("Failed to create template: " + error.message);
+      toast.error("Failed to save template: " + error.message);
     },
   });
 
