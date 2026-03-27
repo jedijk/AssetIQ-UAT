@@ -730,7 +730,7 @@ const en = {
   taskScheduler: {
     title: "Task Planner",
     subtitle: "Manage task templates, plans, and schedules",
-    generateExecutions: "Generate Executions",
+    generateExecutions: "Generate Schedule",
     newTemplate: "Design Task",
     totalExecutions: "Total Executions",
     planned: "Planned",
@@ -1680,7 +1680,7 @@ const nl = {
   taskScheduler: {
     title: "Taakplanner",
     subtitle: "Beheer taaksjablonen, plannen en schema's",
-    generateExecutions: "Genereer uitvoeringen",
+    generateExecutions: "Genereer schema",
     newTemplate: "Taak ontwerpen",
     totalExecutions: "Totaal uitvoeringen",
     planned: "Gepland",

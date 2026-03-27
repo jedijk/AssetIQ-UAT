@@ -1040,6 +1040,15 @@ const TaskSchedulerPage = () => {
                               <CheckCircle2 className="w-4 h-4 mr-1" /> Complete
                             </Button>
                           )}
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => setDeleteInstanceId(instance.id)}
+                            data-testid={`delete-calendar-task-${instance.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}
