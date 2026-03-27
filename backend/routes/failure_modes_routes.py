@@ -162,6 +162,11 @@ class FailureModeCreate(BaseModel):
     description: Optional[str] = None
     source: Optional[str] = None  # e.g., "observation", "manual", "import"
     linked_threat_id: Optional[str] = None
+    # New fields
+    process: Optional[str] = None  # Process area
+    potential_effects: Optional[str] = None  # Potential effects of failure mode
+    potential_causes: Optional[str] = None  # Potential cause of failure mode
+    iso14224_mechanism: Optional[str] = None  # ISO 14224 failure mechanism
 
 
 class FailureModeUpdate(BaseModel):
@@ -179,6 +184,11 @@ class FailureModeUpdate(BaseModel):
     validated_by_name: Optional[str] = None
     validated_by_position: Optional[str] = None
     validated_at: Optional[str] = None
+    # New fields
+    process: Optional[str] = None
+    potential_effects: Optional[str] = None
+    potential_causes: Optional[str] = None
+    iso14224_mechanism: Optional[str] = None
 
 
 class FailureModeValidation(BaseModel):
