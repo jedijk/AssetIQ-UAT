@@ -9,7 +9,7 @@ import {
   ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
   Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, Move, ArrowRight, ArrowUp, ArrowDown,
-  Download,
+  Download, MoreVertical, Copy, Scissors,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -19,6 +19,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { ScrollArea } from "../components/ui/scroll-area";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "../components/ui/context-menu";
 import BackButton from "../components/BackButton";
 import { PropertiesPanel } from "../components/equipment/PropertiesPanel";
 
@@ -79,7 +86,7 @@ function flattenTree(treeNodes, expandedIds, depth = 0) {
 }
 
 // Tree Node Component with Drag-Drop for reorder, promote, demote, and unassigned items
-function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, allNodes, onDrop, onReorder, onChangeLevel, siblings, siblingIndex, isSearchMatch }) {
+function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, allNodes, onDrop, onReorder, onChangeLevel, siblings, siblingIndex, isSearchMatch, onAddChild, onEdit, onDelete, onMoveUp, onMoveDown }) {
   const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
@@ -87,6 +94,76 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
   const [isDragOver, setIsDragOver] = useState(false);
   const [dropPosition, setDropPosition] = useState(null); // 'before', 'after', 'child'
   const [isDragging, setIsDragging] = useState(false);
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+  
+  // Long press handling
+  const longPressTimer = useRef(null);
+  const touchStartPos = useRef({ x: 0, y: 0 });
+  
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+    
+    longPressTimer.current = setTimeout(() => {
+      // Trigger context menu at touch position
+      setContextMenuPos({ x: touch.clientX, y: touch.clientY });
+      setShowContextMenu(true);
+      // Provide haptic feedback if available
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 500); // 500ms long press
+  };
+  
+  const handleTouchMove = (e) => {
+    if (longPressTimer.current) {
+      const touch = e.touches[0];
+      const moveX = Math.abs(touch.clientX - touchStartPos.current.x);
+      const moveY = Math.abs(touch.clientY - touchStartPos.current.y);
+      // Cancel if moved more than 10px
+      if (moveX > 10 || moveY > 10) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    }
+  };
+  
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  
+  const handleContextMenuAction = (action) => {
+    setShowContextMenu(false);
+    switch (action) {
+      case "select":
+        onSelect(node);
+        break;
+      case "expand":
+        if (hasChildren) onExpand(node.id);
+        break;
+      case "addChild":
+        onAddChild?.(node);
+        break;
+      case "edit":
+        onEdit?.(node);
+        break;
+      case "delete":
+        onDelete?.(node);
+        break;
+      case "moveUp":
+        onMoveUp?.(node);
+        break;
+      case "moveDown":
+        onMoveDown?.(node);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const canAddChild = node.level !== "maintainable_item";
 
   const handleDragStart = (e) => {
     e.dataTransfer.setData("application/json", JSON.stringify({ 
@@ -195,49 +272,166 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
   };
 
   return (
-    <div
-      draggable={node.level !== "installation" || true}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDropOnNode}
-      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-grab active:cursor-grabbing ${
-        isDragging ? "opacity-50" :
-        isSelected ? "bg-blue-50 border border-blue-200" : 
-        isSearchMatch ? "bg-yellow-50 border border-yellow-300" :
-        "hover:bg-slate-50 border border-transparent"
-      } ${getDropIndicatorClass()}`}
-      style={{ marginLeft: depth * 24 }}
-      onClick={handleClick}
-      data-testid={`tree-node-${node.id}`}
-    >
-      <GripVertical className="w-4 h-4 text-slate-300 flex-shrink-0 cursor-grab" />
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            draggable={node.level !== "installation" || true}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDropOnNode}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-grab active:cursor-grabbing ${
+              isDragging ? "opacity-50" :
+              isSelected ? "bg-blue-50 border border-blue-200" : 
+              isSearchMatch ? "bg-yellow-50 border border-yellow-300" :
+              "hover:bg-slate-50 border border-transparent"
+            } ${getDropIndicatorClass()}`}
+            style={{ marginLeft: depth * 24 }}
+            onClick={handleClick}
+            data-testid={`tree-node-${node.id}`}
+          >
+            <GripVertical className="w-4 h-4 text-slate-300 flex-shrink-0 cursor-grab" />
+            
+            <button 
+              className={`w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 ${!hasChildren ? "invisible" : ""}`} 
+              onClick={e => { e.stopPropagation(); onExpand(node.id); }}
+            >
+              {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
+            </button>
+            
+            <div className={`w-7 h-7 rounded-md flex items-center justify-center ${critColors?.bg || "bg-slate-100"}`}>
+              <LevelIcon className={`w-4 h-4 ${critColors?.text || "text-slate-600"}`} />
+            </div>
+            
+            <span className={`flex-1 text-sm font-medium truncate ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>{node.name}</span>
+            
+            {isDragOver && dropPosition === "child" && (
+              <span className="text-xs text-blue-600 font-medium">Drop as child</span>
+            )}
+            
+            {isSearchMatch && (
+              <span className="text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded">Match</span>
+            )}
+            
+            <span className="text-xs text-slate-400 hidden sm:block">{config.label}</span>
+            {node.criticality && <div className={`w-2 h-2 rounded-full ${CRIT_COLORS[node.criticality.level]?.dot}`} />}
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-48">
+          <ContextMenuItem onClick={() => handleContextMenuAction("select")}>
+            <Check className="w-4 h-4 mr-2" />
+            Select
+          </ContextMenuItem>
+          {hasChildren && (
+            <ContextMenuItem onClick={() => handleContextMenuAction("expand")}>
+              {isExpanded ? <ChevronUp className="w-4 h-4 mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
+              {isExpanded ? "Collapse" : "Expand"}
+            </ContextMenuItem>
+          )}
+          <ContextMenuSeparator />
+          {canAddChild && (
+            <ContextMenuItem onClick={() => handleContextMenuAction("addChild")}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Child
+            </ContextMenuItem>
+          )}
+          <ContextMenuItem onClick={() => handleContextMenuAction("edit")}>
+            <Edit className="w-4 h-4 mr-2" />
+            Edit
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={() => handleContextMenuAction("moveUp")} disabled={siblingIndex === 0}>
+            <ArrowUp className="w-4 h-4 mr-2" />
+            Move Up
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => handleContextMenuAction("moveDown")} disabled={siblingIndex >= siblings?.length - 1}>
+            <ArrowDown className="w-4 h-4 mr-2" />
+            Move Down
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={() => handleContextMenuAction("delete")} className="text-red-600 focus:text-red-600">
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
       
-      <button 
-        className={`w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 ${!hasChildren ? "invisible" : ""}`} 
-        onClick={e => { e.stopPropagation(); onExpand(node.id); }}
-      >
-        {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
-      </button>
-      
-      <div className={`w-7 h-7 rounded-md flex items-center justify-center ${critColors?.bg || "bg-slate-100"}`}>
-        <LevelIcon className={`w-4 h-4 ${critColors?.text || "text-slate-600"}`} />
-      </div>
-      
-      <span className={`flex-1 text-sm font-medium truncate ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>{node.name}</span>
-      
-      {isDragOver && dropPosition === "child" && (
-        <span className="text-xs text-blue-600 font-medium">Drop as child</span>
+      {/* Mobile Long Press Context Menu */}
+      {showContextMenu && (
+        <div 
+          className="fixed inset-0 z-50" 
+          onClick={() => setShowContextMenu(false)}
+        >
+          <div 
+            className="absolute bg-white rounded-lg shadow-xl border border-slate-200 py-1 min-w-[180px] z-50"
+            style={{ 
+              left: Math.min(contextMenuPos.x, window.innerWidth - 200), 
+              top: Math.min(contextMenuPos.y, window.innerHeight - 300) 
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+              onClick={() => handleContextMenuAction("select")}
+            >
+              <Check className="w-4 h-4" /> Select
+            </button>
+            {hasChildren && (
+              <button 
+                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+                onClick={() => handleContextMenuAction("expand")}
+              >
+                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {isExpanded ? "Collapse" : "Expand"}
+              </button>
+            )}
+            <div className="h-px bg-slate-200 my-1" />
+            {canAddChild && (
+              <button 
+                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+                onClick={() => handleContextMenuAction("addChild")}
+              >
+                <Plus className="w-4 h-4" /> Add Child
+              </button>
+            )}
+            <button 
+              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+              onClick={() => handleContextMenuAction("edit")}
+            >
+              <Edit className="w-4 h-4" /> Edit
+            </button>
+            <div className="h-px bg-slate-200 my-1" />
+            <button 
+              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2 disabled:opacity-50"
+              onClick={() => handleContextMenuAction("moveUp")}
+              disabled={siblingIndex === 0}
+            >
+              <ArrowUp className="w-4 h-4" /> Move Up
+            </button>
+            <button 
+              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2 disabled:opacity-50"
+              onClick={() => handleContextMenuAction("moveDown")}
+              disabled={siblingIndex >= siblings?.length - 1}
+            >
+              <ArrowDown className="w-4 h-4" /> Move Down
+            </button>
+            <div className="h-px bg-slate-200 my-1" />
+            <button 
+              className="w-full px-3 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+              onClick={() => handleContextMenuAction("delete")}
+            >
+              <Trash2 className="w-4 h-4" /> Delete
+            </button>
+          </div>
+        </div>
       )}
-      
-      {isSearchMatch && (
-        <span className="text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded">Match</span>
-      )}
-      
-      <span className="text-xs text-slate-400 hidden sm:block">{config.label}</span>
-      {node.criticality && <div className={`w-2 h-2 rounded-full ${CRIT_COLORS[node.criticality.level]?.dot}`} />}
-    </div>
+    </>
   );
 }
 
@@ -639,6 +833,37 @@ export default function EquipmentManagerPage() {
   const getNextLevel = level => { const normalizedLevel = normalizeLevel(level); const idx = LEVEL_ORDER.indexOf(normalizedLevel); return idx >= 0 && idx < LEVEL_ORDER.length - 1 ? LEVEL_ORDER[idx + 1] : null; };
   const handleAddChild = () => { if (selectedNode) { const next = getNextLevel(selectedNode.level); if (next) { setNewNode({ name: "", level: next, parent_id: selectedNode.id }); setIsCreateOpen(true); } else toast.error("Cannot add children to maintainable items"); } };
   
+  // Context menu handlers for TreeNode
+  const handleContextAddChild = (node) => {
+    const next = getNextLevel(node.level);
+    if (next) {
+      setNewNode({ name: "", level: next, parent_id: node.id });
+      setIsCreateOpen(true);
+    } else {
+      toast.error("Cannot add children to maintainable items");
+    }
+  };
+  
+  const handleContextEdit = (node) => {
+    setSelectedNode(node);
+    // Could open an edit dialog here if needed
+    toast.info("Node selected for editing. Use the Properties panel on the right.");
+  };
+  
+  const handleContextDelete = (node) => {
+    if (window.confirm(`Are you sure you want to delete "${node.name}"?`)) {
+      deleteMutation.mutate(node.id);
+    }
+  };
+  
+  const handleContextMoveUp = (node) => {
+    reorderMutation.mutate({ nodeId: node.id, direction: "up" });
+  };
+  
+  const handleContextMoveDown = (node) => {
+    reorderMutation.mutate({ nodeId: node.id, direction: "down" });
+  };
+  
   // Export hierarchy to Excel
   const [isExporting, setIsExporting] = useState(false);
   const handleExportExcel = async () => {
@@ -774,6 +999,11 @@ export default function EquipmentManagerPage() {
                     siblings={siblings}
                     siblingIndex={siblingIndex}
                     isSearchMatch={isSearchMatch}
+                    onAddChild={handleContextAddChild}
+                    onEdit={handleContextEdit}
+                    onDelete={handleContextDelete}
+                    onMoveUp={handleContextMoveUp}
+                    onMoveDown={handleContextMoveDown}
                   />
                 );
               })}
