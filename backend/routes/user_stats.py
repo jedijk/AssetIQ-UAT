@@ -33,6 +33,7 @@ class TrackEventRequest(BaseModel):
     action: Optional[str] = Field(None, description="Action performed")
     event_type: str = Field(default="page_view")
     duration: Optional[int] = Field(None, description="Time spent in seconds")
+    device_type: Optional[str] = Field(None, description="Device type: desktop, mobile, or tablet")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
@@ -59,6 +60,7 @@ async def track_event(
         action=request.action,
         event_type=request.event_type,
         duration=request.duration,
+        device_type=request.device_type,
         metadata=request.metadata
     )
     
@@ -267,6 +269,28 @@ async def get_action_usage(
     }
     
     return await user_stats_service._get_action_usage(match_stage)
+
+
+@router.get("/devices")
+async def get_device_usage(
+    period: str = Query("30"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get device type usage statistics (desktop vs mobile vs tablet)."""
+    
+    user_role = current_user.get("role", "user")
+    
+    if user_role == "operator":
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    now = datetime.now(timezone.utc)
+    start_dt = now - timedelta(days=int(period) if period.isdigit() else 30)
+    
+    match_stage = {
+        "timestamp": {"$gte": start_dt, "$lte": now}
+    }
+    
+    return await user_stats_service._get_device_usage(match_stage)
 
 
 @router.get("/trends")

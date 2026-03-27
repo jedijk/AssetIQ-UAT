@@ -15,6 +15,9 @@ import {
   Layers,
   MousePointer,
   Zap,
+  Monitor,
+  Smartphone,
+  Tablet,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -216,6 +219,7 @@ const UserStatisticsPage = () => {
   const actionUsage = overview?.action_usage || [];
   const dailyActiveUsers = trends?.daily_active_users || overview?.daily_active_users || [];
   const dailyViews = trends?.daily_views || overview?.daily_views || [];
+  const deviceUsage = overview?.device_usage || { breakdown: { desktop: {}, mobile: {}, tablet: {} }, raw: [] };
 
   // Prepare pie chart data
   const pieData = moduleUsage.slice(0, 6).map((m, idx) => ({
@@ -223,6 +227,13 @@ const UserStatisticsPage = () => {
     value: m.views,
     color: CHART_COLORS[idx % CHART_COLORS.length]
   }));
+
+  // Prepare device pie chart data
+  const devicePieData = [
+    { name: "Desktop", value: deviceUsage.breakdown?.desktop?.views || 0, color: "#3b82f6", icon: Monitor },
+    { name: "Mobile", value: deviceUsage.breakdown?.mobile?.views || 0, color: "#10b981", icon: Smartphone },
+    { name: "Tablet", value: deviceUsage.breakdown?.tablet?.views || 0, color: "#f59e0b", icon: Tablet },
+  ].filter(d => d.value > 0);
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto" data-testid="user-statistics-page">
@@ -320,6 +331,7 @@ const UserStatisticsPage = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="inline-flex h-9 items-center justify-start rounded-lg bg-slate-100 p-1">
           <TabsTrigger value="overview" className="text-xs px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="devices" className="text-xs px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-devices">Devices</TabsTrigger>
           <TabsTrigger value="modules" className="text-xs px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-modules">Modules</TabsTrigger>
           <TabsTrigger value="users" className="text-xs px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-users">Users</TabsTrigger>
           <TabsTrigger value="actions" className="text-xs px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-actions">Actions</TabsTrigger>
@@ -501,6 +513,152 @@ const UserStatisticsPage = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Devices Tab - Desktop vs Mobile vs Tablet */}
+        <TabsContent value="devices" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Desktop Card */}
+            <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-blue-50 to-white">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="h-12 w-12 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center">
+                    <Monitor className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                    {deviceUsage.breakdown?.desktop?.percentage || 0}%
+                  </Badge>
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">Desktop</h3>
+                <div className="mt-3 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Views</span>
+                    <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.desktop?.views || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Users</span>
+                    <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.desktop?.unique_users || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Sessions</span>
+                    <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.desktop?.sessions || 0}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Mobile Card */}
+            <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-emerald-50 to-white">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="h-12 w-12 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center">
+                    <Smartphone className="h-6 w-6 text-emerald-600" />
+                  </div>
+                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+                    {deviceUsage.breakdown?.mobile?.percentage || 0}%
+                  </Badge>
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">Mobile</h3>
+                <div className="mt-3 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Views</span>
+                    <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.mobile?.views || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Users</span>
+                    <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.mobile?.unique_users || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Sessions</span>
+                    <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.mobile?.sessions || 0}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tablet Card */}
+            <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-amber-50 to-white">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="h-12 w-12 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center">
+                    <Tablet className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+                    {deviceUsage.breakdown?.tablet?.percentage || 0}%
+                  </Badge>
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">Tablet</h3>
+                <div className="mt-3 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Views</span>
+                    <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.tablet?.views || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Users</span>
+                    <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.tablet?.unique_users || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Sessions</span>
+                    <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.tablet?.sessions || 0}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Device Distribution Chart */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-slate-700">Device Distribution</CardTitle>
+              <CardDescription className="text-[11px]">Usage breakdown by device type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {devicePieData.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <Monitor className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs">No device data available yet</p>
+                  <p className="text-[10px] mt-1">Device tracking starts with new page views</p>
+                </div>
+              ) : (
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={devicePieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={3}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {devicePieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        layout="vertical" 
+                        align="right" 
+                        verticalAlign="middle"
+                        iconType="circle"
+                        iconSize={8}
+                        formatter={(value, entry) => {
+                          const item = devicePieData.find(d => d.name === value);
+                          return (
+                            <span className="text-xs text-slate-600 ml-1">
+                              {value} <span className="font-semibold">({item?.value || 0} views)</span>
+                            </span>
+                          );
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Modules Tab */}

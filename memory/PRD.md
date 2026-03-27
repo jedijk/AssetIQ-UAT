@@ -46,7 +46,7 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 
 ## Completed in This Session (Mar 27, 2026)
 
-### Feature: User Feedback System
+### Feature: User Feedback System (Enhanced)
 Implemented a comprehensive User Feedback system per the functional spec:
 
 **Backend:**
@@ -54,6 +54,8 @@ Implemented a comprehensive User Feedback system per the functional spec:
 - Submit feedback API: `POST /api/feedback`
 - Get user's feedback: `GET /api/feedback/my`
 - Get feedback detail: `GET /api/feedback/{id}`
+- Update feedback: `PUT /api/feedback/{id}` (edit message, type, severity, status)
+- Delete feedback: `DELETE /api/feedback/{id}`
 - Screenshot upload: `POST /api/feedback/upload-screenshot` (uses Object Storage)
 - Admin endpoints (backend-only for v1): `GET /api/feedback/admin/all`, `PUT /api/feedback/admin/{id}`, `DELETE /api/feedback/admin/{id}`
 
@@ -69,7 +71,28 @@ Implemented a comprehensive User Feedback system per the functional spec:
 - **Screenshot Upload**: Optional image attachment via Object Storage
 - **Bottom Sheet Detail View**: Click feedback item to see full message, status, severity, screenshot, and system response
 - **Submission Modal**: Type selector, severity dropdown (for issues), message textarea, screenshot upload
+- **Edit/Delete**: Users can edit or delete their own feedback
+- **Status Change**: Users can mark feedback as "New" or "Resolved"
+- **Automatic User Recording**: System automatically records who submitted feedback (user_name)
 - **i18n Support**: Full EN/NL translations
+
+### Feature: Device Type Tracking in User Statistics
+Added device tracking (Desktop/Mobile/Tablet) to User Statistics:
+
+**Backend:**
+- Updated event tracking to store `device_type` field
+- New endpoint: `GET /api/user-stats/devices` - Get device usage breakdown
+- Updated `_get_device_usage()` method with aggregation pipeline
+- Device stats included in overview response
+
+**Frontend:**
+- `useAnalyticsTracking.js` - Added `getDeviceType()` function for device detection
+- All tracked events now include device_type
+- New "Devices" tab in User Statistics page with:
+  - Three device cards (Desktop, Mobile, Tablet) with gradient backgrounds
+  - Views, Users, Sessions breakdown per device
+  - Percentage badges
+  - Device Distribution pie chart
 
 **Files Created:**
 - `/app/backend/models/feedback_models.py` - Pydantic models for feedback

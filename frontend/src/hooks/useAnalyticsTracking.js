@@ -5,6 +5,7 @@
  * - Page views (module opens)
  * - Actions executed
  * - Session management (15-min timeout)
+ * - Device type (desktop/mobile/tablet)
  */
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -13,6 +14,27 @@ import { useAuth } from '../contexts/AuthContext';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+// Detect device type based on user agent and screen size
+const getDeviceType = () => {
+  const ua = navigator.userAgent.toLowerCase();
+  const screenWidth = window.innerWidth;
+  
+  // Check for mobile devices
+  const isMobileUA = /android|webos|iphone|ipod|blackberry|iemobile|opera mini|mobile/i.test(ua);
+  const isTabletUA = /ipad|tablet|playbook|silk/i.test(ua);
+  
+  // Also consider screen width for better accuracy
+  if (isTabletUA || (isMobileUA && screenWidth >= 768)) {
+    return 'tablet';
+  }
+  
+  if (isMobileUA || screenWidth < 768) {
+    return 'mobile';
+  }
+  
+  return 'desktop';
+};
 
 // Generate a unique session ID
 const generateSessionId = () => {
@@ -77,13 +99,19 @@ const trackEventAPI = async (eventData) => {
   if (!token) return; // Not logged in
   
   try {
+    // Add device type to all events
+    const enrichedData = {
+      ...eventData,
+      device_type: getDeviceType()
+    };
+    
     await fetch(`${API_BASE_URL}/api/user-stats/track`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(eventData)
+      body: JSON.stringify(enrichedData)
     });
   } catch (error) {
     // Silently fail - tracking should not break the app

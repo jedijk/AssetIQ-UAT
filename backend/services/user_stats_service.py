@@ -42,6 +42,7 @@ class UserStatsService:
         action: Optional[str] = None,
         event_type: str = "page_view",
         duration: Optional[int] = None,
+        device_type: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Track a user event."""
@@ -57,6 +58,7 @@ class UserStatsService:
             "action": action,
             "event_type": event_type,
             "duration": duration,
+            "device_type": device_type or "desktop",  # Default to desktop if not provided
             "metadata": metadata or {}
         }
         
@@ -120,6 +122,9 @@ class UserStatsService:
         # Get action usage (feature tracking)
         action_usage = await self._get_action_usage(match_stage)
         
+        # Get device usage (desktop vs mobile)
+        device_usage = await self._get_device_usage(match_stage)
+        
         # Get daily trends
         daily_trends = await self._get_daily_trends(match_stage, start_date, end_date)
         
@@ -138,6 +143,9 @@ class UserStatsService:
             "avg_session_duration": kpis.get("avg_session_duration", 0),
             "most_used_module": most_used,
             "least_used_module": least_used,
+            
+            # Device breakdown
+            "device_usage": device_usage,
             
             # Tables
             "module_usage": module_usage,
@@ -293,6 +301,59 @@ class UserStatsService:
             })
         
         return results
+    
+    async def _get_device_usage(self, match_stage: Dict[str, Any]) -> Dict[str, Any]:
+        """Get device type usage statistics (desktop vs mobile vs tablet)."""
+        
+        pipeline = [
+            {"$match": match_stage},
+            {"$group": {
+                "_id": {"$ifNull": ["$device_type", "desktop"]},
+                "views": {"$sum": 1},
+                "unique_users": {"$addToSet": "$user_id"},
+                "sessions": {"$addToSet": "$session_id"}
+            }},
+            {"$sort": {"views": -1}}
+        ]
+        
+        results = []
+        total_views = 0
+        
+        async for doc in self.events.aggregate(pipeline):
+            total_views += doc["views"]
+            results.append({
+                "device": doc["_id"],
+                "views": doc["views"],
+                "unique_users": len(doc.get("unique_users", [])),
+                "sessions": len(doc.get("sessions", []))
+            })
+        
+        # Calculate percentages
+        for r in results:
+            r["percentage"] = round((r["views"] / total_views * 100) if total_views > 0 else 0, 1)
+        
+        # Return as breakdown dict for easy frontend consumption
+        device_breakdown = {
+            "desktop": {"views": 0, "unique_users": 0, "sessions": 0, "percentage": 0},
+            "mobile": {"views": 0, "unique_users": 0, "sessions": 0, "percentage": 0},
+            "tablet": {"views": 0, "unique_users": 0, "sessions": 0, "percentage": 0}
+        }
+        
+        for r in results:
+            device = r["device"].lower() if r["device"] else "desktop"
+            if device in device_breakdown:
+                device_breakdown[device] = {
+                    "views": r["views"],
+                    "unique_users": r["unique_users"],
+                    "sessions": r["sessions"],
+                    "percentage": r["percentage"]
+                }
+        
+        return {
+            "breakdown": device_breakdown,
+            "raw": results,
+            "total_views": total_views
+        }
     
     async def _get_daily_trends(
         self,
