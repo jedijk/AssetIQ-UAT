@@ -249,7 +249,33 @@ const SettingsUserManagementPage = () => {
     }
   });
 
-  // Load avatar for a user
+  // Extract users from data
+  const users = usersData?.users || [];
+
+  // Load avatars when users data changes
+  useEffect(() => {
+    const loadAvatars = async () => {
+      for (const user of users) {
+        // Load avatar for users that have an avatar_path and we haven't loaded yet
+        if (user.avatar_path && !avatarUrls[user.id]) {
+          try {
+            const url = await rbacAPI.getUserAvatar(user.id);
+            if (url) {
+              setAvatarUrls(prev => ({ ...prev, [user.id]: url }));
+            }
+          } catch (err) {
+            // Silently fail - user just won't have an avatar
+          }
+        }
+      }
+    };
+    
+    if (users.length > 0) {
+      loadAvatars();
+    }
+  }, [users]);
+
+  // Function to reload a specific user's avatar (called after upload)
   const loadAvatar = async (userId) => {
     try {
       const url = await rbacAPI.getUserAvatar(userId);
@@ -257,28 +283,9 @@ const SettingsUserManagementPage = () => {
         setAvatarUrls(prev => ({ ...prev, [userId]: url }));
       }
     } catch (err) {
-      // Silently fail - user just won't have an avatar
+      // Silently fail
     }
   };
-
-  // Load avatars for users with avatar_path
-  const loadAvatarsForUsers = async (usersList) => {
-    for (const user of usersList) {
-      if (user.avatar_path && !avatarUrls[user.id]) {
-        loadAvatar(user.id);
-      }
-    }
-  };
-
-  // Effect to load avatars when users change
-  const users = usersData?.users || [];
-  
-  // Load avatars when users data changes
-  useEffect(() => {
-    if (users.length > 0) {
-      loadAvatarsForUsers(users);
-    }
-  }, [users]);
 
   const handleAvatarUpload = (userId) => {
     setEditingUserId(userId);

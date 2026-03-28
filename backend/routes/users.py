@@ -288,3 +288,10 @@ async def upload_user_avatar_admin(
     except Exception as e:
         logger.error(f"Failed to upload avatar: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload avatar")
+
+
+
+@router.get("/rbac/role-distribution")
+async def get_role_distribution(current_user: dict = Depends(get_current_user)):
+    """Get count of users per role."""
+    return await rbac_service.get_role_distribution()
