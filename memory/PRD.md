@@ -44,9 +44,20 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 - `action_type` (CM/PM/PDM): Corrective/Preventive/Predictive Maintenance
 - `discipline` (string): e.g., Mechanical, Electrical
 
-## Completed in Latest Session (Mar 28, 2026 - Session 2)
+## Completed in Latest Session (Mar 28, 2026 - Session 3)
 
-### Feature: User Deletion (NEW)
+### Fix: Observation Detail Sticky Header Overlap (P0)
+- Fixed the sticky header on `ThreatDetailPage.js` overlapping the main app header
+- Issue: Threat detail page header was positioned at `top-0`, same as main header
+- Solution: Changed to `top-12` (48px) to sit directly below the main header (h-12)
+- The main app header uses `sticky top-0 z-40` with height 48px (h-12)
+- The page's internal sticky header now properly sits below it without overlap
+- Content remains scrollable beneath both headers as expected
+- File updated: `/app/frontend/src/pages/ThreatDetailPage.js`
+
+## Completed Earlier (Mar 28, 2026 - Session 2)
+
+### Feature: User Deletion
 - Added ability to permanently delete users from User Management page
 - Backend endpoint: `DELETE /api/rbac/users/{user_id}`
 - Safety features:
