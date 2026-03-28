@@ -929,3 +929,128 @@ async def create_investigation_from_threat(
             "action_items": len(action_items)
         }
     }
+
+
+
+# ============= OBSERVATION TIMELINE ENDPOINT =============
+
+@router.get("/threats/{threat_id}/timeline")
+async def get_threat_timeline(
+    threat_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get timeline of actions and tasks related to a specific observation/threat.
+    This includes actions created from this observation and any related tasks.
+    """
+    # Verify threat exists and belongs to user
+    threat = await db.threats.find_one(
+        {"id": threat_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    )
+    if not threat:
+        raise HTTPException(status_code=404, detail="Observation not found")
+    
+    timeline_items = []
+    
+    # Get the observation itself as the first timeline item
+    timeline_items.append({
+        "id": threat.get("id"),
+        "type": "observation",
+        "title": threat.get("title", "Untitled Observation"),
+        "description": threat.get("description", ""),
+        "failure_mode": threat.get("failure_mode", ""),
+        "status": threat.get("status", "open"),
+        "risk_level": threat.get("risk_level", "medium"),
+        "risk_score": threat.get("risk_score", 0),
+        "created_at": threat.get("created_at"),
+        "updated_at": threat.get("updated_at"),
+        "source": "threat"
+    })
+    
+    # Get actions created from this observation
+    actions = await db.central_actions.find(
+        {
+            "created_by": current_user["id"],
+            "$or": [
+                {"source_id": threat_id},
+                {"threat_id": threat_id},
+                {"observation_id": threat_id}
+            ]
+        },
+        {"_id": 0}
+    ).to_list(100)
+    
+    for action in actions:
+        timeline_items.append({
+            "id": action.get("id"),
+            "type": "action",
+            "title": action.get("title", "Untitled Action"),
+            "description": action.get("description", ""),
+            "status": action.get("status", "open"),
+            "priority": action.get("priority", "medium"),
+            "due_date": action.get("due_date"),
+            "created_at": action.get("created_at"),
+            "updated_at": action.get("updated_at"),
+            "source": "action"
+        })
+    
+    # Get task instances related to this observation or its equipment
+    equipment_id = threat.get("linked_equipment_id")
+    asset_name = threat.get("asset", "")
+    
+    task_query = {
+        "created_by": current_user["id"],
+        "$or": [
+            {"observation_id": threat_id},
+            {"threat_id": threat_id}
+        ]
+    }
+    
+    # Also include tasks for the linked equipment
+    if equipment_id:
+        task_query["$or"].append({"equipment_id": equipment_id})
+        task_query["$or"].append({"linked_equipment_id": equipment_id})
+    
+    task_instances = await db.task_instances.find(
+        task_query,
+        {"_id": 0}
+    ).to_list(100)
+    
+    for task in task_instances:
+        timeline_items.append({
+            "id": task.get("id"),
+            "type": "task",
+            "title": task.get("name", task.get("task_name", "Untitled Task")),
+            "description": task.get("description", ""),
+            "status": task.get("status", "pending"),
+            "scheduled_date": task.get("scheduled_date"),
+            "completed_at": task.get("completed_at"),
+            "created_at": task.get("created_at"),
+            "updated_at": task.get("updated_at"),
+            "source": "task"
+        })
+    
+    # Sort by date (most recent first)
+    def get_sort_date(item):
+        date_str = item.get("created_at") or item.get("scheduled_date") or ""
+        if isinstance(date_str, str):
+            try:
+                return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            except:
+                return datetime.min.replace(tzinfo=timezone.utc)
+        return datetime.min.replace(tzinfo=timezone.utc)
+    
+    timeline_items.sort(key=get_sort_date, reverse=True)
+    
+    return {
+        "threat_id": threat_id,
+        "threat_title": threat.get("title", ""),
+        "timeline": timeline_items,
+        "total_items": len(timeline_items),
+        "counts": {
+            "observations": len([i for i in timeline_items if i["type"] == "observation"]),
+            "actions": len([i for i in timeline_items if i["type"] == "action"]),
+            "tasks": len([i for i in timeline_items if i["type"] == "task"])
+        }
+    }

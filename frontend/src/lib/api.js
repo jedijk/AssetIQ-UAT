@@ -110,6 +110,11 @@ export const threatsAPI = {
     const response = await api.post("/threats/recalculate-scores");
     return response.data;
   },
+  
+  getTimeline: async (threatId) => {
+    const response = await api.get(`/threats/${threatId}/timeline`);
+    return response.data;
+  },
 };
 
 // Stats API

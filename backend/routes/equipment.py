@@ -1431,15 +1431,24 @@ async def get_equipment_history(
             "source": "threat"
         })
     
-    # Get actions linked to this equipment
+    # Get observation IDs for this equipment (to find related actions)
+    observation_ids = [obs.get("id") for obs in observations if obs.get("id")]
+    
+    # Get actions linked to this equipment OR created from observations on this equipment
+    action_query = {
+        "created_by": current_user["id"],
+        "$or": [
+            {"linked_equipment_id": node_id},
+            {"equipment_name": {"$regex": f"^{equipment_name}$", "$options": "i"}},
+            {"source_id": {"$in": observation_ids}} if observation_ids else {"_id": None}
+        ]
+    }
+    # Clean up the query if no observation_ids
+    if not observation_ids:
+        action_query["$or"] = action_query["$or"][:2]
+    
     actions = await db.central_actions.find(
-        {
-            "created_by": current_user["id"],
-            "$or": [
-                {"linked_equipment_id": node_id},
-                {"equipment_name": {"$regex": f"^{equipment_name}$", "$options": "i"}}
-            ]
-        },
+        action_query,
         {"_id": 0}
     ).to_list(100)
     
@@ -1457,13 +1466,14 @@ async def get_equipment_history(
             "source": "action"
         })
     
-    # Get task instances linked to this equipment
+    # Get task instances linked to this equipment (including completed ones)
     task_instances = await db.task_instances.find(
         {
             "created_by": current_user["id"],
             "$or": [
                 {"linked_equipment_id": node_id},
-                {"equipment_name": {"$regex": f"^{equipment_name}$", "$options": "i"}}
+                {"equipment_name": {"$regex": f"^{equipment_name}$", "$options": "i"}},
+                {"equipment_id": node_id}
             ]
         },
         {"_id": 0}

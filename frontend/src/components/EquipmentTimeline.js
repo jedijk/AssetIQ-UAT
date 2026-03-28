@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { equipmentHierarchyAPI } from "../lib/api";
+import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 
 // Timeline item colors and icons - lighter colors
@@ -264,17 +264,20 @@ const TimelineItem = ({ item, onClick, isFirst, isLast }) => {
 };
 
 // Main Timeline Component
-const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
+const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [selectedItem, setSelectedItem] = useState(null);
   const [filter, setFilter] = useState("all");
   const [scrollPosition, setScrollPosition] = useState(0);
   
+  // Fetch from threat timeline if threatId provided, otherwise equipment history
   const { data, isLoading, error } = useQuery({
-    queryKey: ["equipmentHistory", equipmentId],
-    queryFn: () => equipmentHierarchyAPI.getEquipmentHistory(equipmentId),
-    enabled: !!equipmentId,
+    queryKey: threatId ? ["threatTimeline", threatId] : ["equipmentHistory", equipmentId],
+    queryFn: () => threatId 
+      ? threatsAPI.getTimeline(threatId)
+      : equipmentHierarchyAPI.getEquipmentHistory(equipmentId),
+    enabled: !!(threatId || equipmentId),
   });
   
   // Handle navigation to item detail
@@ -289,7 +292,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
     }
   };
   
-  if (!equipmentId) {
+  if (!equipmentId && !threatId) {
     return null;
   }
   
@@ -305,26 +308,25 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
   }
   
   if (error) {
-    // If equipment not found, show a friendlier message instead of error
+    // If not found, show a friendlier message instead of error
     if (error.response?.status === 404) {
       return (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="card p-6 mb-6"
+          className="card p-4 mb-6"
           data-testid="equipment-timeline-section"
         >
           <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-5 h-5 text-blue-500" />
-            <h3 className="font-semibold text-primary">
-              Equipment History
+            <Clock className="w-5 h-5 text-blue-400" />
+            <h3 className="font-semibold text-primary text-sm">
+              Related Activity
             </h3>
           </div>
-          <div className="text-center py-6 text-muted">
-            <Calendar className="w-10 h-10 mx-auto mb-2 opacity-50" />
-            <p>No equipment history available yet</p>
-            <p className="text-xs mt-1">Link equipment in the Equipment Manager to track history</p>
+          <div className="text-center py-4 text-muted">
+            <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No related activity yet</p>
           </div>
         </motion.div>
       );
@@ -367,11 +369,11 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-blue-500" />
-          <h3 className="font-semibold text-primary text-sm md:text-base">
-            Equipment History
+          <Clock className="w-4 h-4 text-blue-400" />
+          <h3 className="font-semibold text-primary text-sm">
+            Related Activity
           </h3>
-          <span className="text-xs md:text-sm text-muted">({timeline.length})</span>
+          <span className="text-xs text-muted">({timeline.length})</span>
         </div>
         
         {/* Filter buttons - scrollable on mobile */}
@@ -380,7 +382,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
             variant={filter === "all" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter("all")}
-            className="h-7 text-xs flex-shrink-0"
+            className="h-6 text-[10px] px-2 flex-shrink-0"
           >
             All ({timeline.length})
           </Button>
@@ -388,27 +390,27 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
             variant={filter === "observation" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter("observation")}
-            className="h-7 text-xs flex-shrink-0"
+            className="h-6 text-[10px] px-2 flex-shrink-0"
           >
-            <AlertTriangle className="w-3 h-3 mr-1" />
+            <AlertTriangle className="w-3 h-3 mr-0.5" />
             {counts.observations}
           </Button>
           <Button
             variant={filter === "action" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter("action")}
-            className="h-7 text-xs flex-shrink-0"
+            className="h-6 text-[10px] px-2 flex-shrink-0"
           >
-            <Target className="w-3 h-3 mr-1" />
+            <Target className="w-3 h-3 mr-0.5" />
             {counts.actions}
           </Button>
           <Button
             variant={filter === "task" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter("task")}
-            className="h-7 text-xs flex-shrink-0"
+            className="h-6 text-[10px] px-2 flex-shrink-0"
           >
-            <ClipboardList className="w-3 h-3 mr-1" />
+            <ClipboardList className="w-3 h-3 mr-0.5" />
             {counts.tasks}
           </Button>
         </div>

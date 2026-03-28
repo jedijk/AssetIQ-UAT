@@ -1166,13 +1166,12 @@ const ThreatDetailPage = () => {
         )}
       </motion.div>
 
-      {/* Equipment History Timeline */}
-      {threat.linked_equipment_id && (
-        <EquipmentTimeline 
-          equipmentId={threat.linked_equipment_id}
-          equipmentName={threat.asset}
-        />
-      )}
+      {/* Related Activity Timeline - shows actions and tasks related to this observation */}
+      <EquipmentTimeline 
+        threatId={id}
+        equipmentId={threat.linked_equipment_id}
+        equipmentName={threat.asset}
+      />
 
       {/* Recommended Actions - Extracted Component */}
       <RecommendedActionsSection threat={threat} threatId={id} />
