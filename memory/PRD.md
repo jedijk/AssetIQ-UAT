@@ -45,6 +45,10 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 ## Completed Work
 
 ### March 28, 2026
+- **Added:** Equipment History Timeline to Causal Engine page
+  - Shows related activity when investigation is linked to a threat
+  - File: `/app/frontend/src/pages/CausalEnginePage.js`
+  
 - **Fixed:** Equipment History Timeline missing actions bug
   - Root cause: Query only looked for actions with direct `source_id` match or `linked_equipment_id`
   - Solution: Extended query to include actions from sibling observations (same equipment)

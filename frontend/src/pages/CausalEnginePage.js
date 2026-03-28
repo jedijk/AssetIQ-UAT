@@ -20,6 +20,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CauseTree, CAUSE_CATEGORIES } from "../components/CauseNodeItem";
 import BackButton from "../components/BackButton";
 import { NewInvestigationDialog, EventDialog, FailureDialog, CauseDialog, ActionDialog } from "../components/causal-engine/InvestigationDialogs";
+import EquipmentTimeline from "../components/EquipmentTimeline";
 
 const EVENT_CATEGORIES = [
   { value: "operational_event", label: "Operational Event", bgClass: "bg-blue-100 text-blue-700", dotClass: "bg-blue-500" },
@@ -602,6 +603,15 @@ export default function CausalEnginePage() {
                     data-testid="investigation-notes"
                   />
                 </div>
+
+                {/* Equipment History Timeline - shows related observations and actions from the linked threat */}
+                {investigation.threat_id && (
+                  <EquipmentTimeline 
+                    threatId={investigation.threat_id}
+                    equipmentId={null}
+                    equipmentName={investigation.asset_name}
+                  />
+                )}
 
                 {/* Attached Files */}
                 <div className="bg-white rounded-lg border p-4">
