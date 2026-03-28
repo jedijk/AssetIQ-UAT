@@ -232,7 +232,7 @@ const TimelineItem = ({ item, onClick, isFirst, isLast }) => {
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     try {
-      return format(parseISO(dateStr), "MMM d");
+      return format(parseISO(dateStr), "MMM d, h:mm a");
     } catch {
       return "";
     }
