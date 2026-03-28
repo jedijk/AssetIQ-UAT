@@ -188,32 +188,33 @@ const TimelineItem = ({ item, onClick, isFirst, isLast }) => {
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex-shrink-0 w-40 cursor-pointer group"
+      className="flex-shrink-0 w-32 md:w-40 cursor-pointer group"
       onClick={() => onClick(item)}
+      style={{ scrollSnapAlign: "start" }}
     >
       {/* Timeline connector */}
-      <div className="relative flex items-center justify-center mb-2">
+      <div className="relative flex items-center justify-center mb-1.5 md:mb-2">
         {!isFirst && (
           <div className="absolute left-0 w-1/2 h-0.5 bg-slate-300" />
         )}
         {!isLast && (
           <div className="absolute right-0 w-1/2 h-0.5 bg-slate-300" />
         )}
-        <div className={`relative z-10 w-4 h-4 rounded-full ${config.dotColor} ring-4 ring-white group-hover:scale-125 transition-transform`} />
+        <div className={`relative z-10 w-3 h-3 md:w-4 md:h-4 rounded-full ${config.dotColor} ring-2 md:ring-4 ring-white group-hover:scale-125 transition-transform`} />
       </div>
       
       {/* Date */}
-      <div className="text-center mb-2">
-        <span className="text-xs text-muted">{formatDate(item.created_at)}</span>
+      <div className="text-center mb-1.5 md:mb-2">
+        <span className="text-[10px] md:text-xs text-muted">{formatDate(item.created_at)}</span>
       </div>
       
       {/* Card */}
-      <div className={`p-3 rounded-lg border-2 ${config.borderColor} ${config.bgColor} group-hover:shadow-md transition-all`}>
-        <div className="flex items-center gap-2 mb-1">
-          <Icon className={`w-4 h-4 ${config.iconColor}`} />
-          <span className={`text-xs font-medium ${config.iconColor}`}>{config.label}</span>
+      <div className={`p-2 md:p-3 rounded-lg border-2 ${config.borderColor} ${config.bgColor} group-hover:shadow-md transition-all`}>
+        <div className="flex items-center gap-1.5 md:gap-2 mb-1">
+          <Icon className={`w-3 h-3 md:w-4 md:h-4 ${config.iconColor}`} />
+          <span className={`text-[10px] md:text-xs font-medium ${config.iconColor}`}>{config.label}</span>
         </div>
-        <p className="text-sm font-medium text-primary truncate">{item.title}</p>
+        <p className="text-xs md:text-sm font-medium text-primary truncate">{item.title}</p>
         <div className="mt-1">
           <StatusBadge status={item.status} type={item.type} />
         </div>
@@ -307,26 +308,26 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2 }}
-      className="card p-6 mb-6"
+      className="card p-4 md:p-6 mb-6"
       data-testid="equipment-timeline-section"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-blue-500" />
-          <h3 className="font-semibold text-primary">
+          <h3 className="font-semibold text-primary text-sm md:text-base">
             Equipment History
           </h3>
-          <span className="text-sm text-muted">({timeline.length} items)</span>
+          <span className="text-xs md:text-sm text-muted">({timeline.length})</span>
         </div>
         
-        {/* Filter buttons */}
-        <div className="flex gap-1">
+        {/* Filter buttons - scrollable on mobile */}
+        <div className="flex gap-1 overflow-x-auto scrollbar-hide -mx-1 px-1">
           <Button
             variant={filter === "all" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter("all")}
-            className="h-7 text-xs"
+            className="h-7 text-xs flex-shrink-0"
           >
             All ({timeline.length})
           </Button>
@@ -334,7 +335,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
             variant={filter === "observation" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter("observation")}
-            className="h-7 text-xs"
+            className="h-7 text-xs flex-shrink-0"
           >
             <AlertTriangle className="w-3 h-3 mr-1" />
             {counts.observations}
@@ -343,7 +344,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
             variant={filter === "action" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter("action")}
-            className="h-7 text-xs"
+            className="h-7 text-xs flex-shrink-0"
           >
             <Target className="w-3 h-3 mr-1" />
             {counts.actions}
@@ -352,7 +353,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
             variant={filter === "task" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter("task")}
-            className="h-7 text-xs"
+            className="h-7 text-xs flex-shrink-0"
           >
             <ClipboardList className="w-3 h-3 mr-1" />
             {counts.tasks}
@@ -362,19 +363,19 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
       
       {/* Timeline */}
       {filteredTimeline.length === 0 ? (
-        <div className="text-center py-8 text-muted">
-          <Calendar className="w-10 h-10 mx-auto mb-2 opacity-50" />
-          <p>No history items found for this equipment</p>
+        <div className="text-center py-6 md:py-8 text-muted">
+          <Calendar className="w-8 h-8 md:w-10 md:h-10 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No history items found for this equipment</p>
         </div>
       ) : (
         <div className="relative">
-          {/* Scroll buttons */}
+          {/* Scroll buttons - hidden on mobile (touch scroll instead) */}
           {filteredTimeline.length > 4 && (
             <>
               <Button
                 variant="outline"
                 size="icon"
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full shadow-md bg-white"
+                className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full shadow-md bg-white"
                 onClick={() => handleScroll("left")}
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -382,7 +383,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
               <Button
                 variant="outline"
                 size="icon"
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full shadow-md bg-white"
+                className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full shadow-md bg-white"
                 onClick={() => handleScroll("right")}
               >
                 <ChevronRight className="w-4 h-4" />
@@ -390,11 +391,15 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
             </>
           )}
           
-          {/* Scrollable timeline */}
+          {/* Scrollable timeline - touch friendly on mobile */}
           <div
             id="timeline-scroll-container"
-            className="flex gap-4 overflow-x-auto py-4 px-8 scrollbar-hide"
-            style={{ scrollBehavior: "smooth" }}
+            className="flex gap-3 md:gap-4 overflow-x-auto py-3 md:py-4 px-1 md:px-8 scrollbar-hide -webkit-overflow-scrolling-touch"
+            style={{ 
+              scrollBehavior: "smooth",
+              WebkitOverflowScrolling: "touch",
+              scrollSnapType: "x mandatory"
+            }}
           >
             {filteredTimeline.map((item, index) => (
               <TimelineItem
@@ -405,6 +410,11 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
                 isLast={index === filteredTimeline.length - 1}
               />
             ))}
+          </div>
+          
+          {/* Mobile scroll hint */}
+          <div className="md:hidden text-center mt-2">
+            <span className="text-xs text-muted">← Swipe to see more →</span>
           </div>
         </div>
       )}
