@@ -17,6 +17,7 @@ import FailureModesPage from "./pages/FailureModesPage";
 import EquipmentManagerPage from "./pages/EquipmentManagerPage";
 import CausalEnginePage from "./pages/CausalEnginePage";
 import ActionsPage from "./pages/ActionsPage";
+import ActionDetailPage from "./pages/ActionDetailPage";
 import TaskSchedulerPage from "./pages/TaskSchedulerPage";
 import MyTasksPage from "./pages/MyTasksPage";
 import AnalyticsDashboardPage from "./pages/AnalyticsDashboardPage";
@@ -165,6 +166,7 @@ function App() {
                 <Route path="threats" element={<ThreatsPage />} />
                 <Route path="threats/:id" element={<ThreatDetailPage />} />
                 <Route path="actions" element={<ActionsPage />} />
+                <Route path="actions/:actionId" element={<ActionDetailPage />} />
                 <Route path="library" element={<FailureModesPage />} />
                 <Route path="equipment-manager" element={<EquipmentManagerPage />} />
                 <Route path="causal-engine" element={<CausalEnginePage />} />

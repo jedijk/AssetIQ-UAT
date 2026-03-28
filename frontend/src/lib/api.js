@@ -513,6 +513,11 @@ export const actionsAPI = {
     return response.data;
   },
   
+  getById: async (actionId) => {
+    const response = await api.get(`/actions/${actionId}`);
+    return response.data;
+  },
+  
   create: async (data) => {
     const response = await api.post('/actions', data);
     return response.data;

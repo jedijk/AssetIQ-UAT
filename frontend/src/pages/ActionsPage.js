@@ -584,7 +584,7 @@ export default function ActionsPage() {
                 transition={{ delay: idx * 0.05 }}
                 className={`priority-item group cursor-pointer ${overdue ? "border-l-4 border-l-red-400" : ""}`}
                 data-testid={`action-row-${action.id}`}
-                onClick={() => openEditDialog(action)}
+                onClick={() => navigate(`/actions/${action.id}`)}
               >
                 {/* Status Icon */}
                 <button
@@ -699,7 +699,7 @@ export default function ActionsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEditDialog(action)}>
+                      <DropdownMenuItem onClick={() => navigate(`/actions/${action.id}`)}>
                         <Edit2 className="w-4 h-4 mr-2" /> Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem 
