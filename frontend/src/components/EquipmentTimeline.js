@@ -125,7 +125,18 @@ const TimelineItemPopup = ({ item, isOpen, onClose, onNavigate }) => {
             <div className={`p-1.5 rounded-lg ${config.bgColor} flex-shrink-0`}>
               <Icon className={`w-4 h-4 ${config.iconColor}`} />
             </div>
-            <span className="text-sm font-semibold leading-tight line-clamp-2">{item.title}</span>
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-sm font-semibold leading-tight line-clamp-2 cursor-help">{item.title}</span>
+                </TooltipTrigger>
+                {item.title?.length > 50 && (
+                  <TooltipContent side="bottom" className="max-w-sm bg-slate-900 text-white text-xs p-2 rounded-lg">
+                    <p>{item.title}</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </DialogTitle>
         </DialogHeader>
         
@@ -142,7 +153,18 @@ const TimelineItemPopup = ({ item, isOpen, onClose, onNavigate }) => {
           {item.description && (
             <div>
               <h4 className="text-xs font-medium text-muted mb-1">Description</h4>
-              <p className="text-sm text-secondary leading-relaxed line-clamp-4">{item.description}</p>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="text-sm text-secondary leading-relaxed line-clamp-4 cursor-help">{item.description}</p>
+                  </TooltipTrigger>
+                  {item.description?.length > 150 && (
+                    <TooltipContent side="bottom" className="max-w-md bg-slate-900 text-white text-xs p-3 rounded-lg">
+                      <p className="whitespace-pre-wrap">{item.description}</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </div>
           )}
           
@@ -150,7 +172,18 @@ const TimelineItemPopup = ({ item, isOpen, onClose, onNavigate }) => {
           {item.type === "observation" && item.failure_mode && (
             <div>
               <h4 className="text-xs font-medium text-muted mb-1">Failure Mode</h4>
-              <p className="text-sm text-secondary">{item.failure_mode}</p>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="text-sm text-secondary line-clamp-2 cursor-help">{item.failure_mode}</p>
+                  </TooltipTrigger>
+                  {item.failure_mode?.length > 60 && (
+                    <TooltipContent side="bottom" className="max-w-sm bg-slate-900 text-white text-xs p-2 rounded-lg">
+                      <p>{item.failure_mode}</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </div>
           )}
           
