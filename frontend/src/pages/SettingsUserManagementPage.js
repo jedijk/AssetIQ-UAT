@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
+import ImageEditor from "../components/ImageEditor";
 import {
   Users,
   Search,
@@ -183,6 +184,11 @@ const SettingsUserManagementPage = () => {
   const [selectedRole, setSelectedRole] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(null);
   const [avatarUrls, setAvatarUrls] = useState({});
+  
+  // Image Editor State
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorImage, setEditorImage] = useState(null);
+  const [editingUserId, setEditingUserId] = useState(null);
 
   // Queries
   const { data: usersData, isLoading: usersLoading, refetch } = useQuery({
@@ -233,13 +239,13 @@ const SettingsUserManagementPage = () => {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries(["rbac-users"]);
       toast.success(t("userManagement.photoUploaded") || "Photo uploaded successfully");
-      setUploadingAvatar(null);
+      setEditingUserId(null);
       // Refresh avatar URL
       loadAvatar(variables.userId);
     },
     onError: (error) => {
       toast.error(error.message || t("userManagement.photoError") || "Failed to upload photo");
-      setUploadingAvatar(null);
+      setEditingUserId(null);
     }
   });
 
@@ -275,31 +281,57 @@ const SettingsUserManagementPage = () => {
   }, [users]);
 
   const handleAvatarUpload = (userId) => {
-    setUploadingAvatar(userId);
+    setEditingUserId(userId);
     fileInputRef.current?.click();
   };
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
-    if (!file || !uploadingAvatar) return;
+    if (!file || !editingUserId) return;
     
     // Validate file type
     const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (!validTypes.includes(file.type)) {
       toast.error(t("userManagement.invalidFileType") || "Invalid file type");
-      setUploadingAvatar(null);
+      setEditingUserId(null);
       return;
     }
     
     // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       toast.error(t("userManagement.fileTooLarge") || "File too large");
-      setUploadingAvatar(null);
+      setEditingUserId(null);
       return;
     }
     
-    uploadAvatarMutation.mutate({ userId: uploadingAvatar, file });
+    // Open the image editor with the selected file
+    const imageUrl = URL.createObjectURL(file);
+    setEditorImage(imageUrl);
+    setEditorOpen(true);
     e.target.value = ""; // Reset input
+  };
+
+  const handleEditorSave = (editedFile) => {
+    if (!editingUserId) return;
+    
+    // Upload the edited image
+    uploadAvatarMutation.mutate({ userId: editingUserId, file: editedFile });
+    
+    // Clean up
+    if (editorImage) {
+      URL.revokeObjectURL(editorImage);
+    }
+    setEditorOpen(false);
+    setEditorImage(null);
+  };
+
+  const handleEditorClose = () => {
+    if (editorImage) {
+      URL.revokeObjectURL(editorImage);
+    }
+    setEditorOpen(false);
+    setEditorImage(null);
+    setEditingUserId(null);
   };
   const roles = rolesData?.roles || {};
 
@@ -641,6 +673,17 @@ const SettingsUserManagementPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Image Editor Dialog */}
+      <ImageEditor
+        open={editorOpen}
+        onClose={handleEditorClose}
+        imageSrc={editorImage}
+        onSave={handleEditorSave}
+        aspectRatio={1}
+        cropShape="round"
+        title={t("userManagement.editPhoto") || "Edit Photo"}
+      />
 
       {/* Hidden file input for avatar upload */}
       <input

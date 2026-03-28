@@ -1025,6 +1025,18 @@ const en = {
     photoError: "Failed to upload photo",
     invalidFileType: "Invalid file type. Please use JPEG, PNG, GIF, or WebP.",
     fileTooLarge: "File too large. Maximum size is 5MB.",
+    // Image Editor
+    editPhoto: "Edit Photo",
+    zoom: "Zoom",
+    brightness: "Brightness",
+    contrast: "Contrast",
+    rotateLeft: "Rotate Left",
+    rotateRight: "Rotate Right",
+    flipHorizontal: "Flip Horizontal",
+    flipVertical: "Flip Vertical",
+    reset: "Reset",
+    savePhoto: "Save Photo",
+    saving: "Saving...",
   },
 
   // User Statistics
@@ -2130,6 +2142,18 @@ const nl = {
     photoError: "Foto uploaden mislukt",
     invalidFileType: "Ongeldig bestandstype. Gebruik JPEG, PNG, GIF of WebP.",
     fileTooLarge: "Bestand te groot. Maximale grootte is 5MB.",
+    // Afbeelding Editor
+    editPhoto: "Foto Bewerken",
+    zoom: "Zoom",
+    brightness: "Helderheid",
+    contrast: "Contrast",
+    rotateLeft: "Naar Links Draaien",
+    rotateRight: "Naar Rechts Draaien",
+    flipHorizontal: "Horizontaal Spiegelen",
+    flipVertical: "Verticaal Spiegelen",
+    reset: "Resetten",
+    savePhoto: "Foto Opslaan",
+    saving: "Opslaan...",
   },
 
   // User Statistics

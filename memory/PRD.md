@@ -44,7 +44,60 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 - `action_type` (CM/PM/PDM): Corrective/Preventive/Predictive Maintenance
 - `discipline` (string): e.g., Mechanical, Electrical
 
-## Completed in This Session (Mar 27, 2026)
+## Completed in Latest Session (Mar 28, 2026)
+
+### Feature: Smaller Translation Button
+- Changed language switcher from outline button with icon to ghost button showing just "EN"/"NL" text
+- Reduced size: h-6 w-6 on mobile, h-7 w-7 on desktop
+- Cleaner, more compact header appearance
+
+### Feature: Editable FMEA Definitions per Asset/Installation
+**Backend (`/app/backend/routes/definitions.py`):**
+- `GET /api/definitions/defaults` - Returns default FMEA SOD tables
+- `GET /api/definitions/installations` - Lists installations with custom definition flags
+- `GET /api/definitions/equipment/{id}` - Returns custom or default definitions for an installation
+- `POST /api/definitions` - Creates/updates custom definitions for an equipment/installation
+- `DELETE /api/definitions/{id}` - Resets definitions to defaults
+
+**Frontend (`/app/frontend/src/pages/DefinitionsPage.js`):**
+- Installation selector dropdown to choose which asset to customize
+- "Using default definitions" / "Using custom definitions" badge
+- Edit mode with pencil icons on each row
+- Row edit dialog to modify rank labels, descriptions, and colors
+- Save Changes / Cancel buttons in edit mode
+- Reset to Defaults option for custom definitions
+- Full i18n support (EN/NL)
+
+**Database:**
+- New `definitions` collection storing custom SOD tables per `equipment_id`
+
+### Feature: User Photo Upload with Image Editor
+**Backend (`/app/backend/routes/users.py`, `/app/backend/services/storage_service.py`):**
+- `POST /api/users/me/avatar` - Upload current user's avatar
+- `POST /api/rbac/users/{id}/avatar` - Admin upload for any user
+- `GET /api/users/{id}/avatar` - Retrieve user avatar image
+- Uses Emergent Object Storage for file persistence
+- File validation: JPEG, PNG, GIF, WebP up to 5MB
+
+**Frontend (`/app/frontend/src/pages/SettingsUserManagementPage.js`):**
+- Circular avatar display with initials fallback
+- Camera icon overlay on hover for quick upload
+- "Upload Photo" option in user actions dropdown menu
+- Avatar URLs loaded and displayed in user list
+
+**Frontend (`/app/frontend/src/components/ImageEditor.js`):**
+- Full-featured image editor dialog using react-easy-crop
+- **Positioning**: Drag to reposition image within crop area
+- **Cropping**: Circular crop shape for profile photos
+- **Zoom**: Slider control (1x to 3x)
+- **Rotation**: Rotate left/right by 90 degrees
+- **Flip**: Horizontal and vertical flip options
+- **Brightness**: Adjustable from 50% to 150%
+- **Contrast**: Adjustable from 50% to 150%
+- **Reset**: One-click reset to original settings
+- Saves cropped/edited image as JPEG for optimal size
+
+## Completed in Previous Session (Mar 27, 2026)
 
 ### Feature: User Feedback System (Enhanced)
 Implemented a comprehensive User Feedback system per the functional spec:
@@ -585,6 +638,7 @@ Extracted large components into modular files:
 - `failure_modes` (in failure_modes_db)
 - `user_events`, `user_stats_daily` (User Statistics tracking)
 - `feedback` (User Feedback system)
+- `definitions` (Custom FMEA SOD tables per installation)
 
 ## Test Credentials
 - Email: test@test.com / Password: test
