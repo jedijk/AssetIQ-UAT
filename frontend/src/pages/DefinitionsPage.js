@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sliders, AlertTriangle, BarChart2, Eye, Info, Building2, Check, Pencil, RotateCcw, Save, X } from "lucide-react";
+import { Sliders, AlertTriangle, BarChart2, Eye, Info, Building2, Check, Pencil, RotateCcw, Save, X, Gauge } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
@@ -63,7 +63,7 @@ const definitionsAPI = {
     return response.json();
   },
   
-  saveDefinitions: async ({ equipmentId, severity, occurrence, detection }) => {
+  saveDefinitions: async ({ equipmentId, severity, occurrence, detection, criticality }) => {
     const response = await fetch(`${API_BASE_URL}/api/definitions`, {
       method: "POST",
       headers: {
@@ -74,7 +74,8 @@ const definitionsAPI = {
         equipment_id: equipmentId,
         severity,
         occurrence,
-        detection
+        detection,
+        criticality
       })
     });
     if (!response.ok) throw new Error("Failed to save definitions");
@@ -131,6 +132,11 @@ const EditRowDialog = ({ row, type, onSave, onClose, t }) => {
         return {
           desc: t("definitions.criteria"),
           secondary: t("definitions.detectionMethod")
+        };
+      case "criticality":
+        return {
+          desc: t("definitions.criticalityImpact") || "Impact Description",
+          secondary: t("definitions.criticalityAction") || "Maintenance Strategy"
         };
       default:
         return { desc: "Description", secondary: "Secondary" };
@@ -244,6 +250,13 @@ const EditableTable = ({ type, data, isEditing, onUpdateRow, t }) => {
           t("definitions.criteria"),
           t("definitions.detectionMethod")
         ];
+      case "criticality":
+        return [
+          t("definitions.ranking"),
+          t("definitions.criticalityLevel") || "Criticality Level",
+          t("definitions.criticalityImpact") || "Impact Description",
+          t("definitions.criticalityAction") || "Maintenance Strategy"
+        ];
       default:
         return [];
     }
@@ -314,7 +327,7 @@ export default function DefinitionsPage() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   
-  const [activeTab, setActiveTab] = useState("severity");
+  const [activeTab, setActiveTab] = useState("criticality");
   const [selectedInstallation, setSelectedInstallation] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -323,6 +336,7 @@ export default function DefinitionsPage() {
   const [localSeverity, setLocalSeverity] = useState([]);
   const [localOccurrence, setLocalOccurrence] = useState([]);
   const [localDetection, setLocalDetection] = useState([]);
+  const [localCriticality, setLocalCriticality] = useState([]);
 
   // Queries
   const { data: installationsData, isLoading: loadingInstallations } = useQuery({
@@ -347,10 +361,12 @@ export default function DefinitionsPage() {
       setLocalSeverity(definitionsData.severity || []);
       setLocalOccurrence(definitionsData.occurrence || []);
       setLocalDetection(definitionsData.detection || []);
+      setLocalCriticality(definitionsData.criticality || []);
     } else if (defaultsData && !selectedInstallation) {
       setLocalSeverity(defaultsData.severity || []);
       setLocalOccurrence(defaultsData.occurrence || []);
       setLocalDetection(defaultsData.detection || []);
+      setLocalCriticality(defaultsData.criticality || []);
     }
   }, [definitionsData, defaultsData, selectedInstallation]);
 
@@ -391,6 +407,9 @@ export default function DefinitionsPage() {
       case "detection":
         setLocalDetection(updateFn);
         break;
+      case "criticality":
+        setLocalCriticality(updateFn);
+        break;
     }
   };
 
@@ -401,7 +420,8 @@ export default function DefinitionsPage() {
       equipmentId: selectedInstallation,
       severity: localSeverity,
       occurrence: localOccurrence,
-      detection: localDetection
+      detection: localDetection,
+      criticality: localCriticality
     });
   };
 
@@ -416,6 +436,7 @@ export default function DefinitionsPage() {
       setLocalSeverity(definitionsData.severity || []);
       setLocalOccurrence(definitionsData.occurrence || []);
       setLocalDetection(definitionsData.detection || []);
+      setLocalCriticality(definitionsData.criticality || []);
     }
     setIsEditing(false);
   };
@@ -561,7 +582,11 @@ export default function DefinitionsPage() {
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
+            <TabsTrigger value="criticality" className="flex items-center gap-2" data-testid="criticality-tab">
+              <Gauge className="w-4 h-4" />
+              {t("definitions.criticality") || "Criticality"}
+            </TabsTrigger>
             <TabsTrigger value="severity" className="flex items-center gap-2" data-testid="severity-tab">
               <AlertTriangle className="w-4 h-4" />
               {t("definitions.severity")}
@@ -575,6 +600,29 @@ export default function DefinitionsPage() {
               {t("definitions.detection")}
             </TabsTrigger>
           </TabsList>
+
+          {/* Criticality Tab */}
+          <TabsContent value="criticality">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Gauge className="w-5 h-5 text-purple-500" />
+                  {t("definitions.criticalityTitle") || "Equipment Criticality Definitions"}
+                  {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800">{t("definitions.editMode")}</Badge>}
+                </CardTitle>
+                <CardDescription>{t("definitions.criticalityDesc") || "Define what each criticality level (1-5) means for your equipment hierarchy. This helps prioritize maintenance and resource allocation."}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EditableTable
+                  type="criticality"
+                  data={localCriticality}
+                  isEditing={isEditing}
+                  onUpdateRow={handleUpdateRow}
+                  t={t}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Severity Tab */}
           <TabsContent value="severity">

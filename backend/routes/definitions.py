@@ -38,6 +38,7 @@ class DefinitionsCreate(BaseModel):
     severity: List[DefinitionRow]
     occurrence: List[DefinitionRow]
     detection: List[DefinitionRow]
+    criticality: Optional[List[DefinitionRow]] = None
 
 
 class DefinitionsUpdate(BaseModel):
@@ -45,6 +46,7 @@ class DefinitionsUpdate(BaseModel):
     severity: Optional[List[DefinitionRow]] = None
     occurrence: Optional[List[DefinitionRow]] = None
     detection: Optional[List[DefinitionRow]] = None
+    criticality: Optional[List[DefinitionRow]] = None
 
 
 # ============= DEFAULT DEFINITIONS =============
@@ -88,6 +90,14 @@ DEFAULT_DETECTION = [
     {"rank": 1, "label": "Very High", "description": "Controls certain to detect", "secondary_description": "Discrepant parts cannot be made - error proofed by design", "color": "bg-green-700"},
 ]
 
+DEFAULT_CRITICALITY = [
+    {"rank": 5, "label": "Critical", "description": "Equipment failure causes immediate plant shutdown, major safety hazard, or severe environmental impact. No redundancy available.", "secondary_description": "Immediate action required. 24/7 monitoring. Full spare parts inventory mandatory.", "color": "bg-red-600"},
+    {"rank": 4, "label": "High", "description": "Equipment failure significantly impacts production capacity (>50% reduction) or poses safety concerns. Limited redundancy.", "secondary_description": "Preventive maintenance priority. Condition monitoring recommended. Key spare parts on-site.", "color": "bg-orange-500"},
+    {"rank": 3, "label": "Medium", "description": "Equipment failure causes moderate production impact (25-50% reduction). Partial redundancy or workaround available.", "secondary_description": "Standard maintenance schedule. Periodic inspections. Standard spare parts availability.", "color": "bg-yellow-500"},
+    {"rank": 2, "label": "Low", "description": "Equipment failure causes minor production impact (<25% reduction). Full redundancy or easy workaround available.", "secondary_description": "Run-to-failure acceptable. Reactive maintenance approach. Spare parts on request.", "color": "bg-green-500"},
+    {"rank": 1, "label": "Minimal", "description": "Equipment failure has negligible impact on production, safety, or environment. Multiple redundancies exist.", "secondary_description": "No scheduled maintenance required. Replace on failure. No spare parts needed.", "color": "bg-green-700"},
+]
+
 
 # ============= API ENDPOINTS =============
 
@@ -97,7 +107,8 @@ async def get_default_definitions():
     return {
         "severity": DEFAULT_SEVERITY,
         "occurrence": DEFAULT_OCCURRENCE,
-        "detection": DEFAULT_DETECTION
+        "detection": DEFAULT_DETECTION,
+        "criticality": DEFAULT_CRITICALITY
     }
 
 
@@ -123,6 +134,7 @@ async def get_definitions_for_equipment(
             "severity": definitions.get("severity", DEFAULT_SEVERITY),
             "occurrence": definitions.get("occurrence", DEFAULT_OCCURRENCE),
             "detection": definitions.get("detection", DEFAULT_DETECTION),
+            "criticality": definitions.get("criticality", DEFAULT_CRITICALITY),
             "updated_at": definitions.get("updated_at")
         }
     
@@ -133,6 +145,7 @@ async def get_definitions_for_equipment(
         "severity": DEFAULT_SEVERITY,
         "occurrence": DEFAULT_OCCURRENCE,
         "detection": DEFAULT_DETECTION,
+        "criticality": DEFAULT_CRITICALITY,
         "updated_at": None
     }
 
@@ -191,6 +204,7 @@ async def create_or_update_definitions(
     severity_list = [row.model_dump() for row in data.severity]
     occurrence_list = [row.model_dump() for row in data.occurrence]
     detection_list = [row.model_dump() for row in data.detection]
+    criticality_list = [row.model_dump() for row in data.criticality] if data.criticality else DEFAULT_CRITICALITY
     
     # Check if definitions already exist
     existing = await db.definitions.find_one(
@@ -205,6 +219,7 @@ async def create_or_update_definitions(
                 "severity": severity_list,
                 "occurrence": occurrence_list,
                 "detection": detection_list,
+                "criticality": criticality_list,
                 "equipment_name": equipment["name"],
                 "updated_at": now
             }}
@@ -218,6 +233,7 @@ async def create_or_update_definitions(
             "severity": severity_list,
             "occurrence": occurrence_list,
             "detection": detection_list,
+            "criticality": criticality_list,
             "created_by": current_user["id"],
             "created_at": now,
             "updated_at": now
@@ -255,6 +271,8 @@ async def update_definitions(
         update_data["occurrence"] = [row.model_dump() for row in data.occurrence]
     if data.detection is not None:
         update_data["detection"] = [row.model_dump() for row in data.detection]
+    if data.criticality is not None:
+        update_data["criticality"] = [row.model_dump() for row in data.criticality]
     
     await db.definitions.update_one(
         {"equipment_id": equipment_id, "created_by": current_user["id"]},
