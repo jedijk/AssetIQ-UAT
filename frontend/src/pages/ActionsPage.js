@@ -376,19 +376,19 @@ export default function ActionsPage() {
       )}
       
       {/* Compact Stats Row - matching ThreatsPage */}
-      <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+      <div className="flex flex-wrap gap-1.5 sm:gap-3 mb-4">
         {statCards.map((stat) => (
           <div
             key={stat.label}
-            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200"
+            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-white rounded-lg border border-slate-200"
             data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
           >
-            <div className={`p-1.5 rounded-md ${stat.bg}`}>
-              <stat.icon className={`w-4 h-4 ${stat.color}`} />
+            <div className={`p-1 sm:p-1.5 rounded-md ${stat.bg}`}>
+              <stat.icon className={`w-3 h-3 sm:w-4 sm:h-4 ${stat.color}`} />
             </div>
-            <div>
-              <span className="text-lg font-bold text-slate-900">{stat.value}</span>
-              <span className="text-xs text-slate-500 ml-1">{stat.label}</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-sm sm:text-lg font-bold text-slate-900">{stat.value}</span>
+              <span className="text-[10px] sm:text-xs text-slate-500 hidden sm:inline">{stat.label}</span>
             </div>
           </div>
         ))}
@@ -582,15 +582,15 @@ export default function ActionsPage() {
                       action.status === "in_progress" ? "completed" : "open";
                     quickStatusUpdate(action, nextStatus);
                   }}
-                  className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${priority.iconBg}`}
+                  className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center ${priority.iconBg}`}
                   title={`Status: ${statusConfig[action.status]?.label}. Click to change.`}
                 >
-                  <StatusIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${priority.iconColor}`} />
+                  <StatusIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${priority.iconColor}`} />
                 </button>
 
-                {/* Action Number Badge */}
+                {/* Action Number Badge - Hidden on mobile */}
                 <div 
-                  className="flex items-center justify-center px-2 py-1 bg-slate-100 rounded-md text-xs font-mono text-slate-500 min-w-[60px]" 
+                  className="hidden sm:flex items-center justify-center px-2 py-1 bg-slate-100 rounded-md text-xs font-mono text-slate-500 min-w-[60px]" 
                   data-testid={`action-number-${action.id}`}
                 >
                   {action.action_number}
@@ -598,84 +598,47 @@ export default function ActionsPage() {
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <h3 className="font-semibold text-slate-900 text-sm sm:text-base truncate max-w-[300px] sm:max-w-[400px] lg:max-w-[500px] cursor-default">
-                            {action.title}
-                          </h3>
-                        </TooltipTrigger>
-                        {action.title && action.title.length > 40 && (
-                          <TooltipContent side="bottom" className="max-w-sm">
-                            <p className="text-xs">{action.title}</p>
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
-                    </TooltipProvider>
-                    <Badge className={priority.color}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1">
+                      {action.title}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                    {/* Priority Badge - Always show */}
+                    <Badge className={`${priority.color} text-[10px] sm:text-xs px-1.5 py-0`}>
                       {priority.label}
                     </Badge>
-                    {/* Action Type Badge (CM/PM/PDM) */}
+                    {/* Action Type Badge - Hidden on mobile */}
                     {action.action_type && (
-                      <Badge className={
+                      <Badge className={`hidden sm:inline-flex text-xs ${
                         action.action_type === 'PM' ? 'bg-blue-100 text-blue-700' :
                         action.action_type === 'CM' ? 'bg-amber-100 text-amber-700' :
                         action.action_type === 'PDM' ? 'bg-purple-100 text-purple-700' :
                         'bg-slate-100 text-slate-700'
-                      }>
+                      }`}>
                         {action.action_type}
                       </Badge>
                     )}
-                    {/* Discipline Badge */}
+                    {/* Discipline Badge - Hidden on mobile */}
                     {action.discipline && (
-                      <Badge className="bg-slate-100 text-slate-600">
+                      <Badge className="hidden sm:inline-flex bg-slate-100 text-slate-600 text-xs">
                         {action.discipline}
                       </Badge>
                     )}
                     {overdue && (
-                      <Badge className="bg-red-100 text-red-700">{t("taskScheduler.overdue")}</Badge>
+                      <Badge className="bg-red-100 text-red-700 text-[10px] sm:text-xs px-1.5 py-0">{t("taskScheduler.overdue")}</Badge>
                     )}
                   </div>
-                  <div className="text-xs sm:text-sm text-slate-500 flex items-center gap-2 flex-wrap">
-                    {/* Source Link - Clickable to navigate to source */}
-                    {action.source_type && action.source_id && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (action.source_type === "investigation") {
-                            navigate(`/causal-engine?inv=${action.source_id}`);
-                          } else if (action.source_type === "threat" || action.source_type === "ai_recommendation") {
-                            navigate(`/threats/${action.source_id}`);
-                          }
-                        }}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-700"
-                        data-testid={`source-link-${action.id}`}
-                      >
-                        <SourceIcon className={`w-3 h-3 ${sourceConfig[action.source_type]?.color}`} />
-                        <span className="font-medium">{sourceConfig[action.source_type]?.label || action.source_type}</span>
-                        <span className="text-slate-500">•</span>
-                        <span className="max-w-[150px] truncate">{action.source_name || "Unknown"}</span>
-                        <ExternalLink className="w-3 h-3 text-slate-400" />
-                      </button>
-                    )}
-                    {!action.source_type && (
-                      <span className="text-slate-400 italic">{t("actionsPage.noSourceLinked") || "No source linked"}</span>
-                    )}
-                    {action.assignee && (
-                      <>
-                        <span className="mx-1">•</span>
-                        <User className="w-3 h-3" />
-                        <span>{action.assignee}</span>
-                      </>
-                    )}
+                  {/* Source info - Simplified on mobile */}
+                  <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 truncate">
+                    {action.source_name || action.assignee || "No source"}
                   </div>
                 </div>
 
-                {/* Score Column - matching Observations format */}
-                <div className="hidden sm:flex flex-col items-end min-w-[50px]">
-                  <span className="text-xs text-slate-400 font-medium">{t("observations.riskScore")}</span>
-                  <span className={`text-lg font-bold ${
+                {/* Score Column - Visible on mobile, compact */}
+                <div className="flex flex-col items-end min-w-[40px] sm:min-w-[50px]">
+                  <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">{t("observations.riskScore")}</span>
+                  <span className={`text-sm sm:text-lg font-bold ${
                     action.threat_risk_score >= 70 ? "text-red-600" :
                     action.threat_risk_score >= 50 ? "text-orange-500" :
                     action.threat_risk_score >= 30 ? "text-yellow-500" :
@@ -685,10 +648,10 @@ export default function ActionsPage() {
                   </span>
                 </div>
 
-                {/* RPN Column - matching Observations format */}
-                <div className="hidden sm:flex flex-col items-end min-w-[50px]">
-                  <span className="text-xs text-slate-400 font-medium">RPN</span>
-                  <span className={`text-lg font-bold ${
+                {/* RPN Column - Show on mobile too */}
+                <div className="flex flex-col items-end min-w-[35px] sm:min-w-[50px]">
+                  <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">RPN</span>
+                  <span className={`text-sm sm:text-lg font-bold ${
                     action.threat_rpn >= 200 ? "text-red-600" :
                     action.threat_rpn >= 100 ? "text-orange-500" :
                     action.threat_rpn ? "text-blue-500" : "text-slate-300"
@@ -697,29 +660,30 @@ export default function ActionsPage() {
                   </span>
                 </div>
 
-                {/* Right side - Due date & Status */}
-                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                  <div className="text-right">
+                {/* Right side - Due date & Status - Hidden on mobile except status */}
+                <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+                  {/* Due date - Hidden on mobile */}
+                  <div className="hidden sm:block text-right">
                     <div className={`text-xs sm:text-sm font-medium ${overdue ? "text-red-600" : "text-slate-700"}`}>
                       <Calendar className="w-3 h-3 inline mr-1" />
                       {formatDate(action.due_date)}
                     </div>
                   </div>
                   
-                  {/* Status Badge - matching Observations format */}
-                  <Badge className={
+                  {/* Status Badge - Hidden on mobile */}
+                  <Badge className={`hidden sm:inline-flex ${
                     action.status === "completed" ? "bg-green-100 text-green-700" :
                     action.status === "in_progress" ? "bg-blue-100 text-blue-700" :
                     "bg-slate-100 text-slate-700"
-                  }>
+                  }`}>
                     {statusConfig[action.status]?.label || "Open"}
                   </Badge>
                   
-                  {/* Actions menu */}
+                  {/* Actions menu - Always visible on mobile */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                        <MoreVertical className="w-4 h-4" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-8 sm:w-8 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <MoreVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
