@@ -57,6 +57,16 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 - UI: Delete option added to user actions dropdown menu (red text)
 - Files updated: `/app/backend/routes/users.py`, `/app/frontend/src/pages/SettingsUserManagementPage.js`
 
+### Fix: Task Execution Dialog Dual Header
+- Removed duplicate Dialog/Sheet headers, keeping only the purple gradient header
+- Restructured `TaskFormContent` in `MyTasksPage.js` with proper padding container
+- Files updated: `/app/frontend/src/pages/MyTasksPage.js`
+
+### Feature: Task Completion Tracking
+- Task completions now record `completed_by_id` and `completed_by_name`
+- Backend updated to pass current user info to task service
+- Files updated: `/app/backend/routes/tasks.py`, `/app/backend/services/task_service.py`
+
 ### Bug Fix: Export Hierarchy Error (P1)
 - Fixed `AttributeError: 'str' object has no attribute 'get'` in equipment hierarchy export
 - Root cause: Missing defensive checks for corrupted node data in MongoDB

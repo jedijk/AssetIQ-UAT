@@ -607,7 +607,7 @@ class TaskService:
             return self._serialize_instance(result)
         return None
     
-    async def complete_task(self, instance_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def complete_task(self, instance_id: str, data: Dict[str, Any], completed_by_id: str = None, completed_by_name: str = None) -> Optional[Dict[str, Any]]:
         """Mark a task as completed and update plan."""
         if not ObjectId.is_valid(instance_id):
             return None
@@ -632,6 +632,8 @@ class TaskService:
         update = {
             "status": "completed",
             "completed_at": now,
+            "completed_by_id": completed_by_id,
+            "completed_by_name": completed_by_name,
             "actual_duration_minutes": data.get("actual_duration_minutes") or actual_duration,
             "completion_notes": data.get("completion_notes"),
             "issues_found": data.get("issues_found", []),

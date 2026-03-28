@@ -1057,45 +1057,47 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
   
   // Main Task Execution Form Content
   const TaskFormContent = (
-    <>
+    <div className="flex flex-col h-full">
       {/* Form Header - Gradient style like Form Designer */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 -mx-6 -mt-4 px-6 py-4 mb-6 rounded-t-lg">
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 rounded-t-lg">
         <h3 className="text-white font-semibold text-lg">{task?.title || task?.form_name || "Task Execution"}</h3>
         <p className="text-white/70 text-sm mt-1">
           {task?.equipment_name || task?.asset || "Complete the form below"}
         </p>
       </div>
 
-      {/* Context Block - Clean card design */}
-      <div className={cn(
-        "bg-slate-50 rounded-xl border border-slate-200 mb-6",
-        isMobile ? "p-4" : "p-4"
-      )}>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-            <MapPin className="w-4 h-4 text-indigo-600" />
+      {/* Form Body with padding */}
+      <div className="px-6 py-4 flex-1 overflow-y-auto">
+        {/* Context Block - Clean card design */}
+        <div className={cn(
+          "bg-slate-50 rounded-xl border border-slate-200 mb-6",
+          isMobile ? "p-4" : "p-4"
+        )}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+              <MapPin className="w-4 h-4 text-indigo-600" />
+            </div>
+            <div>
+              <p className="font-medium text-slate-800">{task.equipment_name || task.asset}</p>
+              <p className="text-xs text-slate-500">{task.mitigation_strategy || task.type}</p>
+            </div>
           </div>
-          <div>
-            <p className="font-medium text-slate-800">{task.equipment_name || task.asset}</p>
-            <p className="text-xs text-slate-500">{task.mitigation_strategy || task.type}</p>
+          
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            {task.last_completed && (
+              <div className="bg-white rounded-lg p-2 border border-slate-100">
+                <span className="text-slate-400 text-xs block">Last completed</span>
+                <span className="text-slate-700 font-medium">{format(parseISO(task.last_completed), "MMM d, yyyy")}</span>
+              </div>
+            )}
+            {task.frequency && (
+              <div className="bg-white rounded-lg p-2 border border-slate-100">
+                <span className="text-slate-400 text-xs block">Frequency</span>
+                <span className="text-slate-700 font-medium">{task.frequency}</span>
+              </div>
+            )}
           </div>
         </div>
-        
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          {task.last_completed && (
-            <div className="bg-white rounded-lg p-2 border border-slate-100">
-              <span className="text-slate-400 text-xs block">Last completed</span>
-              <span className="text-slate-700 font-medium">{format(parseISO(task.last_completed), "MMM d, yyyy")}</span>
-            </div>
-          )}
-          {task.frequency && (
-            <div className="bg-white rounded-lg p-2 border border-slate-100">
-              <span className="text-slate-400 text-xs block">Frequency</span>
-              <span className="text-slate-700 font-medium">{task.frequency}</span>
-            </div>
-          )}
-        </div>
-      </div>
       
       {/* Form Fields - Styled like Form Designer preview */}
       <div className={cn("space-y-5", isMobile && "pb-28")}>
@@ -1122,28 +1124,29 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
         )}
       </div>
       
-      {/* Footer Actions */}
-      <div className={cn(
-        "flex gap-3",
-        isMobile ? "fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-lg" : "mt-6"
-      )}>
-        <Button 
-          variant="outline" 
-          onClick={onClose}
-          className={cn("flex-1", isMobile && "h-12 text-base")}
-        >
-          Cancel
-        </Button>
-        <Button 
-          onClick={handleSubmit} 
-          disabled={isSubmitting}
-          className={cn("flex-1", isMobile && "h-12 text-base")}
-        >
-          {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
-          Complete Task
-        </Button>
+        {/* Footer Actions */}
+        <div className={cn(
+          "flex gap-3 px-6 py-4 border-t border-slate-200",
+          isMobile && "fixed bottom-0 left-0 right-0 bg-white shadow-lg"
+        )}>
+          <Button 
+            variant="outline" 
+            onClick={onClose}
+            className={cn("flex-1", isMobile && "h-12 text-base")}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isSubmitting}
+            className={cn("flex-1", isMobile && "h-12 text-base")}
+          >
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+            Complete Task
+          </Button>
+        </div>
       </div>
-    </>
+    </div>
   );
   
   // Render as Sheet on mobile, Dialog on desktop
@@ -1152,13 +1155,9 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
       <Sheet open={open} onOpenChange={onClose}>
         <SheetContent 
           side="bottom" 
-          className="h-[95vh] rounded-t-2xl overflow-y-auto"
+          className="h-[95vh] rounded-t-2xl overflow-y-auto p-0"
           data-testid="task-execution-sheet"
         >
-          <SheetHeader className="text-left mb-4">
-            <SheetTitle className="text-xl">{task.title}</SheetTitle>
-            <SheetDescription>{task.equipment_name || task.asset}</SheetDescription>
-          </SheetHeader>
           {TaskFormContent}
         </SheetContent>
       </Sheet>
@@ -1167,11 +1166,7 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="task-execution-dialog">
-        <DialogHeader>
-          <DialogTitle>{task.title}</DialogTitle>
-          <DialogDescription>{task.equipment_name || task.asset}</DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-0" data-testid="task-execution-dialog">
         {TaskFormContent}
       </DialogContent>
     </Dialog>

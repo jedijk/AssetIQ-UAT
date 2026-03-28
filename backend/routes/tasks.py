@@ -265,7 +265,12 @@ async def complete_task_instance(
     current_user: dict = Depends(get_current_user)
 ):
     """Mark a task as completed."""
-    result = await task_service.complete_task(instance_id, data.model_dump())
+    result = await task_service.complete_task(
+        instance_id, 
+        data.model_dump(),
+        completed_by_id=current_user["id"],
+        completed_by_name=current_user.get("name", "Unknown")
+    )
     if not result:
         raise HTTPException(status_code=404, detail="Task instance not found")
     return result
