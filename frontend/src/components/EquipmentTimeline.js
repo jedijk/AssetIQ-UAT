@@ -18,6 +18,12 @@ import {
   ExternalLink,
   FileSearch,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -241,45 +247,77 @@ const TimelineItem = ({ item, onClick, isFirst, isLast }) => {
       // Show first 30 chars of title as summary
       return item.title?.length > 30 ? item.title.substring(0, 30) + "..." : item.title;
     }
+    if (item.type === "investigation") {
+      return item.title?.length > 30 ? item.title.substring(0, 30) + "..." : item.title;
+    }
     return item.title;
   };
 
+  // Get full text for tooltip
+  const getFullText = () => {
+    if (item.type === "observation") {
+      return item.failure_mode || item.title;
+    }
+    return item.title || "";
+  };
+
+  const displayText = getDisplayText();
+  const fullText = getFullText();
+  const needsTooltip = fullText.length > 30;
+
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex-shrink-0 w-28 md:w-36 cursor-pointer group"
-      onClick={() => onClick(item)}
-      style={{ scrollSnapAlign: "start" }}
-    >
-      {/* Timeline connector - lighter */}
-      <div className="relative flex items-center justify-center mb-1.5 md:mb-2">
-        {!isFirst && (
-          <div className="absolute left-0 w-1/2 h-px bg-slate-200" />
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex-shrink-0 w-28 md:w-36 cursor-pointer group"
+            onClick={() => onClick(item)}
+            style={{ scrollSnapAlign: "start" }}
+          >
+            {/* Timeline connector - lighter */}
+            <div className="relative flex items-center justify-center mb-1.5 md:mb-2">
+              {!isFirst && (
+                <div className="absolute left-0 w-1/2 h-px bg-slate-200" />
+              )}
+              {!isLast && (
+                <div className="absolute right-0 w-1/2 h-px bg-slate-200" />
+              )}
+              <div className={`relative z-10 w-2.5 h-2.5 md:w-3 md:h-3 rounded-full ${config.dotColor} ring-2 ring-white group-hover:scale-125 transition-transform`} />
+            </div>
+            
+            {/* Date */}
+            <div className="text-center mb-1 md:mb-1.5">
+              <span className="text-[9px] md:text-[10px] text-slate-400">{formatDate(item.created_at)}</span>
+            </div>
+            
+            {/* Card - lighter styling */}
+            <div className={`p-2 rounded-lg border ${config.borderColor} ${config.bgColor} group-hover:shadow-sm transition-all`}>
+              <div className="flex items-center gap-1 mb-0.5">
+                <Icon className={`w-3 h-3 ${config.iconColor}`} />
+                <span className={`text-[9px] md:text-[10px] font-medium ${config.iconColor}`}>{config.label}</span>
+              </div>
+              <p className="text-[10px] md:text-xs font-medium text-slate-700 line-clamp-2 leading-tight">{displayText}</p>
+              <div className="mt-1">
+                <StatusBadge status={item.status} type={item.type} />
+              </div>
+            </div>
+          </motion.div>
+        </TooltipTrigger>
+        {needsTooltip && (
+          <TooltipContent 
+            side="top" 
+            className="max-w-xs bg-slate-900 text-white text-xs p-2 rounded-lg shadow-lg"
+          >
+            <p className="font-medium">{fullText}</p>
+            {item.description && (
+              <p className="text-slate-300 mt-1 text-[10px]">{item.description.substring(0, 100)}{item.description.length > 100 ? "..." : ""}</p>
+            )}
+          </TooltipContent>
         )}
-        {!isLast && (
-          <div className="absolute right-0 w-1/2 h-px bg-slate-200" />
-        )}
-        <div className={`relative z-10 w-2.5 h-2.5 md:w-3 md:h-3 rounded-full ${config.dotColor} ring-2 ring-white group-hover:scale-125 transition-transform`} />
-      </div>
-      
-      {/* Date */}
-      <div className="text-center mb-1 md:mb-1.5">
-        <span className="text-[9px] md:text-[10px] text-slate-400">{formatDate(item.created_at)}</span>
-      </div>
-      
-      {/* Card - lighter styling */}
-      <div className={`p-2 rounded-lg border ${config.borderColor} ${config.bgColor} group-hover:shadow-sm transition-all`}>
-        <div className="flex items-center gap-1 mb-0.5">
-          <Icon className={`w-3 h-3 ${config.iconColor}`} />
-          <span className={`text-[9px] md:text-[10px] font-medium ${config.iconColor}`}>{config.label}</span>
-        </div>
-        <p className="text-[10px] md:text-xs font-medium text-slate-700 line-clamp-2 leading-tight">{getDisplayText()}</p>
-        <div className="mt-1">
-          <StatusBadge status={item.status} type={item.type} />
-        </div>
-      </div>
-    </motion.div>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 
