@@ -326,39 +326,39 @@ export function FailureModeViewPanel({
 
         {/* Validation Status */}
         {fm.is_validated ? (
-          <div className="flex items-start gap-4 px-4 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+          <div className="flex items-center gap-4 px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
             {/* Validator Photo */}
             <div className="flex-shrink-0">
               {validatorAvatarUrl ? (
                 <img
                   src={validatorAvatarUrl}
                   alt={fm.validated_by_name || fm.validated_by}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-green-300 shadow-sm"
+                  className="w-11 h-11 rounded-full object-cover border-2 border-green-300 shadow-sm"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-semibold text-lg border-2 border-green-300 shadow-sm">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-semibold text-lg border-2 border-green-300 shadow-sm">
                   {(fm.validated_by_name || fm.validated_by)?.charAt(0)?.toUpperCase() || "V"}
                 </div>
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-semibold text-green-800">{t("library.validated")}</span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm text-green-700">
-                  <User className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="font-medium">{fm.validated_by_name || fm.validated_by}</span>
+              {/* Row 1: Validated + Date */}
+              <div className="flex items-center gap-3 mb-1">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-semibold text-green-800">{t("library.validated")}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-green-600">
-                  <Briefcase className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>{fm.validated_by_position || fm.validated_position}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-green-500">
-                  <Calendar className="w-3 h-3 flex-shrink-0" />
+                <span className="text-xs text-green-500">•</span>
+                <div className="flex items-center gap-1 text-xs text-green-500">
+                  <Calendar className="w-3 h-3" />
                   <span>{new Date(fm.validated_at).toLocaleDateString()}</span>
                 </div>
+              </div>
+              {/* Row 2: Name + Position */}
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium text-green-700">{fm.validated_by_name || fm.validated_by}</span>
+                <span className="text-green-400">•</span>
+                <span className="text-green-600">{fm.validated_by_position || fm.validated_position}</span>
               </div>
             </div>
             {!isEditing && (
