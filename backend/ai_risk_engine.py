@@ -33,32 +33,44 @@ The threat already has a Risk Score calculated using FMEA methodology:
 - Scale: 10-250 (Low < 50, Medium 50-99, High 100-149, Critical >= 150)
 - Current threat risk score is provided in the context
 
-Given the threat details, provide:
+IMPORTANT: Use the EQUIPMENT HISTORY to inform your analysis:
+- Past observations indicate recurring issues or patterns
+- Completed actions show maintenance efforts already taken
+- Completed tasks indicate preventive work done
+- Consider the timeline and frequency of past issues
+
+Given the threat details and equipment history, provide:
 1. DO NOT recalculate risk_score - use the provided threat's current risk score
 2. Failure Probability (0-100%):
    - Based on failure mode patterns
    - Equipment condition indicators
-   - Historical data patterns
+   - Historical data patterns from equipment history
+   - Account for recent maintenance actions completed
 
 3. Time-to-Failure Estimate:
    - Based on degradation patterns
+   - Consider past similar failures on this equipment
    - Provide in hours (null if uncertain)
 
 4. Risk Trend:
    - "increasing", "stable", or "decreasing" based on current conditions
+   - Factor in recent maintenance actions and their effectiveness
 
 5. Trend Delta:
    - Expected change in risk score over time (positive = worsening, negative = improving)
 
 6. Key Risk Factors (3-5 factors)
+   - Include factors from equipment history
 
 7. Forecasts for next 7/14/30 days using the SAME FMEA scale (10-250)
    - Start from the current risk score and project changes
+   - Consider effectiveness of recent maintenance
 
 8. Recommendations - IMPORTANT: Each recommendation must be a structured object with:
    - action: The recommended action description
    - action_type: One of "CM" (Corrective Maintenance), "PM" (Preventive Maintenance), or "PDM" (Predictive Maintenance)
    - discipline: One of "Mechanical", "Electrical", "Instrumentation", "Process", "Operations", "Safety", "Rotating Equipment", "Static Equipment", "Piping", "Multi-discipline"
+   - Avoid recommending actions that have already been completed recently
 
 RESPOND IN THIS EXACT JSON FORMAT:
 {
@@ -87,15 +99,22 @@ CAUSE_ANALYSIS_PROMPT = """You are an AI Causal Analysis Expert for industrial e
 
 IMPORTANT: Respond ONLY with valid JSON. No markdown, no explanations outside the JSON.
 
+IMPORTANT: Use the EQUIPMENT HISTORY to inform your analysis:
+- Past observations on this equipment may reveal recurring issues or patterns
+- Previously identified causes on the same equipment are highly relevant
+- Completed maintenance actions indicate what has been tried before
+- Consider if past causes have been properly addressed or may recur
+
 For the given threat, identify:
 1. Top 3-5 probable causes ranked by likelihood
 2. Category for each cause: technical_cause, human_factor, maintenance_issue, design_issue, organizational_factor, external_condition
 3. Probability percentage for each cause (total can exceed 100% as causes may combine)
-4. Supporting evidence indicators
+4. Supporting evidence indicators (include evidence from equipment history)
 5. Recommended mitigation actions for each cause - IMPORTANT: Each action must be a structured object with:
    - action: The recommended action description
    - action_type: One of "CM" (Corrective Maintenance), "PM" (Preventive Maintenance), or "PDM" (Predictive Maintenance)
    - discipline: One of "Mechanical", "Electrical", "Instrumentation", "Process", "Operations", "Safety", "Rotating Equipment", "Static Equipment", "Piping", "Multi-discipline"
+   - Do not recommend actions that were recently completed unless there's evidence they failed
 
 RESPOND IN THIS EXACT JSON FORMAT:
 {
@@ -270,7 +289,7 @@ class AIRiskEngine:
         clean_response = clean_response.strip()
         return json.loads(clean_response)
     
-    def _build_threat_context(self, threat: dict, equipment_data: dict = None, historical_threats: list = None) -> str:
+    def _build_threat_context(self, threat: dict, equipment_data: dict = None, historical_threats: list = None, equipment_history: dict = None) -> str:
         """Build context string for AI analysis"""
         context = f"""
 THREAT DETAILS:
@@ -297,8 +316,32 @@ EQUIPMENT INFORMATION:
 - Discipline: {equipment_data.get('discipline', 'Unknown')}
 """
         
+        # Add equipment history
+        if equipment_history:
+            past_obs = equipment_history.get("observations", [])
+            past_actions = equipment_history.get("actions", [])
+            past_tasks = equipment_history.get("tasks", [])
+            
+            if past_obs:
+                context += "\nEQUIPMENT HISTORY - PAST OBSERVATIONS:\n"
+                for i, obs in enumerate(past_obs[:5], 1):
+                    context += f"{i}. {obs.get('title', 'Unknown')[:50]} - Failure Mode: {obs.get('failure_mode', 'N/A')}, Risk: {obs.get('risk_score', 'N/A')}, Status: {obs.get('status', 'Unknown')}, Date: {obs.get('created_at', 'Unknown')[:10] if obs.get('created_at') else 'N/A'}\n"
+            
+            if past_actions:
+                context += "\nEQUIPMENT HISTORY - MAINTENANCE ACTIONS:\n"
+                for i, action in enumerate(past_actions[:5], 1):
+                    context += f"{i}. {action.get('title', 'Unknown')[:50]} - Status: {action.get('status', 'Unknown')}, Priority: {action.get('priority', 'N/A')}, Date: {action.get('created_at', 'Unknown')[:10] if action.get('created_at') else 'N/A'}\n"
+            
+            if past_tasks:
+                context += "\nEQUIPMENT HISTORY - COMPLETED MAINTENANCE TASKS:\n"
+                for i, task in enumerate(past_tasks[:5], 1):
+                    context += f"{i}. {task.get('name', 'Unknown')[:50]} - Completed: {task.get('completed_at', 'Unknown')[:10] if task.get('completed_at') else 'N/A'}\n"
+            
+            if not past_obs and not past_actions and not past_tasks:
+                context += "\nEQUIPMENT HISTORY: No previous observations, actions, or completed tasks recorded for this equipment.\n"
+        
         if historical_threats:
-            context += "\nSIMILAR HISTORICAL THREATS:\n"
+            context += "\nSIMILAR HISTORICAL THREATS (other equipment):\n"
             for i, ht in enumerate(historical_threats[:3], 1):
                 context += f"{i}. {ht.get('title', 'Unknown')} - Risk: {ht.get('risk_score', 'N/A')}, Status: {ht.get('status', 'Unknown')}\n"
         
@@ -309,6 +352,7 @@ EQUIPMENT INFORMATION:
         threat: dict, 
         equipment_data: dict = None,
         historical_threats: list = None,
+        equipment_history: dict = None,
         include_forecast: bool = True
     ) -> RiskInsight:
         """Analyze threat and generate dynamic risk assessment"""
@@ -316,7 +360,7 @@ EQUIPMENT INFORMATION:
             session_id = f"risk_analysis_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
             chat = self._create_chat(RISK_ANALYSIS_PROMPT, session_id)
             
-            context = self._build_threat_context(threat, equipment_data, historical_threats)
+            context = self._build_threat_context(threat, equipment_data, historical_threats, equipment_history)
             message = UserMessage(text=f"Analyze this threat:\n{context}")
             
             response = await chat.send_message(message)
@@ -385,6 +429,7 @@ EQUIPMENT INFORMATION:
         self, 
         threat: dict,
         equipment_data: dict = None,
+        equipment_history: dict = None,
         max_causes: int = 5
     ) -> CausalExplanation:
         """Generate probable causes for a threat"""
@@ -392,7 +437,7 @@ EQUIPMENT INFORMATION:
             session_id = f"cause_analysis_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
             chat = self._create_chat(CAUSE_ANALYSIS_PROMPT, session_id)
             
-            context = self._build_threat_context(threat, equipment_data)
+            context = self._build_threat_context(threat, equipment_data, None, equipment_history)
             message = UserMessage(text=f"Analyze causes for this threat (max {max_causes} causes):\n{context}")
             
             response = await chat.send_message(message)

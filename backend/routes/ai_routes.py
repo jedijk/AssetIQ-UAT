@@ -37,6 +37,7 @@ async def analyze_threat_risk(
     
     # Get equipment data if available
     equipment_data = None
+    equipment_id = threat.get("linked_equipment_id")
     if threat.get("asset"):
         equipment_node = await db.equipment_nodes.find_one(
             {"name": threat["asset"], "created_by": current_user["id"]},
@@ -44,6 +45,57 @@ async def analyze_threat_risk(
         )
         if equipment_node:
             equipment_data = equipment_node
+            equipment_id = equipment_node.get("id")
+    
+    # Get equipment history (past observations, actions, tasks)
+    equipment_history = {
+        "observations": [],
+        "actions": [],
+        "tasks": []
+    }
+    
+    if equipment_id or threat.get("asset"):
+        # Get past observations for this equipment
+        past_observations = await db.threats.find(
+            {
+                "created_by": current_user["id"],
+                "id": {"$ne": threat_id},
+                "$or": [
+                    {"linked_equipment_id": equipment_id} if equipment_id else {"_id": None},
+                    {"asset": threat.get("asset")} if threat.get("asset") else {"_id": None}
+                ]
+            },
+            {"_id": 0, "id": 1, "title": 1, "failure_mode": 1, "status": 1, "risk_score": 1, "created_at": 1}
+        ).sort("created_at", -1).limit(10).to_list(10)
+        equipment_history["observations"] = past_observations
+        
+        # Get actions related to this equipment
+        past_actions = await db.central_actions.find(
+            {
+                "created_by": current_user["id"],
+                "$or": [
+                    {"linked_equipment_id": equipment_id} if equipment_id else {"_id": None},
+                    {"equipment_name": threat.get("asset")} if threat.get("asset") else {"_id": None},
+                    {"source_id": threat_id}
+                ]
+            },
+            {"_id": 0, "id": 1, "title": 1, "status": 1, "priority": 1, "created_at": 1}
+        ).sort("created_at", -1).limit(10).to_list(10)
+        equipment_history["actions"] = past_actions
+        
+        # Get completed tasks for this equipment
+        past_tasks = await db.task_instances.find(
+            {
+                "created_by": current_user["id"],
+                "status": "completed",
+                "$or": [
+                    {"equipment_id": equipment_id} if equipment_id else {"_id": None},
+                    {"linked_equipment_id": equipment_id} if equipment_id else {"_id": None}
+                ]
+            },
+            {"_id": 0, "id": 1, "name": 1, "status": 1, "completed_at": 1}
+        ).sort("completed_at", -1).limit(10).to_list(10)
+        equipment_history["tasks"] = past_tasks
     
     # Get similar historical threats
     historical_threats = []
@@ -67,6 +119,7 @@ async def analyze_threat_risk(
         threat=threat,
         equipment_data=equipment_data,
         historical_threats=historical_threats,
+        equipment_history=equipment_history,
         include_forecast=include_forecast
     )
     
@@ -164,6 +217,7 @@ async def generate_threat_causes(
         raise HTTPException(status_code=404, detail="Threat not found")
     
     equipment_data = None
+    equipment_id = threat.get("linked_equipment_id")
     if threat.get("asset"):
         equipment_node = await db.equipment_nodes.find_one(
             {"name": threat["asset"], "created_by": current_user["id"]},
@@ -171,12 +225,50 @@ async def generate_threat_causes(
         )
         if equipment_node:
             equipment_data = equipment_node
+            equipment_id = equipment_node.get("id")
+    
+    # Get equipment history for context
+    equipment_history = {
+        "observations": [],
+        "actions": [],
+        "tasks": []
+    }
+    
+    if equipment_id or threat.get("asset"):
+        # Get past observations for this equipment
+        past_observations = await db.threats.find(
+            {
+                "created_by": current_user["id"],
+                "id": {"$ne": threat_id},
+                "$or": [
+                    {"linked_equipment_id": equipment_id} if equipment_id else {"_id": None},
+                    {"asset": threat.get("asset")} if threat.get("asset") else {"_id": None}
+                ]
+            },
+            {"_id": 0, "id": 1, "title": 1, "failure_mode": 1, "cause": 1, "status": 1, "risk_score": 1, "created_at": 1}
+        ).sort("created_at", -1).limit(5).to_list(5)
+        equipment_history["observations"] = past_observations
+        
+        # Get completed actions
+        past_actions = await db.central_actions.find(
+            {
+                "created_by": current_user["id"],
+                "status": "completed",
+                "$or": [
+                    {"linked_equipment_id": equipment_id} if equipment_id else {"_id": None},
+                    {"equipment_name": threat.get("asset")} if threat.get("asset") else {"_id": None}
+                ]
+            },
+            {"_id": 0, "id": 1, "title": 1, "status": 1, "created_at": 1}
+        ).sort("created_at", -1).limit(5).to_list(5)
+        equipment_history["actions"] = past_actions
     
     max_causes = request.max_causes if request else 5
     
     result = await ai_engine.generate_causes(
         threat=threat,
         equipment_data=equipment_data,
+        equipment_history=equipment_history,
         max_causes=max_causes
     )
     
