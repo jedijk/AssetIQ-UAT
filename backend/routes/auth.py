@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # Email configuration
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
-FRONTEND_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:3000").replace("/api", "")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
 # Initialize Resend if available
 if RESEND_AVAILABLE and RESEND_API_KEY:
