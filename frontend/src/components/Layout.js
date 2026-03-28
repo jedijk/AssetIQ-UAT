@@ -164,7 +164,7 @@ const Layout = () => {
   return (
     <div className="app-container">
       {/* Header */}
-      <header className="app-header">
+      <header className="app-header bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
         <div className="header-content max-w-full px-4">
           {/* Left Section - Logo & Nav */}
           <div className="flex items-center gap-3 lg:gap-6">
@@ -173,7 +173,7 @@ const Layout = () => {
               variant="outline"
               size="icon"
               onClick={() => setHierarchyOpen(!hierarchyOpen)}
-              className="hidden lg:flex h-7 w-7 text-slate-600 hover:text-blue-600 border-slate-300"
+              className="hidden lg:flex h-7 w-7 text-slate-600 dark:text-slate-300 hover:text-blue-600 border-slate-300 dark:border-slate-600"
               data-testid="hierarchy-toggle"
               title={hierarchyOpen ? "Hide Equipment Panel" : "Show Equipment Panel"}
             >
@@ -191,7 +191,7 @@ const Layout = () => {
                 alt="AssetIQ" 
                 className="w-8 h-8 rounded-lg"
               />
-              <span className="text-base font-semibold text-slate-900 hidden sm:block" data-testid="app-logo">
+              <span className="text-base font-semibold text-slate-900 dark:text-white hidden sm:block" data-testid="app-logo">
                 AssetIQ
               </span>
             </div>
@@ -207,8 +207,8 @@ const Layout = () => {
                   className={({ isActive }) =>
                     `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150 whitespace-nowrap ${
                       isActive 
-                        ? "bg-blue-50 text-blue-700" 
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300" 
+                        : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
                     }`
                   }
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
@@ -580,7 +580,7 @@ const Layout = () => {
       <div className="flex min-h-[calc(100vh-48px)]">
         {/* Equipment Hierarchy Sidebar - Desktop */}
         {hierarchyOpen && (
-          <div className="hidden lg:block w-72 flex-shrink-0 border-r border-slate-200 bg-white">
+          <div className="hidden lg:block w-72 flex-shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
             <div className="sticky top-12 h-[calc(100vh-48px)]">
               <EquipmentHierarchy 
                 isOpen={true} 

@@ -107,7 +107,52 @@
   color-scheme: dark;
 }
 
+/* ==================== DARK MODE bg-white OVERRIDE ==================== */
+/* This section ensures bg-white cards and containers become dark in dark mode */
+.theme-dark .bg-white,
+.theme-assetiq .bg-white,
+[data-theme="dark"] .bg-white,
+[data-theme="assetiq"] .bg-white {
+  background-color: var(--bg-secondary) !important;
+}
+
+/* Text inside bg-white cards needs to be light in dark mode */
+.theme-dark .bg-white .text-slate-900,
+.theme-dark .bg-white .text-slate-800,
+.theme-dark .bg-white .text-slate-700,
+.theme-assetiq .bg-white .text-slate-900,
+.theme-assetiq .bg-white .text-slate-800,
+.theme-assetiq .bg-white .text-slate-700,
+[data-theme="dark"] .bg-white .text-slate-900,
+[data-theme="dark"] .bg-white .text-slate-800,
+[data-theme="dark"] .bg-white .text-slate-700,
+[data-theme="assetiq"] .bg-white .text-slate-900,
+[data-theme="assetiq"] .bg-white .text-slate-800,
+[data-theme="assetiq"] .bg-white .text-slate-700 {
+  color: var(--text-primary) !important;
+}
+
 /* ==================== THEMED COMPONENTS ==================== */
+
+/* Themed Card - uses CSS variables for dark mode compatibility */
+.themed-card {
+  background-color: var(--card-bg);
+  border-color: var(--border-primary);
+  color: var(--text-primary);
+}
+
+/* Themed Text Classes */
+.text-primary {
+  color: var(--text-primary) !important;
+}
+
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.text-muted {
+  color: var(--text-tertiary) !important;
+}
 
 /* Layout */
 .app-container {
@@ -120,6 +165,65 @@
     @apply sticky top-0 z-40;
     background-color: var(--bg-secondary);
     border-bottom: 1px solid var(--border-primary);
+}
+
+/* Header text colors for dark mode */
+.theme-dark .app-header,
+.theme-assetiq .app-header,
+[data-theme="dark"] .app-header,
+[data-theme="assetiq"] .app-header {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-primary) !important;
+}
+
+.theme-dark .app-header .text-slate-900,
+.theme-dark .app-header .text-slate-800,
+.theme-dark .app-header .text-slate-700,
+.theme-dark .app-header .text-slate-600,
+.theme-assetiq .app-header .text-slate-900,
+.theme-assetiq .app-header .text-slate-800,
+.theme-assetiq .app-header .text-slate-700,
+.theme-assetiq .app-header .text-slate-600,
+[data-theme="dark"] .app-header .text-slate-900,
+[data-theme="dark"] .app-header .text-slate-800,
+[data-theme="dark"] .app-header .text-slate-700,
+[data-theme="dark"] .app-header .text-slate-600,
+[data-theme="assetiq"] .app-header .text-slate-900,
+[data-theme="assetiq"] .app-header .text-slate-800,
+[data-theme="assetiq"] .app-header .text-slate-700,
+[data-theme="assetiq"] .app-header .text-slate-600 {
+    color: var(--text-primary) !important;
+}
+
+/* Header nav link active state for dark mode */
+.theme-dark .app-header .bg-blue-50,
+.theme-assetiq .app-header .bg-blue-50,
+[data-theme="dark"] .app-header .bg-blue-50,
+[data-theme="assetiq"] .app-header .bg-blue-50 {
+    background-color: var(--accent-light) !important;
+}
+
+.theme-dark .app-header .text-blue-700,
+.theme-dark .app-header .text-blue-600,
+.theme-assetiq .app-header .text-blue-700,
+.theme-assetiq .app-header .text-blue-600,
+[data-theme="dark"] .app-header .text-blue-700,
+[data-theme="dark"] .app-header .text-blue-600,
+[data-theme="assetiq"] .app-header .text-blue-700,
+[data-theme="assetiq"] .app-header .text-blue-600 {
+    color: var(--accent-primary) !important;
+}
+
+/* Header button borders for dark mode */
+.theme-dark .app-header .border-slate-300,
+.theme-dark .app-header .border-slate-200,
+.theme-assetiq .app-header .border-slate-300,
+.theme-assetiq .app-header .border-slate-200,
+[data-theme="dark"] .app-header .border-slate-300,
+[data-theme="dark"] .app-header .border-slate-200,
+[data-theme="assetiq"] .app-header .border-slate-300,
+[data-theme="assetiq"] .app-header .border-slate-200 {
+    border-color: var(--border-primary) !important;
 }
 
 .header-content {
@@ -754,8 +858,12 @@ a, button, input, select, textarea {
 
 .theme-dark .text-slate-900,
 .theme-dark .text-gray-900,
+.theme-dark .text-slate-800,
+.theme-dark .text-gray-800,
 [data-theme="dark"] .text-slate-900,
-[data-theme="dark"] .text-gray-900 {
+[data-theme="dark"] .text-gray-900,
+[data-theme="dark"] .text-slate-800,
+[data-theme="dark"] .text-gray-800 {
   color: var(--text-primary) !important;
 }
 
@@ -772,15 +880,34 @@ a, button, input, select, textarea {
 
 .theme-dark .text-slate-500,
 .theme-dark .text-gray-500,
+.theme-dark .text-slate-400,
+.theme-dark .text-gray-400,
 [data-theme="dark"] .text-slate-500,
-[data-theme="dark"] .text-gray-500 {
+[data-theme="dark"] .text-gray-500,
+[data-theme="dark"] .text-slate-400,
+[data-theme="dark"] .text-gray-400 {
   color: var(--text-tertiary) !important;
+}
+
+.theme-dark .text-slate-300,
+.theme-dark .text-gray-300,
+[data-theme="dark"] .text-slate-300,
+[data-theme="dark"] .text-gray-300 {
+  color: var(--text-muted) !important;
 }
 
 .theme-dark .border-slate-200,
 .theme-dark .border-gray-200,
+.theme-dark .border-slate-300,
+.theme-dark .border-gray-300,
+.theme-dark .border-slate-100,
+.theme-dark .border-gray-100,
 [data-theme="dark"] .border-slate-200,
-[data-theme="dark"] .border-gray-200 {
+[data-theme="dark"] .border-gray-200,
+[data-theme="dark"] .border-slate-300,
+[data-theme="dark"] .border-gray-300,
+[data-theme="dark"] .border-slate-100,
+[data-theme="dark"] .border-gray-100 {
   border-color: var(--border-primary) !important;
 }
 
@@ -824,8 +951,12 @@ a, button, input, select, textarea {
 
 .theme-assetiq .text-slate-900,
 .theme-assetiq .text-gray-900,
+.theme-assetiq .text-slate-800,
+.theme-assetiq .text-gray-800,
 [data-theme="assetiq"] .text-slate-900,
-[data-theme="assetiq"] .text-gray-900 {
+[data-theme="assetiq"] .text-gray-900,
+[data-theme="assetiq"] .text-slate-800,
+[data-theme="assetiq"] .text-gray-800 {
   color: var(--text-primary) !important;
 }
 
@@ -842,15 +973,34 @@ a, button, input, select, textarea {
 
 .theme-assetiq .text-slate-500,
 .theme-assetiq .text-gray-500,
+.theme-assetiq .text-slate-400,
+.theme-assetiq .text-gray-400,
 [data-theme="assetiq"] .text-slate-500,
-[data-theme="assetiq"] .text-gray-500 {
+[data-theme="assetiq"] .text-gray-500,
+[data-theme="assetiq"] .text-slate-400,
+[data-theme="assetiq"] .text-gray-400 {
   color: var(--text-tertiary) !important;
+}
+
+.theme-assetiq .text-slate-300,
+.theme-assetiq .text-gray-300,
+[data-theme="assetiq"] .text-slate-300,
+[data-theme="assetiq"] .text-gray-300 {
+  color: var(--text-muted) !important;
 }
 
 .theme-assetiq .border-slate-200,
 .theme-assetiq .border-gray-200,
+.theme-assetiq .border-slate-300,
+.theme-assetiq .border-gray-300,
+.theme-assetiq .border-slate-100,
+.theme-assetiq .border-gray-100,
 [data-theme="assetiq"] .border-slate-200,
-[data-theme="assetiq"] .border-gray-200 {
+[data-theme="assetiq"] .border-gray-200,
+[data-theme="assetiq"] .border-slate-300,
+[data-theme="assetiq"] .border-gray-300,
+[data-theme="assetiq"] .border-slate-100,
+[data-theme="assetiq"] .border-gray-100 {
   border-color: var(--border-primary) !important;
 }
 
@@ -1032,6 +1182,34 @@ html.theme-transitioning * {
   background-color: var(--bg-tertiary) !important;
 }
 
+/* Hover states - ensure readable text on hover */
+.theme-dark .hover\:bg-slate-50:hover,
+.theme-dark .hover\:bg-slate-100:hover,
+.theme-dark .hover\:bg-gray-50:hover,
+.theme-dark .hover\:bg-gray-100:hover,
+.theme-assetiq .hover\:bg-slate-50:hover,
+.theme-assetiq .hover\:bg-slate-100:hover,
+.theme-assetiq .hover\:bg-gray-50:hover,
+.theme-assetiq .hover\:bg-gray-100:hover,
+[data-theme="dark"] .hover\:bg-slate-50:hover,
+[data-theme="dark"] .hover\:bg-slate-100:hover,
+[data-theme="dark"] .hover\:bg-gray-50:hover,
+[data-theme="dark"] .hover\:bg-gray-100:hover,
+[data-theme="assetiq"] .hover\:bg-slate-50:hover,
+[data-theme="assetiq"] .hover\:bg-slate-100:hover,
+[data-theme="assetiq"] .hover\:bg-gray-50:hover,
+[data-theme="assetiq"] .hover\:bg-gray-100:hover {
+  background-color: var(--bg-hover) !important;
+}
+
+/* Focus states - better contrast */
+.theme-dark .focus\:bg-accent:focus,
+.theme-assetiq .focus\:bg-accent:focus,
+[data-theme="dark"] .focus\:bg-accent:focus,
+[data-theme="assetiq"] .focus\:bg-accent:focus {
+  background-color: var(--accent-light) !important;
+}
+
 /* Shadow adjustments for dark themes */
 .theme-dark [class*="shadow"],
 .theme-assetiq [class*="shadow"],
@@ -1083,4 +1261,177 @@ html.theme-transitioning * {
 .theme-assetiq .bg-yellow-500,
 .theme-assetiq .bg-orange-500 {
   /* Keep original colors for status indicators */
+}
+
+/* ==================== SELECT/DROPDOWN DARK MODE FIXES ==================== */
+
+/* Select trigger button */
+.theme-dark [data-radix-collection-item],
+.theme-assetiq [data-radix-collection-item],
+[data-theme="dark"] [data-radix-collection-item],
+[data-theme="assetiq"] [data-radix-collection-item] {
+  background-color: var(--input-bg) !important;
+  border-color: var(--input-border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Select content dropdown */
+.theme-dark [data-radix-select-content],
+.theme-assetiq [data-radix-select-content],
+[data-theme="dark"] [data-radix-select-content],
+[data-theme="assetiq"] [data-radix-select-content] {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+/* Select items */
+.theme-dark [data-radix-select-item],
+.theme-assetiq [data-radix-select-item],
+[data-theme="dark"] [data-radix-select-item],
+[data-theme="assetiq"] [data-radix-select-item] {
+  color: var(--text-primary) !important;
+}
+
+/* Select item hover/focus state */
+.theme-dark [data-radix-select-item]:hover,
+.theme-dark [data-radix-select-item][data-highlighted],
+.theme-assetiq [data-radix-select-item]:hover,
+.theme-assetiq [data-radix-select-item][data-highlighted],
+[data-theme="dark"] [data-radix-select-item]:hover,
+[data-theme="dark"] [data-radix-select-item][data-highlighted],
+[data-theme="assetiq"] [data-radix-select-item]:hover,
+[data-theme="assetiq"] [data-radix-select-item][data-highlighted] {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Dropdown menu items - better contrast on focus */
+.theme-dark [role="menuitem"]:focus,
+.theme-dark [role="menuitem"]:hover,
+.theme-dark [role="option"]:focus,
+.theme-dark [role="option"]:hover,
+.theme-assetiq [role="menuitem"]:focus,
+.theme-assetiq [role="menuitem"]:hover,
+.theme-assetiq [role="option"]:focus,
+.theme-assetiq [role="option"]:hover,
+[data-theme="dark"] [role="menuitem"]:focus,
+[data-theme="dark"] [role="menuitem"]:hover,
+[data-theme="dark"] [role="option"]:focus,
+[data-theme="dark"] [role="option"]:hover,
+[data-theme="assetiq"] [role="menuitem"]:focus,
+[data-theme="assetiq"] [role="menuitem"]:hover,
+[data-theme="assetiq"] [role="option"]:focus,
+[data-theme="assetiq"] [role="option"]:hover {
+  background-color: var(--accent-light) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Command/Combobox components */
+.theme-dark [cmdk-root],
+.theme-assetiq [cmdk-root],
+[data-theme="dark"] [cmdk-root],
+[data-theme="assetiq"] [cmdk-root] {
+  background-color: var(--bg-secondary) !important;
+}
+
+.theme-dark [cmdk-item],
+.theme-assetiq [cmdk-item],
+[data-theme="dark"] [cmdk-item],
+[data-theme="assetiq"] [cmdk-item] {
+  color: var(--text-primary) !important;
+}
+
+.theme-dark [cmdk-item][data-selected="true"],
+.theme-dark [cmdk-item][aria-selected="true"],
+.theme-assetiq [cmdk-item][data-selected="true"],
+.theme-assetiq [cmdk-item][aria-selected="true"],
+[data-theme="dark"] [cmdk-item][data-selected="true"],
+[data-theme="dark"] [cmdk-item][aria-selected="true"],
+[data-theme="assetiq"] [cmdk-item][data-selected="true"],
+[data-theme="assetiq"] [cmdk-item][aria-selected="true"] {
+  background-color: var(--accent-light) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ==================== BODY AND MAIN CONTAINER DARK MODE ==================== */
+
+.theme-dark body,
+.theme-assetiq body,
+[data-theme="dark"] body,
+[data-theme="assetiq"] body {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Ensure main scrollable area has correct background */
+.theme-dark .min-h-screen,
+.theme-assetiq .min-h-screen,
+[data-theme="dark"] .min-h-screen,
+[data-theme="assetiq"] .min-h-screen {
+  background-color: var(--bg-primary) !important;
+}
+
+/* Fix bg-slate-50 which is commonly used for page backgrounds */
+.theme-dark .bg-slate-50,
+.theme-assetiq .bg-slate-50,
+[data-theme="dark"] .bg-slate-50,
+[data-theme="assetiq"] .bg-slate-50 {
+  background-color: var(--bg-primary) !important;
+}
+
+/* ==================== IMPROVED TEXT CONTRAST ==================== */
+
+/* Ensure good contrast for secondary text */
+.theme-dark .text-slate-400,
+.theme-assetiq .text-slate-400,
+[data-theme="dark"] .text-slate-400,
+[data-theme="assetiq"] .text-slate-400 {
+  color: var(--text-tertiary) !important;
+}
+
+.theme-dark .text-slate-300,
+.theme-assetiq .text-slate-300,
+[data-theme="dark"] .text-slate-300,
+[data-theme="assetiq"] .text-slate-300 {
+  color: var(--text-secondary) !important;
+}
+
+/* Popover content */
+.theme-dark [data-radix-popper-content-wrapper] > div,
+.theme-assetiq [data-radix-popper-content-wrapper] > div,
+[data-theme="dark"] [data-radix-popper-content-wrapper] > div,
+[data-theme="assetiq"] [data-radix-popper-content-wrapper] > div {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+/* Calendar and date pickers */
+.theme-dark [data-radix-calendar],
+.theme-dark .rdp,
+.theme-assetiq [data-radix-calendar],
+.theme-assetiq .rdp,
+[data-theme="dark"] [data-radix-calendar],
+[data-theme="dark"] .rdp,
+[data-theme="assetiq"] [data-radix-calendar],
+[data-theme="assetiq"] .rdp {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Toast/Sonner notifications */
+.theme-dark [data-sonner-toast],
+.theme-assetiq [data-sonner-toast],
+[data-theme="dark"] [data-sonner-toast],
+[data-theme="assetiq"] [data-sonner-toast] {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Sheet/Dialog overlay */
+.theme-dark [data-radix-dialog-overlay],
+.theme-assetiq [data-radix-dialog-overlay],
+[data-theme="dark"] [data-radix-dialog-overlay],
+[data-theme="assetiq"] [data-radix-dialog-overlay] {
+  background-color: rgba(0, 0, 0, 0.7) !important;
 }

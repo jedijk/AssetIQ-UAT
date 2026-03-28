@@ -51,20 +51,20 @@ const StatCard = ({ label, value, icon: Icon, color, bg, subtitle, trend, trendU
   <motion.div
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
-    className={`bg-white rounded-xl border border-slate-200 p-4 transition-all ${
-      clickable ? 'hover:shadow-md hover:border-slate-300 cursor-pointer active:scale-[0.98]' : 'hover:shadow-md'
+    className={`themed-card rounded-xl border p-4 transition-all ${
+      clickable ? 'hover:shadow-md cursor-pointer active:scale-[0.98]' : 'hover:shadow-md'
     }`}
     onClick={clickable ? onClick : undefined}
     role={clickable ? "button" : undefined}
   >
     <div className="flex items-start justify-between">
       <div>
-        <p className="text-sm text-slate-500 mb-1 flex items-center gap-1">
+        <p className="text-sm text-muted mb-1 flex items-center gap-1">
           {label}
-          {clickable && <ExternalLink className="w-3 h-3 text-slate-400" />}
+          {clickable && <ExternalLink className="w-3 h-3 opacity-50" />}
         </p>
-        <p className="text-2xl font-bold text-slate-900">{value}</p>
-        {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
+        <p className="text-2xl font-bold text-primary">{value}</p>
+        {subtitle && <p className="text-xs text-muted mt-1">{subtitle}</p>}
       </div>
       <div className={`p-2.5 rounded-xl ${bg}`}>
         <Icon className={`w-5 h-5 ${color}`} />
@@ -84,8 +84,8 @@ const ProgressCard = ({ title, completed, total, icon: Icon, color, onClick, cli
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
   return (
     <div 
-      className={`bg-white rounded-xl border border-slate-200 p-4 transition-all ${
-        clickable ? 'hover:shadow-md hover:border-slate-300 cursor-pointer active:scale-[0.98]' : ''
+      className={`themed-card rounded-xl border p-4 transition-all ${
+        clickable ? 'hover:shadow-md cursor-pointer active:scale-[0.98]' : ''
       }`}
       onClick={clickable ? onClick : undefined}
       role={clickable ? "button" : undefined}
@@ -95,15 +95,15 @@ const ProgressCard = ({ title, completed, total, icon: Icon, color, onClick, cli
           <Icon className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-medium text-slate-700 flex items-center gap-1">
+          <p className="text-sm font-medium text-secondary flex items-center gap-1">
             {title}
-            {clickable && <ExternalLink className="w-3 h-3 text-slate-400" />}
+            {clickable && <ExternalLink className="w-3 h-3 opacity-50" />}
           </p>
-          <p className="text-xs text-slate-400">{completed} of {total} completed</p>
+          <p className="text-xs text-muted">{completed} of {total} completed</p>
         </div>
       </div>
       <Progress value={percentage} className="h-2" />
-      <p className="text-right text-xs text-slate-500 mt-1">{percentage}%</p>
+      <p className="text-right text-xs text-muted mt-1">{percentage}%</p>
     </div>
   );
 };
@@ -113,15 +113,15 @@ const DistributionCard = ({ title, data, colors, onClick, clickable = false }) =
   const total = Object.values(data).reduce((a, b) => a + b, 0);
   return (
     <div 
-      className={`bg-white rounded-xl border border-slate-200 p-4 transition-all ${
-        clickable ? 'hover:shadow-md hover:border-slate-300 cursor-pointer active:scale-[0.98]' : ''
+      className={`themed-card rounded-xl border p-4 transition-all ${
+        clickable ? 'hover:shadow-md cursor-pointer active:scale-[0.98]' : ''
       }`}
       onClick={clickable ? onClick : undefined}
       role={clickable ? "button" : undefined}
     >
-      <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-1">
+      <h3 className="text-sm font-medium text-secondary mb-3 flex items-center gap-1">
         {title}
-        {clickable && <ExternalLink className="w-3 h-3 text-slate-400" />}
+        {clickable && <ExternalLink className="w-3 h-3 opacity-50" />}
       </h3>
       <div className="space-y-2">
         {Object.entries(data).map(([key, value], idx) => {
@@ -129,9 +129,9 @@ const DistributionCard = ({ title, data, colors, onClick, clickable = false }) =
           return (
             <div key={key} className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${colors[idx % colors.length]}`} />
-              <span className="text-xs text-slate-600 flex-1 capitalize">{key.replace(/_/g, ' ')}</span>
-              <span className="text-xs font-medium text-slate-700">{value}</span>
-              <span className="text-xs text-slate-400">({percentage}%)</span>
+              <span className="text-xs text-muted flex-1 capitalize">{key.replace(/_/g, ' ')}</span>
+              <span className="text-xs font-medium text-secondary">{value}</span>
+              <span className="text-xs text-muted">({percentage}%)</span>
             </div>
           );
         })}
@@ -143,17 +143,17 @@ const DistributionCard = ({ title, data, colors, onClick, clickable = false }) =
 // Recent item card - clickable
 const RecentItemCard = ({ items, title, icon: Icon, emptyMessage, renderItem, onClick, clickable = false }) => (
   <div 
-    className={`bg-white rounded-xl border border-slate-200 p-4 transition-all ${
-      clickable ? 'hover:shadow-md hover:border-slate-300 cursor-pointer' : ''
+    className={`themed-card rounded-xl border p-4 transition-all ${
+      clickable ? 'hover:shadow-md cursor-pointer' : ''
     }`}
     onClick={clickable ? onClick : undefined}
     role={clickable ? "button" : undefined}
   >
     <div className="flex items-center gap-2 mb-3">
-      <Icon className="w-4 h-4 text-slate-500" />
-      <h3 className="text-sm font-medium text-slate-700 flex items-center gap-1">
+      <Icon className="w-4 h-4 text-muted" />
+      <h3 className="text-sm font-medium text-secondary flex items-center gap-1">
         {title}
-        {clickable && <ExternalLink className="w-3 h-3 text-slate-400" />}
+        {clickable && <ExternalLink className="w-3 h-3 opacity-50" />}
       </h3>
     </div>
     {items.length > 0 ? (
@@ -161,7 +161,7 @@ const RecentItemCard = ({ items, title, icon: Icon, emptyMessage, renderItem, on
         {items.slice(0, 5).map((item, idx) => renderItem(item, idx))}
       </div>
     ) : (
-      <p className="text-xs text-slate-400 text-center py-4">{emptyMessage}</p>
+      <p className="text-xs text-muted text-center py-4">{emptyMessage}</p>
     )}
   </div>
 );
@@ -471,18 +471,18 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-6 bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md hover:border-slate-300 cursor-pointer transition-all"
+          className="mt-6 themed-card rounded-xl border p-4 hover:shadow-md cursor-pointer transition-all"
           onClick={() => navigate("/threats", { state: navState })}
         >
-          <h3 className="text-sm font-medium text-slate-700 mb-4 flex items-center gap-1">
+          <h3 className="text-sm font-medium text-secondary mb-4 flex items-center gap-1">
             {t("dashboard.observationsByEquipment") || "Observations by Equipment Type"}
-            <ExternalLink className="w-3 h-3 text-slate-400" />
+            <ExternalLink className="w-3 h-3 opacity-50" />
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {Object.entries(observationsByType).map(([type, count], idx) => (
-              <div key={type} className="bg-slate-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-slate-700">{count}</p>
-                <p className="text-xs text-slate-500 truncate" title={type}>{type}</p>
+              <div key={type} className="themed-card rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-secondary">{count}</p>
+                <p className="text-xs text-muted truncate" title={type}>{type}</p>
               </div>
             ))}
           </div>
