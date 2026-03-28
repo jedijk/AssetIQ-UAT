@@ -202,58 +202,56 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="card p-6"
+        className="card p-4"
         data-testid="recommended-actions-section"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-slate-900 text-sm">Recommended Actions</h3>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowAddRecommendedDialog(true)}
-            className="text-green-600 border-green-200 hover:bg-green-50"
+            className="text-green-600 border-green-200 hover:bg-green-50 h-7 text-xs px-2"
             data-testid="add-recommended-action-button"
           >
-            <Plus className="w-4 h-4 mr-1" />
-            Add Recommendation
+            <Plus className="w-3 h-3 mr-1" />
+            Add
           </Button>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {/* Create Failure Mode Action - Show when is_new_failure_mode is true */}
           {threat.is_new_failure_mode && (
             <div
-              className="flex items-start gap-4 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-xl shadow-sm"
+              className="flex items-start gap-3 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg"
               data-testid="create-failure-mode-action"
             >
               {/* Icon */}
               <div className="flex-shrink-0">
-                <div className="w-12 h-12 rounded-lg bg-emerald-500 text-white flex flex-col items-center justify-center shadow-sm">
-                  <Settings className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-md bg-emerald-500 text-white flex flex-col items-center justify-center shadow-sm">
+                  <Settings className="w-4 h-4" />
                 </div>
               </div>
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    NEW FAILURE MODE
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] px-1.5 py-0">
+                    <Sparkles className="w-2.5 h-2.5 mr-0.5" />
+                    NEW
                   </Badge>
                 </div>
-                <h4 className="font-semibold text-slate-900 mb-1">Create Failure Mode in FMEA Library</h4>
-                <p className="text-sm text-slate-600">
-                  This observation has a new failure mode "{threat.failure_mode}" that doesn't exist in the FMEA library. 
-                  Add it with RPN scoring to track future occurrences.
+                <p className="text-xs text-slate-600">
+                  Add "{threat.failure_mode}" to FMEA library with RPN scoring.
                 </p>
               </div>
 
               {/* Create Button */}
               <Button
                 onClick={() => setShowCreateFMDialog(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-md px-2 h-7 text-xs"
                 data-testid="create-failure-mode-button"
               >
-                <Plus className="w-4 h-4 mr-1.5" />
+                <Plus className="w-3 h-3 mr-1" />
                 Create
               </Button>
             </div>
@@ -269,43 +267,40 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             return (
               <div
                 key={idx}
-                className="flex items-start gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-200 hover:shadow-sm transition-all group"
+                className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-lg hover:border-blue-200 hover:shadow-sm transition-all group"
                 data-testid={`action-item-${idx}`}
               >
-                {/* Action Type Badge */}
+                {/* Action Type Badge - Smaller */}
                 <div className="flex-shrink-0">
                   {typeStyle ? (
-                    <div className={`w-12 h-12 rounded-lg ${typeStyle.bg} ${typeStyle.text} flex flex-col items-center justify-center shadow-sm`}>
-                      <span className="text-xs font-bold">{typeStyle.label}</span>
+                    <div className={`w-8 h-8 rounded-md ${typeStyle.bg} ${typeStyle.text} flex flex-col items-center justify-center shadow-sm`}>
+                      <span className="text-[10px] font-bold">{typeStyle.label}</span>
                     </div>
                   ) : (
-                    <div className="w-12 h-12 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center">
-                      <span className="text-lg font-semibold">{idx + 1}</span>
+                    <div className="w-8 h-8 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center">
+                      <span className="text-sm font-semibold">{idx + 1}</span>
                     </div>
                   )}
                 </div>
 
-                {/* Content */}
+                {/* Content - Smaller text */}
                 <div className="flex-1 min-w-0">
                   {discipline && (
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                        </svg>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium">
                         {discipline}
                       </span>
                       {actionType && (
-                        <span className="text-xs text-slate-400">
-                          {typeStyle?.fullLabel} Maintenance
+                        <span className="text-[10px] text-slate-400">
+                          {typeStyle?.fullLabel}
                         </span>
                       )}
                     </div>
                   )}
-                  <p className="text-slate-700 leading-relaxed">{actionText}</p>
+                  <p className="text-sm text-slate-700 leading-snug">{actionText}</p>
                 </div>
 
-                {/* Act Button */}
+                {/* Act Button - Smaller */}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -315,11 +310,11 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                     discipline: discipline,
                   })}
                   disabled={promoteToActionMutation.isPending}
-                  className="opacity-0 group-hover:opacity-100 transition-all text-blue-600 hover:text-white hover:bg-blue-600 rounded-lg px-4"
+                  className="opacity-0 group-hover:opacity-100 transition-all text-blue-600 hover:text-white hover:bg-blue-600 rounded-md px-2 py-1 h-7 text-xs"
                   title="Add to action tracker"
                   data-testid={`promote-action-${idx}`}
                 >
-                  <ClipboardList className="w-4 h-4 mr-1.5" />
+                  <ClipboardList className="w-3 h-3 mr-1" />
                   Act
                 </Button>
               </div>
