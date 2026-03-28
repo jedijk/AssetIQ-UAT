@@ -1058,69 +1058,65 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
   // Main Task Execution Form Content
   const TaskFormContent = (
     <>
-      {/* Context Block - Collapsible on mobile */}
+      {/* Form Header - Gradient style like Form Designer */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 -mx-6 -mt-4 px-6 py-4 mb-6 rounded-t-lg">
+        <h3 className="text-white font-semibold text-lg">{task?.title || task?.form_name || "Task Execution"}</h3>
+        <p className="text-white/70 text-sm mt-1">
+          {task?.equipment_name || task?.asset || "Complete the form below"}
+        </p>
+      </div>
+
+      {/* Context Block - Clean card design */}
       <div className={cn(
-        "bg-slate-50 rounded-xl border border-slate-200",
-        isMobile ? "p-4" : "p-3"
+        "bg-slate-50 rounded-xl border border-slate-200 mb-6",
+        isMobile ? "p-4" : "p-4"
       )}>
-        {isMobile ? (
-          <button 
-            className="w-full flex items-center justify-between"
-            onClick={() => setExpandedContext(!expandedContext)}
-          >
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-slate-500" />
-              <span className="font-medium text-slate-700">{task.equipment_name || task.asset}</span>
-            </div>
-            {expandedContext ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-          </button>
-        ) : (
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-500">Asset / Location</span>
-            <span className="font-medium">{task.equipment_name || task.asset}</span>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+            <MapPin className="w-4 h-4 text-indigo-600" />
           </div>
-        )}
+          <div>
+            <p className="font-medium text-slate-800">{task.equipment_name || task.asset}</p>
+            <p className="text-xs text-slate-500">{task.mitigation_strategy || task.type}</p>
+          </div>
+        </div>
         
-        {(expandedContext || !isMobile) && (
-          <div className={cn("space-y-2", isMobile ? "mt-4 pt-4 border-t border-slate-200 text-sm" : "text-sm mt-2")}>
-            {task.last_completed && (
-              <div className="flex justify-between">
-                <span className="text-slate-500">Last completed</span>
-                <span>{format(parseISO(task.last_completed), "MMM d, yyyy")}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-slate-500">Task type</span>
-              <span className="capitalize">{task.mitigation_strategy || task.type}</span>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          {task.last_completed && (
+            <div className="bg-white rounded-lg p-2 border border-slate-100">
+              <span className="text-slate-400 text-xs block">Last completed</span>
+              <span className="text-slate-700 font-medium">{format(parseISO(task.last_completed), "MMM d, yyyy")}</span>
             </div>
-            {task.frequency && (
-              <div className="flex justify-between">
-                <span className="text-slate-500">Frequency</span>
-                <span>{task.frequency}</span>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+          {task.frequency && (
+            <div className="bg-white rounded-lg p-2 border border-slate-100">
+              <span className="text-slate-400 text-xs block">Frequency</span>
+              <span className="text-slate-700 font-medium">{task.frequency}</span>
+            </div>
+          )}
+        </div>
       </div>
       
-      {/* Form Fields */}
+      {/* Form Fields - Styled like Form Designer preview */}
       <div className={cn("space-y-5", isMobile && "pb-28")}>
         {formFields.length > 0 ? (
           <>
-            <h4 className={cn("font-semibold text-slate-900", isMobile ? "text-lg" : "text-base")}>
-              Execution Form
-            </h4>
             {formFields.map(renderField)}
           </>
         ) : (
           <div className="space-y-3">
-            <Label className={isMobile ? "text-base" : ""}>Completion Notes</Label>
+            <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
+              Completion Notes
+            </label>
             <Textarea
               value={completionNotes}
               onChange={(e) => setCompletionNotes(e.target.value)}
               placeholder="Enter any notes about the task execution..."
               rows={isMobile ? 5 : 4}
-              className={isMobile ? "text-base" : ""}
+              className={cn(
+                "bg-slate-50 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-indigo-500",
+                isMobile ? "text-base" : ""
+              )}
             />
           </div>
         )}
