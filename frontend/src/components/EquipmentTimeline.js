@@ -16,6 +16,7 @@ import {
   Target,
   AlertCircle,
   ExternalLink,
+  FileSearch,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -56,6 +57,15 @@ const ITEM_CONFIG = {
     label: "Task",
     route: "/my-tasks",
   },
+  investigation: {
+    icon: FileSearch,
+    bgColor: "bg-purple-50",
+    iconColor: "text-purple-500",
+    borderColor: "border-purple-200",
+    dotColor: "bg-purple-400",
+    label: "Investigation",
+    route: "/causal-engine",
+  },
 };
 
 // Status badge component
@@ -67,6 +77,8 @@ const StatusBadge = ({ status, type }) => {
     closed: { bg: "bg-slate-100", text: "text-slate-700", label: "Closed" },
     pending: { bg: "bg-yellow-100", text: "text-yellow-700", label: "Pending" },
     overdue: { bg: "bg-red-100", text: "text-red-700", label: "Overdue" },
+    draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Draft" },
+    review: { bg: "bg-indigo-100", text: "text-indigo-700", label: "Review" },
   };
   
   const config = statusConfig[status] || statusConfig.open;
@@ -154,6 +166,14 @@ const TimelineItemPopup = ({ item, isOpen, onClose, onNavigate }) => {
             <div>
               <span className="text-xs text-muted">Priority</span>
               <p className="text-sm font-medium text-primary capitalize">{item.priority}</p>
+            </div>
+          )}
+          
+          {/* Case number for investigations */}
+          {item.type === "investigation" && item.case_number && (
+            <div>
+              <span className="text-xs text-muted">Case Number</span>
+              <p className="text-sm font-medium text-primary font-mono">{item.case_number}</p>
             </div>
           )}
           
@@ -289,6 +309,8 @@ const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
       navigate(`/actions/${item.id}`);
     } else if (item.type === "task") {
       navigate(`/my-tasks`);
+    } else if (item.type === "investigation") {
+      navigate(`/causal-engine?inv=${item.id}`);
     }
   };
   
@@ -343,7 +365,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
   }
   
   const timeline = data?.timeline || [];
-  const counts = data?.counts || { observations: 0, actions: 0, tasks: 0 };
+  const counts = data?.counts || { observations: 0, actions: 0, tasks: 0, investigations: 0 };
   
   // Filter timeline items
   const filteredTimeline = filter === "all" 
@@ -412,6 +434,15 @@ const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
           >
             <ClipboardList className="w-3 h-3 mr-0.5" />
             {counts.tasks}
+          </Button>
+          <Button
+            variant={filter === "investigation" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilter("investigation")}
+            className="h-6 text-[10px] px-2 flex-shrink-0"
+          >
+            <FileSearch className="w-3 h-3 mr-0.5" />
+            {counts.investigations}
           </Button>
         </div>
       </div>

@@ -45,6 +45,13 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 ## Completed Work
 
 ### March 28, 2026
+- **Added:** Investigations to Equipment History Timeline
+  - Shows investigations linked to threats, sibling observations, or same equipment
+  - Purple-colored cards with Draft/Review/In Progress status badges
+  - Filter button to show only investigations
+  - Backend: `/app/backend/routes/threats.py`
+  - Frontend: `/app/frontend/src/components/EquipmentTimeline.js`
+
 - **Added:** Equipment History Timeline to Causal Engine page
   - Shows related activity when investigation is linked to a threat
   - File: `/app/frontend/src/pages/CausalEnginePage.js`

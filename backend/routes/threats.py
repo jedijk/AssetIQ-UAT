@@ -1094,6 +1094,33 @@ async def get_threat_timeline(
             "source": "task"
         })
     
+    # Get investigations linked to this observation or sibling observations
+    investigation_conditions = [
+        {"threat_id": threat_id}
+    ]
+    if sibling_obs_ids:
+        investigation_conditions.append({"threat_id": {"$in": sibling_obs_ids}})
+    if asset_name:
+        investigation_conditions.append({"asset_name": asset_name})
+    
+    investigations = await db.investigations.find(
+        {"$or": investigation_conditions},
+        {"_id": 0}
+    ).to_list(50)
+    
+    for inv in investigations:
+        timeline_items.append({
+            "id": inv.get("id"),
+            "type": "investigation",
+            "title": inv.get("title", "Untitled Investigation"),
+            "description": inv.get("description", ""),
+            "status": inv.get("status", "draft"),
+            "case_number": inv.get("case_number", ""),
+            "created_at": inv.get("created_at"),
+            "updated_at": inv.get("updated_at"),
+            "source": "investigation"
+        })
+    
     # Sort by date (most recent first)
     def get_sort_date(item):
         date_str = item.get("created_at") or item.get("scheduled_date") or ""
@@ -1114,6 +1141,7 @@ async def get_threat_timeline(
         "counts": {
             "observations": len([i for i in timeline_items if i["type"] == "observation"]),
             "actions": len([i for i in timeline_items if i["type"] == "action"]),
-            "tasks": len([i for i in timeline_items if i["type"] == "task"])
+            "tasks": len([i for i in timeline_items if i["type"] == "task"]),
+            "investigations": len([i for i in timeline_items if i["type"] == "investigation"])
         }
     }
