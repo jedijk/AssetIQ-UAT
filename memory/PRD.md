@@ -44,9 +44,27 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 - `action_type` (CM/PM/PDM): Corrective/Preventive/Predictive Maintenance
 - `discipline` (string): e.g., Mechanical, Electrical
 
-## Completed in Latest Session (Mar 28, 2026)
+## Completed in Latest Session (Mar 28, 2026 - Session 2)
 
-### Feature: Forgot Password with Email Verification (NEW)
+### Bug Fix: Export Hierarchy Error (P1)
+- Fixed `AttributeError: 'str' object has no attribute 'get'` in equipment hierarchy export
+- Root cause: Missing defensive checks for corrupted node data in MongoDB
+- Solution: Added robust type checking and error handling:
+  - Skip non-dictionary nodes with warning log
+  - Safe criticality dictionary access with fallback
+  - Safe level label extraction with try/catch for enum conversion
+  - Updated `get_path()` and `get_criticality_score()` helper functions to handle edge cases
+- File updated: `/app/backend/routes/equipment.py`
+
+### Verification: Form Execution UI in My Tasks
+- Verified the form execution UI redesign from previous session works correctly
+- Gradient headers, styled context cards, and proper form field rendering confirmed
+- Both mobile (Sheet) and desktop (Dialog) versions working
+- File: `/app/frontend/src/pages/MyTasksPage.js`
+
+## Completed Earlier (Mar 28, 2026 - Session 1)
+
+### Feature: Forgot Password with Email Verification
 - Added "Forgot password?" link on login page
 - Created ForgotPasswordPage with email input form
 - Created ResetPasswordPage with:

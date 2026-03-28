@@ -205,21 +205,30 @@ async def export_equipment_hierarchy_excel(
     
     def get_path(node):
         """Generate full path from root to node."""
-        path_parts = [node["name"]]
+        if not isinstance(node, dict):
+            return ""
+        path_parts = [node.get("name", "")]
         current = node
-        while current.get("parent_id") and current["parent_id"] in node_lookup:
+        while isinstance(current, dict) and current.get("parent_id") and current["parent_id"] in node_lookup:
             current = node_lookup[current["parent_id"]]
-            path_parts.insert(0, current["name"])
+            if isinstance(current, dict):
+                path_parts.insert(0, current.get("name", ""))
+            else:
+                break
         return " > ".join(path_parts)
     
     def get_criticality_score(node):
         """Calculate total criticality score."""
-        crit = node.get("criticality") or {}
+        if not isinstance(node, dict):
+            return 0
+        crit = node.get("criticality")
+        if not isinstance(crit, dict):
+            return 0
         return sum([
-            crit.get("safety", 0),
-            crit.get("production", 0),
-            crit.get("environmental", 0),
-            crit.get("reputation", 0)
+            crit.get("safety", 0) or 0,
+            crit.get("production", 0) or 0,
+            crit.get("environmental", 0) or 0,
+            crit.get("reputation", 0) or 0
         ])
     
     # Create workbook
@@ -267,16 +276,34 @@ async def export_equipment_hierarchy_excel(
     
     # Write data rows
     for row_idx, node in enumerate(nodes, 2):
+        # Skip corrupted nodes that are not dictionaries
+        if not isinstance(node, dict):
+            logger.warning(f"Skipping corrupted node at row {row_idx}: expected dict, got {type(node).__name__}")
+            continue
+            
         parent_name = ""
         if node.get("parent_id") and node["parent_id"] in node_lookup:
-            parent_name = node_lookup[node["parent_id"]]["name"]
+            parent_node = node_lookup[node["parent_id"]]
+            if isinstance(parent_node, dict):
+                parent_name = parent_node.get("name", "")
         
         equipment_type_name = ""
         if node.get("equipment_type_id"):
             equipment_type_name = all_types.get(node["equipment_type_id"], "")
         
-        criticality = node.get("criticality") or {}
-        level_label = ISO_LEVEL_LABELS.get(ISOLevel(node["level"]), node["level"]) if node.get("level") else ""
+        # Handle criticality - ensure it's a dict
+        criticality = node.get("criticality")
+        if not isinstance(criticality, dict):
+            criticality = {}
+        
+        # Safely get level label
+        level_label = ""
+        node_level = node.get("level")
+        if node_level:
+            try:
+                level_label = ISO_LEVEL_LABELS.get(ISOLevel(node_level), str(node_level))
+            except (ValueError, TypeError):
+                level_label = str(node_level)
         
         row_data = [
             node.get("id", ""),
