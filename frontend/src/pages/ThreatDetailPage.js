@@ -5,6 +5,7 @@ import { threatsAPI, actionsAPI, equipmentHierarchyAPI, failureModesAPI } from "
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import SearchableCombobox from "../components/SearchableCombobox";
+import EquipmentTimeline from "../components/EquipmentTimeline";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -1164,6 +1165,14 @@ const ThreatDetailPage = () => {
           <p className="text-slate-600">{threat.cause || "Not specified"}</p>
         )}
       </motion.div>
+
+      {/* Equipment History Timeline */}
+      {threat.linked_equipment_id && (
+        <EquipmentTimeline 
+          equipmentId={threat.linked_equipment_id}
+          equipmentName={threat.asset}
+        />
+      )}
 
       {/* Recommended Actions - Extracted Component */}
       <RecommendedActionsSection threat={threat} threatId={id} />

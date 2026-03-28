@@ -46,6 +46,14 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 
 ## Completed in Latest Session (Mar 28, 2026 - Session 4)
 
+### Feature: Equipment History Timeline
+- Created horizontal timeline component showing equipment-related observations, actions, and tasks
+- Added backend endpoint `GET /api/equipment-hierarchy/nodes/{node_id}/history`
+- Timeline positioned under Probable Cause in Observation detail view
+- Features: filter buttons, horizontal scroll, popup detail view on click
+- Color-coded items: Amber (Observations), Blue (Actions), Purple (Tasks)
+- Files: `/app/frontend/src/components/EquipmentTimeline.js`, `/app/backend/routes/equipment.py`
+
 ### Fix: Dark Mode Contrast and Theme Cleanup
 - Improved dark mode contrast throughout the application
 - Added comprehensive CSS variables system for dark mode

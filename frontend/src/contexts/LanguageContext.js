@@ -258,6 +258,11 @@ const en = {
     production: "Production",
     environment: "Environ.",
     reputation: "Reputation",
+    equipmentHistory: "Equipment History",
+    noHistoryItems: "No history items found for this equipment",
+    observation: "Observation",
+    action: "Action",
+    task: "Task",
     location: "Location",
   },
   
@@ -1397,6 +1402,11 @@ const nl = {
     production: "Productie",
     environment: "Milieu",
     reputation: "Reputatie",
+    equipmentHistory: "Apparatuur Geschiedenis",
+    noHistoryItems: "Geen geschiedenis gevonden voor dit apparaat",
+    observation: "Observatie",
+    action: "Actie",
+    task: "Taak",
     location: "Locatie",
   },
   

@@ -350,6 +350,12 @@ export const equipmentHierarchyAPI = {
     const response = await api.delete(`/equipment-hierarchy/types/${typeId}`);
     return response.data;
   },
+  
+  // Equipment history timeline
+  getEquipmentHistory: async (nodeId) => {
+    const response = await api.get(`/equipment-hierarchy/nodes/${nodeId}/history`);
+    return response.data;
+  },
 };
 
 // Causal Investigation API
