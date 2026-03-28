@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, Languages, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -365,19 +365,18 @@ const Layout = () => {
               </Tooltip>
             </TooltipProvider>
 
-            {/* Language Switcher - Compact on mobile */}
+            {/* Language Switcher - Compact */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
                     onClick={toggleLanguage}
-                    className="h-7 w-7 sm:h-8 sm:w-auto sm:px-2.5 text-xs text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-800 font-medium"
+                    className="h-6 w-6 sm:h-7 sm:w-7 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                     data-testid="language-switcher"
                   >
-                    <Languages className="w-3.5 h-3.5 sm:mr-1" />
-                    <span className="hidden sm:inline">{language.toUpperCase()}</span>
+                    <span className="font-medium">{language.toUpperCase()}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">

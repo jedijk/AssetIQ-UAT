@@ -177,8 +177,9 @@ class RBACService:
     async def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get a user by ID."""
         try:
+            # Try both 'id' and 'user_id' fields for compatibility
             user = await self.users.find_one(
-                {"user_id": user_id},
+                {"$or": [{"id": user_id}, {"user_id": user_id}]},
                 {"password_hash": 0}
             )
             if user:
@@ -197,8 +198,9 @@ class RBACService:
         if new_role not in ROLES:
             raise ValueError(f"Invalid role: {new_role}")
         
+        # Try both 'id' and 'user_id' fields for compatibility
         result = await self.users.update_one(
-            {"user_id": user_id},
+            {"$or": [{"id": user_id}, {"user_id": user_id}]},
             {
                 "$set": {
                     "role": new_role,
@@ -219,8 +221,9 @@ class RBACService:
         updated_by: str
     ) -> Optional[Dict[str, Any]]:
         """Activate or deactivate a user."""
+        # Try both 'id' and 'user_id' fields for compatibility
         result = await self.users.update_one(
-            {"user_id": user_id},
+            {"$or": [{"id": user_id}, {"user_id": user_id}]},
             {
                 "$set": {
                     "is_active": is_active,
@@ -245,8 +248,9 @@ class RBACService:
         update_data["updated_at"] = datetime.now(timezone.utc)
         
         if update_data:
+            # Try both 'id' and 'user_id' fields for compatibility
             result = await self.users.update_one(
-                {"user_id": user_id},
+                {"$or": [{"id": user_id}, {"user_id": user_id}]},
                 {"$set": update_data}
             )
             

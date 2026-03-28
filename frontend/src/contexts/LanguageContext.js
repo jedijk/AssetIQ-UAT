@@ -67,6 +67,23 @@ const en = {
     criteria: "Criteria",
     likelihood: "Likelihood",
     detectionMethod: "Suggested Detection Method",
+    // Editable definitions
+    selectInstallation: "Select Installation",
+    selectInstallationDesc: "Choose an installation to view or customize its definitions",
+    noInstallations: "No installations found. Add installations in Equipment Manager first.",
+    usingDefaults: "Using default definitions",
+    usingCustom: "Using custom definitions",
+    editDefinitions: "Edit Definitions",
+    saveChanges: "Save Changes",
+    resetToDefaults: "Reset to Defaults",
+    saving: "Saving...",
+    saved: "Definitions saved successfully",
+    resetConfirm: "Are you sure you want to reset to default definitions? This will remove all customizations.",
+    label: "Label",
+    secondaryDescription: "Secondary Description",
+    editRow: "Edit Row",
+    viewMode: "View",
+    editMode: "Edit",
   },
   
   // Dashboard
@@ -998,6 +1015,16 @@ const en = {
     position: "Position",
     changeUserRole: "Change User Role",
     score: "SCORE",
+    // Photo upload
+    uploadPhoto: "Upload Photo",
+    changePhoto: "Change Photo",
+    removePhoto: "Remove Photo",
+    photoUploading: "Uploading...",
+    photoUploaded: "Photo uploaded successfully",
+    photoRemoved: "Photo removed",
+    photoError: "Failed to upload photo",
+    invalidFileType: "Invalid file type. Please use JPEG, PNG, GIF, or WebP.",
+    fileTooLarge: "File too large. Maximum size is 5MB.",
   },
 
   // User Statistics
@@ -1144,6 +1171,23 @@ const nl = {
     criteria: "Criteria",
     likelihood: "Waarschijnlijkheid",
     detectionMethod: "Voorgestelde Detectiemethode",
+    // Bewerkbare definities
+    selectInstallation: "Selecteer Installatie",
+    selectInstallationDesc: "Kies een installatie om de definities te bekijken of aan te passen",
+    noInstallations: "Geen installaties gevonden. Voeg eerst installaties toe in Equipment Manager.",
+    usingDefaults: "Standaard definities gebruiken",
+    usingCustom: "Aangepaste definities gebruiken",
+    editDefinitions: "Definities Bewerken",
+    saveChanges: "Wijzigingen Opslaan",
+    resetToDefaults: "Terugzetten naar Standaard",
+    saving: "Opslaan...",
+    saved: "Definities succesvol opgeslagen",
+    resetConfirm: "Weet u zeker dat u wilt terugzetten naar standaard definities? Dit verwijdert alle aanpassingen.",
+    label: "Label",
+    secondaryDescription: "Secundaire Beschrijving",
+    editRow: "Rij Bewerken",
+    viewMode: "Bekijken",
+    editMode: "Bewerken",
   },
   
   // Dashboard
@@ -2076,6 +2120,16 @@ const nl = {
     position: "Positie",
     changeUserRole: "Gebruikersrol wijzigen",
     score: "SCORE",
+    // Foto upload
+    uploadPhoto: "Foto Uploaden",
+    changePhoto: "Foto Wijzigen",
+    removePhoto: "Foto Verwijderen",
+    photoUploading: "Uploaden...",
+    photoUploaded: "Foto succesvol geüpload",
+    photoRemoved: "Foto verwijderd",
+    photoError: "Foto uploaden mislukt",
+    invalidFileType: "Ongeldig bestandstype. Gebruik JPEG, PNG, GIF of WebP.",
+    fileTooLarge: "Bestand te groot. Maximale grootte is 5MB.",
   },
 
   // User Statistics

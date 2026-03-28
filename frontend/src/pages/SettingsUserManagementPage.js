@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -27,6 +27,9 @@ import {
   Check,
   Filter,
   RefreshCw,
+  Camera,
+  Upload,
+  Trash2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -135,12 +138,41 @@ const rbacAPI = {
     });
     if (!response.ok) throw new Error("Failed to update profile");
     return response.json();
+  },
+  
+  uploadUserAvatar: async ({ userId, file }) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}/avatar`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      },
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to upload avatar");
+    }
+    return response.json();
+  },
+  
+  getUserAvatar: async (userId) => {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${API_BASE_URL}/api/users/${userId}/avatar?auth=${token}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
   }
 };
 
 const SettingsUserManagementPage = () => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef(null);
   
   // State
   const [search, setSearch] = useState("");
@@ -149,6 +181,8 @@ const SettingsUserManagementPage = () => {
   const [editForm, setEditForm] = useState({});
   const [changeRoleUser, setChangeRoleUser] = useState(null);
   const [selectedRole, setSelectedRole] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(null);
+  const [avatarUrls, setAvatarUrls] = useState({});
 
   // Queries
   const { data: usersData, isLoading: usersLoading, refetch } = useQuery({
@@ -194,7 +228,79 @@ const SettingsUserManagementPage = () => {
     onError: () => toast.error("Failed to update profile")
   });
 
+  const uploadAvatarMutation = useMutation({
+    mutationFn: rbacAPI.uploadUserAvatar,
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries(["rbac-users"]);
+      toast.success(t("userManagement.photoUploaded") || "Photo uploaded successfully");
+      setUploadingAvatar(null);
+      // Refresh avatar URL
+      loadAvatar(variables.userId);
+    },
+    onError: (error) => {
+      toast.error(error.message || t("userManagement.photoError") || "Failed to upload photo");
+      setUploadingAvatar(null);
+    }
+  });
+
+  // Load avatar for a user
+  const loadAvatar = async (userId) => {
+    try {
+      const url = await rbacAPI.getUserAvatar(userId);
+      if (url) {
+        setAvatarUrls(prev => ({ ...prev, [userId]: url }));
+      }
+    } catch (err) {
+      // Silently fail - user just won't have an avatar
+    }
+  };
+
+  // Load avatars for users with avatar_path
+  const loadAvatarsForUsers = async (usersList) => {
+    for (const user of usersList) {
+      if (user.avatar_path && !avatarUrls[user.id]) {
+        loadAvatar(user.id);
+      }
+    }
+  };
+
+  // Effect to load avatars when users change
   const users = usersData?.users || [];
+  
+  // Load avatars when users data changes
+  useState(() => {
+    if (users.length > 0) {
+      loadAvatarsForUsers(users);
+    }
+  }, [users]);
+
+  const handleAvatarUpload = (userId) => {
+    setUploadingAvatar(userId);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadingAvatar) return;
+    
+    // Validate file type
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      toast.error(t("userManagement.invalidFileType") || "Invalid file type");
+      setUploadingAvatar(null);
+      return;
+    }
+    
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(t("userManagement.fileTooLarge") || "File too large");
+      setUploadingAvatar(null);
+      return;
+    }
+    
+    uploadAvatarMutation.mutate({ userId: uploadingAvatar, file });
+    e.target.value = ""; // Reset input
+  };
   const roles = rolesData?.roles || {};
 
   const handleEditProfile = (user) => {
@@ -331,12 +437,31 @@ const SettingsUserManagementPage = () => {
               <tbody className="divide-y divide-slate-100">
                 {users.map((user) => {
                   const RoleIcon = roleIcons[user.role] || Shield;
+                  const avatarUrl = avatarUrls[user.id];
                   return (
                     <tr key={user.id} className="hover:bg-slate-50" data-testid={`user-row-${user.id}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm">
-                            {user.name?.charAt(0)?.toUpperCase() || "U"}
+                          <div className="relative group">
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={user.name}
+                                className="h-10 w-10 rounded-full object-cover border-2 border-white shadow-sm"
+                              />
+                            ) : (
+                              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm border-2 border-white shadow-sm">
+                                {user.name?.charAt(0)?.toUpperCase() || "U"}
+                              </div>
+                            )}
+                            {/* Upload overlay on hover */}
+                            <button
+                              onClick={() => handleAvatarUpload(user.id)}
+                              className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                              title={t("userManagement.uploadPhoto")}
+                            >
+                              <Camera className="w-4 h-4 text-white" />
+                            </button>
                           </div>
                           <div>
                             <div className="font-medium text-slate-900">{user.name}</div>
@@ -382,6 +507,9 @@ const SettingsUserManagementPage = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleAvatarUpload(user.id)}>
+                              <Camera className="w-4 h-4 mr-2" /> {t("userManagement.uploadPhoto") || "Upload Photo"}
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEditProfile(user)}>
                               <Edit className="w-4 h-4 mr-2" /> Edit Profile
                             </DropdownMenuItem>
@@ -513,6 +641,16 @@ const SettingsUserManagementPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Hidden file input for avatar upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        onChange={handleFileChange}
+        className="hidden"
+        data-testid="avatar-file-input"
+      />
     </div>
   );
 };
