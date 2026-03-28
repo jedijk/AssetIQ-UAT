@@ -291,6 +291,43 @@ async def upload_user_avatar_admin(
 
 
 
+@router.delete("/rbac/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Delete a user permanently.
+    - Cannot delete yourself
+    - Removes user from database
+    """
+    # Prevent self-deletion
+    if user_id == current_user["id"]:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot delete your own account"
+        )
+    
+    # Check if user exists
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "name": 1, "email": 1})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Delete the user
+    result = await db.users.delete_one({"id": user_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to delete user")
+    
+    logger.info(f"User {user_id} ({user.get('email')}) deleted by {current_user['id']}")
+    
+    return {
+        "message": "User deleted successfully",
+        "deleted_user_id": user_id,
+        "deleted_user_name": user.get("name")
+    }
+
+
 @router.get("/rbac/role-distribution")
 async def get_role_distribution(current_user: dict = Depends(get_current_user)):
     """Get count of users per role."""

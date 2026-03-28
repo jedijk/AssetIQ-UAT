@@ -46,6 +46,17 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 
 ## Completed in Latest Session (Mar 28, 2026 - Session 2)
 
+### Feature: User Deletion (NEW)
+- Added ability to permanently delete users from User Management page
+- Backend endpoint: `DELETE /api/rbac/users/{user_id}`
+- Safety features:
+  - Cannot delete your own account (returns 400 error)
+  - Confirmation dialog before deletion
+  - Shows user name being deleted
+  - Warning about permanent data removal
+- UI: Delete option added to user actions dropdown menu (red text)
+- Files updated: `/app/backend/routes/users.py`, `/app/frontend/src/pages/SettingsUserManagementPage.js`
+
 ### Bug Fix: Export Hierarchy Error (P1)
 - Fixed `AttributeError: 'str' object has no attribute 'get'` in equipment hierarchy export
 - Root cause: Missing defensive checks for corrupted node data in MongoDB

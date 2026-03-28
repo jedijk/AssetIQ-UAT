@@ -167,6 +167,20 @@ const rbacAPI = {
     if (!response.ok) return null;
     const blob = await response.blob();
     return URL.createObjectURL(blob);
+  },
+  
+  deleteUser: async (userId) => {
+    const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      }
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to delete user");
+    }
+    return response.json();
   }
 };
 
@@ -189,6 +203,9 @@ const SettingsUserManagementPage = () => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorImage, setEditorImage] = useState(null);
   const [editingUserId, setEditingUserId] = useState(null);
+  
+  // Delete confirmation state
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState(null);
 
   // Queries
   const { data: usersData, isLoading: usersLoading, refetch } = useQuery({
@@ -246,6 +263,19 @@ const SettingsUserManagementPage = () => {
     onError: (error) => {
       toast.error(error.message || t("userManagement.photoError") || "Failed to upload photo");
       setEditingUserId(null);
+    }
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: rbacAPI.deleteUser,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["rbac-users"]);
+      toast.success(`User "${data.deleted_user_name}" deleted successfully`);
+      setDeleteConfirmUser(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete user");
+      setDeleteConfirmUser(null);
     }
   });
 
@@ -571,6 +601,14 @@ const SettingsUserManagementPage = () => {
                                 <UserCheck className="w-4 h-4 mr-2" /> Activate
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-red-600"
+                              onClick={() => setDeleteConfirmUser(user)}
+                              data-testid={`delete-user-${user.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" /> Delete User
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>
@@ -691,6 +729,36 @@ const SettingsUserManagementPage = () => {
         cropShape="round"
         title={t("userManagement.editPhoto") || "Edit Photo"}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmUser} onOpenChange={() => setDeleteConfirmUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete User</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to permanently delete <span className="font-semibold text-foreground">{deleteConfirmUser?.name}</span>?
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              This action cannot be undone. All data associated with this user will be removed.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmUser(null)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={() => deleteUserMutation.mutate(deleteConfirmUser?.id)}
+              disabled={deleteUserMutation.isPending}
+              data-testid="confirm-delete-user-btn"
+            >
+              {deleteUserMutation.isPending ? "Deleting..." : "Delete User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Hidden file input for avatar upload */}
       <input
