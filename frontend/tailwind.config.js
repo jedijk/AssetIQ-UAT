@@ -70,11 +70,55 @@ module.exports = {
   				to: {
   					height: '0'
   				}
+  			},
+  			'collapsible-down': {
+  				from: {
+  					height: '0',
+  					opacity: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-collapsible-content-height)',
+  					opacity: '1'
+  				}
+  			},
+  			'collapsible-up': {
+  				from: {
+  					height: 'var(--radix-collapsible-content-height)',
+  					opacity: '1'
+  				},
+  				to: {
+  					height: '0',
+  					opacity: '0'
+  				}
+  			},
+  			'slide-up': {
+  				from: {
+  					transform: 'translateY(10px)',
+  					opacity: '0'
+  				},
+  				to: {
+  					transform: 'translateY(0)',
+  					opacity: '1'
+  				}
+  			},
+  			'scale-in': {
+  				from: {
+  					transform: 'scale(0.95)',
+  					opacity: '0'
+  				},
+  				to: {
+  					transform: 'scale(1)',
+  					opacity: '1'
+  				}
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'collapsible-down': 'collapsible-down 0.25s ease-out',
+  			'collapsible-up': 'collapsible-up 0.2s ease-out',
+  			'slide-up': 'slide-up 0.25s ease-out',
+  			'scale-in': 'scale-in 0.2s ease-out'
   		}
   	}
   },
