@@ -21,6 +21,10 @@ class UserResponse(BaseModel):
     email: str
     name: str
     created_at: str
+    department: Optional[str] = None
+    position: Optional[str] = None
+    role: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class TokenResponse(BaseModel):

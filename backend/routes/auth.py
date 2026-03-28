@@ -51,7 +51,11 @@ async def login(credentials: UserLogin):
             id=user["id"],
             email=user["email"],
             name=user["name"],
-            created_at=user["created_at"]
+            created_at=user["created_at"],
+            department=user.get("department"),
+            position=user.get("position"),
+            role=user.get("role"),
+            phone=user.get("phone")
         )
     )
 
@@ -61,6 +65,10 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         id=current_user["id"],
         email=current_user["email"],
         name=current_user["name"],
-        created_at=current_user["created_at"]
+        created_at=current_user["created_at"],
+        department=current_user.get("department"),
+        position=current_user.get("position"),
+        role=current_user.get("role"),
+        phone=current_user.get("phone")
     )
 
