@@ -614,6 +614,13 @@ const en = {
     hasAccount: "Already have an account?",
     signUp: "Sign up",
     signIn: "Sign in",
+    forgotPassword: "Forgot password?",
+    forgotPasswordSubtitle: "Enter your email and we'll send you a link to reset your password.",
+    resetPassword: "Reset Password",
+    newPassword: "New Password",
+    confirmPassword: "Confirm Password",
+    resetLinkSent: "Reset link sent! Check your email.",
+    passwordResetSuccess: "Password has been reset successfully.",
   },
 
   // AI Features
@@ -1732,6 +1739,13 @@ const nl = {
     hasAccount: "Heeft u al een account?",
     signUp: "Registreren",
     signIn: "Inloggen",
+    forgotPassword: "Wachtwoord vergeten?",
+    forgotPasswordSubtitle: "Voer uw e-mail in en we sturen u een link om uw wachtwoord te resetten.",
+    resetPassword: "Wachtwoord Resetten",
+    newPassword: "Nieuw Wachtwoord",
+    confirmPassword: "Bevestig Wachtwoord",
+    resetLinkSent: "Reset link verzonden! Controleer uw e-mail.",
+    passwordResetSuccess: "Wachtwoord is succesvol gereset.",
   },
 
   // AI Features

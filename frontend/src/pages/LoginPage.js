@@ -123,6 +123,15 @@ const LoginPage = () => {
                 className="h-11"
                 data-testid="login-password-input"
               />
+              <div className="flex justify-end">
+                <Link 
+                  to="/forgot-password" 
+                  className="text-sm text-blue-600 hover:underline"
+                  data-testid="forgot-password-link"
+                >
+                  {t("auth.forgotPassword") || "Forgot password?"}
+                </Link>
+              </div>
             </div>
 
             <Button

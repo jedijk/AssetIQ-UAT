@@ -46,6 +46,24 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 
 ## Completed in Latest Session (Mar 28, 2026)
 
+### Feature: Forgot Password with Email Verification (NEW)
+- Added "Forgot password?" link on login page
+- Created ForgotPasswordPage with email input form
+- Created ResetPasswordPage with:
+  - Token verification on load
+  - New password + confirm password fields
+  - Password strength indicator (Weak/Medium/Strong)
+  - Show/hide password toggle
+  - Invalid/expired token handling with clear error message
+- Backend endpoints:
+  - `POST /api/auth/forgot-password` - Generates token, stores in DB, sends email (Resend)
+  - `POST /api/auth/verify-reset-token` - Validates token is valid and not expired
+  - `POST /api/auth/reset-password` - Resets password, marks token as used
+- Token expires after 1 hour for security
+- Professional HTML email template with AssetIQ branding
+- Files: `ForgotPasswordPage.js`, `ResetPasswordPage.js`, `auth.py` (backend)
+- **Note**: Resend API key required in `.env` for emails to actually send
+
 ### Feature: Mobile Analytics Page (NEW)
 - Built new mobile-first Analytics page following modern dashboard design
 - 2x2 metric grid: Observations, Actions Done, Avg RPN, Compliance
