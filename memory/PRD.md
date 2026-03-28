@@ -46,6 +46,28 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 
 ## Completed in Latest Session (Mar 28, 2026)
 
+### Feature: Mobile Analytics Page (NEW)
+- Built new mobile-first Analytics page following modern dashboard design
+- 2x2 metric grid: Observations, Actions Done, Avg RPN, Compliance
+- Horizontal bar chart: Risk by Equipment Type
+- Line chart with area fill: Observation Trend
+- Date range picker modal with presets (Last 7 days, 30 days, This month, etc.)
+- Integrated with existing analytics APIs
+- Added to mobile bottom navigation as "Analytics" tab
+- Files: `/app/frontend/src/mobile/MobileAnalytics.js`
+
+### Feature: Failure Mode Validation Enhancement
+- Auto-fill validator name and position from logged-in user's profile
+- Show user preview (photo, name, position) in validation dialog
+- Enhanced validation display with validator's photo when viewing validated failure modes
+- Backend stores `validated_by_id` for avatar fetching
+- Files updated: `FailureModeViewPanel.jsx`, `failure_modes_routes.py`, `failure_modes_service.py`
+
+### Bug Fixes
+- Fixed user profile dropdown showing position as plain text instead of badge (better for long text)
+- Fixed user management avatar not displaying (duplicate API route conflict resolved)
+- Removed duplicate RBAC routes from `analytics.py` that were shadowing `users.py` routes
+
 ### Feature: User Avatar in Header with Profile Dropdown
 - Replaced user name text in header with circular avatar
 - Avatar shows uploaded photo or initials with gradient background

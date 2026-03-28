@@ -5,24 +5,25 @@ import {
   Plus, 
   AlertTriangle, 
   CheckSquare,
-  User
+  BarChart3
 } from "lucide-react";
 import MobileHierarchy from "./MobileHierarchy";
 import MobileMyTasks from "./MobileMyTasks";
 import MobileObservations from "./MobileObservations";
 import MobileActions from "./MobileActions";
 import MobileChat from "./MobileChat";
+import MobileAnalytics from "./MobileAnalytics";
 
 const MobileApp = () => {
   const [activeTab, setActiveTab] = useState("home");
   const [showChat, setShowChat] = useState(false);
 
   const tabs = [
-    { id: "home", label: "Hierarchy", icon: Home },
-    { id: "tasks", label: "My Tasks", icon: ClipboardList },
+    { id: "home", label: "Home", icon: Home },
+    { id: "analytics", label: "Analytics", icon: BarChart3 },
     { id: "post", label: "Report", icon: Plus },
-    { id: "observations", label: "Observations", icon: AlertTriangle },
-    { id: "actions", label: "Actions", icon: CheckSquare },
+    { id: "tasks", label: "Tasks", icon: ClipboardList },
+    { id: "observations", label: "Alerts", icon: AlertTriangle },
   ];
 
   const handleTabClick = (tabId) => {
@@ -37,6 +38,8 @@ const MobileApp = () => {
     switch (activeTab) {
       case "home":
         return <MobileHierarchy />;
+      case "analytics":
+        return <MobileAnalytics />;
       case "tasks":
         return <MobileMyTasks />;
       case "observations":
