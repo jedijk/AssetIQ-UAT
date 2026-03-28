@@ -155,6 +155,7 @@ export default function CausalEnginePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investigations"] });
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
     },
   });
 
@@ -252,6 +253,7 @@ export default function CausalEnginePage() {
         });
       }
       queryClient.invalidateQueries({ queryKey: ["investigations"] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       setSelectedInvId(null);
       toast.success("Deleted");
     },
@@ -342,6 +344,7 @@ export default function CausalEnginePage() {
     mutationFn: (data) => investigationAPI.createAction(selectedInvId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       setShowActionDialog(false);
       setEditingItem(null);
       setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" });
@@ -353,6 +356,7 @@ export default function CausalEnginePage() {
     mutationFn: ({ actionId, data }) => investigationAPI.updateAction(selectedInvId, actionId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       setShowActionDialog(false);
       setEditingItem(null);
       setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" });
@@ -362,7 +366,10 @@ export default function CausalEnginePage() {
   
   const deleteActionMutation = useMutation({
     mutationFn: (actionId) => investigationAPI.deleteAction(selectedInvId, actionId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+    },
   });
 
   // Promote investigation action to centralized action
@@ -381,6 +388,7 @@ export default function CausalEnginePage() {
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       toast.success(t("causal.actionPromoted") || "Action promoted! View it in the Actions tab.");
     },
     onError: (error) => {

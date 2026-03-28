@@ -1095,31 +1095,38 @@ async def get_threat_timeline(
         })
     
     # Get investigations linked to this observation or sibling observations
+    # Filter by: direct threat link, sibling observation link, or same asset
+    # Only show investigations created by the current user for consistency
     investigation_conditions = [
-        {"threat_id": threat_id}
+        {"threat_id": threat_id, "created_by": current_user["id"]}
     ]
     if sibling_obs_ids:
-        investigation_conditions.append({"threat_id": {"$in": sibling_obs_ids}})
+        investigation_conditions.append({"threat_id": {"$in": sibling_obs_ids}, "created_by": current_user["id"]})
     if asset_name:
-        investigation_conditions.append({"asset_name": asset_name})
+        investigation_conditions.append({"asset_name": asset_name, "created_by": current_user["id"]})
     
     investigations = await db.investigations.find(
         {"$or": investigation_conditions},
         {"_id": 0}
     ).to_list(50)
     
+    # Deduplicate investigations by id (same investigation may match multiple conditions)
+    seen_inv_ids = set()
     for inv in investigations:
-        timeline_items.append({
-            "id": inv.get("id"),
-            "type": "investigation",
-            "title": inv.get("title", "Untitled Investigation"),
-            "description": inv.get("description", ""),
-            "status": inv.get("status", "draft"),
-            "case_number": inv.get("case_number", ""),
-            "created_at": inv.get("created_at"),
-            "updated_at": inv.get("updated_at"),
-            "source": "investigation"
-        })
+        inv_id = inv.get("id")
+        if inv_id and inv_id not in seen_inv_ids:
+            seen_inv_ids.add(inv_id)
+            timeline_items.append({
+                "id": inv_id,
+                "type": "investigation",
+                "title": inv.get("title", "Untitled Investigation"),
+                "description": inv.get("description", ""),
+                "status": inv.get("status", "draft"),
+                "case_number": inv.get("case_number", ""),
+                "created_at": inv.get("created_at"),
+                "updated_at": inv.get("updated_at"),
+                "source": "investigation"
+            })
     
     # Sort by date (most recent first)
     def get_sort_date(item):

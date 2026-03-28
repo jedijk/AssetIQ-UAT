@@ -213,6 +213,7 @@ export default function ActionsPage() {
         });
       }
       queryClient.invalidateQueries(["actions"]);
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       toast.success("Action updated");
       setIsEditDialogOpen(false);
       setEditingAction(null);
@@ -250,6 +251,7 @@ export default function ActionsPage() {
         });
       }
       queryClient.invalidateQueries(["actions"]);
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       toast.success("Action deleted");
       setDeleteConfirm(null);
     },

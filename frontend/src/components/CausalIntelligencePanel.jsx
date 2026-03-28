@@ -245,6 +245,7 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
     },
     onSuccess: (investigation) => {
       queryClient.invalidateQueries({ queryKey: ["investigations"] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       toast.success(t("ai.investigationCreated"));
       navigate(`/causal-engine?inv=${investigation.id}`);
     },

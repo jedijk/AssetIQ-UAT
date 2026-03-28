@@ -90,6 +90,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline", threatId] });
       toast.success("Action created in tracker!");
     },
     onError: (error) => {
