@@ -31,6 +31,10 @@ const en = {
     criticalityDefinitionsDesc: "Define and customize criticality scales",
     underDevelopment: "Under Development",
     comingSoon: "This feature is coming soon. We're working hard to bring you this functionality.",
+    theme: "Theme",
+    themeLight: "Light",
+    themeDark: "Dark",
+    themeAssetIQ: "AssetIQ Blue",
   },
   
   // Notifications
@@ -1162,6 +1166,10 @@ const nl = {
     criticalityDefinitionsDesc: "Definieer en pas kriticiteitsschalen aan",
     underDevelopment: "In ontwikkeling",
     comingSoon: "Deze functie komt binnenkort. We werken hard om u deze functionaliteit te bieden.",
+    theme: "Thema",
+    themeLight: "Licht",
+    themeDark: "Donker",
+    themeAssetIQ: "AssetIQ Blauw",
   },
   
   // Notifications
