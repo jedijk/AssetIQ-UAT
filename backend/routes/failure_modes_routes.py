@@ -337,6 +337,7 @@ class FailureModeValidation(BaseModel):
     """Model for validating a failure mode"""
     validated_by_name: str
     validated_by_position: str
+    validated_by_id: Optional[str] = None
 
 
 def auto_link_equipment_types(equipment_name: str) -> List[str]:
@@ -634,10 +635,14 @@ async def validate_failure_mode(
 ):
     """Validate a failure mode with validator name and position."""
     try:
+        # Use provided user_id or fall back to current_user's id
+        validated_by_id = data.validated_by_id or current_user.get("id") or current_user.get("user_id")
+        
         result = await failure_modes_service.validate(
             mode_id,
             data.validated_by_name,
-            data.validated_by_position
+            data.validated_by_position,
+            validated_by_id
         )
         if result:
             return result

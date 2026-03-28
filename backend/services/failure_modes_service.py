@@ -321,6 +321,7 @@ class FailureModesService:
                 "is_validated": doc.get("is_validated", False),
                 "validated_by_name": doc.get("validated_by_name"),
                 "validated_by_position": doc.get("validated_by_position"),
+                "validated_by_id": doc.get("validated_by_id"),
                 "validated_at": doc.get("validated_at"),
             },
             "updated_by": updated_by,
@@ -427,7 +428,8 @@ class FailureModesService:
         self,
         mode_id: str,
         validated_by_name: str,
-        validated_by_position: str
+        validated_by_position: str,
+        validated_by_id: str = None
     ) -> Optional[Dict[str, Any]]:
         """Mark a failure mode as validated."""
         
@@ -440,6 +442,7 @@ class FailureModesService:
                 "is_validated": True,
                 "validated_by_name": validated_by_name,
                 "validated_by_position": validated_by_position,
+                "validated_by_id": validated_by_id,
                 "validated_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),
             }
@@ -536,6 +539,7 @@ class FailureModesService:
             "is_validated": doc.get("is_validated", False),
             "validated_by_name": doc.get("validated_by_name"),
             "validated_by_position": doc.get("validated_by_position"),
+            "validated_by_id": doc.get("validated_by_id"),
             "validated_at": doc.get("validated_at").isoformat() if doc.get("validated_at") else None,
             "is_custom": doc.get("is_custom", False),
             "is_builtin": doc.get("is_builtin", True),

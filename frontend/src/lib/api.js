@@ -145,10 +145,11 @@ export const failureModesAPI = {
     return response.data;
   },
   
-  validate: async (id, validatorName, validatorPosition) => {
+  validate: async (id, validatorName, validatorPosition, validatorId) => {
     const response = await api.post(`/failure-modes/${id}/validate`, {
       validated_by_name: validatorName,
-      validated_by_position: validatorPosition
+      validated_by_position: validatorPosition,
+      validated_by_id: validatorId
     });
     return response.data;
   },

@@ -4,6 +4,7 @@ import { useSearchParams, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useAuth } from "../contexts/AuthContext";
 import { 
   Search, 
   Filter, 
@@ -85,6 +86,7 @@ const FailureModesPage = () => {
   const location = useLocation();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Initialize state from URL params (for FMEA linkage from Maintenance Strategies)
@@ -341,8 +343,8 @@ const FailureModesPage = () => {
 
   // Validation mutations
   const validateFmMutation = useMutation({
-    mutationFn: ({ id, validatorName, validatorPosition }) => 
-      failureModesAPI.validate(id, validatorName, validatorPosition),
+    mutationFn: ({ id, validatorName, validatorPosition, validatorId }) => 
+      failureModesAPI.validate(id, validatorName, validatorPosition, validatorId),
     onSuccess: (data) => {
       queryClient.invalidateQueries(["failureModes"]);
       // Update selected FM if it matches
@@ -367,8 +369,8 @@ const FailureModesPage = () => {
     onError: e => toast.error(e.response?.data?.detail || "Failed to remove validation")
   });
 
-  const handleValidateFm = (id, validatorName, validatorPosition) => {
-    validateFmMutation.mutate({ id, validatorName, validatorPosition });
+  const handleValidateFm = (id, validatorName, validatorPosition, validatorId) => {
+    validateFmMutation.mutate({ id, validatorName, validatorPosition, validatorId });
   };
 
   const handleUnvalidateFm = (id) => {
@@ -788,6 +790,7 @@ const FailureModesPage = () => {
                   onShowVersionHistory={handleShowVersionHistory}
                   equipmentTypes={equipmentTypes}
                   categories={categories}
+                  currentUser={user}
                   t={t}
                 />
               </motion.div>

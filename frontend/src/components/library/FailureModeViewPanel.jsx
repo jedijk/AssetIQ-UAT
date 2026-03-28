@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   AlertTriangle, Edit, Trash2, X, Plus, Link, CheckCircle, 
   User, Briefcase, Calendar, History, RotateCcw, Clock, ShieldCheck,
@@ -16,6 +16,9 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
+
+// API base URL for avatar fetching
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
 
 const categoryIcons = {
   Rotating: Cog,
@@ -72,6 +75,7 @@ export function FailureModeViewPanel({
   onShowVersionHistory,
   equipmentTypes,
   categories,
+  currentUser,
   t 
 }) {
   const Icon = categoryIcons[fm?.category] || AlertTriangle;
@@ -89,6 +93,72 @@ export function FailureModeViewPanel({
   // State for action discipline and type in inline editing
   const [actionDiscipline, setActionDiscipline] = useState("mechanical");
   const [actionType, setActionType] = useState("PM");
+  
+  // Avatar URL state for validated user
+  const [validatorAvatarUrl, setValidatorAvatarUrl] = useState(null);
+  // Current user avatar for validation dialog
+  const [currentUserAvatarUrl, setCurrentUserAvatarUrl] = useState(null);
+
+  // Auto-fill validator info from current user when dialog opens
+  useEffect(() => {
+    if (showValidationDialog && currentUser) {
+      setValidatorName(currentUser.name || "");
+      setValidatorPosition(currentUser.position || "");
+    }
+  }, [showValidationDialog, currentUser]);
+  
+  // Fetch current user avatar for validation dialog
+  useEffect(() => {
+    const fetchCurrentUserAvatar = async () => {
+      if (!currentUser?.id) return;
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(
+          `${API_BASE_URL}/api/users/${currentUser.id}/avatar?auth=${token}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.ok) {
+          const blob = await response.blob();
+          setCurrentUserAvatarUrl(URL.createObjectURL(blob));
+        }
+      } catch (err) {
+        // No avatar available
+      }
+    };
+    fetchCurrentUserAvatar();
+    return () => {
+      if (currentUserAvatarUrl) URL.revokeObjectURL(currentUserAvatarUrl);
+    };
+  }, [currentUser?.id]);
+  
+  // Fetch validator avatar when viewing validated failure mode
+  useEffect(() => {
+    const fetchValidatorAvatar = async () => {
+      if (!fm?.validated_by_id) {
+        setValidatorAvatarUrl(null);
+        return;
+      }
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(
+          `${API_BASE_URL}/api/users/${fm.validated_by_id}/avatar?auth=${token}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.ok) {
+          const blob = await response.blob();
+          setValidatorAvatarUrl(URL.createObjectURL(blob));
+        } else {
+          setValidatorAvatarUrl(null);
+        }
+      } catch (err) {
+        setValidatorAvatarUrl(null);
+      }
+    };
+    fetchValidatorAvatar();
+    return () => {
+      if (validatorAvatarUrl) URL.revokeObjectURL(validatorAvatarUrl);
+    };
+  }, [fm?.validated_by_id]);
 
   const addKeyword = () => {
     if (keywordInput.trim() && formData) {
@@ -256,23 +326,39 @@ export function FailureModeViewPanel({
 
         {/* Validation Status */}
         {fm.is_validated ? (
-          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
-            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-              <CheckCircle className="w-4 h-4 text-green-600" />
+          <div className="flex items-start gap-4 px-4 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+            {/* Validator Photo */}
+            <div className="flex-shrink-0">
+              {validatorAvatarUrl ? (
+                <img
+                  src={validatorAvatarUrl}
+                  alt={fm.validated_by_name || fm.validated_by}
+                  className="w-12 h-12 rounded-full object-cover border-2 border-green-300 shadow-sm"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-semibold text-lg border-2 border-green-300 shadow-sm">
+                  {(fm.validated_by_name || fm.validated_by)?.charAt(0)?.toUpperCase() || "V"}
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium text-green-800">{t("library.validated")}</span>
-                <span className="text-xs text-green-600">
-                  <User className="w-3 h-3 inline mr-1" />{fm.validated_by}
-                </span>
-                <span className="text-xs text-green-600">
-                  <Briefcase className="w-3 h-3 inline mr-1" />{fm.validated_position}
-                </span>
-                <span className="text-xs text-green-600">
-                  <Calendar className="w-3 h-3 inline mr-1" />
-                  {new Date(fm.validated_at).toLocaleDateString()}
-                </span>
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle className="w-4 h-4 text-green-600" />
+                <span className="text-sm font-semibold text-green-800">{t("library.validated")}</span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm text-green-700">
+                  <User className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="font-medium">{fm.validated_by_name || fm.validated_by}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <Briefcase className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>{fm.validated_by_position || fm.validated_position}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-green-500">
+                  <Calendar className="w-3 h-3 flex-shrink-0" />
+                  <span>{new Date(fm.validated_at).toLocaleDateString()}</span>
+                </div>
               </div>
             </div>
             {!isEditing && (
@@ -280,7 +366,7 @@ export function FailureModeViewPanel({
                 size="sm"
                 variant="ghost"
                 onClick={() => onUnvalidate(fm.id)}
-                className="text-green-700 hover:text-red-600 hover:bg-red-50"
+                className="text-green-700 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
                 title="Remove validation"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -580,6 +666,26 @@ export function FailureModeViewPanel({
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {/* Current User Preview */}
+              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                {currentUserAvatarUrl ? (
+                  <img
+                    src={currentUserAvatarUrl}
+                    alt={currentUser?.name}
+                    className="w-14 h-14 rounded-full object-cover border-2 border-blue-300 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-xl border-2 border-blue-300 shadow-sm">
+                    {currentUser?.name?.charAt(0)?.toUpperCase() || "U"}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{currentUser?.name || "Unknown User"}</p>
+                  <p className="text-xs text-slate-500 truncate">{currentUser?.position || "No position set"}</p>
+                  <p className="text-xs text-blue-600 mt-1">{t("library.validatingAs") || "Validating as this user"}</p>
+                </div>
+              </div>
+              
               <div>
                 <Label className="text-sm font-medium mb-2 block">{t("library.validatorName")}</Label>
                 <Input
@@ -606,7 +712,7 @@ export function FailureModeViewPanel({
               <Button 
                 onClick={() => {
                   if (validatorName.trim() && validatorPosition.trim()) {
-                    onValidate(fm.id, validatorName.trim(), validatorPosition.trim());
+                    onValidate(fm.id, validatorName.trim(), validatorPosition.trim(), currentUser?.id);
                     setShowValidationDialog(false);
                     setValidatorName("");
                     setValidatorPosition("");
