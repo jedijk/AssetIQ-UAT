@@ -196,8 +196,8 @@ const Layout = () => {
               </span>
             </div>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-0.5" data-testid="desktop-nav">
+            {/* Desktop Navigation - Scrollable on smaller screens */}
+            <nav className="hidden md:flex items-center gap-0.5 overflow-x-auto scrollbar-hide max-w-[calc(100vw-400px)]" data-testid="desktop-nav">
               {/* All Nav Items (including Dashboard as direct link) */}
               {navItems.map((item) => (
                 <NavLink
@@ -205,7 +205,7 @@ const Layout = () => {
                   to={item.path}
                   end={item.path === "/"}
                   className={({ isActive }) =>
-                    `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150 ${
+                    `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150 whitespace-nowrap ${
                       isActive 
                         ? "bg-blue-50 text-blue-700" 
                         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
@@ -213,7 +213,7 @@ const Layout = () => {
                   }
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
-                  <item.icon className="w-3.5 h-3.5" />
+                  <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
                   {item.label}
                 </NavLink>
               ))}
@@ -574,7 +574,7 @@ const Layout = () => {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <nav className="md:hidden border-t border-slate-200 p-4 bg-white" data-testid="mobile-nav">
+          <nav className="md:hidden border-t border-slate-200 p-4 bg-white max-h-[70vh] overflow-y-auto" data-testid="mobile-nav">
             {/* Hierarchy toggle for mobile */}
             <button
               onClick={() => { setHierarchyOpen(true); setMobileMenuOpen(false); }}

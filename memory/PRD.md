@@ -62,6 +62,12 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 - Restructured `TaskFormContent` in `MyTasksPage.js` with proper padding container
 - Files updated: `/app/frontend/src/pages/MyTasksPage.js`
 
+### Fix: Scrollable Navigation Menu
+- Desktop nav (tablet/medium screens): Added horizontal scrolling with hidden scrollbar for overflow items
+- Mobile nav: Added max-height (70vh) with vertical scrolling for long menu lists
+- Added `scrollbar-hide` CSS utility class for clean scrollable areas
+- Files updated: `/app/frontend/src/components/Layout.js`, `/app/frontend/src/App.css`
+
 ### Feature: Task Completion Tracking
 - Task completions now record `completed_by_id` and `completed_by_name`
 - Backend updated to pass current user info to task service

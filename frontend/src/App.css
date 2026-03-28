@@ -634,6 +634,16 @@ button:active:not(:disabled), [role="button"]:active:not(:disabled), .btn:active
     background-color: #94a3b8;
 }
 
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
+}
+
 /* Pulse Animation for Notifications */
 .pulse-badge {
     animation: pulseBadge 2s infinite;
