@@ -475,16 +475,16 @@ const Layout = () => {
                         </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 overflow-hidden">
                       <p className="font-semibold text-slate-900 truncate" data-testid="user-name">
                         {user?.name || "User"}
                       </p>
                       <p className="text-xs text-slate-500 truncate">
                         {user?.department || t("userManagement.department")}
                       </p>
-                      <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      <p className="text-xs text-blue-600 font-medium mt-1 truncate" title={user?.position || t("userManagement.position")}>
                         {user?.position || t("userManagement.position")}
-                      </span>
+                      </p>
                     </div>
                   </div>
                 </div>
