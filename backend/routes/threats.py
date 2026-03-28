@@ -940,8 +940,8 @@ async def get_threat_timeline(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Get timeline of actions and tasks related to a specific observation/threat.
-    This includes actions created from this observation and any related tasks.
+    Get timeline of all activity related to a specific observation/threat.
+    Includes: other observations on same equipment, actions, and tasks.
     """
     # Verify threat exists and belongs to user
     threat = await db.threats.find_one(
@@ -952,8 +952,10 @@ async def get_threat_timeline(
         raise HTTPException(status_code=404, detail="Observation not found")
     
     timeline_items = []
+    equipment_id = threat.get("linked_equipment_id")
+    asset_name = threat.get("asset", "")
     
-    # Get the observation itself as the first timeline item
+    # Get the current observation as the first timeline item
     timeline_items.append({
         "id": threat.get("id"),
         "type": "observation",
@@ -965,18 +967,58 @@ async def get_threat_timeline(
         "risk_score": threat.get("risk_score", 0),
         "created_at": threat.get("created_at"),
         "updated_at": threat.get("updated_at"),
-        "source": "threat"
+        "source": "threat",
+        "is_current": True
     })
     
-    # Get actions created from this observation
+    # Get OTHER observations on the same equipment (past history)
+    if equipment_id or asset_name:
+        obs_query_conditions = []
+        if equipment_id:
+            obs_query_conditions.append({"linked_equipment_id": equipment_id})
+        if asset_name:
+            obs_query_conditions.append({"asset": asset_name})
+        
+        past_observations = await db.threats.find(
+            {
+                "created_by": current_user["id"],
+                "id": {"$ne": threat_id},  # Exclude current observation
+                "$or": obs_query_conditions
+            },
+            {"_id": 0}
+        ).sort("created_at", -1).to_list(50)
+        
+        for obs in past_observations:
+            timeline_items.append({
+                "id": obs.get("id"),
+                "type": "observation",
+                "title": obs.get("title", "Untitled Observation"),
+                "description": obs.get("description", ""),
+                "failure_mode": obs.get("failure_mode", ""),
+                "status": obs.get("status", "open"),
+                "risk_level": obs.get("risk_level", "medium"),
+                "risk_score": obs.get("risk_score", 0),
+                "created_at": obs.get("created_at"),
+                "updated_at": obs.get("updated_at"),
+                "source": "threat",
+                "is_current": False
+            })
+    
+    # Get actions created from this observation OR related to the equipment
+    action_query_conditions = [
+        {"source_id": threat_id},
+        {"threat_id": threat_id},
+        {"observation_id": threat_id}
+    ]
+    if equipment_id:
+        action_query_conditions.append({"linked_equipment_id": equipment_id})
+    if asset_name:
+        action_query_conditions.append({"equipment_name": asset_name})
+    
     actions = await db.central_actions.find(
         {
             "created_by": current_user["id"],
-            "$or": [
-                {"source_id": threat_id},
-                {"threat_id": threat_id},
-                {"observation_id": threat_id}
-            ]
+            "$or": action_query_conditions
         },
         {"_id": 0}
     ).to_list(100)
@@ -996,21 +1038,18 @@ async def get_threat_timeline(
         })
     
     # Get task instances related to this observation or its equipment
-    equipment_id = threat.get("linked_equipment_id")
-    asset_name = threat.get("asset", "")
+    task_query_conditions = [
+        {"observation_id": threat_id},
+        {"threat_id": threat_id}
+    ]
+    if equipment_id:
+        task_query_conditions.append({"equipment_id": equipment_id})
+        task_query_conditions.append({"linked_equipment_id": equipment_id})
     
     task_query = {
         "created_by": current_user["id"],
-        "$or": [
-            {"observation_id": threat_id},
-            {"threat_id": threat_id}
-        ]
+        "$or": task_query_conditions
     }
-    
-    # Also include tasks for the linked equipment
-    if equipment_id:
-        task_query["$or"].append({"equipment_id": equipment_id})
-        task_query["$or"].append({"linked_equipment_id": equipment_id})
     
     task_instances = await db.task_instances.find(
         task_query,
