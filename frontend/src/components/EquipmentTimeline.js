@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import {
@@ -14,6 +15,7 @@ import {
   Calendar,
   Target,
   AlertCircle,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -25,31 +27,34 @@ import {
 import { equipmentHierarchyAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 
-// Timeline item colors and icons
+// Timeline item colors and icons - lighter colors
 const ITEM_CONFIG = {
   observation: {
     icon: AlertTriangle,
-    bgColor: "bg-amber-100",
-    iconColor: "text-amber-600",
-    borderColor: "border-amber-400",
-    dotColor: "bg-amber-500",
+    bgColor: "bg-amber-50",
+    iconColor: "text-amber-500",
+    borderColor: "border-amber-200",
+    dotColor: "bg-amber-400",
     label: "Observation",
+    route: "/threats",
   },
   action: {
     icon: Target,
-    bgColor: "bg-blue-100",
-    iconColor: "text-blue-600",
-    borderColor: "border-blue-400",
-    dotColor: "bg-blue-500",
+    bgColor: "bg-blue-50",
+    iconColor: "text-blue-500",
+    borderColor: "border-blue-200",
+    dotColor: "bg-blue-400",
     label: "Action",
+    route: "/actions",
   },
   task: {
     icon: ClipboardList,
-    bgColor: "bg-purple-100",
-    iconColor: "text-purple-600",
-    borderColor: "border-purple-400",
-    dotColor: "bg-purple-500",
+    bgColor: "bg-violet-50",
+    iconColor: "text-violet-500",
+    borderColor: "border-violet-200",
+    dotColor: "bg-violet-400",
     label: "Task",
+    route: "/my-tasks",
   },
 };
 
@@ -74,7 +79,7 @@ const StatusBadge = ({ status, type }) => {
 };
 
 // Timeline Item Detail Popup
-const TimelineItemPopup = ({ item, isOpen, onClose }) => {
+const TimelineItemPopup = ({ item, isOpen, onClose, onNavigate }) => {
   if (!item) return null;
   
   const config = ITEM_CONFIG[item.type];
@@ -89,22 +94,27 @@ const TimelineItemPopup = ({ item, isOpen, onClose }) => {
     }
   };
 
+  const handleNavigate = () => {
+    onClose();
+    onNavigate(item);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <div className={`p-2 rounded-lg ${config.bgColor}`}>
-              <Icon className={`w-5 h-5 ${config.iconColor}`} />
+          <DialogTitle className="flex items-center gap-2 pr-6">
+            <div className={`p-1.5 rounded-lg ${config.bgColor} flex-shrink-0`}>
+              <Icon className={`w-4 h-4 ${config.iconColor}`} />
             </div>
-            <span className="truncate">{item.title}</span>
+            <span className="text-sm font-semibold leading-tight line-clamp-2">{item.title}</span>
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Type and Status */}
-          <div className="flex items-center gap-2">
-            <span className={`px-2 py-1 rounded text-xs font-medium ${config.bgColor} ${config.iconColor}`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`px-2 py-0.5 rounded text-xs font-medium ${config.bgColor} ${config.iconColor}`}>
               {config.label}
             </span>
             <StatusBadge status={item.status} type={item.type} />
@@ -113,8 +123,16 @@ const TimelineItemPopup = ({ item, isOpen, onClose }) => {
           {/* Description */}
           {item.description && (
             <div>
-              <h4 className="text-sm font-medium text-secondary mb-1">Description</h4>
-              <p className="text-sm text-muted">{item.description}</p>
+              <h4 className="text-xs font-medium text-muted mb-1">Description</h4>
+              <p className="text-sm text-secondary leading-relaxed line-clamp-4">{item.description}</p>
+            </div>
+          )}
+          
+          {/* Failure Mode for observations */}
+          {item.type === "observation" && item.failure_mode && (
+            <div>
+              <h4 className="text-xs font-medium text-muted mb-1">Failure Mode</h4>
+              <p className="text-sm text-secondary">{item.failure_mode}</p>
             </div>
           )}
           
@@ -140,30 +158,40 @@ const TimelineItemPopup = ({ item, isOpen, onClose }) => {
           )}
           
           {/* Dates */}
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200">
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
             <div>
               <span className="text-xs text-muted">Created</span>
-              <p className="text-sm text-secondary">{formatDate(item.created_at)}</p>
+              <p className="text-xs text-secondary">{formatDate(item.created_at)}</p>
             </div>
             {item.due_date && (
               <div>
                 <span className="text-xs text-muted">Due Date</span>
-                <p className="text-sm text-secondary">{formatDate(item.due_date)}</p>
+                <p className="text-xs text-secondary">{formatDate(item.due_date)}</p>
               </div>
             )}
             {item.scheduled_date && (
               <div>
                 <span className="text-xs text-muted">Scheduled</span>
-                <p className="text-sm text-secondary">{formatDate(item.scheduled_date)}</p>
+                <p className="text-xs text-secondary">{formatDate(item.scheduled_date)}</p>
               </div>
             )}
             {item.completed_at && (
               <div>
                 <span className="text-xs text-muted">Completed</span>
-                <p className="text-sm text-secondary">{formatDate(item.completed_at)}</p>
+                <p className="text-xs text-secondary">{formatDate(item.completed_at)}</p>
               </div>
             )}
           </div>
+          
+          {/* Navigate to item button */}
+          <Button 
+            onClick={handleNavigate}
+            className="w-full mt-2"
+            size="sm"
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            View {config.label} Details
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -184,37 +212,49 @@ const TimelineItem = ({ item, onClick, isFirst, isLast }) => {
     }
   };
 
+  // Get display text - failure mode for observations, title/summary for others
+  const getDisplayText = () => {
+    if (item.type === "observation") {
+      return item.failure_mode || item.title;
+    }
+    if (item.type === "action") {
+      // Show first 30 chars of title as summary
+      return item.title?.length > 30 ? item.title.substring(0, 30) + "..." : item.title;
+    }
+    return item.title;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex-shrink-0 w-32 md:w-40 cursor-pointer group"
+      className="flex-shrink-0 w-28 md:w-36 cursor-pointer group"
       onClick={() => onClick(item)}
       style={{ scrollSnapAlign: "start" }}
     >
-      {/* Timeline connector */}
+      {/* Timeline connector - lighter */}
       <div className="relative flex items-center justify-center mb-1.5 md:mb-2">
         {!isFirst && (
-          <div className="absolute left-0 w-1/2 h-0.5 bg-slate-300" />
+          <div className="absolute left-0 w-1/2 h-px bg-slate-200" />
         )}
         {!isLast && (
-          <div className="absolute right-0 w-1/2 h-0.5 bg-slate-300" />
+          <div className="absolute right-0 w-1/2 h-px bg-slate-200" />
         )}
-        <div className={`relative z-10 w-3 h-3 md:w-4 md:h-4 rounded-full ${config.dotColor} ring-2 md:ring-4 ring-white group-hover:scale-125 transition-transform`} />
+        <div className={`relative z-10 w-2.5 h-2.5 md:w-3 md:h-3 rounded-full ${config.dotColor} ring-2 ring-white group-hover:scale-125 transition-transform`} />
       </div>
       
       {/* Date */}
-      <div className="text-center mb-1.5 md:mb-2">
-        <span className="text-[10px] md:text-xs text-muted">{formatDate(item.created_at)}</span>
+      <div className="text-center mb-1 md:mb-1.5">
+        <span className="text-[9px] md:text-[10px] text-slate-400">{formatDate(item.created_at)}</span>
       </div>
       
-      {/* Card */}
-      <div className={`p-2 md:p-3 rounded-lg border-2 ${config.borderColor} ${config.bgColor} group-hover:shadow-md transition-all`}>
-        <div className="flex items-center gap-1.5 md:gap-2 mb-1">
-          <Icon className={`w-3 h-3 md:w-4 md:h-4 ${config.iconColor}`} />
-          <span className={`text-[10px] md:text-xs font-medium ${config.iconColor}`}>{config.label}</span>
+      {/* Card - lighter styling */}
+      <div className={`p-2 rounded-lg border ${config.borderColor} ${config.bgColor} group-hover:shadow-sm transition-all`}>
+        <div className="flex items-center gap-1 mb-0.5">
+          <Icon className={`w-3 h-3 ${config.iconColor}`} />
+          <span className={`text-[9px] md:text-[10px] font-medium ${config.iconColor}`}>{config.label}</span>
         </div>
-        <p className="text-xs md:text-sm font-medium text-primary truncate">{item.title}</p>
+        <p className="text-[10px] md:text-xs font-medium text-slate-700 line-clamp-2 leading-tight">{getDisplayText()}</p>
         <div className="mt-1">
           <StatusBadge status={item.status} type={item.type} />
         </div>
@@ -226,6 +266,7 @@ const TimelineItem = ({ item, onClick, isFirst, isLast }) => {
 // Main Timeline Component
 const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [selectedItem, setSelectedItem] = useState(null);
   const [filter, setFilter] = useState("all");
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -236,16 +277,28 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
     enabled: !!equipmentId,
   });
   
+  // Handle navigation to item detail
+  const handleNavigateToItem = (item) => {
+    const config = ITEM_CONFIG[item.type];
+    if (item.type === "observation") {
+      navigate(`/threats/${item.id}`);
+    } else if (item.type === "action") {
+      navigate(`/actions/${item.id}`);
+    } else if (item.type === "task") {
+      navigate(`/my-tasks`);
+    }
+  };
+  
   if (!equipmentId) {
     return null;
   }
   
   if (isLoading) {
     return (
-      <div className="card p-6 mb-6">
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-          <span className="ml-2 text-muted">Loading equipment history...</span>
+      <div className="card p-4 mb-6">
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+          <span className="ml-2 text-sm text-muted">Loading history...</span>
         </div>
       </div>
     );
@@ -424,6 +477,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName }) => {
         item={selectedItem}
         isOpen={!!selectedItem}
         onClose={() => setSelectedItem(null)}
+        onNavigate={handleNavigateToItem}
       />
     </motion.div>
   );

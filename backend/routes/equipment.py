@@ -1422,6 +1422,7 @@ async def get_equipment_history(
             "type": "observation",
             "title": obs.get("title", "Untitled Observation"),
             "description": obs.get("description", ""),
+            "failure_mode": obs.get("failure_mode", ""),
             "status": obs.get("status", "open"),
             "risk_level": obs.get("risk_level", "medium"),
             "risk_score": obs.get("risk_score", 0),
