@@ -1006,20 +1006,29 @@ async def get_threat_timeline(
     
     # Get actions created from this observation OR related to the equipment
     # Actions directly linked to this observation (source_id) should show regardless of creator
-    # Actions linked by equipment should belong to the current user
+    # Also include actions from sibling observations (same equipment)
     direct_action_conditions = [
         {"source_id": threat_id},
         {"threat_id": threat_id},
         {"observation_id": threat_id}
     ]
     
+    # Collect all sibling observation IDs (observations on same equipment)
+    sibling_obs_ids = [obs.get("id") for obs in past_observations if obs.get("id")]
+    
+    # Add conditions for actions linked to sibling observations
+    if sibling_obs_ids:
+        direct_action_conditions.append({"source_id": {"$in": sibling_obs_ids}})
+        direct_action_conditions.append({"threat_id": {"$in": sibling_obs_ids}})
+        direct_action_conditions.append({"observation_id": {"$in": sibling_obs_ids}})
+    
     equipment_action_conditions = []
     if equipment_id:
-        equipment_action_conditions.append({"linked_equipment_id": equipment_id, "created_by": current_user["id"]})
+        equipment_action_conditions.append({"linked_equipment_id": equipment_id})
     if asset_name:
-        equipment_action_conditions.append({"equipment_name": asset_name, "created_by": current_user["id"]})
+        equipment_action_conditions.append({"equipment_name": asset_name})
     
-    # Combine: directly linked actions (any user) OR equipment-linked actions (current user only)
+    # Combine: directly linked actions OR sibling observation actions OR equipment-linked actions
     action_query = {"$or": direct_action_conditions + equipment_action_conditions} if equipment_action_conditions else {"$or": direct_action_conditions}
     
     actions = await db.central_actions.find(
@@ -1043,20 +1052,27 @@ async def get_threat_timeline(
     
     # Get task instances related to this observation or its equipment
     # Tasks directly linked to this observation should show regardless of creator
+    # Also include tasks from sibling observations (same equipment)
     direct_task_conditions = [
         {"observation_id": threat_id},
         {"threat_id": threat_id},
         {"source_id": threat_id}
     ]
     
+    # Add conditions for tasks linked to sibling observations
+    if sibling_obs_ids:
+        direct_task_conditions.append({"observation_id": {"$in": sibling_obs_ids}})
+        direct_task_conditions.append({"threat_id": {"$in": sibling_obs_ids}})
+        direct_task_conditions.append({"source_id": {"$in": sibling_obs_ids}})
+    
     equipment_task_conditions = []
     if equipment_id:
-        equipment_task_conditions.append({"equipment_id": equipment_id, "created_by": current_user["id"]})
-        equipment_task_conditions.append({"linked_equipment_id": equipment_id, "created_by": current_user["id"]})
+        equipment_task_conditions.append({"equipment_id": equipment_id})
+        equipment_task_conditions.append({"linked_equipment_id": equipment_id})
     if asset_name:
-        equipment_task_conditions.append({"equipment_name": asset_name, "created_by": current_user["id"]})
+        equipment_task_conditions.append({"equipment_name": asset_name})
     
-    # Combine: directly linked tasks (any user) OR equipment-linked tasks (current user only)
+    # Combine: directly linked tasks OR sibling observation tasks OR equipment-linked tasks
     task_query = {"$or": direct_task_conditions + equipment_task_conditions} if equipment_task_conditions else {"$or": direct_task_conditions}
     
     task_instances = await db.task_instances.find(
