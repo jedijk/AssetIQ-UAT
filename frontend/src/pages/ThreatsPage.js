@@ -298,19 +298,19 @@ const ThreatsPage = () => {
       )}
       
       {/* Compact Stats Row */}
-      <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+      <div className="flex flex-wrap gap-1.5 sm:gap-3 mb-4">
         {statCards.map((stat, idx) => (
           <div
             key={stat.label}
-            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200"
+            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-white rounded-lg border border-slate-200"
             data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
           >
-            <div className={`p-1.5 rounded-md ${stat.bg}`}>
-              <stat.icon className={`w-4 h-4 ${stat.color}`} />
+            <div className={`p-1 sm:p-1.5 rounded-md ${stat.bg}`}>
+              <stat.icon className={`w-3 h-3 sm:w-4 sm:h-4 ${stat.color}`} />
             </div>
-            <div>
-              <span className="text-lg font-bold text-slate-900">{stat.value}</span>
-              <span className="text-xs text-slate-500 ml-1">{stat.label}</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-sm sm:text-lg font-bold text-slate-900">{stat.value}</span>
+              <span className="text-[10px] sm:text-xs text-slate-500 hidden sm:inline">{stat.label}</span>
             </div>
           </div>
         ))}
@@ -519,31 +519,32 @@ const ThreatsPage = () => {
               </div>
               
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 sm:gap-3 mb-1">
-                  <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1">
-                    {threat.title}
-                  </h3>
-                </div>
+                <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1 mb-0.5">
+                  {threat.title}
+                </h3>
                 <div className="flex items-center gap-2">
-                  <RiskBadge level={threat.risk_level} size="sm" />
-                  <span className="text-xs sm:text-sm text-slate-500 truncate hidden sm:inline">
+                  {/* Risk Badge - Hidden on mobile */}
+                  <span className="hidden sm:inline">
+                    <RiskBadge level={threat.risk_level} size="sm" />
+                  </span>
+                  <span className="text-xs sm:text-sm text-slate-500 truncate">
                     {threat.asset}
                   </span>
                 </div>
               </div>
 
-              {/* Score Display - Hidden on mobile */}
-              <div className="hidden sm:flex items-center gap-3 sm:gap-4 flex-shrink-0">
+              {/* Score Display - Compact on mobile, full on desktop */}
+              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                 {/* Business Risk Score */}
                 <div className="text-right">
-                  <div className="text-xs text-slate-400">Score</div>
+                  <div className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">Score</div>
                   <div className="text-sm sm:text-base font-semibold text-slate-700">
                     {threat.risk_score}
                   </div>
                 </div>
                 
-                {/* RPN */}
-                <div className="text-right min-w-[50px]">
+                {/* RPN - Hidden on mobile */}
+                <div className="text-right min-w-[50px] hidden sm:block">
                   <div className="text-xs text-slate-400">RPN</div>
                   {rpnValue ? (
                     <div className={`text-sm sm:text-base font-semibold ${
@@ -559,15 +560,15 @@ const ThreatsPage = () => {
                   )}
                 </div>
                 
-                {/* Actions Count */}
-                <div className="text-right">
+                {/* Actions Count - Hidden on mobile */}
+                <div className="text-right hidden sm:block">
                   <div className="text-xs text-slate-400">Actions</div>
                   <div className="text-sm sm:text-base font-semibold text-slate-700">
                     {threat.recommended_actions?.length || 0}
                   </div>
                 </div>
 
-                {/* Status Badge */}
+                {/* Status Badge - Hidden on mobile */}
                 <div className="hidden sm:block">
                   {(() => {
                     const statusConfig = STATUS_OPTIONS.find(s => s.value === threat.status) || 
