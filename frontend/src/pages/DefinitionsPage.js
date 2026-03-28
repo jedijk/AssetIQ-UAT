@@ -35,7 +35,124 @@ import {
 } from "../components/ui/alert-dialog";
 import { toast } from "sonner";
 
+import { Shield, Factory, Leaf, Award } from "lucide-react";
+
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+
+// Criticality dimension icons
+const CRITICALITY_DIMENSIONS = [
+  { key: "safety", icon: Shield, label: "Safety", color: "text-red-600" },
+  { key: "production", icon: Factory, label: "Production", color: "text-blue-600" },
+  { key: "environment", icon: Leaf, label: "Environment", color: "text-green-600" },
+  { key: "reputation", icon: Award, label: "Reputation", color: "text-purple-600" },
+];
+
+// Criticality Table Component (multi-dimensional)
+const CriticalityTable = ({ data, isEditing, onUpdateRow, t }) => {
+  const [editingRow, setEditingRow] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+
+  const handleEditClick = (row) => {
+    setEditingRow(row.rank);
+    setEditForm({ ...row });
+  };
+
+  const handleSaveRow = () => {
+    if (editForm) {
+      onUpdateRow("criticality", editForm);
+      setEditingRow(null);
+      setEditForm(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRow(null);
+    setEditForm(null);
+  };
+
+  return (
+    <div className="space-y-4">
+      {data.map((item) => (
+        <div 
+          key={item.rank} 
+          className={`border rounded-xl overflow-hidden transition-all ${
+            editingRow === item.rank ? 'ring-2 ring-blue-500' : 'hover:shadow-md'
+          }`}
+        >
+          {/* Header Row */}
+          <div className={`flex items-center justify-between px-4 py-3 ${item.color} bg-opacity-20`} 
+               style={{ backgroundColor: item.color.includes('red') ? '#fef2f2' : 
+                                         item.color.includes('orange') ? '#fff7ed' :
+                                         item.color.includes('yellow') ? '#fefce8' :
+                                         item.color.includes('green-5') ? '#f0fdf4' : '#ecfdf5' }}>
+            <div className="flex items-center gap-3">
+              <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full text-white font-bold text-lg ${item.color}`}>
+                {item.rank}
+              </span>
+              {editingRow === item.rank ? (
+                <Input
+                  value={editForm.label}
+                  onChange={(e) => setEditForm({ ...editForm, label: e.target.value })}
+                  className="w-40 h-9 font-semibold"
+                />
+              ) : (
+                <span className="font-semibold text-lg text-slate-800">{item.label}</span>
+              )}
+            </div>
+            {isEditing && editingRow !== item.rank && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleEditClick(item)}
+                className="h-8"
+              >
+                <Pencil className="w-4 h-4 mr-1" />
+                Edit
+              </Button>
+            )}
+            {editingRow === item.rank && (
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                  <X className="w-4 h-4 mr-1" /> Cancel
+                </Button>
+                <Button size="sm" onClick={handleSaveRow}>
+                  <Check className="w-4 h-4 mr-1" /> Save
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Dimensions Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+            {CRITICALITY_DIMENSIONS.map((dim) => {
+              const Icon = dim.icon;
+              return (
+                <div key={dim.key} className="p-4">
+                  <div className={`flex items-center gap-2 mb-2 ${dim.color}`}>
+                    <Icon className="w-4 h-4" />
+                    <span className="font-semibold text-sm">{t(`definitions.${dim.key}`) || dim.label}</span>
+                  </div>
+                  {editingRow === item.rank ? (
+                    <Textarea
+                      value={editForm[dim.key] || ""}
+                      onChange={(e) => setEditForm({ ...editForm, [dim.key]: e.target.value })}
+                      className="text-sm min-h-[80px]"
+                      placeholder={`Enter ${dim.label.toLowerCase()} impact...`}
+                    />
+                  ) : (
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      {item[dim.key] || "-"}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 // API functions
 const definitionsAPI = {
@@ -610,11 +727,10 @@ export default function DefinitionsPage() {
                   {t("definitions.criticalityTitle") || "Equipment Criticality Definitions"}
                   {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800">{t("definitions.editMode")}</Badge>}
                 </CardTitle>
-                <CardDescription>{t("definitions.criticalityDesc") || "Define what each criticality level (1-5) means for your equipment hierarchy. This helps prioritize maintenance and resource allocation."}</CardDescription>
+                <CardDescription>{t("definitions.criticalityDesc") || "Define what each criticality level (1-5) means across Safety, Production, Environment, and Reputation dimensions."}</CardDescription>
               </CardHeader>
               <CardContent>
-                <EditableTable
-                  type="criticality"
+                <CriticalityTable
                   data={localCriticality}
                   isEditing={isEditing}
                   onUpdateRow={handleUpdateRow}

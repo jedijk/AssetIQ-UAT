@@ -91,11 +91,51 @@ DEFAULT_DETECTION = [
 ]
 
 DEFAULT_CRITICALITY = [
-    {"rank": 5, "label": "Critical", "description": "Equipment failure causes immediate plant shutdown, major safety hazard, or severe environmental impact. No redundancy available.", "secondary_description": "Immediate action required. 24/7 monitoring. Full spare parts inventory mandatory.", "color": "bg-red-600"},
-    {"rank": 4, "label": "High", "description": "Equipment failure significantly impacts production capacity (>50% reduction) or poses safety concerns. Limited redundancy.", "secondary_description": "Preventive maintenance priority. Condition monitoring recommended. Key spare parts on-site.", "color": "bg-orange-500"},
-    {"rank": 3, "label": "Medium", "description": "Equipment failure causes moderate production impact (25-50% reduction). Partial redundancy or workaround available.", "secondary_description": "Standard maintenance schedule. Periodic inspections. Standard spare parts availability.", "color": "bg-yellow-500"},
-    {"rank": 2, "label": "Low", "description": "Equipment failure causes minor production impact (<25% reduction). Full redundancy or easy workaround available.", "secondary_description": "Run-to-failure acceptable. Reactive maintenance approach. Spare parts on request.", "color": "bg-green-500"},
-    {"rank": 1, "label": "Minimal", "description": "Equipment failure has negligible impact on production, safety, or environment. Multiple redundancies exist.", "secondary_description": "No scheduled maintenance required. Replace on failure. No spare parts needed.", "color": "bg-green-700"},
+    {
+        "rank": 5, 
+        "label": "Critical", 
+        "color": "bg-red-600",
+        "safety": "Fatality or permanent disability. Immediate danger to personnel.",
+        "production": "Complete plant shutdown. Total loss of production capacity (100%).",
+        "environment": "Major environmental disaster. Significant off-site contamination requiring regulatory notification.",
+        "reputation": "International media coverage. Severe damage to company reputation. Loss of operating license possible."
+    },
+    {
+        "rank": 4, 
+        "label": "High", 
+        "color": "bg-orange-500",
+        "safety": "Serious injury requiring hospitalization. Lost time incident.",
+        "production": "Major production loss (>50%). Extended downtime (>24 hours).",
+        "environment": "Significant environmental impact. On-site contamination requiring remediation.",
+        "reputation": "National media coverage. Significant customer complaints. Regulatory scrutiny."
+    },
+    {
+        "rank": 3, 
+        "label": "Medium", 
+        "color": "bg-yellow-500",
+        "safety": "Minor injury requiring first aid. Recordable incident.",
+        "production": "Moderate production loss (25-50%). Downtime 8-24 hours.",
+        "environment": "Minor environmental impact. Contained spill or emission.",
+        "reputation": "Local media coverage. Customer dissatisfaction. Internal investigation required."
+    },
+    {
+        "rank": 2, 
+        "label": "Low", 
+        "color": "bg-green-500",
+        "safety": "Near miss or minor discomfort. No injury.",
+        "production": "Minor production impact (<25%). Downtime <8 hours.",
+        "environment": "Negligible environmental impact. Within permit limits.",
+        "reputation": "Minor customer complaint. Internal reporting only."
+    },
+    {
+        "rank": 1, 
+        "label": "Minimal", 
+        "color": "bg-green-700",
+        "safety": "No safety impact. Normal operating conditions.",
+        "production": "No production impact. Redundancy available.",
+        "environment": "No environmental impact.",
+        "reputation": "No reputational impact."
+    },
 ]
 
 
