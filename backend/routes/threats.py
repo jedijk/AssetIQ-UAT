@@ -39,8 +39,9 @@ async def get_threats(
         query["status"] = status
     
     threats = await db.threats.find(query, {"_id": 0}).sort("rank", 1).limit(limit).to_list(limit)
+    total_count = len(threats)
     # Ensure required fields have values and risk_score is int
-    for t in threats:
+    for idx, t in enumerate(threats):
         if isinstance(t.get("risk_score"), float):
             t["risk_score"] = int(t["risk_score"])
         # Ensure required string fields are not None
@@ -54,6 +55,18 @@ async def get_threats(
             t["likelihood"] = "Unknown"
         if not t.get("detectability"):
             t["detectability"] = "Unknown"
+        # Add required fields that may be missing
+        if "rank" not in t:
+            t["rank"] = idx + 1
+        if "total_threats" not in t:
+            t["total_threats"] = total_count
+        if "recommended_actions" not in t:
+            t["recommended_actions"] = []
+        if "occurrence_count" not in t:
+            t["occurrence_count"] = 1
+        # Ensure created_at is string
+        if t.get("created_at") and not isinstance(t["created_at"], str):
+            t["created_at"] = t["created_at"].isoformat() if hasattr(t["created_at"], 'isoformat') else str(t["created_at"])
     return threats
 
 @router.get("/threats/top", response_model=List[ThreatResponse])
@@ -65,8 +78,9 @@ async def get_top_threats(
         {"created_by": current_user["id"], "status": {"$ne": "Closed"}},
         {"_id": 0}
     ).sort("risk_score", -1).limit(limit).to_list(limit)
+    total_count = len(threats)
     # Ensure required fields have values and risk_score is int
-    for t in threats:
+    for idx, t in enumerate(threats):
         if isinstance(t.get("risk_score"), float):
             t["risk_score"] = int(t["risk_score"])
         # Ensure required string fields are not None
@@ -80,6 +94,18 @@ async def get_top_threats(
             t["likelihood"] = "Unknown"
         if not t.get("detectability"):
             t["detectability"] = "Unknown"
+        # Add required fields that may be missing
+        if "rank" not in t:
+            t["rank"] = idx + 1
+        if "total_threats" not in t:
+            t["total_threats"] = total_count
+        if "recommended_actions" not in t:
+            t["recommended_actions"] = []
+        if "occurrence_count" not in t:
+            t["occurrence_count"] = 1
+        # Ensure created_at is string
+        if t.get("created_at") and not isinstance(t["created_at"], str):
+            t["created_at"] = t["created_at"].isoformat() if hasattr(t["created_at"], 'isoformat') else str(t["created_at"])
     return threats
 
 
@@ -356,6 +382,30 @@ async def get_threat(
     # Ensure risk_score is int
     if isinstance(threat.get("risk_score"), float):
         threat["risk_score"] = int(threat["risk_score"])
+    
+    # Add required fields that may be missing
+    if "rank" not in threat:
+        threat["rank"] = 1
+    if "total_threats" not in threat:
+        threat["total_threats"] = 1
+    if "recommended_actions" not in threat:
+        threat["recommended_actions"] = []
+    if "occurrence_count" not in threat:
+        threat["occurrence_count"] = 1
+    if not threat.get("frequency"):
+        threat["frequency"] = "Unknown"
+    if not threat.get("likelihood"):
+        threat["likelihood"] = "Unknown"
+    if not threat.get("detectability"):
+        threat["detectability"] = "Unknown"
+    if not threat.get("equipment_type"):
+        threat["equipment_type"] = "Equipment"
+    if not threat.get("impact"):
+        threat["impact"] = "Unknown"
+    # Ensure created_at is string
+    if threat.get("created_at") and not isinstance(threat["created_at"], str):
+        threat["created_at"] = threat["created_at"].isoformat() if hasattr(threat["created_at"], 'isoformat') else str(threat["created_at"])
+    
     return threat
 
 @router.patch("/threats/{threat_id}", response_model=ThreatResponse)

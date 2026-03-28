@@ -439,54 +439,52 @@ const ThreatDetailPage = () => {
   const rpnValue = linkedFmData?.rpn || threat.fmea_rpn || threat.rpn || null;
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl" data-testid="threat-detail-page">
+    <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-4xl pb-20" data-testid="threat-detail-page">
       {/* Sticky Header - Shows when scrolling down (positioned below main nav header) */}
       {showStickyHeader && (
         <motion.div
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -100, opacity: 0 }}
-          className="fixed top-16 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm"
+          className="fixed top-12 sm:top-16 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm"
         >
-          <div className="container mx-auto px-4 py-3 max-w-4xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+          <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 max-w-4xl">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => navigate("/threats")}
-                  className="text-slate-500 hover:text-slate-700"
+                  className="text-slate-500 hover:text-slate-700 p-1 sm:p-2 flex-shrink-0"
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
-                <div className="flex items-center gap-3">
-                  <RiskBadge level={threat.risk_level} size="sm" />
-                  <span className="font-semibold text-slate-900 truncate max-w-[200px] sm:max-w-[300px]">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <span className="hidden sm:inline"><RiskBadge level={threat.risk_level} size="sm" /></span>
+                  <span className="font-semibold text-slate-900 truncate text-sm sm:text-base">
                     {threat.title}
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                {/* Score Display */}
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-lg">
-                    <Target className="w-3.5 h-3.5 text-slate-500" />
-                    <span className="font-medium text-slate-700">Score: {threat.risk_score}</span>
+              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                {/* Score Display - Compact on mobile */}
+                <div className="flex items-center gap-1.5 sm:gap-3 text-xs sm:text-sm">
+                  <div className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1 bg-slate-100 rounded-lg">
+                    <span className="font-medium text-slate-700">{threat.risk_score}</span>
                   </div>
                   {rpnValue && (
-                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${
+                    <div className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-lg ${
                       rpnValue >= 300 ? "bg-red-100 text-red-700" :
                       rpnValue >= 200 ? "bg-orange-100 text-orange-700" :
                       rpnValue >= 100 ? "bg-yellow-100 text-yellow-700" :
                       "bg-green-100 text-green-700"
                     }`}>
-                      <Activity className="w-3.5 h-3.5" />
-                      <span className="font-medium">RPN: {rpnValue}</span>
+                      <span className="font-medium">{rpnValue}</span>
                     </div>
                   )}
                 </div>
-                {/* Quick Actions */}
-                <div className="flex items-center gap-2">
+                {/* Quick Actions - Hidden on mobile */}
+                <div className="hidden sm:flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -521,61 +519,64 @@ const ThreatDetailPage = () => {
         ref={headerRef}
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
+        className="mb-4 sm:mb-6"
       >
         <Button
           variant="ghost"
           onClick={() => navigate("/threats")}
-          className="mb-4 -ml-2 text-slate-500 hover:text-slate-700"
+          className="mb-3 sm:mb-4 -ml-2 text-slate-500 hover:text-slate-700 text-sm"
           data-testid="back-to-threats-button"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Threats
+          <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Back to Threats</span>
+          <span className="sm:hidden">Back</span>
         </Button>
 
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:gap-4">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <RiskBadge level={threat.risk_level} size="lg" />
-              <span className="text-slate-500 font-mono text-sm" data-testid="threat-rank-display">
-                Rank #{threat.rank} of {threat.total_threats}
+            <div className="flex items-center gap-2 sm:gap-3 mb-2">
+              <RiskBadge level={threat.risk_level} size="sm" />
+              <span className="text-slate-500 font-mono text-xs sm:text-sm" data-testid="threat-rank-display">
+                #{threat.rank}/{threat.total_threats}
               </span>
             </div>
             {isEditing ? (
               <Input
                 value={editForm.title || ""}
                 onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                className="text-2xl font-bold h-12"
+                className="text-lg sm:text-2xl font-bold h-10 sm:h-12"
                 data-testid="edit-threat-title"
               />
             ) : (
-              <h1 className="text-2xl font-bold text-slate-900" data-testid="threat-title">
+              <h1 className="text-lg sm:text-2xl font-bold text-slate-900" data-testid="threat-title">
                 {threat.title}
               </h1>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {isEditing ? (
               <>
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={cancelEditing}
                   data-testid="cancel-edit-button"
                 >
-                  <X className="w-4 h-4 mr-2" />
+                  <X className="w-4 h-4 mr-1" />
                   Cancel
                 </Button>
                 <Button
+                  size="sm"
                   onClick={saveChanges}
                   disabled={updateMutation.isPending}
                   className="bg-green-600 hover:bg-green-700"
                   data-testid="save-edit-button"
                 >
                   {updateMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
                   ) : (
-                    <Save className="w-4 h-4 mr-2" />
+                    <Save className="w-4 h-4 mr-1" />
                   )}
                   Save
                 </Button>
@@ -584,10 +585,12 @@ const ThreatDetailPage = () => {
               <>
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={startEditing}
                   data-testid="edit-threat-button"
+                  className="text-xs sm:text-sm"
                 >
-                  <Edit className="w-4 h-4 mr-2" />
+                  <Edit className="w-3.5 h-3.5 mr-1" />
                   Edit
                 </Button>
                 
@@ -596,7 +599,7 @@ const ThreatDetailPage = () => {
                   onValueChange={(value) => updateMutation.mutate({ status: value })}
                   disabled={updateMutation.isPending}
                 >
-                  <SelectTrigger className="w-36" data-testid="status-select">
+                  <SelectTrigger className="w-28 sm:w-36 h-8 text-xs sm:text-sm" data-testid="status-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -646,7 +649,7 @@ const ThreatDetailPage = () => {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className={`card p-6 mb-6 border-l-4 cursor-context-menu relative ${
+        className={`card p-4 sm:p-6 mb-4 sm:mb-6 border-l-4 cursor-context-menu relative ${
           threat.risk_level === "Critical" ? "border-l-red-500" :
           threat.risk_level === "High" ? "border-l-orange-500" :
           threat.risk_level === "Medium" ? "border-l-yellow-500" :
@@ -656,24 +659,24 @@ const ThreatDetailPage = () => {
         onContextMenu={handleScoreContextMenu}
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-4 sm:gap-8">
             {/* Risk Score */}
             <div>
-              <div className="text-sm font-medium text-slate-500 mb-1 flex items-center gap-2">
+              <div className="text-xs sm:text-sm font-medium text-slate-500 mb-0.5 sm:mb-1 flex items-center gap-1 sm:gap-2">
                 {t("observations.riskScore")}
-                <span className="text-xs text-slate-400 font-normal">({t("observations.rightClickForDetails")})</span>
+                <span className="text-[10px] sm:text-xs text-slate-400 font-normal hidden sm:inline">({t("observations.rightClickForDetails")})</span>
               </div>
-              <div className="text-4xl font-bold text-slate-900">{threat.risk_score}</div>
+              <div className="text-2xl sm:text-4xl font-bold text-slate-900">{threat.risk_score}</div>
             </div>
             
             {/* RPN Display */}
             {rpnValue && (
-              <div className="border-l border-slate-200 pl-8">
-                <div className="text-sm font-medium text-slate-500 mb-1 flex items-center gap-2">
+              <div className="border-l border-slate-200 pl-4 sm:pl-8">
+                <div className="text-xs sm:text-sm font-medium text-slate-500 mb-0.5 sm:mb-1 flex items-center gap-1 sm:gap-2">
                   RPN
-                  <span className="text-xs text-slate-400 font-normal">(Risk Priority Number)</span>
+                  <span className="text-[10px] sm:text-xs text-slate-400 font-normal hidden sm:inline">(Risk Priority Number)</span>
                 </div>
-                <div className={`text-4xl font-bold ${
+                <div className={`text-2xl sm:text-4xl font-bold ${
                   rpnValue >= 300 ? "text-red-600" :
                   rpnValue >= 200 ? "text-orange-600" :
                   rpnValue >= 100 ? "text-yellow-600" :
@@ -684,13 +687,13 @@ const ThreatDetailPage = () => {
               </div>
             )}
           </div>
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
+          <div className={`w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl flex items-center justify-center ${
             threat.risk_level === "Critical" ? "bg-red-50" :
             threat.risk_level === "High" ? "bg-orange-50" :
             threat.risk_level === "Medium" ? "bg-yellow-50" :
             "bg-green-50"
           }`}>
-            <AlertTriangle className={`w-8 h-8 ${
+            <AlertTriangle className={`w-5 h-5 sm:w-8 sm:h-8 ${
               threat.risk_level === "Critical" ? "text-red-500" :
               threat.risk_level === "High" ? "text-orange-500" :
               threat.risk_level === "Medium" ? "text-yellow-500" :
@@ -918,35 +921,35 @@ const ThreatDetailPage = () => {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.12 }}
-        className="card p-4 mb-6"
+        className="card p-3 sm:p-4 mb-4 sm:mb-6"
         data-testid="equipment-criticality-card"
       >
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           {/* Equipment Name & Link Status */}
-          <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
               linkedCriticalityData ? 'bg-purple-50' : 'bg-slate-100'
             }`}>
               {linkedCriticalityData ? (
-                <Link className="w-4 h-4 text-purple-600" />
+                <Link className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600" />
               ) : (
-                <Unlink className="w-4 h-4 text-slate-400" />
+                <Unlink className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
               )}
             </div>
-            <div>
-              <div className="text-sm font-semibold text-slate-900">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
                 {threat.asset || t("observations.noEquipmentLinked")}
               </div>
               {linkedCriticalityData ? (
-                <span className="text-xs text-green-600">{t("observations.criticalityLinked")}</span>
+                <span className="text-[10px] sm:text-xs text-green-600">{t("observations.criticalityLinked")}</span>
               ) : (
-                <span className="text-xs text-amber-600">{t("observations.noCriticalityLinked")}</span>
+                <span className="text-[10px] sm:text-xs text-amber-600">{t("observations.noCriticalityLinked")}</span>
               )}
             </div>
           </div>
           
           {/* 4-Dimension Criticality Display + Button */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {linkedCriticalityData && (
               <div className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex items-center gap-0.5 px-1.5">
@@ -1124,14 +1127,14 @@ const ThreatDetailPage = () => {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"
+        className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6"
         data-testid="threat-info-grid"
       >
         {infoItems.map((item) => (
-          <div key={item.label} className="card p-4">
-            <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
-              <item.icon className="w-4 h-4" />
-              {item.label}
+          <div key={item.label} className="card p-2.5 sm:p-4">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-slate-500 text-[10px] sm:text-sm mb-0.5 sm:mb-1">
+              <item.icon className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="truncate">{item.label}</span>
             </div>
             {isEditing ? (
               item.type === "searchable" ? (
@@ -1150,7 +1153,7 @@ const ThreatDetailPage = () => {
                   value={editForm[item.field] || ""}
                   onValueChange={(v) => setEditForm({ ...editForm, [item.field]: v })}
                 >
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1163,14 +1166,14 @@ const ThreatDetailPage = () => {
                 <Input
                   value={editForm[item.field] || ""}
                   onChange={(e) => setEditForm({ ...editForm, [item.field]: e.target.value })}
-                  className="h-9"
+                  className="h-8 sm:h-9 text-xs sm:text-sm"
                 />
               )
             ) : (
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-900">{item.value}</span>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <span className="font-semibold text-slate-900 text-xs sm:text-base truncate">{item.value}</span>
                 {item.field === "failure_mode" && threat.is_new_failure_mode && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] sm:text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200 flex-shrink-0">
                     NEW
                   </span>
                 )}
