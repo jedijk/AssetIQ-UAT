@@ -12,17 +12,14 @@ export const THEMES = {
     name: "Dark", 
     value: "dark",
     icon: "moon"
-  },
-  assetiq: {
-    name: "AssetIQ Blue",
-    value: "assetiq",
-    icon: "droplet"
   }
 };
 
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem("assetiq-theme");
+    // If saved theme was assetiq, default to dark
+    if (saved === "assetiq") return "dark";
     return saved || "light";
   });
 
@@ -30,7 +27,7 @@ export const ThemeProvider = ({ children }) => {
     localStorage.setItem("assetiq-theme", theme);
     
     // Remove all theme classes
-    document.documentElement.classList.remove("theme-light", "theme-dark", "theme-assetiq");
+    document.documentElement.classList.remove("theme-light", "theme-dark");
     
     // Add current theme class
     document.documentElement.classList.add(`theme-${theme}`);

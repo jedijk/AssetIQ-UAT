@@ -44,7 +44,21 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 - `action_type` (CM/PM/PDM): Corrective/Preventive/Predictive Maintenance
 - `discipline` (string): e.g., Mechanical, Electrical
 
-## Completed in Latest Session (Mar 28, 2026 - Session 3)
+## Completed in Latest Session (Mar 28, 2026 - Session 4)
+
+### Fix: Dark Mode Contrast and Theme Cleanup
+- Improved dark mode contrast throughout the application
+- Added comprehensive CSS variables system for dark mode
+- Created `.themed-card` class using CSS variables for proper dark backgrounds
+- Updated DashboardPage.js cards to use theme-aware classes
+- Removed AssetIQ Blue theme mode (simplified to Light/Dark only)
+- Files updated: App.css, index.css, DashboardPage.js, ThemeContext.js, Layout.js
+
+### Fix: Observation Detail Sticky Header Overlap
+- Fixed the sticky header on `ThreatDetailPage.js` overlapping the main app header
+- Changed from `top-0` to `top-12` (48px) to sit directly below the main header
+
+## Completed Earlier (Mar 28, 2026 - Session 3)
 
 ### Fix: Observation Detail Sticky Header Overlap (P0)
 - Fixed the sticky header on `ThreatDetailPage.js` overlapping the main app header

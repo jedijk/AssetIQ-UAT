@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useTheme, THEMES } from "../contexts/ThemeContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Sun, Moon, Droplet } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Sun, Moon } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -38,8 +38,6 @@ const ThemeIcon = ({ theme }) => {
   switch (theme) {
     case "dark":
       return <Moon className="w-4 h-4" />;
-    case "assetiq":
-      return <Droplet className="w-4 h-4" />;
     default:
       return <Sun className="w-4 h-4" />;
   }
@@ -400,14 +398,6 @@ const Layout = () => {
                   <Moon className="w-4 h-4 mr-2" />
                   Dark
                   {theme === "dark" && <span className="ml-auto text-blue-600">✓</span>}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setTheme("assetiq")}
-                  className={`cursor-pointer text-sm ${theme === "assetiq" ? "bg-blue-50 text-blue-700" : ""}`}
-                >
-                  <Droplet className="w-4 h-4 mr-2" />
-                  AssetIQ Blue
-                  {theme === "assetiq" && <span className="ml-auto text-blue-600">✓</span>}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
