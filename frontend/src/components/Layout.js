@@ -483,7 +483,7 @@ const Layout = () => {
                         {user?.department || t("userManagement.department")}
                       </p>
                       <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {user?.role || "Viewer"}
+                        {user?.position || t("userManagement.position")}
                       </span>
                     </div>
                   </div>
