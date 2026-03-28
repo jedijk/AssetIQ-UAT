@@ -222,60 +222,6 @@ const Layout = () => {
 
           {/* Right Side */}
           <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2">
-            {/* Info Button - Hidden on small mobile */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setInfoOpen(true)}
-                    className="h-7 w-7 sm:h-8 sm:w-8 text-slate-500 border-slate-300 hover:bg-slate-50 hover:text-slate-700 hidden sm:flex"
-                    data-testid="info-button"
-                  >
-                    <Info className="w-3.5 h-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>Risk Methodology & Help</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {/* Undo Button */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={undo}
-                    disabled={!canUndo || isUndoing}
-                    className={`h-7 w-7 sm:h-8 sm:w-8 relative transition-all duration-200 ${
-                      canUndo 
-                        ? "text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700" 
-                        : "text-slate-300 border-slate-200"
-                    }`}
-                    data-testid="undo-button"
-                  >
-                    <Undo2 className="w-3.5 h-3.5" />
-                    {undoCount > 0 && (
-                      <span className="absolute -top-1 -right-1 h-3.5 w-3.5 text-[9px] font-bold bg-amber-500 text-white rounded-full flex items-center justify-center">
-                        {undoCount}
-                      </span>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {canUndo ? (
-                    <p>Undo: {lastAction?.label} <span className="text-slate-400">({undoCount} actions)</span></p>
-                  ) : (
-                    <p>No actions to undo</p>
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
             {/* Notifications Bell */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

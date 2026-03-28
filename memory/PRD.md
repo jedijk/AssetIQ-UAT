@@ -63,10 +63,17 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 - Files updated: `/app/frontend/src/pages/MyTasksPage.js`
 
 ### Fix: Scrollable Navigation Menu
-- Desktop nav (tablet/medium screens): Added horizontal scrolling with hidden scrollbar for overflow items
+- Desktop/tablet nav: Added horizontal scrolling with hidden scrollbar for overflow items
 - Mobile nav: Added max-height (70vh) with vertical scrolling for long menu lists
 - Added `scrollbar-hide` CSS utility class for clean scrollable areas
 - Files updated: `/app/frontend/src/components/Layout.js`, `/app/frontend/src/App.css`
+
+### Fix: Header Cleanup & Mobile Observations List
+- Removed Undo button and Info button from header (cleaner UI)
+- Mobile observations list: Hid rank numbers, score counts (Score/RPN/Actions) on mobile for better readability
+- Observation title now shows 2 lines on mobile (`line-clamp-2`) for better visibility
+- Risk badge moved below title on mobile for cleaner layout
+- Files updated: `/app/frontend/src/components/Layout.js`, `/app/frontend/src/pages/ThreatsPage.js`
 
 ### Feature: Task Completion Tracking
 - Task completions now record `completed_by_id` and `completed_by_name`

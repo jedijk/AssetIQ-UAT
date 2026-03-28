@@ -513,29 +513,30 @@ const ThreatsPage = () => {
                 }`} />
               </div>
 
-              <div className="priority-rank text-sm sm:text-base" data-testid={`threat-rank-${threat.id}`}>
+              {/* Rank - Hidden on mobile */}
+              <div className="priority-rank text-sm sm:text-base hidden sm:block" data-testid={`threat-rank-${threat.id}`}>
                 #{threat.rank}
               </div>
               
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
-                  <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-1">
+                <div className="flex items-center gap-2 sm:gap-3 mb-1">
+                  <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1">
                     {threat.title}
                   </h3>
-                  <RiskBadge level={threat.risk_level} size="sm" />
                 </div>
-                <div className="text-xs sm:text-sm text-slate-500 line-clamp-1">
-                  <span>{threat.asset}</span>
-                  <span className="mx-1">•</span>
-                  <span>{threat.equipment_type}</span>
+                <div className="flex items-center gap-2">
+                  <RiskBadge level={threat.risk_level} size="sm" />
+                  <span className="text-xs sm:text-sm text-slate-500 truncate hidden sm:inline">
+                    {threat.asset}
+                  </span>
                 </div>
               </div>
 
-              {/* Score Display - Business Risk and RPN */}
-              <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+              {/* Score Display - Hidden on mobile */}
+              <div className="hidden sm:flex items-center gap-3 sm:gap-4 flex-shrink-0">
                 {/* Business Risk Score */}
                 <div className="text-right">
-                  <div className="text-xs text-slate-400 hidden sm:block">Score</div>
+                  <div className="text-xs text-slate-400">Score</div>
                   <div className="text-sm sm:text-base font-semibold text-slate-700">
                     {threat.risk_score}
                   </div>
@@ -543,7 +544,7 @@ const ThreatsPage = () => {
                 
                 {/* RPN */}
                 <div className="text-right min-w-[50px]">
-                  <div className="text-xs text-slate-400 hidden sm:block">RPN</div>
+                  <div className="text-xs text-slate-400">RPN</div>
                   {rpnValue ? (
                     <div className={`text-sm sm:text-base font-semibold ${
                       rpnValue >= 300 ? "text-red-600" :
@@ -556,6 +557,14 @@ const ThreatsPage = () => {
                   ) : (
                     <div className="text-sm text-slate-300">—</div>
                   )}
+                </div>
+                
+                {/* Actions Count */}
+                <div className="text-right">
+                  <div className="text-xs text-slate-400">Actions</div>
+                  <div className="text-sm sm:text-base font-semibold text-slate-700">
+                    {threat.recommended_actions?.length || 0}
+                  </div>
                 </div>
 
                 {/* Status Badge */}
