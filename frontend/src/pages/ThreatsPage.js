@@ -543,9 +543,9 @@ const ThreatsPage = () => {
                   </div>
                 </div>
                 
-                {/* RPN - Hidden on mobile */}
-                <div className="text-right min-w-[50px] hidden sm:block">
-                  <div className="text-xs text-slate-400">RPN</div>
+                {/* RPN - Compact on mobile */}
+                <div className="text-right">
+                  <div className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">RPN</div>
                   {rpnValue ? (
                     <div className={`text-sm sm:text-base font-semibold ${
                       rpnValue >= 300 ? "text-red-600" :
