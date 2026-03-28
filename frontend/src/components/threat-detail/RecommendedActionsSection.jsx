@@ -81,8 +81,10 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       actionsAPI.create({
         title: text,
         description: `From threat: ${threat.title}`,
+        source_type: "threat",
+        source_id: threatId,
+        source_name: threat.title,
         priority: "medium",
-        linked_threat_id: threatId,
         action_type: action_type || null,
         discipline: discipline || null,
       }),
@@ -90,7 +92,8 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       toast.success("Action created in tracker!");
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Failed to create action:", error);
       toast.error("Failed to create action");
     },
   });
