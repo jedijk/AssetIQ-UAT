@@ -1124,41 +1124,6 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
             />
           </div>
         )}
-        
-        {/* Issue Toggle - More touch-friendly on mobile */}
-        <div className={cn(
-          "flex items-center justify-between p-4 bg-amber-50 rounded-xl border border-amber-200",
-          isMobile && "flex-col gap-4 items-stretch"
-        )}>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className={cn("text-amber-600", isMobile ? "w-6 h-6" : "w-5 h-5")} />
-            <span className={cn("font-medium text-amber-900", isMobile && "text-base")}>Issue Found?</span>
-          </div>
-          <div className={cn("flex gap-2", isMobile && "w-full")}>
-            <Button
-              variant={!issueFound ? "default" : "outline"}
-              size={isMobile ? "lg" : "sm"}
-              onClick={() => setIssueFound(false)}
-              className={cn(
-                !issueFound ? "bg-green-600 hover:bg-green-700" : "",
-                isMobile && "flex-1 h-12 text-base"
-              )}
-            >
-              <Check className="w-4 h-4 mr-1" /> No
-            </Button>
-            <Button
-              variant={issueFound ? "default" : "outline"}
-              size={isMobile ? "lg" : "sm"}
-              onClick={() => setIssueFound(true)}
-              className={cn(
-                issueFound ? "bg-red-600 hover:bg-red-700" : "",
-                isMobile && "flex-1 h-12 text-base"
-              )}
-            >
-              <AlertCircle className="w-4 h-4 mr-1" /> Yes
-            </Button>
-          </div>
-        </div>
       </div>
       
       {/* Footer Actions */}
