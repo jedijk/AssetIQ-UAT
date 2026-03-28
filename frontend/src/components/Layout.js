@@ -44,9 +44,34 @@ const Layout = () => {
   const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
   const [hierarchyOpen, setHierarchyOpen] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(null);
 
   // Track page views for user statistics
   usePageTracking();
+
+  // Fetch user avatar
+  useEffect(() => {
+    const fetchAvatar = async () => {
+      if (!user?.id) return;
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(
+          `${process.env.REACT_APP_BACKEND_URL}/api/users/${user.id}/avatar?auth=${token}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.ok) {
+          const blob = await response.blob();
+          setAvatarUrl(URL.createObjectURL(blob));
+        }
+      } catch (err) {
+        // No avatar available
+      }
+    };
+    fetchAvatar();
+    return () => {
+      if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+    };
+  }, [user?.id]);
 
   // Query overdue actions for notification bell
   const { data: overdueData } = useQuery({
@@ -414,19 +439,67 @@ const Layout = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <span className="hidden lg:block text-xs font-medium text-slate-600" data-testid="user-name">
-              {user?.name}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={logout}
-              className="h-7 sm:h-8 px-2 sm:px-2.5 text-slate-500 hover:text-slate-700 text-xs"
-              data-testid="logout-button"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline ml-1.5">{t("nav.logout")}</span>
-            </Button>
+            {/* User Avatar with Profile Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button 
+                  className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden border-2 border-slate-200 hover:border-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  data-testid="user-avatar-button"
+                >
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={user?.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm">
+                      {user?.name?.charAt(0)?.toUpperCase() || "U"}
+                    </div>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <div className="px-3 py-3 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-full overflow-hidden border-2 border-white shadow-md flex-shrink-0">
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt={user?.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
+                          {user?.name?.charAt(0)?.toUpperCase() || "U"}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-900 truncate" data-testid="user-name">
+                        {user?.name || "User"}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {user?.department || t("userManagement.department")}
+                      </p>
+                      <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {user?.role || "Viewer"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="py-1">
+                  <DropdownMenuItem 
+                    onClick={logout}
+                    className="cursor-pointer text-red-600 hover:text-red-700 hover:bg-red-50"
+                    data-testid="logout-menu-item"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    {t("nav.logout")}
+                  </DropdownMenuItem>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Mobile Menu Toggle */}
             <button

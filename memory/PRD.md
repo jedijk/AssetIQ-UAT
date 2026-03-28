@@ -46,6 +46,17 @@ All recommended actions (manual, FMEA library, AI-generated) use structured form
 
 ## Completed in Latest Session (Mar 28, 2026)
 
+### Feature: User Avatar in Header with Profile Dropdown
+- Replaced user name text in header with circular avatar
+- Avatar shows uploaded photo or initials with gradient background
+- Click avatar to open dropdown showing:
+  - Larger avatar image
+  - User's full name
+  - Department
+  - Role badge (e.g., "Viewer", "Admin")
+  - Logout button
+- Avatar is fetched from object storage on layout mount
+
 ### Feature: Smaller Translation Button
 - Changed language switcher from outline button with icon to ghost button showing just "EN"/"NL" text
 - Reduced size: h-6 w-6 on mobile, h-7 w-7 on desktop
