@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -274,7 +274,7 @@ const SettingsUserManagementPage = () => {
   const users = usersData?.users || [];
   
   // Load avatars when users data changes
-  useState(() => {
+  useEffect(() => {
     if (users.length > 0) {
       loadAvatarsForUsers(users);
     }
