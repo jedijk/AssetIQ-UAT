@@ -255,6 +255,8 @@ export default function DashboardPage() {
   const { data: investigationsData = { investigations: [] } } = useQuery({
     queryKey: ["investigations"],
     queryFn: investigationAPI.getAll,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
   const investigations = Array.isArray(investigationsData?.investigations) ? investigationsData.investigations : (Array.isArray(investigationsData) ? investigationsData : []);
 
@@ -535,7 +537,7 @@ export default function DashboardPage() {
           onClick={() => navigate("/causal-engine", { state: navState })}
           renderItem={(item, idx) => (
             <div key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
-              <div className={`w-2 h-2 rounded-full ${
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                 item.status === "completed" ? "bg-green-500" :
                 item.status === "in_progress" ? "bg-amber-500" : "bg-blue-500"
               }`} />
@@ -543,7 +545,23 @@ export default function DashboardPage() {
                 <p className="text-xs font-medium text-slate-700 truncate">{item.title}</p>
                 <p className="text-[10px] text-slate-400">{item.asset_name || "No asset"}</p>
               </div>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize ${
+              {/* Lead Picture */}
+              {item.lead_picture ? (
+                <img 
+                  src={item.lead_picture} 
+                  alt={item.lead_name || item.investigation_leader || "Lead"} 
+                  className="w-6 h-6 rounded-full object-cover border border-slate-200 flex-shrink-0"
+                  title={item.lead_name || item.investigation_leader}
+                />
+              ) : (
+                <div 
+                  className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-medium text-slate-600 flex-shrink-0"
+                  title={item.lead_name || item.investigation_leader || "Lead"}
+                >
+                  {(item.lead_name || item.investigation_leader || "?").charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize flex-shrink-0 ${
                 item.status === "completed" ? "bg-green-100 text-green-700" :
                 item.status === "in_progress" ? "bg-amber-100 text-amber-700" :
                 "bg-blue-100 text-blue-700"
