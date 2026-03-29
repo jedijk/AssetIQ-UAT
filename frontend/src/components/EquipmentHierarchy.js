@@ -276,7 +276,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
             data-testid="context-menu-filter-on"
           >
             <Filter className="w-4 h-4" />
-            {t ? t("hierarchy.filterOn") : "Filter on"}
+            {t?.("hierarchy.filterOn") || "Filter on"}
           </button>
           <div className="border-t border-slate-100 my-1" />
           <button
@@ -285,7 +285,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
             data-testid="context-menu-show-details"
           >
             <Info className="w-4 h-4" />
-            {t ? t("hierarchy.showDetails") : "Show Details"}
+            {t?.("hierarchy.showDetails") || "Show Details"}
           </button>
           <div className="border-t border-slate-100 my-1" />
           <button
@@ -294,7 +294,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
             data-testid="context-menu-add-threat"
           >
             <Plus className="w-4 h-4" />
-            {t ? t("hierarchy.addThreat") : "Add Observation"}
+            {t?.("hierarchy.addThreat") || "Add Observation"}
           </button>
         </div>
       )}
