@@ -363,10 +363,10 @@ export default function DashboardPage() {
         </div>
         
         {/* Dashboard Tab Buttons - Mobile Optimized */}
-        <div className="flex h-10 items-center rounded-lg bg-slate-100 p-1 w-full sm:w-auto gap-1">
+        <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1">
           <button 
             onClick={() => setActiveTab("operational")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
             data-testid="operational-tab"
           >
             <Activity className="w-4 h-4 flex-shrink-0" />
@@ -374,7 +374,7 @@ export default function DashboardPage() {
           </button>
           <button 
             onClick={() => setActiveTab("reliability")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
             data-testid="reliability-tab"
           >
             <Gauge className="w-4 h-4 flex-shrink-0" />
@@ -501,8 +501,8 @@ export default function DashboardPage() {
                   {/* User Avatar */}
                   <UserAvatar 
                     name={obs.creator_name}
-                    photo={obs.creator_picture}
-                    initials={(obs.creator_name || "U").charAt(0)}
+                    photo={obs.creator_photo}
+                    initials={obs.creator_initials || (obs.creator_name || "U").charAt(0)}
                     size="sm"
                     position={obs.creator_position}
                     showPopover={true}

@@ -133,6 +133,10 @@ async def get_top_threats(
         {"_id": 0}
     ).sort("risk_score", -1).limit(limit).to_list(limit)
     total_count = len(threats)
+    
+    # Enrich with creator info (name, picture, position)
+    threats = await enrich_with_creator_info(threats)
+    
     # Ensure required fields have values and risk_score is int
     for idx, t in enumerate(threats):
         if isinstance(t.get("risk_score"), float):

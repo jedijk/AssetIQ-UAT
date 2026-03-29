@@ -48,10 +48,18 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 - **Styled:** Top 10 Highest Risk Observations to match Recent Observations layout
   - Converted from table view to card-based row layout
   - Added rank badges (top 3 highlighted in red)
-  - Added user avatar with hover card support
+  - Added user avatar with hover card support showing name and position
   - Added risk level colored dots
   - Added RPN (Risk Priority Number) display in purple badge
   - Added risk score and status badges
+  - File: `/app/frontend/src/pages/DashboardPage.js`
+
+- **Fixed:** Top 10 avatars not showing user pictures
+  - Backend `get_top_threats` now calls `enrich_with_creator_info()` to populate creator_photo, creator_name, creator_position
+  - File: `/app/backend/routes/threats.py`
+
+- **Fixed:** Dashboard tabs grey background sizing
+  - Changed from `w-full sm:w-auto` to `inline-flex` so background only covers tab buttons
   - File: `/app/frontend/src/pages/DashboardPage.js`
 
 ### March 29, 2026 (Session 3)
