@@ -28,7 +28,7 @@ async def enrich_with_creator_info(items: list) -> list:
     # Fetch all creators in one query
     creators = await db.users.find(
         {"id": {"$in": list(creator_ids)}},
-        {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1}
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1}
     ).to_list(100)
     
     # Create a lookup map
@@ -40,7 +40,8 @@ async def enrich_with_creator_info(items: list) -> list:
         if creator_id and creator_id in creator_map:
             creator = creator_map[creator_id]
             item["creator_name"] = creator.get("name") or creator.get("email", "").split("@")[0]
-            item["creator_photo"] = creator.get("photo_url")
+            # Check both photo_url and avatar_path
+            item["creator_photo"] = creator.get("photo_url") or creator.get("avatar_path")
             # Generate initials
             name = item["creator_name"]
             if name:
