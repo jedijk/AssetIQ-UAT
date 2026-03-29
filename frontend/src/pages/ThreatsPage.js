@@ -550,16 +550,20 @@ const ThreatsPage = () => {
               </div>
               
               <div className="flex-1 min-w-0">
+                {/* Mobile: Show failure mode as header, Desktop: Show title */}
                 <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1 mb-0.5">
-                  {threat.title}
+                  <span className="sm:hidden">{threat.failure_mode || threat.title}</span>
+                  <span className="hidden sm:inline">{threat.title}</span>
                 </h3>
                 <div className="flex items-center gap-2">
                   {/* Risk Badge - Hidden on mobile */}
                   <span className="hidden sm:inline">
                     <RiskBadge level={threat.risk_level} size="sm" />
                   </span>
+                  {/* Mobile: Show equipment, Desktop: Show asset */}
                   <span className="text-xs sm:text-sm text-slate-500 truncate">
-                    {threat.asset}
+                    <span className="sm:hidden">{threat.asset || threat.title}</span>
+                    <span className="hidden sm:inline">{threat.asset}</span>
                   </span>
                 </div>
               </div>
