@@ -392,178 +392,163 @@ export default function ActionsPage() {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="actions-page">
-      {/* Back Button - shown when navigated from another page */}
-      {location.state?.from && (
-        <div className="mb-3">
-          <BackButton />
-        </div>
-      )}
-      
-      {/* Compact Stats Row - matching ThreatsPage */}
-      <div className="flex flex-wrap gap-1.5 sm:gap-3 mb-4">
-        {statCards.map((stat) => (
-          <div
-            key={stat.label}
-            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-white rounded-lg border border-slate-200"
-            data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
-          >
-            <div className={`p-1 sm:p-1.5 rounded-md ${stat.bg}`}>
-              <stat.icon className={`w-3 h-3 sm:w-4 sm:h-4 ${stat.color}`} />
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-sm sm:text-lg font-bold text-slate-900">{stat.value}</span>
-              <span className="text-[10px] sm:text-xs text-slate-500 hidden sm:inline">{stat.label}</span>
-            </div>
+    <div className="h-[calc(100vh-64px)] flex flex-col" data-testid="actions-page">
+      {/* Fixed Header Section */}
+      <div className="flex-shrink-0 px-4 pt-4 pb-2 max-w-7xl mx-auto w-full">
+        {/* Back Button - shown when navigated from another page */}
+        {location.state?.from && (
+          <div className="mb-3">
+            <BackButton />
           </div>
-        ))}
-      </div>
-
-      {/* Filters - matching Observations page */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6" data-testid="actions-filters">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <Input
-            placeholder={t("actionsPage.searchPlaceholder")}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-11"
-            data-testid="actions-search"
-          />
+        )}
+        
+        {/* Header - Mobile Optimized */}
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900">{t("actionsPage.title") || "Actions"}</h1>
+            <p className="text-xs text-slate-500 hidden sm:block">{t("actionsPage.subtitle") || "Track and manage corrective actions"}</p>
+          </div>
+          {/* Mobile: Inline stats */}
+          <div className="flex sm:hidden items-center gap-2 text-xs">
+            <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">{stats.total}</span>
+            {stats.overdue > 0 && (
+              <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats.overdue} overdue</span>
+            )}
+          </div>
         </div>
         
-        {/* Multi-select Status Filter - matching Observations */}
-        <div className="relative">
-          {statusDropdownOpen && (
-            <div 
-              className="fixed inset-0 z-40" 
-              onClick={() => setStatusDropdownOpen(false)}
+        {/* Compact Stats Row - Desktop only */}
+        <div className="hidden sm:flex flex-wrap gap-3 mb-4">
+          {statCards.map((stat) => (
+            <div
+              key={stat.label}
+              className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200"
+              data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
+            >
+              <div className={`p-1.5 rounded-md ${stat.bg}`}>
+                <stat.icon className={`w-4 h-4 ${stat.color}`} />
+              </div>
+              <span className="text-lg font-bold text-slate-900">{stat.value}</span>
+              <span className="text-xs text-slate-500">{stat.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Filters - Mobile Optimized */}
+        <div className="flex items-center gap-2 mb-2" data-testid="actions-filters">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-9 text-sm"
+              data-testid="actions-search"
             />
-          )}
+          </div>
           
-          <button
-            onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-            className="flex items-center justify-between w-full sm:w-48 h-11 px-3 bg-white border border-slate-200 rounded-md text-sm hover:bg-slate-50 transition-colors"
-            data-testid="status-filter-select"
-          >
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-slate-400" />
-              <span className={statusFilter.length > 0 ? "text-slate-900" : "text-slate-500"}>
-                {getStatusDisplayText()}
-              </span>
-            </div>
-            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
-          
-          {statusDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 w-full sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
-              {statusFilter.length > 0 && (
-                <button
-                  onClick={clearStatusFilter}
-                  className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 border-b border-slate-100"
-                >
-                  Clear all filters
-                </button>
-              )}
-              
-              {STATUS_OPTIONS.map((status) => (
-                <button
-                  key={status.value}
-                  onClick={() => toggleStatus(status.value)}
-                  className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                  data-testid={`status-option-${status.value}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${status.color}`}></span>
-                    <span className="text-sm text-slate-700">{status.label}</span>
-                  </div>
-                  {statusFilter.includes(status.value) && (
-                    <Check className="w-4 h-4 text-blue-600" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Priority Filter */}
-        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-          <SelectTrigger className="w-full sm:w-40 h-11" data-testid="priority-filter">
-            <SelectValue placeholder="Priority" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("decisionEngine.allPriority") || "All Priority"}</SelectItem>
-            {PRIORITY_OPTIONS.map((p) => (
-              <SelectItem key={p.value} value={p.value}>
-                <span className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${p.color}`}></span>
-                  {p.label}
+          {/* Multi-select Status Filter */}
+          <div className="relative">
+            {statusDropdownOpen && (
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setStatusDropdownOpen(false)}
+              />
+            )}
+            
+            <button
+              onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+              className="flex items-center justify-between w-[90px] sm:w-40 h-9 px-2 sm:px-3 bg-white border border-slate-200 rounded-md text-xs sm:text-sm hover:bg-slate-50 transition-colors"
+              data-testid="status-filter-select"
+            >
+              <div className="flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-slate-400" />
+                <span className={`truncate ${statusFilter.length > 0 ? "text-slate-900" : "text-slate-500"}`}>
+                  {statusFilter.length === 0 ? "Status" : statusFilter.length === 1 ? statusFilter[0] : `${statusFilter.length} sel`}
                 </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        {/* Risk Level Filter - matching Observations */}
-        <Select value={riskLevelFilter} onValueChange={setRiskLevelFilter}>
-          <SelectTrigger className="w-full sm:w-40 h-11" data-testid="risk-level-filter">
-            <AlertTriangle className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder="Risk Level" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("actionsPage.allStatus") || "All Risk Levels"}</SelectItem>
-            {RISK_OPTIONS.map((r) => (
-              <SelectItem key={r.value} value={r.value}>
-                <span className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${r.color}`}></span>
-                  {r.label}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ${statusDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {statusDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-48 sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+                {statusFilter.length > 0 && (
+                  <button
+                    onClick={clearStatusFilter}
+                    className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 border-b border-slate-100"
+                  >
+                    Clear all filters
+                  </button>
+                )}
+                
+                {STATUS_OPTIONS.map((status) => (
+                  <button
+                    key={status.value}
+                    onClick={() => toggleStatus(status.value)}
+                    className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                    data-testid={`status-option-${status.value}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${status.color}`}></span>
+                      <span className="text-sm text-slate-700">{status.label}</span>
+                    </div>
+                    {statusFilter.includes(status.value) && (
+                      <Check className="w-4 h-4 text-blue-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        {/* Discipline Filter */}
-        {uniqueDisciplines.length > 0 && (
-          <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
-            <SelectTrigger className="w-full sm:w-44 h-11" data-testid="discipline-filter">
-              <Briefcase className="w-4 h-4 mr-2 text-slate-400" />
-              <SelectValue placeholder={t("common.discipline") || "Discipline"} />
+          {/* Priority Filter - Hidden on mobile */}
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="hidden sm:flex w-36 h-9 text-sm" data-testid="priority-filter">
+              <SelectValue placeholder="Priority" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("actionsPage.allDisciplines") || "All Disciplines"}</SelectItem>
-              {uniqueDisciplines.map((d) => (
-                <SelectItem key={d} value={d}>{d}</SelectItem>
+              <SelectItem value="all">All Priority</SelectItem>
+              {PRIORITY_OPTIONS.map((p) => (
+                <SelectItem key={p.value} value={p.value}>
+                  <span className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${p.color}`}></span>
+                    {p.label}
+                  </span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        )}
 
-        {/* Sort By - matching Observations */}
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-full sm:w-44 h-11" data-testid="sort-by-select">
-            <BarChart3 className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder="Sort By" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="risk_score">
-              <span className="flex items-center gap-2">
-                <Target className="w-3.5 h-3.5 text-purple-500" />
-                Risk Score
-              </span>
-            </SelectItem>
-            <SelectItem value="rpn">
-              <span className="flex items-center gap-2">
-                <Activity className="w-3.5 h-3.5 text-blue-500" />
-                RPN
-              </span>
-            </SelectItem>
-          </SelectContent>
-        </Select>
+          {/* Sort By - Hidden on mobile */}
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="hidden sm:flex w-36 h-9 text-sm" data-testid="sort-by-select">
+              <BarChart3 className="w-3.5 h-3.5 mr-1 text-slate-400" />
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="risk_score">
+                <span className="flex items-center gap-2">
+                  <Target className="w-3.5 h-3.5 text-purple-500" />
+                  Risk Score
+                </span>
+              </SelectItem>
+              <SelectItem value="rpn">
+                <span className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-blue-500" />
+                  RPN
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {/* Actions List - matching ThreatsPage priority-list style */}
-      {isLoading ? (
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
+        <div className="max-w-7xl mx-auto">
+          {/* Actions List */}
+          {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="loading-dots">
             <span></span>
@@ -729,6 +714,8 @@ export default function ActionsPage() {
           })}
         </div>
       )}
+        </div>
+      </div>
 
       {/* Action Detail / Edit - Sheet on mobile, Dialog on desktop */}
       {isMobile ? (

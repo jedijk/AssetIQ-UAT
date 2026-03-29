@@ -364,6 +364,7 @@ const en = {
   // Actions page
   actionsPage: {
     title: "Actions",
+    subtitle: "Track and manage corrective actions",
     totalActions: "Total Actions",
     pendingActions: "Pending",
     completedActions: "Completed",
@@ -1509,6 +1510,7 @@ const nl = {
   // Actions page
   actionsPage: {
     title: "Acties",
+    subtitle: "Beheer en volg corrigerende acties",
     totalActions: "Totaal acties",
     pendingActions: "In behandeling",
     completedActions: "Voltooid",
