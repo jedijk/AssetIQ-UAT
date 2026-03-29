@@ -36,6 +36,8 @@ import {
   X,
   Loader2,
   Image,
+  Repeat,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -1239,15 +1241,44 @@ export default function ActionsPage() {
                       {ea.updated_at && <span>Updated: {new Date(ea.updated_at).toLocaleString()}</span>}
                     </div>
                   </div>
-                  <DialogFooter className="gap-2 sm:justify-between">
-                    <Button
-                      variant="outline"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                      onClick={() => { setDeleteConfirm(ea); setIsEditDialogOpen(false); }}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      {t("common.delete")}
-                    </Button>
+                  <DialogFooter className="gap-2 sm:justify-between flex-wrap">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        onClick={() => { setDeleteConfirm(ea); setIsEditDialogOpen(false); }}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        {t("common.delete")}
+                      </Button>
+                      
+                      {/* Create Recurring Task button - Only for PM actions */}
+                      {ea.action_type === "PM" && (
+                        <Button
+                          variant="outline"
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                          onClick={() => {
+                            // Navigate to task designer with pre-filled data
+                            navigate("/task-scheduler", {
+                              state: {
+                                createTask: true,
+                                prefill: {
+                                  name: ea.title,
+                                  description: ea.description || `Recurring maintenance task from action: ${ea.title}`,
+                                  discipline: ea.discipline || "",
+                                  source_action_id: ea.id,
+                                  source_action_title: ea.title,
+                                }
+                              }
+                            });
+                            setIsEditDialogOpen(false);
+                          }}
+                        >
+                          <CalendarClock className="w-4 h-4 mr-2" />
+                          Create Recurring Task
+                        </Button>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                         {t("common.cancel")}

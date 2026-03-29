@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, isSameMonth, addMonths, subMonths, parseISO } from "date-fns";
@@ -272,6 +273,7 @@ const DisciplineBadge = ({ discipline }) => {
 const TaskSchedulerPage = () => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const location = useLocation();
   
   // State
   const [activeTab, setActiveTab] = useState("instances");
@@ -317,6 +319,32 @@ const TaskSchedulerPage = () => {
   const [editingTemplate, setEditingTemplate] = useState(null); // For editing templates
   const [editingPlan, setEditingPlan] = useState(null); // For editing plans
   const [deleteInstanceId, setDeleteInstanceId] = useState(null); // For delete confirmation
+
+  // Handle prefill from navigation state (e.g., from Actions page PM action)
+  useEffect(() => {
+    if (location.state?.createTask && location.state?.prefill) {
+      const prefill = location.state.prefill;
+      // Switch to templates tab and open create dialog
+      setActiveTab("templates");
+      setTemplateForm(prev => ({
+        ...prev,
+        name: prefill.name || "",
+        description: prefill.description || "",
+        discipline: prefill.discipline || "maintenance",
+        mitigation_strategy: "preventive",
+        source_action_id: prefill.source_action_id,
+        source_action_title: prefill.source_action_title,
+      }));
+      // Open the template dialog after a short delay to ensure tab switch
+      setTimeout(() => {
+        setShowTemplateDialog(true);
+        toast.info("Creating recurring task from PM action. Configure the schedule below.");
+      }, 100);
+      
+      // Clear the navigation state to prevent re-triggering
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Queries
   const { data: statsData } = useQuery({
