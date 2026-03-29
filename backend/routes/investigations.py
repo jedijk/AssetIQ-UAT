@@ -81,15 +81,43 @@ async def get_investigations(
     
     # Fetch lead user pictures and positions
     for inv in investigations:
-        if inv.get("created_by"):
+        lead_picture = None
+        lead_name = inv.get("investigation_leader")
+        lead_position = "Investigation Lead"
+        
+        # First try to find user by leader name (from user selection dropdown)
+        if inv.get("investigation_leader"):
             user = await db.users.find_one(
-                {"id": inv["created_by"]},
-                {"_id": 0, "picture": 1, "name": 1, "position": 1, "role": 1}
+                {"name": inv["investigation_leader"]},
+                {"_id": 0, "id": 1, "photo_url": 1, "avatar_path": 1, "name": 1, "position": 1, "role": 1}
             )
             if user:
-                inv["lead_picture"] = user.get("picture")
-                inv["lead_name"] = user.get("name", inv.get("investigation_leader"))
-                inv["lead_position"] = user.get("position") or user.get("role") or "Investigation Lead"
+                if user.get("photo_url"):
+                    lead_picture = user.get("photo_url")
+                elif user.get("avatar_path"):
+                    lead_picture = f"/api/users/{user['id']}/avatar"
+                lead_name = user.get("name", lead_name)
+                lead_position = user.get("position") or user.get("role") or "Investigation Lead"
+        
+        # Fallback to created_by user if no lead found
+        if not lead_picture and inv.get("created_by"):
+            user = await db.users.find_one(
+                {"id": inv["created_by"]},
+                {"_id": 0, "photo_url": 1, "avatar_path": 1, "name": 1, "position": 1, "role": 1}
+            )
+            if user:
+                if user.get("photo_url"):
+                    lead_picture = user.get("photo_url")
+                elif user.get("avatar_path"):
+                    lead_picture = f"/api/users/{inv['created_by']}/avatar"
+                if not lead_name:
+                    lead_name = user.get("name")
+                if lead_position == "Investigation Lead":
+                    lead_position = user.get("position") or user.get("role") or "Investigation Lead"
+        
+        inv["lead_picture"] = lead_picture
+        inv["lead_name"] = lead_name
+        inv["lead_position"] = lead_position
     
     return {"investigations": investigations}
 
