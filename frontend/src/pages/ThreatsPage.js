@@ -235,12 +235,19 @@ const ThreatsPage = () => {
     
     // Then apply search query filter if present
     if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.toLowerCase().trim();
+    
+    // Get score values as strings for searching
+    const riskScore = threat.risk_score?.toString() || "";
+    const rpn = (threat.fmea_rpn || threat.rpn || threat.failure_mode_data?.rpn || "").toString();
+    
     return (
       threat.title.toLowerCase().includes(query) ||
       threat.asset.toLowerCase().includes(query) ||
       threat.equipment_type.toLowerCase().includes(query) ||
-      threat.failure_mode.toLowerCase().includes(query)
+      threat.failure_mode.toLowerCase().includes(query) ||
+      riskScore.includes(query) ||
+      rpn.includes(query)
     );
   });
 
