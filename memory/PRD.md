@@ -62,6 +62,10 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - Changed from `w-full sm:w-auto` to `inline-flex` so background only covers tab buttons
   - File: `/app/frontend/src/pages/DashboardPage.js`
 
+- **Fixed:** Failure Mode Version History crash (TypeError: Illegal constructor)
+  - Added missing lucide-react icon imports: `History`, `Clock`, `User`, `RotateCcw`
+  - File: `/app/frontend/src/pages/FailureModesPage.js`
+
 ### March 29, 2026 (Session 3)
 - **Added:** Offline support for My Tasks (P1)
   - New `OfflineStorageService` using IndexedDB with 3 stores: tasks, pending_completions, sync_queue
