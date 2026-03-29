@@ -337,9 +337,9 @@ const ThreatsPage = () => {
       )}
 
       {/* Filters - Mobile Optimized */}
-      <div className="flex flex-wrap gap-2 mb-4 sm:mb-6" data-testid="threats-filters">
-        {/* Search - Full width on mobile */}
-        <div className="relative flex-1 min-w-[120px]">
+      <div className="flex items-center gap-2 mb-4 sm:mb-6" data-testid="threats-filters">
+        {/* Search */}
+        <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             placeholder="Search..."
@@ -362,7 +362,7 @@ const ThreatsPage = () => {
           
           <button
             onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-            className="flex items-center justify-between w-[100px] sm:w-40 h-9 px-2 sm:px-3 bg-white border border-slate-200 rounded-md text-xs sm:text-sm hover:bg-slate-50 transition-colors"
+            className="flex items-center justify-between w-[90px] sm:w-40 h-9 px-2 sm:px-3 bg-white border border-slate-200 rounded-md text-xs sm:text-sm hover:bg-slate-50 transition-colors"
             data-testid="status-filter-select"
           >
             <div className="flex items-center gap-1.5">
@@ -407,10 +407,10 @@ const ThreatsPage = () => {
           )}
         </div>
         
-        {/* Risk Level Filter */}
+        {/* Risk Level Filter - Hidden on mobile */}
         <Select value={riskFilter} onValueChange={setRiskFilter}>
-          <SelectTrigger className="w-[90px] sm:w-36 h-9 text-xs sm:text-sm" data-testid="risk-filter-select">
-            <AlertTriangle className="w-3.5 h-3.5 mr-1 text-slate-400 hidden sm:block" />
+          <SelectTrigger className="hidden sm:flex w-36 h-9 text-sm" data-testid="risk-filter-select">
+            <AlertTriangle className="w-3.5 h-3.5 mr-1 text-slate-400" />
             <SelectValue placeholder="Risk" />
           </SelectTrigger>
           <SelectContent>
@@ -442,10 +442,10 @@ const ThreatsPage = () => {
           </SelectContent>
         </Select>
         
-        {/* Sort By Filter */}
+        {/* Sort By Filter - Hidden on mobile */}
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-[90px] sm:w-40 h-9 text-xs sm:text-sm" data-testid="sort-by-select">
-            <BarChart3 className="w-3.5 h-3.5 mr-1 text-slate-400 hidden sm:block" />
+          <SelectTrigger className="hidden sm:flex w-40 h-9 text-sm" data-testid="sort-by-select">
+            <BarChart3 className="w-3.5 h-3.5 mr-1 text-slate-400" />
             <SelectValue placeholder="Sort" />
           </SelectTrigger>
           <SelectContent>
