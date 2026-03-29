@@ -355,22 +355,22 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        {/* Dashboard Tab Buttons - Compact */}
-        <div className="inline-flex h-9 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-full sm:w-auto overflow-x-auto">
+        {/* Dashboard Tab Buttons - Mobile Optimized */}
+        <div className="flex h-10 items-center rounded-lg bg-slate-100 p-1 w-full sm:w-auto gap-1">
           <button 
             onClick={() => setActiveTab("operational")}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md whitespace-nowrap transition-colors text-xs ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
             data-testid="operational-tab"
           >
-            <Activity className="w-3.5 h-3.5 flex-shrink-0" />
+            <Activity className="w-4 h-4 flex-shrink-0" />
             <span>{t("dashboard.operational") || "Operational"}</span>
           </button>
           <button 
             onClick={() => setActiveTab("reliability")}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md whitespace-nowrap transition-colors text-xs ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
             data-testid="reliability-tab"
           >
-            <Gauge className="w-3.5 h-3.5 flex-shrink-0" />
+            <Gauge className="w-4 h-4 flex-shrink-0" />
             <span className="hidden sm:inline">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</span>
             <span className="sm:hidden">Reliability</span>
           </button>
