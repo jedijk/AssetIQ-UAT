@@ -29,11 +29,11 @@ import {
   Briefcase,
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
-import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card";
 import ReliabilityPerformancePage from "./ReliabilityPerformancePage";
 import AnalyticsDashboardPage from "./AnalyticsDashboardPage";
 
-// User avatar component with optional hover popover
+// User avatar component with optional hover card
 const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showPopover = false }) => {
   const sizeClasses = {
     sm: "w-6 h-6 text-[9px]",
@@ -72,14 +72,14 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
     <img
       src={photoUrl}
       alt={name || "User"}
-      className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0`}
+      className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0 cursor-pointer`}
       onError={(e) => {
         e.target.style.display = 'none';
       }}
     />
   ) : (
     <div 
-      className={`${sizeClasses[size]} ${getAvatarColor(name)} rounded-full flex items-center justify-center text-white font-medium ring-2 ring-white flex-shrink-0`}
+      className={`${sizeClasses[size]} ${getAvatarColor(name)} rounded-full flex items-center justify-center text-white font-medium ring-2 ring-white flex-shrink-0 cursor-pointer`}
       title={!showPopover ? (name || "Unknown user") : undefined}
     >
       {initials || (name ? name.charAt(0).toUpperCase() : "?")}
@@ -88,13 +88,13 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
 
   if (showPopover && name) {
     return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <button className="focus:outline-none rounded-full" onClick={(e) => e.stopPropagation()}>
+      <HoverCard openDelay={200} closeDelay={100}>
+        <HoverCardTrigger asChild>
+          <span className="inline-block" onClick={(e) => e.stopPropagation()}>
             {avatarElement}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-48 p-3" side="top" align="center">
+          </span>
+        </HoverCardTrigger>
+        <HoverCardContent className="w-48 p-3" side="top" align="center">
           <div className="flex items-center gap-3">
             {photoUrl ? (
               <img 
@@ -115,8 +115,8 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
               </p>
             </div>
           </div>
-        </PopoverContent>
-      </Popover>
+        </HoverCardContent>
+      </HoverCard>
     );
   }
 
