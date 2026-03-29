@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { useLanguage } from "../contexts/LanguageContext";
 import { feedbackAPI } from "../lib/api";
 import { Button } from "../components/ui/button";
-import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import {
   Dialog,
@@ -345,8 +344,8 @@ const FeedbackPage = () => {
 
   const feedbackItems = feedbackData?.items || [];
 
-  // Feedback Form Content (shared between Dialog and Full-screen)
-  const FeedbackFormContent = ({ isFullScreen = false }) => (
+  // Inline form content render function
+  const renderFormContent = (isFullScreen = false) => (
     <div className={`space-y-4 ${isFullScreen ? 'p-4' : 'py-4'}`}>
       {/* Type Selector */}
       <div className="space-y-2">
@@ -361,6 +360,7 @@ const FeedbackPage = () => {
           ].map(({ value, label, Icon, color }) => (
             <button
               key={value}
+              type="button"
               onClick={() => setFeedbackType(value)}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border-2 transition-all ${
                 feedbackType === value
@@ -401,11 +401,12 @@ const FeedbackPage = () => {
         <label className="text-sm font-medium text-slate-700">
           {t("feedback.message") || "Message"}
         </label>
-        <Textarea
+        <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={t("feedback.messagePlaceholder") || "Describe your feedback..."}
           rows={isFullScreen ? 6 : 4}
+          className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
           data-testid="feedback-message-input"
         />
       </div>
@@ -424,6 +425,7 @@ const FeedbackPage = () => {
               className="max-h-32 rounded-lg border border-slate-200"
             />
             <button
+              type="button"
               onClick={clearScreenshot}
               className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
             >
@@ -432,6 +434,7 @@ const FeedbackPage = () => {
           </div>
         ) : (
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             className="w-full flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-slate-200 rounded-lg text-slate-500 hover:border-slate-300 hover:text-slate-600 transition-colors"
             data-testid="upload-screenshot-btn"
@@ -494,7 +497,7 @@ const FeedbackPage = () => {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
-          <FeedbackFormContent isFullScreen={true} />
+          {renderFormContent(true)}
         </div>
       </div>
     );
@@ -664,7 +667,7 @@ const FeedbackPage = () => {
               </DialogDescription>
             </DialogHeader>
 
-            <FeedbackFormContent />
+            {renderFormContent(false)}
 
             <DialogFooter>
               <Button
