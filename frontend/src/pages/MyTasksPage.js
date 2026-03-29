@@ -733,15 +733,15 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <div className={cn(
               "border-2 border-dashed rounded-xl text-center",
               analysis?.damage_detected ? "border-red-300 bg-red-50" : "border-slate-300",
-              isMobile ? "p-6" : "p-4"
+              isMobile ? "p-4" : "p-4"
             )}>
               {value ? (
-                <div className="space-y-3">
-                  <img src={value} alt="Uploaded" className="max-h-40 mx-auto rounded-lg" />
+                <div className="space-y-2">
+                  <img src={value} alt="Uploaded" className="max-h-32 mx-auto rounded-lg" />
                   <div className={cn("flex gap-2 justify-center", isMobile && "flex-col")}>
                     <Button
                       variant="outline"
-                      size={isMobile ? "lg" : "sm"}
+                      size="sm"
                       onClick={() => {
                         handleFieldChange(field.id, null);
                         setImageAnalysis(prev => {
@@ -750,29 +750,29 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                           return updated;
                         });
                       }}
-                      className={cn(isMobile && "h-12 text-base")}
+                      className="h-9 text-sm"
                     >
-                      <X className="w-4 h-4 mr-2" /> Remove
+                      <X className="w-3.5 h-3.5 mr-1.5" /> Remove
                     </Button>
                     <Button
                       variant={analysis ? "outline" : "default"}
-                      size={isMobile ? "lg" : "sm"}
+                      size="sm"
                       onClick={handleAnalyzeImage}
                       disabled={isAnalyzing}
                       className={cn(
-                        isMobile && "h-12 text-base",
+                        "h-9 text-sm",
                         !analysis && "bg-purple-600 hover:bg-purple-700"
                       )}
                       data-testid={`analyze-image-${field.id}`}
                     >
                       {isAnalyzing ? (
                         <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                           Analyzing...
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-4 h-4 mr-2" />
+                          <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                           {analysis ? "Re-analyze" : "AI Analyze"}
                         </>
                       )}
@@ -782,57 +782,51 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                   {/* Analysis Results */}
                   {analysis && (
                     <div className={cn(
-                      "mt-4 p-3 rounded-lg text-left",
+                      "mt-3 p-2.5 rounded-lg text-left",
                       analysis.damage_detected 
                         ? analysis.severity === 'critical' || analysis.severity === 'severe'
                           ? "bg-red-100 border border-red-300"
                           : "bg-amber-100 border border-amber-300"
                         : "bg-green-100 border border-green-300"
                     )}>
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-1.5">
                         {analysis.damage_detected ? (
                           <AlertTriangle className={cn(
-                            "w-5 h-5",
+                            "w-4 h-4",
                             analysis.severity === 'critical' || analysis.severity === 'severe'
                               ? "text-red-600"
                               : "text-amber-600"
                           )} />
                         ) : (
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          <CheckCircle2 className="w-4 h-4 text-green-600" />
                         )}
-                        <span className={cn(
-                          "font-semibold",
-                          isMobile ? "text-base" : "text-sm"
-                        )}>
+                        <span className="font-semibold text-sm">
                           {analysis.damage_detected 
                             ? `Damage Detected (${analysis.severity})`
                             : "No Damage Detected"
                           }
                         </span>
                         <Badge className={cn(
-                          "ml-auto",
+                          "ml-auto text-xs",
                           analysis.confidence === 'high' ? "bg-blue-100 text-blue-700" :
                           analysis.confidence === 'medium' ? "bg-slate-100 text-slate-700" :
                           "bg-slate-50 text-slate-500"
                         )}>
-                          {analysis.confidence} confidence
+                          {analysis.confidence}
                         </Badge>
                       </div>
                       
-                      <p className={cn("text-slate-700", isMobile ? "text-sm" : "text-xs")}>
+                      <p className="text-slate-700 text-xs">
                         {analysis.overall_assessment}
                       </p>
                       
                       {analysis.findings?.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          <p className={cn("font-medium text-slate-800", isMobile ? "text-sm" : "text-xs")}>
+                        <div className="mt-1.5 space-y-0.5">
+                          <p className="font-medium text-slate-800 text-xs">
                             Findings:
                           </p>
                           {analysis.findings.map((finding, idx) => (
-                            <div key={idx} className={cn(
-                              "flex items-start gap-2 pl-2",
-                              isMobile ? "text-sm" : "text-xs"
-                            )}>
+                            <div key={idx} className="flex items-start gap-1.5 pl-2 text-xs">
                               <span className="text-slate-400">•</span>
                               <span>
                                 <strong>{finding.type}</strong>
@@ -845,11 +839,11 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                       )}
                       
                       {analysis.recommended_actions?.length > 0 && (
-                        <div className="mt-2">
-                          <p className={cn("font-medium text-slate-800", isMobile ? "text-sm" : "text-xs")}>
+                        <div className="mt-1.5">
+                          <p className="font-medium text-slate-800 text-xs">
                             Recommended Actions:
                           </p>
-                          <ul className={cn("list-disc pl-5 text-slate-600", isMobile ? "text-sm" : "text-xs")}>
+                          <ul className="list-disc pl-5 text-slate-600 text-xs">
                             {analysis.recommended_actions.map((action, idx) => (
                               <li key={idx}>{action}</li>
                             ))}
@@ -859,8 +853,8 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                       
                       {analysis.requires_immediate_attention && (
                         <div className="mt-2 flex items-center gap-2 text-red-700 font-semibold">
-                          <AlertCircle className="w-4 h-4" />
-                          <span className={isMobile ? "text-sm" : "text-xs"}>Requires Immediate Attention</span>
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          <span className="text-xs">Requires Immediate Attention</span>
                         </div>
                       )}
                     </div>
@@ -882,10 +876,10 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                       }
                     }}
                   />
-                  <div className={cn("py-6", isMobile && "py-8")}>
-                    <Camera className={cn("mx-auto text-slate-400 mb-3", isMobile ? "w-12 h-12" : "w-8 h-8")} />
-                    <p className={cn("text-slate-600 font-medium", isMobile ? "text-base" : "text-sm")}>
-                      {isMobile ? "Tap to take photo" : "Tap to add photo"}
+                  <div className="py-4">
+                    <Camera className="mx-auto text-slate-400 mb-2 w-8 h-8" />
+                    <p className="text-slate-600 font-medium text-sm">
+                      Tap to take photo
                     </p>
                     <p className="text-xs text-slate-400 mt-1">or choose from gallery</p>
                   </div>
