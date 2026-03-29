@@ -22,7 +22,6 @@ import TaskSchedulerPage from "./pages/TaskSchedulerPage";
 import MyTasksPage from "./pages/MyTasksPage";
 import SettingsUserManagementPage from "./pages/SettingsUserManagementPage";
 import FormsPage from "./pages/FormsPage";
-import DecisionEnginePage from "./pages/DecisionEnginePage";
 import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
 import UserStatisticsPage from "./pages/UserStatisticsPage";
 import FeedbackPage from "./pages/FeedbackPage";
@@ -172,7 +171,7 @@ function App() {
                 <Route path="tasks" element={<TaskSchedulerPage />} />
                 <Route path="my-tasks" element={<MyTasksPage />} />
                 <Route path="forms" element={<FormsPage />} />
-                <Route path="decision-engine" element={<DecisionEnginePage />} />
+                <Route path="decision-engine" element={<UnderDevelopmentPage />} />
                 <Route path="settings/user-management" element={<SettingsUserManagementPage />} />
                 <Route path="settings/statistics" element={<UserStatisticsPage />} />
                 <Route path="user-statistics" element={<UserStatisticsPage />} />
