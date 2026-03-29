@@ -469,10 +469,10 @@ export default function DashboardPage() {
       {topObservations.length > 0 && (
         <div className="mb-6">
           <div className="themed-card rounded-xl border p-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <AlertOctagon className="w-5 h-5 text-red-500" />
-                <h3 className="text-sm font-semibold text-secondary">
+                <AlertOctagon className="w-4 h-4 text-red-500" />
+                <h3 className="text-sm font-medium text-secondary">
                   {t("dashboard.topRiskObservations") || "Top 10 Highest Risk Observations"}
                 </h3>
               </div>
@@ -483,84 +483,65 @@ export default function DashboardPage() {
                 View All <ExternalLink className="w-3 h-3" />
               </button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-left py-2 px-3 text-xs font-medium text-muted">Rank</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-muted">Observation</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-muted">Asset</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-muted">Risk Level</th>
-                    <th className="text-right py-2 px-3 text-xs font-medium text-muted">Score</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-muted">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topObservations.map((obs, index) => {
-                    const riskColors = {
-                      Critical: "bg-red-100 text-red-700 border-red-200",
-                      High: "bg-orange-100 text-orange-700 border-orange-200",
-                      Medium: "bg-yellow-100 text-yellow-700 border-yellow-200",
-                      Low: "bg-green-100 text-green-700 border-green-200",
-                    };
-                    const statusColors = {
-                      Open: "bg-blue-100 text-blue-700",
-                      "In Progress": "bg-amber-100 text-amber-700",
-                      Closed: "bg-green-100 text-green-700",
-                    };
-                    
-                    return (
-                      <tr 
-                        key={obs.id} 
-                        className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
-                        onClick={() => navigate(`/threats/${obs.id}`, { state: navState })}
-                        data-testid={`top-obs-${obs.id}`}
-                      >
-                        <td className="py-2 px-3">
-                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                            index < 3 ? "bg-red-500 text-white" : "bg-slate-200 text-slate-600"
-                          }`}>
-                            {index + 1}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3">
-                          <div className="flex items-center gap-2">
-                            <UserAvatar 
-                              name={obs.creator_name}
-                              photo={obs.creator_picture}
-                              initials={(obs.creator_name || "U").charAt(0)}
-                              size="sm"
-                              position={obs.creator_position}
-                              showPopover={true}
-                            />
-                            <span className="font-medium text-secondary truncate max-w-[200px]" title={obs.title}>
-                              {obs.title}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-2 px-3 text-muted truncate max-w-[150px]" title={obs.asset}>
-                          {obs.asset || obs.equipment_name || "-"}
-                        </td>
-                        <td className="py-2 px-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${riskColors[obs.risk_level] || "bg-slate-100 text-slate-700"}`}>
-                            {obs.risk_level || "Unknown"}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <span className="font-semibold text-secondary">
-                            {typeof obs.risk_score === 'number' ? Math.round(obs.risk_score) : obs.risk_score || 0}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[obs.status] || "bg-slate-100 text-slate-700"}`}>
-                            {obs.status || "Open"}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="space-y-2">
+              {topObservations.map((obs, index) => (
+                <div 
+                  key={obs.id} 
+                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+                  onClick={() => navigate(`/threats/${obs.id}`, { state: navState })}
+                  data-testid={`top-obs-${obs.id}`}
+                >
+                  {/* Rank Badge */}
+                  <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold flex-shrink-0 ${
+                    index < 3 ? "bg-red-500 text-white" : "bg-slate-200 text-slate-600"
+                  }`}>
+                    {index + 1}
+                  </span>
+                  
+                  {/* User Avatar */}
+                  <UserAvatar 
+                    name={obs.creator_name}
+                    photo={obs.creator_picture}
+                    initials={(obs.creator_name || "U").charAt(0)}
+                    size="sm"
+                    position={obs.creator_position}
+                    showPopover={true}
+                  />
+                  
+                  {/* Risk Level Dot */}
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    obs.risk_level === "Critical" ? "bg-red-500" :
+                    obs.risk_level === "High" ? "bg-orange-500" :
+                    obs.risk_level === "Medium" ? "bg-yellow-500" : "bg-green-500"
+                  }`} />
+                  
+                  {/* Title and Asset */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-slate-700 truncate">{obs.title}</p>
+                    <p className="text-[10px] text-slate-400">{obs.asset || obs.equipment_name || "-"}</p>
+                  </div>
+                  
+                  {/* RPN Badge */}
+                  {obs.fmea_rpn && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium flex-shrink-0" title="Risk Priority Number">
+                      RPN: {obs.fmea_rpn}
+                    </span>
+                  )}
+                  
+                  {/* Risk Score */}
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold flex-shrink-0" title="Risk Score">
+                    {typeof obs.risk_score === 'number' ? Math.round(obs.risk_score) : obs.risk_score || 0}
+                  </span>
+                  
+                  {/* Status Badge */}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
+                    obs.status === "Open" ? "bg-blue-100 text-blue-700" :
+                    obs.status === "Mitigated" ? "bg-green-100 text-green-700" :
+                    obs.status === "In Progress" ? "bg-amber-100 text-amber-700" :
+                    "bg-slate-100 text-slate-700"
+                  }`}>{obs.status || "Open"}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
