@@ -620,9 +620,9 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
 
   // Content component
   const Content = () => (
-    <>
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className={`flex items-center justify-between p-3 border-b border-slate-200 ${isMobile ? 'bg-white sticky top-0 z-10' : ''}`}>
+      <div className={`flex items-center justify-between p-3 border-b border-slate-200 flex-shrink-0 ${isMobile ? 'bg-white sticky top-0 z-10' : ''}`}>
         <div className="flex items-center gap-2">
           <Layers className="w-5 h-5 text-blue-600" />
           <h2 className="font-semibold text-slate-900">{isMobile ? 'Equipment Hierarchy' : 'Hierarchy'}</h2>
@@ -731,7 +731,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
       )}
 
       {/* Footer */}
-      <div className="p-3 border-t border-slate-200 bg-slate-50">
+      <div className="p-3 border-t border-slate-200 bg-slate-50 flex-shrink-0">
         {isMobile && (
           <p className="text-xs text-slate-400 mb-2 text-center">
             Tap for menu • Double-tap to filter
@@ -749,14 +749,14 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
           </button>
         </div>
       </div>
-    </>
+    </div>
   );
 
   // Mobile: render full-screen overlay
   if (isMobile) {
     if (!isOpen) return null;
     return (
-      <div className="fixed inset-0 z-50 bg-white flex flex-col">
+      <div className="fixed inset-0 z-50 bg-white flex flex-col" style={{ height: '100dvh' }}>
         <Content />
       </div>
     );
