@@ -28,7 +28,6 @@ import {
   User,
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import ReliabilityPerformancePage from "./ReliabilityPerformancePage";
 import AnalyticsDashboardPage from "./AnalyticsDashboardPage";
 
@@ -286,9 +285,9 @@ export default function DashboardPage() {
   const openObservations = observationsByStatus["Open"] || 0;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto" data-testid="dashboard-page">
-      {/* Header with Tabs */}
-      <div className="mb-6">
+    <div className="h-[calc(100vh-64px)] flex flex-col" data-testid="dashboard-page">
+      {/* Fixed Header with Tabs */}
+      <div className="flex-shrink-0 p-6 pb-4 max-w-7xl mx-auto w-full">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
@@ -296,26 +295,42 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        {/* Dashboard Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-full sm:w-auto overflow-x-auto">
-            <TabsTrigger value="operational" className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 whitespace-nowrap" data-testid="operational-tab">
-              <Activity className="w-4 h-4 flex-shrink-0" />
-              <span className="text-xs sm:text-sm">{t("dashboard.operational") || "Operational"}</span>
-            </TabsTrigger>
-            <TabsTrigger value="reliability" className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 whitespace-nowrap" data-testid="reliability-tab">
-              <Gauge className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline text-sm">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</span>
-              <span className="sm:hidden text-xs">Reliability</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 whitespace-nowrap" data-testid="analytics-tab">
-              <BarChart3 className="w-4 h-4 flex-shrink-0" />
-              <span className="text-xs sm:text-sm">{t("dashboard.analytics") || "Analytics"}</span>
-            </TabsTrigger>
-          </TabsList>
-          
+        {/* Dashboard Tab Buttons */}
+        <div className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-full sm:w-auto overflow-x-auto">
+          <button 
+            onClick={() => setActiveTab("operational")}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
+            data-testid="operational-tab"
+          >
+            <Activity className="w-4 h-4 flex-shrink-0" />
+            <span className="text-xs sm:text-sm">{t("dashboard.operational") || "Operational"}</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab("reliability")}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
+            data-testid="reliability-tab"
+          >
+            <Gauge className="w-4 h-4 flex-shrink-0" />
+            <span className="hidden sm:inline text-sm">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</span>
+            <span className="sm:hidden text-xs">Reliability</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab("analytics")}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ${activeTab === "analytics" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
+            data-testid="analytics-tab"
+          >
+            <BarChart3 className="w-4 h-4 flex-shrink-0" />
+            <span className="text-xs sm:text-sm">{t("dashboard.analytics") || "Analytics"}</span>
+          </button>
+        </div>
+      </div>
+      
+      {/* Scrollable Tab Content */}
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
+        <div className="max-w-7xl mx-auto">
           {/* Operational Dashboard Tab */}
-          <TabsContent value="operational" className="mt-6">
+          {activeTab === "operational" && (
+            <div className="animate-fade-in">
       {/* Key Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard
@@ -540,18 +555,23 @@ export default function DashboardPage() {
           </div>
         </motion.div>
       )}
-          </TabsContent>
+            </div>
+          )}
           
           {/* Reliability Performance Tab */}
-          <TabsContent value="reliability" className="mt-6">
-            <ReliabilityPerformancePage />
-          </TabsContent>
+          {activeTab === "reliability" && (
+            <div className="animate-fade-in">
+              <ReliabilityPerformancePage />
+            </div>
+          )}
           
           {/* Analytics Tab */}
-          <TabsContent value="analytics" className="mt-6">
-            <AnalyticsDashboardPage embedded={true} />
-          </TabsContent>
-        </Tabs>
+          {activeTab === "analytics" && (
+            <div className="animate-fade-in">
+              <AnalyticsDashboardPage embedded={true} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
