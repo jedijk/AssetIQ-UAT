@@ -59,14 +59,6 @@ import {
   DialogFooter,
   DialogDescription,
 } from "../components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from "../components/ui/sheet";
 import { Label } from "../components/ui/label";
 import { Checkbox } from "../components/ui/checkbox";
 import { Calendar } from "../components/ui/calendar";
@@ -352,8 +344,8 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
   );
 };
 
-// Task Execution Dialog Component - Mobile Responsive
-const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
+// Task Execution Frame Component - Full Page View with Back Button
+const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState({});
   const [issueFound, setIssueFound] = useState(false);
@@ -496,7 +488,7 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
         create_observation: issueAction === "log_observation" || issueAction === "create_task",
         attachments: attachments, // Include uploaded attachments
       });
-      onClose();
+      onBack();
     } catch (error) {
       toast.error(error.message || "Failed to complete task");
     } finally {
@@ -917,29 +909,45 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
   
   if (!task) return null;
   
-  // Issue Decision Prompt - Mobile Optimized
+  // Issue Decision Prompt - Inline Frame View
   if (showIssuePrompt) {
-    const IssuePromptContent = (
-      <>
-        <div className={cn("space-y-4", isMobile && "pb-20")}>
-          {!isMobile && (
-            <p className="text-sm text-slate-600">
-              An issue was found during task execution. What would you like to do?
-            </p>
-          )}
+    return (
+      <div className="h-full flex flex-col bg-white" data-testid="task-execution-frame">
+        {/* Back Header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white sticky top-0 z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setShowIssuePrompt(false)}
+            data-testid="issue-back-btn"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex items-center gap-2 text-amber-600">
+            <AlertTriangle className="w-5 h-5" />
+            <span className="font-semibold">Issue Detected</span>
+          </div>
+        </div>
+        
+        {/* Issue Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <p className="text-sm text-slate-600 mb-4">
+            An issue was found during task execution. What would you like to do?
+          </p>
           
           <div className="space-y-3">
             <Button
               variant={issueAction === "create_task" ? "default" : "outline"}
-              className={cn("w-full justify-start h-auto", isMobile ? "py-4 px-4" : "py-3")}
+              className="w-full justify-start h-auto py-4 px-4"
               onClick={() => setIssueAction("create_task")}
             >
               <div className="text-left">
-                <div className={cn("font-medium flex items-center gap-2", isMobile && "text-base")}>
+                <div className="font-medium flex items-center gap-2">
                   <Plus className="w-4 h-4" />
                   Create follow-up task
                 </div>
-                <p className={cn("text-muted-foreground font-normal mt-1", isMobile ? "text-sm" : "text-xs")}>
+                <p className="text-muted-foreground font-normal mt-1 text-sm">
                   Create a corrective task and log observation
                 </p>
               </div>
@@ -947,15 +955,15 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
             
             <Button
               variant={issueAction === "log_observation" ? "default" : "outline"}
-              className={cn("w-full justify-start h-auto", isMobile ? "py-4 px-4" : "py-3")}
+              className="w-full justify-start h-auto py-4 px-4"
               onClick={() => setIssueAction("log_observation")}
             >
               <div className="text-left">
-                <div className={cn("font-medium flex items-center gap-2", isMobile && "text-base")}>
+                <div className="font-medium flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Log observation only
                 </div>
-                <p className={cn("text-muted-foreground font-normal mt-1", isMobile ? "text-sm" : "text-xs")}>
+                <p className="text-muted-foreground font-normal mt-1 text-sm">
                   Record the issue without creating a task
                 </p>
               </div>
@@ -963,15 +971,15 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
             
             <Button
               variant={issueAction === "ignore" ? "default" : "outline"}
-              className={cn("w-full justify-start h-auto", isMobile ? "py-4 px-4" : "py-3")}
+              className="w-full justify-start h-auto py-4 px-4"
               onClick={() => setIssueAction("ignore")}
             >
               <div className="text-left">
-                <div className={cn("font-medium flex items-center gap-2", isMobile && "text-base")}>
+                <div className="font-medium flex items-center gap-2">
                   <X className="w-4 h-4" />
                   Ignore
                 </div>
-                <p className={cn("text-muted-foreground font-normal mt-1", isMobile ? "text-sm" : "text-xs")}>
+                <p className="text-muted-foreground font-normal mt-1 text-sm">
                   Complete without logging the issue
                 </p>
               </div>
@@ -980,14 +988,14 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
           
           {/* Issue Details */}
           {(issueAction === "create_task" || issueAction === "log_observation") && (
-            <div className="space-y-4 border-t pt-4">
+            <div className="space-y-4 border-t mt-4 pt-4">
               <div className="space-y-2">
-                <Label className={isMobile ? "text-base" : ""}>Severity</Label>
+                <Label>Severity</Label>
                 <Select
                   value={issueDetails.severity}
                   onValueChange={(v) => setIssueDetails(prev => ({ ...prev, severity: v }))}
                 >
-                  <SelectTrigger className={isMobile ? "h-12 text-base" : ""}>
+                  <SelectTrigger className="h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -999,15 +1007,14 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
               </div>
               
               <div className="space-y-2">
-                <Label className={isMobile ? "text-base" : ""}>
+                <Label>
                   Description <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   value={issueDetails.description}
                   onChange={(e) => setIssueDetails(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Describe the issue..."
-                  rows={isMobile ? 4 : 3}
-                  className={isMobile ? "text-base" : ""}
+                  rows={4}
                 />
               </div>
             </div>
@@ -1015,63 +1022,24 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
         </div>
         
         {/* Footer Actions */}
-        <div className={cn(
-          "flex gap-3",
-          isMobile ? "fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200" : "mt-6"
-        )}>
+        <div className="flex gap-3 p-4 border-t border-slate-200 bg-white">
           <Button 
             variant="outline" 
             onClick={() => setShowIssuePrompt(false)}
-            className={cn("flex-1", isMobile && "h-12 text-base")}
+            className="flex-1 h-11"
           >
             Back
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || ((issueAction === "create_task" || issueAction === "log_observation") && !issueDetails.description)}
-            className={cn("flex-1", isMobile && "h-12 text-base")}
+            className="flex-1 h-11"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Complete Task
           </Button>
         </div>
-      </>
-    );
-    
-    if (isMobile) {
-      return (
-        <Sheet open={open} onOpenChange={onClose}>
-          <SheetContent side="bottom" className="h-[90vh] rounded-t-2xl overflow-y-auto p-6">
-            <SheetHeader className="text-left mb-4">
-              <SheetTitle className="flex items-center gap-2 text-amber-600 text-xl">
-                <AlertTriangle className="w-6 h-6" />
-                Issue Detected
-              </SheetTitle>
-              <SheetDescription>
-                An issue was found during task execution. What would you like to do?
-              </SheetDescription>
-            </SheetHeader>
-            {IssuePromptContent}
-          </SheetContent>
-        </Sheet>
-      );
-    }
-    
-    return (
-      <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-600">
-              <AlertTriangle className="w-5 h-5" />
-              Issue Detected
-            </DialogTitle>
-            <DialogDescription>
-              An issue was found during task execution. What would you like to do?
-            </DialogDescription>
-          </DialogHeader>
-          {IssuePromptContent}
-        </DialogContent>
-      </Dialog>
+      </div>
     );
   }
   
@@ -1230,21 +1198,18 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
       </div>
       
         {/* Footer Actions */}
-        <div className={cn(
-          "flex gap-3 px-6 py-4 border-t border-slate-200",
-          isMobile && "fixed bottom-0 left-0 right-0 bg-white shadow-lg"
-        )}>
+        <div className="flex gap-3 px-6 py-4 border-t border-slate-200 bg-white">
           <Button 
             variant="outline" 
-            onClick={onClose}
-            className={cn("flex-1", isMobile && "h-12 text-base")}
+            onClick={onBack}
+            className="flex-1 h-11"
           >
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit} 
             disabled={isSubmitting}
-            className={cn("flex-1", isMobile && "h-12 text-base")}
+            className="flex-1 h-11"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
             Complete Task
@@ -1254,27 +1219,31 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
     </div>
   );
   
-  // Render as Sheet on mobile, Dialog on desktop
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={onClose}>
-        <SheetContent 
-          side="bottom" 
-          className="h-[95vh] rounded-t-2xl overflow-y-auto p-0"
-          data-testid="task-execution-sheet"
-        >
-          {TaskFormContent}
-        </SheetContent>
-      </Sheet>
-    );
-  }
-  
+  // Render as full-page Frame View with Back Button
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-0" data-testid="task-execution-dialog">
+    <div className="h-full flex flex-col bg-white" data-testid="task-execution-frame">
+      {/* Back Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white sticky top-0 z-10">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={onBack}
+          data-testid="task-execution-back-btn"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div>
+          <h2 className="font-semibold text-slate-900">Execute Task</h2>
+          <p className="text-xs text-slate-500">{task?.equipment_name || task?.asset || "Task Execution"}</p>
+        </div>
+      </div>
+      
+      {/* Scrollable Form Content */}
+      <div className="flex-1 overflow-y-auto">
         {TaskFormContent}
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 };
 
@@ -1286,7 +1255,7 @@ const MyTasksPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
-  const [executionDialogOpen, setExecutionDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState("list"); // "list" or "execution"
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
   
   // Available disciplines for filtering
@@ -1318,7 +1287,7 @@ const MyTasksPage = () => {
       toast.success("Task completed successfully!");
       queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["task-instances"] });
-      setExecutionDialogOpen(false);
+      setViewMode("list");
       setSelectedTask(null);
     },
     onError: (error) => {
@@ -1352,7 +1321,7 @@ const MyTasksPage = () => {
       queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
       // Open the new task for execution
       setSelectedTask(newTask);
-      setExecutionDialogOpen(true);
+      setViewMode("execution");
     },
     onError: (error) => {
       toast.error(error.message || "Failed to execute ad-hoc plan");
@@ -1391,7 +1360,7 @@ const MyTasksPage = () => {
     if (task.status !== "in_progress") {
       startMutation.mutate({ taskId: task.id, isAction });
     }
-    setExecutionDialogOpen(true);
+    setViewMode("execution");
   };
   
   // Handle quick complete
@@ -1458,6 +1427,26 @@ const MyTasksPage = () => {
     open: tasks.filter(t => t.source_type === "action" || (t.source_type === "task" && t.status === "in_progress")).length,
   };
   
+  // Handle back from execution frame
+  const handleBackFromExecution = () => {
+    setViewMode("list");
+    setSelectedTask(null);
+  };
+  
+  // If in execution mode, show the execution frame
+  if (viewMode === "execution" && selectedTask) {
+    return (
+      <div className="h-[calc(100vh-64px)]">
+        <TaskExecutionFrame
+          task={selectedTask}
+          onBack={handleBackFromExecution}
+          onComplete={handleCompleteTask}
+        />
+      </div>
+    );
+  }
+  
+  // Default: Task List View
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col">
       {/* Fixed Header - Condensed */}
@@ -1701,17 +1690,6 @@ const MyTasksPage = () => {
           )
         )}
       </div>
-      
-      {/* Task Execution Dialog */}
-      <TaskExecutionDialog
-        task={selectedTask}
-        open={executionDialogOpen}
-        onClose={() => {
-          setExecutionDialogOpen(false);
-          setSelectedTask(null);
-        }}
-        onComplete={handleCompleteTask}
-      />
       
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteTaskId} onOpenChange={(open) => !open && setDeleteTaskId(null)}>

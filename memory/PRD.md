@@ -44,6 +44,14 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 
 ## Completed Work
 
+### March 29, 2026
+- **Changed:** Task/Form execution UI from popup dialogs to frame view
+  - Replaced modal dialog with full-page frame view
+  - Added back button (←) in header to return to task list
+  - Cancel button now also returns to task list
+  - Works on both desktop and mobile viewports
+  - File: `/app/frontend/src/pages/MyTasksPage.js` - `TaskExecutionFrame` component
+
 ### March 28, 2026
 - **Added:** Investigations to Equipment History Timeline
   - Shows investigations linked to threats, sibling observations, or same equipment
@@ -96,7 +104,7 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 
 ### P3 (Low)
 - [ ] Module detail panel for User Statistics page
-- [ ] Refactor `TaskExecutionDialog` from `MyTasksPage.js`
+- [x] ~~Refactor `TaskExecutionDialog` from `MyTasksPage.js`~~ (Completed - Now `TaskExecutionFrame` with frame view)
 - [ ] Refactor `FormsPage.js` and `TaskSchedulerPage.js` (>1000 lines each)
 
 ---
