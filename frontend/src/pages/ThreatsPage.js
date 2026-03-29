@@ -179,11 +179,23 @@ const ThreatsPage = () => {
   });
 
   // Fetch threats (fetch all, filter client-side for multi-select)
-  const { data: threats = [], isLoading, error: threatsError } = useQuery({
+  const { data: threats = [], isLoading, error: threatsError, isFetching } = useQuery({
     queryKey: ["threats"],
-    queryFn: () => threatsAPI.getAll(null),
-    staleTime: 30000, // Keep data fresh for 30 seconds
-    retry: 2,
+    queryFn: async () => {
+      const result = await threatsAPI.getAll(null);
+      // Ensure we always return an array
+      if (!result || !Array.isArray(result)) {
+        console.warn("Threats API returned non-array:", result);
+        return [];
+      }
+      return result;
+    },
+    staleTime: 60000, // Keep data fresh for 60 seconds
+    gcTime: 300000, // Keep in cache for 5 minutes (formerly cacheTime)
+    retry: 3, // Retry 3 times on failure
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus (prevents flickering)
+    placeholderData: (previousData) => previousData, // Keep previous data while refetching
   });
   
   // Log error if fetch fails
@@ -265,17 +277,19 @@ const ThreatsPage = () => {
   });
 
   // Sort threats based on selected sort method
-  const sortedThreats = [...filteredThreats].sort((a, b) => {
-    if (sortBy === "rpn") {
-      // Sort by RPN (higher first), fall back to risk_score if no RPN
-      const rpnA = a.fmea_rpn || a.rpn || a.failure_mode_data?.rpn || 0;
-      const rpnB = b.fmea_rpn || b.rpn || b.failure_mode_data?.rpn || 0;
-      return rpnB - rpnA;
-    } else {
-      // Default: sort by business risk score (higher first)
-      return (b.risk_score || 0) - (a.risk_score || 0);
-    }
-  });
+  const sortedThreats = Array.isArray(filteredThreats) && filteredThreats.length > 0 
+    ? [...filteredThreats].sort((a, b) => {
+        if (sortBy === "rpn") {
+          // Sort by RPN (higher first), fall back to risk_score if no RPN
+          const rpnA = a?.fmea_rpn || a?.rpn || a?.failure_mode_data?.rpn || 0;
+          const rpnB = b?.fmea_rpn || b?.rpn || b?.failure_mode_data?.rpn || 0;
+          return rpnB - rpnA;
+        } else {
+          // Default: sort by business risk score (higher first)
+          return (b?.risk_score || 0) - (a?.risk_score || 0);
+        }
+      })
+    : [];
 
   const statCards = [
     {
@@ -515,7 +529,7 @@ const ThreatsPage = () => {
             <span></span>
           </div>
         </div>
-      ) : sortedThreats.length === 0 ? (
+      ) : !Array.isArray(sortedThreats) || sortedThreats.length === 0 ? (
         <div className="empty-state py-16" data-testid="no-threats-message">
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
             <CheckCircle className="w-8 h-8 text-slate-400" />
@@ -526,6 +540,9 @@ const ThreatsPage = () => {
               ? t("common.noResults")
               : t("observations.noObservationsDesc")}
           </p>
+          {isFetching && (
+            <p className="text-sm text-blue-500 mt-2">Loading observations...</p>
+          )}
         </div>
       ) : (
         <div className="priority-list" data-testid="threats-list">
