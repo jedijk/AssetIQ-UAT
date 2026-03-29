@@ -1448,7 +1448,7 @@ const MyTasksPage = () => {
     <div className="h-[calc(100vh-64px)] flex flex-col">
       {/* Fixed Header - Mobile Optimized Minimalist */}
       <div className="flex-shrink-0">
-        <div className="px-4 sm:px-6 pt-3 pb-3 max-w-4xl mx-auto w-full">
+        <div className="px-4 sm:px-6 pt-3 pb-3 max-w-7xl mx-auto w-full">
           {/* Title Row - Compact on mobile */}
           <div className="flex items-center justify-between mb-2">
             <div>
@@ -1573,7 +1573,7 @@ const MyTasksPage = () => {
       
       {/* Scrollable Task List */}
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-6">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           {/* Task List or Ad-hoc Plans */}
           <div className="space-y-3 pt-2">
         {activeFilter === "adhoc" ? (
