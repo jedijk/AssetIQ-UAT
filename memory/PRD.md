@@ -94,6 +94,14 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - Completed/Closed investigations show locked badge, hide edit/delete buttons, disable add buttons
   - File: `/app/frontend/src/pages/CausalEnginePage.js`
 
+- **Added:** Actions Tracker section in Observation detail page
+  - Shows all actions linked to the observation with their current status
+  - Status badges: Open (blue), In Progress (amber), Completed (green), Cancelled (grey)
+  - Displays action type badge (CM/PM/PDM), title, owner, due date, and priority
+  - "View All" link to navigate to Actions page
+  - Click on action to navigate to action detail page
+  - File: `/app/frontend/src/components/threat-detail/RecommendedActionsSection.jsx`
+
 - **Critical Fix:** Feedback page mobile layout
   - Fixed header buttons to fit within mobile viewport (AI + New buttons)
   - Added responsive typography and spacing (sm: breakpoints)

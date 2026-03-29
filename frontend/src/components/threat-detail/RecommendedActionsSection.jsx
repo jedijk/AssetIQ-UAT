@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { threatsAPI, actionsAPI } from "../../lib/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Plus, ClipboardList, Loader2, Sparkles, AlertTriangle, Settings } from "lucide-react";
+import { Plus, ClipboardList, Loader2, Sparkles, AlertTriangle, Settings, CheckCircle, Clock, XCircle, ExternalLink } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
+import { useNavigate } from "react-router-dom";
 
 const ACTION_TYPES = [
   { value: "CM", label: "CM - Corrective", color: "bg-amber-500" },
@@ -52,8 +53,17 @@ const TYPE_STYLES = {
   PDM: { bg: "bg-purple-500", text: "text-white", label: "PDM", fullLabel: "Predictive" },
 };
 
+const ACTION_STATUS_CONFIG = {
+  open: { icon: Clock, color: "text-blue-500", bg: "bg-blue-50", label: "Open" },
+  in_progress: { icon: Clock, color: "text-amber-500", bg: "bg-amber-50", label: "In Progress" },
+  "in-progress": { icon: Clock, color: "text-amber-500", bg: "bg-amber-50", label: "In Progress" },
+  completed: { icon: CheckCircle, color: "text-green-500", bg: "bg-green-50", label: "Completed" },
+  cancelled: { icon: XCircle, color: "text-slate-400", bg: "bg-slate-50", label: "Cancelled" },
+};
+
 export const RecommendedActionsSection = ({ threat, threatId }) => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [showAddRecommendedDialog, setShowAddRecommendedDialog] = useState(false);
   const [showCreateFMDialog, setShowCreateFMDialog] = useState(false);
   const [newRecommendedAction, setNewRecommendedAction] = useState({
@@ -74,6 +84,23 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   const rpn = fmData.severity * fmData.occurrence * fmData.detection;
   const rpnLevel = rpn >= 300 ? "Critical" : rpn >= 200 ? "High" : rpn >= 100 ? "Medium" : "Low";
   const rpnColor = rpn >= 300 ? "text-red-600" : rpn >= 200 ? "text-orange-600" : rpn >= 100 ? "text-yellow-600" : "text-green-600";
+
+  // Fetch actions linked to this threat/observation
+  const { data: linkedActionsData } = useQuery({
+    queryKey: ["actions", "linked", threatId],
+    queryFn: async () => {
+      const response = await actionsAPI.getAll();
+      const allActions = response?.actions || response || [];
+      // Filter actions that are linked to this threat (check both source types)
+      return allActions.filter(
+        action => (action.source_type === "threat" || action.source_type === "observation") 
+          && action.source_id === threatId
+      );
+    },
+    enabled: !!threatId,
+    staleTime: 30000,
+  });
+  const linkedActions = linkedActionsData || [];
 
   // Promote to action mutation
   const promoteToActionMutation = useMutation({
@@ -323,6 +350,103 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
           })}
         </div>
       </motion.div>
+
+      {/* Linked Actions Section - Shows actions created from this observation */}
+      {linkedActions.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="card p-4"
+          data-testid="linked-actions-section"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-slate-900 text-sm">Actions Tracker</h3>
+              <Badge variant="secondary" className="text-xs">
+                {linkedActions.length}
+              </Badge>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/actions")}
+              className="text-blue-600 hover:text-blue-700 h-7 text-xs px-2"
+            >
+              View All
+              <ExternalLink className="w-3 h-3 ml-1" />
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {linkedActions.map((action) => {
+              const statusCfg = ACTION_STATUS_CONFIG[action.status] || ACTION_STATUS_CONFIG.open;
+              const StatusIcon = statusCfg.icon;
+              const typeStyle = action.action_type ? TYPE_STYLES[action.action_type] : null;
+              
+              return (
+                <div
+                  key={action.id}
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:shadow-sm transition-all ${statusCfg.bg} border-slate-200`}
+                  onClick={() => navigate(`/actions/${action.id}`)}
+                  data-testid={`linked-action-${action.id}`}
+                >
+                  {/* Action Type Badge */}
+                  <div className="flex-shrink-0">
+                    {typeStyle ? (
+                      <div className={`w-8 h-8 rounded-md ${typeStyle.bg} ${typeStyle.text} flex flex-col items-center justify-center shadow-sm`}>
+                        <span className="text-[10px] font-bold">{typeStyle.label}</span>
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-md bg-slate-200 text-slate-500 flex items-center justify-center">
+                        <ClipboardList className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      {/* Status Badge */}
+                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${statusCfg.bg} border`}>
+                        <StatusIcon className={`w-3 h-3 ${statusCfg.color}`} />
+                        <span className={`text-[10px] font-medium ${statusCfg.color}`}>{statusCfg.label}</span>
+                      </div>
+                      {action.discipline && (
+                        <span className="text-[10px] text-slate-400">{action.discipline}</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-700 leading-snug line-clamp-2">{action.title}</p>
+                    {action.owner && (
+                      <p className="text-[10px] text-slate-400 mt-1">Owner: {action.owner}</p>
+                    )}
+                  </div>
+
+                  {/* Date/Priority */}
+                  <div className="flex-shrink-0 text-right">
+                    {action.due_date && (
+                      <p className="text-[10px] text-slate-500">
+                        Due: {new Date(action.due_date).toLocaleDateString()}
+                      </p>
+                    )}
+                    {action.priority && (
+                      <Badge 
+                        variant="outline" 
+                        className={`text-[10px] mt-1 ${
+                          action.priority === 'high' ? 'border-red-300 text-red-600' :
+                          action.priority === 'medium' ? 'border-amber-300 text-amber-600' :
+                          'border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        {action.priority}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
 
       {/* Add Recommended Action Dialog */}
       <Dialog open={showAddRecommendedDialog} onOpenChange={setShowAddRecommendedDialog}>
