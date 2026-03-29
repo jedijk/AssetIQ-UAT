@@ -329,13 +329,15 @@ const UserStatisticsPage = () => {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="inline-flex h-9 items-center justify-start rounded-lg bg-slate-100 p-1">
-          <TabsTrigger value="overview" className="text-xs px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-overview">Overview</TabsTrigger>
-          <TabsTrigger value="devices" className="text-xs px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-devices">Devices</TabsTrigger>
-          <TabsTrigger value="modules" className="text-xs px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-modules">Modules</TabsTrigger>
-          <TabsTrigger value="users" className="text-xs px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-users">Users</TabsTrigger>
-          <TabsTrigger value="actions" className="text-xs px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-actions">Actions</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex h-9 items-center justify-start rounded-lg bg-slate-100 p-1 min-w-max">
+            <TabsTrigger value="overview" className="text-xs px-3 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="devices" className="text-xs px-3 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-devices">Devices</TabsTrigger>
+            <TabsTrigger value="modules" className="text-xs px-3 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-modules">Modules</TabsTrigger>
+            <TabsTrigger value="users" className="text-xs px-3 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-users">Users</TabsTrigger>
+            <TabsTrigger value="actions" className="text-xs px-3 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-actions">Actions</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
