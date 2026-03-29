@@ -20,7 +20,8 @@ import {
   Shield,
   Zap,
   Leaf,
-  Star
+  Star,
+  Filter
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -183,6 +184,11 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     setShowDetails(true);
   };
 
+  const handleFilterOn = () => {
+    setContextMenu({ show: false, x: 0, y: 0 });
+    onClick?.(); // Navigate to filtered observations
+  };
+
   // Get equipment type name
   const getEquipmentTypeName = () => {
     if (!node.equipment_type) return null;
@@ -264,6 +270,15 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50 min-w-[180px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
+          <button
+            onClick={handleFilterOn}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-700"
+            data-testid="context-menu-filter-on"
+          >
+            <Filter className="w-4 h-4" />
+            {t ? t("hierarchy.filterOn") : "Filter on"}
+          </button>
+          <div className="border-t border-slate-100 my-1" />
           <button
             onClick={handleShowDetails}
             className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 text-slate-700 hover:text-slate-900"
@@ -719,7 +734,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
       <div className="p-3 border-t border-slate-200 bg-slate-50">
         {isMobile && (
           <p className="text-xs text-slate-400 mb-2 text-center">
-            Tap for details • Double-tap to filter observations
+            Tap for menu • Double-tap to filter
           </p>
         )}
         <div className="flex items-center justify-between text-xs text-slate-500">
