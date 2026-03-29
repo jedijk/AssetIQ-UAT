@@ -233,8 +233,9 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
           <div className="flex items-center gap-2 mb-1">
             <TypeIcon className={cn("w-4 h-4 flex-shrink-0", isAction ? "text-indigo-500" : "text-slate-500")} />
             <h3 className="font-medium text-slate-900 truncate">{task.title}</h3>
+            {/* Action badge - Desktop only */}
             {isAction && (
-              <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+              <Badge variant="outline" className="hidden sm:flex text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
                 Action
               </Badge>
             )}
@@ -248,43 +249,50 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
           
           {/* Tags Row */}
           <div className="flex flex-wrap items-center gap-1.5">
-            {/* Priority Badge */}
-            <Badge variant="outline" className={cn("text-xs", priorityColors[task.priority])}>
+            {/* Priority Badge - Hide "medium" on mobile, always show high/critical */}
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-xs", 
+                priorityColors[task.priority],
+                task.priority === "medium" && "hidden sm:flex"
+              )}
+            >
               {task.priority}
             </Badge>
             
-            {/* Action Type (CM/PM/PDM) for actions */}
+            {/* Action Type (CM/PM/PDM) for actions - Desktop only */}
             {isAction && task.action_type && (
-              <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+              <Badge variant="outline" className="hidden sm:flex text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
                 {task.action_type}
               </Badge>
             )}
             
-            {/* Task Type / Discipline */}
+            {/* Task Type / Discipline - Desktop only */}
             {!isAction && (
-              <Badge variant="outline" className="text-xs bg-slate-50">
+              <Badge variant="outline" className="hidden sm:flex text-xs bg-slate-50">
                 {task.mitigation_strategy || task.type || "Task"}
               </Badge>
             )}
             
-            {/* Discipline for actions */}
+            {/* Discipline for actions - Desktop only */}
             {isAction && task.discipline && (
-              <Badge variant="outline" className="text-xs bg-slate-50">
+              <Badge variant="outline" className="hidden sm:flex text-xs bg-slate-50">
                 {task.discipline}
               </Badge>
             )}
             
-            {/* Risk Score */}
+            {/* Risk Score - Compact on mobile */}
             {(task.risk_score !== undefined && task.risk_score !== null) && (
               <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                Risk: {task.risk_score}
+                <span className="hidden sm:inline">Risk: </span>{task.risk_score}
               </Badge>
             )}
             
-            {/* RPN (Risk Priority Number) */}
+            {/* RPN (Risk Priority Number) - Compact on mobile */}
             {(task.rpn !== undefined && task.rpn !== null) && (
               <Badge variant="outline" className="text-xs bg-rose-50 text-rose-700 border-rose-200">
-                RPN: {task.rpn}
+                <span className="hidden sm:inline">RPN: </span>{task.rpn}
               </Badge>
             )}
           </div>
@@ -1520,27 +1528,27 @@ const MyTasksPage = () => {
         </div>
         
         {/* Quick Filter Tabs */}
-        <Tabs value={activeFilter} onValueChange={setActiveFilter}>
-          <TabsList className="grid w-full grid-cols-4 h-9">
-            <TabsTrigger value="open" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-8" data-testid="filter-open">
+        <Tabs value={activeFilter} onValueChange={setActiveFilter} className="w-full">
+          <TabsList className="grid w-full grid-cols-4 h-9 p-1">
+            <TabsTrigger value="open" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7" data-testid="filter-open">
               <Clock className="w-4 h-4" />
               <span className="hidden sm:inline">Open</span>
               {stats.today > 0 && (
                 <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.today}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="overdue" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-8" data-testid="filter-overdue">
+            <TabsTrigger value="overdue" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7" data-testid="filter-overdue">
               <AlertCircle className="w-4 h-4" />
               <span className="hidden sm:inline">Overdue</span>
               {stats.overdue > 0 && (
                 <Badge variant="destructive" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.overdue}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="recurring" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-8" data-testid="filter-recurring">
+            <TabsTrigger value="recurring" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7" data-testid="filter-recurring">
               <Repeat className="w-4 h-4" />
               <span className="hidden sm:inline">Recurring</span>
             </TabsTrigger>
-            <TabsTrigger value="adhoc" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-8" data-testid="filter-adhoc">
+            <TabsTrigger value="adhoc" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7" data-testid="filter-adhoc">
               <Zap className="w-4 h-4" />
               <span className="hidden sm:inline">Adhoc</span>
             </TabsTrigger>
