@@ -179,10 +179,20 @@ const ThreatsPage = () => {
   });
 
   // Fetch threats (fetch all, filter client-side for multi-select)
-  const { data: threats = [], isLoading } = useQuery({
+  const { data: threats = [], isLoading, error: threatsError } = useQuery({
     queryKey: ["threats"],
     queryFn: () => threatsAPI.getAll(null),
+    staleTime: 30000, // Keep data fresh for 30 seconds
+    retry: 2,
   });
+  
+  // Log error if fetch fails
+  useEffect(() => {
+    if (threatsError) {
+      console.error("Failed to fetch observations:", threatsError);
+      toast.error("Failed to load observations. Please refresh the page.");
+    }
+  }, [threatsError]);
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -212,13 +222,16 @@ const ThreatsPage = () => {
   };
 
   // Filter threats by search query, asset hierarchy, status, and risk level
-  const filteredThreats = threats.filter((threat) => {
+  const filteredThreats = (threats || []).filter((threat) => {
+    if (!threat) return false;
+    
     // First check if we have a hierarchical asset filter
     if (assetsToFilter.length > 0) {
       // Check if threat's asset matches any of the assets in the hierarchy
+      const threatAsset = (threat.asset || "").toLowerCase();
       const assetMatches = assetsToFilter.some(filterAsset => 
-        threat.asset.toLowerCase() === filterAsset.toLowerCase() ||
-        threat.asset.toLowerCase().includes(filterAsset.toLowerCase())
+        threatAsset === filterAsset.toLowerCase() ||
+        threatAsset.includes(filterAsset.toLowerCase())
       );
       if (!assetMatches) return false;
     }
@@ -242,10 +255,10 @@ const ThreatsPage = () => {
     const rpn = (threat.fmea_rpn || threat.rpn || threat.failure_mode_data?.rpn || "").toString();
     
     return (
-      threat.title.toLowerCase().includes(query) ||
-      threat.asset.toLowerCase().includes(query) ||
-      threat.equipment_type.toLowerCase().includes(query) ||
-      threat.failure_mode.toLowerCase().includes(query) ||
+      (threat.title || "").toLowerCase().includes(query) ||
+      (threat.asset || "").toLowerCase().includes(query) ||
+      (threat.equipment_type || "").toLowerCase().includes(query) ||
+      (threat.failure_mode || "").toLowerCase().includes(query) ||
       riskScore.includes(query) ||
       rpn.includes(query)
     );
