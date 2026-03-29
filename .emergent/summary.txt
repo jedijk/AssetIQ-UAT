@@ -1,20 +1,20 @@
 <analysis>**original_problem_statement**: 
-The user wants to build an AI-Powered Threat Capture & Prioritization Platform named ThreatBase (AssetIQ). The scope includes user authentication, a chat-based threat capture system, risk prioritization, an Equipment Hierarchy FMEA Library, User Statistics, and a Causal Engine. Recent focus has been on the Equipment History Timeline on Observation detail views, ensuring that Actions and Tasks correctly populate and link to historical data, regardless of which user originally created them.
+The user wants to build an AI-Powered Threat Capture & Prioritization Platform named ThreatBase (AssetIQ). The scope includes user authentication, a chat-based threat capture system, risk prioritization, an Equipment Hierarchy FMEA Library, User Statistics, and a Causal Engine. Recent requirements focused heavily on dashboard improvements, allowing investigation edits, user management mapping, avatar hover cards (name/position), deep linking, UI fixes for risk coloring, and navigation reordering.
 
 **User's preferred language**: English (INSTRUCT next agent to respond in English only)
 
 **what currently exists?** 
-A mature full-stack React/FastAPI/MongoDB application with Auth, Equipment Manager, Chatbot, Task Execution, Failure Modes, and robust light/dark theming (using CSS variables). The Observation detail view features an Equipment History Timeline that correctly fetches and displays horizontally scrollable historical observations, actions, and tasks explicitly linked to the specific equipment or observation, now properly supporting cross-user visibility.
+A mature full-stack React/FastAPI/MongoDB application. The application features a highly optimized mobile layout, full-screen mobile dialogs, and a Causal Engine. The Dashboard now features deep-linking to specific observations/actions/investigations, and hover-cards over user avatars to show real-time names and positions. Investigations have been upgraded to support full editing and mapping leads directly to the system's user directory.
 
 **Last working item**: 
-    - Last item agent was working: Fixing a backend filtering bug where linked actions and tasks were missing from the Equipment History Timeline because the database query strictly filtered by the current user's ID (), hiding items created by other users but explicitly linked to the viewed observation/equipment.
-    - Status: NONE (Completed and verified via database queries and UI screenshot validation).
+    - Last item agent was working: Fixing a backend MongoDB projection bug where  and  were missing from the user lookup in  and , causing the frontend avatar hover cards to incorrectly display the fallback text Team Member.
+    - Status: USER VERIFICATION PENDING
     - Agent Testing Done: Y
-    - Which testing method agent to use? NA
+    - Which testing method agent to use? screenshot tool
     - User Testing Done: N
 
 **All Pending/In progress Issue list**: 
-  None active.
+  None active. All recent user-reported dashboard and UI issues were resolved in the final steps.
 
 **In progress Task List**: 
   None active.
@@ -28,11 +28,20 @@ A mature full-stack React/FastAPI/MongoDB application with Auth, Equipment Manag
     Future Tasks:
     - P2: Implement bulk criticality assignment for equipment.
     - P3: Build Module detail panel/slide-over for the User Statistics page.
-    - P3: Refactor / Extract  component from  to improve maintainability.
+    - P3: Refactor / Extract  component from  to improve maintainability (File is >1700 lines).
     - P3: Refactor  and  to extract modular components.
 
 **Completed work in this session**
-- Fixed Equipment Timeline missing items bug: Updated  in  to remove the restrictive  filter for actions and tasks that are explicitly linked to the current threat () or equipment (). (DONE)
+- Edit Investigation Feature: Added edit button in Causal Engine overview opening a dialog to modify investigation details. (DONE)
+- Map Lead to Users: Updated New/Edit Investigation dialogs to populate the 'Lead' dropdown from the  endpoint. (DONE)
+- Dashboard Investigations Count Mismatch: Fixed React Query setup so  accurately displays on the dashboard stat cards. (DONE)
+- Avatar Hover Cards: Implemented Radix  for Dashboard line items (Observations, Actions, Investigations) to show creator Name and Position on hover instead of click. (DONE)
+- Dashboard Deep Linking: Made Dashboard line items clickable, navigating the user directly to the respective detail page (Observation, Action, or Causal Engine specific investigation). (DONE)
+- Risk Level Colors: Fixed  sorting in  so status dots map strictly to Critical=Red, High=Orange, Medium=Yellow, Low=Green. (DONE)
+- Avatar Layout: Moved user avatar to the first position (leftmost) in Recent Investigations list to match Observations/Actions. (DONE)
+- Navigation Reordering: Moved My Tasks tab immediately after Actions in . (DONE)
+- Investigation Lead Avatar: Updated  to properly map  (not ) and fallback correctly to creator if  is absent. (DONE)
+- Hover Position DB Fix: Added  and  to DB query projections in  and  so the correct position shows on hover instead of Team Member. (DONE)
 
 **Earlier issues found/mentioned but not fixed**
    None found.
@@ -41,46 +50,55 @@ A mature full-stack React/FastAPI/MongoDB application with Auth, Equipment Manag
   - Issue recurrence in previous fork:  serialization errors crashing backend endpoints.
   - Recurrence count: 2
   - Status: RESOLVED
-  Note: Always ensure  or any relational ID is cast to a string when returning MongoDB documents. 
+  Note: Always ensure  or any relational ID is cast to a string when returning MongoDB documents.
 
 **Code Architecture**
-
+?inv=
 
 **Key Technical Concepts**
 - Full-stack app: React frontend + FastAPI backend + MongoDB
-- Theming: Relies on Tailwind CSS paired with CSS variables (, ) mapped to a  class.
-- AI Integration: Uses  pointing to GPT-5.2 via Emergent LLM key. It dynamically builds prompt context blocks (including historical JSON payloads).
+- Caching/Data Fetching: App relies heavily on . 
+- UI Components: Employs Shadcn UI (Radix primitives). Swapped  for  to fulfill mouse-enter requirements.
+- Routing: Utilizes  for deep linking () and URL query parameters to auto-select entities on load ().
 
 **key DB schema**
-  - : Contains  which acts as the relational bridge to tie historical tasks, actions, and past threats together.
-  - : Uses  to link directly back to the  it was generated from.
-  - : Linked via .
+  - : Profile pictures are stored under the  field. Job titles are under , and fallback is .
+  - : Now explicitly maps a string  which requires secondary lookup logic, or falls back to .
 
 **changes in tech stack**
   - None.
 
 **All files of reference** 
-  -  (Updated to fix the timeline data fetching logic by adjusting the  query parameters).
-  -  (Reference for timeline component structure).
+  -  (Extensively updated for hovers, deep linking, UI sorting).
+  -  (Updated for editing investigations and responding to URL params).
+  - , ,  (Updated MongoDB projections to fetch , , ).
+  -  (Updated ).
 
 **Areas that need refactoring**: 
-- , ,  (>1,000 lines) are in desperate need of component extraction.
--  has grown complex due to the Timeline and Recommended Actions sub-components.
+-  (~1,750 lines) is a monolithic file. The  must be extracted into a separate component.
+-  is also growing large and could benefit from extracting the metric cards.
 
 **key api endpoints**
--  (Fetches related observations, actions, and completed tasks. Now properly shows items created by other users if explicitly linked).
--  (Generates risk forecasts using the timeline history).
+-  (Returns investigations with enriched , , ).
+-  &  (Now project  and  to supply accurate hover card data).
+-  (Used by Investigation Dialogs to populate the Lead dropdown).
 
 **Critical Info for New Agent** 
-- **Querying Linked Entities Data:** When querying for entities (like Actions or Tasks) that explicitly map to a parent item (like an Observation/Threat), do not enforce a strict  check on the query. If a user has permission to view the Observation, they should see the Actions linked to it, regardless of which user initially created that Action.
+- **User Avatar Lookups:** When enriching backend data with user details, remember that the profile picture field is , not  or .
+- **Database Projections:** When querying , explicitly include  in the projection, otherwise frontend components that expect job titles will fall back to default text like Team Member.
+- **React Query  calls:** Do not pass API functions directly to  without an arrow function wrapper if the API function has default parameters (e.g.,  instead of ). React Query passes a context object that will override the default parameter and break the endpoint (e.g., ).
 
 **documents and test reports created in this job** 
-  -  (Updated)
+  - 
 
 **Last 10 User Messages and any pending HUMAN messages** 
- 1. User: Please use ask_human tool and confirm your plan now. (COMPLETED)
- 2. User: i still do not see the actions and tasks in the timeline (COMPLETED - Investigated component and DB)
- 3. User: oke clear but i would a least expect to see the action they are linked to and equipment (COMPLETED - Identified and fixed backend UUID filtering bug; actions are now visible).
+ 1. User: allow editing investigation and map lead to user names in user managment (DONE)
+ 2. User: in dashboard on hover of picture of observation/action/investigation owner show name and position. on click in dashboard in line item allow deep linking to item (DONE)
+ 3. User: in dashboard under recent investigation place circle picture first then the rest and fix risk coloring it does not make sense high is green (DONE)
+ 4. User: i still do not see on hover of picture the name an position in dashboard (DONE - Changed Popover to HoverCard)
+ 5. User: place my tasks tab after actions (DONE)
+ 6. User: recent investigations does not show a picture (DONE - Fixed avatar_path mapping in backend)
+ 7. User: on hover on picture dashboard shows position as team member but that is not the position (DONE - Added missing DB query projections for role/position)
 
 **Project Health Check:**
 - Broken: None.
@@ -94,7 +112,7 @@ A mature full-stack React/FastAPI/MongoDB application with Auth, Equipment Manag
 - OpenAI GPT-4o / Vision (Image Analysis) — uses Emergent LLM Key.
 
 **Testing status**
-  - Testing agent used after significant changes: NO (Agent verified fix using direct bash Python queries and screenshot validations).
+  - Testing agent used after significant changes: NO (Main agent self-tested extensively with the screenshot tool, but no comprehensive subagent regression run was done).
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None.
   - Known regressions: None identified.
@@ -104,4 +122,4 @@ A mature full-stack React/FastAPI/MongoDB application with Auth, Equipment Manag
 - Password: 
 
 **What agent forgot to execute**
-- The agent successfully debugged and resolved the user's reported bug. No tasks were skipped, but the agent hasn't started the next planned backlog task yet. Next step is to seek user approval to begin the P0 task: .</analysis>
+- The agent successfully executed all user requests, but completely omitted calling  after performing heavy DOM manipulations across the Dashboard and Causal Engine. It is highly advised to run an automated test sweep soon. Next action is to seek user approval to begin the P0 task: .</analysis>
