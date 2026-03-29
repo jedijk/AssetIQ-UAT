@@ -94,6 +94,31 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - Completed/Closed investigations show locked badge, hide edit/delete buttons, disable add buttons
   - File: `/app/frontend/src/pages/CausalEnginePage.js`
 
+- **Critical Fix:** Feedback page mobile layout
+  - Fixed header buttons to fit within mobile viewport (AI + New buttons)
+  - Added responsive typography and spacing (sm: breakpoints)
+  - Added status filter dropdown with count display
+  - Added List/Snowflake view toggle with localStorage persistence
+  - Improved feedback item cards for mobile with proper line-clamp and spacing
+  - File: `/app/frontend/src/pages/FeedbackPage.js`
+
+- **Added:** Snowflake timeline view for Feedback page
+  - Groups feedback items by status (New, In Review, Implemented, Parked, Rejected, Resolved)
+  - Shows status header with count badge
+  - Persists view preference in localStorage
+  - File: `/app/frontend/src/pages/FeedbackPage.js`
+
+- **Added:** New feedback statuses: Implemented, Parked, Rejected
+  - Added to statusConfig with appropriate colors (emerald, orange, red)
+  - Added to status filter dropdown and detail panel status selector
+  - File: `/app/frontend/src/pages/FeedbackPage.js`
+
+- **Improved:** Message/description box in feedback detail panel
+  - Added bg-slate-50 container with border
+  - Added max-height with internal scrolling for long content
+  - Added break-words for proper text wrapping
+  - File: `/app/frontend/src/pages/FeedbackPage.js`
+
 ### March 29, 2026 (Session 3)
 - **Added:** Offline support for My Tasks (P1)
   - New `OfflineStorageService` using IndexedDB with 3 stores: tasks, pending_completions, sync_queue

@@ -66,6 +66,11 @@ import {
   Check,
   Square,
   CheckSquare,
+  Snowflake,
+  List,
+  LayoutGrid,
+  Archive,
+  Ban,
 } from "lucide-react";
 import { Checkbox } from "../components/ui/checkbox";
 
@@ -100,13 +105,16 @@ const typeColors = {
   general: "text-blue-500",
 };
 
-// Status indicators
+// Status indicators - expanded with new statuses
 const statusConfig = {
   new: { icon: Circle, color: "bg-slate-400", label: "New" },
   in_review: { icon: Clock, color: "bg-amber-500", label: "In Review" },
   resolved: { icon: CheckCircle2, color: "bg-green-500", label: "Resolved" },
   planned: { icon: Clock, color: "bg-blue-500", label: "Planned" },
   wont_fix: { icon: X, color: "bg-slate-500", label: "Won't Fix" },
+  implemented: { icon: CheckCircle2, color: "bg-emerald-500", label: "Implemented" },
+  parked: { icon: Clock, color: "bg-orange-400", label: "Parked" },
+  rejected: { icon: X, color: "bg-red-500", label: "Rejected" },
 };
 
 // Severity badge colors
@@ -140,6 +148,14 @@ const FeedbackPage = () => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   
+  // Timeline view mode: 'list' | 'snowflake'
+  const [timelineView, setTimelineView] = useState(() => {
+    return localStorage.getItem('feedback_timeline_view') || 'list';
+  });
+  
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState('all');
+  
   // Selection state for AI prompt generation
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -147,6 +163,11 @@ const FeedbackPage = () => {
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  
+  // Persist timeline view preference
+  useEffect(() => {
+    localStorage.setItem('feedback_timeline_view', timelineView);
+  }, [timelineView]);
   
   // Form state
   const [feedbackType, setFeedbackType] = useState("general");
@@ -356,7 +377,12 @@ const FeedbackPage = () => {
     setIsModalOpen(true);
   };
 
-  const feedbackItems = feedbackData?.items || [];
+  const allFeedbackItems = feedbackData?.items || [];
+  
+  // Filter feedback items by status
+  const feedbackItems = statusFilter === 'all' 
+    ? allFeedbackItems 
+    : allFeedbackItems.filter(item => item.status === statusFilter);
 
   // Selection handlers
   const toggleSelection = (id, e) => {
@@ -573,81 +599,183 @@ const FeedbackPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">
-              {t("feedback.title") || "Feedback"}
-            </h1>
-            <p className="text-slate-500 mt-1">
-              {t("feedback.subtitle") || "Your submissions"}
-            </p>
+      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        {/* Header - Mobile Optimized */}
+        <div className="mb-4 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex-shrink-0">
+              <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">
+                {t("feedback.title") || "Feedback"}
+              </h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                {t("feedback.subtitle") || "Your submissions"}
+              </p>
+            </div>
+            
+            {/* Action buttons - responsive layout */}
+            {allFeedbackItems.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {isSelectionMode ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleSelectAll}
+                      className="text-xs sm:text-sm"
+                      data-testid="select-all-btn"
+                    >
+                      {selectedIds.size === feedbackItems.length ? (
+                        <>
+                          <Square className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                          <span className="hidden sm:inline">Deselect All</span>
+                          <span className="sm:hidden">Deselect</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckSquare className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                          <span className="hidden sm:inline">Select All</span>
+                          <span className="sm:hidden">Select</span>
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleGeneratePrompt}
+                      disabled={selectedIds.size === 0 || isGeneratingPrompt}
+                      size="sm"
+                      className="bg-purple-600 hover:bg-purple-700 text-xs sm:text-sm"
+                      data-testid="generate-prompt-btn"
+                    >
+                      {isGeneratingPrompt ? (
+                        <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                      )}
+                      <span className="hidden sm:inline">Generate Prompt</span>
+                      <span className="sm:hidden">Generate</span>
+                      <span className="ml-1">({selectedIds.size})</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={cancelSelection}
+                      data-testid="cancel-selection-btn"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsSelectionMode(true)}
+                      className="text-xs sm:text-sm"
+                      data-testid="start-selection-btn"
+                    >
+                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">AI Prompt</span>
+                      <span className="sm:hidden">AI</span>
+                    </Button>
+                    <Button
+                      onClick={openNewFeedbackModal}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
+                      data-testid="add-feedback-btn"
+                    >
+                      <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">{t("feedback.sendFeedback") || "Send feedback"}</span>
+                      <span className="sm:hidden">New</span>
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
-          {feedbackItems.length > 0 && (
-            <div className="flex items-center gap-2">
-              {isSelectionMode ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={toggleSelectAll}
-                    data-testid="select-all-btn"
-                  >
-                    {selectedIds.size === feedbackItems.length ? (
-                      <>
-                        <Square className="w-4 h-4 mr-2" />
-                        Deselect All
-                      </>
-                    ) : (
-                      <>
-                        <CheckSquare className="w-4 h-4 mr-2" />
-                        Select All
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={handleGeneratePrompt}
-                    disabled={selectedIds.size === 0 || isGeneratingPrompt}
-                    className="bg-purple-600 hover:bg-purple-700"
-                    data-testid="generate-prompt-btn"
-                  >
-                    {isGeneratingPrompt ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4 mr-2" />
-                    )}
-                    Generate Prompt ({selectedIds.size})
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={cancelSelection}
-                    data-testid="cancel-selection-btn"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsSelectionMode(true)}
-                    data-testid="start-selection-btn"
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    AI Prompt
-                  </Button>
-                  <Button
-                    onClick={openNewFeedbackModal}
-                    className="bg-blue-600 hover:bg-blue-700"
-                    data-testid="add-feedback-btn"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {t("feedback.sendFeedback") || "Send feedback"}
-                  </Button>
-                </>
-              )}
+          
+          {/* Filters and View Controls Row */}
+          {allFeedbackItems.length > 0 && !isSelectionMode && (
+            <div className="flex items-center justify-between mt-4 gap-2">
+              {/* Status Filter */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-1">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-32 sm:w-40 h-8 text-xs sm:text-sm" data-testid="status-filter">
+                    <SelectValue placeholder="Filter status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="new">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-slate-400" />
+                        New
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="in_review">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        In Review
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="implemented">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        Implemented
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="parked">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-orange-400" />
+                        Parked
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="rejected">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        Rejected
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="resolved">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                        Resolved
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {statusFilter !== 'all' && (
+                  <span className="text-xs text-slate-500 whitespace-nowrap">
+                    {feedbackItems.length} of {allFeedbackItems.length}
+                  </span>
+                )}
+              </div>
+              
+              {/* Timeline View Toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 flex-shrink-0">
+                <button
+                  onClick={() => setTimelineView('list')}
+                  className={`p-1.5 rounded-md transition-colors ${
+                    timelineView === 'list' 
+                      ? 'bg-white shadow-sm text-slate-900' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  title="List view"
+                  data-testid="view-list-btn"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setTimelineView('snowflake')}
+                  className={`p-1.5 rounded-md transition-colors ${
+                    timelineView === 'snowflake' 
+                      ? 'bg-white shadow-sm text-blue-600' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  title="Snowflake view (grouped by status)"
+                  data-testid="view-snowflake-btn"
+                >
+                  <Snowflake className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -661,30 +789,39 @@ const FeedbackPage = () => {
 
         {/* Empty State */}
         {!isLoading && feedbackItems.length === 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <MessageSquare className="w-8 h-8 text-slate-400" />
+          <div className="bg-white rounded-xl border border-slate-200 p-8 sm:p-12 text-center">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <MessageSquare className="w-7 h-7 sm:w-8 sm:h-8 text-slate-400" />
             </div>
-            <h3 className="text-lg font-medium text-slate-800 mb-2">
-              {t("feedback.noFeedbackYet") || "No feedback yet"}
+            <h3 className="text-base sm:text-lg font-medium text-slate-800 mb-2">
+              {statusFilter !== 'all' 
+                ? `No ${statusConfig[statusFilter]?.label || statusFilter} feedback`
+                : (t("feedback.noFeedbackYet") || "No feedback yet")
+              }
             </h3>
-            <p className="text-slate-500 mb-6 max-w-sm mx-auto">
-              {t("feedback.noFeedbackDesc") || "Share your thoughts, report issues, or suggest improvements."}
+            <p className="text-sm text-slate-500 mb-6 max-w-sm mx-auto">
+              {statusFilter !== 'all'
+                ? "Try selecting a different status filter."
+                : (t("feedback.noFeedbackDesc") || "Share your thoughts, report issues, or suggest improvements.")
+              }
             </p>
-            <Button
-              onClick={openNewFeedbackModal}
-              className="bg-blue-600 hover:bg-blue-700"
-              data-testid="send-feedback-btn"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              {t("feedback.sendFeedback") || "Send feedback"}
-            </Button>
+            {statusFilter === 'all' && (
+              <Button
+                onClick={openNewFeedbackModal}
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="send-feedback-btn"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {t("feedback.sendFeedback") || "Send feedback"}
+              </Button>
+            )}
           </div>
         )}
 
-        {/* Feedback List */}
-        {!isLoading && feedbackItems.length > 0 && (
-          <div className="space-y-3">
+        {/* Feedback List - List View */}
+        {!isLoading && feedbackItems.length > 0 && timelineView === 'list' && (
+          <div className="space-y-2 sm:space-y-3">
             {feedbackItems.map((item) => {
               const TypeIcon = typeIcons[item.type] || MessageCircle;
               const statusCfg = statusConfig[item.status] || statusConfig.new;
@@ -693,7 +830,7 @@ const FeedbackPage = () => {
               return (
                 <div
                   key={item.id}
-                  className={`bg-white rounded-xl border p-4 hover:shadow-sm transition-all duration-150 ${
+                  className={`bg-white rounded-lg sm:rounded-xl border p-3 sm:p-4 hover:shadow-sm transition-all duration-150 ${
                     isSelected 
                       ? "border-purple-400 bg-purple-50/50" 
                       : "border-slate-200 hover:border-slate-300"
@@ -701,7 +838,7 @@ const FeedbackPage = () => {
                   data-testid={`feedback-item-${item.id}`}
                   onClick={isSelectionMode ? (e) => toggleSelection(item.id, e) : undefined}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2 sm:gap-3">
                     {/* Checkbox in selection mode */}
                     {isSelectionMode && (
                       <div 
@@ -717,10 +854,10 @@ const FeedbackPage = () => {
                     
                     {/* Type Icon */}
                     <div 
-                      className={`mt-0.5 ${typeColors[item.type]} ${!isSelectionMode ? 'cursor-pointer' : ''}`}
+                      className={`mt-0.5 flex-shrink-0 ${typeColors[item.type]} ${!isSelectionMode ? 'cursor-pointer' : ''}`}
                       onClick={!isSelectionMode ? () => openFeedbackDetail(item) : undefined}
                     >
-                      <TypeIcon className="w-5 h-5" />
+                      <TypeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     
                     {/* Content */}
@@ -728,22 +865,22 @@ const FeedbackPage = () => {
                       className={`flex-1 min-w-0 ${!isSelectionMode ? 'cursor-pointer' : ''}`}
                       onClick={!isSelectionMode ? () => openFeedbackDetail(item) : undefined}
                     >
-                      <p className="text-slate-800 line-clamp-2 text-sm">
+                      <p className="text-slate-800 line-clamp-2 text-xs sm:text-sm">
                         {item.message}
                       </p>
-                      <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      <div className="flex items-center gap-2 sm:gap-3 mt-1.5 sm:mt-2 flex-wrap">
                         {/* Status indicator */}
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${statusCfg.color}`} />
-                          <span className="text-xs text-slate-500">{statusCfg.label}</span>
+                        <div className="flex items-center gap-1">
+                          <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${statusCfg.color}`} />
+                          <span className="text-[10px] sm:text-xs text-slate-500">{statusCfg.label}</span>
                         </div>
                         {/* Submitted by */}
-                        <div className="flex items-center gap-1 text-xs text-slate-400">
-                          <User className="w-3 h-3" />
-                          <span>{item.user_name || "Unknown"}</span>
+                        <div className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-400">
+                          <User className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                          <span className="truncate max-w-[60px] sm:max-w-none">{item.user_name || "Unknown"}</span>
                         </div>
                         {/* Timestamp */}
-                        <span className="text-xs text-slate-400">
+                        <span className="text-[10px] sm:text-xs text-slate-400">
                           {formatRelativeTime(item.timestamp)}
                         </span>
                       </div>
@@ -756,10 +893,10 @@ const FeedbackPage = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                            className="h-7 w-7 sm:h-8 sm:w-8 text-slate-400 hover:text-slate-600 flex-shrink-0"
                             data-testid={`feedback-menu-${item.id}`}
                           >
-                            <MoreVertical className="w-4 h-4" />
+                            <MoreVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -778,6 +915,106 @@ const FeedbackPage = () => {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Feedback List - Snowflake View (Grouped by Status) */}
+        {!isLoading && feedbackItems.length > 0 && timelineView === 'snowflake' && (
+          <div className="space-y-6">
+            {/* Group items by status */}
+            {Object.entries(
+              feedbackItems.reduce((groups, item) => {
+                const status = item.status || 'new';
+                if (!groups[status]) groups[status] = [];
+                groups[status].push(item);
+                return groups;
+              }, {})
+            )
+            .sort(([a], [b]) => {
+              // Sort order: new, in_review, implemented, parked, rejected, resolved
+              const order = ['new', 'in_review', 'implemented', 'parked', 'rejected', 'resolved', 'planned', 'wont_fix'];
+              return order.indexOf(a) - order.indexOf(b);
+            })
+            .map(([status, items]) => {
+              const statusCfg = statusConfig[status] || statusConfig.new;
+              const StatusIcon = statusCfg.icon;
+              
+              return (
+                <div key={status} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  {/* Status Header */}
+                  <div className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-100 bg-slate-50`}>
+                    <span className={`w-2.5 h-2.5 rounded-full ${statusCfg.color}`} />
+                    <span className="text-sm font-medium text-slate-700">{statusCfg.label}</span>
+                    <Badge variant="secondary" className="ml-auto text-xs">
+                      {items.length}
+                    </Badge>
+                  </div>
+                  
+                  {/* Items */}
+                  <div className="divide-y divide-slate-100">
+                    {items.map((item) => {
+                      const TypeIcon = typeIcons[item.type] || MessageCircle;
+                      const isSelected = selectedIds.has(item.id);
+                      
+                      return (
+                        <div
+                          key={item.id}
+                          className={`flex items-start gap-2 sm:gap-3 p-3 sm:p-4 hover:bg-slate-50 transition-colors ${
+                            isSelected ? "bg-purple-50/50" : ""
+                          } ${!isSelectionMode ? 'cursor-pointer' : ''}`}
+                          onClick={isSelectionMode 
+                            ? (e) => toggleSelection(item.id, e) 
+                            : () => openFeedbackDetail(item)
+                          }
+                          data-testid={`feedback-item-${item.id}`}
+                        >
+                          {isSelectionMode && (
+                            <div className="mt-0.5 flex-shrink-0">
+                              <Checkbox
+                                checked={isSelected}
+                                className="data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
+                              />
+                            </div>
+                          )}
+                          
+                          <div className={`mt-0.5 flex-shrink-0 ${typeColors[item.type]}`}>
+                            <TypeIcon className="w-4 h-4" />
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs sm:text-sm text-slate-800 line-clamp-2">{item.message}</p>
+                            <div className="flex items-center gap-2 mt-1 text-[10px] sm:text-xs text-slate-400">
+                              <span>{item.user_name || "Unknown"}</span>
+                              <span>•</span>
+                              <span>{formatRelativeTime(item.timestamp)}</span>
+                            </div>
+                          </div>
+                          
+                          {!isSelectionMode && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-600 flex-shrink-0">
+                                  <MoreVertical className="w-3.5 h-3.5" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(item, e); }}>
+                                  <Pencil className="w-4 h-4 mr-2" />Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(item.id, e); }} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -957,6 +1194,30 @@ const FeedbackPage = () => {
                           New
                         </div>
                       </SelectItem>
+                      <SelectItem value="in_review">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" />
+                          In Review
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="implemented">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                          Implemented
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="parked">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-orange-400" />
+                          Parked
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="rejected">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          Rejected
+                        </div>
+                      </SelectItem>
                       <SelectItem value="resolved">
                         <div className="flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-green-500" />
@@ -977,12 +1238,14 @@ const FeedbackPage = () => {
                   </div>
                 )}
 
-                {/* Full Message */}
+                {/* Full Message - Improved sizing for long content */}
                 <div>
                   <h4 className="text-sm font-medium text-slate-600 mb-2">{t("feedback.message") || "Message"}</h4>
-                  <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">
-                    {selectedFeedback.message}
-                  </p>
+                  <div className="bg-slate-50 rounded-lg border border-slate-200 p-3 sm:p-4 max-h-[200px] overflow-y-auto">
+                    <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                      {selectedFeedback.message}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Screenshot */}
