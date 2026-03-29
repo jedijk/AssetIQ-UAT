@@ -15,7 +15,6 @@ import {
   GitBranch,
   Wrench,
   FileText,
-  BarChart3,
   PieChart,
   Layers,
   AlertOctagon,
@@ -31,7 +30,6 @@ import {
 import { Progress } from "../components/ui/progress";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card";
 import ReliabilityPerformancePage from "./ReliabilityPerformancePage";
-import AnalyticsDashboardPage from "./AnalyticsDashboardPage";
 
 // User avatar component with optional hover card
 const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showPopover = false }) => {
@@ -376,14 +374,6 @@ export default function DashboardPage() {
             <span className="hidden sm:inline">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</span>
             <span className="sm:hidden">Reliability</span>
           </button>
-          <button 
-            onClick={() => setActiveTab("analytics")}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md whitespace-nowrap transition-colors text-xs ${activeTab === "analytics" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
-            data-testid="analytics-tab"
-          >
-            <BarChart3 className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>{t("dashboard.analytics") || "Analytics"}</span>
-          </button>
         </div>
       </div>
       
@@ -651,13 +641,6 @@ export default function DashboardPage() {
           {activeTab === "reliability" && (
             <div className="animate-fade-in">
               <ReliabilityPerformancePage />
-            </div>
-          )}
-          
-          {/* Analytics Tab */}
-          {activeTab === "analytics" && (
-            <div className="animate-fade-in">
-              <AnalyticsDashboardPage embedded={true} />
             </div>
           )}
         </div>

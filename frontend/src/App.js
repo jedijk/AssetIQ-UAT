@@ -20,7 +20,6 @@ import ActionsPage from "./pages/ActionsPage";
 import ActionDetailPage from "./pages/ActionDetailPage";
 import TaskSchedulerPage from "./pages/TaskSchedulerPage";
 import MyTasksPage from "./pages/MyTasksPage";
-import AnalyticsDashboardPage from "./pages/AnalyticsDashboardPage";
 import SettingsUserManagementPage from "./pages/SettingsUserManagementPage";
 import FormsPage from "./pages/FormsPage";
 import DecisionEnginePage from "./pages/DecisionEnginePage";
@@ -172,7 +171,6 @@ function App() {
                 <Route path="causal-engine" element={<CausalEnginePage />} />
                 <Route path="tasks" element={<TaskSchedulerPage />} />
                 <Route path="my-tasks" element={<MyTasksPage />} />
-                <Route path="analytics" element={<AnalyticsDashboardPage />} />
                 <Route path="forms" element={<FormsPage />} />
                 <Route path="decision-engine" element={<DecisionEnginePage />} />
                 <Route path="settings/user-management" element={<SettingsUserManagementPage />} />
