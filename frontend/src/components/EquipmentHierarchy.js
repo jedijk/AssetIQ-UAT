@@ -92,8 +92,8 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   const [showDetails, setShowDetails] = useState(false);
   const contextMenuRef = useRef(null);
   const detailsRef = useRef(null);
-  const longPressTimer = useRef(null);
-  const touchStartPos = useRef({ x: 0, y: 0 });
+  const lastTapTime = useRef(0);
+  const singleTapTimer = useRef(null);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -121,46 +121,53 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     setContextMenu({ show: true, x: e.clientX, y: e.clientY });
   };
 
-  // Long press handlers for mobile
-  const handleTouchStart = (e) => {
-    const touch = e.touches[0];
-    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-    
-    longPressTimer.current = setTimeout(() => {
-      // Trigger context menu at touch position
-      setContextMenu({ 
-        show: true, 
-        x: Math.min(touchStartPos.current.x, window.innerWidth - 200), 
-        y: Math.min(touchStartPos.current.y, window.innerHeight - 150) 
-      });
-      // Vibrate for feedback if available
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
+  // Handle click/tap with double-tap detection for mobile
+  const handleClick = (e) => {
+    if (isMobile) {
+      const currentTime = new Date().getTime();
+      const tapGap = currentTime - lastTapTime.current;
+      
+      if (tapGap < 300 && tapGap > 0) {
+        // Double tap detected - navigate to observations
+        if (singleTapTimer.current) {
+          clearTimeout(singleTapTimer.current);
+          singleTapTimer.current = null;
+        }
+        lastTapTime.current = 0;
+        // Double tap action: navigate to filtered observations
+        onClick?.();
+      } else {
+        // Single tap - wait to see if it's a double tap
+        lastTapTime.current = currentTime;
+        singleTapTimer.current = setTimeout(() => {
+          // Single tap confirmed - show details popup
+          const rect = e.currentTarget.getBoundingClientRect();
+          setContextMenu({ 
+            show: true, 
+            x: Math.min(rect.left + 20, window.innerWidth - 200), 
+            y: Math.min(rect.bottom + 5, window.innerHeight - 150) 
+          });
+          singleTapTimer.current = null;
+        }, 300);
       }
-    }, 500); // 500ms long press
-  };
-
-  const handleTouchMove = (e) => {
-    // Cancel long press if user moves finger
-    const touch = e.touches[0];
-    const moveThreshold = 10;
-    if (
-      Math.abs(touch.clientX - touchStartPos.current.x) > moveThreshold ||
-      Math.abs(touch.clientY - touchStartPos.current.y) > moveThreshold
-    ) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
-      }
+      
+      // Still toggle children if has children
+      if (hasChildren) onToggle?.();
+    } else {
+      // Desktop behavior - single click navigates
+      if (hasChildren) onToggle?.();
+      onClick?.();
     }
   };
 
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (singleTapTimer.current) {
+        clearTimeout(singleTapTimer.current);
+      }
+    };
+  }, []);
 
   const handleAddThreatClick = () => {
     setContextMenu({ show: false, x: 0, y: 0 });
@@ -211,15 +218,8 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           isActive ? "bg-blue-50 text-blue-700" : "hover:bg-slate-100 text-slate-700"
         }`}
         style={{ paddingLeft: `${8 + level * 16}px` }}
-        onClick={() => {
-          if (hasChildren) onToggle?.();
-          onClick?.();
-        }}
+        onClick={handleClick}
         onContextMenu={handleContextMenu}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
         data-testid={`hierarchy-node-${node.id}`}
       >
         {hasChildren ? (
@@ -715,7 +715,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
       <div className="p-3 border-t border-slate-200 bg-slate-50">
         {isMobile && (
           <p className="text-xs text-slate-400 mb-2 text-center">
-            Long press on equipment for options
+            Tap for details • Double-tap to filter observations
           </p>
         )}
         <div className="flex items-center justify-between text-xs text-slate-500">
