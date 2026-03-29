@@ -79,16 +79,17 @@ async def get_investigations(
         query, {"_id": 0}
     ).sort("created_at", -1).to_list(100)
     
-    # Fetch lead user pictures
+    # Fetch lead user pictures and positions
     for inv in investigations:
         if inv.get("created_by"):
             user = await db.users.find_one(
                 {"id": inv["created_by"]},
-                {"_id": 0, "picture": 1, "name": 1}
+                {"_id": 0, "picture": 1, "name": 1, "position": 1, "role": 1}
             )
             if user:
                 inv["lead_picture"] = user.get("picture")
                 inv["lead_name"] = user.get("name", inv.get("investigation_leader"))
+                inv["lead_position"] = user.get("position") or user.get("role") or "Investigation Lead"
     
     return {"investigations": investigations}
 
