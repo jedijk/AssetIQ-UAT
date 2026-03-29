@@ -296,70 +296,72 @@ const ThreatsPage = () => {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="threats-page">
-      {/* Back Button - shown when navigated from another page */}
-      {location.state?.from && (
-        <div className="mb-3">
-          <BackButton />
-        </div>
-      )}
-      
-      {/* Header - Mobile Optimized */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900">{t("observations.title")}</h1>
-          <p className="text-xs text-slate-500 hidden sm:block">{t("observations.subtitle")}</p>
-        </div>
-        {/* Mobile: Inline stats */}
-        <div className="flex sm:hidden items-center gap-2 text-xs">
-          <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">{stats?.total || 0}</span>
-          {(stats?.critical_count || 0) > 0 && (
-            <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats?.critical_count} critical</span>
-          )}
-        </div>
-      </div>
-      
-      {/* Compact Stats Row - Desktop only */}
-      <div className="hidden sm:flex flex-wrap gap-3 mb-4">
-        {statCards.map((stat, idx) => (
-          <div
-            key={stat.label}
-            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200"
-            data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
-          >
-            <div className={`p-1.5 rounded-md ${stat.bg}`}>
-              <stat.icon className={`w-4 h-4 ${stat.color}`} />
-            </div>
-            <span className="text-lg font-bold text-slate-900">{stat.value}</span>
-            <span className="text-xs text-slate-500">{stat.label}</span>
+    <div className="h-[calc(100vh-64px)] flex flex-col" data-testid="threats-page">
+      {/* Fixed Header Section */}
+      <div className="flex-shrink-0 px-4 pt-4 pb-2 max-w-7xl mx-auto w-full">
+        {/* Back Button - shown when navigated from another page */}
+        {location.state?.from && (
+          <div className="mb-3">
+            <BackButton />
           </div>
-        ))}
-      </div>
-
-      {/* Asset Filter Banner - Compact on mobile */}
-      {assetFilter && (
-        <div className="flex items-center gap-2 mb-3 sm:mb-4 px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-50 border border-blue-200 rounded-lg">
-          <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 flex-shrink-0" />
-          <span className="text-xs sm:text-sm text-blue-700 truncate">
-            <strong className="hidden sm:inline">Showing threats for: </strong>
-            <strong>{assetFilter}</strong>
-            {assetsToFilter.length > 1 && (
-              <span className="ml-1 text-blue-500">
-                (+{assetsToFilter.length - 1})
-              </span>
+        )}
+        
+        {/* Header - Mobile Optimized */}
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900">{t("observations.title")}</h1>
+            <p className="text-xs text-slate-500 hidden sm:block">{t("observations.subtitle")}</p>
+          </div>
+          {/* Mobile: Inline stats */}
+          <div className="flex sm:hidden items-center gap-2 text-xs">
+            <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">{stats?.total || 0}</span>
+            {(stats?.critical_count || 0) > 0 && (
+              <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats?.critical_count} critical</span>
             )}
-          </span>
-          <button 
-            onClick={clearAssetFilter}
-            className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium flex-shrink-0"
-          >
-            Clear
-          </button>
+          </div>
         </div>
-      )}
+        
+        {/* Compact Stats Row - Desktop only */}
+        <div className="hidden sm:flex flex-wrap gap-3 mb-4">
+          {statCards.map((stat, idx) => (
+            <div
+              key={stat.label}
+              className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200"
+              data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
+            >
+              <div className={`p-1.5 rounded-md ${stat.bg}`}>
+                <stat.icon className={`w-4 h-4 ${stat.color}`} />
+              </div>
+              <span className="text-lg font-bold text-slate-900">{stat.value}</span>
+              <span className="text-xs text-slate-500">{stat.label}</span>
+            </div>
+          ))}
+        </div>
 
-      {/* Filters - Mobile Optimized */}
-      <div className="flex items-center gap-2 mb-4 sm:mb-6" data-testid="threats-filters">
+        {/* Asset Filter Banner - Compact on mobile */}
+        {assetFilter && (
+          <div className="flex items-center gap-2 mb-3 sm:mb-4 px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 flex-shrink-0" />
+            <span className="text-xs sm:text-sm text-blue-700 truncate">
+              <strong className="hidden sm:inline">Showing threats for: </strong>
+              <strong>{assetFilter}</strong>
+              {assetsToFilter.length > 1 && (
+                <span className="ml-1 text-blue-500">
+                  (+{assetsToFilter.length - 1})
+                </span>
+              )}
+            </span>
+            <button 
+              onClick={clearAssetFilter}
+              className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium flex-shrink-0"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
+        {/* Filters - Mobile Optimized */}
+        <div className="flex items-center gap-2 mb-2" data-testid="threats-filters">
         {/* Search */}
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -486,9 +488,13 @@ const ThreatsPage = () => {
           </SelectContent>
         </Select>
       </div>
+      </div>
 
-      {/* Threats List */}
-      {isLoading ? (
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
+        <div className="max-w-7xl mx-auto">
+          {/* Threats List */}
+          {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="loading-dots">
             <span></span>
@@ -621,6 +627,8 @@ const ThreatsPage = () => {
           })}
         </div>
       )}
+        </div>
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
