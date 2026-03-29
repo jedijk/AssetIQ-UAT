@@ -1459,17 +1459,28 @@ const MyTasksPage = () => {
           <div className="flex sm:hidden items-center gap-2 text-xs">
             <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">{stats.total}</span>
             {stats.overdue > 0 && (
-              <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats.overdue} overdue</span>
+              <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats.overdue}</span>
             )}
           </div>
         </div>
         
-        {/* Filters Row - Single row on mobile */}
-        <div className="flex gap-2 mb-2">
-          {/* Discipline Filter - Hidden on mobile, shown in dropdown */}
+        {/* Filters Row - Aligned single row */}
+        <div className="flex items-center gap-2 mb-2">
+          {/* Search - Flexible width */}
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-9 text-sm"
+              data-testid="task-search"
+            />
+          </div>
+          
+          {/* Discipline Filter */}
           <Select value={selectedDiscipline || "all"} onValueChange={(v) => setSelectedDiscipline(v === "all" ? "" : v)}>
-            <SelectTrigger className="w-[100px] sm:w-[160px] h-8 text-xs" data-testid="discipline-filter">
-              <Users className="w-3.5 h-3.5 mr-1 text-slate-400 hidden sm:block" />
+            <SelectTrigger className="w-[90px] sm:w-[140px] h-9 text-xs sm:text-sm" data-testid="discipline-filter">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>
@@ -1482,18 +1493,18 @@ const MyTasksPage = () => {
             </SelectContent>
           </Select>
           
-          {/* Date Picker - Compact */}
+          {/* Date Picker - Desktop only */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-[90px] sm:w-[160px] h-8 text-xs justify-start text-left font-normal",
+                  "hidden sm:flex w-[140px] h-9 text-sm justify-start text-left font-normal",
                   !selectedDate && "text-muted-foreground"
                 )}
                 data-testid="date-filter"
               >
-                <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                <CalendarIcon className="mr-1.5 h-4 w-4" />
                 <span className="truncate">{selectedDate ? format(selectedDate, "MMM d") : "Date"}</span>
               </Button>
             </PopoverTrigger>
@@ -1506,43 +1517,31 @@ const MyTasksPage = () => {
               />
             </PopoverContent>
           </Popover>
-          
-          {/* Search - Flexible width */}
-          <div className="relative flex-1">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-7 h-8 text-xs"
-              data-testid="task-search"
-            />
-          </div>
         </div>
         
-        {/* Quick Filter Tabs - Icon only on mobile */}
+        {/* Quick Filter Tabs */}
         <Tabs value={activeFilter} onValueChange={setActiveFilter}>
-          <TabsList className="grid w-full grid-cols-4 h-8">
-            <TabsTrigger value="open" className="flex items-center gap-1 text-xs h-7 px-1 sm:px-3" data-testid="filter-open">
-              <Clock className="w-3.5 h-3.5" />
+          <TabsList className="grid w-full grid-cols-4 h-9">
+            <TabsTrigger value="open" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-8" data-testid="filter-open">
+              <Clock className="w-4 h-4" />
               <span className="hidden sm:inline">Open</span>
               {stats.today > 0 && (
                 <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.today}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="overdue" className="flex items-center gap-1 text-xs h-7 px-1 sm:px-3" data-testid="filter-overdue">
-              <AlertCircle className="w-3.5 h-3.5" />
+            <TabsTrigger value="overdue" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-8" data-testid="filter-overdue">
+              <AlertCircle className="w-4 h-4" />
               <span className="hidden sm:inline">Overdue</span>
               {stats.overdue > 0 && (
                 <Badge variant="destructive" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.overdue}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="recurring" className="flex items-center gap-1 text-xs h-7 px-1 sm:px-3" data-testid="filter-recurring">
-              <Repeat className="w-3.5 h-3.5" />
+            <TabsTrigger value="recurring" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-8" data-testid="filter-recurring">
+              <Repeat className="w-4 h-4" />
               <span className="hidden sm:inline">Recurring</span>
             </TabsTrigger>
-            <TabsTrigger value="adhoc" className="flex items-center gap-1 text-xs h-7 px-1 sm:px-3" data-testid="filter-adhoc">
-              <Zap className="w-3.5 h-3.5" />
+            <TabsTrigger value="adhoc" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-8" data-testid="filter-adhoc">
+              <Zap className="w-4 h-4" />
               <span className="hidden sm:inline">Adhoc</span>
             </TabsTrigger>
           </TabsList>
