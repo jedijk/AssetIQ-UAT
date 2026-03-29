@@ -127,6 +127,11 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
       const currentTime = new Date().getTime();
       const tapGap = currentTime - lastTapTime.current;
       
+      // Capture position data immediately before it's lost
+      const rect = e.currentTarget.getBoundingClientRect();
+      const menuX = Math.min(rect.left + 20, window.innerWidth - 200);
+      const menuY = Math.min(rect.bottom + 5, window.innerHeight - 150);
+      
       if (tapGap < 300 && tapGap > 0) {
         // Double tap detected - navigate to observations
         if (singleTapTimer.current) {
@@ -141,11 +146,10 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
         lastTapTime.current = currentTime;
         singleTapTimer.current = setTimeout(() => {
           // Single tap confirmed - show details popup
-          const rect = e.currentTarget.getBoundingClientRect();
           setContextMenu({ 
             show: true, 
-            x: Math.min(rect.left + 20, window.innerWidth - 200), 
-            y: Math.min(rect.bottom + 5, window.innerHeight - 150) 
+            x: menuX, 
+            y: menuY 
           });
           singleTapTimer.current = null;
         }, 300);
