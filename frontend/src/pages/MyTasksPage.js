@@ -516,36 +516,35 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
     const minThreshold = field.min_threshold ?? thresholds.critical_low ?? thresholds.warning_low;
     const maxThreshold = field.max_threshold ?? thresholds.critical_high ?? thresholds.warning_high;
     
-    // Mobile-friendly input classes
-    const mobileInputClass = isMobile ? "h-12 text-base" : "";
-    const mobileLabelClass = isMobile ? "text-base mb-2" : "";
-    const mobileTextareaRows = isMobile ? 4 : 3;
+    // Mobile-friendly input classes - smaller text to match app style
+    const mobileInputClass = isMobile ? "h-10 text-sm" : "";
+    const mobileLabelClass = isMobile ? "text-sm mb-1.5" : "";
+    const mobileTextareaRows = isMobile ? 3 : 3;
     
     switch (fieldType) {
       case "boolean":
-        // Single checkbox/toggle for boolean fields - larger on mobile
+        // Single checkbox/toggle for boolean fields
         return (
           <div key={field.id} className="space-y-2">
             <div className={cn(
-              "flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200",
-              isMobile && "min-h-[60px]"
+              "flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200",
+              isMobile && "min-h-[48px]"
             )}>
               <Checkbox
                 id={field.id}
                 checked={value === true}
                 onCheckedChange={(checked) => handleFieldChange(field.id, checked)}
-                className={cn(isMobile && "h-6 w-6")}
+                className={cn(isMobile && "h-5 w-5")}
               />
               <div className="flex-1">
                 <label htmlFor={field.id} className={cn(
-                  "font-medium cursor-pointer",
-                  hasError && "text-red-600",
-                  isMobile ? "text-base" : "text-sm"
+                  "font-medium cursor-pointer text-sm",
+                  hasError && "text-red-600"
                 )}>
                   {field.label} {field.required && <span className="text-red-500">*</span>}
                 </label>
                 {field.description && (
-                  <p className={cn("text-slate-500 mt-0.5", isMobile ? "text-sm" : "text-xs")}>{field.description}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{field.description}</p>
                 )}
               </div>
             </div>
@@ -555,28 +554,28 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       
       case "checklist":
         return (
-          <div key={field.id} className="space-y-3">
+          <div key={field.id} className="space-y-2">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {(field.items || []).map((item, idx) => (
                 <div 
                   key={idx} 
                   className={cn(
-                    "flex items-center gap-4 p-3 bg-slate-50 rounded-lg border border-slate-200",
-                    isMobile && "min-h-[52px]"
+                    "flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200",
+                    isMobile && "min-h-[44px]"
                   )}
                 >
                   <Checkbox
                     id={`${field.id}-${idx}`}
                     checked={value?.[idx] || false}
                     onCheckedChange={() => handleChecklistToggle(field.id, idx, field.items)}
-                    className={cn(isMobile && "h-6 w-6")}
+                    className={cn(isMobile && "h-5 w-5")}
                   />
                   <label 
                     htmlFor={`${field.id}-${idx}`} 
-                    className={cn("flex-1 cursor-pointer", isMobile ? "text-base" : "text-sm")}
+                    className="flex-1 cursor-pointer text-sm"
                   >
                     {item}
                   </label>
@@ -593,7 +592,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
           (minThreshold != null && parseFloat(value) < minThreshold)
         );
         return (
-          <div key={field.id} className="space-y-2">
+          <div key={field.id} className="space-y-1.5">
             <Label className={cn((hasError || isExceeded) && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
               {field.unit && <span className="text-slate-400 font-normal ml-1">({field.unit})</span>}
@@ -610,7 +609,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
               )}
             />
             {(minThreshold != null || maxThreshold != null) && (
-              <p className={cn("text-slate-500", isMobile ? "text-sm" : "text-xs")}>
+              <p className="text-xs text-slate-500">
                 {minThreshold != null && maxThreshold != null 
                   ? `Range: ${minThreshold} - ${maxThreshold}` 
                   : minThreshold != null 
@@ -620,8 +619,8 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
               </p>
             )}
             {isExceeded && (
-              <p className="text-sm text-red-600 flex items-center gap-1 bg-red-50 p-2 rounded-lg">
-                <AlertTriangle className="w-4 h-4" />
+              <p className="text-xs text-red-600 flex items-center gap-1 bg-red-50 p-2 rounded-lg">
+                <AlertTriangle className="w-3.5 h-3.5" />
                 Value outside threshold - issue detected
               </p>
             )}
@@ -632,7 +631,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       case "text":
       case "textarea":
         return (
-          <div key={field.id} className="space-y-2">
+          <div key={field.id} className="space-y-1.5">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
@@ -641,7 +640,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
               placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
               rows={mobileTextareaRows}
-              className={cn(isMobile && "text-base")}
+              className="text-sm"
             />
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
           </div>
@@ -650,12 +649,12 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       case "select":
       case "multiple_choice":
         return (
-          <div key={field.id} className="space-y-3">
+          <div key={field.id} className="space-y-2">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
             <div className={cn(
-              "grid gap-2",
+              "grid gap-1.5",
               isMobile ? "grid-cols-1" : "flex flex-wrap"
             )}>
               {(field.options || ["Good", "Warning", "Bad"]).map((option) => {
@@ -666,16 +665,17 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                     key={optionValue}
                     type="button"
                     variant={value === optionValue ? "default" : "outline"}
-                    size={isMobile ? "lg" : "sm"}
+                    size={isMobile ? "default" : "sm"}
                     onClick={() => handleFieldChange(field.id, optionValue)}
                     className={cn(
-                      isMobile && "h-14 text-base justify-start px-4",
+                      "text-sm",
+                      isMobile && "h-10 justify-start px-3",
                       value === optionValue && optionLabel === "Good" && "bg-green-600 hover:bg-green-700",
                       value === optionValue && optionLabel === "Warning" && "bg-amber-500 hover:bg-amber-600",
                       value === optionValue && optionLabel === "Bad" && "bg-red-600 hover:bg-red-700"
                     )}
                   >
-                    {value === optionValue && <Check className="w-4 h-4 mr-2" />}
+                    {value === optionValue && <Check className="w-3.5 h-3.5 mr-1.5" />}
                     {optionLabel}
                   </Button>
                 );
@@ -1094,13 +1094,13 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
         </div>
       
       {/* Form Fields - Styled like Form Designer preview */}
-      <div className={cn("space-y-5", isMobile && "pb-28")}>
+      <div className={cn("space-y-4", isMobile && "pb-28")}>
         {formFields.length > 0 ? (
           <>
             {formFields.map(renderField)}
           </>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
               Completion Notes
             </label>
@@ -1108,11 +1108,8 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
               value={completionNotes}
               onChange={(e) => setCompletionNotes(e.target.value)}
               placeholder="Enter any notes about the task execution..."
-              rows={isMobile ? 5 : 4}
-              className={cn(
-                "bg-slate-50 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-indigo-500",
-                isMobile ? "text-base" : ""
-              )}
+              rows={isMobile ? 4 : 4}
+              className="bg-slate-50 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 text-sm"
             />
           </div>
         )}
