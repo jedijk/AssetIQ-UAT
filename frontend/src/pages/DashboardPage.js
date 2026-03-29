@@ -25,11 +25,51 @@ import {
   Users,
   Gauge,
   ExternalLink,
+  User,
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import ReliabilityPerformancePage from "./ReliabilityPerformancePage";
 import AnalyticsDashboardPage from "./AnalyticsDashboardPage";
+
+// User avatar component
+const UserAvatar = ({ name, photo, initials, size = "sm" }) => {
+  const sizeClasses = {
+    sm: "w-6 h-6 text-[9px]",
+    md: "w-8 h-8 text-xs",
+    lg: "w-10 h-10 text-sm"
+  };
+  
+  // Generate a consistent color based on name
+  const getAvatarColor = (name) => {
+    const colors = [
+      "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500",
+      "bg-pink-500", "bg-teal-500", "bg-indigo-500", "bg-rose-500"
+    ];
+    if (!name) return colors[0];
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
+
+  if (photo) {
+    return (
+      <img
+        src={photo}
+        alt={name || "User"}
+        className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0`}
+      />
+    );
+  }
+
+  return (
+    <div 
+      className={`${sizeClasses[size]} ${getAvatarColor(name)} rounded-full flex items-center justify-center text-white font-medium ring-2 ring-white flex-shrink-0`}
+      title={name || "Unknown user"}
+    >
+      {initials || "?"}
+    </div>
+  );
+};
 
 // Mini chart component for trends
 const MiniBarChart = ({ data, maxValue }) => {
@@ -394,7 +434,13 @@ export default function DashboardPage() {
           onClick={() => navigate("/threats", { state: navState })}
           renderItem={(item, idx) => (
             <div key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
-              <div className={`w-2 h-2 rounded-full ${
+              <UserAvatar 
+                name={item.creator_name}
+                photo={item.creator_photo}
+                initials={item.creator_initials}
+                size="sm"
+              />
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                 item.risk_level === "Critical" ? "bg-red-500" :
                 item.risk_level === "High" ? "bg-orange-500" :
                 item.risk_level === "Medium" ? "bg-yellow-500" : "bg-green-500"
@@ -421,7 +467,13 @@ export default function DashboardPage() {
           onClick={() => navigate("/actions", { state: navState })}
           renderItem={(item, idx) => (
             <div key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
-              <div className={`w-2 h-2 rounded-full ${
+              <UserAvatar 
+                name={item.creator_name}
+                photo={item.creator_photo}
+                initials={item.creator_initials}
+                size="sm"
+              />
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                 item.priority === "critical" ? "bg-red-500" :
                 item.priority === "high" ? "bg-orange-500" :
                 item.priority === "medium" ? "bg-yellow-500" : "bg-green-500"

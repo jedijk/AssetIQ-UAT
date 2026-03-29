@@ -28,6 +28,47 @@ async def generate_case_number(user_id: str) -> str:
     year = datetime.now(timezone.utc).strftime("%Y")
     return f"INV-{year}-{count + 1:04d}"
 
+# Helper function to enrich items with creator info
+async def enrich_with_creator_info(items: list) -> list:
+    """Add creator name and initials to items based on created_by field"""
+    if not items:
+        return items
+    
+    # Collect unique creator IDs
+    creator_ids = set(item.get("created_by") for item in items if item.get("created_by"))
+    if not creator_ids:
+        return items
+    
+    # Fetch all creators in one query
+    creators = await db.users.find(
+        {"id": {"$in": list(creator_ids)}},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1}
+    ).to_list(100)
+    
+    # Create a lookup map
+    creator_map = {c["id"]: c for c in creators}
+    
+    # Enrich items
+    for item in items:
+        creator_id = item.get("created_by")
+        if creator_id and creator_id in creator_map:
+            creator = creator_map[creator_id]
+            item["creator_name"] = creator.get("name") or creator.get("email", "").split("@")[0]
+            item["creator_photo"] = creator.get("photo_url")
+            # Generate initials
+            name = item["creator_name"]
+            if name:
+                parts = name.split()
+                item["creator_initials"] = "".join(p[0].upper() for p in parts[:2])
+            else:
+                item["creator_initials"] = "?"
+        else:
+            item["creator_name"] = None
+            item["creator_photo"] = None
+            item["creator_initials"] = "?"
+    
+    return items
+
 @router.get("/threats", response_model=List[ThreatResponse])
 async def get_threats(
     status: Optional[str] = None,
@@ -40,6 +81,10 @@ async def get_threats(
     
     threats = await db.threats.find(query, {"_id": 0}).sort("rank", 1).limit(limit).to_list(limit)
     total_count = len(threats)
+    
+    # Enrich with creator info
+    threats = await enrich_with_creator_info(threats)
+    
     # Ensure required fields have values and risk_score is int
     for idx, t in enumerate(threats):
         if isinstance(t.get("risk_score"), float):

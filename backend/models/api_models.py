@@ -71,6 +71,10 @@ class ThreatResponse(BaseModel):
     equipment_criticality_data: Optional[dict] = None
     session_id: Optional[str] = None
     attachments: Optional[List[dict]] = None
+    # Creator info for dashboard display
+    creator_name: Optional[str] = None
+    creator_photo: Optional[str] = None
+    creator_initials: Optional[str] = None
 
 
 class ThreatUpdate(BaseModel):

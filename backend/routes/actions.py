@@ -14,6 +14,47 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Actions"])
 
+# Helper function to enrich items with creator info
+async def enrich_with_creator_info(items: list) -> list:
+    """Add creator name and initials to items based on created_by field"""
+    if not items:
+        return items
+    
+    # Collect unique creator IDs
+    creator_ids = set(item.get("created_by") for item in items if item.get("created_by"))
+    if not creator_ids:
+        return items
+    
+    # Fetch all creators in one query
+    creators = await db.users.find(
+        {"id": {"$in": list(creator_ids)}},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1}
+    ).to_list(100)
+    
+    # Create a lookup map
+    creator_map = {c["id"]: c for c in creators}
+    
+    # Enrich items
+    for item in items:
+        creator_id = item.get("created_by")
+        if creator_id and creator_id in creator_map:
+            creator = creator_map[creator_id]
+            item["creator_name"] = creator.get("name") or creator.get("email", "").split("@")[0]
+            item["creator_photo"] = creator.get("photo_url")
+            # Generate initials
+            name = item["creator_name"]
+            if name:
+                parts = name.split()
+                item["creator_initials"] = "".join(p[0].upper() for p in parts[:2])
+            else:
+                item["creator_initials"] = "?"
+        else:
+            item["creator_name"] = None
+            item["creator_photo"] = None
+            item["creator_initials"] = "?"
+    
+    return items
+
 # ============= CENTRALIZED ACTIONS MANAGEMENT =============
 
 class CentralActionCreate(BaseModel):
@@ -66,6 +107,9 @@ async def get_all_actions(
         query["source_type"] = source_type
     
     actions = await db.central_actions.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    # Enrich with creator info
+    actions = await enrich_with_creator_info(actions)
     
     # Enrich actions with threat data (RPN and risk score)
     enriched_actions = []
