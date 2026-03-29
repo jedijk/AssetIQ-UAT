@@ -304,19 +304,34 @@ const ThreatsPage = () => {
         </div>
       )}
       
-      {/* Compact Stats Row - Even more compact on mobile */}
-      <div className="flex flex-wrap gap-1 sm:gap-3 mb-3 sm:mb-4">
+      {/* Header - Mobile Optimized */}
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900">{t("observations.title")}</h1>
+          <p className="text-xs text-slate-500 hidden sm:block">{t("observations.subtitle")}</p>
+        </div>
+        {/* Mobile: Inline stats */}
+        <div className="flex sm:hidden items-center gap-2 text-xs">
+          <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">{stats?.total || 0}</span>
+          {(stats?.critical_count || 0) > 0 && (
+            <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats?.critical_count} critical</span>
+          )}
+        </div>
+      </div>
+      
+      {/* Compact Stats Row - Desktop only */}
+      <div className="hidden sm:flex flex-wrap gap-3 mb-4">
         {statCards.map((stat, idx) => (
           <div
             key={stat.label}
-            className="flex items-center gap-1 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-2 bg-white rounded-lg border border-slate-200"
+            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200"
             data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
           >
-            <div className={`p-0.5 sm:p-1.5 rounded-md ${stat.bg}`}>
-              <stat.icon className={`w-3 h-3 sm:w-4 sm:h-4 ${stat.color}`} />
+            <div className={`p-1.5 rounded-md ${stat.bg}`}>
+              <stat.icon className={`w-4 h-4 ${stat.color}`} />
             </div>
-            <span className="text-sm sm:text-lg font-bold text-slate-900">{stat.value}</span>
-            <span className="text-[9px] sm:text-xs text-slate-500 hidden sm:inline">{stat.label}</span>
+            <span className="text-lg font-bold text-slate-900">{stat.value}</span>
+            <span className="text-xs text-slate-500">{stat.label}</span>
           </div>
         ))}
       </div>

@@ -200,6 +200,7 @@ const en = {
   // Threats page
   observations: {
     title: "Observations",
+    subtitle: "Monitor and manage risk observations",
     totalObservations: "Total Observations",
     openObservations: "Open Observations",
     highPriority: "High Priority",
@@ -1343,8 +1344,9 @@ const nl = {
   
   // Threats page
   observations: {
-    title: "Dreigingen",
-    totalObservations: "Totaal dreigingen",
+    title: "Observaties",
+    subtitle: "Monitor en beheer risico-observaties",
+    totalObservations: "Totaal observaties",
     openObservations: "Open dreigingen",
     highPriority: "Hoge prioriteit",
     searchPlaceholder: "Zoek observaties...",
