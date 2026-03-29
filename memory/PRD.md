@@ -44,6 +44,49 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 
 ## Completed Work
 
+### March 29, 2026 (Session 3)
+- **Added:** Offline support for My Tasks (P1)
+  - New `OfflineStorageService` using IndexedDB with 3 stores: tasks, pending_completions, sync_queue
+  - Tasks automatically cached when fetched for offline access
+  - Completed tasks saved locally when offline
+  - Auto-sync when connection restored + manual "Sync Now" button
+  - Offline banner shows when disconnected with pending count
+  - Sync banner shows when online with pending items to sync
+  - Files: `/app/frontend/src/services/offlineStorage.js`, `/app/frontend/src/pages/MyTasksPage.js`
+
+- **Added:** Mobile form execution flow (P1)
+  - Full form rendering on mobile (390x844 viewport)
+  - Supports all field types: checkboxes, numeric inputs with range validation, text areas
+  - Attachments section with file upload
+  - Cancel and Complete action buttons
+  - Back navigation to task list
+  - File: `/app/frontend/src/pages/MyTasksPage.js`
+
+- **Added:** AI Prompt Generation for Feedback
+  - Select multiple feedback items in Feedback page
+  - Generate AI-powered prompt using GPT-5.2
+  - Copy generated prompt to clipboard for Emergent Agent
+  - Files: `/app/frontend/src/pages/FeedbackPage.js`, `/app/backend/routes/feedback.py`
+
+- **Fixed:** User Statistics page not showing all users
+  - Modified `_get_user_activity()` to query actual business data (threats, actions, investigations)
+  - Now shows all users with their real activity counts
+  - Fixed datetime timezone comparison issues
+  - File: `/app/backend/services/user_stats_service.py`
+
+- **Fixed:** Feedback textarea typing issue
+  - Changed from component function to render function to prevent re-mount on keystroke
+  - File: `/app/frontend/src/pages/FeedbackPage.js`
+
+- **Fixed:** Dashboard mobile tab buttons
+  - Equal-width buttons, larger touch targets, centered content
+  - File: `/app/frontend/src/pages/DashboardPage.js`
+
+- **Removed:** Analytics page and Decision Engine page
+  - Analytics page deleted, tab removed from Dashboard
+  - Decision Engine now shows "Under Development" placeholder
+  - Files: `/app/frontend/src/App.js`, `/app/frontend/src/pages/DashboardPage.js`
+
 ### March 29, 2026 (Session 2)
 - **Added:** Edit Investigation feature in Causal Engine
   - Edit button on investigation overview opens dialog with all editable fields
@@ -144,8 +187,8 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 - [ ] Report generation (PowerPoint/PDF) for Causal Investigations
 
 ### P1 (High)
-- [ ] Offline support with local storage for My Tasks execution
-- [ ] Form execution flow in mobile My Tasks
+- [x] Offline support with local storage for My Tasks execution ✅ (Completed March 29, 2026)
+- [x] Form execution flow in mobile My Tasks ✅ (Completed March 29, 2026)
 
 ### P2 (Medium)
 - [ ] Bulk criticality assignment for equipment
