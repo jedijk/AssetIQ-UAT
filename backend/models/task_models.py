@@ -222,3 +222,5 @@ class TaskExecutionSubmit(BaseModel):
     # Observation creation fields (when Issue = YES)
     create_observation: bool = False
     issue_severity: Optional[str] = None  # low, medium, high
+    # Attachments (file URLs from object storage)
+    attachments: List[dict] = Field(default_factory=list)  # [{url, name, type, size}]

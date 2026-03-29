@@ -36,6 +36,8 @@ import {
   ChevronUp,
   Sparkles,
   ScanEye,
+  Paperclip,
+  Image,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -92,6 +94,19 @@ const myTasksAPI = {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch tasks");
+    return response.json();
+  },
+  
+  uploadAttachment: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    const response = await fetch(`${API_BASE_URL}/api/tasks/upload-attachment`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      body: formData
+    });
+    if (!response.ok) throw new Error("Failed to upload attachment");
     return response.json();
   },
   
@@ -351,6 +366,8 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
   const [expandedContext, setExpandedContext] = useState(!isMobile);
   const [imageAnalysis, setImageAnalysis] = useState({}); // Store analysis results per field
   const [analyzingImage, setAnalyzingImage] = useState(null); // Currently analyzing field id
+  const [attachments, setAttachments] = useState([]); // Completion attachments
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   
   // Reset form when task changes
   useEffect(() => {
@@ -364,6 +381,8 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
       setIssueAction(null);
       setImageAnalysis({});
       setAnalyzingImage(null);
+      setAttachments([]);
+      setUploadingAttachment(false);
     }
   }, [task?.id]);
   
@@ -475,6 +494,7 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
         follow_up_notes: issueAction === "create_task" ? issueDetails.description : null,
         issue_severity: issueFound ? issueDetails.severity : null,
         create_observation: issueAction === "log_observation" || issueAction === "create_task",
+        attachments: attachments, // Include uploaded attachments
       });
       onClose();
     } catch (error) {
@@ -1122,6 +1142,91 @@ const TaskExecutionDialog = ({ task, open, onClose, onComplete }) => {
             />
           </div>
         )}
+        
+        {/* Attachments Section */}
+        <div className="space-y-2 mt-4">
+          <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
+            <Paperclip className="w-4 h-4" />
+            Attachments
+            <span className="text-slate-400 font-normal text-xs">(optional)</span>
+          </label>
+          
+          {/* Uploaded Attachments List */}
+          {attachments.length > 0 && (
+            <div className="space-y-1.5">
+              {attachments.map((att, idx) => (
+                <div key={idx} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                  {att.type?.startsWith("image/") ? (
+                    <Image className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  ) : (
+                    <FileText className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                  )}
+                  <span className="text-sm text-slate-700 truncate flex-1">{att.name}</span>
+                  <span className="text-xs text-slate-400">{(att.size / 1024).toFixed(1)} KB</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Upload Button */}
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              id="attachment-upload"
+              className="hidden"
+              multiple
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+              onChange={async (e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length === 0) return;
+                
+                setUploadingAttachment(true);
+                try {
+                  for (const file of files) {
+                    const result = await myTasksAPI.uploadAttachment(file);
+                    setAttachments(prev => [...prev, result]);
+                  }
+                  toast.success(`${files.length} file(s) uploaded`);
+                } catch (error) {
+                  console.error("Upload failed:", error);
+                  toast.error("Failed to upload file(s)");
+                } finally {
+                  setUploadingAttachment(false);
+                  e.target.value = ""; // Reset input
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={uploadingAttachment}
+              onClick={() => document.getElementById("attachment-upload")?.click()}
+            >
+              {uploadingAttachment ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-3.5 h-3.5 mr-1.5" />
+                  Add Files
+                </>
+              )}
+            </Button>
+            <span className="text-xs text-slate-400">Images, PDF, documents</span>
+          </div>
+        </div>
       </div>
       
         {/* Footer Actions */}

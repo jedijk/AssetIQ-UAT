@@ -640,6 +640,7 @@ class TaskService:
             "follow_up_required": data.get("follow_up_required", False),
             "follow_up_notes": data.get("follow_up_notes"),
             "form_data": data.get("form_data"),
+            "attachments": data.get("attachments", []),  # Completion attachments
             "updated_at": now,
         }
         

@@ -31,6 +31,11 @@ import {
   Activity,
   Eye,
   MessageSquare,
+  Paperclip,
+  Upload,
+  X,
+  Loader2,
+  Image,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -174,7 +179,9 @@ export default function ActionsPage() {
     status: "open",
     comments: "",
     completion_notes: "",
+    attachments: [],
   });
+  const [uploadingActionAttachment, setUploadingActionAttachment] = useState(false);
 
   // Fetch actions (fetch all, filter client-side for multi-select)
   const { data, isLoading } = useQuery({
@@ -281,7 +288,9 @@ export default function ActionsPage() {
       status: action.status || "open",
       comments: action.comments || "",
       completion_notes: action.completion_notes || "",
+      attachments: action.attachments || [],
     });
+    setUploadingActionAttachment(false);
     setIsEditDialogOpen(true);
   };
 
@@ -862,6 +871,86 @@ export default function ActionsPage() {
                         />
                       </div>
                     )}
+                    
+                    {/* Attachments Section */}
+                    {editForm.status === "completed" && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                          <Paperclip className="w-3.5 h-3.5" />
+                          Attachments
+                        </label>
+                        
+                        {editForm.attachments?.length > 0 && (
+                          <div className="space-y-1">
+                            {editForm.attachments.map((att, idx) => (
+                              <div key={idx} className="flex items-center gap-2 p-1.5 bg-slate-50 rounded border border-slate-200 text-xs">
+                                {att.type?.startsWith("image/") ? (
+                                  <Image className="w-3.5 h-3.5 text-blue-500" />
+                                ) : (
+                                  <FileText className="w-3.5 h-3.5 text-slate-500" />
+                                )}
+                                <span className="truncate flex-1">{att.name}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 w-5 p-0"
+                                  onClick={() => setEditForm(prev => ({
+                                    ...prev,
+                                    attachments: prev.attachments.filter((_, i) => i !== idx)
+                                  }))}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            id="action-attachment-mobile"
+                            className="hidden"
+                            multiple
+                            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length === 0) return;
+                              setUploadingActionAttachment(true);
+                              try {
+                                for (const file of files) {
+                                  const result = await actionsAPI.uploadAttachment(file);
+                                  setEditForm(prev => ({
+                                    ...prev,
+                                    attachments: [...(prev.attachments || []), result]
+                                  }));
+                                }
+                                toast.success(`${files.length} file(s) uploaded`);
+                              } catch (error) {
+                                toast.error("Failed to upload file(s)");
+                              } finally {
+                                setUploadingActionAttachment(false);
+                                e.target.value = "";
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={uploadingActionAttachment}
+                            onClick={() => document.getElementById("action-attachment-mobile")?.click()}
+                          >
+                            {uploadingActionAttachment ? (
+                              <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Uploading...</>
+                            ) : (
+                              <><Upload className="w-3 h-3 mr-1" />Add Files</>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     {/* Risk Scores */}
                     {(ea.threat_risk_score != null || ea.threat_rpn != null) && (
                       <div className="grid grid-cols-2 gap-3 p-2 bg-slate-50 rounded-lg">
@@ -1045,6 +1134,88 @@ export default function ActionsPage() {
                           placeholder="Notes on how the action was completed"
                           rows={2}
                         />
+                      </div>
+                    )}
+                    
+                    {/* Attachments Section */}
+                    {editForm.status === "completed" && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                          <Paperclip className="w-4 h-4" />
+                          Attachments
+                        </label>
+                        
+                        {editForm.attachments?.length > 0 && (
+                          <div className="space-y-1.5">
+                            {editForm.attachments.map((att, idx) => (
+                              <div key={idx} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                                {att.type?.startsWith("image/") ? (
+                                  <Image className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                                ) : (
+                                  <FileText className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                                )}
+                                <span className="text-sm text-slate-700 truncate flex-1">{att.name}</span>
+                                <span className="text-xs text-slate-400">{(att.size / 1024).toFixed(1)} KB</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => setEditForm(prev => ({
+                                    ...prev,
+                                    attachments: prev.attachments.filter((_, i) => i !== idx)
+                                  }))}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            id="action-attachment-desktop"
+                            className="hidden"
+                            multiple
+                            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length === 0) return;
+                              setUploadingActionAttachment(true);
+                              try {
+                                for (const file of files) {
+                                  const result = await actionsAPI.uploadAttachment(file);
+                                  setEditForm(prev => ({
+                                    ...prev,
+                                    attachments: [...(prev.attachments || []), result]
+                                  }));
+                                }
+                                toast.success(`${files.length} file(s) uploaded`);
+                              } catch (error) {
+                                toast.error("Failed to upload file(s)");
+                              } finally {
+                                setUploadingActionAttachment(false);
+                                e.target.value = "";
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs"
+                            disabled={uploadingActionAttachment}
+                            onClick={() => document.getElementById("action-attachment-desktop")?.click()}
+                          >
+                            {uploadingActionAttachment ? (
+                              <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Uploading...</>
+                            ) : (
+                              <><Upload className="w-3.5 h-3.5 mr-1.5" />Add Files</>
+                            )}
+                          </Button>
+                          <span className="text-xs text-slate-400">Images, PDF, documents</span>
+                        </div>
                       </div>
                     )}
                     {(ea.threat_risk_score != null || ea.threat_rpn != null) && (

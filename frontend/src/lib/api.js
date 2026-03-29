@@ -543,6 +543,15 @@ export const actionsAPI = {
     const response = await api.delete(`/actions/${actionId}`);
     return response.data;
   },
+  
+  uploadAttachment: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/tasks/upload-attachment', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
 };
 
 // AI Risk Engine API
