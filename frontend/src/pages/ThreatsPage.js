@@ -297,55 +297,55 @@ const ThreatsPage = () => {
         </div>
       )}
       
-      {/* Compact Stats Row */}
-      <div className="flex flex-wrap gap-1.5 sm:gap-3 mb-4">
+      {/* Compact Stats Row - Even more compact on mobile */}
+      <div className="flex flex-wrap gap-1 sm:gap-3 mb-3 sm:mb-4">
         {statCards.map((stat, idx) => (
           <div
             key={stat.label}
-            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-white rounded-lg border border-slate-200"
+            className="flex items-center gap-1 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-2 bg-white rounded-lg border border-slate-200"
             data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
           >
-            <div className={`p-1 sm:p-1.5 rounded-md ${stat.bg}`}>
+            <div className={`p-0.5 sm:p-1.5 rounded-md ${stat.bg}`}>
               <stat.icon className={`w-3 h-3 sm:w-4 sm:h-4 ${stat.color}`} />
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-sm sm:text-lg font-bold text-slate-900">{stat.value}</span>
-              <span className="text-[10px] sm:text-xs text-slate-500 hidden sm:inline">{stat.label}</span>
-            </div>
+            <span className="text-sm sm:text-lg font-bold text-slate-900">{stat.value}</span>
+            <span className="text-[9px] sm:text-xs text-slate-500 hidden sm:inline">{stat.label}</span>
           </div>
         ))}
       </div>
 
-      {/* Asset Filter Banner */}
+      {/* Asset Filter Banner - Compact on mobile */}
       {assetFilter && (
-        <div className="flex items-center gap-2 mb-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-          <AlertTriangle className="w-4 h-4 text-blue-600" />
-          <span className="text-sm text-blue-700">
-            Showing threats for: <strong>{assetFilter}</strong>
+        <div className="flex items-center gap-2 mb-3 sm:mb-4 px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 flex-shrink-0" />
+          <span className="text-xs sm:text-sm text-blue-700 truncate">
+            <strong className="hidden sm:inline">Showing threats for: </strong>
+            <strong>{assetFilter}</strong>
             {assetsToFilter.length > 1 && (
               <span className="ml-1 text-blue-500">
-                (including {assetsToFilter.length - 1} item{assetsToFilter.length > 2 ? 's' : ''} below)
+                (+{assetsToFilter.length - 1})
               </span>
             )}
           </span>
           <button 
             onClick={clearAssetFilter}
-            className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium"
+            className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium flex-shrink-0"
           >
-            Clear filter
+            Clear
           </button>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6" data-testid="threats-filters">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+      {/* Filters - Mobile Optimized */}
+      <div className="flex flex-wrap gap-2 mb-4 sm:mb-6" data-testid="threats-filters">
+        {/* Search - Full width on mobile */}
+        <div className="relative flex-1 min-w-[120px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
-            placeholder={t("observations.searchPlaceholder")}
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-11"
+            className="pl-8 h-9 text-sm"
             data-testid="search-threats-input"
           />
         </div>
@@ -362,20 +362,20 @@ const ThreatsPage = () => {
           
           <button
             onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-            className="flex items-center justify-between w-full sm:w-48 h-11 px-3 bg-white border border-slate-200 rounded-md text-sm hover:bg-slate-50 transition-colors"
+            className="flex items-center justify-between w-[100px] sm:w-40 h-9 px-2 sm:px-3 bg-white border border-slate-200 rounded-md text-xs sm:text-sm hover:bg-slate-50 transition-colors"
             data-testid="status-filter-select"
           >
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-slate-400" />
-              <span className={statusFilter.length > 0 ? "text-slate-900" : "text-slate-500"}>
-                {getStatusDisplayText()}
+            <div className="flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <span className={`truncate ${statusFilter.length > 0 ? "text-slate-900" : "text-slate-500"}`}>
+                {statusFilter.length === 0 ? "Status" : statusFilter.length === 1 ? statusFilter[0] : `${statusFilter.length} sel`}
               </span>
             </div>
-            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ${statusDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {statusDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 w-full sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+            <div className="absolute top-full left-0 mt-1 w-48 sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
               {/* Clear All Option */}
               {statusFilter.length > 0 && (
                 <button
@@ -407,13 +407,14 @@ const ThreatsPage = () => {
           )}
         </div>
         
+        {/* Risk Level Filter */}
         <Select value={riskFilter} onValueChange={setRiskFilter}>
-          <SelectTrigger className="w-full sm:w-40 h-11" data-testid="risk-filter-select">
-            <AlertTriangle className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder="Risk Level" />
+          <SelectTrigger className="w-[90px] sm:w-36 h-9 text-xs sm:text-sm" data-testid="risk-filter-select">
+            <AlertTriangle className="w-3.5 h-3.5 mr-1 text-slate-400 hidden sm:block" />
+            <SelectValue placeholder="Risk" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Risk Levels</SelectItem>
+            <SelectItem value="all">All Risks</SelectItem>
             <SelectItem value="Critical">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-red-500"></span>
@@ -440,10 +441,12 @@ const ThreatsPage = () => {
             </SelectItem>
           </SelectContent>
         </Select>
+        
+        {/* Sort By Filter */}
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-full sm:w-44 h-11" data-testid="sort-by-select">
-            <BarChart3 className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder="Sort By" />
+          <SelectTrigger className="w-[90px] sm:w-40 h-9 text-xs sm:text-sm" data-testid="sort-by-select">
+            <BarChart3 className="w-3.5 h-3.5 mr-1 text-slate-400 hidden sm:block" />
+            <SelectValue placeholder="Sort" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="business_risk">
