@@ -129,9 +129,9 @@ const Layout = () => {
   const allNavItems = [
     { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { path: "/threats", label: t("nav.observations"), icon: AlertTriangle },
-    { path: "/my-tasks", label: t("nav.myTasks") || "My Tasks", icon: ClipboardCheck },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
+    { path: "/my-tasks", label: t("nav.myTasks") || "My Tasks", icon: ClipboardCheck },
     { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true },
   ];
   
