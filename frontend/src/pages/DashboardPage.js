@@ -286,41 +286,41 @@ export default function DashboardPage() {
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col" data-testid="dashboard-page">
-      {/* Fixed Header with Tabs */}
-      <div className="flex-shrink-0 p-6 pb-4 max-w-7xl mx-auto w-full">
-        <div className="flex items-center justify-between mb-4">
+      {/* Fixed Header with Tabs - Condensed */}
+      <div className="flex-shrink-0 px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
-            <p className="text-slate-500">{t("dashboard.subtitle") || "Overview of your risk management status"}</p>
+            <h1 className="text-xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
+            <p className="text-sm text-slate-500">{t("dashboard.subtitle") || "Overview of your risk management status"}</p>
           </div>
         </div>
         
-        {/* Dashboard Tab Buttons */}
-        <div className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-full sm:w-auto overflow-x-auto">
+        {/* Dashboard Tab Buttons - Compact */}
+        <div className="inline-flex h-9 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-full sm:w-auto overflow-x-auto">
           <button 
             onClick={() => setActiveTab("operational")}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md whitespace-nowrap transition-colors text-xs ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
             data-testid="operational-tab"
           >
-            <Activity className="w-4 h-4 flex-shrink-0" />
-            <span className="text-xs sm:text-sm">{t("dashboard.operational") || "Operational"}</span>
+            <Activity className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>{t("dashboard.operational") || "Operational"}</span>
           </button>
           <button 
             onClick={() => setActiveTab("reliability")}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md whitespace-nowrap transition-colors text-xs ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
             data-testid="reliability-tab"
           >
-            <Gauge className="w-4 h-4 flex-shrink-0" />
-            <span className="hidden sm:inline text-sm">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</span>
-            <span className="sm:hidden text-xs">Reliability</span>
+            <Gauge className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="hidden sm:inline">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</span>
+            <span className="sm:hidden">Reliability</span>
           </button>
           <button 
             onClick={() => setActiveTab("analytics")}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ${activeTab === "analytics" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md whitespace-nowrap transition-colors text-xs ${activeTab === "analytics" ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/50"}`}
             data-testid="analytics-tab"
           >
-            <BarChart3 className="w-4 h-4 flex-shrink-0" />
-            <span className="text-xs sm:text-sm">{t("dashboard.analytics") || "Analytics"}</span>
+            <BarChart3 className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>{t("dashboard.analytics") || "Analytics"}</span>
           </button>
         </div>
       </div>
