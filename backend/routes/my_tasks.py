@@ -328,8 +328,16 @@ async def get_my_tasks(
                     action["threat_risk_score"] = threat.get("risk_score")
             tasks.append(serialize_action_as_task(action))
     
-    # Sort combined list: Overdue -> High Priority -> Due Soon
+    # Sort combined list: Risk Score (highest first) -> Status -> Priority -> Due Date
     def sort_key(item):
+        # Risk score (higher = more urgent, so negate for ascending sort)
+        risk_score = item.get("risk_score") or 0
+        risk_val = -risk_score  # Negate so higher scores come first
+        
+        # RPN as secondary risk metric
+        rpn = item.get("rpn") or 0
+        rpn_val = -rpn  # Negate so higher RPN comes first
+        
         # Status priority: overdue/in_progress first
         status_order = {"overdue": 0, "in_progress": 1, "planned": 2, "scheduled": 2}
         status_val = status_order.get(item.get("status", "planned"), 2)
@@ -352,7 +360,8 @@ async def get_my_tasks(
         else:
             due_val = float('inf')
         
-        return (status_val, priority_val, due_val)
+        # Sort by: risk_score (desc) -> rpn (desc) -> status -> priority -> due_date
+        return (risk_val, rpn_val, status_val, priority_val, due_val)
     
     tasks.sort(key=sort_key)
     
