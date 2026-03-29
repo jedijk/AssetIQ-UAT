@@ -138,14 +138,19 @@ const Layout = () => {
 
   const lastAction = getLastAction();
 
-  const navItems = [
+  const allNavItems = [
     { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { path: "/threats", label: t("nav.observations"), icon: AlertTriangle },
     { path: "/my-tasks", label: t("nav.myTasks") || "My Tasks", icon: ClipboardCheck },
-    { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch },
+    { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
     { path: "/library", label: t("nav.library"), icon: BookOpen },
   ];
+  
+  // Filter nav items based on device
+  const navItems = isMobileView 
+    ? allNavItems.filter(item => !item.desktopOnly)
+    : allNavItems;
 
   // Settings menu items (including Execution, Forms, AI Engine)
   const settingsMenuItems = [

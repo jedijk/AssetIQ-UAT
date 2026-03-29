@@ -60,6 +60,9 @@ export default function CausalEnginePage() {
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
   
+  // Check for mobile viewport
+  const [isMobile, setIsMobile] = useState(false);
+  
   const [selectedInvId, setSelectedInvId] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,6 +82,13 @@ export default function CausalEnginePage() {
   const [localNotes, setLocalNotes] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Handle inv query parameter - auto-select investigation from URL
   useEffect(() => {
@@ -414,6 +424,21 @@ export default function CausalEnginePage() {
     { id: "causes", label: t("causal.causalTree"), icon: GitBranch, count: stats.rootCauses },
     { id: "actions", label: t("causal.correctiveActions"), icon: CheckSquare, count: stats.openActions },
   ];
+
+  // Show mobile-not-supported message
+  if (isMobile) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+          <GitBranch className="w-8 h-8 text-slate-400" />
+        </div>
+        <h2 className="text-xl font-semibold text-slate-900 mb-2">Desktop Only</h2>
+        <p className="text-slate-500 max-w-sm">
+          The Causal Engine requires a larger screen for the best experience. Please use a tablet or desktop device.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col" data-testid="causal-engine-page">
