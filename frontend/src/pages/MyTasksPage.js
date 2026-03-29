@@ -1530,26 +1530,26 @@ const MyTasksPage = () => {
           
           {/* Quick Filter Tabs */}
           <Tabs value={activeFilter} onValueChange={setActiveFilter} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-slate-100">
-              <TabsTrigger value="open" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7" data-testid="filter-open">
+            <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-slate-100 rounded-lg">
+              <TabsTrigger value="open" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7 rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="filter-open">
                 <Clock className="w-4 h-4" />
                 <span className="hidden sm:inline">Open</span>
                 {stats.today > 0 && (
                   <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.today}</Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="overdue" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7" data-testid="filter-overdue">
+              <TabsTrigger value="overdue" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7 rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="filter-overdue">
                 <AlertCircle className="w-4 h-4" />
                 <span className="hidden sm:inline">Overdue</span>
                 {stats.overdue > 0 && (
                   <Badge variant="destructive" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.overdue}</Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="recurring" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7" data-testid="filter-recurring">
+              <TabsTrigger value="recurring" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7 rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="filter-recurring">
                 <Repeat className="w-4 h-4" />
                 <span className="hidden sm:inline">Recurring</span>
               </TabsTrigger>
-              <TabsTrigger value="adhoc" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7" data-testid="filter-adhoc">
+              <TabsTrigger value="adhoc" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7 rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="filter-adhoc">
                 <Zap className="w-4 h-4" />
                 <span className="hidden sm:inline">Adhoc</span>
               </TabsTrigger>
