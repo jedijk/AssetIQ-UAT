@@ -47,7 +47,7 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 ### March 29, 2026 (Session 4)
 - **Styled:** Top 10 Highest Risk Observations to match Recent Observations layout
   - Converted from table view to card-based row layout
-  - Added rank badges (top 3 highlighted in red)
+  - Added rank badges (uniform grey styling)
   - Added user avatar with hover card support showing name and position
   - Added risk level colored dots
   - Added RPN (Risk Priority Number) display in purple badge
@@ -65,6 +65,19 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 - **Fixed:** Failure Mode Version History crash (TypeError: Illegal constructor)
   - Added missing lucide-react icon imports: `History`, `Clock`, `User`, `RotateCcw`
   - File: `/app/frontend/src/pages/FailureModesPage.js`
+
+- **Improved:** Observations page stability to prevent disappearing data
+  - Added null-safe API response handling and filtering
+  - Added longer staleTime (60s), gcTime (5min cache), 3 retries with exponential backoff
+  - Disabled refetchOnWindowFocus, added placeholderData to keep previous data while refetching
+  - File: `/app/frontend/src/pages/ThreatsPage.js`
+
+- **Changed:** Investigation editing from popup dialog to inline editing
+  - Edit button now opens inline form directly in the Overview section
+  - Equipment field shows as dropdown when equipment hierarchy exists, text input as fallback
+  - Investigation Lead populated from users list
+  - Removed EditInvestigationDialog component usage
+  - File: `/app/frontend/src/pages/CausalEnginePage.js`
 
 ### March 29, 2026 (Session 3)
 - **Added:** Offline support for My Tasks (P1)

@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { investigationAPI, actionsAPI, usersAPI } from "../lib/api";
+import { investigationAPI, actionsAPI, usersAPI, equipmentHierarchyAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -9,17 +9,18 @@ import { motion } from "framer-motion";
 import {
   Search, Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
   ChevronRight, Trash2, Calendar, User, MapPin,
-  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download,
+  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Save,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
+import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
 import { CauseTree, CAUSE_CATEGORIES } from "../components/CauseNodeItem";
 import BackButton from "../components/BackButton";
-import { NewInvestigationDialog, EditInvestigationDialog, EventDialog, FailureDialog, CauseDialog, ActionDialog } from "../components/causal-engine/InvestigationDialogs";
+import { NewInvestigationDialog, EventDialog, FailureDialog, CauseDialog, ActionDialog } from "../components/causal-engine/InvestigationDialogs";
 import EquipmentTimeline from "../components/EquipmentTimeline";
 
 const EVENT_CATEGORIES = [
@@ -68,7 +69,7 @@ export default function CausalEnginePage() {
   const [searchQuery, setSearchQuery] = useState("");
   
   const [showNewInvDialog, setShowNewInvDialog] = useState(false);
-  const [showEditInvDialog, setShowEditInvDialog] = useState(false);
+  const [isEditingInvestigation, setIsEditingInvestigation] = useState(false); // Inline editing mode
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [showFailureDialog, setShowFailureDialog] = useState(false);
   const [showCauseDialog, setShowCauseDialog] = useState(false);
@@ -120,6 +121,14 @@ export default function CausalEnginePage() {
     staleTime: 60000, // Cache for 1 minute
   });
   const users = usersData?.users || [];
+  
+  // Fetch equipment nodes for equipment dropdown
+  const { data: equipmentNodesData } = useQuery({
+    queryKey: ["equipment-nodes"],
+    queryFn: () => equipmentHierarchyAPI.getNodes(),
+    staleTime: 60000, // Cache for 1 minute
+  });
+  const equipmentNodes = equipmentNodesData?.nodes || [];
   
   // Log error for debugging
   useEffect(() => {
@@ -189,15 +198,15 @@ export default function CausalEnginePage() {
       queryClient.invalidateQueries({ queryKey: ["investigations"] });
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
-      // Close edit dialog if open
-      if (showEditInvDialog) {
-        setShowEditInvDialog(false);
+      // Close inline edit mode if it was open
+      if (isEditingInvestigation) {
+        setIsEditingInvestigation(false);
         toast.success(t("causal.investigationUpdated") || "Investigation updated");
       }
     },
   });
 
-  // Handle opening edit investigation dialog
+  // Handle enabling inline edit mode
   const handleEditInvestigation = () => {
     if (investigation) {
       setEditInvForm({
@@ -209,7 +218,7 @@ export default function CausalEnginePage() {
         investigation_leader: investigation.investigation_leader || "",
         status: investigation.status || "draft",
       });
-      setShowEditInvDialog(true);
+      setIsEditingInvestigation(true);
     }
   };
 
@@ -217,6 +226,24 @@ export default function CausalEnginePage() {
   const handleSaveInvestigation = () => {
     if (selectedInvId) {
       updateInvMutation.mutate({ id: selectedInvId, data: editInvForm });
+      setIsEditingInvestigation(false);
+    }
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setIsEditingInvestigation(false);
+    // Reset form to original values
+    if (investigation) {
+      setEditInvForm({
+        title: investigation.title || "",
+        description: investigation.description || "",
+        asset_name: investigation.asset_name || "",
+        location: investigation.location || "",
+        incident_date: investigation.incident_date || "",
+        investigation_leader: investigation.investigation_leader || "",
+        status: investigation.status || "draft",
+      });
     }
   };
 
@@ -612,63 +639,196 @@ export default function CausalEnginePage() {
           <div className="flex-1 overflow-y-auto p-4">
             {activeTab === "overview" && (
               <div className="space-y-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-mono text-slate-500">{investigation.case_number}</span>
-                      <Select value={investigation.status} onValueChange={(v) => updateInvMutation.mutate({ id: selectedInvId, data: { status: v } })}>
-                        <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>{INVESTIGATION_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-                      </Select>
+                {/* Inline Edit Mode */}
+                {isEditingInvestigation ? (
+                  <div className="bg-white rounded-xl border p-6 space-y-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h2 className="text-lg font-semibold text-slate-900">Edit Investigation</h2>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={handleCancelEdit}>
+                          <X className="w-4 h-4 mr-1" /> Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleSaveInvestigation} disabled={updateInvMutation.isPending}>
+                          <Save className="w-4 h-4 mr-1" /> {updateInvMutation.isPending ? "Saving..." : "Save"}
+                        </Button>
+                      </div>
                     </div>
-                    <h1 className="text-xl font-bold text-slate-900 mb-1">{investigation.title}</h1>
-                    <p className="text-sm text-slate-600">{investigation.description}</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <Label htmlFor="edit-title">Title</Label>
+                        <Input
+                          id="edit-title"
+                          value={editInvForm.title}
+                          onChange={(e) => setEditInvForm({ ...editInvForm, title: e.target.value })}
+                          placeholder="Investigation title"
+                          className="mt-1"
+                        />
+                      </div>
+                      
+                      <div className="md:col-span-2">
+                        <Label htmlFor="edit-description">Description</Label>
+                        <Textarea
+                          id="edit-description"
+                          value={editInvForm.description}
+                          onChange={(e) => setEditInvForm({ ...editInvForm, description: e.target.value })}
+                          placeholder="Investigation description"
+                          className="mt-1 min-h-[80px]"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="edit-equipment">Equipment</Label>
+                        {equipmentNodes.length > 0 ? (
+                          <Select
+                            value={editInvForm.asset_name}
+                            onValueChange={(v) => setEditInvForm({ ...editInvForm, asset_name: v })}
+                          >
+                            <SelectTrigger className="mt-1" id="edit-equipment">
+                              <SelectValue placeholder="Select equipment" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {equipmentNodes.map((node) => (
+                                <SelectItem key={node.id} value={node.name}>
+                                  {node.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            id="edit-equipment"
+                            value={editInvForm.asset_name}
+                            onChange={(e) => setEditInvForm({ ...editInvForm, asset_name: e.target.value })}
+                            placeholder="Enter equipment name"
+                            className="mt-1"
+                          />
+                        )}
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="edit-location">Location</Label>
+                        <Input
+                          id="edit-location"
+                          value={editInvForm.location}
+                          onChange={(e) => setEditInvForm({ ...editInvForm, location: e.target.value })}
+                          placeholder="Location"
+                          className="mt-1"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="edit-date">Incident Date</Label>
+                        <Input
+                          id="edit-date"
+                          type="date"
+                          value={editInvForm.incident_date}
+                          onChange={(e) => setEditInvForm({ ...editInvForm, incident_date: e.target.value })}
+                          className="mt-1"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="edit-lead">Investigation Lead</Label>
+                        <Select
+                          value={editInvForm.investigation_leader}
+                          onValueChange={(v) => setEditInvForm({ ...editInvForm, investigation_leader: v })}
+                        >
+                          <SelectTrigger className="mt-1" id="edit-lead">
+                            <SelectValue placeholder="Select lead" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {users.map((user) => (
+                              <SelectItem key={user.id} value={user.name || user.email}>
+                                {user.name || user.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="edit-status">Status</Label>
+                        <Select
+                          value={editInvForm.status}
+                          onValueChange={(v) => setEditInvForm({ ...editInvForm, status: v })}
+                        >
+                          <SelectTrigger className="mt-1" id="edit-status">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {INVESTIGATION_STATUSES.map((s) => (
+                              <SelectItem key={s.value} value={s.value}>
+                                {s.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={handleEditInvestigation} className="text-slate-500 hover:text-blue-600" data-testid="edit-investigation-btn">
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="w-4 h-4" /></Button></AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader><AlertDialogTitle>Delete Investigation</AlertDialogTitle><AlertDialogDescription>This will delete all data.</AlertDialogDescription></AlertDialogHeader>
-                        <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteInvMutation.mutate(selectedInvId)} className="bg-red-600">Delete</AlertDialogAction></AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-                
-                {/* Compact Stats Row - Same as Threats */}
-                <div className="flex flex-wrap gap-2">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-                    <div className="p-1.5 rounded-md bg-blue-50"><Clock className="w-4 h-4 text-blue-600" /></div>
-                    <div><span className="text-lg font-bold text-slate-900">{stats.totalEvents}</span><span className="text-xs text-slate-500 ml-1">Events</span></div>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-                    <div className="p-1.5 rounded-md bg-orange-50"><AlertTriangle className="w-4 h-4 text-orange-600" /></div>
-                    <div><span className="text-lg font-bold text-slate-900">{stats.totalFailures}</span><span className="text-xs text-slate-500 ml-1">Failures</span></div>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-                    <div className="p-1.5 rounded-md bg-purple-50"><GitBranch className="w-4 h-4 text-purple-600" /></div>
-                    <div><span className="text-lg font-bold text-slate-900">{stats.totalCauses}</span><span className="text-xs text-slate-500 ml-1">Causes</span></div>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-                    <div className="p-1.5 rounded-md bg-red-50"><Target className="w-4 h-4 text-red-600" /></div>
-                    <div><span className="text-lg font-bold text-red-600">{stats.rootCauses}</span><span className="text-xs text-slate-500 ml-1">Root Causes</span></div>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-                    <div className="p-1.5 rounded-md bg-green-50"><CheckSquare className="w-4 h-4 text-green-600" /></div>
-                    <div><span className="text-lg font-bold text-slate-900">{stats.totalActions}</span><span className="text-xs text-slate-500 ml-1">Actions</span></div>
-                  </div>
-                </div>
+                ) : (
+                  /* View Mode */
+                  <>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm font-mono text-slate-500">{investigation.case_number}</span>
+                          <Select value={investigation.status} onValueChange={(v) => updateInvMutation.mutate({ id: selectedInvId, data: { status: v } })}>
+                            <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>{INVESTIGATION_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <h1 className="text-xl font-bold text-slate-900 mb-1">{investigation.title}</h1>
+                        <p className="text-sm text-slate-600">{investigation.description}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={handleEditInvestigation} className="text-slate-500 hover:text-blue-600" data-testid="edit-investigation-btn">
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="w-4 h-4" /></Button></AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader><AlertDialogTitle>Delete Investigation</AlertDialogTitle><AlertDialogDescription>This will delete all data.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteInvMutation.mutate(selectedInvId)} className="bg-red-600">Delete</AlertDialogAction></AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                    
+                    {/* Compact Stats Row - Same as Threats */}
+                    <div className="flex flex-wrap gap-2">
+                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
+                        <div className="p-1.5 rounded-md bg-blue-50"><Clock className="w-4 h-4 text-blue-600" /></div>
+                        <div><span className="text-lg font-bold text-slate-900">{stats.totalEvents}</span><span className="text-xs text-slate-500 ml-1">Events</span></div>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
+                        <div className="p-1.5 rounded-md bg-orange-50"><AlertTriangle className="w-4 h-4 text-orange-600" /></div>
+                        <div><span className="text-lg font-bold text-slate-900">{stats.totalFailures}</span><span className="text-xs text-slate-500 ml-1">Failures</span></div>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
+                        <div className="p-1.5 rounded-md bg-purple-50"><GitBranch className="w-4 h-4 text-purple-600" /></div>
+                        <div><span className="text-lg font-bold text-slate-900">{stats.totalCauses}</span><span className="text-xs text-slate-500 ml-1">Causes</span></div>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
+                        <div className="p-1.5 rounded-md bg-red-50"><Target className="w-4 h-4 text-red-600" /></div>
+                        <div><span className="text-lg font-bold text-red-600">{stats.rootCauses}</span><span className="text-xs text-slate-500 ml-1">Root Causes</span></div>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
+                        <div className="p-1.5 rounded-md bg-green-50"><CheckSquare className="w-4 h-4 text-green-600" /></div>
+                        <div><span className="text-lg font-bold text-slate-900">{stats.totalActions}</span><span className="text-xs text-slate-500 ml-1">Actions</span></div>
+                      </div>
+                    </div>
 
-                {/* Info cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {investigation.asset_name && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Target className="w-3 h-3" />Asset</div><p className="font-medium text-sm">{investigation.asset_name}</p></div>}
-                  {investigation.location && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><MapPin className="w-3 h-3" />Location</div><p className="font-medium text-sm">{investigation.location}</p></div>}
-                  {investigation.incident_date && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Calendar className="w-3 h-3" />Date</div><p className="font-medium text-sm">{new Date(investigation.incident_date).toLocaleDateString()}</p></div>}
-                  {investigation.investigation_leader && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><User className="w-3 h-3" />Lead</div><p className="font-medium text-sm">{investigation.investigation_leader}</p></div>}
-                </div>
+                    {/* Info cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {investigation.asset_name && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Target className="w-3 h-3" />Equipment</div><p className="font-medium text-sm">{investigation.asset_name}</p></div>}
+                      {investigation.location && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><MapPin className="w-3 h-3" />Location</div><p className="font-medium text-sm">{investigation.location}</p></div>}
+                      {investigation.incident_date && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Calendar className="w-3 h-3" />Date</div><p className="font-medium text-sm">{new Date(investigation.incident_date).toLocaleDateString()}</p></div>}
+                      {investigation.investigation_leader && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><User className="w-3 h-3" />Lead</div><p className="font-medium text-sm">{investigation.investigation_leader}</p></div>}
+                    </div>
+                  </>
+                )}
                 
                 {/* Quick Actions */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1072,16 +1232,6 @@ export default function CausalEnginePage() {
         setForm={setNewInvForm}
         onSubmit={() => createInvMutation.mutate(newInvForm)}
         isPending={createInvMutation.isPending}
-        users={users}
-      />
-      
-      <EditInvestigationDialog
-        open={showEditInvDialog}
-        onOpenChange={setShowEditInvDialog}
-        form={editInvForm}
-        setForm={setEditInvForm}
-        onSubmit={handleSaveInvestigation}
-        isPending={updateInvMutation.isPending}
         users={users}
       />
       
