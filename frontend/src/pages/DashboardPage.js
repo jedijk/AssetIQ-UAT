@@ -298,6 +298,13 @@ export default function DashboardPage() {
   });
   const equipment = Array.isArray(equipmentData?.nodes) ? equipmentData.nodes : (Array.isArray(equipmentData) ? equipmentData : []);
 
+  // Top 10 highest scoring observations
+  const { data: topObservationsData = [] } = useQuery({
+    queryKey: ["top-observations"],
+    queryFn: () => threatsAPI.getTop(10),
+  });
+  const topObservations = Array.isArray(topObservationsData) ? topObservationsData : [];
+
   // Calculate metrics
   const observationsByStatus = observations.reduce((acc, t) => {
     acc[t.status] = (acc[t.status] || 0) + 1;
@@ -457,6 +464,107 @@ export default function DashboardPage() {
           onClick={() => navigate("/causal-engine", { state: navState })}
         />
       </div>
+
+      {/* Top 10 Highest Scoring Observations */}
+      {topObservations.length > 0 && (
+        <div className="mb-6">
+          <div className="themed-card rounded-xl border p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <AlertOctagon className="w-5 h-5 text-red-500" />
+                <h3 className="text-sm font-semibold text-secondary">
+                  {t("dashboard.topRiskObservations") || "Top 10 Highest Risk Observations"}
+                </h3>
+              </div>
+              <button 
+                onClick={() => navigate("/threats", { state: navState })}
+                className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                View All <ExternalLink className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted">Rank</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted">Observation</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted">Asset</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted">Risk Level</th>
+                    <th className="text-right py-2 px-3 text-xs font-medium text-muted">Score</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topObservations.map((obs, index) => {
+                    const riskColors = {
+                      Critical: "bg-red-100 text-red-700 border-red-200",
+                      High: "bg-orange-100 text-orange-700 border-orange-200",
+                      Medium: "bg-yellow-100 text-yellow-700 border-yellow-200",
+                      Low: "bg-green-100 text-green-700 border-green-200",
+                    };
+                    const statusColors = {
+                      Open: "bg-blue-100 text-blue-700",
+                      "In Progress": "bg-amber-100 text-amber-700",
+                      Closed: "bg-green-100 text-green-700",
+                    };
+                    
+                    return (
+                      <tr 
+                        key={obs.id} 
+                        className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
+                        onClick={() => navigate(`/threats/${obs.id}`, { state: navState })}
+                        data-testid={`top-obs-${obs.id}`}
+                      >
+                        <td className="py-2 px-3">
+                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                            index < 3 ? "bg-red-500 text-white" : "bg-slate-200 text-slate-600"
+                          }`}>
+                            {index + 1}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-2">
+                            <UserAvatar 
+                              name={obs.creator_name}
+                              photo={obs.creator_picture}
+                              initials={(obs.creator_name || "U").charAt(0)}
+                              size="sm"
+                              position={obs.creator_position}
+                              showPopover={true}
+                            />
+                            <span className="font-medium text-secondary truncate max-w-[200px]" title={obs.title}>
+                              {obs.title}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-muted truncate max-w-[150px]" title={obs.asset}>
+                          {obs.asset || obs.equipment_name || "-"}
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${riskColors[obs.risk_level] || "bg-slate-100 text-slate-700"}`}>
+                            {obs.risk_level || "Unknown"}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <span className="font-semibold text-secondary">
+                            {typeof obs.risk_score === 'number' ? Math.round(obs.risk_score) : obs.risk_score || 0}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[obs.status] || "bg-slate-100 text-slate-700"}`}>
+                            {obs.status || "Open"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Distribution Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
