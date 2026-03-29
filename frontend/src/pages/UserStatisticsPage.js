@@ -519,20 +519,20 @@ const UserStatisticsPage = () => {
 
         {/* Devices Tab - Desktop vs Mobile vs Tablet */}
         <TabsContent value="devices" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             {/* Desktop Card */}
             <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-blue-50 to-white">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="h-12 w-12 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center">
-                    <Monitor className="h-6 w-6 text-blue-600" />
+              <CardContent className="pt-4 sm:pt-6">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center">
+                    <Monitor className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                   </div>
-                  <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                  <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
                     {deviceUsage.breakdown?.desktop?.percentage || 0}%
                   </Badge>
                 </div>
-                <h3 className="text-lg font-bold text-slate-800">Desktop</h3>
-                <div className="mt-3 space-y-2">
+                <h3 className="text-base sm:text-lg font-bold text-slate-800">Desktop</h3>
+                <div className="mt-2 sm:mt-3 space-y-1.5 sm:space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-500">Views</span>
                     <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.desktop?.views || 0}</span>
@@ -551,17 +551,17 @@ const UserStatisticsPage = () => {
 
             {/* Mobile Card */}
             <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-emerald-50 to-white">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="h-12 w-12 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center">
-                    <Smartphone className="h-6 w-6 text-emerald-600" />
+              <CardContent className="pt-4 sm:pt-6">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center">
+                    <Smartphone className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
                   </div>
-                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs">
                     {deviceUsage.breakdown?.mobile?.percentage || 0}%
                   </Badge>
                 </div>
-                <h3 className="text-lg font-bold text-slate-800">Mobile</h3>
-                <div className="mt-3 space-y-2">
+                <h3 className="text-base sm:text-lg font-bold text-slate-800">Mobile</h3>
+                <div className="mt-2 sm:mt-3 space-y-1.5 sm:space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-500">Views</span>
                     <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.mobile?.views || 0}</span>
@@ -580,17 +580,17 @@ const UserStatisticsPage = () => {
 
             {/* Tablet Card */}
             <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-amber-50 to-white">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="h-12 w-12 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center">
-                    <Tablet className="h-6 w-6 text-amber-600" />
+              <CardContent className="pt-4 sm:pt-6">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center">
+                    <Tablet className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
                   </div>
-                  <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
                     {deviceUsage.breakdown?.tablet?.percentage || 0}%
                   </Badge>
                 </div>
-                <h3 className="text-lg font-bold text-slate-800">Tablet</h3>
-                <div className="mt-3 space-y-2">
+                <h3 className="text-base sm:text-lg font-bold text-slate-800">Tablet</h3>
+                <div className="mt-2 sm:mt-3 space-y-1.5 sm:space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-500">Views</span>
                     <span className="font-semibold text-slate-700">{deviceUsage.breakdown?.tablet?.views || 0}</span>
@@ -622,15 +622,15 @@ const UserStatisticsPage = () => {
                   <p className="text-[10px] mt-1">Device tracking starts with new page views</p>
                 </div>
               ) : (
-                <div className="h-[300px]">
+                <div className="h-[280px] sm:h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={devicePieData}
                         cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
+                        cy="45%"
+                        innerRadius={50}
+                        outerRadius={80}
                         paddingAngle={3}
                         dataKey="value"
                         stroke="none"
@@ -641,11 +641,12 @@ const UserStatisticsPage = () => {
                       </Pie>
                       <Tooltip content={<CustomTooltip />} />
                       <Legend 
-                        layout="vertical" 
-                        align="right" 
-                        verticalAlign="middle"
+                        layout="horizontal" 
+                        align="center" 
+                        verticalAlign="bottom"
                         iconType="circle"
                         iconSize={8}
+                        wrapperStyle={{ paddingTop: '10px' }}
                         formatter={(value, entry) => {
                           const item = devicePieData.find(d => d.name === value);
                           return (
