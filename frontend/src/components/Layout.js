@@ -4,8 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { useTheme, THEMES } from "../contexts/ThemeContext";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Sun, Moon } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -33,21 +32,10 @@ import { actionsAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
 
-// Theme icon component
-const ThemeIcon = ({ theme }) => {
-  switch (theme) {
-    case "dark":
-      return <Moon className="w-4 h-4" />;
-    default:
-      return <Sun className="w-4 h-4" />;
-  }
-};
-
 const Layout = () => {
   const { user, logout } = useAuth();
   const { canUndo, undo, isUndoing, getLastAction, undoCount } = useUndo();
   const { language, toggleLanguage, t } = useLanguage();
-  const { theme, setTheme, cycleTheme } = useTheme();
   const { isOnline, totalPending, isSyncing, syncAllPending } = useOfflineSync();
   const navigate = useNavigate();
   const location = useLocation();
@@ -377,40 +365,6 @@ const Layout = () => {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-
-            {/* Theme Toggle */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  data-testid="theme-toggle"
-                >
-                  <ThemeIcon theme={theme} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuLabel className="text-xs">{t("settings.theme") || "Theme"}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={() => setTheme("light")}
-                  className={`cursor-pointer text-sm ${theme === "light" ? "bg-blue-50 text-blue-700" : ""}`}
-                >
-                  <Sun className="w-4 h-4 mr-2" />
-                  Light
-                  {theme === "light" && <span className="ml-auto text-blue-600">✓</span>}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setTheme("dark")}
-                  className={`cursor-pointer text-sm ${theme === "dark" ? "bg-blue-50 text-blue-700" : ""}`}
-                >
-                  <Moon className="w-4 h-4 mr-2" />
-                  Dark
-                  {theme === "dark" && <span className="ml-auto text-blue-600">✓</span>}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
 
             {/* Settings Menu */}
             <DropdownMenu>

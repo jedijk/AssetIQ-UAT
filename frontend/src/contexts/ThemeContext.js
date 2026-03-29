@@ -16,32 +16,19 @@ export const THEMES = {
 };
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem("assetiq-theme");
-    // If saved theme was assetiq, default to dark
-    if (saved === "assetiq") return "dark";
-    return saved || "light";
-  });
+  // Dark mode disabled - always use light theme
+  const [theme] = useState("light");
 
   useEffect(() => {
-    localStorage.setItem("assetiq-theme", theme);
-    
-    // Remove all theme classes
+    // Always ensure light theme is applied
     document.documentElement.classList.remove("theme-light", "theme-dark");
-    
-    // Add current theme class
-    document.documentElement.classList.add(`theme-${theme}`);
-    
-    // Also set data attribute for CSS targeting
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+    document.documentElement.classList.add("theme-light");
+    document.documentElement.setAttribute("data-theme", "light");
+  }, []);
 
-  const cycleTheme = () => {
-    const themes = Object.keys(THEMES);
-    const currentIndex = themes.indexOf(theme);
-    const nextIndex = (currentIndex + 1) % themes.length;
-    setTheme(themes[nextIndex]);
-  };
+  // No-op functions since dark mode is disabled
+  const setTheme = () => {};
+  const cycleTheme = () => {};
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, cycleTheme, THEMES }}>
