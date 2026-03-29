@@ -54,8 +54,14 @@ async def enrich_with_creator_info(items: list) -> list:
         if creator_id and creator_id in creator_map:
             creator = creator_map[creator_id]
             item["creator_name"] = creator.get("name") or creator.get("email", "").split("@")[0]
-            # Check both photo_url and avatar_path
-            item["creator_photo"] = creator.get("photo_url") or creator.get("avatar_path")
+            # Check both photo_url and avatar_path - convert avatar_path to API URL
+            if creator.get("photo_url"):
+                item["creator_photo"] = creator.get("photo_url")
+            elif creator.get("avatar_path"):
+                # Generate API URL for avatar
+                item["creator_photo"] = f"/api/users/{creator_id}/avatar"
+            else:
+                item["creator_photo"] = None
             # Generate initials
             name = item["creator_name"]
             if name:

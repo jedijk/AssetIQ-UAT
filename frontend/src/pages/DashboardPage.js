@@ -50,12 +50,32 @@ const UserAvatar = ({ name, photo, initials, size = "sm" }) => {
     return colors[index];
   };
 
-  if (photo) {
+  // Build photo URL with auth token if needed
+  const getPhotoUrl = () => {
+    if (!photo) return null;
+    // If it's an API path, add auth token
+    if (photo.startsWith("/api/")) {
+      const token = localStorage.getItem("token");
+      if (token) {
+        return `${process.env.REACT_APP_BACKEND_URL}${photo}?auth=${token}`;
+      }
+    }
+    // If it's already a full URL, use as-is
+    return photo;
+  };
+
+  const photoUrl = getPhotoUrl();
+
+  if (photoUrl) {
     return (
       <img
-        src={photo}
+        src={photoUrl}
         alt={name || "User"}
         className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0`}
+        onError={(e) => {
+          // If image fails to load, hide it and show initials instead
+          e.target.style.display = 'none';
+        }}
       />
     );
   }
