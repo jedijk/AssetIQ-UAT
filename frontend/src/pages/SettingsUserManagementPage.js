@@ -4,6 +4,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import ImageEditor from "../components/ImageEditor";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
+import { usersAPI } from "../lib/api";
 import {
   Users,
   Search,
@@ -32,6 +33,9 @@ import {
   Camera,
   Upload,
   Trash2,
+  AlertCircle,
+  UserPlus,
+  Bell,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -92,6 +96,31 @@ const rbacAPI = {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch users");
+    return response.json();
+  },
+  
+  getPendingUsers: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/rbac/users/pending`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    if (!response.ok) throw new Error("Failed to fetch pending users");
+    return response.json();
+  },
+  
+  approveUser: async ({ userId, action, role, rejectionReason }) => {
+    const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}/approve`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      },
+      body: JSON.stringify({ 
+        action, 
+        role,
+        rejection_reason: rejectionReason 
+      })
+    });
+    if (!response.ok) throw new Error("Failed to process approval");
     return response.json();
   },
   
@@ -209,6 +238,12 @@ const SettingsUserManagementPage = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(null);
   const [avatarUrls, setAvatarUrls] = useState({});
   
+  // Approval workflow state
+  const [approvalDialogUser, setApprovalDialogUser] = useState(null);
+  const [approvalAction, setApprovalAction] = useState("approve");
+  const [approvalRole, setApprovalRole] = useState("viewer");
+  const [rejectionReason, setRejectionReason] = useState("");
+  
   // Image Editor State
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorImage, setEditorImage] = useState(null);
@@ -225,10 +260,32 @@ const SettingsUserManagementPage = () => {
       role: roleFilter !== "all" ? roleFilter : undefined
     })
   });
+  
+  // Pending users query
+  const { data: pendingData, isLoading: pendingLoading, refetch: refetchPending } = useQuery({
+    queryKey: ["pending-users"],
+    queryFn: rbacAPI.getPendingUsers,
+  });
 
   const { data: rolesData } = useQuery({
     queryKey: ["rbac-roles"],
     queryFn: rbacAPI.getRoles
+  });
+
+  // Approval mutation
+  const approvalMutation = useMutation({
+    mutationFn: rbacAPI.approveUser,
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries(["rbac-users"]);
+      queryClient.invalidateQueries(["pending-users"]);
+      const action = variables.action === "approve" ? "approved" : "rejected";
+      toast.success(`User ${action} successfully`);
+      setApprovalDialogUser(null);
+      setRejectionReason("");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to process approval");
+    },
   });
 
   // Mutations
@@ -493,6 +550,83 @@ const SettingsUserManagementPage = () => {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Pending Approvals Section */}
+      {pendingData?.count > 0 && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-amber-600" />
+              <h2 className="text-lg font-semibold text-amber-800">
+                Pending Approvals ({pendingData.count})
+              </h2>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => refetchPending()}
+              className="text-amber-700 border-amber-300 hover:bg-amber-100"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {pendingData.users?.map((user) => (
+              <div 
+                key={user.id} 
+                className="flex items-center justify-between bg-white rounded-lg border border-amber-200 p-4"
+                data-testid={`pending-user-${user.id}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <UserPlus className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">{user.name}</p>
+                    <p className="text-sm text-slate-500">{user.email}</p>
+                  </div>
+                  <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">
+                    Pending Approval
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">
+                    Registered {formatDate(user.created_at)}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-green-600 border-green-300 hover:bg-green-50"
+                    onClick={() => {
+                      setApprovalDialogUser(user);
+                      setApprovalAction("approve");
+                      setApprovalRole("viewer");
+                    }}
+                    data-testid={`approve-btn-${user.id}`}
+                  >
+                    <Check className="w-4 h-4 mr-1" />
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={() => {
+                      setApprovalDialogUser(user);
+                      setApprovalAction("reject");
+                    }}
+                    data-testid={`reject-btn-${user.id}`}
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Users Table */}
       {usersLoading ? (
@@ -784,6 +918,114 @@ const SettingsUserManagementPage = () => {
         className="hidden"
         data-testid="avatar-file-input"
       />
+
+      {/* Approval Dialog */}
+      <Dialog open={!!approvalDialogUser} onOpenChange={(open) => !open && setApprovalDialogUser(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {approvalAction === "approve" ? (
+                <>
+                  <UserCheck className="w-5 h-5 text-green-600" />
+                  Approve User
+                </>
+              ) : (
+                <>
+                  <UserX className="w-5 h-5 text-red-600" />
+                  Reject User
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {approvalDialogUser && (
+            <div className="space-y-4 py-4">
+              {/* User Info */}
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                <div className="h-10 w-10 rounded-full bg-slate-200 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-slate-600" />
+                </div>
+                <div>
+                  <p className="font-medium">{approvalDialogUser.name}</p>
+                  <p className="text-sm text-slate-500">{approvalDialogUser.email}</p>
+                </div>
+              </div>
+              
+              {approvalAction === "approve" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label>Assign Role</Label>
+                    <Select value={approvalRole} onValueChange={setApprovalRole}>
+                      <SelectTrigger data-testid="approval-role-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(roles).map(([roleKey, roleInfo]) => (
+                          <SelectItem key={roleKey} value={roleKey}>
+                            {roleInfo.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-sm text-slate-500">
+                    The user will be notified via email that their account has been approved and they can now log in.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label>Rejection Reason (optional)</Label>
+                    <Input
+                      placeholder="e.g., Not authorized for this organization"
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      data-testid="rejection-reason-input"
+                    />
+                  </div>
+                  <div className="flex items-start gap-2 p-3 bg-red-50 rounded-lg">
+                    <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-red-700">
+                      This user will be notified that their account request was rejected. They will not be able to log in.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApprovalDialogUser(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant={approvalAction === "approve" ? "default" : "destructive"}
+              onClick={() => approvalMutation.mutate({
+                userId: approvalDialogUser?.id,
+                action: approvalAction,
+                role: approvalAction === "approve" ? approvalRole : undefined,
+                rejectionReason: approvalAction === "reject" ? rejectionReason : undefined,
+              })}
+              disabled={approvalMutation.isPending}
+              data-testid={`confirm-${approvalAction}-btn`}
+            >
+              {approvalMutation.isPending ? (
+                "Processing..."
+              ) : approvalAction === "approve" ? (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Approve User
+                </>
+              ) : (
+                <>
+                  <X className="w-4 h-4 mr-2" />
+                  Reject User
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

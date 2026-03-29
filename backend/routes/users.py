@@ -215,6 +215,83 @@ async def update_user_status(
     return result
 
 
+@router.get("/rbac/users/pending")
+async def get_pending_users(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all users with pending approval status. Admin only."""
+    if current_user.get("role") not in ["admin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    pending_users = await db.users.find(
+        {"approval_status": "pending"},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+    
+    return {"users": pending_users, "count": len(pending_users)}
+
+
+@router.patch("/rbac/users/{user_id}/approve")
+async def approve_user(
+    user_id: str,
+    approval_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Approve or reject a pending user. Admin only."""
+    if current_user.get("role") not in ["admin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    action = approval_data.get("action")  # "approve" or "reject"
+    if action not in ["approve", "reject"]:
+        raise HTTPException(status_code=400, detail="Invalid action. Use 'approve' or 'reject'")
+    
+    # Find the user
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.get("approval_status") != "pending":
+        raise HTTPException(status_code=400, detail="User is not pending approval")
+    
+    # Update user status
+    new_status = "approved" if action == "approve" else "rejected"
+    rejection_reason = approval_data.get("rejection_reason", "")
+    
+    update_data = {
+        "approval_status": new_status,
+        "approved_by": current_user["id"],
+        "approved_at": datetime.now(timezone.utc).isoformat(),
+    }
+    
+    if action == "reject" and rejection_reason:
+        update_data["rejection_reason"] = rejection_reason
+    
+    # If approving, also set the role if provided
+    if action == "approve" and approval_data.get("role"):
+        update_data["role"] = approval_data["role"]
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": update_data}
+    )
+    
+    # Send email notification to user
+    try:
+        from routes.auth import send_approval_result_email
+        await send_approval_result_email(
+            user_email=user["email"],
+            user_name=user.get("name", "User"),
+            approved=(action == "approve"),
+            rejection_reason=rejection_reason if action == "reject" else None
+        )
+    except Exception as e:
+        logger.error(f"Failed to send approval notification: {e}")
+    
+    # Fetch and return updated user
+    updated_user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    return updated_user
+
+
 @router.patch("/rbac/users/{user_id}/profile")
 async def update_user_profile(
     user_id: str,

@@ -708,6 +708,38 @@ export const usersAPI = {
     const response = await api.get('/rbac/users');
     return response.data;
   },
+  
+  // Get pending users awaiting approval
+  getPending: async () => {
+    const response = await api.get('/rbac/users/pending');
+    return response.data;
+  },
+  
+  // Approve or reject a user
+  approveUser: async (userId, action, role = null, rejectionReason = null) => {
+    const response = await api.patch(`/rbac/users/${userId}/approve`, {
+      action, // 'approve' or 'reject'
+      role,
+      rejection_reason: rejectionReason,
+    });
+    return response.data;
+  },
+  
+  // Update user status (active/inactive)
+  updateStatus: async (userId, isActive) => {
+    const response = await api.patch(`/rbac/users/${userId}/status`, {
+      is_active: isActive,
+    });
+    return response.data;
+  },
+  
+  // Update user role
+  updateRole: async (userId, role) => {
+    const response = await api.patch(`/rbac/users/${userId}/role`, {
+      role,
+    });
+    return response.data;
+  },
 };
 
 // Feedback API

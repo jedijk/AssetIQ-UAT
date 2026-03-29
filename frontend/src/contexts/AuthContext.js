@@ -45,6 +45,14 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (name, email, password) => {
     const response = await axios.post(`${API_URL}/auth/register`, { name, email, password });
+    
+    // Check if registration requires approval (new workflow)
+    if (response.data.status === "pending_approval") {
+      // Don't set token or user - they need to wait for approval
+      return response.data;
+    }
+    
+    // Legacy behavior: auto-login after registration (for backwards compatibility)
     const { token: newToken, user: userData } = response.data;
     
     localStorage.setItem("token", newToken);

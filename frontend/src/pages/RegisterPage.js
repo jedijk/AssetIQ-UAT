@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Loader2, Shield, Activity, BarChart3 } from "lucide-react";
+import { Loader2, Shield, Activity, BarChart3, CheckCircle2, Clock } from "lucide-react";
 
 // Industrial background image (same as login)
 const BACKGROUND_IMAGE = "https://customer-assets.emergentagent.com/job_682831cd-c439-4614-becb-4ef9d40f147d/artifacts/a6gi0iug_27149310e1925cc6e07ada4653176e7f361ba5e96a825c22e1e22a3df59bf5a7.png";
@@ -14,10 +14,12 @@ const BACKGROUND_IMAGE = "https://customer-assets.emergentagent.com/job_682831cd
 const RegisterPage = () => {
   const { register } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [registrationComplete, setRegistrationComplete] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,14 +32,81 @@ const RegisterPage = () => {
     setLoading(true);
 
     try {
-      await register(name, email, password);
-      toast.success("Account created successfully!");
+      const result = await register(name, email, password);
+      // Show pending approval state instead of auto-login
+      if (result?.status === "pending_approval") {
+        setRegistrationComplete(true);
+      } else {
+        // Fallback for existing behavior (if any)
+        toast.success("Account created successfully!");
+        navigate("/login");
+      }
     } catch (error) {
       const message = error.response?.data?.detail || "Registration failed. Please try again.";
       toast.error(message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Show success screen after registration
+  if (registrationComplete) {
+    return (
+      <div className="register-page-container">
+        {/* Left side - Background Image with Overlay */}
+        <div className="register-image-section">
+          <img 
+            src={BACKGROUND_IMAGE} 
+            alt="Industrial Plant" 
+            className="register-bg-image"
+          />
+          <div className="register-image-overlay" />
+          <div className="register-image-content">
+            <div className="register-brand">
+              <img 
+                src="/logo.png" 
+                alt="AssetIQ" 
+                className="w-14 h-14 rounded-xl shadow-lg"
+              />
+              <h1 className="register-brand-title">AssetIQ</h1>
+            </div>
+          </div>
+        </div>
+
+        {/* Right side - Success Message */}
+        <div className="register-form-section">
+          <div className="register-form-container">
+            <div className="text-center space-y-6">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Registration Successful!</h2>
+                <p className="text-slate-600">Your account has been created.</p>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left">
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-amber-800">Approval Required</p>
+                    <p className="text-sm text-amber-700 mt-1">
+                      Your account is pending approval by an administrator. You'll receive an email once your account has been approved.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <Button 
+                onClick={() => navigate("/login")}
+                className="w-full"
+                data-testid="go-to-login-btn"
+              >
+                Go to Login
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
