@@ -67,6 +67,18 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - Dashboard now correctly shows investigation count (was showing 0)
   - File: `/app/frontend/src/pages/DashboardPage.js`
 
+- **Added:** Dashboard Avatar Hover Popovers for All Item Types
+  - Observations, Actions, and Investigations now show creator/lead popover with name and position
+  - Updated `UserAvatar` component to support optional popover with `showPopover` prop
+  - Backend updated to return `creator_position` for threats and actions
+  - Files: `/app/frontend/src/pages/DashboardPage.js`, `/app/backend/routes/threats.py`, `/app/backend/routes/actions.py`
+
+- **Added:** Dashboard Deep Linking
+  - Clicking on individual observation items navigates to `/threats/{id}` detail page
+  - Clicking on individual action items navigates to `/actions/{id}` detail page
+  - Clicking on individual investigation items navigates to `/causal-engine?inv={id}` with auto-selection
+  - File: `/app/frontend/src/pages/DashboardPage.js`
+
 ### March 29, 2026
 - **Changed:** Task/Form execution UI from popup dialogs to frame view
   - Replaced modal dialog with full-page frame view

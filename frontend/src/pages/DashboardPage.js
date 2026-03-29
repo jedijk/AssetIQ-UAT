@@ -33,8 +33,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popove
 import ReliabilityPerformancePage from "./ReliabilityPerformancePage";
 import AnalyticsDashboardPage from "./AnalyticsDashboardPage";
 
-// User avatar component
-const UserAvatar = ({ name, photo, initials, size = "sm" }) => {
+// User avatar component with optional hover popover
+const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showPopover = false }) => {
   const sizeClasses = {
     sm: "w-6 h-6 text-[9px]",
     md: "w-8 h-8 text-xs",
@@ -68,28 +68,59 @@ const UserAvatar = ({ name, photo, initials, size = "sm" }) => {
 
   const photoUrl = getPhotoUrl();
 
-  if (photoUrl) {
+  const avatarElement = photoUrl ? (
+    <img
+      src={photoUrl}
+      alt={name || "User"}
+      className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0`}
+      onError={(e) => {
+        e.target.style.display = 'none';
+      }}
+    />
+  ) : (
+    <div 
+      className={`${sizeClasses[size]} ${getAvatarColor(name)} rounded-full flex items-center justify-center text-white font-medium ring-2 ring-white flex-shrink-0`}
+      title={!showPopover ? (name || "Unknown user") : undefined}
+    >
+      {initials || (name ? name.charAt(0).toUpperCase() : "?")}
+    </div>
+  );
+
+  if (showPopover && name) {
     return (
-      <img
-        src={photoUrl}
-        alt={name || "User"}
-        className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0`}
-        onError={(e) => {
-          // If image fails to load, hide it and show initials instead
-          e.target.style.display = 'none';
-        }}
-      />
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className="focus:outline-none rounded-full" onClick={(e) => e.stopPropagation()}>
+            {avatarElement}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-48 p-3" side="top" align="center">
+          <div className="flex items-center gap-3">
+            {photoUrl ? (
+              <img 
+                src={photoUrl} 
+                alt={name} 
+                className="w-10 h-10 rounded-full object-cover border border-slate-200"
+              />
+            ) : (
+              <div className={`w-10 h-10 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-sm font-semibold text-white`}>
+                {initials || name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                <Briefcase className="w-3 h-3" />
+                {position || "Team Member"}
+              </p>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
     );
   }
 
-  return (
-    <div 
-      className={`${sizeClasses[size]} ${getAvatarColor(name)} rounded-full flex items-center justify-center text-white font-medium ring-2 ring-white flex-shrink-0`}
-      title={name || "Unknown user"}
-    >
-      {initials || "?"}
-    </div>
-  );
+  return avatarElement;
 };
 
 // Mini chart component for trends
@@ -473,12 +504,19 @@ export default function DashboardPage() {
           clickable={true}
           onClick={() => navigate("/threats", { state: navState })}
           renderItem={(item, idx) => (
-            <div key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
+            <div 
+              key={idx} 
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+              onClick={(e) => { e.stopPropagation(); navigate(`/threats/${item.id}`, { state: navState }); }}
+              data-testid={`observation-item-${item.id}`}
+            >
               <UserAvatar 
                 name={item.creator_name}
                 photo={item.creator_photo}
                 initials={item.creator_initials}
+                position={item.creator_position}
                 size="sm"
+                showPopover={true}
               />
               <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                 item.risk_level === "Critical" ? "bg-red-500" :
@@ -506,12 +544,19 @@ export default function DashboardPage() {
           clickable={true}
           onClick={() => navigate("/actions", { state: navState })}
           renderItem={(item, idx) => (
-            <div key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
+            <div 
+              key={idx} 
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+              onClick={(e) => { e.stopPropagation(); navigate(`/actions/${item.id}`, { state: navState }); }}
+              data-testid={`action-item-${item.id}`}
+            >
               <UserAvatar 
                 name={item.creator_name}
                 photo={item.creator_photo}
                 initials={item.creator_initials}
+                position={item.creator_position}
                 size="sm"
+                showPopover={true}
               />
               <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                 item.priority === "critical" ? "bg-red-500" :
@@ -539,7 +584,12 @@ export default function DashboardPage() {
           clickable={true}
           onClick={() => navigate("/causal-engine", { state: navState })}
           renderItem={(item, idx) => (
-            <div key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
+            <div 
+              key={idx} 
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+              onClick={(e) => { e.stopPropagation(); navigate(`/causal-engine?inv=${item.id}`, { state: navState }); }}
+              data-testid={`investigation-item-${item.id}`}
+            >
               <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                 item.status === "completed" ? "bg-green-500" :
                 item.status === "in_progress" ? "bg-amber-500" : "bg-blue-500"
@@ -549,50 +599,13 @@ export default function DashboardPage() {
                 <p className="text-[10px] text-slate-400">{item.asset_name || "No asset"}</p>
               </div>
               {/* Lead Picture with Popover */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  {item.lead_picture ? (
-                    <button className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full" onClick={(e) => e.stopPropagation()}>
-                      <img 
-                        src={item.lead_picture} 
-                        alt={item.lead_name || item.investigation_leader || "Lead"} 
-                        className="w-6 h-6 rounded-full object-cover border border-slate-200 flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
-                      />
-                    </button>
-                  ) : (
-                    <button 
-                      className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-medium text-slate-600 flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {(item.lead_name || item.investigation_leader || "?").charAt(0).toUpperCase()}
-                    </button>
-                  )}
-                </PopoverTrigger>
-                <PopoverContent className="w-48 p-3" side="top" align="center">
-                  <div className="flex items-center gap-3">
-                    {item.lead_picture ? (
-                      <img 
-                        src={item.lead_picture} 
-                        alt={item.lead_name || "Lead"} 
-                        className="w-10 h-10 rounded-full object-cover border border-slate-200"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold text-blue-600">
-                        {(item.lead_name || item.investigation_leader || "?").charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">
-                        {item.lead_name || item.investigation_leader || "Unknown"}
-                      </p>
-                      <p className="text-xs text-slate-500 flex items-center gap-1">
-                        <Briefcase className="w-3 h-3" />
-                        {item.lead_position || "Investigation Lead"}
-                      </p>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <UserAvatar 
+                name={item.lead_name || item.investigation_leader}
+                photo={item.lead_picture}
+                position={item.lead_position || "Investigation Lead"}
+                size="sm"
+                showPopover={true}
+              />
               <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize flex-shrink-0 ${
                 item.status === "completed" ? "bg-green-100 text-green-700" :
                 item.status === "in_progress" ? "bg-amber-100 text-amber-700" :
