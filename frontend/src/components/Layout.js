@@ -144,7 +144,7 @@ const Layout = () => {
     { path: "/my-tasks", label: t("nav.myTasks") || "My Tasks", icon: ClipboardCheck },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
-    { path: "/library", label: t("nav.library"), icon: BookOpen },
+    { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true },
   ];
   
   // Filter nav items based on device
@@ -153,16 +153,21 @@ const Layout = () => {
     : allNavItems;
 
   // Settings menu items (including Execution, Forms, AI Engine)
-  const settingsMenuItems = [
-    { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2 },
-    { path: "/tasks", label: t("taskScheduler.execution"), icon: Calendar },
-    { path: "/forms", label: t("forms.title"), icon: FileText },
-    { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain },
-    { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users },
+  const allSettingsMenuItems = [
+    { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2, desktopOnly: true },
+    { path: "/tasks", label: t("taskScheduler.execution"), icon: Calendar, desktopOnly: true },
+    { path: "/forms", label: t("forms.title"), icon: FileText, desktopOnly: true },
+    { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
+    { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, desktopOnly: true },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders },
     { path: "/settings/feedback", label: t("nav.feedback") || "Feedback", icon: MessageCircleQuestion },
   ];
+  
+  // Filter settings items based on device
+  const settingsMenuItems = isMobileView
+    ? allSettingsMenuItems.filter(item => !item.desktopOnly)
+    : allSettingsMenuItems;
 
   return (
     <div className="app-container">

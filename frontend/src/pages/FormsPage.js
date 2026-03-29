@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
+import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import {
   FileText,
   Plus,
@@ -385,6 +386,16 @@ const SubmissionRow = ({ submission }) => {
 const FormsPage = () => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
   const [activeTab, setActiveTab] = useState("templates");
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
@@ -543,6 +554,11 @@ const FormsPage = () => {
     warningCount: submissions.filter(s => s.has_warnings).length,
     criticalCount: submissions.filter(s => s.has_critical).length,
   };
+
+  // Mobile: Show desktop-only message
+  if (isMobile) {
+    return <DesktopOnlyMessage title="Form Designer" icon={FileText} />;
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto" data-testid="forms-page">

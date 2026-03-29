@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, isSameMonth, addMonths, subMonths, parseISO } from "date-fns";
+import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import {
   Calendar as CalendarIcon,
   ClipboardList,
@@ -274,6 +275,15 @@ const TaskSchedulerPage = () => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const location = useLocation();
+  
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // State
   const [activeTab, setActiveTab] = useState("instances");
@@ -675,6 +685,11 @@ const TaskSchedulerPage = () => {
       year: "numeric"
     });
   };
+
+  // Mobile: Show desktop-only message
+  if (isMobile) {
+    return <DesktopOnlyMessage title="Task Planner" icon={CalendarIcon} />;
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto" data-testid="task-scheduler-page">

@@ -5,6 +5,7 @@ import { equipmentHierarchyAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
+import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import {
   ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
@@ -458,6 +459,15 @@ export default function EquipmentManagerPage() {
   const fileInputRef = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
   
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
   // Load expanded IDs from localStorage on initial render
   const [expandedIds, setExpandedIds] = useState(() => {
     try {
@@ -903,6 +913,11 @@ export default function EquipmentManagerPage() {
   const filteredRows = searchQuery 
     ? flatRows.filter(r => matchingIds.has(r.node.id) || expandForSearch.has(r.node.id)) 
     : flatRows;
+
+  // Mobile: Show desktop-only message
+  if (isMobile) {
+    return <DesktopOnlyMessage title="Equipment Manager" icon={Building2} />;
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50" data-testid="equipment-manager-page">

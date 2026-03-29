@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import ImageEditor from "../components/ImageEditor";
+import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import {
   Users,
   Search,
@@ -188,6 +189,15 @@ const SettingsUserManagementPage = () => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
+  
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // State
   const [search, setSearch] = useState("");
@@ -411,6 +421,11 @@ const SettingsUserManagementPage = () => {
       day: "numeric"
     });
   };
+
+  // Mobile: Show desktop-only message
+  if (isMobile) {
+    return <DesktopOnlyMessage title="User Management" icon={Users} />;
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto" data-testid="user-management-page">

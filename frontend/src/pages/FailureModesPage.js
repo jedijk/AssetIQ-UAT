@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
+import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { 
   Search, 
   Filter, 
@@ -32,7 +33,8 @@ import {
   X,
   CheckCircle,
   ChevronRight,
-  Download
+  Download,
+  BookOpen
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -88,6 +90,15 @@ const FailureModesPage = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Initialize state from URL params (for FMEA linkage from Maintenance Strategies)
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "");
@@ -600,6 +611,11 @@ const FailureModesPage = () => {
       setIsExporting(false);
     }
   };
+
+  // Mobile: Show desktop-only message
+  if (isMobile) {
+    return <DesktopOnlyMessage title="FMEA Library" icon={BookOpen} />;
+  }
 
   return (
     <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="failure-modes-page">

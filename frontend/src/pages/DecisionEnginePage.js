@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
+import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import {
   Brain,
   Lightbulb,
@@ -359,6 +360,16 @@ const SuggestionCard = ({ suggestion, onApprove, onReject, onExecute }) => {
 const DecisionEnginePage = () => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
   const [activeTab, setActiveTab] = useState("suggestions");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -468,6 +479,11 @@ const DecisionEnginePage = () => {
   const suggestions = suggestionsData?.suggestions || [];
   const stats = dashboard?.suggestions || {};
   const ruleStats = dashboard?.rules || {};
+
+  // Mobile: Show desktop-only message
+  if (isMobile) {
+    return <DesktopOnlyMessage title="Decision Engine" icon={Brain} />;
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto" data-testid="decision-engine-page">
