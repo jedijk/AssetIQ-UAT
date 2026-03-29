@@ -330,12 +330,27 @@ const UserStatisticsPage = () => {
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-          <TabsList className="inline-flex h-9 items-center justify-start rounded-lg bg-slate-100 p-1 min-w-max">
-            <TabsTrigger value="overview" className="text-xs px-3 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-overview">Overview</TabsTrigger>
-            <TabsTrigger value="devices" className="text-xs px-3 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-devices">Devices</TabsTrigger>
-            <TabsTrigger value="modules" className="text-xs px-3 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-modules">Modules</TabsTrigger>
-            <TabsTrigger value="users" className="text-xs px-3 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-users">Users</TabsTrigger>
-            <TabsTrigger value="actions" className="text-xs px-3 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="tab-actions">Actions</TabsTrigger>
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-5 mb-2 sm:mb-4">
+            <TabsTrigger value="overview" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="tab-overview">
+              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="devices" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="tab-devices">
+              <Monitor className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm">Devices</span>
+            </TabsTrigger>
+            <TabsTrigger value="modules" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="tab-modules">
+              <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm">Modules</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="tab-users">
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm">Users</span>
+            </TabsTrigger>
+            <TabsTrigger value="actions" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="tab-actions">
+              <MousePointer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm">Actions</span>
+            </TabsTrigger>
           </TabsList>
         </div>
 
