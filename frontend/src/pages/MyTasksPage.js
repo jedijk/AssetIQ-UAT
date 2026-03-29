@@ -1447,7 +1447,7 @@ const MyTasksPage = () => {
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col">
       {/* Fixed Header - Mobile Optimized Minimalist */}
-      <div className="flex-shrink-0 bg-white border-b border-slate-100">
+      <div className="flex-shrink-0">
         <div className="px-4 sm:px-6 pt-3 pb-3 max-w-4xl mx-auto w-full">
           {/* Title Row - Compact on mobile */}
           <div className="flex items-center justify-between mb-2">
