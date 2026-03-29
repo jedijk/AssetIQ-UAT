@@ -492,9 +492,7 @@ export default function DashboardPage() {
                   data-testid={`top-obs-${obs.id}`}
                 >
                   {/* Rank Badge */}
-                  <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold flex-shrink-0 ${
-                    index < 3 ? "bg-red-500 text-white" : "bg-slate-200 text-slate-600"
-                  }`}>
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold flex-shrink-0 bg-slate-200 text-slate-600">
                     {index + 1}
                   </span>
                   
