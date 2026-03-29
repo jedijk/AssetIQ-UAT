@@ -386,46 +386,50 @@ const EditableTable = ({ type, data, isEditing, onUpdateRow, t }) => {
 
   return (
     <>
-      <ScrollArea className="h-[500px]">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-slate-100">
-            <tr>
-              {getHeaders().map((header, idx) => (
-                <th key={idx} className={`px-3 py-3 text-left font-semibold text-slate-700 ${idx === 0 ? 'w-16' : ''}`}>
-                  {header}
-                </th>
-              ))}
-              {isEditing && <th className="px-3 py-3 w-16"></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((item) => (
-              <tr key={item.rank} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                <td className="px-3 py-3">
-                  <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold ${item.color}`}>
-                    {item.rank}
-                  </span>
-                </td>
-                <td className="px-3 py-3 font-medium text-slate-800">{item.label}</td>
-                <td className="px-3 py-3 text-slate-600">{item.description}</td>
-                <td className="px-3 py-3 text-slate-600 text-xs">{item.secondary_description}</td>
-                {isEditing && (
-                  <td className="px-3 py-3">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setEditingRow(item)}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </ScrollArea>
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="min-w-[600px] px-4 sm:px-0">
+          <ScrollArea className="h-[500px]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-slate-100">
+                <tr>
+                  {getHeaders().map((header, idx) => (
+                    <th key={idx} className={`px-3 py-3 text-left font-semibold text-slate-700 whitespace-nowrap ${idx === 0 ? 'w-16' : ''}`}>
+                      {header}
+                    </th>
+                  ))}
+                  {isEditing && <th className="px-3 py-3 w-16"></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((item) => (
+                  <tr key={item.rank} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td className="px-3 py-3">
+                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold ${item.color}`}>
+                        {item.rank}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 font-medium text-slate-800 whitespace-nowrap">{item.label}</td>
+                    <td className="px-3 py-3 text-slate-600 min-w-[200px]">{item.description}</td>
+                    <td className="px-3 py-3 text-slate-600 text-xs min-w-[150px]">{item.secondary_description}</td>
+                    {isEditing && (
+                      <td className="px-3 py-3">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setEditingRow(item)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </div>
+      </div>
 
       {editingRow && (
         <EditRowDialog
