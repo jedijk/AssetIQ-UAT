@@ -1,11 +1,19 @@
 import { useLanguage } from "../../contexts/LanguageContext";
-import { Loader2 } from "lucide-react";
+import { Loader2, User } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import { CAUSE_CATEGORIES } from "../CauseNodeItem";
+
+const INVESTIGATION_STATUSES = [
+  { value: "draft", label: "Draft" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "review", label: "Under Review" },
+  { value: "completed", label: "Completed" },
+  { value: "closed", label: "Closed" },
+];
 
 const EVENT_CATEGORIES = [
   { value: "operational_event", label: "Operational Event" },
@@ -29,7 +37,7 @@ const ACTION_TYPES = [
   { value: "PDM", label: "PDM - Predictive" },
 ];
 
-export const NewInvestigationDialog = ({ open, onOpenChange, form, setForm, onSubmit, isPending }) => {
+export const NewInvestigationDialog = ({ open, onOpenChange, form, setForm, onSubmit, isPending, users = [] }) => {
   const { t } = useLanguage();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -44,12 +52,119 @@ export const NewInvestigationDialog = ({ open, onOpenChange, form, setForm, onSu
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="text-sm font-medium">{t("causal.incidentDate")}</label><Input type="date" value={form.incident_date} onChange={(e) => setForm({ ...form, incident_date: e.target.value })} /></div>
-            <div><label className="text-sm font-medium">{t("causal.lead")}</label><Input value={form.investigation_leader} onChange={(e) => setForm({ ...form, investigation_leader: e.target.value })} placeholder="Name" /></div>
+            <div>
+              <label className="text-sm font-medium">{t("causal.lead")}</label>
+              {users.length > 0 ? (
+                <Select value={form.investigation_leader || "none"} onValueChange={(v) => setForm({ ...form, investigation_leader: v === "none" ? "" : v })}>
+                  <SelectTrigger data-testid="new-inv-lead-select">
+                    <SelectValue placeholder="Select lead" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No lead assigned</SelectItem>
+                    {users.map(user => (
+                      <SelectItem key={user.id} value={user.name}>
+                        <div className="flex items-center gap-2">
+                          <User className="w-3 h-3 text-slate-400" />
+                          <span>{user.name}</span>
+                          {user.position && <span className="text-xs text-slate-400">• {user.position}</span>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={form.investigation_leader} onChange={(e) => setForm({ ...form, investigation_leader: e.target.value })} placeholder="Name" />
+              )}
+            </div>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button onClick={onSubmit} disabled={!form.title || !form.description || isPending} data-testid="create-inv-btn">{isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{t("common.create")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export const EditInvestigationDialog = ({ open, onOpenChange, form, setForm, onSubmit, isPending, users = [] }) => {
+  const { t } = useLanguage();
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t("causal.editInvestigation") || "Edit Investigation"}</DialogTitle>
+          <DialogDescription>{t("causal.editInvestigationDesc") || "Update investigation details"}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div>
+            <label className="text-sm font-medium">{t("common.name")} *</label>
+            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Investigation title" data-testid="edit-inv-title" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">{t("common.description")} *</label>
+            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Describe..." rows={3} data-testid="edit-inv-description" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">{t("common.asset")}</label>
+              <Input value={form.asset_name} onChange={(e) => setForm({ ...form, asset_name: e.target.value })} placeholder="Equipment" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">{t("causal.location")}</label>
+              <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Area" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">{t("causal.incidentDate")}</label>
+              <Input type="date" value={form.incident_date} onChange={(e) => setForm({ ...form, incident_date: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">{t("causal.lead")}</label>
+              {users.length > 0 ? (
+                <Select value={form.investigation_leader || "none"} onValueChange={(v) => setForm({ ...form, investigation_leader: v === "none" ? "" : v })}>
+                  <SelectTrigger data-testid="edit-inv-lead-select">
+                    <SelectValue placeholder="Select lead" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No lead assigned</SelectItem>
+                    {users.map(user => (
+                      <SelectItem key={user.id} value={user.name}>
+                        <div className="flex items-center gap-2">
+                          <User className="w-3 h-3 text-slate-400" />
+                          <span>{user.name}</span>
+                          {user.position && <span className="text-xs text-slate-400">• {user.position}</span>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={form.investigation_leader} onChange={(e) => setForm({ ...form, investigation_leader: e.target.value })} placeholder="Name" />
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium">{t("common.status")}</label>
+            <Select value={form.status || "draft"} onValueChange={(v) => setForm({ ...form, status: v })}>
+              <SelectTrigger data-testid="edit-inv-status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INVESTIGATION_STATUSES.map(s => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
+          <Button onClick={onSubmit} disabled={!form.title || !form.description || isPending} data-testid="save-inv-btn">
+            {isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+            {t("common.save") || "Save Changes"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

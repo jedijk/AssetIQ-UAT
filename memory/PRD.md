@@ -44,6 +44,29 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 
 ## Completed Work
 
+### March 29, 2026 (Session 2)
+- **Added:** Edit Investigation feature in Causal Engine
+  - Edit button on investigation overview opens dialog with all editable fields
+  - Title, description, asset, location, incident date, lead, and status
+  - Files: `/app/frontend/src/components/causal-engine/InvestigationDialogs.js`, `/app/frontend/src/pages/CausalEnginePage.js`
+
+- **Added:** Lead selection mapped to User Management
+  - New and Edit investigation dialogs show user dropdown
+  - Dropdown displays user names with their positions from RBAC users
+  - Fallback to text input if no users available
+  - Files: Same as above
+
+- **Fixed:** Dashboard Avatar Popover for investigations
+  - Clicking lead avatar in Recent Investigations shows popover with name and role
+  - Added `stopPropagation()` to prevent navigation when clicking avatar
+  - File: `/app/frontend/src/pages/DashboardPage.js`
+
+- **Fixed:** Dashboard Investigations Count Mismatch
+  - Root cause: `queryFn: investigationAPI.getAll` was receiving React Query context object as `status` param
+  - Solution: Wrapped in arrow function `queryFn: () => investigationAPI.getAll()`
+  - Dashboard now correctly shows investigation count (was showing 0)
+  - File: `/app/frontend/src/pages/DashboardPage.js`
+
 ### March 29, 2026
 - **Changed:** Task/Form execution UI from popup dialogs to frame view
   - Replaced modal dialog with full-page frame view

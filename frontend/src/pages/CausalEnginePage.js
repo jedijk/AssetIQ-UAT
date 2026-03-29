@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { investigationAPI, actionsAPI } from "../lib/api";
+import { investigationAPI, actionsAPI, usersAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
 import { CauseTree, CAUSE_CATEGORIES } from "../components/CauseNodeItem";
 import BackButton from "../components/BackButton";
-import { NewInvestigationDialog, EventDialog, FailureDialog, CauseDialog, ActionDialog } from "../components/causal-engine/InvestigationDialogs";
+import { NewInvestigationDialog, EditInvestigationDialog, EventDialog, FailureDialog, CauseDialog, ActionDialog } from "../components/causal-engine/InvestigationDialogs";
 import EquipmentTimeline from "../components/EquipmentTimeline";
 
 const EVENT_CATEGORIES = [
@@ -68,6 +68,7 @@ export default function CausalEnginePage() {
   const [searchQuery, setSearchQuery] = useState("");
   
   const [showNewInvDialog, setShowNewInvDialog] = useState(false);
+  const [showEditInvDialog, setShowEditInvDialog] = useState(false);
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [showFailureDialog, setShowFailureDialog] = useState(false);
   const [showCauseDialog, setShowCauseDialog] = useState(false);
@@ -75,6 +76,7 @@ export default function CausalEnginePage() {
   const [editingItem, setEditingItem] = useState(null);
   
   const [newInvForm, setNewInvForm] = useState({ title: "", description: "", asset_name: "", location: "", incident_date: "", investigation_leader: "" });
+  const [editInvForm, setEditInvForm] = useState({ title: "", description: "", asset_name: "", location: "", incident_date: "", investigation_leader: "", status: "draft" });
   const [eventForm, setEventForm] = useState({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" });
   const [failureForm, setFailureForm] = useState({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" });
   const [causeForm, setCauseForm] = useState({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" });
@@ -110,6 +112,14 @@ export default function CausalEnginePage() {
   });
   
   const investigations = investigationsData?.investigations || [];
+  
+  // Fetch users for lead selection
+  const { data: usersData } = useQuery({
+    queryKey: ["rbac-users"],
+    queryFn: () => usersAPI.getAll(),
+    staleTime: 60000, // Cache for 1 minute
+  });
+  const users = usersData?.users || [];
   
   // Log error for debugging
   useEffect(() => {
@@ -179,8 +189,36 @@ export default function CausalEnginePage() {
       queryClient.invalidateQueries({ queryKey: ["investigations"] });
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      // Close edit dialog if open
+      if (showEditInvDialog) {
+        setShowEditInvDialog(false);
+        toast.success(t("causal.investigationUpdated") || "Investigation updated");
+      }
     },
   });
+
+  // Handle opening edit investigation dialog
+  const handleEditInvestigation = () => {
+    if (investigation) {
+      setEditInvForm({
+        title: investigation.title || "",
+        description: investigation.description || "",
+        asset_name: investigation.asset_name || "",
+        location: investigation.location || "",
+        incident_date: investigation.incident_date || "",
+        investigation_leader: investigation.investigation_leader || "",
+        status: investigation.status || "draft",
+      });
+      setShowEditInvDialog(true);
+    }
+  };
+
+  // Handle save edit investigation
+  const handleSaveInvestigation = () => {
+    if (selectedInvId) {
+      updateInvMutation.mutate({ id: selectedInvId, data: editInvForm });
+    }
+  };
 
   // Sync localNotes with investigation data when investigation changes
   useEffect(() => {
@@ -586,13 +624,18 @@ export default function CausalEnginePage() {
                     <h1 className="text-xl font-bold text-slate-900 mb-1">{investigation.title}</h1>
                     <p className="text-sm text-slate-600">{investigation.description}</p>
                   </div>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="w-4 h-4" /></Button></AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader><AlertDialogTitle>Delete Investigation</AlertDialogTitle><AlertDialogDescription>This will delete all data.</AlertDialogDescription></AlertDialogHeader>
-                      <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteInvMutation.mutate(selectedInvId)} className="bg-red-600">Delete</AlertDialogAction></AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={handleEditInvestigation} className="text-slate-500 hover:text-blue-600" data-testid="edit-investigation-btn">
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="w-4 h-4" /></Button></AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader><AlertDialogTitle>Delete Investigation</AlertDialogTitle><AlertDialogDescription>This will delete all data.</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteInvMutation.mutate(selectedInvId)} className="bg-red-600">Delete</AlertDialogAction></AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
                 
                 {/* Compact Stats Row - Same as Threats */}
@@ -1029,6 +1072,17 @@ export default function CausalEnginePage() {
         setForm={setNewInvForm}
         onSubmit={() => createInvMutation.mutate(newInvForm)}
         isPending={createInvMutation.isPending}
+        users={users}
+      />
+      
+      <EditInvestigationDialog
+        open={showEditInvDialog}
+        onOpenChange={setShowEditInvDialog}
+        form={editInvForm}
+        setForm={setEditInvForm}
+        onSubmit={handleSaveInvestigation}
+        isPending={updateInvMutation.isPending}
+        users={users}
       />
       
       <EventDialog

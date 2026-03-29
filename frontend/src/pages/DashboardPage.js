@@ -254,11 +254,12 @@ export default function DashboardPage() {
   const actions = Array.isArray(actionsData?.actions) ? actionsData.actions : (Array.isArray(actionsData) ? actionsData : []);
   const actionsStats = actionsData?.stats || {};
 
-  const { data: investigationsData = { investigations: [] } } = useQuery({
+  const { data: investigationsData = { investigations: [] }, isLoading: isLoadingInvestigations, error: investigationsError } = useQuery({
     queryKey: ["investigations"],
-    queryFn: investigationAPI.getAll,
+    queryFn: () => investigationAPI.getAll(),
     staleTime: 0,
     refetchOnMount: 'always',
+    retry: 2,
   });
   const investigations = Array.isArray(investigationsData?.investigations) ? investigationsData.investigations : (Array.isArray(investigationsData) ? investigationsData : []);
 
@@ -551,7 +552,7 @@ export default function DashboardPage() {
               <Popover>
                 <PopoverTrigger asChild>
                   {item.lead_picture ? (
-                    <button className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full">
+                    <button className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full" onClick={(e) => e.stopPropagation()}>
                       <img 
                         src={item.lead_picture} 
                         alt={item.lead_name || item.investigation_leader || "Lead"} 
@@ -561,6 +562,7 @@ export default function DashboardPage() {
                   ) : (
                     <button 
                       className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-medium text-slate-600 flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       {(item.lead_name || item.investigation_leader || "?").charAt(0).toUpperCase()}
                     </button>
