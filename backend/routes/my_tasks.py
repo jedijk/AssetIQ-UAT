@@ -51,6 +51,8 @@ def serialize_task(task: dict) -> dict:
         "estimated_duration_minutes": task.get("estimated_duration_minutes"),
         "can_quick_complete": not task.get("form_fields") and not task.get("template", {}).get("form_fields"),
         "action_type": task.get("action_type"),  # CM/PM/PDM for actions
+        "risk_score": task.get("risk_score"),
+        "rpn": task.get("rpn"),
     }
     
     return result
@@ -105,6 +107,8 @@ def serialize_action_as_task(action: dict) -> dict:
         "can_quick_complete": True,  # Actions can be quick completed
         "action_type": action.get("action_type"),  # CM/PM/PDM
         "comments": action.get("comments", ""),
+        "risk_score": action.get("threat_risk_score") or action.get("risk_score"),
+        "rpn": action.get("threat_rpn") or action.get("rpn"),
     }
     
     return result
@@ -313,6 +317,15 @@ async def get_my_tasks(
         
         actions_cursor = db.central_actions.find(action_query, {"_id": 0})
         async for action in actions_cursor:
+            # Enrich action with threat risk data
+            if action.get("source_id"):
+                threat = await db.threats.find_one(
+                    {"id": action["source_id"]},
+                    {"_id": 0, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1}
+                )
+                if threat:
+                    action["threat_rpn"] = threat.get("fmea_rpn")
+                    action["threat_risk_score"] = threat.get("risk_score")
             tasks.append(serialize_action_as_task(action))
     
     # Sort combined list: Overdue -> High Priority -> Due Soon

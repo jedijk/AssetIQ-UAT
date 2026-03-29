@@ -274,18 +274,17 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
               </Badge>
             )}
             
-            {/* Recurring Indicator */}
-            {task.is_recurring && (
-              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-                <Repeat className="w-3 h-3 mr-1" />
-                Recurring
+            {/* Risk Score */}
+            {(task.risk_score !== undefined && task.risk_score !== null) && (
+              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                Risk: {task.risk_score}
               </Badge>
             )}
             
-            {/* Source */}
-            {task.source && sourceBadges[task.source] && (
-              <Badge variant="outline" className={cn("text-xs", sourceBadges[task.source].color)}>
-                {sourceBadges[task.source].label}
+            {/* RPN (Risk Priority Number) */}
+            {(task.rpn !== undefined && task.rpn !== null) && (
+              <Badge variant="outline" className="text-xs bg-rose-50 text-rose-700 border-rose-200">
+                RPN: {task.rpn}
               </Badge>
             )}
           </div>
