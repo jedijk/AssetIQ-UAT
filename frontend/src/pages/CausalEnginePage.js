@@ -101,17 +101,30 @@ export default function CausalEnginePage() {
     }
   }, [searchParams, setSearchParams, selectedInvId]);
 
-  const { data: investigationsData, isLoading: loadingInvestigations } = useQuery({
+  const { data: investigationsData, isLoading: loadingInvestigations, error: investigationsError } = useQuery({
     queryKey: ["investigations"],
     queryFn: () => investigationAPI.getAll(),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    retry: 2,
   });
   
   const investigations = investigationsData?.investigations || [];
+  
+  // Log error for debugging
+  useEffect(() => {
+    if (investigationsError) {
+      console.error("Failed to load investigations:", investigationsError);
+    }
+  }, [investigationsError]);
   
   const { data: investigationData, isLoading: loadingInvestigation } = useQuery({
     queryKey: ["investigation", selectedInvId],
     queryFn: () => investigationAPI.getById(selectedInvId),
     enabled: !!selectedInvId,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    retry: 2,
   });
   
   const investigation = investigationData?.investigation;
