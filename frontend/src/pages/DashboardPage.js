@@ -306,8 +306,11 @@ export default function DashboardPage() {
     return acc;
   }, {});
 
-  const observationsByRisk = observations.reduce((acc, t) => {
-    acc[t.risk_level] = (acc[t.risk_level] || 0) + 1;
+  // Order risk levels correctly: Critical > High > Medium > Low
+  const riskOrder = ["Critical", "High", "Medium", "Low"];
+  const observationsByRisk = riskOrder.reduce((acc, level) => {
+    const count = observations.filter(t => t.risk_level === level).length;
+    if (count > 0) acc[level] = count;
     return acc;
   }, {});
 
@@ -322,8 +325,11 @@ export default function DashboardPage() {
     return acc;
   }, {});
 
-  const actionsByPriority = actions.reduce((acc, a) => {
-    acc[a.priority] = (acc[a.priority] || 0) + 1;
+  // Order action priorities correctly: critical > high > medium > low
+  const priorityOrder = ["critical", "high", "medium", "low"];
+  const actionsByPriority = priorityOrder.reduce((acc, level) => {
+    const count = actions.filter(a => a.priority === level).length;
+    if (count > 0) acc[level] = count;
     return acc;
   }, {});
 
@@ -590,6 +596,14 @@ export default function DashboardPage() {
               onClick={(e) => { e.stopPropagation(); navigate(`/causal-engine?inv=${item.id}`, { state: navState }); }}
               data-testid={`investigation-item-${item.id}`}
             >
+              {/* Lead Picture with Popover - FIRST */}
+              <UserAvatar 
+                name={item.lead_name || item.investigation_leader}
+                photo={item.lead_picture}
+                position={item.lead_position || "Investigation Lead"}
+                size="sm"
+                showPopover={true}
+              />
               <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                 item.status === "completed" ? "bg-green-500" :
                 item.status === "in_progress" ? "bg-amber-500" : "bg-blue-500"
@@ -598,14 +612,6 @@ export default function DashboardPage() {
                 <p className="text-xs font-medium text-slate-700 truncate">{item.title}</p>
                 <p className="text-[10px] text-slate-400">{item.asset_name || "No asset"}</p>
               </div>
-              {/* Lead Picture with Popover */}
-              <UserAvatar 
-                name={item.lead_name || item.investigation_leader}
-                photo={item.lead_picture}
-                position={item.lead_position || "Investigation Lead"}
-                size="sm"
-                showPopover={true}
-              />
               <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize flex-shrink-0 ${
                 item.status === "completed" ? "bg-green-100 text-green-700" :
                 item.status === "in_progress" ? "bg-amber-100 text-amber-700" :
