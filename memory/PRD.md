@@ -59,6 +59,12 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - File: `/app/frontend/src/pages/ActionDetailPage.js`
   - Fixed route path from `/task-scheduler` to `/tasks` in ActionsPage.js
 
+- **Optimized:** Mobile UI for My Tasks and Task Execution
+  - My Tasks header: Hides description, inline stats badge, icon-only filter tabs, hidden stats grid
+  - Task Execution frame: Compact back header, smaller gradient header, compact context block
+  - Footer buttons use shorter labels on mobile
+  - File: `/app/frontend/src/pages/MyTasksPage.js`
+
 ### March 28, 2026
 - **Added:** Investigations to Equipment History Timeline
   - Shows investigations linked to threats, sibling observations, or same equipment

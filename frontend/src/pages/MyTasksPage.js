@@ -1046,45 +1046,44 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   // Main Task Execution Form Content
   const TaskFormContent = (
     <div className="flex flex-col h-full">
-      {/* Form Header - Gradient style like Form Designer */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 rounded-t-lg">
-        <h3 className="text-white font-semibold text-lg">{task?.title || task?.form_name || "Task Execution"}</h3>
-        <p className="text-white/70 text-sm mt-1">
+      {/* Form Header - Compact gradient on mobile */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 sm:px-6 sm:py-4">
+        <h3 className="text-white font-semibold text-base sm:text-lg truncate">{task?.title || task?.form_name || "Task Execution"}</h3>
+        <p className="text-white/70 text-xs sm:text-sm mt-0.5 truncate">
           {task?.equipment_name || task?.asset || "Complete the form below"}
         </p>
       </div>
 
       {/* Form Body with padding */}
-      <div className="px-6 py-4 flex-1 overflow-y-auto">
-        {/* Context Block - Clean card design */}
-        <div className={cn(
-          "bg-slate-50 rounded-xl border border-slate-200 mb-6",
-          isMobile ? "p-4" : "p-4"
-        )}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-              <MapPin className="w-4 h-4 text-indigo-600" />
+      <div className="px-4 py-3 sm:px-6 sm:py-4 flex-1 overflow-y-auto">
+        {/* Context Block - Compact on mobile */}
+        <div className="bg-slate-50 rounded-lg sm:rounded-xl border border-slate-200 mb-4 sm:mb-6 p-3 sm:p-4">
+          <div className="flex items-center gap-2 mb-2 sm:mb-3">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
             </div>
-            <div>
-              <p className="font-medium text-slate-800">{task.equipment_name || task.asset}</p>
-              <p className="text-xs text-slate-500">{task.mitigation_strategy || task.type}</p>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-slate-800 text-sm sm:text-base truncate">{task.equipment_name || task.asset}</p>
+              <p className="text-xs text-slate-500 truncate">{task.mitigation_strategy || task.type}</p>
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            {task.last_completed && (
-              <div className="bg-white rounded-lg p-2 border border-slate-100">
-                <span className="text-slate-400 text-xs block">Last completed</span>
-                <span className="text-slate-700 font-medium">{format(parseISO(task.last_completed), "MMM d, yyyy")}</span>
-              </div>
-            )}
-            {task.frequency && (
-              <div className="bg-white rounded-lg p-2 border border-slate-100">
-                <span className="text-slate-400 text-xs block">Frequency</span>
-                <span className="text-slate-700 font-medium">{task.frequency}</span>
-              </div>
-            )}
-          </div>
+          {(task.last_completed || task.frequency) && (
+            <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
+              {task.last_completed && (
+                <div className="bg-white rounded-md sm:rounded-lg p-1.5 sm:p-2 border border-slate-100">
+                  <span className="text-slate-400 text-[10px] sm:text-xs block">Last completed</span>
+                  <span className="text-slate-700 font-medium text-xs sm:text-sm">{format(parseISO(task.last_completed), "MMM d, yyyy")}</span>
+                </div>
+              )}
+              {task.frequency && (
+                <div className="bg-white rounded-md sm:rounded-lg p-1.5 sm:p-2 border border-slate-100">
+                  <span className="text-slate-400 text-[10px] sm:text-xs block">Frequency</span>
+                  <span className="text-slate-700 font-medium text-xs sm:text-sm">{task.frequency}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       
       {/* Form Fields - Styled like Form Designer preview */}
@@ -1197,22 +1196,22 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
         </div>
       </div>
       
-        {/* Footer Actions */}
-        <div className="flex gap-3 px-6 py-4 border-t border-slate-200 bg-white">
+        {/* Footer Actions - Compact on mobile */}
+        <div className="flex gap-2 sm:gap-3 px-4 py-3 sm:px-6 sm:py-4 border-t border-slate-200 bg-white">
           <Button 
             variant="outline" 
             onClick={onBack}
-            className="flex-1 h-11"
+            className="flex-1 h-10 sm:h-11 text-sm"
           >
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit} 
             disabled={isSubmitting}
-            className="flex-1 h-11"
+            className="flex-1 h-10 sm:h-11 text-sm"
           >
-            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
-            Complete Task
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Check className="w-4 h-4 mr-1.5" />}
+            Complete
           </Button>
         </div>
       </div>
@@ -1222,20 +1221,20 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   // Render as full-page Frame View with Back Button
   return (
     <div className="h-full flex flex-col bg-white" data-testid="task-execution-frame">
-      {/* Back Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white sticky top-0 z-10">
+      {/* Back Header - Minimalist on mobile */}
+      <div className="flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-3 border-b border-slate-200 bg-white sticky top-0 z-10">
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9"
+          className="h-8 w-8 sm:h-9 sm:w-9"
           onClick={onBack}
           data-testid="task-execution-back-btn"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
         </Button>
-        <div>
-          <h2 className="font-semibold text-slate-900">Execute Task</h2>
-          <p className="text-xs text-slate-500">{task?.equipment_name || task?.asset || "Task Execution"}</p>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold text-slate-900 text-sm sm:text-base truncate">{task?.title || "Execute Task"}</h2>
+          <p className="text-xs text-slate-500 truncate">{task?.equipment_name || task?.asset || ""}</p>
         </div>
       </div>
       
@@ -1449,21 +1448,30 @@ const MyTasksPage = () => {
   // Default: Task List View
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col">
-      {/* Fixed Header - Condensed */}
+      {/* Fixed Header - Mobile Optimized Minimalist */}
       <div className="flex-shrink-0 px-4 sm:px-6 pt-3 pb-2 max-w-4xl mx-auto w-full">
-        {/* Title Row */}
-        <div className="mb-2">
-          <h1 className="text-xl font-bold text-slate-900">My Tasks</h1>
-          <p className="text-sm text-slate-500">Execute and complete your assigned tasks</p>
+        {/* Title Row - Compact on mobile */}
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900">My Tasks</h1>
+            <p className="text-xs text-slate-500 hidden sm:block">Execute and complete your assigned tasks</p>
+          </div>
+          {/* Mobile: Inline stats */}
+          <div className="flex sm:hidden items-center gap-2 text-xs">
+            <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">{stats.total}</span>
+            {stats.overdue > 0 && (
+              <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats.overdue} overdue</span>
+            )}
+          </div>
         </div>
         
-        {/* Filters Row - Compact */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-2">
-          {/* Discipline/Role Filter */}
+        {/* Filters Row - Single row on mobile */}
+        <div className="flex gap-2 mb-2">
+          {/* Discipline Filter - Hidden on mobile, shown in dropdown */}
           <Select value={selectedDiscipline || "all"} onValueChange={(v) => setSelectedDiscipline(v === "all" ? "" : v)}>
-            <SelectTrigger className="w-full sm:w-[160px] h-8 text-xs" data-testid="discipline-filter">
-              <Users className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
-              <SelectValue placeholder="All Disciplines" />
+            <SelectTrigger className="w-[100px] sm:w-[160px] h-8 text-xs" data-testid="discipline-filter">
+              <Users className="w-3.5 h-3.5 mr-1 text-slate-400 hidden sm:block" />
+              <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Disciplines</SelectItem>
@@ -1475,19 +1483,19 @@ const MyTasksPage = () => {
             </SelectContent>
           </Select>
           
-          {/* Date Picker */}
+          {/* Date Picker - Compact */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-full sm:w-[160px] h-8 text-xs justify-start text-left font-normal",
+                  "w-[90px] sm:w-[160px] h-8 text-xs justify-start text-left font-normal",
                   !selectedDate && "text-muted-foreground"
                 )}
                 data-testid="date-filter"
               >
-                <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-                {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                <span className="truncate">{selectedDate ? format(selectedDate, "MMM d") : "Date"}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0">
@@ -1500,49 +1508,49 @@ const MyTasksPage = () => {
             </PopoverContent>
           </Popover>
           
-          {/* Search */}
+          {/* Search - Flexible width */}
           <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <Input
-              placeholder="Search tasks..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 h-8 text-xs"
+              className="pl-7 h-8 text-xs"
               data-testid="task-search"
             />
           </div>
         </div>
         
-        {/* Quick Filter Tabs - Compact */}
-        <Tabs value={activeFilter} onValueChange={setActiveFilter} className="mb-2">
+        {/* Quick Filter Tabs - Icon only on mobile */}
+        <Tabs value={activeFilter} onValueChange={setActiveFilter}>
           <TabsList className="grid w-full grid-cols-4 h-8">
-            <TabsTrigger value="open" className="flex items-center gap-1 text-xs h-7" data-testid="filter-open">
+            <TabsTrigger value="open" className="flex items-center gap-1 text-xs h-7 px-1 sm:px-3" data-testid="filter-open">
               <Clock className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Open</span>
               {stats.today > 0 && (
-                <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px]">{stats.today}</Badge>
+                <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.today}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="overdue" className="flex items-center gap-1 text-xs h-7" data-testid="filter-overdue">
+            <TabsTrigger value="overdue" className="flex items-center gap-1 text-xs h-7 px-1 sm:px-3" data-testid="filter-overdue">
               <AlertCircle className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Overdue</span>
               {stats.overdue > 0 && (
-                <Badge variant="destructive" className="ml-0.5 h-4 px-1 text-[10px]">{stats.overdue}</Badge>
+                <Badge variant="destructive" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.overdue}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="recurring" className="flex items-center gap-1 text-xs h-7" data-testid="filter-recurring">
+            <TabsTrigger value="recurring" className="flex items-center gap-1 text-xs h-7 px-1 sm:px-3" data-testid="filter-recurring">
               <Repeat className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Recurring</span>
             </TabsTrigger>
-            <TabsTrigger value="adhoc" className="flex items-center gap-1 text-xs h-7" data-testid="filter-adhoc">
+            <TabsTrigger value="adhoc" className="flex items-center gap-1 text-xs h-7 px-1 sm:px-3" data-testid="filter-adhoc">
               <Zap className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Adhoc</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
         
-        {/* Stats Summary - Compact */}
-        <div className="grid grid-cols-4 gap-2">
+        {/* Stats Summary - Desktop only */}
+        <div className="hidden sm:grid grid-cols-4 gap-2 mt-2">
           <div className="bg-slate-50 rounded-lg p-1.5 text-center">
             <div className="text-base font-bold text-slate-900">{stats.total}</div>
             <div className="text-[10px] text-slate-500">Total</div>
