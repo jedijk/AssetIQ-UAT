@@ -61,7 +61,13 @@ import {
   Trash2,
   User,
   ArrowLeft,
+  Sparkles,
+  Copy,
+  Check,
+  Square,
+  CheckSquare,
 } from "lucide-react";
+import { Checkbox } from "../components/ui/checkbox";
 
 // Format relative time (e.g., "2d ago")
 const formatRelativeTime = (timestamp) => {
@@ -133,6 +139,14 @@ const FeedbackPage = () => {
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  
+  // Selection state for AI prompt generation
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
+  const [generatedPrompt, setGeneratedPrompt] = useState("");
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
   
   // Form state
   const [feedbackType, setFeedbackType] = useState("general");
@@ -344,6 +358,60 @@ const FeedbackPage = () => {
 
   const feedbackItems = feedbackData?.items || [];
 
+  // Selection handlers
+  const toggleSelection = (id, e) => {
+    if (e) e.stopPropagation();
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === feedbackItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(feedbackItems.map(item => item.id)));
+    }
+  };
+
+  const cancelSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleGeneratePrompt = async () => {
+    if (selectedIds.size === 0) {
+      toast.error("Please select at least one feedback item");
+      return;
+    }
+    
+    setIsGeneratingPrompt(true);
+    try {
+      const result = await feedbackAPI.generatePrompt(Array.from(selectedIds));
+      setGeneratedPrompt(result.prompt);
+      setIsPromptDialogOpen(true);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to generate prompt");
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  };
+
+  const copyPromptToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedPrompt);
+      setCopiedPrompt(true);
+      toast.success("Prompt copied to clipboard!");
+      setTimeout(() => setCopiedPrompt(false), 2000);
+    } catch (error) {
+      toast.error("Failed to copy prompt");
+    }
+  };
+
   // Inline form content render function
   const renderFormContent = (isFullScreen = false) => (
     <div className={`space-y-4 ${isFullScreen ? 'p-4' : 'py-4'}`}>
@@ -517,14 +585,70 @@ const FeedbackPage = () => {
             </p>
           </div>
           {feedbackItems.length > 0 && (
-            <Button
-              onClick={openNewFeedbackModal}
-              className="bg-blue-600 hover:bg-blue-700"
-              data-testid="add-feedback-btn"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              {t("feedback.sendFeedback") || "Send feedback"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {isSelectionMode ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleSelectAll}
+                    data-testid="select-all-btn"
+                  >
+                    {selectedIds.size === feedbackItems.length ? (
+                      <>
+                        <Square className="w-4 h-4 mr-2" />
+                        Deselect All
+                      </>
+                    ) : (
+                      <>
+                        <CheckSquare className="w-4 h-4 mr-2" />
+                        Select All
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={handleGeneratePrompt}
+                    disabled={selectedIds.size === 0 || isGeneratingPrompt}
+                    className="bg-purple-600 hover:bg-purple-700"
+                    data-testid="generate-prompt-btn"
+                  >
+                    {isGeneratingPrompt ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    Generate Prompt ({selectedIds.size})
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={cancelSelection}
+                    data-testid="cancel-selection-btn"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsSelectionMode(true)}
+                    data-testid="start-selection-btn"
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    AI Prompt
+                  </Button>
+                  <Button
+                    onClick={openNewFeedbackModal}
+                    className="bg-blue-600 hover:bg-blue-700"
+                    data-testid="add-feedback-btn"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {t("feedback.sendFeedback") || "Send feedback"}
+                  </Button>
+                </>
+              )}
+            </div>
           )}
         </div>
 
@@ -564,26 +688,45 @@ const FeedbackPage = () => {
             {feedbackItems.map((item) => {
               const TypeIcon = typeIcons[item.type] || MessageCircle;
               const statusCfg = statusConfig[item.status] || statusConfig.new;
+              const isSelected = selectedIds.has(item.id);
               
               return (
                 <div
                   key={item.id}
-                  className="bg-white rounded-xl border border-slate-200 p-4 hover:border-slate-300 hover:shadow-sm transition-all duration-150"
+                  className={`bg-white rounded-xl border p-4 hover:shadow-sm transition-all duration-150 ${
+                    isSelected 
+                      ? "border-purple-400 bg-purple-50/50" 
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
                   data-testid={`feedback-item-${item.id}`}
+                  onClick={isSelectionMode ? (e) => toggleSelection(item.id, e) : undefined}
                 >
                   <div className="flex items-start gap-3">
+                    {/* Checkbox in selection mode */}
+                    {isSelectionMode && (
+                      <div 
+                        className="mt-0.5 flex-shrink-0"
+                        onClick={(e) => toggleSelection(item.id, e)}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          className="data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
+                        />
+                      </div>
+                    )}
+                    
                     {/* Type Icon */}
                     <div 
-                      className={`mt-0.5 ${typeColors[item.type]} cursor-pointer`}
-                      onClick={() => openFeedbackDetail(item)}
+                      className={`mt-0.5 ${typeColors[item.type]} ${!isSelectionMode ? 'cursor-pointer' : ''}`}
+                      onClick={!isSelectionMode ? () => openFeedbackDetail(item) : undefined}
                     >
                       <TypeIcon className="w-5 h-5" />
                     </div>
                     
                     {/* Content */}
                     <div 
-                      className="flex-1 min-w-0 cursor-pointer"
-                      onClick={() => openFeedbackDetail(item)}
+                      className={`flex-1 min-w-0 ${!isSelectionMode ? 'cursor-pointer' : ''}`}
+                      onClick={!isSelectionMode ? () => openFeedbackDetail(item) : undefined}
                     >
                       <p className="text-slate-800 line-clamp-2 text-sm">
                         {item.message}
@@ -606,33 +749,35 @@ const FeedbackPage = () => {
                       </div>
                     </div>
 
-                    {/* Actions Menu */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-slate-400 hover:text-slate-600"
-                          data-testid={`feedback-menu-${item.id}`}
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={(e) => handleEdit(item, e)}>
-                          <Pencil className="w-4 h-4 mr-2" />
-                          {t("common.edit") || "Edit"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={(e) => handleDelete(item.id, e)}
-                          className="text-red-600 focus:text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          {t("common.delete") || "Delete"}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {/* Actions Menu - hide in selection mode */}
+                    {!isSelectionMode && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                            data-testid={`feedback-menu-${item.id}`}
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => handleEdit(item, e)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            {t("common.edit") || "Edit"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={(e) => handleDelete(item.id, e)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            {t("common.delete") || "Delete"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </div>
               );
@@ -866,6 +1011,57 @@ const FeedbackPage = () => {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Generated Prompt Dialog */}
+      <Dialog open={isPromptDialogOpen} onOpenChange={setIsPromptDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-600" />
+              Generated AI Prompt
+            </DialogTitle>
+            <DialogDescription>
+              Copy this prompt and paste it directly to your Emergent Agent to implement the selected feedback items.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto my-4">
+            <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-100 whitespace-pre-wrap leading-relaxed">
+              {generatedPrompt}
+            </div>
+          </div>
+          
+          <DialogFooter className="flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsPromptDialogOpen(false);
+                setGeneratedPrompt("");
+                cancelSelection();
+              }}
+            >
+              Close
+            </Button>
+            <Button
+              onClick={copyPromptToClipboard}
+              className="bg-purple-600 hover:bg-purple-700"
+              data-testid="copy-prompt-btn"
+            >
+              {copiedPrompt ? (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy Prompt
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -751,6 +751,12 @@ export const feedbackAPI = {
     const response = await api.delete(`/feedback/${feedbackId}`);
     return response.data;
   },
+  
+  // Generate AI prompt from selected feedback items
+  generatePrompt: async (feedbackIds) => {
+    const response = await api.post('/feedback/generate-prompt', { feedback_ids: feedbackIds });
+    return response.data;
+  },
 };
 
 // Image Analysis API

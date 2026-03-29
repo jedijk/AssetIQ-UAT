@@ -172,3 +172,84 @@ async def admin_delete_feedback(
     if not success:
         raise HTTPException(status_code=404, detail="Feedback not found")
     return {"status": "deleted", "id": feedback_id}
+
+
+@router.post("/generate-prompt")
+async def generate_ai_prompt(
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate an AI prompt from selected feedback items."""
+    import os
+    import uuid
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    
+    feedback_ids = data.get("feedback_ids", [])
+    if not feedback_ids:
+        raise HTTPException(status_code=400, detail="No feedback items selected")
+    
+    # Fetch selected feedback items
+    feedback_items = []
+    for fid in feedback_ids:
+        item = await get_feedback_by_id(fid)
+        if item:
+            feedback_items.append(item)
+    
+    if not feedback_items:
+        raise HTTPException(status_code=404, detail="No feedback items found")
+    
+    # Build context from feedback items
+    feedback_context = []
+    for item in feedback_items:
+        item_text = f"- Type: {item.get('type', 'general').upper()}"
+        if item.get('severity'):
+            item_text += f" | Severity: {item['severity'].upper()}"
+        item_text += f"\n  Message: {item.get('message', '')}"
+        feedback_context.append(item_text)
+    
+    combined_feedback = "\n\n".join(feedback_context)
+    
+    # Get API key
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="AI service not configured")
+    
+    try:
+        # Generate prompt using GPT
+        system_prompt = """You are an expert at converting user feedback into clear, actionable prompts for a development AI agent.
+Your task is to analyze the provided feedback items and generate a single, comprehensive prompt that can be directly copied and pasted to an AI coding agent.
+
+The prompt should:
+1. Start with a clear action statement (e.g., "Fix the following issues:" or "Implement the following improvements:")
+2. List each issue/request as a numbered item with clear technical requirements
+3. Include any relevant context from the feedback messages
+4. Be specific and actionable
+5. Prioritize critical issues first, then high, medium, and low severity items
+6. Use professional technical language
+
+Keep the prompt concise but complete. Do not include any preamble or explanation - just output the ready-to-use prompt."""
+
+        user_message = f"""Based on the following user feedback items, generate a prompt for an AI coding agent:
+
+{combined_feedback}
+
+Generate a clear, actionable prompt that can be directly used with an AI development agent."""
+
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"feedback-prompt-{uuid.uuid4()}",
+            system_message=system_prompt
+        ).with_model("openai", "gpt-5.2")
+        
+        message = UserMessage(text=user_message)
+        response = await chat.send_message(message)
+        
+        generated_prompt = response if isinstance(response, str) else str(response)
+        
+        return {
+            "prompt": generated_prompt,
+            "feedback_count": len(feedback_items)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate prompt: {str(e)}")
