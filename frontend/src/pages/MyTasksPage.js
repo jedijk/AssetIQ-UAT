@@ -76,6 +76,7 @@ import { cn } from "../lib/utils";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { imageAnalysisAPI } from "../lib/api";
 import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
+import { DISCIPLINES } from "../constants/disciplines";
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -1301,16 +1302,8 @@ const MyTasksPage = () => {
     }
   };
   
-  // Available disciplines for filtering
-  const disciplines = [
-    { value: "Mechanical", label: "Mechanical" },
-    { value: "Electrical", label: "Electrical" },
-    { value: "Instrumentation", label: "Instrumentation" },
-    { value: "Operations", label: "Operations" },
-    { value: "Process", label: "Process" },
-    { value: "Safety", label: "Safety" },
-    { value: "Reliability", label: "Reliability" },
-  ];
+  // Available disciplines for filtering (from unified constants)
+  const disciplines = DISCIPLINES;
   
   // Fetch tasks with offline caching
   const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useQuery({

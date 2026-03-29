@@ -64,6 +64,7 @@ import {
 import { TemplateDialog } from "../components/task-scheduler/TemplateDialog";
 import { PlanDialog } from "../components/task-scheduler/PlanDialog";
 import { CompleteDialog, DeleteExecutionDialog } from "../components/task-scheduler/ExecutionDialogs";
+import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 
 // Get base URL without /api suffix
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
@@ -254,18 +255,11 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-// Discipline badge
+// Discipline badge - using unified discipline colors
 const DisciplineBadge = ({ discipline }) => {
-  const colors = {
-    operations: "bg-blue-100 text-blue-700",
-    maintenance: "bg-yellow-100 text-yellow-700",
-    lab: "bg-purple-100 text-purple-700",
-    laboratory: "bg-purple-100 text-purple-700",
-    inspection: "bg-green-100 text-green-700",
-    engineering: "bg-orange-100 text-orange-700",
-  };
+  const colorClass = getDisciplineColor(discipline);
   return (
-    <Badge className={colors[discipline] || "bg-slate-100 text-slate-700"}>
+    <Badge className={colorClass}>
       {discipline}
     </Badge>
   );

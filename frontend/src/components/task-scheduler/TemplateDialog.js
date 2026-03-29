@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Zap, FileText } from "lucide-react";
+import { DISCIPLINES } from "../../constants/disciplines";
 
 export const TemplateDialog = ({
   open,
@@ -66,14 +67,14 @@ export const TemplateDialog = ({
                 onValueChange={(v) => setTemplateForm({ ...templateForm, discipline: v })}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select discipline" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="operations">{t("taskScheduler.operations")}</SelectItem>
-                  <SelectItem value="maintenance">{t("taskScheduler.maintenance")}</SelectItem>
-                  <SelectItem value="laboratory">{t("taskScheduler.laboratory")}</SelectItem>
-                  <SelectItem value="inspection">{t("taskScheduler.inspection")}</SelectItem>
-                  <SelectItem value="engineering">{t("taskScheduler.engineering")}</SelectItem>
+                  {DISCIPLINES.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

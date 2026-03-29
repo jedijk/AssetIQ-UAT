@@ -79,6 +79,7 @@ import {
 } from "../components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import BackButton from "../components/BackButton";
+import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 
 // Status options with colors and icons - matching Observations
 const STATUS_OPTIONS = [
@@ -784,12 +785,21 @@ export default function ActionsPage() {
                       </div>
                       <div>
                         <label className="text-xs font-medium text-slate-600">Discipline</label>
-                        <Input
-                          value={editForm.discipline}
-                          onChange={(e) => setEditForm({ ...editForm, discipline: e.target.value })}
-                          className="h-9 text-sm"
-                          placeholder="e.g. Mech"
-                        />
+                        <Select 
+                          value={editForm.discipline} 
+                          onValueChange={(v) => setEditForm({ ...editForm, discipline: v })}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder="Select discipline" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DISCIPLINES.map((d) => (
+                              <SelectItem key={d.value} value={d.value}>
+                                {d.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -1046,11 +1056,21 @@ export default function ActionsPage() {
                       </div>
                       <div>
                         <label className="text-sm font-medium text-slate-700">{t("common.discipline") || "Discipline"}</label>
-                        <Input
-                          value={editForm.discipline}
-                          onChange={(e) => setEditForm({ ...editForm, discipline: e.target.value })}
-                          placeholder="e.g. Mechanical, Electrical"
-                        />
+                        <Select 
+                          value={editForm.discipline || ""} 
+                          onValueChange={(v) => setEditForm({ ...editForm, discipline: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select discipline" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DISCIPLINES.map((d) => (
+                              <SelectItem key={d.value} value={d.value}>
+                                {d.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">

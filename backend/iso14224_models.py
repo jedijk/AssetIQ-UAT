@@ -87,12 +87,20 @@ def is_valid_parent_child(parent_level: ISOLevel, child_level: ISOLevel) -> bool
     valid_parent = get_valid_parent_level(norm_child)
     return valid_parent == norm_parent
 
-# Discipline categories
+# Discipline categories - Unified across the application
 class Discipline(str, Enum):
-    MECHANICAL = "mechanical"
-    ELECTRICAL = "electrical"
-    INSTRUMENTATION = "instrumentation"
-    PROCESS = "process"
+    MECHANICAL = "Mechanical"
+    ELECTRICAL = "Electrical"
+    INSTRUMENTATION = "Instrumentation"
+    PROCESS = "Process"
+    OPERATIONS = "Operations"
+    MAINTENANCE = "Maintenance"
+    SAFETY = "Safety"
+    INSPECTION = "Inspection"
+    RELIABILITY = "Reliability"
+    ROTATING_EQUIPMENT = "Rotating Equipment"
+    STATIC_EQUIPMENT = "Static Equipment"
+    MULTI_DISCIPLINE = "Multi-discipline"
 
 # Criticality levels
 class CriticalityLevel(str, Enum):
@@ -103,28 +111,28 @@ class CriticalityLevel(str, Enum):
 
 # Equipment types with ISO classification
 EQUIPMENT_TYPES = [
-    {"id": "pump_centrifugal", "name": "Centrifugal Pump", "iso_class": "1.1.1", "discipline": "mechanical", "icon": "droplets"},
-    {"id": "pump_reciprocating", "name": "Reciprocating Pump", "iso_class": "1.1.2", "discipline": "mechanical", "icon": "droplets"},
-    {"id": "compressor_centrifugal", "name": "Centrifugal Compressor", "iso_class": "1.2.1", "discipline": "mechanical", "icon": "wind"},
-    {"id": "compressor_reciprocating", "name": "Reciprocating Compressor", "iso_class": "1.2.2", "discipline": "mechanical", "icon": "wind"},
-    {"id": "turbine_gas", "name": "Gas Turbine", "iso_class": "1.3.1", "discipline": "mechanical", "icon": "cog"},
-    {"id": "turbine_steam", "name": "Steam Turbine", "iso_class": "1.3.2", "discipline": "mechanical", "icon": "cog"},
-    {"id": "extruder", "name": "Extruder", "iso_class": "1.4.1", "discipline": "mechanical", "icon": "cylinder"},
-    {"id": "heat_exchanger", "name": "Heat Exchanger", "iso_class": "2.1.1", "discipline": "process", "icon": "thermometer"},
-    {"id": "vessel_pressure", "name": "Pressure Vessel", "iso_class": "2.2.1", "discipline": "process", "icon": "box"},
-    {"id": "vessel_storage", "name": "Storage Tank", "iso_class": "2.2.2", "discipline": "process", "icon": "box"},
-    {"id": "valve_control", "name": "Control Valve", "iso_class": "3.1.1", "discipline": "instrumentation", "icon": "circle-dot"},
-    {"id": "valve_safety", "name": "Safety Valve", "iso_class": "3.1.2", "discipline": "mechanical", "icon": "circle-dot"},
-    {"id": "valve_manual", "name": "Manual Valve", "iso_class": "3.1.3", "discipline": "mechanical", "icon": "circle-dot"},
-    {"id": "motor_electric", "name": "Electric Motor", "iso_class": "4.1.1", "discipline": "electrical", "icon": "zap"},
-    {"id": "transformer", "name": "Transformer", "iso_class": "4.2.1", "discipline": "electrical", "icon": "zap"},
-    {"id": "switchgear", "name": "Switchgear", "iso_class": "4.3.1", "discipline": "electrical", "icon": "zap"},
-    {"id": "sensor_pressure", "name": "Pressure Sensor", "iso_class": "5.1.1", "discipline": "instrumentation", "icon": "gauge"},
-    {"id": "sensor_temperature", "name": "Temperature Sensor", "iso_class": "5.1.2", "discipline": "instrumentation", "icon": "gauge"},
-    {"id": "sensor_flow", "name": "Flow Sensor", "iso_class": "5.1.3", "discipline": "instrumentation", "icon": "gauge"},
-    {"id": "plc", "name": "PLC Controller", "iso_class": "5.2.1", "discipline": "instrumentation", "icon": "cpu"},
-    {"id": "pipe", "name": "Piping", "iso_class": "6.1.1", "discipline": "mechanical", "icon": "pipette"},
-    {"id": "grinder", "name": "Grinder", "iso_class": "1.5.1", "discipline": "mechanical", "icon": "settings"},
+    {"id": "pump_centrifugal", "name": "Centrifugal Pump", "iso_class": "1.1.1", "discipline": "Mechanical", "icon": "droplets"},
+    {"id": "pump_reciprocating", "name": "Reciprocating Pump", "iso_class": "1.1.2", "discipline": "Mechanical", "icon": "droplets"},
+    {"id": "compressor_centrifugal", "name": "Centrifugal Compressor", "iso_class": "1.2.1", "discipline": "Rotating Equipment", "icon": "wind"},
+    {"id": "compressor_reciprocating", "name": "Reciprocating Compressor", "iso_class": "1.2.2", "discipline": "Rotating Equipment", "icon": "wind"},
+    {"id": "turbine_gas", "name": "Gas Turbine", "iso_class": "1.3.1", "discipline": "Rotating Equipment", "icon": "cog"},
+    {"id": "turbine_steam", "name": "Steam Turbine", "iso_class": "1.3.2", "discipline": "Rotating Equipment", "icon": "cog"},
+    {"id": "extruder", "name": "Extruder", "iso_class": "1.4.1", "discipline": "Mechanical", "icon": "cylinder"},
+    {"id": "heat_exchanger", "name": "Heat Exchanger", "iso_class": "2.1.1", "discipline": "Static Equipment", "icon": "thermometer"},
+    {"id": "vessel_pressure", "name": "Pressure Vessel", "iso_class": "2.2.1", "discipline": "Static Equipment", "icon": "box"},
+    {"id": "vessel_storage", "name": "Storage Tank", "iso_class": "2.2.2", "discipline": "Static Equipment", "icon": "box"},
+    {"id": "valve_control", "name": "Control Valve", "iso_class": "3.1.1", "discipline": "Instrumentation", "icon": "circle-dot"},
+    {"id": "valve_safety", "name": "Safety Valve", "iso_class": "3.1.2", "discipline": "Safety", "icon": "circle-dot"},
+    {"id": "valve_manual", "name": "Manual Valve", "iso_class": "3.1.3", "discipline": "Mechanical", "icon": "circle-dot"},
+    {"id": "motor_electric", "name": "Electric Motor", "iso_class": "4.1.1", "discipline": "Electrical", "icon": "zap"},
+    {"id": "transformer", "name": "Transformer", "iso_class": "4.2.1", "discipline": "Electrical", "icon": "zap"},
+    {"id": "switchgear", "name": "Switchgear", "iso_class": "4.3.1", "discipline": "Electrical", "icon": "zap"},
+    {"id": "sensor_pressure", "name": "Pressure Sensor", "iso_class": "5.1.1", "discipline": "Instrumentation", "icon": "gauge"},
+    {"id": "sensor_temperature", "name": "Temperature Sensor", "iso_class": "5.1.2", "discipline": "Instrumentation", "icon": "gauge"},
+    {"id": "sensor_flow", "name": "Flow Sensor", "iso_class": "5.1.3", "discipline": "Instrumentation", "icon": "gauge"},
+    {"id": "plc", "name": "PLC Controller", "iso_class": "5.2.1", "discipline": "Instrumentation", "icon": "cpu"},
+    {"id": "pipe", "name": "Piping", "iso_class": "6.1.1", "discipline": "Static Equipment", "icon": "pipette"},
+    {"id": "grinder", "name": "Grinder", "iso_class": "1.5.1", "discipline": "Mechanical", "icon": "settings"},
 ]
 
 # Default criticality profiles

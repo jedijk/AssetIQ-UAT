@@ -69,7 +69,7 @@ Given the threat details and equipment history, provide:
 8. Recommendations - IMPORTANT: Each recommendation must be a structured object with:
    - action: The recommended action description
    - action_type: One of "CM" (Corrective Maintenance), "PM" (Preventive Maintenance), or "PDM" (Predictive Maintenance)
-   - discipline: One of "Mechanical", "Electrical", "Instrumentation", "Process", "Operations", "Safety", "Rotating Equipment", "Static Equipment", "Piping", "Multi-discipline"
+   - discipline: One of "Mechanical", "Electrical", "Instrumentation", "Process", "Operations", "Maintenance", "Safety", "Inspection", "Reliability", "Rotating Equipment", "Static Equipment", "Multi-discipline"
    - Avoid recommending actions that have already been completed recently
 
 RESPOND IN THIS EXACT JSON FORMAT:
