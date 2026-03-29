@@ -28,7 +28,7 @@ async def enrich_with_creator_info(items: list) -> list:
     # Fetch all creators in one query
     creators = await db.users.find(
         {"id": {"$in": list(creator_ids)}},
-        {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1}
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "position": 1, "role": 1}
     ).to_list(100)
     
     # Create a lookup map

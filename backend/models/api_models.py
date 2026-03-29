@@ -75,6 +75,7 @@ class ThreatResponse(BaseModel):
     creator_name: Optional[str] = None
     creator_photo: Optional[str] = None
     creator_initials: Optional[str] = None
+    creator_position: Optional[str] = None
 
 
 class ThreatUpdate(BaseModel):
