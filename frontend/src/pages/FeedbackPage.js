@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -61,6 +61,7 @@ import {
   Pencil,
   Trash2,
   User,
+  ArrowLeft,
 } from "lucide-react";
 
 // Format relative time (e.g., "2d ago")
@@ -115,6 +116,16 @@ const FeedbackPage = () => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
+
+  // Check if mobile viewport
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -334,6 +345,161 @@ const FeedbackPage = () => {
 
   const feedbackItems = feedbackData?.items || [];
 
+  // Feedback Form Content (shared between Dialog and Full-screen)
+  const FeedbackFormContent = ({ isFullScreen = false }) => (
+    <div className={`space-y-4 ${isFullScreen ? 'p-4' : 'py-4'}`}>
+      {/* Type Selector */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-slate-700">
+          {t("feedback.type") || "Type"}
+        </label>
+        <div className="flex gap-2">
+          {[
+            { value: "issue", label: t("feedback.typeIssue") || "Issue", Icon: AlertCircle, color: "text-red-500 border-red-200 bg-red-50" },
+            { value: "improvement", label: t("feedback.typeImprovement") || "Improvement", Icon: Lightbulb, color: "text-amber-500 border-amber-200 bg-amber-50" },
+            { value: "general", label: t("feedback.typeGeneral") || "General", Icon: MessageCircle, color: "text-blue-500 border-blue-200 bg-blue-50" },
+          ].map(({ value, label, Icon, color }) => (
+            <button
+              key={value}
+              onClick={() => setFeedbackType(value)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border-2 transition-all ${
+                feedbackType === value
+                  ? color
+                  : "border-slate-200 text-slate-600 hover:border-slate-300"
+              }`}
+              data-testid={`feedback-type-${value}`}
+            >
+              <Icon className="w-4 h-4" />
+              <span className="text-sm font-medium">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Severity (only for issues) */}
+      {feedbackType === "issue" && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-700">
+            {t("feedback.severity") || "Severity"}
+          </label>
+          <Select value={severity} onValueChange={setSeverity}>
+            <SelectTrigger data-testid="feedback-severity-select">
+              <SelectValue placeholder={t("feedback.selectSeverity") || "Select severity"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">{t("common.low") || "Low"}</SelectItem>
+              <SelectItem value="medium">{t("common.medium") || "Medium"}</SelectItem>
+              <SelectItem value="high">{t("common.high") || "High"}</SelectItem>
+              <SelectItem value="critical">{t("common.critical") || "Critical"}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Message */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-slate-700">
+          {t("feedback.message") || "Message"}
+        </label>
+        <Textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder={t("feedback.messagePlaceholder") || "Describe your feedback..."}
+          rows={isFullScreen ? 6 : 4}
+          data-testid="feedback-message-input"
+        />
+      </div>
+
+      {/* Screenshot Upload */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-slate-700">
+          {t("feedback.screenshot") || "Screenshot"} <span className="text-slate-400 font-normal">({t("common.optional") || "optional"})</span>
+        </label>
+        
+        {screenshotPreview ? (
+          <div className="relative inline-block">
+            <img
+              src={screenshotPreview}
+              alt="Screenshot preview"
+              className="max-h-32 rounded-lg border border-slate-200"
+            />
+            <button
+              onClick={clearScreenshot}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-slate-200 rounded-lg text-slate-500 hover:border-slate-300 hover:text-slate-600 transition-colors"
+            data-testid="upload-screenshot-btn"
+          >
+            <Camera className="w-5 h-5" />
+            <span className="text-sm">{t("feedback.attachScreenshot") || "Attach screenshot"}</span>
+          </button>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+      </div>
+    </div>
+  );
+
+  // Mobile Full-Screen Form View
+  if (isMobile && isModalOpen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                resetForm();
+                setIsEditMode(false);
+                setEditingFeedback(null);
+                setIsModalOpen(false);
+              }}
+              className="p-1 -ml-1"
+            >
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+            </button>
+            <div>
+              <h1 className="text-lg font-semibold text-slate-900">
+                {isEditMode 
+                  ? (t("feedback.editFeedback") || "Edit Feedback")
+                  : (t("feedback.newFeedback") || "New Feedback")
+                }
+              </h1>
+            </div>
+          </div>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitMutation.isPending || updateMutation.isPending || isUploading}
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-700"
+            data-testid="submit-feedback-btn"
+          >
+            {(submitMutation.isPending || updateMutation.isPending || isUploading) && (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            )}
+            {isEditMode ? (t("common.save") || "Save") : (t("feedback.submit") || "Submit")}
+          </Button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <FeedbackFormContent isFullScreen={true} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto px-4 py-8">
@@ -472,163 +638,64 @@ const FeedbackPage = () => {
         )}
       </div>
 
-      {/* Submit/Edit Feedback Modal */}
-      <Dialog open={isModalOpen} onOpenChange={(open) => {
-        if (!open) {
-          resetForm();
-          setIsEditMode(false);
-          setEditingFeedback(null);
-        }
-        setIsModalOpen(open);
-      }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {isEditMode 
-                ? (t("feedback.editFeedback") || "Edit Feedback")
-                : (t("feedback.newFeedback") || "Send Feedback")
-              }
-            </DialogTitle>
-            <DialogDescription>
-              {isEditMode
-                ? (t("feedback.editFeedbackDesc") || "Update your feedback details.")
-                : (t("feedback.newFeedbackDesc") || "Share your thoughts, report an issue, or suggest an improvement.")
-              }
-            </DialogDescription>
-          </DialogHeader>
+      {/* Submit/Edit Feedback Modal - Desktop Only */}
+      {!isMobile && (
+        <Dialog open={isModalOpen} onOpenChange={(open) => {
+          if (!open) {
+            resetForm();
+            setIsEditMode(false);
+            setEditingFeedback(null);
+          }
+          setIsModalOpen(open);
+        }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                {isEditMode 
+                  ? (t("feedback.editFeedback") || "Edit Feedback")
+                  : (t("feedback.newFeedback") || "Send Feedback")
+                }
+              </DialogTitle>
+              <DialogDescription>
+                {isEditMode
+                  ? (t("feedback.editFeedbackDesc") || "Update your feedback details.")
+                  : (t("feedback.newFeedbackDesc") || "Share your thoughts, report an issue, or suggest an improvement.")
+                }
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            {/* Type Selector */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">
-                {t("feedback.type") || "Type"}
-              </label>
-              <div className="flex gap-2">
-                {[
-                  { value: "issue", label: t("feedback.typeIssue") || "Issue", Icon: AlertCircle, color: "text-red-500 border-red-200 bg-red-50" },
-                  { value: "improvement", label: t("feedback.typeImprovement") || "Improvement", Icon: Lightbulb, color: "text-amber-500 border-amber-200 bg-amber-50" },
-                  { value: "general", label: t("feedback.typeGeneral") || "General", Icon: MessageCircle, color: "text-blue-500 border-blue-200 bg-blue-50" },
-                ].map(({ value, label, Icon, color }) => (
-                  <button
-                    key={value}
-                    onClick={() => setFeedbackType(value)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border-2 transition-all ${
-                      feedbackType === value
-                        ? color
-                        : "border-slate-200 text-slate-600 hover:border-slate-300"
-                    }`}
-                    data-testid={`feedback-type-${value}`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-sm font-medium">{label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <FeedbackFormContent />
 
-            {/* Severity (only for issues) */}
-            {feedbackType === "issue" && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  {t("feedback.severity") || "Severity"}
-                </label>
-                <Select value={severity} onValueChange={setSeverity}>
-                  <SelectTrigger data-testid="feedback-severity-select">
-                    <SelectValue placeholder={t("feedback.selectSeverity") || "Select severity"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">{t("common.low") || "Low"}</SelectItem>
-                    <SelectItem value="medium">{t("common.medium") || "Medium"}</SelectItem>
-                    <SelectItem value="high">{t("common.high") || "High"}</SelectItem>
-                    <SelectItem value="critical">{t("common.critical") || "Critical"}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Message */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">
-                {t("feedback.message") || "Message"}
-              </label>
-              <Textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder={t("feedback.messagePlaceholder") || "Describe your feedback..."}
-                rows={4}
-                data-testid="feedback-message-input"
-              />
-            </div>
-
-            {/* Screenshot Upload */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">
-                {t("feedback.screenshot") || "Screenshot"} <span className="text-slate-400 font-normal">({t("common.optional") || "optional"})</span>
-              </label>
-              
-              {screenshotPreview ? (
-                <div className="relative inline-block">
-                  <img
-                    src={screenshotPreview}
-                    alt="Screenshot preview"
-                    className="max-h-32 rounded-lg border border-slate-200"
-                  />
-                  <button
-                    onClick={clearScreenshot}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-slate-200 rounded-lg text-slate-500 hover:border-slate-300 hover:text-slate-600 transition-colors"
-                  data-testid="upload-screenshot-btn"
-                >
-                  <Camera className="w-5 h-5" />
-                  <span className="text-sm">{t("feedback.attachScreenshot") || "Attach screenshot"}</span>
-                </button>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                resetForm();
-                setIsEditMode(false);
-                setEditingFeedback(null);
-                setIsModalOpen(false);
-              }}
-            >
-              {t("common.cancel") || "Cancel"}
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={submitMutation.isPending || updateMutation.isPending || isUploading}
-              className="bg-blue-600 hover:bg-blue-700"
-              data-testid="submit-feedback-btn"
-            >
-              {(submitMutation.isPending || updateMutation.isPending || isUploading) && (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              )}
-              {isEditMode 
-                ? (t("common.save") || "Save")
-                : (t("feedback.submit") || "Submit")
-              }
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetForm();
+                  setIsEditMode(false);
+                  setEditingFeedback(null);
+                  setIsModalOpen(false);
+                }}
+              >
+                {t("common.cancel") || "Cancel"}
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={submitMutation.isPending || updateMutation.isPending || isUploading}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="submit-feedback-btn"
+              >
+                {(submitMutation.isPending || updateMutation.isPending || isUploading) && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
+                {isEditMode 
+                  ? (t("common.save") || "Save")
+                  : (t("feedback.submit") || "Submit")
+                }
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sliders, AlertTriangle, BarChart2, Eye, Info, Building2, Check, Pencil, RotateCcw, Save, X, Gauge } from "lucide-react";
+import { Sliders, AlertTriangle, BarChart2, Eye, Info, Building2, Check, Pencil, RotateCcw, Save, X, Gauge, ArrowLeft } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
@@ -449,6 +449,16 @@ export default function DefinitionsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   
+  // Check if mobile viewport
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
   // Local state for editing
   const [localSeverity, setLocalSeverity] = useState([]);
   const [localOccurrence, setLocalOccurrence] = useState([]);
@@ -562,254 +572,311 @@ export default function DefinitionsPage() {
   const isCustom = definitionsData?.is_custom || false;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Sliders className="w-6 h-6 text-purple-600" />
+    <div className={`${isMobile ? 'h-[calc(100vh-64px)] flex flex-col' : ''}`}>
+      {/* Fixed Header Section */}
+      <div className={`${isMobile ? 'flex-shrink-0 px-4 pt-4 pb-2' : 'p-6 max-w-7xl mx-auto'}`}>
+        {/* Header */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-purple-100 rounded-lg">
+                <Sliders className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+              </div>
+              <div>
+                <h1 className="text-lg sm:text-2xl font-bold text-slate-800">
+                  {t("settings.criticalityDefinitions") || "Definitions"}
+                </h1>
+                <p className="text-slate-500 text-xs sm:text-sm hidden sm:block">
+                  {t("definitions.pageDescription")}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800">
-                {t("settings.criticalityDefinitions") || "Definitions"}
-              </h1>
-              <p className="text-slate-500 text-sm">
-                {t("definitions.pageDescription")}
-              </p>
-            </div>
+            
+            {selectedInstallation && !isMobile && (
+              <div className="flex items-center gap-2">
+                {isEditing ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelEdit}
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      {t("common.cancel")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSave}
+                      disabled={saveMutation.isPending}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Save className="w-4 h-4 mr-1" />
+                      {saveMutation.isPending ? t("definitions.saving") : t("definitions.saveChanges")}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {isCustom && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowResetConfirm(true)}
+                      >
+                        <RotateCcw className="w-4 h-4 mr-1" />
+                        {t("definitions.resetToDefaults")}
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={() => setIsEditing(true)}
+                    >
+                      <Pencil className="w-4 h-4 mr-1" />
+                      {t("definitions.editDefinitions")}
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           
-          {selectedInstallation && (
-            <div className="flex items-center gap-2">
+          {/* Mobile Edit Actions */}
+          {selectedInstallation && isMobile && (
+            <div className="flex items-center gap-2 mt-2">
               {isEditing ? (
                 <>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleCancelEdit}
+                    className="flex-1"
                   >
                     <X className="w-4 h-4 mr-1" />
-                    {t("common.cancel")}
+                    Cancel
                   </Button>
                   <Button
                     size="sm"
                     onClick={handleSave}
                     disabled={saveMutation.isPending}
-                    className="bg-green-600 hover:bg-green-700"
+                    className="flex-1 bg-green-600 hover:bg-green-700"
                   >
                     <Save className="w-4 h-4 mr-1" />
-                    {saveMutation.isPending ? t("definitions.saving") : t("definitions.saveChanges")}
+                    {saveMutation.isPending ? "Saving..." : "Save"}
                   </Button>
                 </>
               ) : (
-                <>
-                  {isCustom && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowResetConfirm(true)}
-                    >
-                      <RotateCcw className="w-4 h-4 mr-1" />
-                      {t("definitions.resetToDefaults")}
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    <Pencil className="w-4 h-4 mr-1" />
-                    {t("definitions.editDefinitions")}
-                  </Button>
-                </>
+                <Button
+                  size="sm"
+                  onClick={() => setIsEditing(true)}
+                  className="w-full"
+                >
+                  <Pencil className="w-4 h-4 mr-1" />
+                  Edit Definitions
+                </Button>
               )}
             </div>
           )}
         </div>
-      </div>
 
-      {/* Installation Selector */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <Building2 className="w-5 h-5 text-slate-500" />
-            <div className="flex-1">
-              <label className="text-sm font-medium text-slate-700 mb-1 block">
-                {t("definitions.selectInstallation")}
-              </label>
-              {loadingInstallations ? (
-                <div className="h-10 bg-slate-100 animate-pulse rounded" />
-              ) : installations.length === 0 ? (
-                <p className="text-sm text-slate-500">{t("definitions.noInstallations")}</p>
-              ) : (
-                <Select
-                  value={selectedInstallation || ""}
-                  onValueChange={(val) => {
-                    setSelectedInstallation(val);
-                    setIsEditing(false);
-                  }}
-                >
-                  <SelectTrigger className="w-full md:w-96" data-testid="installation-selector">
-                    <SelectValue placeholder={t("definitions.selectInstallationDesc")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {installations.map(inst => (
-                      <SelectItem key={inst.id} value={inst.id}>
-                        <div className="flex items-center gap-2">
-                          {inst.name}
-                          {inst.has_custom_definitions && (
-                            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                              Custom
-                            </Badge>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        {/* Installation Selector - Compact on mobile */}
+        <Card className="mb-4">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
+                <span className="text-sm font-medium text-slate-700">
+                  {t("definitions.selectInstallation")}
+                </span>
+              </div>
+              <div className="flex-1">
+                {loadingInstallations ? (
+                  <div className="h-10 bg-slate-100 animate-pulse rounded" />
+                ) : installations.length === 0 ? (
+                  <p className="text-sm text-slate-500">{t("definitions.noInstallations")}</p>
+                ) : (
+                  <Select
+                    value={selectedInstallation || ""}
+                    onValueChange={(val) => {
+                      setSelectedInstallation(val);
+                      setIsEditing(false);
+                    }}
+                  >
+                    <SelectTrigger className="w-full" data-testid="installation-selector">
+                      <SelectValue placeholder={t("definitions.selectInstallationDesc")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {installations.map(inst => (
+                        <SelectItem key={inst.id} value={inst.id}>
+                          <div className="flex items-center gap-2">
+                            {inst.name}
+                            {inst.has_custom_definitions && (
+                              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                Custom
+                              </Badge>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              
+              {selectedInstallation && (
+                <Badge className={`${isCustom ? "bg-purple-100 text-purple-800" : "bg-slate-100 text-slate-700"} whitespace-nowrap`}>
+                  {isCustom ? "Custom" : "Default"}
+                </Badge>
               )}
             </div>
-            
-            {selectedInstallation && (
-              <Badge className={isCustom ? "bg-purple-100 text-purple-800" : "bg-slate-100 text-slate-700"}>
-                {isCustom ? t("definitions.usingCustom") : t("definitions.usingDefaults")}
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Info Card */}
-      <Card className="mb-6 border-blue-200 bg-blue-50">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">{t("definitions.rpnInfo")}</p>
-              <p>{t("definitions.rpnFormula")}</p>
+        {/* Info Card - Hidden on mobile */}
+        <Card className="mb-4 border-blue-200 bg-blue-50 hidden sm:block">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-1">{t("definitions.rpnInfo")}</p>
+                <p>{t("definitions.rpnFormula")}</p>
+              </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Tabs - Horizontal scrollable on mobile */}
+        {!loadingDefinitions && selectedInstallation && (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+              <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-4 mb-2 sm:mb-4">
+                <TabsTrigger value="criticality" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="criticality-tab">
+                  <Gauge className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm">{t("definitions.criticality") || "Criticality"}</span>
+                </TabsTrigger>
+                <TabsTrigger value="severity" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="severity-tab">
+                  <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm">{t("definitions.severity")}</span>
+                </TabsTrigger>
+                <TabsTrigger value="occurrence" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="occurrence-tab">
+                  <BarChart2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm">{t("definitions.occurrence")}</span>
+                </TabsTrigger>
+                <TabsTrigger value="detection" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="detection-tab">
+                  <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm">{t("definitions.detection")}</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </Tabs>
+        )}
+      </div>
+
+      {/* Scrollable Content Area */}
+      <div className={`${isMobile ? 'flex-1 overflow-y-auto px-4 pb-4' : 'px-6 pb-6 max-w-7xl mx-auto'}`}>
+        {/* Loading Spinner */}
+        {loadingDefinitions && selectedInstallation ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full" />
           </div>
-        </CardContent>
-      </Card>
+        ) : selectedInstallation ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            {/* Criticality Tab */}
+            <TabsContent value="criticality">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Gauge className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
+                    <span className="truncate">{t("definitions.criticalityTitle") || "Equipment Criticality"}</span>
+                    {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800 text-xs">{t("definitions.editMode")}</Badge>}
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">{t("definitions.criticalityDesc") || "Define criticality levels across dimensions."}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CriticalityTable
+                    data={localCriticality}
+                    isEditing={isEditing}
+                    onUpdateRow={handleUpdateRow}
+                    t={t}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-      {/* Tabs */}
-      {loadingDefinitions && selectedInstallation ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full" />
-        </div>
-      ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
-            <TabsTrigger value="criticality" className="flex items-center gap-2" data-testid="criticality-tab">
-              <Gauge className="w-4 h-4" />
-              {t("definitions.criticality") || "Criticality"}
-            </TabsTrigger>
-            <TabsTrigger value="severity" className="flex items-center gap-2" data-testid="severity-tab">
-              <AlertTriangle className="w-4 h-4" />
-              {t("definitions.severity")}
-            </TabsTrigger>
-            <TabsTrigger value="occurrence" className="flex items-center gap-2" data-testid="occurrence-tab">
-              <BarChart2 className="w-4 h-4" />
-              {t("definitions.occurrence")}
-            </TabsTrigger>
-            <TabsTrigger value="detection" className="flex items-center gap-2" data-testid="detection-tab">
-              <Eye className="w-4 h-4" />
-              {t("definitions.detection")}
-            </TabsTrigger>
-          </TabsList>
+            {/* Severity Tab */}
+            <TabsContent value="severity">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
+                    {t("definitions.severityTitle")}
+                    {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800 text-xs">{t("definitions.editMode")}</Badge>}
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">{t("definitions.severityDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <EditableTable
+                    type="severity"
+                    data={localSeverity}
+                    isEditing={isEditing}
+                    onUpdateRow={handleUpdateRow}
+                    t={t}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          {/* Criticality Tab */}
-          <TabsContent value="criticality">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Gauge className="w-5 h-5 text-purple-500" />
-                  {t("definitions.criticalityTitle") || "Equipment Criticality Definitions"}
-                  {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800">{t("definitions.editMode")}</Badge>}
-                </CardTitle>
-                <CardDescription>{t("definitions.criticalityDesc") || "Define what each criticality level (1-5) means across Safety, Production, Environment, and Reputation dimensions."}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CriticalityTable
-                  data={localCriticality}
-                  isEditing={isEditing}
-                  onUpdateRow={handleUpdateRow}
-                  t={t}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
+            {/* Occurrence Tab */}
+            <TabsContent value="occurrence">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <BarChart2 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+                    {t("definitions.occurrenceTitle")}
+                    {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800 text-xs">{t("definitions.editMode")}</Badge>}
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">{t("definitions.occurrenceDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <EditableTable
+                    type="occurrence"
+                    data={localOccurrence}
+                    isEditing={isEditing}
+                    onUpdateRow={handleUpdateRow}
+                    t={t}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          {/* Severity Tab */}
-          <TabsContent value="severity">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <AlertTriangle className="w-5 h-5 text-red-500" />
-                  {t("definitions.severityTitle")}
-                  {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800">{t("definitions.editMode")}</Badge>}
-                </CardTitle>
-                <CardDescription>{t("definitions.severityDesc")}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <EditableTable
-                  type="severity"
-                  data={localSeverity}
-                  isEditing={isEditing}
-                  onUpdateRow={handleUpdateRow}
-                  t={t}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Occurrence Tab */}
-          <TabsContent value="occurrence">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <BarChart2 className="w-5 h-5 text-orange-500" />
-                  {t("definitions.occurrenceTitle")}
-                  {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800">{t("definitions.editMode")}</Badge>}
-                </CardTitle>
-                <CardDescription>{t("definitions.occurrenceDesc")}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <EditableTable
-                  type="occurrence"
-                  data={localOccurrence}
-                  isEditing={isEditing}
-                  onUpdateRow={handleUpdateRow}
-                  t={t}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Detection Tab */}
-          <TabsContent value="detection">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Eye className="w-5 h-5 text-blue-500" />
-                  {t("definitions.detectionTitle")}
-                  {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800">{t("definitions.editMode")}</Badge>}
-                </CardTitle>
-                <CardDescription>{t("definitions.detectionDesc")}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <EditableTable
-                  type="detection"
-                  data={localDetection}
-                  isEditing={isEditing}
-                  onUpdateRow={handleUpdateRow}
-                  t={t}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      )}
+            {/* Detection Tab */}
+            <TabsContent value="detection">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+                    {t("definitions.detectionTitle")}
+                    {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800 text-xs">{t("definitions.editMode")}</Badge>}
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">{t("definitions.detectionDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <EditableTable
+                    type="detection"
+                    data={localDetection}
+                    isEditing={isEditing}
+                    onUpdateRow={handleUpdateRow}
+                    t={t}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <div className="text-center py-12 text-slate-500">
+            <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+            <p>{t("definitions.selectInstallationDesc") || "Select an installation to view definitions"}</p>
+          </div>
+        )}
+      </div>
 
       {/* Reset Confirmation Dialog */}
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
