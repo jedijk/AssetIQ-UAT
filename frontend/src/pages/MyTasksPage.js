@@ -1456,21 +1456,22 @@ const MyTasksPage = () => {
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col">
       {/* Fixed Header - Mobile Optimized Minimalist */}
-      <div className="flex-shrink-0 px-4 sm:px-6 pt-3 pb-2 max-w-4xl mx-auto w-full">
-        {/* Title Row - Compact on mobile */}
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900">My Tasks</h1>
-            <p className="text-xs text-slate-500 hidden sm:block">Execute and complete your assigned tasks</p>
+      <div className="flex-shrink-0 bg-white border-b border-slate-100">
+        <div className="px-4 sm:px-6 pt-3 pb-2 max-w-4xl mx-auto w-full">
+          {/* Title Row - Compact on mobile */}
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900">My Tasks</h1>
+              <p className="text-xs text-slate-500 hidden sm:block">Execute and complete your assigned tasks</p>
+            </div>
+            {/* Mobile: Inline stats */}
+            <div className="flex sm:hidden items-center gap-2 text-xs">
+              <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">{stats.total}</span>
+              {stats.overdue > 0 && (
+                <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats.overdue}</span>
+              )}
+            </div>
           </div>
-          {/* Mobile: Inline stats */}
-          <div className="flex sm:hidden items-center gap-2 text-xs">
-            <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">{stats.total}</span>
-            {stats.overdue > 0 && (
-              <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats.overdue}</span>
-            )}
-          </div>
-        </div>
         
         {/* Filters Row - Aligned single row */}
         <div className="flex items-center gap-2 mb-2">
@@ -1573,6 +1574,7 @@ const MyTasksPage = () => {
             <div className="text-base font-bold text-blue-600">{stats.open}</div>
             <div className="text-[10px] text-slate-500">Open</div>
           </div>
+        </div>
         </div>
       </div>
       
