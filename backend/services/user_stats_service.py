@@ -240,8 +240,9 @@ class UserStatsService:
         return formatted
     
     async def _get_user_activity(self, match_stage: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Get user activity statistics."""
+        """Get user activity statistics combining tracked events and actual data."""
         
+        # First get activity from user_events (UI tracking)
         pipeline = [
             {"$match": match_stage},
             {"$group": {
@@ -257,24 +258,125 @@ class UserStatsService:
             {"$limit": 50}
         ]
         
-        results = []
+        tracked_users = {}
         async for doc in self.events.aggregate(pipeline):
-            # Find most used module
-            module_counts = {}
-            for m in doc.get("module_counts", []):
-                module_counts[m] = module_counts.get(m, 0) + 1
+            user_id = doc["_id"]
+            if user_id:  # Only include if user_id is not None
+                module_counts = {}
+                for m in doc.get("module_counts", []):
+                    module_counts[m] = module_counts.get(m, 0) + 1
+                
+                most_used = max(module_counts, key=module_counts.get) if module_counts else "N/A"
+                
+                tracked_users[user_id] = {
+                    "user_id": user_id,
+                    "user_name": doc.get("user_name", "Unknown"),
+                    "role": doc.get("role", "user"),
+                    "last_active": doc.get("last_active").isoformat() if doc.get("last_active") else None,
+                    "sessions": len(doc.get("sessions", [])),
+                    "actions": doc.get("actions", 0),
+                    "most_used_module": most_used
+                }
+        
+        # Now get all users and their actual activity from business data
+        all_users = await self.users.find({}, {"_id": 0, "id": 1, "name": 1, "role": 1}).to_list(100)
+        
+        results = []
+        for user in all_users:
+            user_id = user.get("id")
+            user_name = user.get("name", "Unknown")
+            user_role = user.get("role", "user")
             
-            most_used = max(module_counts, key=module_counts.get) if module_counts else "N/A"
+            # Count actual business activity
+            threats_count = await self.db.threats.count_documents({"created_by": user_id})
+            actions_count = await self.db.central_actions.count_documents({"created_by": user_id})
+            investigations_count = await self.db.investigations.count_documents({"created_by": user_id})
+            
+            total_actions = threats_count + actions_count + investigations_count
+            
+            # Determine most used module based on actual data
+            module_activity = []
+            if threats_count > 0:
+                module_activity.append(("Observations", threats_count))
+            if actions_count > 0:
+                module_activity.append(("Actions", actions_count))
+            if investigations_count > 0:
+                module_activity.append(("Causal Engine", investigations_count))
+            
+            most_used = max(module_activity, key=lambda x: x[1])[0] if module_activity else "Dashboard"
+            
+            # Get last activity timestamp from actual data
+            last_active = None
+            
+            # Helper function to parse datetime and ensure it's timezone-aware
+            def parse_datetime(dt_value):
+                if dt_value is None:
+                    return None
+                if isinstance(dt_value, datetime):
+                    # Ensure timezone awareness
+                    if dt_value.tzinfo is None:
+                        return dt_value.replace(tzinfo=timezone.utc)
+                    return dt_value
+                if isinstance(dt_value, str):
+                    try:
+                        # Try parsing ISO format
+                        parsed = datetime.fromisoformat(dt_value.replace('Z', '+00:00'))
+                        if parsed.tzinfo is None:
+                            return parsed.replace(tzinfo=timezone.utc)
+                        return parsed
+                    except:
+                        return None
+                return None
+            
+            # Check threats for latest activity
+            latest_threat = await self.db.threats.find_one(
+                {"created_by": user_id}, 
+                {"_id": 0, "created_at": 1},
+                sort=[("created_at", -1)]
+            )
+            if latest_threat and latest_threat.get("created_at"):
+                last_active = parse_datetime(latest_threat["created_at"])
+            
+            # Check actions for latest activity
+            latest_action = await self.db.central_actions.find_one(
+                {"created_by": user_id},
+                {"_id": 0, "created_at": 1},
+                sort=[("created_at", -1)]
+            )
+            if latest_action and latest_action.get("created_at"):
+                action_time = parse_datetime(latest_action["created_at"])
+                if action_time and (not last_active or action_time > last_active):
+                    last_active = action_time
+            
+            # Merge with tracked data if available
+            if user_id in tracked_users:
+                tracked = tracked_users[user_id]
+                sessions = tracked["sessions"]
+                if tracked.get("last_active"):
+                    tracked_time = parse_datetime(tracked["last_active"])
+                    if tracked_time and (not last_active or tracked_time > last_active):
+                        last_active = tracked_time
+            else:
+                sessions = 0
+            
+            # Format last_active
+            if last_active:
+                last_active_str = last_active.isoformat() if hasattr(last_active, 'isoformat') else str(last_active)
+            else:
+                last_active_str = None
             
             results.append({
-                "user_id": doc["_id"],
-                "user_name": doc.get("user_name", "Unknown"),
-                "role": doc.get("role", "user"),
-                "last_active": doc.get("last_active").isoformat() if doc.get("last_active") else None,
-                "sessions": len(doc.get("sessions", [])),
-                "actions": doc.get("actions", 0),
+                "user_id": user_id,
+                "user_name": user_name,
+                "role": user_role,
+                "last_active": last_active_str,
+                "sessions": sessions,
+                "actions": total_actions,
                 "most_used_module": most_used
             })
+        
+        # Sort by actions (activity) descending
+        results.sort(key=lambda x: x["actions"], reverse=True)
         
         return results
     
