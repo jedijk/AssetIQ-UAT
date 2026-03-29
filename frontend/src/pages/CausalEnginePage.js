@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { investigationAPI, actionsAPI, usersAPI, equipmentHierarchyAPI } from "../lib/api";
+import { investigationAPI, actionsAPI, usersAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 import {
   Search, Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
   ChevronRight, Trash2, Calendar, User, MapPin,
-  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Save,
+  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Save, Lock,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -74,6 +74,7 @@ export default function CausalEnginePage() {
   const [showFailureDialog, setShowFailureDialog] = useState(false);
   const [showCauseDialog, setShowCauseDialog] = useState(false);
   const [showActionDialog, setShowActionDialog] = useState(false);
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false); // Completion confirmation
   const [editingItem, setEditingItem] = useState(null);
   
   const [newInvForm, setNewInvForm] = useState({ title: "", description: "", asset_name: "", location: "", incident_date: "", investigation_leader: "" });
@@ -130,6 +131,14 @@ export default function CausalEnginePage() {
   });
   const equipmentNodes = equipmentNodesData?.nodes || [];
   
+  // Fetch failure modes for failure mode dropdown
+  const { data: failureModesData } = useQuery({
+    queryKey: ["failure-modes-list"],
+    queryFn: () => failureModesAPI.getAll(),
+    staleTime: 60000, // Cache for 1 minute
+  });
+  const failureModesList = failureModesData?.failure_modes || [];
+  
   // Log error for debugging
   useEffect(() => {
     if (investigationsError) {
@@ -147,6 +156,10 @@ export default function CausalEnginePage() {
   });
   
   const investigation = investigationData?.investigation;
+  
+  // Check if investigation is completed/locked
+  const isInvestigationLocked = investigation?.status === "completed" || investigation?.status === "closed";
+  
   const timelineEvents = investigationData?.timeline_events || [];
   // Sort timeline events chronologically by event_time
   const sortedTimelineEvents = useMemo(() => {
@@ -245,6 +258,24 @@ export default function CausalEnginePage() {
         status: investigation.status || "draft",
       });
     }
+  };
+
+  // Handle status change with confirmation for completion
+  const handleStatusChange = (newStatus) => {
+    if (newStatus === "completed" && investigation?.status !== "completed") {
+      // Show confirmation dialog before completing
+      setShowCompleteConfirm(true);
+    } else {
+      // Direct status change for other statuses
+      updateInvMutation.mutate({ id: selectedInvId, data: { status: newStatus } });
+    }
+  };
+
+  // Confirm and complete investigation
+  const handleConfirmComplete = () => {
+    updateInvMutation.mutate({ id: selectedInvId, data: { status: "completed" } });
+    setShowCompleteConfirm(false);
+    toast.success("Investigation marked as completed. All fields are now locked.");
   };
 
   // Sync localNotes with investigation data when investigation changes
@@ -774,25 +805,36 @@ export default function CausalEnginePage() {
                       <div>
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-sm font-mono text-slate-500">{investigation.case_number}</span>
-                          <Select value={investigation.status} onValueChange={(v) => updateInvMutation.mutate({ id: selectedInvId, data: { status: v } })}>
-                            <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>{INVESTIGATION_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-                          </Select>
+                          {isInvestigationLocked ? (
+                            <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-green-100 text-green-700 text-xs font-medium">
+                              <Lock className="w-3 h-3" />
+                              {investigation.status === "completed" ? "Completed" : "Closed"}
+                            </div>
+                          ) : (
+                            <Select value={investigation.status} onValueChange={handleStatusChange}>
+                              <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>{INVESTIGATION_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                            </Select>
+                          )}
                         </div>
                         <h1 className="text-xl font-bold text-slate-900 mb-1">{investigation.title}</h1>
                         <p className="text-sm text-slate-600">{investigation.description}</p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={handleEditInvestigation} className="text-slate-500 hover:text-blue-600" data-testid="edit-investigation-btn">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="w-4 h-4" /></Button></AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader><AlertDialogTitle>Delete Investigation</AlertDialogTitle><AlertDialogDescription>This will delete all data.</AlertDialogDescription></AlertDialogHeader>
-                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteInvMutation.mutate(selectedInvId)} className="bg-red-600">Delete</AlertDialogAction></AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        {!isInvestigationLocked && (
+                          <Button variant="ghost" size="icon" onClick={handleEditInvestigation} className="text-slate-500 hover:text-blue-600" data-testid="edit-investigation-btn">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {!isInvestigationLocked && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="w-4 h-4" /></Button></AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>Delete Investigation</AlertDialogTitle><AlertDialogDescription>This will delete all data.</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteInvMutation.mutate(selectedInvId)} className="bg-red-600">Delete</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     </div>
                     
@@ -956,7 +998,7 @@ export default function CausalEnginePage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div><h2 className="text-lg font-semibold">Sequence of Events</h2><p className="text-sm text-slate-500">Reconstruct the timeline</p></div>
-                  <Button onClick={() => { setEditingItem(null); setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" }); setShowEventDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-event-btn"><Plus className="w-4 h-4 mr-2" />Add Event</Button>
+                  <Button onClick={() => { setEditingItem(null); setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" }); setShowEventDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-event-btn" disabled={isInvestigationLocked}><Plus className="w-4 h-4 mr-2" />Add Event</Button>
                 </div>
                 
                 {sortedTimelineEvents.length === 0 ? (
@@ -1013,7 +1055,7 @@ export default function CausalEnginePage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div><h2 className="text-lg font-semibold">Failure Identification</h2><p className="text-sm text-slate-500">Define what technically failed</p></div>
-                  <Button onClick={() => { setEditingItem(null); setFailureForm({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" }); setShowFailureDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-btn"><Plus className="w-4 h-4 mr-2" />Add Failure</Button>
+                  <Button onClick={() => { setEditingItem(null); setFailureForm({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" }); setShowFailureDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-btn" disabled={isInvestigationLocked}><Plus className="w-4 h-4 mr-2" />Add Failure</Button>
                 </div>
                 
                 {failureIdentifications.length === 0 ? (
@@ -1059,7 +1101,7 @@ export default function CausalEnginePage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div><h2 className="text-lg font-semibold">Causal Tree</h2><p className="text-sm text-slate-500">Build cause-and-effect relationships</p></div>
-                  <Button onClick={() => { setEditingItem(null); setCauseForm({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" }); setShowCauseDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-cause-btn"><Plus className="w-4 h-4 mr-2" />Add Cause</Button>
+                  <Button onClick={() => { setEditingItem(null); setCauseForm({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" }); setShowCauseDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-cause-btn" disabled={isInvestigationLocked}><Plus className="w-4 h-4 mr-2" />Add Cause</Button>
                 </div>
                 
                 {causeNodes.length === 0 ? (
@@ -1071,7 +1113,7 @@ export default function CausalEnginePage() {
                     <p className="text-sm text-slate-500">Start building the causal tree</p>
                   </div>
                 ) : (
-                  <CauseTree causes={causeNodes} onEdit={handleEditCause} onDelete={handleDeleteCause} onAddChild={handleAddChildCause} onToggleRoot={handleToggleRootCause} />
+                  <CauseTree causes={causeNodes} onEdit={handleEditCause} onDelete={handleDeleteCause} onAddChild={handleAddChildCause} onToggleRoot={handleToggleRootCause} isLocked={isInvestigationLocked} />
                 )}
               </div>
             )}
@@ -1080,7 +1122,7 @@ export default function CausalEnginePage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div><h2 className="text-lg font-semibold">Corrective Actions</h2><p className="text-sm text-slate-500">Track actions to prevent recurrence</p></div>
-                  <Button onClick={() => { setEditingItem(null); setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" }); setShowActionDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-action-btn"><Plus className="w-4 h-4 mr-2" />Add Action</Button>
+                  <Button onClick={() => { setEditingItem(null); setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" }); setShowActionDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-action-btn" disabled={isInvestigationLocked}><Plus className="w-4 h-4 mr-2" />Add Action</Button>
                 </div>
                 
                 {actionItems.length === 0 ? (
@@ -1251,6 +1293,8 @@ export default function CausalEnginePage() {
         form={failureForm}
         setForm={setFailureForm}
         onSubmit={() => { if (editingItem?.type === "failure") updateFailureMutation.mutate({ failureId: editingItem.data.id, data: failureForm }); else createFailureMutation.mutate(failureForm); }}
+        equipmentNodes={equipmentNodes}
+        failureModes={failureModesList}
       />
       
       <CauseDialog
@@ -1271,7 +1315,32 @@ export default function CausalEnginePage() {
         setForm={setActionForm}
         onSubmit={() => { if (editingItem?.type === "action") updateActionMutation.mutate({ actionId: editingItem.data.id, data: actionForm }); else createActionMutation.mutate(actionForm); }}
         causeNodes={causeNodes}
+        users={users}
       />
+      
+      {/* Complete Investigation Confirmation Dialog */}
+      <AlertDialog open={showCompleteConfirm} onOpenChange={setShowCompleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-amber-500" />
+              Complete Investigation?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Marking this investigation as <strong>Completed</strong> will lock all fields. 
+              You will no longer be able to edit the investigation details, add events, failures, causes, or actions.
+              <br /><br />
+              Are you sure you want to complete this investigation?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmComplete} className="bg-green-600 hover:bg-green-700">
+              Yes, Complete Investigation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       </div>
     </div>
   );

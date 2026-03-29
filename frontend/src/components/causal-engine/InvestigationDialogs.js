@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { Loader2, User } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
+import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import { CAUSE_CATEGORIES } from "../CauseNodeItem";
+import { DISCIPLINES } from "../../constants/disciplines";
 
 const INVESTIGATION_STATUSES = [
   { value: "draft", label: "Draft" },
@@ -196,21 +199,86 @@ export const EventDialog = ({ open, onOpenChange, editingItem, form, setForm, on
   );
 };
 
-export const FailureDialog = ({ open, onOpenChange, editingItem, form, setForm, onSubmit }) => {
+export const FailureDialog = ({ open, onOpenChange, editingItem, form, setForm, onSubmit, equipmentNodes = [], failureModes = [] }) => {
   const { t } = useLanguage();
+  const [customFailureMode, setCustomFailureMode] = useState("");
+  
+  // Get unique failure mode names from library (field is 'failure_mode' not 'name')
+  const failureModeOptions = [...new Set(failureModes.map(fm => fm.failure_mode || fm.name))].filter(Boolean);
+  
+  const handleFailureModeChange = (value) => {
+    if (value === "__custom__") {
+      // User wants to enter custom failure mode
+      setForm({ ...form, failure_mode: customFailureMode });
+    } else {
+      setForm({ ...form, failure_mode: value });
+      setCustomFailureMode("");
+    }
+  };
+  
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>{editingItem?.type === "failure" ? t("causal.editFailure") : t("causal.addFailure")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-4">
-          <div><label className="text-sm font-medium">{t("common.asset")} *</label><Input value={form.asset_name} onChange={(e) => setForm({ ...form, asset_name: e.target.value })} placeholder="Equipment" /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><label className="text-sm font-medium">{t("causal.subsystem")}</label><Input value={form.subsystem} onChange={(e) => setForm({ ...form, subsystem: e.target.value })} placeholder="e.g., Sealing" /></div>
-            <div><label className="text-sm font-medium">{t("causal.component")} *</label><Input value={form.component} onChange={(e) => setForm({ ...form, component: e.target.value })} placeholder="e.g., Seal" /></div>
+          <div>
+            <Label className="text-sm font-medium">{t("common.asset")} *</Label>
+            {equipmentNodes.length > 0 ? (
+              <Select value={form.asset_name || "none"} onValueChange={(v) => setForm({ ...form, asset_name: v === "none" ? "" : v })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select equipment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select equipment</SelectItem>
+                  {equipmentNodes.map(node => (
+                    <SelectItem key={node.id} value={node.name}>{node.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input value={form.asset_name} onChange={(e) => setForm({ ...form, asset_name: e.target.value })} placeholder="Equipment name" className="mt-1" />
+            )}
           </div>
-          <div><label className="text-sm font-medium">{t("common.failureMode")} *</label><Input value={form.failure_mode} onChange={(e) => setForm({ ...form, failure_mode: e.target.value })} placeholder="e.g., Leakage" /></div>
-          <div><label className="text-sm font-medium">{t("causal.mechanism")}</label><Input value={form.degradation_mechanism} onChange={(e) => setForm({ ...form, degradation_mechanism: e.target.value })} placeholder="e.g., Fatigue" /></div>
-          <div><label className="text-sm font-medium">{t("common.comment")}</label><Textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label className="text-sm font-medium">{t("causal.subsystem")}</Label><Input value={form.subsystem} onChange={(e) => setForm({ ...form, subsystem: e.target.value })} placeholder="e.g., Sealing" className="mt-1" /></div>
+            <div><Label className="text-sm font-medium">{t("causal.component")} *</Label><Input value={form.component} onChange={(e) => setForm({ ...form, component: e.target.value })} placeholder="e.g., Seal" className="mt-1" /></div>
+          </div>
+          <div>
+            <Label className="text-sm font-medium">{t("common.failureMode")} *</Label>
+            {failureModeOptions.length > 0 ? (
+              <div className="space-y-2 mt-1">
+                <Select 
+                  value={failureModeOptions.includes(form.failure_mode) ? form.failure_mode : (form.failure_mode ? "__custom__" : "none")} 
+                  onValueChange={handleFailureModeChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select or enter failure mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Select failure mode</SelectItem>
+                    {failureModeOptions.map(fm => (
+                      <SelectItem key={fm} value={fm}>{fm}</SelectItem>
+                    ))}
+                    <SelectItem value="__custom__">+ Enter custom failure mode</SelectItem>
+                  </SelectContent>
+                </Select>
+                {(!failureModeOptions.includes(form.failure_mode) && form.failure_mode) || customFailureMode ? (
+                  <Input 
+                    value={form.failure_mode || customFailureMode} 
+                    onChange={(e) => {
+                      setCustomFailureMode(e.target.value);
+                      setForm({ ...form, failure_mode: e.target.value });
+                    }} 
+                    placeholder="Enter custom failure mode" 
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <Input value={form.failure_mode} onChange={(e) => setForm({ ...form, failure_mode: e.target.value })} placeholder="e.g., Leakage" className="mt-1" />
+            )}
+          </div>
+          <div><Label className="text-sm font-medium">{t("causal.mechanism")}</Label><Input value={form.degradation_mechanism} onChange={(e) => setForm({ ...form, degradation_mechanism: e.target.value })} placeholder="e.g., Fatigue" className="mt-1" /></div>
+          <div><Label className="text-sm font-medium">{t("common.comment")}</Label><Textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} className="mt-1" /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
@@ -243,27 +311,81 @@ export const CauseDialog = ({ open, onOpenChange, editingItem, form, setForm, on
   );
 };
 
-export const ActionDialog = ({ open, onOpenChange, editingItem, form, setForm, onSubmit, causeNodes }) => {
+export const ActionDialog = ({ open, onOpenChange, editingItem, form, setForm, onSubmit, causeNodes, users = [] }) => {
   const { t } = useLanguage();
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>{editingItem?.type === "action" ? t("causal.editAction") : t("causal.addAction")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-4">
-          <div><label className="text-sm font-medium">{t("common.description")} *</label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What to do?" rows={2} /></div>
+          <div><Label className="text-sm font-medium">{t("common.description")} *</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What to do?" rows={2} className="mt-1" /></div>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="text-sm font-medium">{t("common.type") || "Type"}</label><Select value={form.action_type || "none"} onValueChange={(v) => setForm({ ...form, action_type: v === "none" ? "" : v })}><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger><SelectContent><SelectItem value="none">No type</SelectItem>{ACTION_TYPES.map(at => <SelectItem key={at.value} value={at.value}>{at.label}</SelectItem>)}</SelectContent></Select></div>
-            <div><label className="text-sm font-medium">{t("common.discipline") || "Discipline"}</label><Input value={form.discipline || ""} onChange={(e) => setForm({ ...form, discipline: e.target.value })} placeholder="e.g. Mechanical, Electrical" /></div>
+            <div>
+              <Label className="text-sm font-medium">{t("common.type") || "Type"}</Label>
+              <Select value={form.action_type || "none"} onValueChange={(v) => setForm({ ...form, action_type: v === "none" ? "" : v })}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No type</SelectItem>
+                  {ACTION_TYPES.map(at => <SelectItem key={at.value} value={at.value}>{at.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">{t("common.discipline") || "Discipline"}</Label>
+              <Select value={form.discipline || "none"} onValueChange={(v) => setForm({ ...form, discipline: v === "none" ? "" : v })}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select discipline" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No discipline</SelectItem>
+                  {DISCIPLINES.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="text-sm font-medium">{t("common.owner")}</label><Input value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} placeholder="Person" /></div>
-            <div><label className="text-sm font-medium">{t("common.priority")}</label><Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ACTION_PRIORITIES.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent></Select></div>
+            <div>
+              <Label className="text-sm font-medium">{t("common.owner")}</Label>
+              {users.length > 0 ? (
+                <Select value={form.owner || "none"} onValueChange={(v) => setForm({ ...form, owner: v === "none" ? "" : v })}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select owner" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No owner assigned</SelectItem>
+                    {users.map(user => (
+                      <SelectItem key={user.id} value={user.name || user.email}>
+                        <div className="flex items-center gap-2">
+                          <User className="w-3 h-3 text-slate-400" />
+                          <span>{user.name || user.email}</span>
+                          {user.position && <span className="text-xs text-slate-400">• {user.position}</span>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} placeholder="Person" className="mt-1" />
+              )}
+            </div>
+            <div>
+              <Label className="text-sm font-medium">{t("common.priority")}</Label>
+              <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>{ACTION_PRIORITIES.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="text-sm font-medium">{t("common.dueDate")}</label><Input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></div>
-            <div><label className="text-sm font-medium">{t("causal.linkedRootCause")}</label><Select value={form.linked_cause_id || "none"} onValueChange={(v) => setForm({ ...form, linked_cause_id: v === "none" ? null : v })}><SelectTrigger><SelectValue placeholder={t("causal.noParent")} /></SelectTrigger><SelectContent><SelectItem value="none">{t("causal.noParent")}</SelectItem>{causeNodes.filter(c => c.is_root_cause).map(c => <SelectItem key={c.id} value={c.id}>{c.description.substring(0, 30)}...</SelectItem>)}</SelectContent></Select></div>
+            <div><Label className="text-sm font-medium">{t("common.dueDate")}</Label><Input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} className="mt-1" /></div>
+            <div>
+              <Label className="text-sm font-medium">{t("causal.linkedRootCause")}</Label>
+              <Select value={form.linked_cause_id || "none"} onValueChange={(v) => setForm({ ...form, linked_cause_id: v === "none" ? null : v })}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder={t("causal.noParent")} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("causal.noParent")}</SelectItem>
+                  {causeNodes.filter(c => c.is_root_cause).map(c => <SelectItem key={c.id} value={c.id}>{c.description.substring(0, 30)}...</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div><label className="text-sm font-medium">{t("common.comment")}</label><Textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} /></div>
+          <div><Label className="text-sm font-medium">{t("common.comment")}</Label><Textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} className="mt-1" /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>

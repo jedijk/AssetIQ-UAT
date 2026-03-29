@@ -79,6 +79,21 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - Removed EditInvestigationDialog component usage
   - File: `/app/frontend/src/pages/CausalEnginePage.js`
 
+- **Enhanced:** Add Failure dialog in Causal Engine
+  - Asset field now shows as dropdown (equipment hierarchy) or text input (fallback)
+  - Failure Mode field shows as dropdown with FMEA library options + custom entry option
+  - File: `/app/frontend/src/components/causal-engine/InvestigationDialogs.js`
+
+- **Enhanced:** Add Action dialog in Causal Engine
+  - Discipline field now shows as dropdown with all unified disciplines
+  - Owner field now shows as dropdown with users from user management
+  - File: `/app/frontend/src/components/causal-engine/InvestigationDialogs.js`
+
+- **Added:** Investigation completion confirmation and field locking
+  - When changing status to "Completed", confirmation dialog appears warning about field locking
+  - Completed/Closed investigations show locked badge, hide edit/delete buttons, disable add buttons
+  - File: `/app/frontend/src/pages/CausalEnginePage.js`
+
 ### March 29, 2026 (Session 3)
 - **Added:** Offline support for My Tasks (P1)
   - New `OfflineStorageService` using IndexedDB with 3 stores: tasks, pending_completions, sync_queue
