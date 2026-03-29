@@ -482,6 +482,21 @@ export default function DefinitionsPage() {
     enabled: !!selectedInstallation
   });
 
+  // Auto-select first installation on mobile, or use defaults if none
+  useEffect(() => {
+    if (isMobile && !selectedInstallation) {
+      if (installationsData?.installations?.length > 0) {
+        setSelectedInstallation(installationsData.installations[0].id);
+      } else if (defaultsData && !loadingInstallations) {
+        // On mobile with no installations, use defaults directly
+        setLocalSeverity(defaultsData.severity || []);
+        setLocalOccurrence(defaultsData.occurrence || []);
+        setLocalDetection(defaultsData.detection || []);
+        setLocalCriticality(defaultsData.criticality || []);
+      }
+    }
+  }, [isMobile, installationsData, selectedInstallation, defaultsData, loadingInstallations]);
+
   // Update local state when definitions change
   useEffect(() => {
     if (definitionsData) {
@@ -638,97 +653,80 @@ export default function DefinitionsPage() {
               </div>
             )}
           </div>
-          
-          {/* Mobile Edit Actions */}
-          {selectedInstallation && isMobile && (
-            <div className="flex items-center gap-2 mt-2">
-              {isEditing ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCancelEdit}
-                    className="flex-1"
-                  >
-                    <X className="w-4 h-4 mr-1" />
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleSave}
-                    disabled={saveMutation.isPending}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                  >
-                    <Save className="w-4 h-4 mr-1" />
-                    {saveMutation.isPending ? "Saving..." : "Save"}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={() => setIsEditing(true)}
-                  className="w-full"
-                >
-                  <Pencil className="w-4 h-4 mr-1" />
-                  Edit Definitions
-                </Button>
-              )}
-            </div>
-          )}
         </div>
+        
+        {/* Mobile Edit Actions - REMOVED: Read-only on mobile */}
 
-        {/* Installation Selector - Compact on mobile */}
-        <Card className="mb-4">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
-                <span className="text-sm font-medium text-slate-700">
-                  {t("definitions.selectInstallation")}
-                </span>
-              </div>
-              <div className="flex-1">
-                {loadingInstallations ? (
-                  <div className="h-10 bg-slate-100 animate-pulse rounded" />
-                ) : installations.length === 0 ? (
-                  <p className="text-sm text-slate-500">{t("definitions.noInstallations")}</p>
-                ) : (
-                  <Select
-                    value={selectedInstallation || ""}
-                    onValueChange={(val) => {
-                      setSelectedInstallation(val);
-                      setIsEditing(false);
-                    }}
-                  >
-                    <SelectTrigger className="w-full" data-testid="installation-selector">
-                      <SelectValue placeholder={t("definitions.selectInstallationDesc")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {installations.map(inst => (
-                        <SelectItem key={inst.id} value={inst.id}>
-                          <div className="flex items-center gap-2">
-                            {inst.name}
-                            {inst.has_custom_definitions && (
-                              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                Custom
-                              </Badge>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+        {/* Installation Selector - Desktop only */}
+        {!isMobile && (
+          <Card className="mb-4">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
+                  <span className="text-sm font-medium text-slate-700">
+                    {t("definitions.selectInstallation")}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  {loadingInstallations ? (
+                    <div className="h-10 bg-slate-100 animate-pulse rounded" />
+                  ) : installations.length === 0 ? (
+                    <p className="text-sm text-slate-500">{t("definitions.noInstallations")}</p>
+                  ) : (
+                    <Select
+                      value={selectedInstallation || ""}
+                      onValueChange={(val) => {
+                        setSelectedInstallation(val);
+                        setIsEditing(false);
+                      }}
+                    >
+                      <SelectTrigger className="w-full" data-testid="installation-selector">
+                        <SelectValue placeholder={t("definitions.selectInstallationDesc")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {installations.map(inst => (
+                          <SelectItem key={inst.id} value={inst.id}>
+                            <div className="flex items-center gap-2">
+                              {inst.name}
+                              {inst.has_custom_definitions && (
+                                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                  Custom
+                                </Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+                
+                {selectedInstallation && (
+                  <Badge className={`${isCustom ? "bg-purple-100 text-purple-800" : "bg-slate-100 text-slate-700"} whitespace-nowrap`}>
+                    {isCustom ? "Custom" : "Default"}
+                  </Badge>
                 )}
               </div>
-              
-              {selectedInstallation && (
-                <Badge className={`${isCustom ? "bg-purple-100 text-purple-800" : "bg-slate-100 text-slate-700"} whitespace-nowrap`}>
-                  {isCustom ? "Custom" : "Default"}
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Mobile: Show active installation name or Default label */}
+        {isMobile && (selectedInstallation || localCriticality.length > 0) && (
+          <div className="flex items-center gap-2 mb-3 px-2 py-1.5 bg-slate-100 rounded-lg">
+            <Building2 className="w-4 h-4 text-slate-500" />
+            <span className="text-sm text-slate-700 font-medium truncate">
+              {selectedInstallation 
+                ? installations.find(i => i.id === selectedInstallation)?.name || "Installation"
+                : "Default Definitions"
+              }
+            </span>
+            <Badge className={`ml-auto ${isCustom ? "bg-purple-100 text-purple-800" : "bg-slate-100 text-slate-700"} text-xs`}>
+              {isCustom ? "Custom" : "Default"}
+            </Badge>
+          </div>
+        )}
 
         {/* Info Card - Hidden on mobile */}
         <Card className="mb-4 border-blue-200 bg-blue-50 hidden sm:block">
@@ -744,7 +742,7 @@ export default function DefinitionsPage() {
         </Card>
 
         {/* Tabs - Horizontal scrollable on mobile */}
-        {!loadingDefinitions && selectedInstallation && (
+        {!loadingDefinitions && (selectedInstallation || (isMobile && localCriticality.length > 0)) && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
               <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-4 mb-2 sm:mb-4">
@@ -777,7 +775,7 @@ export default function DefinitionsPage() {
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full" />
           </div>
-        ) : selectedInstallation ? (
+        ) : (selectedInstallation || (isMobile && localCriticality.length > 0)) ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             {/* Criticality Tab */}
             <TabsContent value="criticality">
