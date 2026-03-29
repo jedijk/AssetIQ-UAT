@@ -1530,30 +1530,32 @@ const MyTasksPage = () => {
           
           {/* Quick Filter Tabs */}
           <Tabs value={activeFilter} onValueChange={setActiveFilter} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-slate-100 rounded-lg">
-              <TabsTrigger value="open" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7 rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="filter-open">
-                <Clock className="w-4 h-4" />
-                <span className="hidden sm:inline">Open</span>
-                {stats.today > 0 && (
-                  <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.today}</Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="overdue" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7 rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="filter-overdue">
-                <AlertCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">Overdue</span>
-                {stats.overdue > 0 && (
-                  <Badge variant="destructive" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.overdue}</Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="recurring" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7 rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="filter-recurring">
-                <Repeat className="w-4 h-4" />
-                <span className="hidden sm:inline">Recurring</span>
-              </TabsTrigger>
-              <TabsTrigger value="adhoc" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm h-7 rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm" data-testid="filter-adhoc">
-                <Zap className="w-4 h-4" />
-                <span className="hidden sm:inline">Adhoc</span>
-              </TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+              <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-4 mb-2 sm:mb-0">
+                <TabsTrigger value="open" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="filter-open">
+                  <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm">Open</span>
+                  {stats.today > 0 && (
+                    <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.today}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="overdue" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="filter-overdue">
+                  <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm">Overdue</span>
+                  {stats.overdue > 0 && (
+                    <Badge variant="destructive" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.overdue}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="recurring" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="filter-recurring">
+                  <Repeat className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm">Recurring</span>
+                </TabsTrigger>
+                <TabsTrigger value="adhoc" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="filter-adhoc">
+                  <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm">Adhoc</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </Tabs>
           
           {/* Stats Summary - Desktop only */}
