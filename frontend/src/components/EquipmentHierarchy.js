@@ -83,7 +83,7 @@ function getCumulativeThreatCount(node, threatCountMap) {
 }
 
 // Tree node component
-const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, onEditEquipment, t, equipmentTypes }) => {
+const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, onEditEquipment, t, equipmentTypes, isMobile = false }) => {
   const hasChildren = node.children && node.children.length > 0;
   const config = ISO_LEVEL_CONFIG[node.level] || ISO_LEVEL_CONFIG.equipment_unit;
   const Icon = config.icon;
@@ -92,6 +92,8 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   const [showDetails, setShowDetails] = useState(false);
   const contextMenuRef = useRef(null);
   const detailsRef = useRef(null);
+  const longPressTimer = useRef(null);
+  const touchStartPos = useRef({ x: 0, y: 0 });
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -105,7 +107,11 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     };
     if (contextMenu.show || showDetails) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("touchstart", handleClickOutside);
+      };
     }
   }, [contextMenu.show, showDetails]);
 
@@ -113,6 +119,47 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ show: true, x: e.clientX, y: e.clientY });
+  };
+
+  // Long press handlers for mobile
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+    
+    longPressTimer.current = setTimeout(() => {
+      // Trigger context menu at touch position
+      setContextMenu({ 
+        show: true, 
+        x: Math.min(touchStartPos.current.x, window.innerWidth - 200), 
+        y: Math.min(touchStartPos.current.y, window.innerHeight - 150) 
+      });
+      // Vibrate for feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 500); // 500ms long press
+  };
+
+  const handleTouchMove = (e) => {
+    // Cancel long press if user moves finger
+    const touch = e.touches[0];
+    const moveThreshold = 10;
+    if (
+      Math.abs(touch.clientX - touchStartPos.current.x) > moveThreshold ||
+      Math.abs(touch.clientY - touchStartPos.current.y) > moveThreshold
+    ) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
   };
 
   const handleAddThreatClick = () => {
@@ -169,6 +216,10 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           onClick?.();
         }}
         onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         data-testid={`hierarchy-node-${node.id}`}
       >
         {hasChildren ? (
@@ -540,6 +591,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
             onEditEquipment={handleEditEquipment}
             t={t}
             equipmentTypes={equipmentTypes}
+            isMobile={isMobile}
           >
             {node.children && node.children.length > 0 && renderTree(node.children, level + 1)}
           </TreeNode>
@@ -551,10 +603,10 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   const Content = () => (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-slate-200">
+      <div className={`flex items-center justify-between p-3 border-b border-slate-200 ${isMobile ? 'bg-white sticky top-0 z-10' : ''}`}>
         <div className="flex items-center gap-2">
           <Layers className="w-5 h-5 text-blue-600" />
-          <h2 className="font-semibold text-slate-900">Hierarchy</h2>
+          <h2 className="font-semibold text-slate-900">{isMobile ? 'Equipment Hierarchy' : 'Hierarchy'}</h2>
         </div>
         <div className="flex items-center gap-1">
           {/* View mode toggle */}
@@ -661,12 +713,17 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
 
       {/* Footer */}
       <div className="p-3 border-t border-slate-200 bg-slate-50">
+        {isMobile && (
+          <p className="text-xs text-slate-400 mb-2 text-center">
+            Long press on equipment for options
+          </p>
+        )}
         <div className="flex items-center justify-between text-xs text-slate-500">
           <span>
             <span className="font-medium">{nodes.length}</span> items
           </span>
           <button
-            onClick={() => navigate("/equipment-manager")}
+            onClick={() => { navigate("/equipment-manager"); if (isMobile) onClose?.(); }}
             className="text-blue-600 hover:text-blue-700 font-medium"
           >
             Manage
@@ -676,19 +733,13 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
     </>
   );
 
-  // Mobile: render with overlay
+  // Mobile: render full-screen overlay
   if (isMobile) {
     if (!isOpen) return null;
     return (
-      <>
-        <div
-          onClick={onClose}
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30"
-        />
-        <div className="fixed left-0 top-16 h-[calc(100vh-64px)] w-72 bg-white border-r border-slate-200 z-40 flex flex-col shadow-lg">
-          <Content />
-        </div>
-      </>
+      <div className="fixed inset-0 z-50 bg-white flex flex-col">
+        <Content />
+      </div>
     );
   }
 
