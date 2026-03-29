@@ -52,6 +52,13 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - Works on both desktop and mobile viewports
   - File: `/app/frontend/src/pages/MyTasksPage.js` - `TaskExecutionFrame` component
 
+- **Added:** "Create Recurring Task" button for PM Actions in ActionDetailPage
+  - Button appears only when action type is "PM - Preventive"
+  - Clicking navigates to Task Designer (`/tasks`) with prefilled data (name, description, discipline)
+  - Toast notification guides user to configure schedule
+  - File: `/app/frontend/src/pages/ActionDetailPage.js`
+  - Fixed route path from `/task-scheduler` to `/tasks` in ActionsPage.js
+
 ### March 28, 2026
 - **Added:** Investigations to Equipment History Timeline
   - Shows investigations linked to threats, sibling observations, or same equipment

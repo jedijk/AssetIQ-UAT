@@ -1259,7 +1259,7 @@ export default function ActionsPage() {
                           className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
                           onClick={() => {
                             // Navigate to task designer with pre-filled data
-                            navigate("/task-scheduler", {
+                            navigate("/tasks", {
                               state: {
                                 createTask: true,
                                 prefill: {
@@ -1273,6 +1273,7 @@ export default function ActionsPage() {
                             });
                             setIsEditDialogOpen(false);
                           }}
+                          data-testid="create-recurring-task-btn"
                         >
                           <CalendarClock className="w-4 h-4 mr-2" />
                           Create Recurring Task

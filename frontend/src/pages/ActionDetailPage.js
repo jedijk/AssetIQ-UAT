@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { 
   ArrowLeft, Save, Trash2, ExternalLink, Calendar, User,
-  FileText, Brain, Search, AlertTriangle, Loader2, Check
+  FileText, Brain, Search, AlertTriangle, Loader2, Check,
+  CalendarClock
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -416,6 +417,34 @@ export default function ActionDetailPage() {
             {action.created_at && <span>Created: {new Date(action.created_at).toLocaleDateString()}</span>}
             {action.updated_at && <span>Updated: {new Date(action.updated_at).toLocaleDateString()}</span>}
           </div>
+
+          {/* Create Recurring Task Button - Only for PM actions */}
+          {editForm.action_type === "PM" && (
+            <div className="pt-4 border-t border-slate-200">
+              <Button
+                variant="outline"
+                className="w-full text-blue-600 border-blue-200 hover:bg-blue-50"
+                onClick={() => {
+                  navigate("/tasks", {
+                    state: {
+                      createTask: true,
+                      prefill: {
+                        name: editForm.title,
+                        description: editForm.description || `Recurring maintenance task from action: ${editForm.title}`,
+                        discipline: editForm.discipline || "",
+                        source_action_id: actionId,
+                        source_action_title: editForm.title,
+                      }
+                    }
+                  });
+                }}
+                data-testid="create-recurring-task-btn"
+              >
+                <CalendarClock className="w-4 h-4 mr-2" />
+                Create Recurring Task
+              </Button>
+            </div>
+          )}
 
           {/* Delete Button */}
           <div className="pt-4 border-t border-slate-200">
