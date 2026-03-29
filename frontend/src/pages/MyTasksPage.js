@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -38,6 +38,11 @@ import {
   ScanEye,
   Paperclip,
   Image,
+  WifiOff,
+  Wifi,
+  RefreshCw,
+  CloudOff,
+  Cloud,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -70,6 +75,7 @@ import {
 import { cn } from "../lib/utils";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { imageAnalysisAPI } from "../lib/api";
+import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -1255,6 +1261,46 @@ const MyTasksPage = () => {
   const [viewMode, setViewMode] = useState("list"); // "list" or "execution"
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
   
+  // Offline support
+  const offlineStatus = useOfflineStatus();
+  const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Cache tasks when fetched for offline access
+  const cacheTasksForOffline = useCallback(async (tasks) => {
+    try {
+      await offlineStorage.cacheTasks(tasks);
+    } catch (error) {
+      console.error('Failed to cache tasks:', error);
+    }
+  }, []);
+  
+  // Manual sync trigger
+  const handleManualSync = async () => {
+    if (!offlineStatus.isOnline) {
+      toast.error("You're offline. Please connect to the internet to sync.");
+      return;
+    }
+    
+    setIsSyncing(true);
+    try {
+      const result = await offlineStorage.syncPendingCompletions();
+      if (result.synced > 0) {
+        toast.success(`Synced ${result.synced} completed task(s)`);
+        queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+      }
+      if (result.failed > 0) {
+        toast.error(`Failed to sync ${result.failed} task(s)`);
+      }
+      if (result.synced === 0 && result.failed === 0) {
+        toast.info("Nothing to sync");
+      }
+    } catch (error) {
+      toast.error("Sync failed");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+  
   // Available disciplines for filtering
   const disciplines = [
     { value: "Mechanical", label: "Mechanical" },
@@ -1266,22 +1312,58 @@ const MyTasksPage = () => {
     { value: "Reliability", label: "Reliability" },
   ];
   
-  // Fetch tasks
+  // Fetch tasks with offline caching
   const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useQuery({
     queryKey: ["my-tasks", activeFilter, selectedDate, selectedDiscipline],
-    queryFn: () => myTasksAPI.getTasks({
-      filter: activeFilter,
-      date: activeFilter === "open" ? format(selectedDate, "yyyy-MM-dd") : undefined,
-      discipline: selectedDiscipline || undefined,
-    }),
-    refetchInterval: 30000, // Refresh every 30 seconds
+    queryFn: async () => {
+      try {
+        const data = await myTasksAPI.getTasks({
+          filter: activeFilter,
+          date: activeFilter === "open" ? format(selectedDate, "yyyy-MM-dd") : undefined,
+          discipline: selectedDiscipline || undefined,
+        });
+        // Cache tasks for offline access
+        if (data?.tasks) {
+          cacheTasksForOffline(data.tasks);
+        }
+        return data;
+      } catch (error) {
+        // If offline, try to get cached tasks
+        if (!offlineStatus.isOnline) {
+          const cachedTasks = await offlineStorage.getCachedTasks();
+          if (cachedTasks.length > 0) {
+            return { tasks: cachedTasks, total: cachedTasks.length, fromCache: true };
+          }
+        }
+        throw error;
+      }
+    },
+    refetchInterval: offlineStatus.isOnline ? 30000 : false, // Only refresh when online
+    retry: offlineStatus.isOnline ? 3 : 0,
   });
   
-  // Complete task mutation
+  // Complete task mutation with offline support
   const completeMutation = useMutation({
-    mutationFn: myTasksAPI.completeTask,
-    onSuccess: () => {
-      toast.success("Task completed successfully!");
+    mutationFn: async ({ taskId, data, isAction }) => {
+      // If offline, save for later sync
+      if (!offlineStatus.isOnline) {
+        const taskInfo = selectedTask || { title: 'Unknown Task', source_type: isAction ? 'action' : 'task' };
+        await offlineStorage.savePendingCompletion(taskId, data, taskInfo);
+        // Update local cache to show task as completed
+        await offlineStorage.updateCachedTask(taskId, { status: 'completed_offline', completed_at: new Date().toISOString() });
+        return { offline: true, taskId };
+      }
+      // Online: complete normally
+      return myTasksAPI.completeTask({ taskId, data, isAction });
+    },
+    onSuccess: (result) => {
+      if (result?.offline) {
+        toast.success("Task saved offline! Will sync when connected.", {
+          icon: <CloudOff className="w-4 h-4" />,
+        });
+      } else {
+        toast.success("Task completed successfully!");
+      }
       queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["task-instances"] });
       setViewMode("list");
@@ -1446,15 +1528,65 @@ const MyTasksPage = () => {
   // Default: Task List View
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col">
+      {/* Offline Banner */}
+      {!offlineStatus.isOnline && (
+        <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2">
+            <WifiOff className="w-4 h-4" />
+            <span>You're offline. Tasks will sync when connected.</span>
+          </div>
+          {offlineStatus.pendingCount > 0 && (
+            <Badge variant="secondary" className="bg-amber-600 text-white">
+              {offlineStatus.pendingCount} pending
+            </Badge>
+          )}
+        </div>
+      )}
+      
+      {/* Sync Banner - Show when online with pending items */}
+      {offlineStatus.isOnline && offlineStatus.pendingCount > 0 && (
+        <div className="bg-blue-500 text-white px-4 py-2 flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2">
+            <Cloud className="w-4 h-4" />
+            <span>{offlineStatus.pendingCount} task(s) completed offline, ready to sync</span>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-7 text-xs bg-white text-blue-600 hover:bg-blue-50"
+            onClick={handleManualSync}
+            disabled={isSyncing}
+          >
+            {isSyncing ? (
+              <>
+                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Sync Now
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+      
       {/* Fixed Header - Mobile Optimized Minimalist */}
       <div className="flex-shrink-0">
         <div className="px-4 sm:px-6 pt-3 pb-3 max-w-7xl mx-auto w-full">
           {/* Title Row - Compact on mobile */}
           <div className="flex items-center justify-between mb-2">
-            <div>
+            <div className="flex items-center gap-2">
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">My Tasks</h1>
-              <p className="text-xs text-slate-500 hidden sm:block">Execute and complete your assigned tasks</p>
+              {/* Online/Offline indicator - small */}
+              {offlineStatus.isOnline ? (
+                <Wifi className="w-4 h-4 text-green-500 hidden sm:block" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-amber-500" />
+              )}
             </div>
+            <p className="text-xs text-slate-500 hidden sm:block">Execute and complete your assigned tasks</p>
             {/* Mobile: Inline stats */}
             <div className="flex sm:hidden items-center gap-2 text-xs">
               <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">{stats.total}</span>
