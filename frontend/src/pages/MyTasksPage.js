@@ -1354,119 +1354,125 @@ const MyTasksPage = () => {
   };
   
   return (
-    <div className="p-4 sm:p-6 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 mb-1">My Tasks</h1>
-        <p className="text-slate-500">Execute and complete your assigned tasks</p>
-      </div>
-      
-      {/* Filters Row */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        {/* Discipline/Role Filter */}
-        <Select value={selectedDiscipline || "all"} onValueChange={(v) => setSelectedDiscipline(v === "all" ? "" : v)}>
-          <SelectTrigger className="w-full sm:w-[180px]" data-testid="discipline-filter">
-            <Users className="w-4 h-4 mr-2 text-slate-400" />
-            <SelectValue placeholder="All Disciplines" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Disciplines</SelectItem>
-            {disciplines.map((disc) => (
-              <SelectItem key={disc.value} value={disc.value}>
-                {disc.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="h-[calc(100vh-64px)] flex flex-col">
+      {/* Fixed Header - Condensed */}
+      <div className="flex-shrink-0 px-4 sm:px-6 pt-3 pb-2 max-w-4xl mx-auto w-full">
+        {/* Title Row */}
+        <div className="mb-2">
+          <h1 className="text-xl font-bold text-slate-900">My Tasks</h1>
+          <p className="text-sm text-slate-500">Execute and complete your assigned tasks</p>
+        </div>
         
-        {/* Date Picker */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                "w-full sm:w-[200px] justify-start text-left font-normal",
-                !selectedDate && "text-muted-foreground"
-              )}
-              data-testid="date-filter"
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => date && setSelectedDate(date)}
-              initialFocus
+        {/* Filters Row - Compact */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-2">
+          {/* Discipline/Role Filter */}
+          <Select value={selectedDiscipline || "all"} onValueChange={(v) => setSelectedDiscipline(v === "all" ? "" : v)}>
+            <SelectTrigger className="w-full sm:w-[160px] h-8 text-xs" data-testid="discipline-filter">
+              <Users className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+              <SelectValue placeholder="All Disciplines" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Disciplines</SelectItem>
+              {disciplines.map((disc) => (
+                <SelectItem key={disc.value} value={disc.value}>
+                  {disc.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {/* Date Picker */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full sm:w-[160px] h-8 text-xs justify-start text-left font-normal",
+                  !selectedDate && "text-muted-foreground"
+                )}
+                data-testid="date-filter"
+              >
+                <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Input
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 text-xs"
+              data-testid="task-search"
             />
-          </PopoverContent>
-        </Popover>
+          </div>
+        </div>
         
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            placeholder="Search tasks..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-testid="task-search"
-          />
+        {/* Quick Filter Tabs - Compact */}
+        <Tabs value={activeFilter} onValueChange={setActiveFilter} className="mb-2">
+          <TabsList className="grid w-full grid-cols-4 h-8">
+            <TabsTrigger value="open" className="flex items-center gap-1 text-xs h-7" data-testid="filter-open">
+              <Clock className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Open</span>
+              {stats.today > 0 && (
+                <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px]">{stats.today}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="overdue" className="flex items-center gap-1 text-xs h-7" data-testid="filter-overdue">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Overdue</span>
+              {stats.overdue > 0 && (
+                <Badge variant="destructive" className="ml-0.5 h-4 px-1 text-[10px]">{stats.overdue}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="recurring" className="flex items-center gap-1 text-xs h-7" data-testid="filter-recurring">
+              <Repeat className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Recurring</span>
+            </TabsTrigger>
+            <TabsTrigger value="adhoc" className="flex items-center gap-1 text-xs h-7" data-testid="filter-adhoc">
+              <Zap className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Adhoc</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
+        {/* Stats Summary - Compact */}
+        <div className="grid grid-cols-4 gap-2">
+          <div className="bg-slate-50 rounded-lg p-1.5 text-center">
+            <div className="text-base font-bold text-slate-900">{stats.total}</div>
+            <div className="text-[10px] text-slate-500">Total</div>
+          </div>
+          <div className="bg-amber-50 rounded-lg p-1.5 text-center">
+            <div className="text-base font-bold text-amber-600">{stats.inProgress}</div>
+            <div className="text-[10px] text-slate-500">In Progress</div>
+          </div>
+          <div className="bg-red-50 rounded-lg p-1.5 text-center">
+            <div className="text-base font-bold text-red-600">{stats.overdue}</div>
+            <div className="text-[10px] text-slate-500">Overdue</div>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-1.5 text-center">
+            <div className="text-base font-bold text-blue-600">{stats.open}</div>
+            <div className="text-[10px] text-slate-500">Open</div>
+          </div>
         </div>
       </div>
       
-      {/* Quick Filter Tabs */}
-      <Tabs value={activeFilter} onValueChange={setActiveFilter} className="mb-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="open" className="flex items-center gap-1.5" data-testid="filter-open">
-            <Clock className="w-4 h-4" />
-            <span className="hidden sm:inline">Open</span>
-            {stats.today > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5">{stats.today}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="overdue" className="flex items-center gap-1.5" data-testid="filter-overdue">
-            <AlertCircle className="w-4 h-4" />
-            <span className="hidden sm:inline">Overdue</span>
-            {stats.overdue > 0 && (
-              <Badge variant="destructive" className="ml-1 h-5 px-1.5">{stats.overdue}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="recurring" className="flex items-center gap-1.5" data-testid="filter-recurring">
-            <Repeat className="w-4 h-4" />
-            <span className="hidden sm:inline">Recurring</span>
-          </TabsTrigger>
-          <TabsTrigger value="adhoc" className="flex items-center gap-1.5" data-testid="filter-adhoc">
-            <Zap className="w-4 h-4" />
-            <span className="hidden sm:inline">Adhoc</span>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-      
-      {/* Stats Summary */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
-        <div className="bg-slate-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-slate-900">{stats.total}</div>
-          <div className="text-xs text-slate-500">Total</div>
-        </div>
-        <div className="bg-amber-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-amber-600">{stats.inProgress}</div>
-          <div className="text-xs text-slate-500">In Progress</div>
-        </div>
-        <div className="bg-red-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-red-600">{stats.overdue}</div>
-          <div className="text-xs text-slate-500">Overdue</div>
-        </div>
-        <div className="bg-blue-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-blue-600">{stats.open}</div>
-          <div className="text-xs text-slate-500">Open</div>
-        </div>
-      </div>
-      
-      {/* Task List or Ad-hoc Plans */}
-      <div className="space-y-3">
+      {/* Scrollable Task List */}
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-6">
+        <div className="max-w-4xl mx-auto">
+          {/* Task List or Ad-hoc Plans */}
+          <div className="space-y-3 pt-2">
         {activeFilter === "adhoc" ? (
           // Ad-hoc Plans View
           adhocPlansLoading ? (
@@ -1639,6 +1645,8 @@ const MyTasksPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </div>
+      </div>
     </div>
   );
 };
