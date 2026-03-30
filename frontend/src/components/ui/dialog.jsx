@@ -36,7 +36,8 @@ const DialogContent = React.forwardRef(({ className, children, onPointerDownOuts
         // Prevent closing when interacting with Select/Popover portals
         const target = e.target;
         if (target?.closest('[data-radix-select-content]') || 
-            target?.closest('[data-radix-popper-content-wrapper]')) {
+            target?.closest('[data-radix-popper-content-wrapper]') ||
+            target?.closest('[data-radix-popover-content]')) {
           e.preventDefault();
         }
         onPointerDownOutside?.(e);
@@ -45,7 +46,8 @@ const DialogContent = React.forwardRef(({ className, children, onPointerDownOuts
         // Prevent closing when interacting with Select/Popover portals
         const target = e.target;
         if (target?.closest('[data-radix-select-content]') || 
-            target?.closest('[data-radix-popper-content-wrapper]')) {
+            target?.closest('[data-radix-popper-content-wrapper]') ||
+            target?.closest('[data-radix-popover-content]')) {
           e.preventDefault();
         }
         onInteractOutside?.(e);
