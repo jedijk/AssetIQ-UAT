@@ -117,6 +117,43 @@ export const threatsAPI = {
   },
 };
 
+// Observations API
+export const observationsAPI = {
+  getAll: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.equipment_id) searchParams.append("equipment_id", params.equipment_id);
+    if (params.severity) searchParams.append("severity", params.severity);
+    if (params.status) searchParams.append("status", params.status);
+    const response = await api.get(`/observations?${searchParams.toString()}`);
+    return response.data;
+  },
+  
+  getById: async (id) => {
+    const response = await api.get(`/observations/${id}`);
+    return response.data;
+  },
+  
+  create: async (data) => {
+    const response = await api.post("/observations", data);
+    return response.data;
+  },
+  
+  update: async (id, data) => {
+    const response = await api.patch(`/observations/${id}`, data);
+    return response.data;
+  },
+  
+  delete: async (id) => {
+    const response = await api.delete(`/observations/${id}`);
+    return response.data;
+  },
+  
+  close: async (id, resolutionNotes = null) => {
+    const response = await api.post(`/observations/${id}/close`, { resolution_notes: resolutionNotes });
+    return response.data;
+  },
+};
+
 // Stats API
 export const statsAPI = {
   get: async () => {

@@ -566,9 +566,15 @@ async def delete_threat(
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    result = await db.threats.delete_one({"id": threat_id, "created_by": current_user["id"]})
+    # Owner and admin can delete any threat
+    if current_user.get("role") in ["owner", "admin"]:
+        result = await db.threats.delete_one({"id": threat_id})
+    else:
+        # Others can only delete their own
+        result = await db.threats.delete_one({"id": threat_id, "created_by": current_user["id"]})
+    
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Threat not found")
+        raise HTTPException(status_code=404, detail="Threat not found or you don't have permission to delete it")
     
     await update_all_ranks(current_user["id"])
     return {"message": "Threat deleted"}
