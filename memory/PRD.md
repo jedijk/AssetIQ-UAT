@@ -76,6 +76,22 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - Automatically checks if source is already closed before showing notification
   - Files: `/app/backend/routes/actions.py`, `/app/backend/routes/investigations.py`, `/app/frontend/src/pages/ActionsPage.js`, `/app/frontend/src/pages/ActionDetailPage.js`, `/app/frontend/src/pages/CausalEnginePage.js`
 
+- **Added:** Observation Owner, Discipline, and Plant/Unit Fields
+  - Extended ThreatResponse and ThreatUpdate models with owner_id, owner_name, discipline, plant_unit
+  - Observation detail page now shows Owner, Discipline, and Plant/Unit fields with edit support
+  - Owner dropdown populated from /api/rbac/users endpoint
+  - Discipline dropdown uses DISCIPLINES constant (Mechanical, Electrical, Instrumentation, etc.)
+  - Files: `/app/backend/models/api_models.py`, `/app/frontend/src/pages/ThreatDetailPage.js`
+
+- **Added:** Dashboard Filtering System
+  - Filter bar with collapsible panel on Operational dashboard tab
+  - Three filters: Discipline, Owner/Assignee, Plant/Unit
+  - Active filter badges shown as removable chips
+  - "Clear all" button to reset filters
+  - Filters apply to Observations, Actions, and Investigations sections
+  - Top 10 observations now show discipline badge and owner name if assigned
+  - Files: `/app/frontend/src/pages/DashboardPage.js`
+
 ### March 30, 2026 (Session 6)
 - **Added:** Report Generation for Causal Investigations (P0)
   - PowerPoint (.pptx) export with professional styling

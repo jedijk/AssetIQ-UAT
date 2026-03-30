@@ -1,11 +1,12 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { threatsAPI, actionsAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
+import { threatsAPI, actionsAPI, equipmentHierarchyAPI, failureModesAPI, usersAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import SearchableCombobox from "../components/SearchableCombobox";
 import EquipmentTimeline from "../components/EquipmentTimeline";
+import { DISCIPLINES } from "../constants/disciplines";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -38,6 +39,8 @@ import {
   Image,
   FileImage,
   Maximize2,
+  User,
+  Building2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -146,6 +149,14 @@ const ThreatDetailPage = () => {
     staleTime: 5 * 60 * 1000,
   });
   const failureModes = failureModesData?.failure_modes || [];
+  
+  // Fetch users for Owner dropdown
+  const { data: usersData } = useQuery({
+    queryKey: ["rbac-users"],
+    queryFn: usersAPI.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+  const usersList = usersData?.users || [];
 
   // Transform data for searchable comboboxes
   const assetOptions = useMemo(() => {
@@ -409,6 +420,9 @@ const ThreatDetailPage = () => {
     { label: t("observations.likelihood"), value: threat.likelihood, icon: Activity, field: "likelihood", type: "select", options: LIKELIHOOD_OPTIONS },
     { label: t("observations.detectability"), value: threat.detectability, icon: Eye, field: "detectability", type: "select", options: DETECTABILITY_OPTIONS },
     { label: t("observations.location"), value: threat.location || "Not specified", icon: MapPin, field: "location", type: "text" },
+    { label: "Owner", value: threat.owner_name || "Not assigned", icon: User, field: "owner_id", type: "user-select" },
+    { label: "Discipline", value: threat.discipline || "Not specified", icon: Wrench, field: "discipline", type: "discipline-select" },
+    { label: "Plant/Unit", value: threat.plant_unit || "Not specified", icon: Building2, field: "plant_unit", type: "text" },
   ];
 
   const startEditing = () => {
@@ -424,6 +438,10 @@ const ThreatDetailPage = () => {
       detectability: threat.detectability,
       location: threat.location || "",
       status: threat.status,
+      owner_id: threat.owner_id || "",
+      owner_name: threat.owner_name || "",
+      discipline: threat.discipline || "",
+      plant_unit: threat.plant_unit || "",
     });
     setIsEditing(true);
   };
@@ -1055,6 +1073,47 @@ const ThreatDetailPage = () => {
                   <SelectContent>
                     {item.options.map(opt => (
                       <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : item.type === "user-select" ? (
+                <Select
+                  value={editForm.owner_id || "_none"}
+                  onValueChange={(v) => {
+                    if (v === "_none") {
+                      setEditForm({ ...editForm, owner_id: "", owner_name: "" });
+                    } else {
+                      const selectedUser = usersList.find(u => u.id === v);
+                      setEditForm({ 
+                        ...editForm, 
+                        owner_id: v,
+                        owner_name: selectedUser?.name || ""
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm">
+                    <SelectValue placeholder="Select owner..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Not assigned</SelectItem>
+                    {usersList.map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : item.type === "discipline-select" ? (
+                <Select
+                  value={editForm.discipline || "_none"}
+                  onValueChange={(v) => setEditForm({ ...editForm, discipline: v === "_none" ? "" : v })}
+                >
+                  <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm">
+                    <SelectValue placeholder="Select discipline..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Not specified</SelectItem>
+                    {DISCIPLINES.map(d => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

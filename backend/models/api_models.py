@@ -71,6 +71,11 @@ class ThreatResponse(BaseModel):
     equipment_criticality_data: Optional[dict] = None
     session_id: Optional[str] = None
     attachments: Optional[List[dict]] = None
+    # Owner fields
+    owner_id: Optional[str] = None
+    owner_name: Optional[str] = None
+    discipline: Optional[str] = None
+    plant_unit: Optional[str] = None
     # Creator info for dashboard display
     creator_name: Optional[str] = None
     creator_photo: Optional[str] = None
@@ -96,6 +101,10 @@ class ThreatUpdate(BaseModel):
     linked_equipment_id: Optional[str] = None
     is_new_failure_mode: Optional[bool] = None
     fmea_rpn: Optional[int] = None
+    owner_id: Optional[str] = None
+    owner_name: Optional[str] = None
+    discipline: Optional[str] = None
+    plant_unit: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

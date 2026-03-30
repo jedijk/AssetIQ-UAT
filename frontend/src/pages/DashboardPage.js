@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI } from "../lib/api";
+import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { motion } from "framer-motion";
 import {
@@ -26,10 +26,18 @@ import {
   ExternalLink,
   User,
   Briefcase,
+  Filter,
+  X,
+  Building2,
+  ChevronDown,
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import ReliabilityPerformancePage from "./ReliabilityPerformancePage";
+import { DISCIPLINES } from "../constants/disciplines";
 
 // User avatar component with optional hover card
 const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showPopover = false }) => {
@@ -260,9 +268,23 @@ export default function DashboardPage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("operational");
+  
+  // Filter states
+  const [disciplineFilter, setDisciplineFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("all");
+  const [plantUnitFilter, setPlantUnitFilter] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Navigation state for back button support
   const navState = { from: "dashboard", fromPage: "Dashboard" };
+  
+  // Fetch users for owner filter
+  const { data: usersData } = useQuery({
+    queryKey: ["rbac-users"],
+    queryFn: usersAPI.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+  const usersList = usersData?.users || [];
 
   // Fetch all data
   const { data: stats } = useQuery({
@@ -274,14 +296,32 @@ export default function DashboardPage() {
     queryKey: ["threats"],
     queryFn: threatsAPI.getAll,
   });
-  const observations = Array.isArray(observationsData) ? observationsData : [];
+  const allObservations = Array.isArray(observationsData) ? observationsData : [];
+  
+  // Extract unique plant/units from observations
+  const plantUnits = [...new Set(allObservations.map(o => o.plant_unit || o.location).filter(Boolean))].sort();
+
+  // Apply filters to observations
+  const observations = allObservations.filter(o => {
+    if (disciplineFilter !== "all" && o.discipline !== disciplineFilter) return false;
+    if (ownerFilter !== "all" && o.owner_id !== ownerFilter) return false;
+    if (plantUnitFilter !== "all" && (o.plant_unit || o.location) !== plantUnitFilter) return false;
+    return true;
+  });
 
   const { data: actionsData = { actions: [], stats: {} } } = useQuery({
     queryKey: ["actions"],
     queryFn: actionsAPI.getAll,
   });
-  const actions = Array.isArray(actionsData?.actions) ? actionsData.actions : (Array.isArray(actionsData) ? actionsData : []);
+  const allActions = Array.isArray(actionsData?.actions) ? actionsData.actions : (Array.isArray(actionsData) ? actionsData : []);
   const actionsStats = actionsData?.stats || {};
+  
+  // Apply filters to actions
+  const actions = allActions.filter(a => {
+    if (disciplineFilter !== "all" && a.discipline !== disciplineFilter) return false;
+    if (ownerFilter !== "all" && a.assignee !== ownerFilter) return false;
+    return true;
+  });
 
   const { data: investigationsData = { investigations: [] }, isLoading: isLoadingInvestigations, error: investigationsError } = useQuery({
     queryKey: ["investigations"],
@@ -290,7 +330,14 @@ export default function DashboardPage() {
     refetchOnMount: 'always',
     retry: 2,
   });
-  const investigations = Array.isArray(investigationsData?.investigations) ? investigationsData.investigations : (Array.isArray(investigationsData) ? investigationsData : []);
+  const allInvestigations = Array.isArray(investigationsData?.investigations) ? investigationsData.investigations : (Array.isArray(investigationsData) ? investigationsData : []);
+  
+  // Apply filters to investigations  
+  const investigations = allInvestigations.filter(i => {
+    if (ownerFilter !== "all" && i.investigation_leader !== ownerFilter && i.created_by !== ownerFilter) return false;
+    if (plantUnitFilter !== "all" && i.location !== plantUnitFilter) return false;
+    return true;
+  });
 
   const { data: equipmentData = { nodes: [] } } = useQuery({
     queryKey: ["equipment"],
@@ -304,6 +351,16 @@ export default function DashboardPage() {
     queryFn: () => threatsAPI.getTop(10),
   });
   const topObservations = Array.isArray(topObservationsData) ? topObservationsData : [];
+  
+  // Check if any filter is active
+  const hasActiveFilters = disciplineFilter !== "all" || ownerFilter !== "all" || plantUnitFilter !== "all";
+  
+  // Clear all filters
+  const clearFilters = () => {
+    setDisciplineFilter("all");
+    setOwnerFilter("all");
+    setPlantUnitFilter("all");
+  };
 
   // Calculate metrics
   const observationsByStatus = observations.reduce((acc, t) => {
@@ -387,6 +444,125 @@ export default function DashboardPage() {
       {/* Scrollable Tab Content */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
         <div className="max-w-7xl mx-auto">
+          {/* Filter Bar - Only show on operational tab */}
+          {activeTab === "operational" && (
+            <div className="mb-4">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filter Toggle Button */}
+                <Button
+                  variant={showFilters ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="gap-1.5"
+                >
+                  <Filter className="w-4 h-4" />
+                  Filters
+                  {hasActiveFilters && (
+                    <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-700 px-1.5 py-0">
+                      {[disciplineFilter !== "all", ownerFilter !== "all", plantUnitFilter !== "all"].filter(Boolean).length}
+                    </Badge>
+                  )}
+                </Button>
+                
+                {/* Active Filter Badges */}
+                {hasActiveFilters && (
+                  <>
+                    {disciplineFilter !== "all" && (
+                      <Badge variant="secondary" className="gap-1 bg-slate-100">
+                        <Wrench className="w-3 h-3" />
+                        {DISCIPLINES.find(d => d.value === disciplineFilter)?.label || disciplineFilter}
+                        <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setDisciplineFilter("all")} />
+                      </Badge>
+                    )}
+                    {ownerFilter !== "all" && (
+                      <Badge variant="secondary" className="gap-1 bg-slate-100">
+                        <User className="w-3 h-3" />
+                        {usersList.find(u => u.id === ownerFilter)?.name || "Unknown"}
+                        <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setOwnerFilter("all")} />
+                      </Badge>
+                    )}
+                    {plantUnitFilter !== "all" && (
+                      <Badge variant="secondary" className="gap-1 bg-slate-100">
+                        <Building2 className="w-3 h-3" />
+                        {plantUnitFilter}
+                        <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setPlantUnitFilter("all")} />
+                      </Badge>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-slate-500 hover:text-red-500">
+                      Clear all
+                    </Button>
+                  </>
+                )}
+              </div>
+              
+              {/* Expanded Filter Panel */}
+              {showFilters && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Discipline Filter */}
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+                        <Wrench className="w-3 h-3" /> Discipline
+                      </label>
+                      <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
+                        <SelectTrigger className="h-9 bg-white">
+                          <SelectValue placeholder="All Disciplines" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Disciplines</SelectItem>
+                          {DISCIPLINES.map(d => (
+                            <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* Owner Filter */}
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+                        <User className="w-3 h-3" /> Owner / Assignee
+                      </label>
+                      <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+                        <SelectTrigger className="h-9 bg-white">
+                          <SelectValue placeholder="All Users" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Users</SelectItem>
+                          {usersList.map(u => (
+                            <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* Plant/Unit Filter */}
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+                        <Building2 className="w-3 h-3" /> Plant / Unit
+                      </label>
+                      <Select value={plantUnitFilter} onValueChange={setPlantUnitFilter}>
+                        <SelectTrigger className="h-9 bg-white">
+                          <SelectValue placeholder="All Plants/Units" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Plants/Units</SelectItem>
+                          {plantUnits.map(pu => (
+                            <SelectItem key={pu} value={pu}>{pu}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          )}
+          
           {/* Operational Dashboard Tab */}
           {activeTab === "operational" && (
             <div className="animate-fade-in">
@@ -496,11 +672,11 @@ export default function DashboardPage() {
                     {index + 1}
                   </span>
                   
-                  {/* User Avatar */}
+                  {/* User Avatar - Show owner if assigned, else creator */}
                   <UserAvatar 
-                    name={obs.creator_name}
+                    name={obs.owner_name || obs.creator_name}
                     photo={obs.creator_photo}
-                    initials={obs.creator_initials || (obs.creator_name || "U").charAt(0)}
+                    initials={(obs.owner_name || obs.creator_name || "U").charAt(0)}
                     size="sm"
                     position={obs.creator_position}
                     showPopover={true}
@@ -516,7 +692,12 @@ export default function DashboardPage() {
                   {/* Title and Asset */}
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-slate-700 truncate">{obs.title}</p>
-                    <p className="text-[10px] text-slate-400">{obs.asset || obs.equipment_name || "-"}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[10px] text-slate-400 truncate">{obs.asset || obs.equipment_name || "-"}</p>
+                      {obs.discipline && (
+                        <span className="text-[9px] px-1 py-0 rounded bg-slate-100 text-slate-500">{obs.discipline}</span>
+                      )}
+                    </div>
                   </div>
                   
                   {/* RPN Badge */}
