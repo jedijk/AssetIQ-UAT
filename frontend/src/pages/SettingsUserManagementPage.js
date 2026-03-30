@@ -740,7 +740,10 @@ const SettingsUserManagementPage = () => {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
                           setInstallationDialogUser(user);
-                          setSelectedInstallations(user.assigned_installations || []);
+                          // Filter to only include valid installation IDs that exist in current installations list
+                          const validInstallationIds = installations.map(i => i.id);
+                          const filteredAssignments = (user.assigned_installations || []).filter(id => validInstallationIds.includes(id));
+                          setSelectedInstallations(filteredAssignments);
                         }}>
                           <Factory className="w-4 h-4 mr-2" /> Manage Installations
                         </DropdownMenuItem>
@@ -1355,7 +1358,10 @@ const SettingsUserManagementPage = () => {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => {
                               setInstallationDialogUser(user);
-                              setSelectedInstallations(user.assigned_installations || []);
+                              // Filter to only include valid installation IDs that exist in current installations list
+                              const validInstallationIds = installations.map(i => i.id);
+                              const filteredAssignments = (user.assigned_installations || []).filter(id => validInstallationIds.includes(id));
+                              setSelectedInstallations(filteredAssignments);
                             }}>
                               <Factory className="w-4 h-4 mr-2" /> Manage Installations
                             </DropdownMenuItem>
