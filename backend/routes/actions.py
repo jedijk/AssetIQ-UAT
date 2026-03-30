@@ -4,7 +4,6 @@ Actions routes.
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List, Optional
 from datetime import datetime, timezone
 import uuid
 import logging
@@ -177,7 +176,7 @@ async def get_overdue_actions(
     overdue_actions = await db.central_actions.find({
         "created_by": current_user["id"],
         "status": {"$in": ["open", "in_progress"]},
-        "due_date": {"$lt": now, "$ne": None, "$ne": ""}
+        "due_date": {"$lt": now, "$nin": [None, ""]}
     }, {"_id": 0}).sort("due_date", 1).to_list(50)
     
     return {
@@ -255,13 +254,72 @@ async def update_central_action(
     update_data = {k: v for k, v in data.dict().items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
+    # Check if status is being changed to completed
+    status_changed_to_completed = (
+        data.status == "completed" and 
+        action.get("status") != "completed"
+    )
+    
     await db.central_actions.update_one(
         {"id": action_id},
         {"$set": update_data}
     )
     
     updated = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
-    return updated
+    
+    # Check if all actions for the source are now completed
+    completion_notification = None
+    if status_changed_to_completed and action.get("source_type") and action.get("source_id"):
+        source_type = action["source_type"]
+        source_id = action["source_id"]
+        
+        # Count remaining open actions for this source
+        remaining_open = await db.central_actions.count_documents({
+            "source_type": source_type,
+            "source_id": source_id,
+            "created_by": current_user["id"],
+            "status": {"$ne": "completed"}
+        })
+        
+        if remaining_open == 0:
+            # All actions completed - prepare notification
+            total_actions = await db.central_actions.count_documents({
+                "source_type": source_type,
+                "source_id": source_id,
+                "created_by": current_user["id"]
+            })
+            
+            # Get source details
+            source_name = None
+            source_status = None
+            if source_type == "threat":
+                threat = await db.threats.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
+                if threat:
+                    source_name = threat.get("title", "Observation")
+                    source_status = threat.get("status")
+            elif source_type == "investigation":
+                inv = await db.investigations.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
+                if inv:
+                    source_name = inv.get("title", "Investigation")
+                    source_status = inv.get("status")
+            
+            # Only suggest closure if source is not already closed
+            if source_status not in ["closed", "completed"]:
+                completion_notification = {
+                    "type": "all_actions_completed",
+                    "source_type": source_type,
+                    "source_id": source_id,
+                    "source_name": source_name,
+                    "total_actions": total_actions,
+                    "message": f"All {total_actions} action(s) for '{source_name}' are now complete! Consider closing this {source_type.replace('threat', 'observation')}.",
+                    "suggest_closure": True
+                }
+    
+    response = dict(updated)
+    if completion_notification:
+        response["completion_notification"] = completion_notification
+    
+    return response
 
 
 @router.delete("/actions/{action_id}")
@@ -346,6 +404,85 @@ async def unvalidate_action(
     
     updated = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
     return updated
+
+
+# ============= ACTION COMPLETION CHECK =============
+
+@router.get("/actions/source/{source_type}/{source_id}/completion-status")
+async def get_source_action_completion_status(
+    source_type: str,
+    source_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Check if all actions for a given source (threat/investigation) are completed.
+    Returns completion status and suggests closure if all actions are done.
+    """
+    if source_type not in ["threat", "investigation"]:
+        raise HTTPException(status_code=400, detail="Invalid source_type. Must be 'threat' or 'investigation'")
+    
+    # Get all actions for this source
+    all_actions = await db.central_actions.find(
+        {"source_type": source_type, "source_id": source_id, "created_by": current_user["id"]},
+        {"_id": 0, "id": 1, "status": 1, "title": 1, "is_validated": 1}
+    ).to_list(100)
+    
+    if not all_actions:
+        return {
+            "source_type": source_type,
+            "source_id": source_id,
+            "total_actions": 0,
+            "completed_actions": 0,
+            "all_completed": False,
+            "all_validated": False,
+            "suggest_closure": False,
+            "pending_actions": [],
+            "message": "No actions found for this source"
+        }
+    
+    completed_actions = [a for a in all_actions if a.get("status") == "completed"]
+    validated_actions = [a for a in all_actions if a.get("is_validated")]
+    pending_actions = [a for a in all_actions if a.get("status") != "completed"]
+    
+    total = len(all_actions)
+    completed = len(completed_actions)
+    validated = len(validated_actions)
+    all_completed = completed == total
+    all_validated = validated == total
+    
+    # Suggest closure only if ALL actions are completed
+    suggest_closure = all_completed and total > 0
+    
+    # Get source name for notification
+    source_name = None
+    if source_type == "threat":
+        threat = await db.threats.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
+        if threat:
+            source_name = threat.get("title", "Observation")
+            # Don't suggest closure if already closed
+            if threat.get("status") == "closed":
+                suggest_closure = False
+    elif source_type == "investigation":
+        investigation = await db.investigations.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
+        if investigation:
+            source_name = investigation.get("title", "Investigation")
+            if investigation.get("status") == "completed":
+                suggest_closure = False
+    
+    return {
+        "source_type": source_type,
+        "source_id": source_id,
+        "source_name": source_name,
+        "total_actions": total,
+        "completed_actions": completed,
+        "validated_actions": validated,
+        "completion_percentage": round((completed / total) * 100) if total > 0 else 0,
+        "all_completed": all_completed,
+        "all_validated": all_validated,
+        "suggest_closure": suggest_closure,
+        "pending_actions": [{"id": a["id"], "title": a.get("title", "Untitled")} for a in pending_actions],
+        "message": f"All {total} action(s) completed! Consider closing this {source_type.replace('threat', 'observation')}." if suggest_closure else None
+    }
 
 
 

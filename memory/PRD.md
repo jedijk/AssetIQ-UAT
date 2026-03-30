@@ -66,6 +66,15 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - Removed `desktopOnly` flag from User Management navigation
   - Files: `/app/frontend/src/pages/SettingsUserManagementPage.js`, `/app/frontend/src/components/Layout.js`
 
+- **Added:** Action Completion Notification System
+  - Backend endpoint: `GET /api/actions/source/{source_type}/{source_id}/completion-status`
+  - Modified `PATCH /api/actions/{action_id}` to return `completion_notification` when all actions completed
+  - Frontend dialog prompts user to close observation when all action plan items are marked complete
+  - Dialog shows: total actions completed, source observation name, and "Go to Observation" button
+  - Works on both ActionsPage and ActionDetailPage
+  - Automatically checks if source is already closed before showing notification
+  - Files: `/app/backend/routes/actions.py`, `/app/frontend/src/pages/ActionsPage.js`, `/app/frontend/src/pages/ActionDetailPage.js`
+
 ### March 30, 2026 (Session 6)
 - **Added:** Report Generation for Causal Investigations (P0)
   - PowerPoint (.pptx) export with professional styling

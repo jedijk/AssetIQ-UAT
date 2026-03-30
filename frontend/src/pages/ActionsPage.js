@@ -207,11 +207,14 @@ export default function ActionsPage() {
   });
   const usersList = usersData?.users || [];
 
+  // State for closure suggestion dialog
+  const [closureSuggestion, setClosureSuggestion] = useState(null);
+
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ actionId, data, oldData }) => 
       actionsAPI.update(actionId, data).then(result => ({ result, actionId, data, oldData })),
-    onSuccess: ({ actionId, data, oldData }) => {
+    onSuccess: ({ result, actionId, data, oldData }) => {
       if (oldData) {
         pushUndo({
           type: "UPDATE_ACTION",
@@ -228,6 +231,12 @@ export default function ActionsPage() {
       toast.success("Action updated");
       setIsEditDialogOpen(false);
       setEditingAction(null);
+      
+      // Check if all actions for the source are now completed
+      if (result?.completion_notification) {
+        const notification = result.completion_notification;
+        setClosureSuggestion(notification);
+      }
     },
     onError: () => toast.error("Failed to update action"),
   });
@@ -1324,6 +1333,58 @@ export default function ActionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Closure Suggestion Dialog - Shows when all actions for an observation are completed */}
+      <Dialog open={!!closureSuggestion} onOpenChange={() => setClosureSuggestion(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-700">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              All Actions Completed!
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
+              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-green-800">
+                  {closureSuggestion?.total_actions} action{closureSuggestion?.total_actions !== 1 ? 's' : ''} completed
+                </p>
+                <p className="text-sm text-green-600">
+                  {closureSuggestion?.source_name}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600">
+              {closureSuggestion?.message || `All corrective actions for this ${closureSuggestion?.source_type === 'threat' ? 'observation' : 'investigation'} have been completed.`}
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setClosureSuggestion(null)}>
+              Later
+            </Button>
+            <Button 
+              onClick={() => {
+                const sourceType = closureSuggestion?.source_type;
+                const sourceId = closureSuggestion?.source_id;
+                setClosureSuggestion(null);
+                // Navigate to the source to close it
+                if (sourceType === 'threat') {
+                  navigate(`/threats/${sourceId}`);
+                } else if (sourceType === 'investigation') {
+                  navigate(`/causal-engine?inv=${sourceId}`);
+                }
+              }}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Go to {closureSuggestion?.source_type === 'threat' ? 'Observation' : 'Investigation'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
