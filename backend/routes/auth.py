@@ -339,12 +339,12 @@ async def send_approval_result_email(user_email: str, user_name: str, approved: 
         button_link = login_link
     else:
         subject = "Your AssetIQ Account Registration"
-        message = f"Unfortunately, your account registration was not approved."
+        message = "Unfortunately, your account registration was not approved."
         if rejection_reason:
             message += f"<br><br><strong>Reason:</strong> {rejection_reason}"
         message += "<br><br>If you believe this was a mistake, please contact an administrator."
         button_text = "Contact Support"
-        button_link = f"mailto:support@assetiq.com"
+        button_link = "mailto:support@assetiq.com"
     
     html_content = f"""
     <!DOCTYPE html>

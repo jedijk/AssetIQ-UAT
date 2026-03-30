@@ -1,7 +1,7 @@
 """
 Stats routes.
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Optional
 import logging
 import json

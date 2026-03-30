@@ -20,6 +20,20 @@ from investigation_models import (
 )
 logger = logging.getLogger(__name__)
 
+# Common failure mode causes for investigation root cause analysis
+FAILURE_MODE_CAUSES = {
+    "wear": ["Normal wear and tear", "Inadequate lubrication", "Abrasive particles", "Improper material selection"],
+    "corrosion": ["Chemical exposure", "Moisture ingress", "Galvanic reaction", "Inadequate coating"],
+    "fatigue": ["Cyclic loading", "Stress concentration", "Material defect", "Design inadequacy"],
+    "overload": ["Excessive force", "Improper operation", "Design limitation", "Control system failure"],
+    "contamination": ["Foreign particles", "Fluid degradation", "Seal failure", "Inadequate filtration"],
+    "vibration": ["Imbalance", "Misalignment", "Looseness", "Resonance"],
+    "leakage": ["Seal degradation", "Gasket failure", "Crack propagation", "Connection loosening"],
+    "electrical": ["Insulation breakdown", "Overheating", "Voltage spike", "Connection corrosion"],
+    "blockage": ["Debris accumulation", "Scale buildup", "Foreign object", "Product solidification"],
+    "default": ["Equipment degradation", "Operational stress", "Environmental factors", "Maintenance gap"]
+}
+
 router = APIRouter(tags=["Threats"])
 
 

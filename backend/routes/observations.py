@@ -3,8 +3,8 @@ Observations routes.
 """
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
 from database import db, observation_service
 from auth import get_current_user
 

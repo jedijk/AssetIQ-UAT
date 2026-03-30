@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import uuid
 import json
 import logging
+import os
 from pathlib import Path
 from database import db, EMERGENT_LLM_KEY, failure_modes_service
 from auth import get_current_user
@@ -18,6 +19,7 @@ from maintenance_strategy_models import (
 )
 from maintenance_strategy_generator import MaintenanceStrategyGenerator
 from iso14224_models import EQUIPMENT_TYPES
+from failure_modes import FAILURE_MODES_LIBRARY, find_failure_modes_flexible
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Maintenance Strategies"])
@@ -275,7 +277,7 @@ async def create_maintenance_strategy(
     if existing:
         raise HTTPException(
             status_code=400,
-            detail=f"Strategy already exists for this equipment type"
+            detail="Strategy already exists for this equipment type"
         )
     
     strategy = MaintenanceStrategy(

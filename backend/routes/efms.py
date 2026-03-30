@@ -4,7 +4,6 @@ Equipment Failure Modes routes.
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
 import logging
 from database import db, efm_service
 from auth import get_current_user

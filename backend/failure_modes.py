@@ -243,3 +243,48 @@ FAILURE_MODES_LIBRARY = [
   {"id": 215, "category": "Rotating", "equipment": "Grinder", "failure_mode": "Dust Extraction Failure", "keywords": ["dust extraction", "dust collector", "grinding dust", "exhaust failure", "ventilation"], "severity": 7, "occurrence": 5, "detectability": 5, "rpn": 175, "recommended_actions": [{"action": "Check filter condition", "action_type": "PM", "discipline": "Mechanical"}, {"action": "Clean extraction system", "action_type": "PM", "discipline": "Mechanical"}, {"action": "Verify airflow", "action_type": "PM", "discipline": "Mechanical"}, {"action": "Maintain ductwork", "action_type": "PM", "discipline": "Mechanical"}], "equipment_type_ids": ["grinder"]},
 
 ]
+
+
+def find_failure_modes_flexible(search_term: str, equipment_type: str = None, limit: int = 15):
+    """
+    Flexible search for failure modes based on equipment type or search term.
+    Returns matching failure modes from the library.
+    """
+    results = []
+    search_lower = search_term.lower() if search_term else ""
+    equipment_lower = equipment_type.lower() if equipment_type else ""
+    
+    for fm in FAILURE_MODES_LIBRARY:
+        fm_equipment = fm.get("equipment", "").lower()
+        fm_category = fm.get("category", "").lower()
+        fm_keywords = [k.lower() for k in fm.get("keywords", [])]
+        fm_failure_mode = fm.get("failure_mode", "").lower()
+        
+        # Match by equipment name
+        if equipment_lower and (
+            equipment_lower in fm_equipment or
+            fm_equipment in equipment_lower or
+            equipment_lower in fm_category
+        ):
+            results.append(fm)
+            continue
+        
+        # Match by search term in keywords or failure mode
+        if search_lower and (
+            search_lower in fm_failure_mode or
+            any(search_lower in kw for kw in fm_keywords) or
+            search_lower in fm_equipment
+        ):
+            results.append(fm)
+    
+    # Remove duplicates and limit results
+    seen_ids = set()
+    unique_results = []
+    for fm in results:
+        if fm["id"] not in seen_ids:
+            seen_ids.add(fm["id"])
+            unique_results.append(fm)
+            if len(unique_results) >= limit:
+                break
+    
+    return unique_results

@@ -4,7 +4,6 @@ Analytics & RBAC routes.
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
 import logging
 from database import db, analytics_service, rbac_service
 from auth import get_current_user
@@ -16,7 +15,7 @@ router = APIRouter(tags=["Analytics & RBAC"])
 # ============= ANALYTICS ENDPOINTS =============
 
 from services.analytics_service import AnalyticsService
-from services.rbac_service import RBACService, ROLES
+from services.rbac_service import RBACService
 
 # Initialize services
 analytics_service = AnalyticsService(db)
