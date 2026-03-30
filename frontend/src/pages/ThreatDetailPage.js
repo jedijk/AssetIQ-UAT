@@ -399,12 +399,12 @@ const ThreatDetailPage = () => {
 
   if (error || !threat) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl" data-testid="threat-not-found">
+      <div className="container mx-auto px-4 py-8 max-w-4xl" data-testid="observation-not-found">
         <div className="text-center py-16">
           <XCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-slate-700 mb-2">Threat not found</h2>
+          <h2 className="text-xl font-semibold text-slate-700 mb-2">Observation not found</h2>
           <Button onClick={() => navigate("/threats")} variant="outline">
-            Back to Threats
+            Back to Observations
           </Button>
         </div>
       </div>
