@@ -11,7 +11,7 @@ import json
 import logging
 import base64
 import io
-from database import db, efm_service, EMERGENT_LLM_KEY
+from database import db, efm_service, EMERGENT_LLM_KEY, installation_filter
 from auth import get_current_user
 from services.threat_score_service import recalculate_threat_scores_for_asset
 from iso14224_models import (
@@ -166,11 +166,26 @@ async def get_iso_levels():
 async def get_equipment_nodes(
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all equipment hierarchy nodes for the current user, sorted by sort_order."""
+    """Get equipment hierarchy nodes filtered by user's assigned installations."""
+    # Get user's installation filter data
+    installation_ids = await installation_filter.get_user_installation_ids(current_user)
+    
+    # If no installations assigned, return empty list
+    if not installation_ids:
+        return {"nodes": []}
+    
+    # Get all equipment IDs under assigned installations
+    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+        installation_ids, current_user["id"]
+    )
+    
+    if not equipment_ids:
+        return {"nodes": []}
+    
     nodes = await db.equipment_nodes.find(
-        {"created_by": current_user["id"]},
+        {"created_by": current_user["id"], "id": {"$in": list(equipment_ids)}},
         {"_id": 0}
-    ).sort("sort_order", 1).to_list(1000)
+    ).sort("sort_order", 1).to_list(5000)
     return {"nodes": nodes}
 
 
@@ -1076,35 +1091,74 @@ async def assign_discipline(
 async def get_hierarchy_stats(
     current_user: dict = Depends(get_current_user)
 ):
-    """Get statistics about the equipment hierarchy."""
+    """Get statistics about the equipment hierarchy, filtered by assigned installations."""
     user_id = current_user["id"]
     
-    total_nodes = await db.equipment_nodes.count_documents({"created_by": user_id})
+    # Get user's installation filter data
+    installation_ids = await installation_filter.get_user_installation_ids(current_user)
+    
+    # If no installations assigned, return zeros
+    if not installation_ids:
+        level_counts = {level.value: 0 for level in ISO_LEVEL_ORDER}
+        return {
+            "total_nodes": 0,
+            "by_level": level_counts,
+            "by_criticality": {
+                "safety_critical": 0,
+                "production_critical": 0,
+                "medium": 0,
+                "low": 0,
+                "unassigned": 0
+            }
+        }
+    
+    # Get all equipment IDs under assigned installations
+    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+        installation_ids, user_id
+    )
+    
+    if not equipment_ids:
+        level_counts = {level.value: 0 for level in ISO_LEVEL_ORDER}
+        return {
+            "total_nodes": 0,
+            "by_level": level_counts,
+            "by_criticality": {
+                "safety_critical": 0,
+                "production_critical": 0,
+                "medium": 0,
+                "low": 0,
+                "unassigned": 0
+            }
+        }
+    
+    base_query = {"created_by": user_id, "id": {"$in": list(equipment_ids)}}
+    
+    total_nodes = await db.equipment_nodes.count_documents(base_query)
     
     # Count by level
     level_counts = {}
     for level in ISO_LEVEL_ORDER:
         count = await db.equipment_nodes.count_documents(
-            {"created_by": user_id, "level": level.value}
+            {**base_query, "level": level.value}
         )
         level_counts[level.value] = count
     
     # Count by criticality
     criticality_counts = {
         "safety_critical": await db.equipment_nodes.count_documents(
-            {"created_by": user_id, "criticality.level": "safety_critical"}
+            {**base_query, "criticality.level": "safety_critical"}
         ),
         "production_critical": await db.equipment_nodes.count_documents(
-            {"created_by": user_id, "criticality.level": "production_critical"}
+            {**base_query, "criticality.level": "production_critical"}
         ),
         "medium": await db.equipment_nodes.count_documents(
-            {"created_by": user_id, "criticality.level": "medium"}
+            {**base_query, "criticality.level": "medium"}
         ),
         "low": await db.equipment_nodes.count_documents(
-            {"created_by": user_id, "criticality.level": "low"}
+            {**base_query, "criticality.level": "low"}
         ),
         "unassigned": await db.equipment_nodes.count_documents(
-            {"created_by": user_id, "criticality": None}
+            {**base_query, "criticality": None}
         )
     }
     

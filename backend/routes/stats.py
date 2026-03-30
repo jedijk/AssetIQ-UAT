@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import Optional
 import logging
 import json
-from database import db
+from database import db, installation_filter
 from auth import get_current_user
 from failure_modes import FAILURE_MODES_LIBRARY
 logger = logging.getLogger(__name__)
@@ -16,10 +16,48 @@ router = APIRouter(tags=["Stats"])
 async def get_stats(current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
     
-    total = await db.threats.count_documents({"created_by": user_id})
-    open_count = await db.threats.count_documents({"created_by": user_id, "status": "Open"})
-    critical = await db.threats.count_documents({"created_by": user_id, "risk_level": "Critical", "status": {"$ne": "Closed"}})
-    high = await db.threats.count_documents({"created_by": user_id, "risk_level": "High", "status": {"$ne": "Closed"}})
+    # Get user's installation filter data
+    installation_ids = await installation_filter.get_user_installation_ids(current_user)
+    
+    # If no installations assigned, return zeros
+    if not installation_ids:
+        return {
+            "total_threats": 0,
+            "open_threats": 0,
+            "critical_count": 0,
+            "high_count": 0
+        }
+    
+    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+        installation_ids, user_id
+    )
+    equipment_names = await installation_filter.get_equipment_names_for_installations(
+        installation_ids, user_id
+    )
+    
+    # Build base filter
+    base_filter = installation_filter.build_threat_filter(
+        user_id, equipment_ids, equipment_names
+    )
+    
+    if base_filter.get("_impossible"):
+        return {
+            "total_threats": 0,
+            "open_threats": 0,
+            "critical_count": 0,
+            "high_count": 0
+        }
+    
+    total = await db.threats.count_documents(base_filter)
+    
+    open_filter = {**base_filter, "status": "Open"}
+    open_count = await db.threats.count_documents(open_filter)
+    
+    critical_filter = {**base_filter, "risk_level": "Critical", "status": {"$ne": "Closed"}}
+    critical = await db.threats.count_documents(critical_filter)
+    
+    high_filter = {**base_filter, "risk_level": "High", "status": {"$ne": "Closed"}}
+    high = await db.threats.count_documents(high_filter)
     
     return {
         "total_threats": total,

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from datetime import datetime, timezone
 import uuid
 import logging
-from database import db
+from database import db, installation_filter
 from auth import get_current_user
 logger = logging.getLogger(__name__)
 
@@ -102,9 +102,47 @@ async def get_all_actions(
     source_type: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all centralized actions with optional filters."""
-    query = {"created_by": current_user["id"]}
+    """Get all centralized actions with optional filters, filtered by user's assigned installations."""
+    # Get user's installation filter data
+    installation_ids = await installation_filter.get_user_installation_ids(current_user)
     
+    # If no installations assigned, return empty result
+    if not installation_ids:
+        return {
+            "actions": [],
+            "stats": {
+                "total": 0,
+                "open": 0,
+                "in_progress": 0,
+                "completed": 0,
+                "overdue": 0
+            }
+        }
+    
+    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+        installation_ids, current_user["id"]
+    )
+    equipment_names = await installation_filter.get_equipment_names_for_installations(
+        installation_ids, current_user["id"]
+    )
+    
+    # Get threat IDs that belong to user's installations
+    threat_ids = await installation_filter.get_filtered_threat_ids(
+        current_user["id"], equipment_ids, equipment_names
+    )
+    
+    # Build base query with installation filtering
+    query = installation_filter.build_action_filter(
+        current_user["id"], equipment_ids, equipment_names, threat_ids
+    )
+    
+    if query.get("_impossible"):
+        return {
+            "actions": [],
+            "stats": {"total": 0, "open": 0, "in_progress": 0, "completed": 0, "overdue": 0}
+        }
+    
+    # Add additional filters
     if status and status != "all":
         query["status"] = status
     if priority and priority != "all":
@@ -143,26 +181,43 @@ async def get_all_actions(
         
         enriched_actions.append(enriched_action)
     
-    # Get stats
-    total = await db.central_actions.count_documents({"created_by": current_user["id"]})
-    open_count = await db.central_actions.count_documents({"created_by": current_user["id"], "status": "open"})
-    in_progress_count = await db.central_actions.count_documents({"created_by": current_user["id"], "status": "in_progress"})
-    completed_count = await db.central_actions.count_documents({"created_by": current_user["id"], "status": "completed"})
-    overdue_count = await db.central_actions.count_documents({
-        "created_by": current_user["id"],
-        "status": {"$in": ["open", "in_progress"]},
-        "due_date": {"$lt": datetime.now(timezone.utc).isoformat(), "$ne": None}
-    })
+    # Get stats (also filtered by installation)
+    base_stats_query = installation_filter.build_action_filter(
+        current_user["id"], equipment_ids, equipment_names, threat_ids
+    )
     
-    return {
-        "actions": enriched_actions,
-        "stats": {
+    if base_stats_query.get("_impossible"):
+        stats = {"total": 0, "open": 0, "in_progress": 0, "completed": 0, "overdue": 0}
+    else:
+        total = await db.central_actions.count_documents(base_stats_query)
+        
+        open_query = {**base_stats_query, "status": "open"}
+        open_count = await db.central_actions.count_documents(open_query)
+        
+        in_progress_query = {**base_stats_query, "status": "in_progress"}
+        in_progress_count = await db.central_actions.count_documents(in_progress_query)
+        
+        completed_query = {**base_stats_query, "status": "completed"}
+        completed_count = await db.central_actions.count_documents(completed_query)
+        
+        overdue_query = {
+            **base_stats_query,
+            "status": {"$in": ["open", "in_progress"]},
+            "due_date": {"$lt": datetime.now(timezone.utc).isoformat(), "$ne": None}
+        }
+        overdue_count = await db.central_actions.count_documents(overdue_query)
+        
+        stats = {
             "total": total,
             "open": open_count,
             "in_progress": in_progress_count,
             "completed": completed_count,
             "overdue": overdue_count
         }
+    
+    return {
+        "actions": enriched_actions,
+        "stats": stats
     }
 
 

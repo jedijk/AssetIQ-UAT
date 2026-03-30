@@ -1242,8 +1242,9 @@ const SettingsUserManagementPage = () => {
                 <tr>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">User</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">Role</th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600 hidden md:table-cell">Department</th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600 hidden lg:table-cell">Last Login</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600 hidden md:table-cell">Installations</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600 hidden lg:table-cell">Department</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600 hidden xl:table-cell">Last Login</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">Status</th>
                   <th className="text-right px-4 py-3 text-sm font-semibold text-slate-600">Actions</th>
                 </tr>
@@ -1293,11 +1294,33 @@ const SettingsUserManagementPage = () => {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {user.assigned_installations && user.assigned_installations.length > 0 ? (
+                            user.assigned_installations.slice(0, 2).map((inst, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                                <Factory className="w-3 h-3 mr-1" />
+                                {inst}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              No access
+                            </span>
+                          )}
+                          {user.assigned_installations && user.assigned_installations.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{user.assigned_installations.length - 2} more
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
                         <span className="text-sm text-slate-600">
                           {user.department || "-"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
+                      <td className="px-4 py-3 hidden xl:table-cell">
                         <span className="text-sm text-slate-500">
                           {formatDate(user.last_login)}
                         </span>

@@ -311,6 +311,7 @@ class RBACService:
             "department": user.get("department"),
             "position": user.get("position"),
             "phone": user.get("phone"),
+            "assigned_installations": user.get("assigned_installations", []),
             "created_at": serialize_date(user.get("created_at")),
             "last_login": serialize_date(user.get("last_login")),
             "role_updated_at": serialize_date(user.get("role_updated_at")),

@@ -6,7 +6,7 @@ from typing import List, Optional
 from datetime import datetime, timezone
 import uuid
 import logging
-from database import db, failure_modes_service, efm_service
+from database import db, failure_modes_service, efm_service, installation_filter
 from auth import get_current_user
 from models.api_models import ThreatResponse, ThreatUpdate
 from failure_modes import FAILURE_MODES_LIBRARY
@@ -84,9 +84,31 @@ async def get_threats(
     limit: int = 100,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"created_by": current_user["id"]}
+    # Get user's installation filter data
+    installation_ids = await installation_filter.get_user_installation_ids(current_user)
+    
+    # If no installations assigned, return empty list
+    if not installation_ids:
+        return []
+    
+    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+        installation_ids, current_user["id"]
+    )
+    equipment_names = await installation_filter.get_equipment_names_for_installations(
+        installation_ids, current_user["id"]
+    )
+    
+    # Build filter with installation scope
+    additional_filters = {}
     if status:
-        query["status"] = status
+        additional_filters["status"] = status
+    
+    query = installation_filter.build_threat_filter(
+        current_user["id"], equipment_ids, equipment_names, additional_filters
+    )
+    
+    if query.get("_impossible"):
+        return []
     
     threats = await db.threats.find(query, {"_id": 0}).sort("rank", 1).limit(limit).to_list(limit)
     total_count = len(threats)
@@ -128,10 +150,29 @@ async def get_top_threats(
     limit: int = 10,
     current_user: dict = Depends(get_current_user)
 ):
-    threats = await db.threats.find(
-        {"created_by": current_user["id"], "status": {"$ne": "Closed"}},
-        {"_id": 0}
-    ).sort("risk_score", -1).limit(limit).to_list(limit)
+    # Get user's installation filter data
+    installation_ids = await installation_filter.get_user_installation_ids(current_user)
+    
+    # If no installations assigned, return empty list
+    if not installation_ids:
+        return []
+    
+    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+        installation_ids, current_user["id"]
+    )
+    equipment_names = await installation_filter.get_equipment_names_for_installations(
+        installation_ids, current_user["id"]
+    )
+    
+    # Build filter with installation scope
+    query = installation_filter.build_threat_filter(
+        current_user["id"], equipment_ids, equipment_names, {"status": {"$ne": "Closed"}}
+    )
+    
+    if query.get("_impossible"):
+        return []
+    
+    threats = await db.threats.find(query, {"_id": 0}).sort("risk_score", -1).limit(limit).to_list(limit)
     total_count = len(threats)
     
     # Enrich with creator info (name, picture, position)
