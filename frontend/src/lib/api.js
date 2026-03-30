@@ -500,6 +500,21 @@ export const investigationAPI = {
     });
     return response.data;
   },
+  
+  // Report generation
+  downloadReportPPTX: async (investigationId) => {
+    const response = await api.get(`/investigations/${investigationId}/report/pptx`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+  
+  downloadReportPDF: async (investigationId) => {
+    const response = await api.get(`/investigations/${investigationId}/report/pdf`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
 };
 
 // Centralized Actions API

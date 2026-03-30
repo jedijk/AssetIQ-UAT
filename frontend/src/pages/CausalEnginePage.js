@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 import {
   Search, Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
   ChevronRight, Trash2, Calendar, User, MapPin,
-  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Save, Lock, ShieldCheck, UserCheck, CheckCircle, ExternalLink,
+  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Save, Lock, ShieldCheck, UserCheck, CheckCircle, ExternalLink, FileDown, Presentation,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { SearchableSelect } from "../components/ui/searchable-select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { CauseTree, CAUSE_CATEGORIES } from "../components/CauseNodeItem";
 import BackButton from "../components/BackButton";
 import { NewInvestigationDialog, EventDialog, FailureDialog, CauseDialog, ActionDialog } from "../components/causal-engine/InvestigationDialogs";
@@ -95,6 +96,7 @@ export default function CausalEnginePage() {
   const [actionForm, setActionForm] = useState({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" });
   const [localNotes, setLocalNotes] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const fileInputRef = useRef(null);
   
   useEffect(() => {
@@ -603,6 +605,51 @@ export default function CausalEnginePage() {
     );
   }, [centralActions]);
 
+  // Report download functions
+  const handleDownloadPPTX = async () => {
+    if (!selectedInvId) return;
+    setIsGeneratingReport(true);
+    try {
+      const blob = await investigationAPI.downloadReportPPTX(selectedInvId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Investigation_${investigation?.case_number || selectedInvId}.pptx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("PowerPoint report downloaded!");
+    } catch (error) {
+      console.error("Failed to download PPTX:", error);
+      toast.error("Failed to generate PowerPoint report");
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!selectedInvId) return;
+    setIsGeneratingReport(true);
+    try {
+      const blob = await investigationAPI.downloadReportPDF(selectedInvId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Investigation_${investigation?.case_number || selectedInvId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("PDF report downloaded!");
+    } catch (error) {
+      console.error("Failed to download PDF:", error);
+      toast.error("Failed to generate PDF report");
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   const handleEditCause = useCallback((node) => {
     setEditingItem({ type: "cause", data: node });
     setCauseForm({ description: node.description, category: node.category, parent_id: node.parent_id, is_root_cause: node.is_root_cause, evidence: node.evidence || "", comment: node.comment || "" });
@@ -908,6 +955,36 @@ export default function CausalEnginePage() {
                         <p className="text-sm text-slate-600">{investigation.description}</p>
                       </div>
                       <div className="flex items-center gap-1">
+                        {/* Export Dropdown */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-slate-600 h-8"
+                              disabled={isGeneratingReport}
+                              data-testid="export-report-btn"
+                            >
+                              {isGeneratingReport ? (
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                              ) : (
+                                <FileDown className="w-4 h-4 mr-1" />
+                              )}
+                              Export
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={handleDownloadPPTX} disabled={isGeneratingReport}>
+                              <Presentation className="w-4 h-4 mr-2 text-orange-500" />
+                              PowerPoint (.pptx)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleDownloadPDF} disabled={isGeneratingReport}>
+                              <FileText className="w-4 h-4 mr-2 text-red-500" />
+                              PDF Report (.pdf)
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        
                         {!isInvestigationLocked && (
                           <Button variant="ghost" size="icon" onClick={handleEditInvestigation} className="text-slate-500 hover:text-blue-600" data-testid="edit-investigation-btn">
                             <Edit className="w-4 h-4" />

@@ -44,6 +44,42 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 
 ## Completed Work
 
+### March 30, 2026 (Session 6)
+- **Added:** Report Generation for Causal Investigations (P0)
+  - PowerPoint (.pptx) export with professional styling
+  - PDF export with tables and formatted sections
+  - Reports include: Overview, Timeline, Failures, Root Causes, Actions, Summary
+  - Export dropdown in investigation header
+  - Files: `/app/backend/routes/reports.py`, updated `CausalEnginePage.js`
+
+- **Added:** Searchable Dropdowns across the application
+  - New `SearchableSelect` component with search input and keyboard navigation
+  - Applied to: Lead, Owner, Discipline, Root Cause dropdowns
+  - Files: `/app/frontend/src/components/ui/searchable-select.jsx`
+
+- **Added:** Investigation Action Plan with Validation
+  - Same look and feel as Observation actions
+  - "In Action Plan" indicator for already-acted items
+  - Validation feature with name/position capture
+  - Central action plan section below investigation actions
+
+- **Added:** Video background to Login and Register pages (4K version)
+  - Dolly 4K.mov video plays behind the blue gradient overlay
+  - Works on both desktop (left panel) and mobile (full background behind form)
+
+- **Fixed:** RegisterPage.js still referencing static BACKGROUND_IMAGE
+  - Updated to use BACKGROUND_VIDEO with `<video>` elements
+
+- **Fixed:** Feedback status update validation error (422)
+  - Added missing statuses: `"implemented"`, `"parked"`, `"rejected"`
+
+- **Fixed:** Task execution form double header
+  - Removed white header, embedded back button in purple header
+
+- **Fixed:** Recommended Actions re-acting
+  - Actions already in Action Plan show "Added" badge
+  - "Act" button hidden for already-acted items
+
 ### March 30, 2026 (Session 5)
 - **Added:** Video background to Login and Register pages
   - Dolly 1080p.mov video plays behind the blue gradient overlay

@@ -23,6 +23,7 @@ from routes.feedback import router as feedback_router
 from routes.image_analysis import router as image_analysis_router
 from routes.definitions import router as definitions_router
 from routes.users import router as users_router
+from routes.reports import router as reports_router
 
 all_routers = [
     auth_router,
@@ -47,4 +48,5 @@ all_routers = [
     image_analysis_router,
     definitions_router,
     users_router,
+    reports_router,
 ]
