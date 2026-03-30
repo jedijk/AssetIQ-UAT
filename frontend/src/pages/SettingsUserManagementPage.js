@@ -724,7 +724,7 @@ const SettingsUserManagementPage = () => {
                     {/* Actions Menu */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid={`mobile-user-menu-${user.id}`}>
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -1706,7 +1706,7 @@ const SettingsUserManagementPage = () => {
           setSelectedInstallations([]);
         }
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Factory className="w-5 h-5 text-blue-600" />
