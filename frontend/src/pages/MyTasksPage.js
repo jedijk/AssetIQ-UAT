@@ -1054,14 +1054,6 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   // Main Task Execution Form Content
   const TaskFormContent = (
     <div className="flex flex-col h-full">
-      {/* Form Header - Compact gradient on mobile */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 sm:px-6 sm:py-4">
-        <h3 className="text-white font-semibold text-base sm:text-lg truncate">{task?.title || task?.form_name || "Task Execution"}</h3>
-        <p className="text-white/70 text-xs sm:text-sm mt-0.5 truncate">
-          {task?.equipment_name || task?.asset || "Complete the form below"}
-        </p>
-      </div>
-
       {/* Form Body with padding */}
       <div className="px-4 py-3 sm:px-6 sm:py-4 flex-1 overflow-y-auto">
         {/* Context Block - Compact on mobile */}
@@ -1226,20 +1218,24 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   // Render as full-page Frame View with Back Button
   return (
     <div className="h-full flex flex-col bg-white" data-testid="task-execution-frame">
-      {/* Back Header - Minimalist on mobile */}
-      <div className="flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-3 border-b border-slate-200 bg-white sticky top-0 z-10">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 sm:h-9 sm:w-9"
-          onClick={onBack}
-          data-testid="task-execution-back-btn"
-        >
-          <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-slate-900 text-sm sm:text-base truncate">{task?.title || "Execute Task"}</h2>
-          <p className="text-xs text-slate-500 truncate">{task?.equipment_name || task?.asset || ""}</p>
+      {/* Purple Header with Back Button */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-3 py-3 sm:px-4 sm:py-4 sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 sm:h-9 sm:w-9 text-white hover:bg-white/20"
+            onClick={onBack}
+            data-testid="task-execution-back-btn"
+          >
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white font-semibold text-base sm:text-lg truncate">{task?.title || task?.form_name || "Task Execution"}</h3>
+            <p className="text-white/70 text-xs sm:text-sm truncate">
+              {task?.equipment_name || task?.asset || "Complete the form below"}
+            </p>
+          </div>
         </div>
       </div>
       
