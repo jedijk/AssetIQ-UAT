@@ -1,12 +1,13 @@
 """
 RBAC Service - Role-Based Access Control.
 
-Implements 5 User Roles:
-1. Admin: Full access, can manage users and roles
-2. Reliability Engineer: Full access to analysis, limited settings
-3. Maintenance: Task management, observations, limited analysis
-4. Operations: View threats, create observations, limited editing
-5. Viewer: Read-only access across the platform
+Implements 6 User Roles:
+1. Owner: Super admin - sees all installations, full access
+2. Admin: Full access, can manage users and roles
+3. Reliability Engineer: Full access to analysis, limited settings
+4. Maintenance: Task management, observations, limited analysis
+5. Operations: View threats, create observations, limited editing
+6. Viewer: Read-only access across the platform
 """
 
 from datetime import datetime, timezone
@@ -19,6 +20,25 @@ logger = logging.getLogger(__name__)
 
 # Role definitions with permissions
 ROLES = {
+    "owner": {
+        "name": "Owner",
+        "description": "Super admin with access to all installations and full control",
+        "permissions": [
+            "users:read", "users:write", "users:delete",
+            "threats:read", "threats:write", "threats:delete",
+            "equipment:read", "equipment:write", "equipment:delete",
+            "library:read", "library:write", "library:delete",
+            "investigations:read", "investigations:write", "investigations:delete",
+            "actions:read", "actions:write", "actions:delete",
+            "tasks:read", "tasks:write", "tasks:delete",
+            "forms:read", "forms:write", "forms:delete",
+            "observations:read", "observations:write", "observations:delete",
+            "decision_engine:read", "decision_engine:write",
+            "analytics:read", "analytics:export",
+            "settings:read", "settings:write",
+            "installations:all"  # Special permission to see all installations
+        ]
+    },
     "admin": {
         "name": "Admin",
         "description": "Full access to all features including user management",

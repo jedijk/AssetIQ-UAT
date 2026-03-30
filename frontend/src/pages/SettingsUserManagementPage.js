@@ -37,6 +37,7 @@ import {
   UserPlus,
   Bell,
   Factory,
+  Crown,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -69,6 +70,7 @@ const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
 
 // Role icons mapping
 const roleIcons = {
+  owner: Crown,
   admin: ShieldAlert,
   reliability_engineer: ShieldCheck,
   maintenance: Wrench,
@@ -78,6 +80,7 @@ const roleIcons = {
 
 // Role colors
 const roleColors = {
+  owner: "bg-purple-100 text-purple-800 border-purple-200",
   admin: "bg-red-100 text-red-800 border-red-200",
   reliability_engineer: "bg-blue-100 text-blue-800 border-blue-200",
   maintenance: "bg-amber-100 text-amber-800 border-amber-200",
@@ -1300,7 +1303,12 @@ const SettingsUserManagementPage = () => {
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         <div className="flex flex-wrap gap-1">
-                          {user.assigned_installations && user.assigned_installations.length > 0 ? (
+                          {user.role === "owner" ? (
+                            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                              <Crown className="w-3 h-3 mr-1" />
+                              All Installations
+                            </Badge>
+                          ) : user.assigned_installations && user.assigned_installations.length > 0 ? (
                             user.assigned_installations.slice(0, 2).map((inst, idx) => (
                               <Badge key={idx} variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
                                 <Factory className="w-3 h-3 mr-1" />
@@ -1313,7 +1321,7 @@ const SettingsUserManagementPage = () => {
                               No access
                             </span>
                           )}
-                          {user.assigned_installations && user.assigned_installations.length > 2 && (
+                          {user.role !== "owner" && user.assigned_installations && user.assigned_installations.length > 2 && (
                             <Badge variant="outline" className="text-xs">
                               +{user.assigned_installations.length - 2} more
                             </Badge>

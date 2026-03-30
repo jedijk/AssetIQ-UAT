@@ -219,8 +219,8 @@ async def update_user_status(
 async def get_pending_users(
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all users with pending approval status. Admin only."""
-    if current_user.get("role") not in ["admin"]:
+    """Get all users with pending approval status. Admin/Owner only."""
+    if current_user.get("role") not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     pending_users = await db.users.find(
@@ -237,8 +237,8 @@ async def approve_user(
     approval_data: dict,
     current_user: dict = Depends(get_current_user)
 ):
-    """Approve or reject a pending user. Admin only."""
-    if current_user.get("role") not in ["admin"]:
+    """Approve or reject a pending user. Admin/Owner only."""
+    if current_user.get("role") not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     action = approval_data.get("action")  # "approve" or "reject"
@@ -318,8 +318,8 @@ async def update_user_installations(
     data: dict,
     current_user: dict = Depends(get_current_user)
 ):
-    """Update user's assigned installations. Admin only."""
-    if current_user.get("role") not in ["admin"]:
+    """Update user's assigned installations. Admin/Owner only."""
+    if current_user.get("role") not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     user = await db.users.find_one({"id": user_id}, {"_id": 0})

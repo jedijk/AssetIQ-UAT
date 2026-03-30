@@ -1,6 +1,7 @@
 """
 Installation-based filtering service.
 Filters all data based on user's assigned installations.
+Owner role bypasses all installation filtering.
 """
 import logging
 from typing import List, Optional, Set
@@ -14,11 +15,24 @@ class InstallationFilterService:
     def __init__(self, db):
         self.db = db
     
+    def is_owner(self, user: dict) -> bool:
+        """Check if user has owner role (bypasses all installation filtering)."""
+        return user.get("role") == "owner"
+    
     async def get_user_installation_ids(self, user: dict) -> List[str]:
         """
         Get the equipment node IDs for installations assigned to the user.
         Returns empty list if no installations assigned (which means no data access).
+        Owner role gets ALL installations.
         """
+        # Owner bypasses filtering - gets all installations
+        if self.is_owner(user):
+            all_installations = await self.db.equipment_nodes.find(
+                {"level": "installation"},
+                {"_id": 0, "id": 1}
+            ).to_list(500)
+            return [node["id"] for node in all_installations]
+        
         assigned_installations = user.get("assigned_installations", [])
         
         if not assigned_installations:
@@ -34,6 +48,14 @@ class InstallationFilterService:
         ).to_list(100)
         
         return [node["id"] for node in installation_nodes]
+    
+    async def get_all_installation_names(self) -> List[str]:
+        """Get all installation names (for owner role display)."""
+        installations = await self.db.equipment_nodes.find(
+            {"level": "installation"},
+            {"_id": 0, "name": 1}
+        ).to_list(500)
+        return [inst["name"] for inst in installations]
     
     async def get_all_equipment_ids_for_installations(
         self, 
@@ -204,6 +226,9 @@ class InstallationFilterService:
         return [t["id"] for t in threats]
     
     def has_installation_access(self, user: dict) -> bool:
-        """Check if user has any installations assigned."""
+        """Check if user has any installations assigned or is owner."""
+        # Owner always has access to all
+        if self.is_owner(user):
+            return True
         assigned = user.get("assigned_installations", [])
         return len(assigned) > 0
