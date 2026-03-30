@@ -12,7 +12,7 @@ from database import db, EMERGENT_LLM_KEY
 from auth import get_current_user
 
 # AI Integration
-from emergentintegrations.llm.chat import LlmChat
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 # PowerPoint imports
 from pptx import Presentation
@@ -707,53 +707,180 @@ async def generate_ai_summary(data: dict) -> dict:
     causes = data["causes"]
     actions = data["actions"]
     
-    # Prepare context for AI
+    # Compute statistics for richer context
+    root_causes = [c for c in causes if c.get('is_root_cause')]
+    contributing_factors = [c for c in causes if not c.get('is_root_cause')]
+    open_actions = [a for a in actions if a.get('status') in ['open', 'in_progress']]
+    completed_actions = [a for a in actions if a.get('status') == 'completed']
+    high_priority_actions = [a for a in actions if a.get('priority') == 'high']
+    validated_actions = [a for a in actions if a.get('is_validated')]
+    
+    # Build detailed timeline narrative
+    timeline_details = []
+    for i, e in enumerate(events[:15], 1):
+        event_time = e.get('event_time', '')[:16] if e.get('event_time') else 'Unknown time'
+        category = e.get('category', 'event').replace('_', ' ').title()
+        confidence = e.get('confidence', 'medium').title()
+        desc = e.get('description', 'No description')
+        timeline_details.append(f"{i}. [{event_time}] ({category} - {confidence} confidence): {desc}")
+    
+    # Build detailed failure analysis
+    failure_details = []
+    for i, f in enumerate(failures[:10], 1):
+        asset = f.get('asset_name', 'Unknown Asset')
+        component = f.get('component', 'Unknown Component')
+        mode = f.get('failure_mode', 'Unknown Mode')
+        mechanism = f.get('degradation_mechanism', 'Unknown Mechanism')
+        discipline = f.get('discipline', 'N/A')
+        failure_details.append(
+            f"{i}. Asset: {asset} | Component: {component}\n"
+            f"   - Failure Mode: {mode}\n"
+            f"   - Degradation Mechanism: {mechanism}\n"
+            f"   - Discipline: {discipline}"
+        )
+    
+    # Build detailed root cause analysis
+    root_cause_details = []
+    for i, c in enumerate(root_causes[:8], 1):
+        category = c.get('category', 'unknown').replace('_', ' ').title()
+        desc = c.get('description', 'No description')
+        root_cause_details.append(f"{i}. [{category}] {desc}")
+    
+    # Build contributing factors with categories
+    factor_details = []
+    factor_categories = {}
+    for c in contributing_factors[:12]:
+        cat = c.get('category', 'other').replace('_', ' ').title()
+        if cat not in factor_categories:
+            factor_categories[cat] = []
+        factor_categories[cat].append(c.get('description', 'No description'))
+    
+    for cat, items in factor_categories.items():
+        factor_details.append(f"  {cat}:")
+        for item in items[:3]:
+            factor_details.append(f"    • {item}")
+    
+    # Build detailed action plan
+    action_details = []
+    for i, a in enumerate(actions[:12], 1):
+        num = a.get('action_number', f'A{i}')
+        desc = a.get('description', 'No description')
+        owner = a.get('owner', 'Unassigned')
+        priority = a.get('priority', 'medium').title()
+        status = a.get('status', 'open').replace('_', ' ').title()
+        due_date = a.get('due_date', '')[:10] if a.get('due_date') else 'No due date'
+        validated = "✓ Validated" if a.get('is_validated') else "Not validated"
+        action_details.append(
+            f"{num}. {desc}\n"
+            f"   - Owner: {owner} | Priority: {priority} | Status: {status}\n"
+            f"   - Due: {due_date} | {validated}"
+        )
+    
+    # Prepare comprehensive context for AI
     context = f"""
-Investigation: {inv.get('title', 'N/A')}
-Asset: {inv.get('asset_name', 'N/A')}
-Location: {inv.get('location', 'N/A')}
-Incident Date: {inv.get('incident_date', 'N/A')}
-Status: {inv.get('status', 'N/A')}
-Description: {inv.get('description', 'N/A')}
+================================================================================
+                        CAUSAL INVESTIGATION ANALYSIS
+================================================================================
 
-TIMELINE EVENTS ({len(events)}):
-{chr(10).join([f"- [{e.get('category', 'event')}] {e.get('description', '')}" for e in events[:10]])}
+INVESTIGATION IDENTIFICATION
+----------------------------
+• Title: {inv.get('title', 'N/A')}
+• Case Number: {inv.get('case_number', 'N/A')}
+• Asset: {inv.get('asset_name', 'N/A')}
+• Location: {inv.get('location', 'N/A')}
+• Incident Date: {inv.get('incident_date', 'N/A')[:10] if inv.get('incident_date') else 'N/A'}
+• Investigation Status: {inv.get('status', 'N/A').replace('_', ' ').title()}
+• Lead Investigator: {inv.get('investigation_leader', 'N/A')}
 
-IDENTIFIED FAILURES ({len(failures)}):
-{chr(10).join([f"- {f.get('asset_name', '')}: {f.get('failure_mode', '')} - {f.get('degradation_mechanism', '')}" for f in failures[:5]])}
+INCIDENT DESCRIPTION
+--------------------
+{inv.get('description', 'No description provided.')}
 
-ROOT CAUSES:
-{chr(10).join([f"- [ROOT CAUSE] {c.get('description', '')}" for c in causes if c.get('is_root_cause')][:5])}
+================================================================================
+                            TIMELINE OF EVENTS
+                          ({len(events)} events recorded)
+================================================================================
+{chr(10).join(timeline_details) if timeline_details else 'No timeline events recorded.'}
 
-CONTRIBUTING FACTORS:
-{chr(10).join([f"- [{c.get('category', 'factor')}] {c.get('description', '')}" for c in causes if not c.get('is_root_cause')][:5])}
+================================================================================
+                         FAILURE IDENTIFICATION
+                        ({len(failures)} failures identified)
+================================================================================
+{chr(10).join(failure_details) if failure_details else 'No failures identified.'}
 
-CORRECTIVE ACTIONS ({len(actions)}):
-{chr(10).join([f"- [{a.get('priority', 'medium')}] {a.get('description', '')} - Status: {a.get('status', 'open')}" for a in actions[:8]])}
+================================================================================
+                          ROOT CAUSE ANALYSIS
+================================================================================
+PRIMARY ROOT CAUSES ({len(root_causes)} identified):
+{chr(10).join(root_cause_details) if root_cause_details else '• No root causes identified yet.'}
+
+CONTRIBUTING FACTORS ({len(contributing_factors)} identified):
+{chr(10).join(factor_details) if factor_details else '• No contributing factors identified.'}
+
+================================================================================
+                        CORRECTIVE ACTION PLAN
+                        ({len(actions)} total actions)
+================================================================================
+Action Statistics:
+• Open/In-Progress: {len(open_actions)}
+• Completed: {len(completed_actions)}
+• High Priority: {len(high_priority_actions)}
+• Validated: {len(validated_actions)}
+
+Detailed Action Items:
+{chr(10).join(action_details) if action_details else 'No corrective actions defined.'}
+
+================================================================================
 """
     
-    prompt = f"""You are an expert reliability engineer analyzing a causal investigation report. Based on the following investigation data, provide:
+    prompt = f"""You are a senior reliability engineer and root cause analysis expert preparing an executive briefing based on a completed causal investigation. Your analysis must be DATA-DRIVEN and reference SPECIFIC details from the investigation.
 
-1. A concise executive summary (2-3 paragraphs) covering the incident, key findings, and overall assessment
-2. A list of 3-5 key findings from the investigation
-3. A list of 4-6 specific, actionable next steps the team should take
-4. A list of 2-4 strategic recommendations for preventing similar incidents
+ANALYSIS REQUIREMENTS:
+1. EXECUTIVE SUMMARY (3-4 detailed paragraphs):
+   - Paragraph 1: Describe what happened - reference the specific asset ({inv.get('asset_name', 'the asset')}), location, and incident date. Summarize the event sequence.
+   - Paragraph 2: Explain WHY it happened - explicitly name the identified root causes and explain their relationship to the failure modes.
+   - Paragraph 3: Describe the impact and current action plan status. Reference specific numbers (e.g., "{len(open_actions)} actions pending, {len(completed_actions)} completed").
+   - Paragraph 4: Provide overall assessment of investigation completeness and risk exposure.
+
+2. KEY FINDINGS (5-7 findings):
+   - Each finding must reference specific data from the investigation
+   - Include the actual failure modes, mechanisms, and root causes identified
+   - Cite specific contributing factors discovered
+   - Reference action plan progress with real numbers
+
+3. NEXT STEPS (5-8 specific actions):
+   - Prioritize based on the HIGH PRIORITY actions that are still OPEN
+   - Reference specific owners and due dates where available
+   - Include validation requirements for unvalidated actions
+   - Add follow-up investigation steps if root causes are incomplete
+
+4. STRATEGIC RECOMMENDATIONS (3-5 recommendations):
+   - Based on the specific failure modes and mechanisms found
+   - Reference the contributing factor categories
+   - Include preventive measures tied to the actual root causes
+   - Suggest systemic improvements based on investigation findings
 
 {context}
 
-Respond in JSON format with the following structure:
-{{
-  "summary": "Executive summary text here...",
-  "key_findings": ["Finding 1", "Finding 2", ...],
-  "next_steps": ["Step 1", "Step 2", ...],
-  "recommendations": ["Recommendation 1", "Recommendation 2", ...]
-}}
+CRITICAL: Your response must be CONTENT-RICH and reference actual data points, names, dates, equipment, and findings from this investigation. Avoid generic statements. Every bullet point should contain specific information.
 
-Focus on actionable insights and practical recommendations. Be specific to this investigation."""
+Respond in JSON format:
+{{
+  "summary": "Multi-paragraph executive summary with specific references...",
+  "key_findings": ["Specific finding 1 with data...", "Specific finding 2 with data...", ...],
+  "next_steps": ["Specific action with owner/date...", "Specific action 2...", ...],
+  "recommendations": ["Specific recommendation based on findings...", ...]
+}}"""
 
     try:
-        chat = LlmChat(api_key=EMERGENT_LLM_KEY, model="gpt-5.2")
-        response = await chat.send_message_async(prompt)
+        import uuid
+        inv_id = inv.get('id', str(uuid.uuid4()))
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY, 
+            session_id=f"ai-summary-{inv_id}-{uuid.uuid4()}",
+            system_message="You are a senior reliability engineer and root cause analysis expert. Always respond with valid JSON only."
+        ).with_model("openai", "gpt-5.2")
+        response = await chat.send_message(UserMessage(text=prompt))
         
         # Parse JSON response
         import json
@@ -770,24 +897,40 @@ Focus on actionable insights and practical recommendations. Be specific to this 
         return result
     except Exception as e:
         logger.error(f"Error generating AI summary: {e}")
-        # Return a basic fallback
+        # Return a detailed fallback that still references specific data
+        root_cause_list = [c.get('description', 'Unknown') for c in root_causes[:3]]
+        failure_list = [f"{f.get('asset_name', 'Asset')}: {f.get('failure_mode', 'Unknown failure')}" for f in failures[:3]]
+        pending_owners = list(set([a.get('owner', 'Unassigned') for a in open_actions[:5]]))
+        
         return {
-            "summary": f"Investigation '{inv.get('title', 'N/A')}' identified {len([c for c in causes if c.get('is_root_cause')])} root causes and {len(failures)} failure modes. {len(actions)} corrective actions have been defined.",
+            "summary": f"""Investigation '{inv.get('title', 'N/A')}' (Case #{inv.get('case_number', 'N/A')}) was initiated following an incident at {inv.get('asset_name', 'the asset')} located in {inv.get('location', 'the facility')}. The investigation timeline captured {len(events)} events leading to the incident.
+
+The root cause analysis identified {len(root_causes)} primary root cause(s) and {len(contributing_factors)} contributing factors. {f"Key root causes include: {'; '.join(root_cause_list)}." if root_cause_list else "Root cause identification is still in progress."} Failure analysis revealed {len(failures)} failure mode(s) affecting the asset.
+
+The corrective action plan contains {len(actions)} total actions, of which {len(completed_actions)} are completed, {len(open_actions)} remain open, and {len(validated_actions)} have been validated. {f"High priority actions ({len(high_priority_actions)}) require immediate attention." if high_priority_actions else ""}
+
+Overall investigation status: {inv.get('status', 'In Progress').replace('_', ' ').title()}. {"Immediate action required to address open high-priority items." if high_priority_actions else "Continue systematic closure of remaining action items."}""",
             "key_findings": [
-                f"Identified {len(failures)} failure identification(s)",
-                f"Found {len([c for c in causes if c.get('is_root_cause')])} root cause(s)",
-                f"{len([a for a in actions if a.get('status') == 'completed'])} of {len(actions)} actions completed"
+                f"Timeline Analysis: {len(events)} events documented, establishing the incident sequence",
+                f"Failure Modes: {len(failures)} failure(s) identified - {', '.join(failure_list) if failure_list else 'Analysis in progress'}",
+                f"Root Causes: {len(root_causes)} primary root cause(s) confirmed through investigation",
+                f"Contributing Factors: {len(contributing_factors)} factors identified across {len(factor_categories)} categories",
+                f"Action Plan Status: {len(completed_actions)}/{len(actions)} actions completed ({int(len(completed_actions)/len(actions)*100) if actions else 0}% completion rate)",
+                f"Validation Progress: {len(validated_actions)} of {len(actions)} actions validated by designated personnel"
             ],
             "next_steps": [
-                "Review and validate all identified root causes",
-                "Prioritize and assign owners to open action items",
-                "Schedule follow-up review in 2-4 weeks",
-                "Document lessons learned"
+                f"Complete root cause validation for {len(root_causes)} identified causes" if root_causes else "Initiate root cause analysis to identify primary failure causes",
+                f"Address {len(high_priority_actions)} high-priority open actions immediately" if high_priority_actions else "Review action prioritization and ensure critical items are flagged",
+                f"Obtain validation sign-off for {len(actions) - len(validated_actions)} unvalidated actions" if actions else "Define corrective actions based on root cause findings",
+                f"Follow up with action owners: {', '.join(pending_owners[:3])}" if pending_owners else "Assign owners to all open action items",
+                "Schedule 2-week progress review with investigation team",
+                "Update FMEA library with lessons learned from this investigation"
             ],
             "recommendations": [
-                "Implement preventive maintenance procedures",
-                "Update equipment monitoring protocols",
-                "Share findings with relevant teams"
+                f"Implement preventive measures targeting the identified root causes: {root_cause_list[0] if root_cause_list else 'TBD'}",
+                f"Update inspection protocols for {inv.get('asset_name', 'affected equipment')} based on failure mode analysis",
+                "Establish leading indicators to detect similar failure patterns earlier",
+                "Share investigation findings with maintenance and operations teams during toolbox talks"
             ]
         }
 

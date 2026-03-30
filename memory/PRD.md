@@ -44,6 +44,18 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 
 ## Completed Work
 
+### March 30, 2026 (Session 7)
+- **Enhanced:** AI Investigation Summary - Content-Driven Analysis (P0)
+  - Rewrote AI prompt to generate highly specific, data-heavy summaries
+  - Summary now references: specific action numbers (ACT-001, ACT-002, etc.)
+  - Includes exact statistics: "8 actions, 0 completed, 0 validated"
+  - References actual equipment names, failure modes, root cause mechanisms
+  - Multi-paragraph executive summary with incident timeline
+  - Detailed validation requirements for each corrective action
+  - Strategic recommendations tied to specific root causes
+  - Fixed LlmChat API usage (with_model, send_message patterns)
+  - Files: `/app/backend/routes/reports.py` (generate_ai_summary function)
+
 ### March 30, 2026 (Session 6)
 - **Added:** Report Generation for Causal Investigations (P0)
   - PowerPoint (.pptx) export with professional styling
