@@ -420,149 +420,147 @@ export default function DashboardPage() {
         </div>
         
         {/* Dashboard Tab Buttons - Mobile Optimized */}
-        <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1">
-          <button 
-            onClick={() => setActiveTab("operational")}
-            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
-            data-testid="operational-tab"
-          >
-            <Activity className="w-4 h-4 flex-shrink-0" />
-            <span>{t("dashboard.operational") || "Operational"}</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab("reliability")}
-            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
-            data-testid="reliability-tab"
-          >
-            <Gauge className="w-4 h-4 flex-shrink-0" />
-            <span className="hidden sm:inline">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</span>
-            <span className="sm:hidden">Reliability</span>
-          </button>
+        <div className="flex items-center justify-between gap-4">
+          <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1">
+            <button 
+              onClick={() => setActiveTab("operational")}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+              data-testid="operational-tab"
+            >
+              <Activity className="w-4 h-4 flex-shrink-0" />
+              <span>{t("dashboard.operational") || "Operational"}</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab("reliability")}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+              data-testid="reliability-tab"
+            >
+              <Gauge className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</span>
+              <span className="sm:hidden">Reliability</span>
+            </button>
+          </div>
+          
+          {/* Filter Button - Next to tabs, only on operational */}
+          {activeTab === "operational" && (
+            <div className="flex items-center gap-2">
+              {/* Active Filter Badges */}
+              {hasActiveFilters && (
+                <div className="hidden sm:flex items-center gap-2">
+                  {disciplineFilter !== "all" && (
+                    <Badge variant="secondary" className="gap-1 bg-slate-100">
+                      <Wrench className="w-3 h-3" />
+                      {DISCIPLINES.find(d => d.value === disciplineFilter)?.label || disciplineFilter}
+                      <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setDisciplineFilter("all")} />
+                    </Badge>
+                  )}
+                  {ownerFilter !== "all" && (
+                    <Badge variant="secondary" className="gap-1 bg-slate-100">
+                      <User className="w-3 h-3" />
+                      {usersList.find(u => u.id === ownerFilter)?.name || "Unknown"}
+                      <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setOwnerFilter("all")} />
+                    </Badge>
+                  )}
+                  {plantUnitFilter !== "all" && (
+                    <Badge variant="secondary" className="gap-1 bg-slate-100">
+                      <Building2 className="w-3 h-3" />
+                      {plantUnitFilter}
+                      <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setPlantUnitFilter("all")} />
+                    </Badge>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-slate-500 hover:text-red-500 h-7 px-2">
+                    Clear
+                  </Button>
+                </div>
+              )}
+              <Button
+                variant={showFilters ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-1.5 h-9"
+              >
+                <Filter className="w-4 h-4" />
+                <span className="hidden sm:inline">Filters</span>
+                {hasActiveFilters && (
+                  <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-700 px-1.5 py-0 text-xs">
+                    {[disciplineFilter !== "all", ownerFilter !== "all", plantUnitFilter !== "all"].filter(Boolean).length}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
+        
+        {/* Expanded Filter Panel - Below tabs when open */}
+        {activeTab === "operational" && showFilters && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Discipline Filter */}
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+                  <Wrench className="w-3 h-3" /> Discipline
+                </label>
+                <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
+                  <SelectTrigger className="h-9 bg-white">
+                    <SelectValue placeholder="All Disciplines" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Disciplines</SelectItem>
+                    {DISCIPLINES.map(d => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Owner Filter */}
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+                  <User className="w-3 h-3" /> Owner / Assignee
+                </label>
+                <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+                  <SelectTrigger className="h-9 bg-white">
+                    <SelectValue placeholder="All Users" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Users</SelectItem>
+                    {usersList.map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Plant/Unit Filter */}
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+                  <Building2 className="w-3 h-3" /> Plant / Unit
+                </label>
+                <Select value={plantUnitFilter} onValueChange={setPlantUnitFilter}>
+                  <SelectTrigger className="h-9 bg-white">
+                    <SelectValue placeholder="All Plants/Units" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Plants/Units</SelectItem>
+                    {plantUnits.map(pu => (
+                      <SelectItem key={pu} value={pu}>{pu}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </div>
       
       {/* Scrollable Tab Content */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
         <div className="max-w-7xl mx-auto">
-          {/* Filter Bar - Only show on operational tab */}
-          {activeTab === "operational" && (
-            <div className="mb-4">
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Filter Toggle Button */}
-                <Button
-                  variant={showFilters ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="gap-1.5"
-                >
-                  <Filter className="w-4 h-4" />
-                  Filters
-                  {hasActiveFilters && (
-                    <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-700 px-1.5 py-0">
-                      {[disciplineFilter !== "all", ownerFilter !== "all", plantUnitFilter !== "all"].filter(Boolean).length}
-                    </Badge>
-                  )}
-                </Button>
-                
-                {/* Active Filter Badges */}
-                {hasActiveFilters && (
-                  <>
-                    {disciplineFilter !== "all" && (
-                      <Badge variant="secondary" className="gap-1 bg-slate-100">
-                        <Wrench className="w-3 h-3" />
-                        {DISCIPLINES.find(d => d.value === disciplineFilter)?.label || disciplineFilter}
-                        <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setDisciplineFilter("all")} />
-                      </Badge>
-                    )}
-                    {ownerFilter !== "all" && (
-                      <Badge variant="secondary" className="gap-1 bg-slate-100">
-                        <User className="w-3 h-3" />
-                        {usersList.find(u => u.id === ownerFilter)?.name || "Unknown"}
-                        <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setOwnerFilter("all")} />
-                      </Badge>
-                    )}
-                    {plantUnitFilter !== "all" && (
-                      <Badge variant="secondary" className="gap-1 bg-slate-100">
-                        <Building2 className="w-3 h-3" />
-                        {plantUnitFilter}
-                        <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setPlantUnitFilter("all")} />
-                      </Badge>
-                    )}
-                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-slate-500 hover:text-red-500">
-                      Clear all
-                    </Button>
-                  </>
-                )}
-              </div>
-              
-              {/* Expanded Filter Panel */}
-              {showFilters && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {/* Discipline Filter */}
-                    <div>
-                      <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
-                        <Wrench className="w-3 h-3" /> Discipline
-                      </label>
-                      <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
-                        <SelectTrigger className="h-9 bg-white">
-                          <SelectValue placeholder="All Disciplines" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Disciplines</SelectItem>
-                          {DISCIPLINES.map(d => (
-                            <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {/* Owner Filter */}
-                    <div>
-                      <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
-                        <User className="w-3 h-3" /> Owner / Assignee
-                      </label>
-                      <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-                        <SelectTrigger className="h-9 bg-white">
-                          <SelectValue placeholder="All Users" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Users</SelectItem>
-                          {usersList.map(u => (
-                            <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {/* Plant/Unit Filter */}
-                    <div>
-                      <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
-                        <Building2 className="w-3 h-3" /> Plant / Unit
-                      </label>
-                      <Select value={plantUnitFilter} onValueChange={setPlantUnitFilter}>
-                        <SelectTrigger className="h-9 bg-white">
-                          <SelectValue placeholder="All Plants/Units" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Plants/Units</SelectItem>
-                          {plantUnits.map(pu => (
-                            <SelectItem key={pu} value={pu}>{pu}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </div>
-          )}
-          
           {/* Operational Dashboard Tab */}
           {activeTab === "operational" && (
             <div className="animate-fade-in">
