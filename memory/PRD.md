@@ -44,6 +44,23 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
 
 ## Completed Work
 
+### March 30, 2026 (Session 5)
+- **Added:** Video background to Login and Register pages
+  - Dolly 1080p.mov video plays behind the blue gradient overlay
+  - Works on both desktop (left panel) and mobile (full background behind form)
+  - Mobile uses fixed video element with overlay gradient
+  - Files: `/app/frontend/src/pages/LoginPage.js`, `/app/frontend/src/pages/RegisterPage.js`
+
+- **Fixed:** RegisterPage.js still referencing static BACKGROUND_IMAGE
+  - Updated to use BACKGROUND_VIDEO with `<video>` elements matching LoginPage
+  - Added mobile video background support
+  - File: `/app/frontend/src/pages/RegisterPage.js`
+
+- **Fixed:** Feedback status update validation error (422)
+  - Backend FeedbackUserUpdate Pydantic model only accepted `"new"` and `"resolved"`
+  - Added missing statuses: `"implemented"`, `"parked"`, `"rejected"`
+  - File: `/app/backend/models/feedback_models.py`
+
 ### March 29, 2026 (Session 4)
 - **Styled:** Top 10 Highest Risk Observations to match Recent Observations layout
   - Converted from table view to card-based row layout

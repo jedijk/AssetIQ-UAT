@@ -53,12 +53,15 @@ const RegisterPage = () => {
   if (registrationComplete) {
     return (
       <div className="register-page-container">
-        {/* Left side - Background Image with Overlay */}
+        {/* Left side - Background Video with Overlay */}
         <div className="register-image-section">
-          <img 
-            src={BACKGROUND_IMAGE} 
-            alt="Industrial Plant" 
-            className="register-bg-image"
+          <video 
+            src={BACKGROUND_VIDEO}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="register-bg-video"
           />
           <div className="register-image-overlay" />
           <div className="register-image-content">
@@ -75,7 +78,16 @@ const RegisterPage = () => {
 
         {/* Right side - Success Message */}
         <div className="register-form-section">
-          <div className="register-form-container">
+          {/* Mobile Video Background */}
+          <video 
+            src={BACKGROUND_VIDEO}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="register-mobile-video lg:hidden"
+          />
+          <div className="register-form-wrapper">
             <div className="text-center space-y-6">
               <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
                 <CheckCircle2 className="w-8 h-8 text-green-600" />
@@ -107,16 +119,19 @@ const RegisterPage = () => {
         </div>
       </div>
     );
-  };
+  }
 
   return (
     <div className="register-page-container">
-      {/* Left side - Background Image with Overlay */}
+      {/* Left side - Background Video with Overlay */}
       <div className="register-image-section">
-        <img 
-          src={BACKGROUND_IMAGE} 
-          alt="Industrial Plant" 
-          className="register-bg-image"
+        <video 
+          src={BACKGROUND_VIDEO}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="register-bg-video"
         />
         <div className="register-image-overlay" />
         <div className="register-image-content">
@@ -151,6 +166,16 @@ const RegisterPage = () => {
 
       {/* Right side - Register Form */}
       <div className="register-form-section">
+        {/* Mobile Video Background */}
+        <video 
+          src={BACKGROUND_VIDEO}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="register-mobile-video lg:hidden"
+        />
+        
         <div className="register-form-wrapper animate-fade-in">
           {/* Mobile Logo (hidden on desktop) */}
           <div className="register-mobile-logo">
@@ -260,7 +285,7 @@ const RegisterPage = () => {
           }
         }
 
-        .register-bg-image {
+        .register-bg-video {
           position: absolute;
           inset: 0;
           width: 100%;
@@ -379,13 +404,11 @@ const RegisterPage = () => {
           }
         }
 
-        /* Mobile full background */
+        /* Mobile video background */
         @media (max-width: 1023px) {
           .register-page-container {
-            background-image: url('${BACKGROUND_IMAGE}');
-            background-size: cover;
-            background-position: center;
             position: relative;
+            overflow: hidden;
           }
 
           .register-page-container::before {
@@ -398,6 +421,16 @@ const RegisterPage = () => {
               rgba(30, 64, 175, 0.85) 50%,
               rgba(15, 23, 42, 0.95) 100%
             );
+            z-index: 1;
+          }
+
+          .register-mobile-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
           }
 
           .register-form-section {

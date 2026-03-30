@@ -27,7 +27,7 @@ class FeedbackUserUpdate(BaseModel):
     message: Optional[str] = None
     severity: Optional[Literal["low", "medium", "high", "critical"]] = None
     screenshot_url: Optional[str] = None
-    status: Optional[Literal["new", "resolved"]] = None  # Users can only set to new or resolved
+    status: Optional[Literal["new", "resolved", "implemented", "parked", "rejected"]] = None
 
 
 class FeedbackResponse(BaseModel):
