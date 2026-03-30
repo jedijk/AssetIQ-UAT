@@ -505,7 +505,15 @@ const TaskSchedulerPage = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries(["task-instances"]);
       queryClient.invalidateQueries(["task-stats"]);
-      toast.success(`Generated ${data.created || 0} new executions`);
+      const count = data.instances_generated ?? data.created ?? 0;
+      const plansCount = data.plans_processed || 0;
+      if (count > 0) {
+        toast.success(`Generated ${count} new executions from ${plansCount} plans`);
+      } else if (plansCount > 0) {
+        toast.info(`${plansCount} plans checked - all executions already exist`);
+      } else {
+        toast.info("No active plans found to generate executions");
+      }
     },
     onError: () => toast.error("Failed to generate executions")
   });
