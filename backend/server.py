@@ -41,10 +41,12 @@ async def shutdown_db_client():
 
 
 @app.post("/api/admin/seed-database")
+@app.get("/api/admin/seed-database")
 async def trigger_database_seed(secret_key: str = None):
     """
     Admin endpoint to seed the database with preview data.
     Requires SEED_SECRET_KEY environment variable to be set and matched.
+    Works with both GET and POST methods for convenience.
     """
     expected_key = os.environ.get('SEED_SECRET_KEY', 'emergent-seed-2024')
     
