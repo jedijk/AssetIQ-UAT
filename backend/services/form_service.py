@@ -799,8 +799,8 @@ class FormService:
             "is_active": doc.get("is_active", True),
             "is_latest": doc.get("is_latest", True),
             "usage_count": doc.get("usage_count", 0),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
-            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
+            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") and hasattr(doc.get("created_at"), 'isoformat') else doc.get("created_at"),
+            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") and hasattr(doc.get("updated_at"), 'isoformat') else doc.get("updated_at"),
         }
     
     def _serialize_submission(self, doc: Dict) -> Dict[str, Any]:
@@ -822,5 +822,5 @@ class FormService:
             "notes": doc.get("notes"),
             "has_signature": doc.get("signature_data") is not None,
             "submitted_by": doc.get("submitted_by"),
-            "submitted_at": doc.get("submitted_at").isoformat() if doc.get("submitted_at") else None,
+            "submitted_at": doc.get("submitted_at").isoformat() if doc.get("submitted_at") and hasattr(doc.get("submitted_at"), 'isoformat') else doc.get("submitted_at"),
         }
