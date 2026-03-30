@@ -9,7 +9,7 @@ import { Label } from "../components/ui/label";
 import { Loader2, Shield, Activity, BarChart3 } from "lucide-react";
 
 // Background video for login/register
-const BACKGROUND_VIDEO = "https://customer-assets.emergentagent.com/job_b964aaab-cbb5-4b7f-8bdc-0f183ed3d1c2/artifacts/0b0o65cv_Dolly%201080p%20-%20HD%201080p.mov";
+const BACKGROUND_VIDEO = "https://customer-assets.emergentagent.com/job_b964aaab-cbb5-4b7f-8bdc-0f183ed3d1c2/artifacts/6o08nkrm_Dolly%204k%20-%204K.mov";
 
 const LoginPage = () => {
   const { login } = useAuth();
