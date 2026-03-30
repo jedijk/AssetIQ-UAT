@@ -112,7 +112,7 @@ const rbacAPI = {
     return response.json();
   },
   
-  approveUser: async ({ userId, action, role, rejectionReason }) => {
+  approveUser: async ({ userId, action, role, rejectionReason, assignedInstallations }) => {
     const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}/approve`, {
       method: "PATCH",
       headers: {
@@ -122,7 +122,8 @@ const rbacAPI = {
       body: JSON.stringify({ 
         action, 
         role,
-        rejection_reason: rejectionReason 
+        rejection_reason: rejectionReason,
+        assigned_installations: assignedInstallations
       })
     });
     if (!response.ok) throw new Error("Failed to process approval");
@@ -972,13 +973,20 @@ const SettingsUserManagementPage = () => {
                 <Button
                   size="sm"
                   variant={approvalAction === "approve" ? "default" : "destructive"}
-                  onClick={() => approvalMutation.mutate({
-                    userId: approvalDialogUser?.id,
-                    action: approvalAction,
-                    role: approvalAction === "approve" ? approvalRole : undefined,
-                    rejectionReason: approvalAction === "reject" ? rejectionReason : undefined,
-                    assignedInstallations: approvalAction === "approve" ? approvalInstallations : undefined,
-                  })}
+                  onClick={() => {
+                    // Convert installation IDs to names for the backend
+                    const installationNames = approvalInstallations
+                      .map(id => installations.find(inst => inst.id === id)?.name)
+                      .filter(Boolean);
+                    
+                    approvalMutation.mutate({
+                      userId: approvalDialogUser?.id,
+                      action: approvalAction,
+                      role: approvalAction === "approve" ? approvalRole : undefined,
+                      rejectionReason: approvalAction === "reject" ? rejectionReason : undefined,
+                      assignedInstallations: approvalAction === "approve" ? installationNames : undefined,
+                    });
+                  }}
                   disabled={approvalMutation.isPending}
                 >
                   {approvalMutation.isPending ? "..." : (approvalAction === "approve" ? "Approve" : "Reject")}
@@ -1718,13 +1726,20 @@ const SettingsUserManagementPage = () => {
             </Button>
             <Button
               variant={approvalAction === "approve" ? "default" : "destructive"}
-              onClick={() => approvalMutation.mutate({
-                userId: approvalDialogUser?.id,
-                action: approvalAction,
-                role: approvalAction === "approve" ? approvalRole : undefined,
-                rejectionReason: approvalAction === "reject" ? rejectionReason : undefined,
-                assignedInstallations: approvalAction === "approve" ? approvalInstallations : undefined,
-              })}
+              onClick={() => {
+                // Convert installation IDs to names for the backend
+                const installationNames = approvalInstallations
+                  .map(id => installations.find(inst => inst.id === id)?.name)
+                  .filter(Boolean);
+                
+                approvalMutation.mutate({
+                  userId: approvalDialogUser?.id,
+                  action: approvalAction,
+                  role: approvalAction === "approve" ? approvalRole : undefined,
+                  rejectionReason: approvalAction === "reject" ? rejectionReason : undefined,
+                  assignedInstallations: approvalAction === "approve" ? installationNames : undefined,
+                });
+              }}
               disabled={approvalMutation.isPending}
               data-testid={`confirm-${approvalAction}-btn`}
             >
