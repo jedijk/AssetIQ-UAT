@@ -3,14 +3,14 @@
 ## User Accounts
 
 ### Owner Account (Full Access - All Installations)
-- **Email:** test@test.com
-- **Password:** test
+- **Email:** jedijk@gmail.com
+- **Password:** admin123
 - **Role:** Owner
 - **Access:** All installations automatically, can delete installations
 
 ### Admin Account
-- **Email:** jedijk@gmail.com
-- **Password:** admin123
+- **Email:** test@test.com
+- **Password:** test
 - **Role:** Admin
 - **Installations:** Tyromer
 - **Restrictions:** Cannot delete installations
@@ -33,8 +33,3 @@ GET/POST https://your-domain/api/admin/seed-database?secret_key=emergent-seed-20
 4. **Maintenance** - Task management, observations
 5. **Operations** - Report threats, create observations
 6. **Viewer** - Read-only access
-
-## Permission Notes
-- Only Owner can delete installations (top-level equipment nodes)
-- Only Owner and Admin can delete threats and observations
-- Equipment nodes (non-installation) can be deleted by Admin and Owner
