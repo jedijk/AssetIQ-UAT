@@ -100,6 +100,7 @@ export default function CausalEnginePage() {
   const [showAISummaryDialog, setShowAISummaryDialog] = useState(false);
   const [aiSummary, setAISummary] = useState(null);
   const [isGeneratingAISummary, setIsGeneratingAISummary] = useState(false);
+  const [closureSuggestion, setClosureSuggestion] = useState(null); // Investigation closure suggestion
   const fileInputRef = useRef(null);
   
   useEffect(() => {
@@ -504,13 +505,18 @@ export default function CausalEnginePage() {
   
   const updateActionMutation = useMutation({
     mutationFn: ({ actionId, data }) => investigationAPI.updateAction(selectedInvId, actionId, data),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       setShowActionDialog(false);
       setEditingItem(null);
       setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" });
       toast.success("Action updated");
+      
+      // Check if all actions for the investigation are now completed
+      if (result?.completion_notification) {
+        setClosureSuggestion(result.completion_notification);
+      }
     },
   });
   
@@ -1904,6 +1910,52 @@ export default function CausalEnginePage() {
                 Regenerate
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Investigation Closure Suggestion Dialog */}
+      <Dialog open={!!closureSuggestion} onOpenChange={() => setClosureSuggestion(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-700">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              All Actions Completed!
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
+              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckSquare className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-green-800">
+                  {closureSuggestion?.total_actions} action{closureSuggestion?.total_actions !== 1 ? 's' : ''} completed
+                </p>
+                <p className="text-sm text-green-600">
+                  {closureSuggestion?.source_name}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600">
+              {closureSuggestion?.message || "All corrective actions for this investigation have been completed. Consider closing this investigation."}
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setClosureSuggestion(null)}>
+              Later
+            </Button>
+            <Button 
+              onClick={() => {
+                setClosureSuggestion(null);
+                // Show the completion confirmation dialog
+                setShowCompleteConfirm(true);
+              }}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Complete Investigation
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -503,12 +503,55 @@ async def update_action_item(
     if "status" in update_data and isinstance(update_data["status"], ActionStatus):
         update_data["status"] = update_data["status"].value
     
+    # Check if status is being changed to completed
+    status_changed_to_completed = (
+        update_data.get("status") == "completed" and 
+        action.get("status") != "completed"
+    )
+    
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         await db.action_items.update_one({"id": action_id}, {"$set": update_data})
     
     updated = await db.action_items.find_one({"id": action_id}, {"_id": 0})
-    return updated
+    
+    # Check if all actions for this investigation are now completed
+    completion_notification = None
+    if status_changed_to_completed:
+        # Count remaining open actions for this investigation
+        remaining_open = await db.action_items.count_documents({
+            "investigation_id": inv_id,
+            "status": {"$ne": "completed"}
+        })
+        
+        if remaining_open == 0:
+            # All actions completed - prepare notification
+            total_actions = await db.action_items.count_documents({
+                "investigation_id": inv_id
+            })
+            
+            # Get investigation details
+            inv = await db.investigations.find_one({"id": inv_id}, {"_id": 0, "title": 1, "status": 1})
+            inv_name = inv.get("title", "Investigation") if inv else "Investigation"
+            inv_status = inv.get("status") if inv else None
+            
+            # Only suggest closure if investigation is not already completed/closed
+            if inv_status not in ["completed", "closed"]:
+                completion_notification = {
+                    "type": "all_actions_completed",
+                    "source_type": "investigation",
+                    "source_id": inv_id,
+                    "source_name": inv_name,
+                    "total_actions": total_actions,
+                    "message": f"All {total_actions} action(s) for '{inv_name}' are now complete! Consider closing this investigation.",
+                    "suggest_closure": True
+                }
+    
+    response = dict(updated)
+    if completion_notification:
+        response["completion_notification"] = completion_notification
+    
+    return response
 
 
 @router.delete("/investigations/{inv_id}/actions/{action_id}")
