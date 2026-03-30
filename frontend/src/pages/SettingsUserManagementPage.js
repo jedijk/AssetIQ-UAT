@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -285,10 +285,38 @@ const SettingsUserManagementPage = () => {
     staleTime: 5 * 60 * 1000,
   });
   
+  // Also fetch threats to extract locations as fallback
+  const { data: threatsData } = useQuery({
+    queryKey: ["threats-for-locations"],
+    queryFn: async () => {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/threats`, {
+        headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+      });
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  
   // Filter to get only installations (level 1 or type "installation")
-  const installations = (equipmentData?.nodes || []).filter(
+  const equipmentInstallations = (equipmentData?.nodes || []).filter(
     node => node.level === 1 || node.node_type === "installation" || node.node_type === "plant"
   );
+  
+  // Extract unique locations from threats as fallback installations
+  const locationInstallations = useMemo(() => {
+    const threats = Array.isArray(threatsData) ? threatsData : [];
+    const locations = new Set();
+    threats.forEach(t => {
+      if (t.location) locations.add(t.location);
+      if (t.plant_unit) locations.add(t.plant_unit);
+    });
+    return Array.from(locations).map(loc => ({ id: loc, name: loc, source: 'location' }));
+  }, [threatsData]);
+  
+  // Combine equipment installations and location-based installations
+  const installations = equipmentInstallations.length > 0 
+    ? equipmentInstallations 
+    : locationInstallations;
 
   // Approval mutation
   const approvalMutation = useMutation({
