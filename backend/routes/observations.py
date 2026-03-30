@@ -159,6 +159,43 @@ async def close_observation(
         raise HTTPException(status_code=404, detail="Observation not found")
     return result
 
+
+@router.delete("/observations/{obs_id}")
+async def delete_observation(
+    obs_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete an observation. Requires admin, owner, or reliability_engineer role."""
+    # Check if user has permission to delete
+    if current_user.get("role") not in ["admin", "owner", "reliability_engineer"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions to delete observations")
+    
+    from bson import ObjectId
+    
+    # Try to find by ObjectId first, then by id field
+    observation = None
+    try:
+        observation = await db.observations.find_one({"_id": ObjectId(obs_id)})
+    except:
+        pass
+    
+    if not observation:
+        observation = await db.observations.find_one({"id": obs_id})
+    
+    if not observation:
+        raise HTTPException(status_code=404, detail="Observation not found")
+    
+    # Delete the observation
+    try:
+        result = await db.observations.delete_one({"_id": observation["_id"]})
+    except:
+        result = await db.observations.delete_one({"id": obs_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to delete observation")
+    
+    return {"status": "success", "message": "Observation deleted successfully"}
+
 # --- AI Failure Mode Suggestions ---
 
 class SuggestRequest(BaseModel):
