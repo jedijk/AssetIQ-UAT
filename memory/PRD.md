@@ -103,6 +103,13 @@ Build an AI-Powered Threat Capture & Prioritization Platform with features inclu
 ---
 
 ## Latest Changes (March 30, 2026)
+- **Task Creation Fix:** Fixed `'str' object has no attribute 'isoformat'` error in `task_service.py` by adding `_safe_isoformat()` helper function
+  - Handles datetime fields that may already be stringified from MongoDB
+  - Applied to `_serialize_template`, `_serialize_plan`, and `_serialize_instance` methods
+- **Duration Input Improvement:** Changed task duration field from minutes-only input to Hours:Minutes format
+  - Two separate number inputs for hours and minutes
+  - Clearer UX with "Hours : Minutes" helper text
+  - Works for both recurring and ad-hoc task templates
 - **Form Builder Dropdown Fix:** Fixed Radix UI issue where Select dropdowns inside Dialogs would instantly close the parent modal
   - Updated `DialogContent` component to handle `onPointerDownOutside` and `onInteractOutside` events
   - Detects clicks on Radix portal elements (`data-radix-select-content`, `data-radix-popper-content-wrapper`)

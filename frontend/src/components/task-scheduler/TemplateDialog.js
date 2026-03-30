@@ -172,27 +172,79 @@ export const TemplateDialog = ({
                 </div>
               </div>
               <div>
-                <Label>{t("taskScheduler.durationMin")}</Label>
-                <Input
-                  type="number"
-                  value={templateForm.estimated_duration_minutes}
-                  onChange={(e) => setTemplateForm({ ...templateForm, estimated_duration_minutes: parseInt(e.target.value) || 0 })}
-                  min={0}
-                />
+                <Label>{t("taskScheduler.duration")}</Label>
+                <div className="flex gap-1 items-center">
+                  <Input
+                    type="number"
+                    className="w-16 text-center"
+                    value={Math.floor((templateForm.estimated_duration_minutes || 0) / 60)}
+                    onChange={(e) => {
+                      const hours = parseInt(e.target.value) || 0;
+                      const currentMins = (templateForm.estimated_duration_minutes || 0) % 60;
+                      setTemplateForm({ ...templateForm, estimated_duration_minutes: (hours * 60) + currentMins });
+                    }}
+                    min={0}
+                    max={99}
+                    placeholder="HH"
+                    data-testid="duration-hours-input"
+                  />
+                  <span className="text-slate-500 font-medium">:</span>
+                  <Input
+                    type="number"
+                    className="w-16 text-center"
+                    value={(templateForm.estimated_duration_minutes || 0) % 60}
+                    onChange={(e) => {
+                      const mins = Math.min(59, Math.max(0, parseInt(e.target.value) || 0));
+                      const currentHours = Math.floor((templateForm.estimated_duration_minutes || 0) / 60);
+                      setTemplateForm({ ...templateForm, estimated_duration_minutes: (currentHours * 60) + mins });
+                    }}
+                    min={0}
+                    max={59}
+                    placeholder="MM"
+                    data-testid="duration-minutes-input"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Hours : Minutes</p>
               </div>
             </div>
           )}
 
           {/* Duration field when ad-hoc (still useful) */}
           {templateForm.is_adhoc && (
-            <div className="w-1/3">
-              <Label>{t("taskScheduler.durationMin")}</Label>
-              <Input
-                type="number"
-                value={templateForm.estimated_duration_minutes}
-                onChange={(e) => setTemplateForm({ ...templateForm, estimated_duration_minutes: parseInt(e.target.value) || 0 })}
-                min={0}
-              />
+            <div className="w-1/2">
+              <Label>{t("taskScheduler.duration")}</Label>
+              <div className="flex gap-1 items-center">
+                <Input
+                  type="number"
+                  className="w-16 text-center"
+                  value={Math.floor((templateForm.estimated_duration_minutes || 0) / 60)}
+                  onChange={(e) => {
+                    const hours = parseInt(e.target.value) || 0;
+                    const currentMins = (templateForm.estimated_duration_minutes || 0) % 60;
+                    setTemplateForm({ ...templateForm, estimated_duration_minutes: (hours * 60) + currentMins });
+                  }}
+                  min={0}
+                  max={99}
+                  placeholder="HH"
+                  data-testid="duration-hours-input-adhoc"
+                />
+                <span className="text-slate-500 font-medium">:</span>
+                <Input
+                  type="number"
+                  className="w-16 text-center"
+                  value={(templateForm.estimated_duration_minutes || 0) % 60}
+                  onChange={(e) => {
+                    const mins = Math.min(59, Math.max(0, parseInt(e.target.value) || 0));
+                    const currentHours = Math.floor((templateForm.estimated_duration_minutes || 0) / 60);
+                    setTemplateForm({ ...templateForm, estimated_duration_minutes: (currentHours * 60) + mins });
+                  }}
+                  min={0}
+                  max={59}
+                  placeholder="MM"
+                  data-testid="duration-minutes-input-adhoc"
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Hours : Minutes</p>
             </div>
           )}
         </div>

@@ -17,6 +17,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _safe_isoformat(value):
+    """Safely convert datetime to ISO format string, handling already-stringified values."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if hasattr(value, 'isoformat'):
+        return value.isoformat()
+    return str(value)
+
+
 class TaskService:
     """Service for task management operations."""
     
@@ -1031,8 +1042,8 @@ class TaskService:
             "is_adhoc": doc.get("is_adhoc", False),
             "is_active": doc.get("is_active", True),
             "usage_count": doc.get("usage_count", 0),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
-            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
+            "created_at": _safe_isoformat(doc.get("created_at")),
+            "updated_at": _safe_isoformat(doc.get("updated_at")),
         }
     
     def _serialize_plan(self, doc: Dict) -> Dict[str, Any]:
@@ -1052,16 +1063,16 @@ class TaskService:
             "trigger_condition": doc.get("trigger_condition"),
             "assigned_team": doc.get("assigned_team"),
             "assigned_user_id": doc.get("assigned_user_id"),
-            "effective_from": doc.get("effective_from").isoformat() if doc.get("effective_from") else None,
-            "effective_until": doc.get("effective_until").isoformat() if doc.get("effective_until") else None,
-            "last_executed_at": doc.get("last_executed_at").isoformat() if doc.get("last_executed_at") else None,
-            "next_due_date": doc.get("next_due_date").isoformat() if doc.get("next_due_date") else None,
+            "effective_from": _safe_isoformat(doc.get("effective_from")),
+            "effective_until": _safe_isoformat(doc.get("effective_until")),
+            "last_executed_at": _safe_isoformat(doc.get("last_executed_at")),
+            "next_due_date": _safe_isoformat(doc.get("next_due_date")),
             "execution_count": doc.get("execution_count", 0),
             "notes": doc.get("notes"),
             "is_active": doc.get("is_active", True),
             "is_adhoc": doc.get("is_adhoc", False),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
-            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
+            "created_at": _safe_isoformat(doc.get("created_at")),
+            "updated_at": _safe_isoformat(doc.get("updated_at")),
         }
     
     def _serialize_instance(self, doc: Dict) -> Dict[str, Any]:
@@ -1079,22 +1090,22 @@ class TaskService:
             "equipment_id": doc["equipment_id"],
             "equipment_name": doc.get("equipment_name"),
             "efm_id": doc.get("efm_id"),
-            "scheduled_date": doc["scheduled_date"].isoformat() if doc.get("scheduled_date") else None,
-            "due_date": doc["due_date"].isoformat() if doc.get("due_date") else None,
+            "scheduled_date": _safe_isoformat(doc.get("scheduled_date")),
+            "due_date": _safe_isoformat(doc.get("due_date")),
             "status": doc["status"],
             "priority": doc.get("priority", "medium"),
             "assigned_team": doc.get("assigned_team"),
             "assigned_user_id": doc.get("assigned_user_id"),
             "discipline": doc.get("discipline"),
             "estimated_duration_minutes": doc.get("estimated_duration_minutes"),
-            "started_at": doc.get("started_at").isoformat() if doc.get("started_at") else None,
-            "completed_at": doc.get("completed_at").isoformat() if doc.get("completed_at") else None,
+            "started_at": _safe_isoformat(doc.get("started_at")),
+            "completed_at": _safe_isoformat(doc.get("completed_at")),
             "actual_duration_minutes": doc.get("actual_duration_minutes"),
             "completion_notes": doc.get("completion_notes"),
             "issues_found": doc.get("issues_found", []),
             "follow_up_required": doc.get("follow_up_required", False),
             "follow_up_notes": doc.get("follow_up_notes"),
             "notes": doc.get("notes"),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
-            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
+            "created_at": _safe_isoformat(doc.get("created_at")),
+            "updated_at": _safe_isoformat(doc.get("updated_at")),
         }
