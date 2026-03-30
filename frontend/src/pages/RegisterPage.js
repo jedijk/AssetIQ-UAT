@@ -11,6 +11,185 @@ import { Loader2, Shield, Activity, BarChart3, CheckCircle2, Clock } from "lucid
 // Background video for login/register (same as login)
 const BACKGROUND_VIDEO = "https://customer-assets.emergentagent.com/job_b964aaab-cbb5-4b7f-8bdc-0f183ed3d1c2/artifacts/6o08nkrm_Dolly%204k%20-%204K.mov";
 
+// Styles for register page (shared between form and success states)
+const REGISTER_STYLES = `
+  .register-page-container {
+    display: flex;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Left Image Section */
+  .register-image-section {
+    display: none;
+    position: relative;
+    width: 55%;
+    overflow: hidden;
+  }
+
+  @media (min-width: 1024px) {
+    .register-image-section {
+      display: block;
+    }
+  }
+
+  .register-bg-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .register-image-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(15, 23, 42, 0.85) 0%,
+      rgba(30, 64, 175, 0.75) 50%,
+      rgba(15, 23, 42, 0.9) 100%
+    );
+  }
+
+  .register-image-content {
+    position: relative;
+    z-index: 10;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 48px;
+    color: white;
+  }
+
+  .register-brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .register-brand-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -0.02em;
+  }
+
+  .register-tagline {
+    max-width: 480px;
+  }
+
+  .register-tagline h2 {
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 16px;
+    letter-spacing: -0.02em;
+  }
+
+  .register-tagline p {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.6;
+  }
+
+  .register-features {
+    display: flex;
+    gap: 24px;
+  }
+
+  .register-feature {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  /* Right Form Section */
+  .register-form-section {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #f8fafc;
+  }
+
+  @media (min-width: 1024px) {
+    .register-form-section {
+      width: 45%;
+      padding: 48px;
+    }
+  }
+
+  .register-form-wrapper {
+    width: 100%;
+    max-width: 400px;
+    padding: 32px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  @media (min-width: 640px) {
+    .register-form-wrapper {
+      padding: 40px;
+    }
+  }
+
+  /* Mobile video background - hidden on desktop, visible on mobile */
+  .register-mobile-video {
+    display: none;
+  }
+
+  @media (max-width: 1023px) {
+    .register-page-container {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .register-mobile-video {
+      display: block;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+    }
+
+    .register-page-container::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        135deg,
+        rgba(15, 23, 42, 0.9) 0%,
+        rgba(30, 64, 175, 0.85) 50%,
+        rgba(15, 23, 42, 0.95) 100%
+      );
+      z-index: 1;
+    }
+
+    .register-form-section {
+      position: relative;
+      z-index: 10;
+      background: transparent;
+    }
+
+    .register-form-wrapper {
+      background: rgba(255, 255, 255, 0.97);
+      backdrop-filter: blur(12px);
+    }
+  }
+`;
+
 const RegisterPage = () => {
   const { register } = useAuth();
   const { t } = useLanguage();
@@ -83,6 +262,24 @@ const RegisterPage = () => {
               />
               <h1 className="register-brand-title">AssetIQ</h1>
             </div>
+            <div className="register-tagline">
+              <h2>Welcome Aboard!</h2>
+              <p>Your account has been created successfully. You're one step away from accessing powerful reliability intelligence.</p>
+            </div>
+            <div className="register-features">
+              <div className="register-feature">
+                <Shield className="w-5 h-5" />
+                <span>Risk Prioritization</span>
+              </div>
+              <div className="register-feature">
+                <Activity className="w-5 h-5" />
+                <span>FMEA Analysis</span>
+              </div>
+              <div className="register-feature">
+                <BarChart3 className="w-5 h-5" />
+                <span>Real-time Analytics</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -90,8 +287,8 @@ const RegisterPage = () => {
         <div className="register-form-section">
           <div className="register-form-wrapper">
             <div className="text-center space-y-6">
-              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-10 h-10 text-green-600" />
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Registration Successful!</h2>
@@ -110,7 +307,7 @@ const RegisterPage = () => {
               </div>
               <Button 
                 onClick={() => navigate("/login")}
-                className="w-full"
+                className="w-full h-11"
                 data-testid="go-to-login-btn"
               >
                 Go to Login
@@ -118,6 +315,7 @@ const RegisterPage = () => {
             </div>
           </div>
         </div>
+        <style>{REGISTER_STYLES}</style>
       </div>
     );
   }
@@ -265,192 +463,7 @@ const RegisterPage = () => {
         </div>
       </div>
 
-      <style>{`
-        .register-page-container {
-          display: flex;
-          min-height: 100vh;
-          min-height: 100dvh;
-        }
-
-        /* Left Image Section */
-        .register-image-section {
-          display: none;
-          position: relative;
-          width: 55%;
-          overflow: hidden;
-        }
-
-        @media (min-width: 1024px) {
-          .register-image-section {
-            display: block;
-          }
-        }
-
-        .register-bg-video {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .register-image-overlay {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(
-            135deg,
-            rgba(15, 23, 42, 0.85) 0%,
-            rgba(30, 64, 175, 0.75) 50%,
-            rgba(15, 23, 42, 0.9) 100%
-          );
-        }
-
-        .register-image-content {
-          position: relative;
-          z-index: 10;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: 48px;
-          color: white;
-        }
-
-        .register-brand {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .register-brand-title {
-          font-size: 28px;
-          font-weight: 700;
-          color: white;
-          letter-spacing: -0.02em;
-        }
-
-        .register-tagline {
-          max-width: 480px;
-        }
-
-        .register-tagline h2 {
-          font-size: 42px;
-          font-weight: 700;
-          line-height: 1.2;
-          margin-bottom: 16px;
-          letter-spacing: -0.02em;
-        }
-
-        .register-tagline p {
-          font-size: 18px;
-          color: rgba(255, 255, 255, 0.8);
-          line-height: 1.6;
-        }
-
-        .register-features {
-          display: flex;
-          gap: 32px;
-        }
-
-        .register-feature {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          color: rgba(255, 255, 255, 0.9);
-          font-size: 14px;
-          font-weight: 500;
-          background: rgba(255, 255, 255, 0.1);
-          padding: 10px 16px;
-          border-radius: 8px;
-          backdrop-filter: blur(8px);
-        }
-
-        /* Right Form Section */
-        .register-form-section {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 24px;
-          background: #f8fafc;
-        }
-
-        @media (min-width: 1024px) {
-          .register-form-section {
-            width: 45%;
-            flex: none;
-          }
-        }
-
-        .register-form-wrapper {
-          width: 100%;
-          max-width: 400px;
-          background: white;
-          padding: 40px;
-          border-radius: 20px;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-          border: 1px solid #e2e8f0;
-        }
-
-        .register-mobile-logo {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 32px;
-        }
-
-        @media (min-width: 1024px) {
-          .register-mobile-logo {
-            display: none;
-          }
-        }
-
-        /* Mobile video background - hidden on desktop, visible on mobile */
-        .register-mobile-video {
-          display: none;
-        }
-
-        @media (max-width: 1023px) {
-          .register-page-container {
-            position: relative;
-            overflow: hidden;
-          }
-
-          .register-mobile-video {
-            display: block;
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 0;
-          }
-
-          .register-page-container::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(
-              135deg,
-              rgba(15, 23, 42, 0.9) 0%,
-              rgba(30, 64, 175, 0.85) 50%,
-              rgba(15, 23, 42, 0.95) 100%
-            );
-            z-index: 1;
-          }
-
-          .register-form-section {
-            position: relative;
-            z-index: 10;
-            background: transparent;
-          }
-
-          .register-form-wrapper {
-            background: rgba(255, 255, 255, 0.97);
-            backdrop-filter: blur(12px);
-          }
-        }
-      `}</style>
+      <style>{REGISTER_STYLES}</style>
     </div>
   );
 };
