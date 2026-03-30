@@ -708,11 +708,17 @@ export default function ActionsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => navigate(`/actions/${action.id}`)}>
+                      <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/actions/${action.id}`);
+                      }}>
                         <Edit2 className="w-4 h-4 mr-2" /> Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem 
-                        onClick={() => setDeleteConfirm(action)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirm(action);
+                        }}
                         className="text-red-600"
                       >
                         <Trash2 className="w-4 h-4 mr-2" /> Delete
