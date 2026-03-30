@@ -590,13 +590,21 @@ async def delete_equipment_node(
     node_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete an equipment node and optionally its children."""
+    """Delete an equipment node and optionally its children. Installations can only be deleted by Owner."""
     # Equipment is shared - no created_by filter
     node = await db.equipment_nodes.find_one(
         {"id": node_id}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    # Only Owner can delete installations
+    if node.get("level") == "installation":
+        if current_user.get("role") != "owner":
+            raise HTTPException(
+                status_code=403, 
+                detail="Only Owner can delete installations. Contact your system administrator."
+            )
     
     # Get all children recursively (global, not per-user)
     async def get_children_ids(parent_id):
