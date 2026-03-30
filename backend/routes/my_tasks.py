@@ -15,6 +15,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["My Tasks"])
 
 
+def safe_isoformat(value):
+    """Safely convert a datetime or string to ISO format string."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value  # Already a string
+    if isinstance(value, datetime):
+        return value.isoformat()
+    # Try to convert other types
+    try:
+        return str(value)
+    except Exception:
+        return None
+
+
 def serialize_task(task: dict) -> dict:
     """Serialize a task instance for API response."""
     if not task:
@@ -29,8 +44,8 @@ def serialize_task(task: dict) -> dict:
         "description": task.get("description", ""),
         "status": task.get("status", "scheduled"),
         "priority": task.get("priority", "medium"),
-        "due_date": task.get("due_date").isoformat() if task.get("due_date") else None,
-        "scheduled_date": task.get("scheduled_date").isoformat() if task.get("scheduled_date") else None,
+        "due_date": safe_isoformat(task.get("due_date")),
+        "scheduled_date": safe_isoformat(task.get("scheduled_date")),
         "equipment_id": str(task.get("equipment_id", "")) if task.get("equipment_id") else None,
         "equipment_name": task.get("equipment_name", ""),
         "asset": task.get("equipment_name", ""),
@@ -44,7 +59,7 @@ def serialize_task(task: dict) -> dict:
         "assigned_user_id": str(task.get("assigned_user_id", "")) if task.get("assigned_user_id") else None,
         "assigned_team": task.get("assigned_team", ""),
         "assignee": task.get("assignee", ""),
-        "last_completed": task.get("last_completed").isoformat() if task.get("last_completed") else None,
+        "last_completed": safe_isoformat(task.get("last_completed")),
         "form_fields": task.get("form_fields", []),
         "form_template_name": task.get("form_template_name", ""),
         "template": task.get("template", {}),
