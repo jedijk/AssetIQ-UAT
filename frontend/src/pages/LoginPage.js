@@ -8,8 +8,8 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Loader2, Shield, Activity, BarChart3 } from "lucide-react";
 
-// Industrial background image
-const BACKGROUND_IMAGE = "https://customer-assets.emergentagent.com/job_682831cd-c439-4614-becb-4ef9d40f147d/artifacts/a6gi0iug_27149310e1925cc6e07ada4653176e7f361ba5e96a825c22e1e22a3df59bf5a7.png";
+// Background video for login/register
+const BACKGROUND_VIDEO = "https://customer-assets.emergentagent.com/job_b964aaab-cbb5-4b7f-8bdc-0f183ed3d1c2/artifacts/0b0o65cv_Dolly%201080p%20-%20HD%201080p.mov";
 
 const LoginPage = () => {
   const { login } = useAuth();
@@ -42,12 +42,15 @@ const LoginPage = () => {
 
   return (
     <div className="login-page-container">
-      {/* Left side - Background Image with Overlay */}
+      {/* Left side - Background Video with Overlay */}
       <div className="login-image-section">
-        <img 
-          src={BACKGROUND_IMAGE} 
-          alt="Industrial Plant" 
-          className="login-bg-image"
+        <video 
+          src={BACKGROUND_VIDEO}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="login-bg-video"
         />
         <div className="login-image-overlay" />
         <div className="login-image-content">
@@ -82,6 +85,16 @@ const LoginPage = () => {
 
       {/* Right side - Login Form */}
       <div className="login-form-section">
+        {/* Mobile Video Background */}
+        <video 
+          src={BACKGROUND_VIDEO}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="login-mobile-video lg:hidden"
+        />
+        
         <div className="login-form-wrapper animate-fade-in">
           {/* Mobile Logo (hidden on desktop) */}
           <div className="login-mobile-logo">
@@ -171,7 +184,7 @@ const LoginPage = () => {
           min-height: 100dvh;
         }
 
-        /* Left Image Section */
+        /* Left Video Section */
         .login-image-section {
           display: none;
           position: relative;
@@ -185,7 +198,7 @@ const LoginPage = () => {
           }
         }
 
-        .login-bg-image {
+        .login-bg-video {
           position: absolute;
           inset: 0;
           width: 100%;
@@ -304,13 +317,11 @@ const LoginPage = () => {
           }
         }
 
-        /* Mobile full background */
+        /* Mobile video background */
         @media (max-width: 1023px) {
           .login-page-container {
-            background-image: url('${BACKGROUND_IMAGE}');
-            background-size: cover;
-            background-position: center;
             position: relative;
+            overflow: hidden;
           }
 
           .login-page-container::before {
@@ -323,6 +334,16 @@ const LoginPage = () => {
               rgba(30, 64, 175, 0.85) 50%,
               rgba(15, 23, 42, 0.95) 100%
             );
+            z-index: 1;
+          }
+
+          .login-mobile-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
           }
 
           .login-form-section {

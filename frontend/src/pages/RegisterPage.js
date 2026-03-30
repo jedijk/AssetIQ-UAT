@@ -8,8 +8,8 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Loader2, Shield, Activity, BarChart3, CheckCircle2, Clock } from "lucide-react";
 
-// Industrial background image (same as login)
-const BACKGROUND_IMAGE = "https://customer-assets.emergentagent.com/job_682831cd-c439-4614-becb-4ef9d40f147d/artifacts/a6gi0iug_27149310e1925cc6e07ada4653176e7f361ba5e96a825c22e1e22a3df59bf5a7.png";
+// Background video for login/register (same as login)
+const BACKGROUND_VIDEO = "https://customer-assets.emergentagent.com/job_b964aaab-cbb5-4b7f-8bdc-0f183ed3d1c2/artifacts/0b0o65cv_Dolly%201080p%20-%20HD%201080p.mov";
 
 const RegisterPage = () => {
   const { register } = useAuth();
