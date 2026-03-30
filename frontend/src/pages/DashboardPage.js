@@ -286,6 +286,36 @@ export default function DashboardPage() {
   });
   const usersList = usersData?.users || [];
 
+  // Fetch equipment hierarchy for plant unit filter
+  const { data: equipmentData } = useQuery({
+    queryKey: ["equipment-nodes"],
+    queryFn: equipmentHierarchyAPI.getNodes,
+    staleTime: 5 * 60 * 1000,
+  });
+  const equipmentNodes = equipmentData?.nodes || [];
+  
+  // Get plant units from equipment hierarchy
+  const plantUnits = equipmentNodes
+    .filter(node => node.level === "plant_unit")
+    .map(node => ({ id: node.id, name: node.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Get all descendant equipment IDs for a given plant unit
+  const getDescendantIds = (parentId) => {
+    const descendants = new Set();
+    const findChildren = (pid) => {
+      equipmentNodes.forEach(node => {
+        if (node.parent_id === pid) {
+          descendants.add(node.id);
+          descendants.add(node.name);
+          findChildren(node.id);
+        }
+      });
+    };
+    findChildren(parentId);
+    return descendants;
+  };
+
   // Fetch all data
   const { data: stats } = useQuery({
     queryKey: ["stats"],
@@ -297,15 +327,23 @@ export default function DashboardPage() {
     queryFn: threatsAPI.getAll,
   });
   const allObservations = Array.isArray(observationsData) ? observationsData : [];
-  
-  // Extract unique plant/units from observations
-  const plantUnits = [...new Set(allObservations.map(o => o.plant_unit || o.location).filter(Boolean))].sort();
 
   // Apply filters to observations
   const observations = allObservations.filter(o => {
     if (disciplineFilter !== "all" && o.discipline !== disciplineFilter) return false;
     if (ownerFilter !== "all" && o.owner_id !== ownerFilter) return false;
-    if (plantUnitFilter !== "all" && (o.plant_unit || o.location) !== plantUnitFilter) return false;
+    if (plantUnitFilter !== "all") {
+      // Get all equipment IDs/names under this plant unit
+      const descendantIds = getDescendantIds(plantUnitFilter);
+      const equipmentMatch = 
+        descendantIds.has(o.equipment_id) || 
+        descendantIds.has(o.linked_equipment_id) ||
+        descendantIds.has(o.equipment_name) ||
+        descendantIds.has(o.linked_equipment_name) ||
+        o.plant_unit === plantUnitFilter ||
+        o.location === plantUnitFilter;
+      if (!equipmentMatch) return false;
+    }
     return true;
   });
 
@@ -320,6 +358,13 @@ export default function DashboardPage() {
   const actions = allActions.filter(a => {
     if (disciplineFilter !== "all" && a.discipline !== disciplineFilter) return false;
     if (ownerFilter !== "all" && a.assignee !== ownerFilter) return false;
+    if (plantUnitFilter !== "all") {
+      const descendantIds = getDescendantIds(plantUnitFilter);
+      const equipmentMatch = 
+        descendantIds.has(a.linked_equipment_id) ||
+        descendantIds.has(a.equipment_name);
+      if (!equipmentMatch) return false;
+    }
     return true;
   });
 
@@ -335,15 +380,19 @@ export default function DashboardPage() {
   // Apply filters to investigations  
   const investigations = allInvestigations.filter(i => {
     if (ownerFilter !== "all" && i.investigation_leader !== ownerFilter && i.created_by !== ownerFilter) return false;
-    if (plantUnitFilter !== "all" && i.location !== plantUnitFilter) return false;
+    if (plantUnitFilter !== "all") {
+      const descendantIds = getDescendantIds(plantUnitFilter);
+      const equipmentMatch = 
+        descendantIds.has(i.equipment_id) ||
+        descendantIds.has(i.asset_name) ||
+        i.location === plantUnitFilter;
+      if (!equipmentMatch) return false;
+    }
     return true;
   });
 
-  const { data: equipmentData = { nodes: [] } } = useQuery({
-    queryKey: ["equipment"],
-    queryFn: equipmentHierarchyAPI.getNodes,
-  });
-  const equipment = Array.isArray(equipmentData?.nodes) ? equipmentData.nodes : (Array.isArray(equipmentData) ? equipmentData : []);
+  // Equipment data already fetched above as equipmentNodes
+  const equipment = equipmentNodes;
 
   // Top 10 highest scoring observations
   const { data: topObservationsData = [] } = useQuery({
@@ -464,7 +513,7 @@ export default function DashboardPage() {
                   {plantUnitFilter !== "all" && (
                     <Badge variant="secondary" className="gap-1 bg-slate-100">
                       <Building2 className="w-3 h-3" />
-                      {plantUnitFilter}
+                      {plantUnits.find(pu => pu.id === plantUnitFilter)?.name || plantUnitFilter}
                       <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setPlantUnitFilter("all")} />
                     </Badge>
                   )}
@@ -548,7 +597,7 @@ export default function DashboardPage() {
                   <SelectContent>
                     <SelectItem value="all">All Plants/Units</SelectItem>
                     {plantUnits.map(pu => (
-                      <SelectItem key={pu} value={pu}>{pu}</SelectItem>
+                      <SelectItem key={pu.id} value={pu.id}>{pu.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
