@@ -40,8 +40,7 @@ async def shutdown_db_client():
     client.close()
 
 
-@app.post("/api/admin/seed-database")
-@app.get("/api/admin/seed-database")
+@app.api_route("/api/admin/seed-database", methods=["GET", "POST"])
 async def trigger_database_seed(secret_key: str = None):
     """
     Admin endpoint to seed the database with preview data.
