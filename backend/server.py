@@ -2,13 +2,14 @@
 AssetIQ / ThreatBase API - Main application entry point.
 All route handlers are in /routes/, services in /services/, models in /models/.
 """
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
 
 from database import client
 from routes import all_routers
+from seed_database import seed_database
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -37,3 +38,25 @@ app.add_middleware(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+
+@app.post("/api/admin/seed-database")
+async def trigger_database_seed(secret_key: str = None):
+    """
+    Admin endpoint to seed the database with preview data.
+    Requires SEED_SECRET_KEY environment variable to be set and matched.
+    """
+    expected_key = os.environ.get('SEED_SECRET_KEY', 'emergent-seed-2024')
+    
+    if secret_key != expected_key:
+        raise HTTPException(status_code=403, detail="Invalid secret key")
+    
+    try:
+        success = await seed_database()
+        if success:
+            return {"status": "success", "message": "Database seeded successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Seeding failed - check logs")
+    except Exception as e:
+        logger.error(f"Seed error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
