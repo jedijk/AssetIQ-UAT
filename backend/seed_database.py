@@ -1,6 +1,6 @@
 """
 Database Seed Script for Deployment
-Replaces specified collections with seed data from preview environment.
+Replaces ALL collections with seed data from preview environment.
 Run this script to sync deployment database with preview data.
 """
 
@@ -10,20 +10,52 @@ import os
 from motor.motor_asyncio import AsyncIOMotorClient
 from pathlib import Path
 
-# Collections to seed (complete replace)
+# Collections to seed (complete replace) - ALL application data
 SEED_COLLECTIONS = [
+    # Core data
     'equipment_nodes',
     'threats', 
+    'observations',
+    'investigations',
     'central_actions',
+    'action_items',
+    'cause_nodes',
+    'failure_identifications',
+    
+    # Tasks
     'task_instances',
     'task_templates',
     'task_plans',
+    
+    # Users & Auth
     'users',
-    'observations',
-    'investigations',
-    'cause_nodes',
-    'failure_identifications',
-    'action_items'
+    
+    # Forms
+    'form_templates',
+    'form_submissions',
+    
+    # AI/Analysis data
+    'ai_causal_analysis',
+    'ai_risk_insights',
+    'ai_bow_ties',
+    'ai_fault_trees',
+    'ai_action_optimization',
+    
+    # Equipment & Failure Modes
+    'failure_modes',
+    'failure_mode_versions',
+    'equipment_failure_modes',
+    'custom_equipment_types',
+    
+    # Decision Engine
+    'decision_rules',
+    'decision_suggestions',
+    'maintenance_strategies',
+    
+    # Other
+    'timeline_events',
+    'feedback',
+    'chat_messages',
 ]
 
 async def seed_database():
