@@ -103,6 +103,10 @@ Build an AI-Powered Threat Capture & Prioritization Platform with features inclu
 ---
 
 ## Latest Changes (March 30, 2026)
+- **Form Builder Dropdown Fix:** Fixed Radix UI issue where Select dropdowns inside Dialogs would instantly close the parent modal
+  - Updated `DialogContent` component to handle `onPointerDownOutside` and `onInteractOutside` events
+  - Detects clicks on Radix portal elements (`data-radix-select-content`, `data-radix-popper-content-wrapper`)
+  - Both Discipline dropdown and Field Type dropdown now work correctly in Form Designer
 - **Installation-Based Data Filtering:** Implemented comprehensive data filtering across all pages based on user's assigned installations
   - Users with no assigned installations see NO data (zeros everywhere)
   - Both admins and regular users are filtered by their assignments

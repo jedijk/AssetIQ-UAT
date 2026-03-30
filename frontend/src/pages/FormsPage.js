@@ -739,7 +739,7 @@ const FormsPage = () => {
 
       {/* Create/Edit Template Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {newTemplate.id ? t("common.edit") + " " + t("forms.templates") : t("forms.title")}
@@ -1018,7 +1018,7 @@ const FormsPage = () => {
 
       {/* Add/Edit Field Dialog */}
       <Dialog open={showFieldDialog} onOpenChange={setShowFieldDialog}>
-        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingField ? t("common.edit") : t("common.add")} {t("forms.label")}</DialogTitle>
           </DialogHeader>
