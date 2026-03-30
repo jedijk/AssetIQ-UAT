@@ -387,12 +387,34 @@ async def delete_central_action(
     action_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete a centralized action."""
-    result = await db.central_actions.delete_one(
-        {"id": action_id, "created_by": current_user["id"]}
-    )
+    """Delete a centralized action. Owner and Admin can delete any action."""
+    from bson import ObjectId
+    
+    # Owner and Admin can delete any action
+    if current_user.get("role") in ["owner", "admin"]:
+        # Try to find by id field first
+        action = await db.central_actions.find_one({"id": action_id})
+        
+        # If not found, try by ObjectId
+        if not action:
+            try:
+                action = await db.central_actions.find_one({"_id": ObjectId(action_id)})
+            except:
+                pass
+        
+        if not action:
+            raise HTTPException(status_code=404, detail="Action not found")
+        
+        # Delete using the found document's _id
+        result = await db.central_actions.delete_one({"_id": action["_id"]})
+    else:
+        # Others can only delete their own
+        result = await db.central_actions.delete_one(
+            {"id": action_id, "created_by": current_user["id"]}
+        )
+    
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Action not found")
+        raise HTTPException(status_code=404, detail="Action not found or you don't have permission to delete it")
     return {"message": "Action deleted"}
 
 
@@ -412,9 +434,18 @@ async def validate_action(
     current_user: dict = Depends(get_current_user)
 ):
     """Validate an action (mark as reviewed/approved by a person)."""
-    action = await db.central_actions.find_one(
-        {"id": action_id, "created_by": current_user["id"]}
-    )
+    from bson import ObjectId
+    
+    # Try to find by id field first
+    action = await db.central_actions.find_one({"id": action_id})
+    
+    # If not found, try by ObjectId
+    if not action:
+        try:
+            action = await db.central_actions.find_one({"_id": ObjectId(action_id)})
+        except:
+            pass
+    
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
     
