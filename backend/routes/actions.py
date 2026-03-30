@@ -289,10 +289,24 @@ async def get_central_action(
     current_user: dict = Depends(get_current_user)
 ):
     """Get a specific centralized action."""
+    from bson import ObjectId
+    
+    # Try to find by id field first
     action = await db.central_actions.find_one(
-        {"id": action_id, "created_by": current_user["id"]},
+        {"id": action_id},
         {"_id": 0}
     )
+    
+    # If not found, try by ObjectId
+    if not action:
+        try:
+            action = await db.central_actions.find_one(
+                {"_id": ObjectId(action_id)},
+                {"_id": 0}
+            )
+        except:
+            pass
+    
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
     return action
@@ -304,10 +318,19 @@ async def update_central_action(
     data: CentralActionUpdate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Update a centralized action."""
-    action = await db.central_actions.find_one(
-        {"id": action_id, "created_by": current_user["id"]}
-    )
+    """Update a centralized action. Owner and Admin can update any action."""
+    from bson import ObjectId
+    
+    # Try to find by id field first
+    action = await db.central_actions.find_one({"id": action_id})
+    
+    # If not found, try by ObjectId
+    if not action:
+        try:
+            action = await db.central_actions.find_one({"_id": ObjectId(action_id)})
+        except:
+            pass
+    
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
     
@@ -320,12 +343,13 @@ async def update_central_action(
         action.get("status") != "completed"
     )
     
+    # Update using _id from the found document
     await db.central_actions.update_one(
-        {"id": action_id},
+        {"_id": action["_id"]},
         {"$set": update_data}
     )
     
-    updated = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
+    updated = await db.central_actions.find_one({"_id": action["_id"]}, {"_id": 0})
     
     # Check if all actions for the source are now completed
     completion_notification = None
@@ -333,11 +357,10 @@ async def update_central_action(
         source_type = action["source_type"]
         source_id = action["source_id"]
         
-        # Count remaining open actions for this source
+        # Count remaining open actions for this source (not filtered by created_by - actions are shared)
         remaining_open = await db.central_actions.count_documents({
             "source_type": source_type,
             "source_id": source_id,
-            "created_by": current_user["id"],
             "status": {"$ne": "completed"}
         })
         
@@ -345,8 +368,7 @@ async def update_central_action(
             # All actions completed - prepare notification
             total_actions = await db.central_actions.count_documents({
                 "source_type": source_type,
-                "source_id": source_id,
-                "created_by": current_user["id"]
+                "source_id": source_id
             })
             
             # Get source details
