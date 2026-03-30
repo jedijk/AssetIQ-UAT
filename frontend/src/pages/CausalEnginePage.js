@@ -4,18 +4,21 @@ import { useLocation, useSearchParams } from "react-router-dom";
 import { investigationAPI, actionsAPI, usersAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
   Search, Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
   ChevronRight, Trash2, Calendar, User, MapPin,
-  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Save, Lock,
+  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Save, Lock, ShieldCheck, UserCheck, CheckCircle, ExternalLink,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
+import { Badge } from "../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { SearchableSelect } from "../components/ui/searchable-select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
 import { CauseTree, CAUSE_CATEGORIES } from "../components/CauseNodeItem";
@@ -60,6 +63,7 @@ export default function CausalEnginePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
+  const { user } = useAuth();
   
   // Check for mobile viewport
   const [isMobile, setIsMobile] = useState(false);
@@ -76,6 +80,12 @@ export default function CausalEnginePage() {
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false); // Completion confirmation
   const [editingItem, setEditingItem] = useState(null);
+  
+  // Validation dialog state
+  const [showValidateDialog, setShowValidateDialog] = useState(false);
+  const [actionToValidate, setActionToValidate] = useState(null);
+  const [validatorName, setValidatorName] = useState("");
+  const [validatorPosition, setValidatorPosition] = useState("");
   
   const [newInvForm, setNewInvForm] = useState({ title: "", description: "", asset_name: "", location: "", incident_date: "", investigation_leader: "" });
   const [editInvForm, setEditInvForm] = useState({ title: "", description: "", asset_name: "", location: "", incident_date: "", investigation_leader: "", status: "draft" });
@@ -138,6 +148,22 @@ export default function CausalEnginePage() {
     staleTime: 60000, // Cache for 1 minute
   });
   const failureModesList = failureModesData?.failure_modes || [];
+  
+  // Fetch central actions linked to this investigation (for Action Plan section)
+  const { data: centralActionsData } = useQuery({
+    queryKey: ["central-actions", "investigation", selectedInvId],
+    queryFn: async () => {
+      const response = await actionsAPI.getAll();
+      const allActions = response?.actions || response || [];
+      // Filter actions linked to this investigation
+      return allActions.filter(
+        action => action.source_type === "investigation" && action.source_id === selectedInvId
+      );
+    },
+    enabled: !!selectedInvId,
+    staleTime: 30000,
+  });
+  const centralActions = centralActionsData || [];
   
   // Log error for debugging
   useEffect(() => {
@@ -507,14 +533,75 @@ export default function CausalEnginePage() {
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: ["central-actions", "investigation", selectedInvId] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
-      toast.success(t("causal.actionPromoted") || "Action promoted! View it in the Actions tab.");
+      toast.success(t("causal.actionPromoted") || "Action added to Action Plan!");
     },
     onError: (error) => {
       console.error("Failed to promote action:", error);
-      toast.error(t("causal.actionPromoteFailed") || "Failed to promote action");
+      toast.error(t("causal.actionPromoteFailed") || "Failed to add to Action Plan");
     },
   });
+
+  // Validate action in central action plan
+  const validateActionMutation = useMutation({
+    mutationFn: ({ actionId, validatorName, validatorPosition }) =>
+      actionsAPI.validate(actionId, validatorName, validatorPosition, user?.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: ["central-actions", "investigation", selectedInvId] });
+      toast.success("Action validated successfully!");
+      setShowValidateDialog(false);
+      setActionToValidate(null);
+      setValidatorName("");
+      setValidatorPosition("");
+    },
+    onError: (error) => {
+      console.error("Failed to validate action:", error);
+      toast.error("Failed to validate action");
+    },
+  });
+
+  // Unvalidate action
+  const unvalidateActionMutation = useMutation({
+    mutationFn: (actionId) => actionsAPI.unvalidate(actionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: ["central-actions", "investigation", selectedInvId] });
+      toast.success("Validation removed");
+    },
+    onError: (error) => {
+      console.error("Failed to remove validation:", error);
+      toast.error("Failed to remove validation");
+    },
+  });
+
+  const handleOpenValidateDialog = (action) => {
+    setActionToValidate(action);
+    setValidatorName(user?.name || "");
+    setValidatorPosition(user?.position || "");
+    setShowValidateDialog(true);
+  };
+
+  const handleValidateAction = () => {
+    if (!validatorName.trim() || !validatorPosition.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    validateActionMutation.mutate({
+      actionId: actionToValidate.id,
+      validatorName: validatorName.trim(),
+      validatorPosition: validatorPosition.trim(),
+    });
+  };
+
+  // Check if an investigation action is already in the central action plan
+  const isActionInPlan = useCallback((action) => {
+    return centralActions.some(ca => 
+      ca.title?.toLowerCase().trim() === action.description?.substring(0, 100).toLowerCase().trim() ||
+      ca.description?.toLowerCase().trim() === action.description?.toLowerCase().trim()
+    );
+  }, [centralActions]);
 
   const handleEditCause = useCallback((node) => {
     setEditingItem({ type: "cause", data: node });
@@ -1139,13 +1226,19 @@ export default function CausalEnginePage() {
                       const priority = ACTION_PRIORITIES.find(p => p.value === action.priority);
                       const statusInfo = ACTION_STATUSES.find(s => s.value === action.status);
                       const isOverdue = action.due_date && new Date(action.due_date) < new Date() && action.status !== "completed";
+                      const alreadyInPlan = isActionInPlan(action);
+                      
                       return (
                         <motion.div 
                           key={action.id} 
                           initial={{ opacity: 0, y: 10 }} 
                           animate={{ opacity: 1, y: 0 }} 
                           transition={{ delay: idx * 0.03 }} 
-                          className={`bg-white rounded-xl border p-4 group hover:shadow-md transition-all ${isOverdue ? 'border-red-200 bg-red-50/30' : 'border-slate-200'}`}
+                          className={`rounded-xl border p-4 group hover:shadow-md transition-all ${
+                            alreadyInPlan ? 'bg-green-50 border-green-200' :
+                            isOverdue ? 'border-red-200 bg-red-50/30' : 
+                            'bg-white border-slate-200'
+                          }`}
                           data-testid={`action-item-${action.id}`}
                         >
                           <div className="flex items-start gap-4">
@@ -1195,6 +1288,13 @@ export default function CausalEnginePage() {
                                 {isOverdue && (
                                   <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium">Overdue</span>
                                 )}
+                                {/* In Action Plan indicator */}
+                                {alreadyInPlan && (
+                                  <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+                                    <CheckCircle className="w-3 h-3" />
+                                    In Action Plan
+                                  </span>
+                                )}
                               </div>
                               
                               {/* Details Row */}
@@ -1222,17 +1322,24 @@ export default function CausalEnginePage() {
                             
                             {/* Action Buttons */}
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
-                                onClick={() => promoteToCentralActionMutation.mutate(action)} 
-                                disabled={promoteToCentralActionMutation.isPending} 
-                                title="Add to action plan" 
-                                data-testid={`promote-action-${action.id}`}
-                              >
-                                <ClipboardList className="w-4 h-4 mr-1" />Act
-                              </Button>
+                              {alreadyInPlan ? (
+                                <Badge className="bg-green-100 text-green-700 border-green-300 text-xs px-2 py-1">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Added
+                                </Badge>
+                              ) : (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
+                                  onClick={() => promoteToCentralActionMutation.mutate(action)} 
+                                  disabled={promoteToCentralActionMutation.isPending} 
+                                  title="Add to action plan" 
+                                  data-testid={`promote-action-${action.id}`}
+                                >
+                                  <ClipboardList className="w-4 h-4 mr-1" />Act
+                                </Button>
+                              )}
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -1260,11 +1367,239 @@ export default function CausalEnginePage() {
                     })}
                   </div>
                 )}
+                
+                {/* Action Plan Section - Central actions linked to this investigation */}
+                {centralActions.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="mt-6 bg-white rounded-xl border border-slate-200 p-4"
+                    data-testid="investigation-action-plan-section"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <ClipboardList className="w-5 h-5 text-blue-600" />
+                        <h3 className="font-semibold text-slate-900">Action Plan</h3>
+                        <Badge variant="secondary" className="text-xs">{centralActions.length}</Badge>
+                        {centralActions.filter(a => a.is_validated).length > 0 && (
+                          <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">
+                            <ShieldCheck className="w-3 h-3 mr-1" />
+                            {centralActions.filter(a => a.is_validated).length} validated
+                          </Badge>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.location.href = "/actions"}
+                        className="text-blue-600 hover:text-blue-700 h-7 text-xs px-2"
+                      >
+                        View All
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {centralActions.map((action) => {
+                        const statusCfg = {
+                          open: { bg: "bg-slate-50", color: "text-slate-600", label: "Open" },
+                          in_progress: { bg: "bg-blue-50", color: "text-blue-600", label: "In Progress" },
+                          completed: { bg: "bg-green-50", color: "text-green-600", label: "Completed" },
+                          closed: { bg: "bg-slate-100", color: "text-slate-500", label: "Closed" },
+                        }[action.status] || { bg: "bg-slate-50", color: "text-slate-600", label: action.status };
+                        
+                        return (
+                          <div
+                            key={action.id}
+                            className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
+                              action.is_validated 
+                                ? "bg-green-50 border-green-200" 
+                                : `${statusCfg.bg} border-slate-200 hover:shadow-sm`
+                            }`}
+                            data-testid={`inv-action-plan-item-${action.id}`}
+                          >
+                            {/* Action Type Badge */}
+                            <div className="flex-shrink-0">
+                              {action.action_type ? (
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xs ${
+                                  action.action_type === 'CM' ? 'bg-amber-500' :
+                                  action.action_type === 'PM' ? 'bg-blue-500' :
+                                  action.action_type === 'PDM' ? 'bg-purple-500' :
+                                  'bg-slate-500'
+                                }`}>
+                                  {action.action_type}
+                                </div>
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center">
+                                  <ClipboardList className="w-5 h-5" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => window.location.href = `/actions/${action.id}`}>
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusCfg.bg} ${statusCfg.color}`}>
+                                  {statusCfg.label}
+                                </span>
+                                {action.discipline && (
+                                  <span className="text-[10px] text-slate-400">{action.discipline}</span>
+                                )}
+                                {action.is_validated && (
+                                  <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5">
+                                    <ShieldCheck className="w-3 h-3 mr-0.5" />
+                                    Validated
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-slate-700 leading-snug line-clamp-2">{action.title}</p>
+                              {action.is_validated && action.validated_by_name && (
+                                <p className="text-[10px] text-green-600 mt-1 flex items-center gap-1">
+                                  <UserCheck className="w-3 h-3" />
+                                  {action.validated_by_name} ({action.validated_by_position})
+                                </p>
+                              )}
+                              {action.assignee && !action.is_validated && (
+                                <p className="text-[10px] text-slate-400 mt-1">Owner: {action.assignee}</p>
+                              )}
+                            </div>
+
+                            {/* Actions Column */}
+                            <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                              {action.due_date && (
+                                <p className="text-[10px] text-slate-500">
+                                  Due: {new Date(action.due_date).toLocaleDateString()}
+                                </p>
+                              )}
+                              {action.priority && (
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-[10px] ${
+                                    action.priority === 'high' || action.priority === 'critical' ? 'border-red-300 text-red-600' :
+                                    action.priority === 'medium' ? 'border-amber-300 text-amber-600' :
+                                    'border-slate-300 text-slate-600'
+                                  }`}
+                                >
+                                  {action.priority}
+                                </Badge>
+                              )}
+                              {!action.is_validated ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenValidateDialog(action);
+                                  }}
+                                  className="h-6 text-[10px] px-2 text-green-600 border-green-200 hover:bg-green-50 mt-1"
+                                  data-testid={`inv-validate-action-${action.id}`}
+                                >
+                                  <ShieldCheck className="w-3 h-3 mr-1" />
+                                  Validate
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    unvalidateActionMutation.mutate(action.id);
+                                  }}
+                                  className="h-6 text-[10px] px-2 text-slate-400 hover:text-red-500 mt-1"
+                                  title="Remove validation"
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
               </div>
             )}
           </div>
         </div>
       ) : <div className="flex-1 flex items-center justify-center"><p>Not found</p></div>}
+      
+      {/* Validate Action Dialog */}
+      <Dialog open={showValidateDialog} onOpenChange={setShowValidateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-green-600" />
+              Validate Action
+            </DialogTitle>
+            <DialogDescription>
+              Confirm this action has been reviewed and approved by a subject matter expert.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {actionToValidate && (
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <p className="text-sm font-medium text-slate-700">{actionToValidate.title}</p>
+                {actionToValidate.action_type && (
+                  <Badge className={`mt-2 text-[10px] ${
+                    actionToValidate.action_type === 'CM' ? 'bg-amber-100 text-amber-700' :
+                    actionToValidate.action_type === 'PM' ? 'bg-blue-100 text-blue-700' :
+                    'bg-purple-100 text-purple-700'
+                  }`}>
+                    {actionToValidate.action_type}
+                  </Badge>
+                )}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="inv-validator-name">Validator Name *</Label>
+              <Input
+                id="inv-validator-name"
+                value={validatorName}
+                onChange={(e) => setValidatorName(e.target.value)}
+                placeholder="e.g., John Smith"
+                data-testid="inv-validator-name-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="inv-validator-position">Position / Role *</Label>
+              <Input
+                id="inv-validator-position"
+                value={validatorPosition}
+                onChange={(e) => setValidatorPosition(e.target.value)}
+                placeholder="e.g., Reliability Engineer"
+                data-testid="inv-validator-position-input"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowValidateDialog(false);
+                setActionToValidate(null);
+                setValidatorName("");
+                setValidatorPosition("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleValidateAction}
+              disabled={validateActionMutation.isPending || !validatorName.trim() || !validatorPosition.trim()}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="inv-confirm-validate-button"
+            >
+              {validateActionMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <ShieldCheck className="w-4 h-4 mr-2" />
+              )}
+              Confirm Validation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Dialogs */}
       <NewInvestigationDialog
