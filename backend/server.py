@@ -35,6 +35,17 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database indexes on startup."""
+    try:
+        from scripts.create_indexes import create_indexes
+        created, skipped = await create_indexes()
+        logger.info(f"Database indexes: {created} created, {skipped} already existed")
+    except Exception as e:
+        logger.warning(f"Index creation skipped: {e}")
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
