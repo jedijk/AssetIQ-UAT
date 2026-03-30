@@ -292,10 +292,21 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             const discipline = isObj ? action.discipline : null;
             const typeStyle = actionType ? TYPE_STYLES[actionType] || { bg: "bg-slate-500", text: "text-white", label: actionType } : null;
 
+            // Check if this action has already been acted upon (exists in linked actions)
+            const isAlreadyActed = linkedActions.some(linkedAction => {
+              const linkedTitle = linkedAction.title?.toLowerCase().trim();
+              const actionTextLower = actionText?.toLowerCase().trim();
+              return linkedTitle === actionTextLower || linkedTitle?.includes(actionTextLower) || actionTextLower?.includes(linkedTitle);
+            });
+
             return (
               <div
                 key={idx}
-                className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-lg hover:border-blue-200 hover:shadow-sm transition-all group"
+                className={`flex items-start gap-3 p-3 border rounded-lg transition-all group ${
+                  isAlreadyActed 
+                    ? "bg-green-50 border-green-200" 
+                    : "bg-white border-slate-200 hover:border-blue-200 hover:shadow-sm"
+                }`}
                 data-testid={`action-item-${idx}`}
               >
                 {/* Action Type Badge - Smaller */}
@@ -326,25 +337,45 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                     </div>
                   )}
                   <p className="text-sm text-slate-700 leading-snug">{actionText}</p>
+                  
+                  {/* Already Acted Indicator */}
+                  {isAlreadyActed && (
+                    <div className="flex items-center gap-1 mt-1.5 text-green-600">
+                      <CheckCircle className="w-3 h-3" />
+                      <span className="text-[10px] font-medium">In Action Plan</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Act Button - Smaller */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => promoteToActionMutation.mutate({
-                    text: actionText,
-                    action_type: actionType,
-                    discipline: discipline,
-                  })}
-                  disabled={promoteToActionMutation.isPending}
-                  className="opacity-0 group-hover:opacity-100 transition-all text-blue-600 hover:text-white hover:bg-blue-600 rounded-md px-2 py-1 h-7 text-xs"
-                  title="Add to action tracker"
-                  data-testid={`promote-action-${idx}`}
-                >
-                  <ClipboardList className="w-3 h-3 mr-1" />
-                  Act
-                </Button>
+                {/* Act Button - Show only if not already acted */}
+                {isAlreadyActed ? (
+                  <div className="flex-shrink-0">
+                    <Badge 
+                      variant="outline" 
+                      className="bg-green-100 text-green-700 border-green-300 text-[10px] px-2 py-1"
+                    >
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Added
+                    </Badge>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => promoteToActionMutation.mutate({
+                      text: actionText,
+                      action_type: actionType,
+                      discipline: discipline,
+                    })}
+                    disabled={promoteToActionMutation.isPending}
+                    className="opacity-0 group-hover:opacity-100 transition-all text-blue-600 hover:text-white hover:bg-blue-600 rounded-md px-2 py-1 h-7 text-xs"
+                    title="Add to action tracker"
+                    data-testid={`promote-action-${idx}`}
+                  >
+                    <ClipboardList className="w-3 h-3 mr-1" />
+                    Act
+                  </Button>
+                )}
               </div>
             );
           })}
