@@ -1,419 +1,124 @@
 # ThreatBase (AssetIQ) - Product Requirements Document
 
-## Overview
-AI-Powered Threat Capture & Prioritization Platform for industrial asset management and reliability engineering.
-
-## Core Features
-
-### 1. User Authentication
-- JWT-based authentication
-- Role-based access (admin/user)
-- Password reset via email (Resend integration)
-
-### 2. Equipment Manager
-- Hierarchical equipment structure
-- Equipment nodes with criticality ratings
-- Equipment-failure mode linking
-
-### 3. Chatbot Threat Capture
-- AI-powered threat/observation capture
-- Voice input (Whisper integration)
-- Image analysis (GPT-4o Vision)
-
-### 4. Risk Prioritization
-- AI Risk Analysis using GPT-5.2
-- Risk scoring with FMEA methodology
-- Trend analysis and forecasting
-
-### 5. Equipment History Timeline
-- Shows related activity for equipment
-- Displays observations, actions, and tasks
-- Cross-observation visibility (actions from sibling observations)
-
-### 6. Causal Intelligence
-- Causal diagram generation
-- Root cause analysis
-- Fault tree and bow-tie analysis
-
-### 7. Task Management
-- Task scheduling and execution
-- Form-based task completion
-- Task history tracking
-
----
-
-## Completed Work
-
-### March 30, 2026 (Session 7)
-- **Enhanced:** AI Investigation Summary - Content-Driven Analysis (P0)
-  - Rewrote AI prompt to generate highly specific, data-heavy summaries
-  - Summary now references: specific action numbers (ACT-001, ACT-002, etc.)
-  - Includes exact statistics: "8 actions, 0 completed, 0 validated"
-  - References actual equipment names, failure modes, root cause mechanisms
-  - Multi-paragraph executive summary with incident timeline
-  - Detailed validation requirements for each corrective action
-  - Strategic recommendations tied to specific root causes
-  - Fixed LlmChat API usage (with_model, send_message patterns)
-  - Files: `/app/backend/routes/reports.py` (generate_ai_summary function)
-
-- **Added:** Mobile User Management (Full Compatibility)
-  - Created responsive mobile layout with card-based user list
-  - Role filter pills with horizontal scroll
-  - Full-screen dialogs for Edit Profile and Change Role
-  - Mobile-optimized pending approvals banner
-  - User cards show avatar, name, email, role badge, department, position
-  - Three-dot menu for all user actions (edit, role change, activate/deactivate, delete)
-  - Removed `desktopOnly` flag from User Management navigation
-  - Files: `/app/frontend/src/pages/SettingsUserManagementPage.js`, `/app/frontend/src/components/Layout.js`
-
-- **Added:** Action Completion Notification System
-  - Backend endpoint: `GET /api/actions/source/{source_type}/{source_id}/completion-status`
-  - Modified `PATCH /api/actions/{action_id}` to return `completion_notification` when all actions completed
-  - Modified `PATCH /api/investigations/{inv_id}/actions/{action_id}` for investigation action completion
-  - Frontend dialog prompts user to close observation/investigation when all action plan items complete
-  - Dialog shows: total actions completed, source name, and "Go to Observation/Investigation" or "Complete Investigation" button
-  - Works on ActionsPage, ActionDetailPage, and CausalEnginePage
-  - Automatically checks if source is already closed before showing notification
-  - Files: `/app/backend/routes/actions.py`, `/app/backend/routes/investigations.py`, `/app/frontend/src/pages/ActionsPage.js`, `/app/frontend/src/pages/ActionDetailPage.js`, `/app/frontend/src/pages/CausalEnginePage.js`
-
-- **Added:** Observation Owner, Discipline, and Plant/Unit Fields
-  - Extended ThreatResponse and ThreatUpdate models with owner_id, owner_name, discipline, plant_unit
-  - Observation detail page now shows Owner, Discipline, and Plant/Unit fields with edit support
-  - Owner dropdown populated from /api/rbac/users endpoint
-  - Discipline dropdown uses DISCIPLINES constant (Mechanical, Electrical, Instrumentation, etc.)
-  - Files: `/app/backend/models/api_models.py`, `/app/frontend/src/pages/ThreatDetailPage.js`
-
-- **Added:** Dashboard Filtering System
-  - Filter bar with collapsible panel on Operational dashboard tab
-  - Three filters: Discipline, Owner/Assignee, Plant/Unit
-  - Active filter badges shown as removable chips
-  - "Clear all" button to reset filters
-  - Filters apply to Observations, Actions, and Investigations sections
-  - Top 10 observations now show discipline badge and owner name if assigned
-  - Files: `/app/frontend/src/pages/DashboardPage.js`
-
-- **Fixed:** Email URL Configuration
-  - Added `EMAIL_FRONTEND_URL` env variable for emails (separate from preview URL)
-  - Email links now use `EMAIL_FRONTEND_URL` instead of `FRONTEND_URL`
-  - Set `EMAIL_FRONTEND_URL` in .env to your production domain for correct email links
-  - Files: `/app/backend/routes/auth.py`, `/app/backend/.env`
-
-- **Added:** Installation Assignment on User Approval
-  - Approval dialog now includes "Assign Installations" checkbox list
-  - Backend stores `assigned_installations` array on user document
-  - New endpoint: `PATCH /api/rbac/users/{user_id}/installations` for editing
-  - "Manage Installations" option added to user action dropdown menu
-  - Dedicated dialog for editing user installations post-approval
-  - Files: `/app/backend/routes/users.py`, `/app/frontend/src/lib/api.js`, `/app/frontend/src/pages/SettingsUserManagementPage.js`
-
-### March 30, 2026 (Session 6)
-- **Added:** Report Generation for Causal Investigations (P0)
-  - PowerPoint (.pptx) export with professional styling
-  - PDF export with tables and formatted sections
-  - Reports include: Overview, Timeline, Failures, Root Causes, Actions, Summary
-  - "Generated with AssetIQ" watermark on every page (bottom right, subtle)
-  - Export dropdown in investigation header
-  - Files: `/app/backend/routes/reports.py`, updated `CausalEnginePage.js`
-
-- **Added:** AI Investigation Summary Feature
-  - AI-powered analysis of investigation data using GPT-5.2
-  - Executive Summary with key findings overview
-  - Key Findings list (numbered)
-  - Recommended Next Steps (numbered, actionable)
-  - Strategic Recommendations (checkmark list)
-  - Regenerate button to refresh analysis
-  - Purple "AI Summary" button in investigation header
-  - Files: `/app/backend/routes/reports.py`, updated `CausalEnginePage.js`
-
-- **Added:** Searchable Dropdowns across the application
-  - New `SearchableSelect` component with search input and keyboard navigation
-  - Applied to: Lead, Owner, Discipline, Root Cause dropdowns
-  - Files: `/app/frontend/src/components/ui/searchable-select.jsx`
-
-- **Added:** Investigation Action Plan with Validation
-  - Same look and feel as Observation actions
-  - "In Action Plan" indicator for already-acted items
-  - Validation feature with name/position capture
-  - Central action plan section below investigation actions
-
-- **Added:** Video background to Login and Register pages (4K version)
-  - Dolly 4K.mov video plays behind the blue gradient overlay
-  - Works on both desktop (left panel) and mobile (full background behind form)
-
-- **Fixed:** RegisterPage.js still referencing static BACKGROUND_IMAGE
-  - Updated to use BACKGROUND_VIDEO with `<video>` elements
-
-- **Fixed:** Feedback status update validation error (422)
-  - Added missing statuses: `"implemented"`, `"parked"`, `"rejected"`
-
-- **Fixed:** Task execution form double header
-  - Removed white header, embedded back button in purple header
-
-- **Fixed:** Recommended Actions re-acting
-  - Actions already in Action Plan show "Added" badge
-  - "Act" button hidden for already-acted items
-
-### March 30, 2026 (Session 5)
-- **Added:** Video background to Login and Register pages
-  - Dolly 1080p.mov video plays behind the blue gradient overlay
-  - Works on both desktop (left panel) and mobile (full background behind form)
-  - Mobile uses fixed video element with overlay gradient
-  - Files: `/app/frontend/src/pages/LoginPage.js`, `/app/frontend/src/pages/RegisterPage.js`
-
-- **Fixed:** RegisterPage.js still referencing static BACKGROUND_IMAGE
-  - Updated to use BACKGROUND_VIDEO with `<video>` elements matching LoginPage
-  - Added mobile video background support
-  - File: `/app/frontend/src/pages/RegisterPage.js`
-
-- **Fixed:** Feedback status update validation error (422)
-  - Backend FeedbackUserUpdate Pydantic model only accepted `"new"` and `"resolved"`
-  - Added missing statuses: `"implemented"`, `"parked"`, `"rejected"`
-  - File: `/app/backend/models/feedback_models.py`
-
-### March 29, 2026 (Session 4)
-- **Styled:** Top 10 Highest Risk Observations to match Recent Observations layout
-  - Converted from table view to card-based row layout
-  - Added rank badges (uniform grey styling)
-  - Added user avatar with hover card support showing name and position
-  - Added risk level colored dots
-  - Added RPN (Risk Priority Number) display in purple badge
-  - Added risk score and status badges
-  - File: `/app/frontend/src/pages/DashboardPage.js`
-
-- **Fixed:** Top 10 avatars not showing user pictures
-  - Backend `get_top_threats` now calls `enrich_with_creator_info()` to populate creator_photo, creator_name, creator_position
-  - File: `/app/backend/routes/threats.py`
-
-- **Fixed:** Dashboard tabs grey background sizing
-  - Changed from `w-full sm:w-auto` to `inline-flex` so background only covers tab buttons
-  - File: `/app/frontend/src/pages/DashboardPage.js`
-
-- **Fixed:** Failure Mode Version History crash (TypeError: Illegal constructor)
-  - Added missing lucide-react icon imports: `History`, `Clock`, `User`, `RotateCcw`
-  - File: `/app/frontend/src/pages/FailureModesPage.js`
-
-- **Improved:** Observations page stability to prevent disappearing data
-  - Added null-safe API response handling and filtering
-  - Added longer staleTime (60s), gcTime (5min cache), 3 retries with exponential backoff
-  - Disabled refetchOnWindowFocus, added placeholderData to keep previous data while refetching
-  - File: `/app/frontend/src/pages/ThreatsPage.js`
-
-- **Changed:** Investigation editing from popup dialog to inline editing
-  - Edit button now opens inline form directly in the Overview section
-  - Equipment field shows as dropdown when equipment hierarchy exists, text input as fallback
-  - Investigation Lead populated from users list
-  - Removed EditInvestigationDialog component usage
-  - File: `/app/frontend/src/pages/CausalEnginePage.js`
-
-- **Enhanced:** Add Failure dialog in Causal Engine
-  - Asset field now shows as dropdown (equipment hierarchy) or text input (fallback)
-  - Failure Mode field shows as dropdown with FMEA library options + custom entry option
-  - File: `/app/frontend/src/components/causal-engine/InvestigationDialogs.js`
-
-- **Enhanced:** Add Action dialog in Causal Engine
-  - Discipline field now shows as dropdown with all unified disciplines
-  - Owner field now shows as dropdown with users from user management
-  - File: `/app/frontend/src/components/causal-engine/InvestigationDialogs.js`
-
-- **Added:** Investigation completion confirmation and field locking
-  - When changing status to "Completed", confirmation dialog appears warning about field locking
-  - Completed/Closed investigations show locked badge, hide edit/delete buttons, disable add buttons
-  - File: `/app/frontend/src/pages/CausalEnginePage.js`
-
-- **Added:** Actions Tracker section in Observation detail page
-  - Shows all actions linked to the observation with their current status
-  - Status badges: Open (blue), In Progress (amber), Completed (green), Cancelled (grey)
-  - Displays action type badge (CM/PM/PDM), title, owner, due date, and priority
-  - "View All" link to navigate to Actions page
-  - Click on action to navigate to action detail page
-  - File: `/app/frontend/src/components/threat-detail/RecommendedActionsSection.jsx`
-
-- **Critical Fix:** Feedback page mobile layout
-  - Fixed header buttons to fit within mobile viewport (AI + New buttons)
-  - Added responsive typography and spacing (sm: breakpoints)
-  - Added status filter dropdown with count display
-  - Added List/Snowflake view toggle with localStorage persistence
-  - Improved feedback item cards for mobile with proper line-clamp and spacing
-  - File: `/app/frontend/src/pages/FeedbackPage.js`
-
-- **Added:** Snowflake timeline view for Feedback page
-  - Groups feedback items by status (New, In Review, Implemented, Parked, Rejected, Resolved)
-  - Shows status header with count badge
-  - Persists view preference in localStorage
-  - File: `/app/frontend/src/pages/FeedbackPage.js`
-
-- **Added:** New feedback statuses: Implemented, Parked, Rejected
-  - Added to statusConfig with appropriate colors (emerald, orange, red)
-  - Added to status filter dropdown and detail panel status selector
-  - File: `/app/frontend/src/pages/FeedbackPage.js`
-
-- **Improved:** Message/description box in feedback detail panel
-  - Added bg-slate-50 container with border
-  - Added max-height with internal scrolling for long content
-  - Added break-words for proper text wrapping
-  - File: `/app/frontend/src/pages/FeedbackPage.js`
-
-### March 29, 2026 (Session 3)
-- **Added:** Offline support for My Tasks (P1)
-  - New `OfflineStorageService` using IndexedDB with 3 stores: tasks, pending_completions, sync_queue
-  - Tasks automatically cached when fetched for offline access
-  - Completed tasks saved locally when offline
-  - Auto-sync when connection restored + manual "Sync Now" button
-  - Offline banner shows when disconnected with pending count
-  - Sync banner shows when online with pending items to sync
-  - Files: `/app/frontend/src/services/offlineStorage.js`, `/app/frontend/src/pages/MyTasksPage.js`
-
-- **Added:** Mobile form execution flow (P1)
-  - Full form rendering on mobile (390x844 viewport)
-  - Supports all field types: checkboxes, numeric inputs with range validation, text areas
-  - Attachments section with file upload
-  - Cancel and Complete action buttons
-  - Back navigation to task list
-  - File: `/app/frontend/src/pages/MyTasksPage.js`
-
-- **Added:** AI Prompt Generation for Feedback
-  - Select multiple feedback items in Feedback page
-  - Generate AI-powered prompt using GPT-5.2
-  - Copy generated prompt to clipboard for Emergent Agent
-  - Files: `/app/frontend/src/pages/FeedbackPage.js`, `/app/backend/routes/feedback.py`
-
-- **Fixed:** User Statistics page not showing all users
-  - Modified `_get_user_activity()` to query actual business data (threats, actions, investigations)
-  - Now shows all users with their real activity counts
-  - Fixed datetime timezone comparison issues
-  - File: `/app/backend/services/user_stats_service.py`
-
-- **Fixed:** Feedback textarea typing issue
-  - Changed from component function to render function to prevent re-mount on keystroke
-  - File: `/app/frontend/src/pages/FeedbackPage.js`
-
-- **Fixed:** Dashboard mobile tab buttons
-  - Equal-width buttons, larger touch targets, centered content
-  - File: `/app/frontend/src/pages/DashboardPage.js`
-
-- **Removed:** Analytics page and Decision Engine page
-  - Analytics page deleted, tab removed from Dashboard
-  - Decision Engine now shows "Under Development" placeholder
-  - Files: `/app/frontend/src/App.js`, `/app/frontend/src/pages/DashboardPage.js`
-
-### March 29, 2026 (Session 2)
-- **Added:** Edit Investigation feature in Causal Engine
-  - Edit button on investigation overview opens dialog with all editable fields
-  - Title, description, asset, location, incident date, lead, and status
-  - Files: `/app/frontend/src/components/causal-engine/InvestigationDialogs.js`, `/app/frontend/src/pages/CausalEnginePage.js`
-
-- **Added:** Lead selection mapped to User Management
-  - New and Edit investigation dialogs show user dropdown
-  - Dropdown displays user names with their positions from RBAC users
-  - Fallback to text input if no users available
-  - Files: Same as above
-
-- **Fixed:** Dashboard Avatar Popover for investigations
-  - Clicking lead avatar in Recent Investigations shows popover with name and role
-  - Added `stopPropagation()` to prevent navigation when clicking avatar
-  - File: `/app/frontend/src/pages/DashboardPage.js`
-
-- **Fixed:** Dashboard Investigations Count Mismatch
-  - Root cause: `queryFn: investigationAPI.getAll` was receiving React Query context object as `status` param
-  - Solution: Wrapped in arrow function `queryFn: () => investigationAPI.getAll()`
-  - Dashboard now correctly shows investigation count (was showing 0)
-  - File: `/app/frontend/src/pages/DashboardPage.js`
-
-- **Added:** Dashboard Avatar Hover Popovers for All Item Types
-  - Observations, Actions, and Investigations now show creator/lead popover with name and position
-  - Updated `UserAvatar` component to support optional popover with `showPopover` prop
-  - Backend updated to return `creator_position` for threats and actions
-  - Files: `/app/frontend/src/pages/DashboardPage.js`, `/app/backend/routes/threats.py`, `/app/backend/routes/actions.py`
-
-- **Added:** Dashboard Deep Linking
-  - Clicking on individual observation items navigates to `/threats/{id}` detail page
-  - Clicking on individual action items navigates to `/actions/{id}` detail page
-  - Clicking on individual investigation items navigates to `/causal-engine?inv={id}` with auto-selection
-  - File: `/app/frontend/src/pages/DashboardPage.js`
-
-### March 29, 2026
-- **Changed:** Task/Form execution UI from popup dialogs to frame view
-  - Replaced modal dialog with full-page frame view
-  - Added back button (←) in header to return to task list
-  - Cancel button now also returns to task list
-  - Works on both desktop and mobile viewports
-  - File: `/app/frontend/src/pages/MyTasksPage.js` - `TaskExecutionFrame` component
-
-- **Added:** "Create Recurring Task" button for PM Actions in ActionDetailPage
-  - Button appears only when action type is "PM - Preventive"
-  - Clicking navigates to Task Designer (`/tasks`) with prefilled data (name, description, discipline)
-  - Toast notification guides user to configure schedule
-  - File: `/app/frontend/src/pages/ActionDetailPage.js`
-  - Fixed route path from `/task-scheduler` to `/tasks` in ActionsPage.js
-
-- **Optimized:** Mobile UI for My Tasks and Task Execution
-  - My Tasks header: Hides description, inline stats badge, icon-only filter tabs, hidden stats grid
-  - Task Execution frame: Compact back header, smaller gradient header, compact context block
-  - Footer buttons use shorter labels on mobile
-  - File: `/app/frontend/src/pages/MyTasksPage.js`
-
-### March 28, 2026
-- **Added:** Investigations to Equipment History Timeline
-  - Shows investigations linked to threats, sibling observations, or same equipment
-  - Purple-colored cards with Draft/Review/In Progress status badges
-  - Filter button to show only investigations
-  - Backend: `/app/backend/routes/threats.py`
-  - Frontend: `/app/frontend/src/components/EquipmentTimeline.js`
-
-- **Added:** Equipment History Timeline to Causal Engine page
-  - Shows related activity when investigation is linked to a threat
-  - File: `/app/frontend/src/pages/CausalEnginePage.js`
-  
-- **Fixed:** Equipment History Timeline missing actions bug
-  - Root cause: Query only looked for actions with direct `source_id` match or `linked_equipment_id`
-  - Solution: Extended query to include actions from sibling observations (same equipment)
-  - File: `/app/backend/routes/threats.py` - `get_threat_timeline` endpoint
-  - Verified: "Screw Breakage" now shows 4 actions (was 0)
-
-### Previous Sessions
-- Full-stack React/FastAPI/MongoDB architecture
-- Light/dark theming with CSS variables
-- AI integrations (GPT-5.2, Whisper, Vision)
-- Object storage for file uploads
-- Equipment hierarchy FMEA library
-- User statistics dashboard
-
----
+## Original Problem Statement
+Build an AI-Powered Threat Capture & Prioritization Platform with features including:
+- User authentication and role-based access control
+- Chat-based threat capture system with AI-powered risk analysis
+- Risk prioritization engine
+- Equipment Hierarchy FMEA Library (ISO 14224 compliant)
+- User Statistics and Analytics
+- Causal Engine for root cause analysis
+- Mobile-optimized interfaces
+- Task management and scheduling
+- Form-based inspections and data collection
 
 ## Tech Stack
-- **Frontend:** React, Tailwind CSS, Shadcn/UI, React Query
-- **Backend:** FastAPI, Motor (async MongoDB)
+- **Frontend:** React with Shadcn UI components
+- **Backend:** FastAPI (Python)
 - **Database:** MongoDB
-- **AI:** OpenAI GPT-5.2, GPT-4o Vision, Whisper (via Emergent LLM Key)
-- **Storage:** Emergent Object Storage
-- **Email:** Resend
+- **AI Integration:** OpenAI GPT-5.2 via Emergent LLM Key
+- **File Storage:** Emergent Object Storage
+- **Email:** Resend (requires domain verification for production)
+
+## Core User Personas
+1. **Admin** - Full system access, user management, configuration
+2. **Reliability Engineer** - Risk analysis, equipment management, investigations
+3. **Maintenance** - Task execution, observations, actions
+4. **Operations** - Daily operations, observations
+5. **Viewer** - Read-only access
 
 ---
 
-## Prioritized Backlog
+## Completed Features (as of March 2026)
 
-### P0 (Critical)
-- [ ] Report generation (PowerPoint/PDF) for Causal Investigations
+### Authentication & Authorization
+- [x] JWT-based authentication
+- [x] Role-based access control (RBAC)
+- [x] User registration with approval workflow
+- [x] Email notifications for approval/rejection (Resend)
+- [x] Multi-installation assignment for users
+- [x] Mobile-compatible User Management
 
-### P1 (High)
-- [x] Offline support with local storage for My Tasks execution ✅ (Completed March 29, 2026)
-- [x] Form execution flow in mobile My Tasks ✅ (Completed March 29, 2026)
+### Dashboard
+- [x] Overview statistics (Observations, Actions, Investigations, Equipment)
+- [x] Risk level visualizations with correct color mapping
+- [x] Deep linking to specific observations/actions/investigations
+- [x] Avatar hover cards showing user name and position
+- [x] Filtering by Owner, Discipline, Plant/Unit
 
-### P2 (Medium)
+### Observations (Threats)
+- [x] AI-powered threat capture via chat
+- [x] Risk prioritization with scoring
+- [x] Equipment linking
+- [x] Owner assignment
+- [x] Action plan creation
+- [x] Status tracking (Open, In Progress, Closed)
+
+### Actions
+- [x] Central action repository
+- [x] Priority levels and due dates
+- [x] Assignment to users
+- [x] Completion tracking
+- [x] Closure notification when all actions complete
+
+### Causal Engine (Investigations)
+- [x] Investigation creation and management
+- [x] AI-generated summaries
+- [x] Lead assignment from user directory
+- [x] Investigation editing
+- [x] PDF/PPTX report generation
+- [x] Closure notification when all actions complete
+
+### Equipment Hierarchy
+- [x] ISO 14224 compliant structure
+- [x] Criticality assessment (4-dimension model)
+- [x] Equipment Failure Modes (EFM) library
+- [x] Drag-and-drop reordering
+- [x] Excel export
+- [x] Equipment history timeline
+
+### Tasks & Forms
+- [x] Task scheduling and assignment
+- [x] Form templates with dynamic fields
+- [x] Task execution tracking
+- [x] Mobile-optimized My Tasks page
+
+### AI Features
+- [x] GPT-5.2 powered threat analysis
+- [x] AI document search
+- [x] AI-generated investigation summaries
+- [x] Intelligent risk scoring
+
+---
+
+## Latest Changes (March 30, 2026)
+- **Database Cleanup:** Removed 69 test equipment nodes from the database
+- **Installation List:** Now shows only "Tyromer" instead of test data
+- **Verification:** Confirmed via API and screenshot
+
+---
+
+## Backlog
+
+### P1 - High Priority
+- [ ] Offline support with local storage for My Tasks execution
+- [ ] Form execution flow in mobile My Tasks
+
+### P2 - Medium Priority
 - [ ] Bulk criticality assignment for equipment
 
-### P3 (Low)
+### P3 - Low Priority / Tech Debt
+- [ ] Refactor `MyTasksPage.js` (~1850 lines) - Extract TaskExecutionFrame
+- [ ] Refactor `CausalEnginePage.js` (~1900 lines)
+- [ ] Refactor `SettingsUserManagementPage.js` (~1750 lines)
 - [ ] Module detail panel for User Statistics page
-- [x] ~~Refactor `TaskExecutionDialog` from `MyTasksPage.js`~~ (Completed - Now `TaskExecutionFrame` with frame view)
-- [ ] Refactor `FormsPage.js` and `TaskSchedulerPage.js` (>1000 lines each)
 
 ---
+
+## Known Limitations
+- **Resend Email:** Requires domain verification to send emails to external addresses
+- **Offline Mode:** Not yet implemented for task execution
 
 ## Test Credentials
 - Email: `test@test.com`
 - Password: `test`
-
-## Key Files
-- `/app/backend/routes/threats.py` - Threat/Observation endpoints including timeline
-- `/app/frontend/src/components/EquipmentTimeline.js` - Timeline UI component
-- `/app/frontend/src/pages/ThreatDetailPage.js` - Observation detail view
