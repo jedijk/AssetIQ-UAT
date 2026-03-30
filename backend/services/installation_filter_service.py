@@ -171,14 +171,15 @@ class InstallationFilterService:
         equipment_ids: Set[str],
         equipment_names: Set[str],
         threat_ids: List[str] = None,
+        investigation_ids: List[str] = None,
         additional_filters: dict = None
     ) -> dict:
         """
         Build a MongoDB query filter for actions based on assigned installations.
-        Actions are filtered by source threats that belong to assigned installations.
+        Actions are filtered by source threats or investigations that belong to assigned installations.
         Note: Actions are shared - anyone with installation access can see them.
         """
-        if not equipment_ids and not equipment_names and not threat_ids:
+        if not equipment_ids and not equipment_names and not threat_ids and not investigation_ids:
             return {"_impossible": True}
         
         base_filter = {
@@ -186,13 +187,20 @@ class InstallationFilterService:
         }
         
         if threat_ids:
-            base_filter["$or"].append({"source_id": {"$in": threat_ids}})
+            base_filter["$or"].append({"source_id": {"$in": threat_ids}, "source_type": "threat"})
+        
+        if investigation_ids:
+            base_filter["$or"].append({"source_id": {"$in": investigation_ids}, "source_type": "investigation"})
         
         if equipment_ids:
             base_filter["$or"].append({"linked_equipment_id": {"$in": list(equipment_ids)}})
         
         if equipment_names:
             base_filter["$or"].append({"equipment_name": {"$in": list(equipment_names)}})
+        
+        # Also include AI recommendations linked to threats
+        if threat_ids:
+            base_filter["$or"].append({"source_id": {"$in": threat_ids}, "source_type": "ai_recommendation"})
         
         if not base_filter["$or"]:
             return {"_impossible": True}
@@ -224,6 +232,22 @@ class InstallationFilterService:
         ).to_list(5000)
         
         return [t["id"] for t in threats]
+    
+    async def get_filtered_investigation_ids(
+        self,
+        user_id: str,
+        equipment_ids: Set[str],
+        equipment_names: Set[str]
+    ) -> List[str]:
+        """Get all investigation IDs that belong to the user's assigned installations."""
+        # For now, return all investigations since they don't have direct equipment linking
+        # The filtering happens through threats that are linked to investigations
+        investigations = await self.db.investigations.find(
+            {},
+            {"_id": 0, "id": 1}
+        ).to_list(5000)
+        
+        return [inv["id"] for inv in investigations]
     
     def has_installation_access(self, user: dict) -> bool:
         """Check if user has any installations assigned or is owner."""

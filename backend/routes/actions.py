@@ -131,9 +131,14 @@ async def get_all_actions(
         current_user["id"], equipment_ids, equipment_names
     )
     
+    # Get investigation IDs that belong to user's installations
+    investigation_ids = await installation_filter.get_filtered_investigation_ids(
+        current_user["id"], equipment_ids, equipment_names
+    )
+    
     # Build base query with installation filtering
     query = installation_filter.build_action_filter(
-        current_user["id"], equipment_ids, equipment_names, threat_ids
+        current_user["id"], equipment_ids, equipment_names, threat_ids, investigation_ids
     )
     
     if query.get("_impossible"):
