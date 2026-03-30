@@ -40,7 +40,6 @@ import {
   FileImage,
   Maximize2,
   User,
-  Building2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -421,8 +420,6 @@ const ThreatDetailPage = () => {
     { label: t("observations.detectability"), value: threat.detectability, icon: Eye, field: "detectability", type: "select", options: DETECTABILITY_OPTIONS },
     { label: t("observations.location"), value: threat.location || "Not specified", icon: MapPin, field: "location", type: "text" },
     { label: "Owner", value: threat.owner_name || "Not assigned", icon: User, field: "owner_id", type: "user-select" },
-    { label: "Discipline", value: threat.discipline || "Not specified", icon: Wrench, field: "discipline", type: "discipline-select" },
-    { label: "Plant/Unit", value: threat.plant_unit || "Not specified", icon: Building2, field: "plant_unit", type: "text" },
   ];
 
   const startEditing = () => {
@@ -440,8 +437,6 @@ const ThreatDetailPage = () => {
       status: threat.status,
       owner_id: threat.owner_id || "",
       owner_name: threat.owner_name || "",
-      discipline: threat.discipline || "",
-      plant_unit: threat.plant_unit || "",
     });
     setIsEditing(true);
   };
