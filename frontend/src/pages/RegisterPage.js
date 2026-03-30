@@ -53,6 +53,16 @@ const RegisterPage = () => {
   if (registrationComplete) {
     return (
       <div className="register-page-container">
+        {/* Mobile Video Background - positioned at container level */}
+        <video 
+          src={BACKGROUND_VIDEO}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="register-mobile-video"
+        />
+        
         {/* Left side - Background Video with Overlay */}
         <div className="register-image-section">
           <video 
@@ -78,15 +88,6 @@ const RegisterPage = () => {
 
         {/* Right side - Success Message */}
         <div className="register-form-section">
-          {/* Mobile Video Background */}
-          <video 
-            src={BACKGROUND_VIDEO}
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="register-mobile-video lg:hidden"
-          />
           <div className="register-form-wrapper">
             <div className="text-center space-y-6">
               <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
@@ -123,6 +124,16 @@ const RegisterPage = () => {
 
   return (
     <div className="register-page-container">
+      {/* Mobile Video Background - positioned at container level */}
+      <video 
+        src={BACKGROUND_VIDEO}
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="register-mobile-video"
+      />
+      
       {/* Left side - Background Video with Overlay */}
       <div className="register-image-section">
         <video 
@@ -166,16 +177,6 @@ const RegisterPage = () => {
 
       {/* Right side - Register Form */}
       <div className="register-form-section">
-        {/* Mobile Video Background */}
-        <video 
-          src={BACKGROUND_VIDEO}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="register-mobile-video lg:hidden"
-        />
-        
         <div className="register-form-wrapper animate-fade-in">
           {/* Mobile Logo (hidden on desktop) */}
           <div className="register-mobile-logo">
@@ -404,11 +405,25 @@ const RegisterPage = () => {
           }
         }
 
-        /* Mobile video background */
+        /* Mobile video background - hidden on desktop, visible on mobile */
+        .register-mobile-video {
+          display: none;
+        }
+
         @media (max-width: 1023px) {
           .register-page-container {
             position: relative;
             overflow: hidden;
+          }
+
+          .register-mobile-video {
+            display: block;
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
           }
 
           .register-page-container::before {
@@ -422,15 +437,6 @@ const RegisterPage = () => {
               rgba(15, 23, 42, 0.95) 100%
             );
             z-index: 1;
-          }
-
-          .register-mobile-video {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 0;
           }
 
           .register-form-section {

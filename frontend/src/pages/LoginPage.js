@@ -42,6 +42,18 @@ const LoginPage = () => {
 
   return (
     <div className="login-page-container">
+      {/* Mobile Video Background - positioned at container level */}
+      <video 
+        src={BACKGROUND_VIDEO}
+        autoPlay
+        loop
+        muted
+        playsInline
+        poster="/logo.png"
+        className="login-mobile-video"
+        style={{ backgroundColor: '#1e3a5f' }}
+      />
+      
       {/* Left side - Background Video with Overlay */}
       <div className="login-image-section">
         <video 
@@ -85,16 +97,6 @@ const LoginPage = () => {
 
       {/* Right side - Login Form */}
       <div className="login-form-section">
-        {/* Mobile Video Background */}
-        <video 
-          src={BACKGROUND_VIDEO}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="login-mobile-video lg:hidden"
-        />
-        
         <div className="login-form-wrapper animate-fade-in">
           {/* Mobile Logo (hidden on desktop) */}
           <div className="login-mobile-logo">
@@ -317,11 +319,25 @@ const LoginPage = () => {
           }
         }
 
-        /* Mobile video background */
+        /* Mobile video background - hidden on desktop, visible on mobile */
+        .login-mobile-video {
+          display: none;
+        }
+
         @media (max-width: 1023px) {
           .login-page-container {
             position: relative;
             overflow: hidden;
+          }
+
+          .login-mobile-video {
+            display: block;
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
           }
 
           .login-page-container::before {
@@ -335,15 +351,6 @@ const LoginPage = () => {
               rgba(15, 23, 42, 0.95) 100%
             );
             z-index: 1;
-          }
-
-          .login-mobile-video {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 0;
           }
 
           .login-form-section {
