@@ -1,5 +1,13 @@
 # ThreatBase (AssetIQ) - Product Requirements Document
 
+## Latest Updates (December 2025)
+
+### Session Update - Threat Access Fix
+- **Fixed:** "Threat not found" error when clicking observations
+- **Root Cause:** `created_by` filters in threat endpoints blocked shared tenant access
+- **Resolution:** Removed ownership filters from GET/PATCH/POST threat endpoints in `threats.py`
+- Threats are now shared tenant entities (like Equipment and Actions)
+
 ## Recent Updates (March 30, 2026)
 - **Fixed**: Equipment move functionality - removed `created_by` ownership filters from move, criticality, discipline, and reorder endpoints to support shared equipment management across users with same installation access
 

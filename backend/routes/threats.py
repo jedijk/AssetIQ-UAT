@@ -343,8 +343,10 @@ async def get_threat(
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
+    # Remove created_by filter - threats are shared tenant entities
+    # Access is controlled by installation assignment, not ownership
     threat = await db.threats.find_one(
-        {"id": threat_id, "created_by": current_user["id"]},
+        {"id": threat_id},
         {"_id": 0}
     )
     if not threat:
@@ -354,16 +356,16 @@ async def get_threat(
     linked_equipment_id = threat.get("linked_equipment_id")
     asset_name = threat.get("asset")
     
-    # Try to find linked equipment node
+    # Try to find linked equipment node (shared entity - no created_by filter)
     equipment_node = None
     if linked_equipment_id:
         equipment_node = await db.equipment_nodes.find_one(
-            {"id": linked_equipment_id, "created_by": current_user["id"]}
+            {"id": linked_equipment_id}
         )
     elif asset_name:
         # Fallback: try to find by asset name
         equipment_node = await db.equipment_nodes.find_one(
-            {"name": asset_name, "created_by": current_user["id"]}
+            {"name": asset_name}
         )
     
     # Auto-sync FMEA score from linked failure mode
@@ -513,7 +515,8 @@ async def update_threat(
     update: ThreatUpdate,
     current_user: dict = Depends(get_current_user)
 ):
-    threat = await db.threats.find_one({"id": threat_id, "created_by": current_user["id"]})
+    # Remove created_by filter - threats are shared tenant entities
+    threat = await db.threats.find_one({"id": threat_id})
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
     
@@ -590,13 +593,13 @@ async def link_threat_to_equipment(
     Link a threat to an equipment node and apply its criticality to the threat score.
     This updates the threat's asset field and recalculates the risk score.
     """
-    # Get the threat
-    threat = await db.threats.find_one({"id": threat_id, "created_by": current_user["id"]})
+    # Get the threat (shared entity - no created_by filter)
+    threat = await db.threats.find_one({"id": threat_id})
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
     
-    # Get the equipment node
-    node = await db.equipment_nodes.find_one({"id": equipment_node_id, "created_by": current_user["id"]})
+    # Get the equipment node (shared entity - no created_by filter)
+    node = await db.equipment_nodes.find_one({"id": equipment_node_id})
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
@@ -695,8 +698,8 @@ async def link_threat_to_failure_mode(
     """
     Link a threat to a failure mode from the FMEA library and recalculate the risk score.
     """
-    # Get the threat
-    threat = await db.threats.find_one({"id": threat_id, "created_by": current_user["id"]})
+    # Get the threat (shared entity - no created_by filter)
+    threat = await db.threats.find_one({"id": threat_id})
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
     
@@ -798,8 +801,9 @@ async def create_investigation_from_threat(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new investigation from an existing threat with auto-generated timeline and causal diagram."""
+    # Shared entity - no created_by filter for read access
     threat = await db.threats.find_one(
-        {"id": threat_id, "created_by": current_user["id"]},
+        {"id": threat_id},
         {"_id": 0}
     )
     if not threat:
@@ -1048,9 +1052,9 @@ async def get_threat_timeline(
     Get timeline of all activity related to a specific observation/threat.
     Includes: other observations on same equipment, actions, and tasks.
     """
-    # Verify threat exists and belongs to user
+    # Shared entity - no created_by filter for read access
     threat = await db.threats.find_one(
-        {"id": threat_id, "created_by": current_user["id"]},
+        {"id": threat_id},
         {"_id": 0}
     )
     if not threat:
@@ -1084,9 +1088,9 @@ async def get_threat_timeline(
         if asset_name:
             obs_query_conditions.append({"asset": asset_name})
         
+        # Shared entities - no created_by filter
         past_observations = await db.threats.find(
             {
-                "created_by": current_user["id"],
                 "id": {"$ne": threat_id},  # Exclude current observation
                 "$or": obs_query_conditions
             },
@@ -1201,14 +1205,14 @@ async def get_threat_timeline(
     
     # Get investigations linked to this observation or sibling observations
     # Filter by: direct threat link, sibling observation link, or same asset
-    # Only show investigations created by the current user for consistency
+    # Shared entities - no created_by filter
     investigation_conditions = [
-        {"threat_id": threat_id, "created_by": current_user["id"]}
+        {"threat_id": threat_id}
     ]
     if sibling_obs_ids:
-        investigation_conditions.append({"threat_id": {"$in": sibling_obs_ids}, "created_by": current_user["id"]})
+        investigation_conditions.append({"threat_id": {"$in": sibling_obs_ids}})
     if asset_name:
-        investigation_conditions.append({"asset_name": asset_name, "created_by": current_user["id"]})
+        investigation_conditions.append({"asset_name": asset_name})
     
     investigations = await db.investigations.find(
         {"$or": investigation_conditions},
