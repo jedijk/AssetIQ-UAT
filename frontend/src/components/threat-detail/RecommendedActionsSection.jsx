@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { SearchableSelect } from "../ui/searchable-select";
 import {
   Dialog,
   DialogContent,
@@ -636,19 +637,14 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="rec-action-discipline">Discipline *</Label>
-                <Select
+                <SearchableSelect
+                  options={DISCIPLINES.map((disc) => ({ value: disc, label: disc }))}
                   value={newRecommendedAction.discipline}
                   onValueChange={(v) => setNewRecommendedAction({ ...newRecommendedAction, discipline: v })}
-                >
-                  <SelectTrigger data-testid="rec-action-discipline-select">
-                    <SelectValue placeholder="Select discipline..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DISCIPLINES.map((disc) => (
-                      <SelectItem key={disc} value={disc}>{disc}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select discipline..."
+                  searchPlaceholder="Search disciplines..."
+                  data-testid="rec-action-discipline-select"
+                />
               </div>
             </div>
             {/* Preview */}

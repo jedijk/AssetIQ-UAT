@@ -50,6 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { SearchableSelect } from "../components/ui/searchable-select";
 import {
   Dialog,
   DialogContent,
@@ -1101,20 +1102,20 @@ export default function ActionsPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium text-slate-700">{t("threatDetail.actionAssignee")}</label>
-                        <Select value={editForm.assignee || "unassigned"} onValueChange={(v) => setEditForm({ ...editForm, assignee: v === "unassigned" ? "" : v })}>
-                          <SelectTrigger><SelectValue placeholder="Select assignee" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
-                            {usersList.map((u) => (
-                              <SelectItem key={u.id} value={u.name || u.email}>
-                                <span className="flex items-center gap-2">
-                                  <User className="w-3 h-3" />
-                                  {u.name || u.email}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                          options={[
+                            { value: "unassigned", label: "Unassigned" },
+                            ...usersList.map((u) => ({
+                              value: u.name || u.email,
+                              label: u.name || u.email,
+                              badge: u.position || u.role || ""
+                            }))
+                          ]}
+                          value={editForm.assignee || "unassigned"}
+                          onValueChange={(v) => setEditForm({ ...editForm, assignee: v === "unassigned" ? "" : v })}
+                          placeholder="Select assignee"
+                          searchPlaceholder="Search users..."
+                        />
                       </div>
                       <div>
                         <label className="text-sm font-medium text-slate-700">{t("common.dueDate")}</label>

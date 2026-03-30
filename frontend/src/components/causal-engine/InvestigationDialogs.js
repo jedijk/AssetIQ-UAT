@@ -6,6 +6,7 @@ import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { SearchableSelect } from "../ui/searchable-select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import { CAUSE_CATEGORIES } from "../CauseNodeItem";
 import { DISCIPLINES } from "../../constants/disciplines";
@@ -58,23 +59,21 @@ export const NewInvestigationDialog = ({ open, onOpenChange, form, setForm, onSu
             <div>
               <label className="text-sm font-medium">{t("causal.lead")}</label>
               {users.length > 0 ? (
-                <Select value={form.investigation_leader || "none"} onValueChange={(v) => setForm({ ...form, investigation_leader: v === "none" ? "" : v })}>
-                  <SelectTrigger data-testid="new-inv-lead-select">
-                    <SelectValue placeholder="Select lead" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No lead assigned</SelectItem>
-                    {users.map(user => (
-                      <SelectItem key={user.id} value={user.name}>
-                        <div className="flex items-center gap-2">
-                          <User className="w-3 h-3 text-slate-400" />
-                          <span>{user.name}</span>
-                          {user.position && <span className="text-xs text-slate-400">• {user.position}</span>}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={[
+                    { value: "none", label: "No lead assigned" },
+                    ...users.map(user => ({
+                      value: user.name,
+                      label: user.name,
+                      badge: user.position || user.role || ""
+                    }))
+                  ]}
+                  value={form.investigation_leader || "none"}
+                  onValueChange={(v) => setForm({ ...form, investigation_leader: v === "none" ? "" : v })}
+                  placeholder="Select lead"
+                  searchPlaceholder="Search users..."
+                  data-testid="new-inv-lead-select"
+                />
               ) : (
                 <Input value={form.investigation_leader} onChange={(e) => setForm({ ...form, investigation_leader: e.target.value })} placeholder="Name" />
               )}
@@ -126,23 +125,21 @@ export const EditInvestigationDialog = ({ open, onOpenChange, form, setForm, onS
             <div>
               <label className="text-sm font-medium">{t("causal.lead")}</label>
               {users.length > 0 ? (
-                <Select value={form.investigation_leader || "none"} onValueChange={(v) => setForm({ ...form, investigation_leader: v === "none" ? "" : v })}>
-                  <SelectTrigger data-testid="edit-inv-lead-select">
-                    <SelectValue placeholder="Select lead" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No lead assigned</SelectItem>
-                    {users.map(user => (
-                      <SelectItem key={user.id} value={user.name}>
-                        <div className="flex items-center gap-2">
-                          <User className="w-3 h-3 text-slate-400" />
-                          <span>{user.name}</span>
-                          {user.position && <span className="text-xs text-slate-400">• {user.position}</span>}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={[
+                    { value: "none", label: "No lead assigned" },
+                    ...users.map(user => ({
+                      value: user.name,
+                      label: user.name,
+                      badge: user.position || user.role || ""
+                    }))
+                  ]}
+                  value={form.investigation_leader || "none"}
+                  onValueChange={(v) => setForm({ ...form, investigation_leader: v === "none" ? "" : v })}
+                  placeholder="Select lead"
+                  searchPlaceholder="Search users..."
+                  data-testid="edit-inv-lead-select"
+                />
               ) : (
                 <Input value={form.investigation_leader} onChange={(e) => setForm({ ...form, investigation_leader: e.target.value })} placeholder="Name" />
               )}
@@ -313,6 +310,30 @@ export const CauseDialog = ({ open, onOpenChange, editingItem, form, setForm, on
 
 export const ActionDialog = ({ open, onOpenChange, editingItem, form, setForm, onSubmit, causeNodes, users = [] }) => {
   const { t } = useLanguage();
+  
+  // Prepare options for searchable selects
+  const disciplineOptions = [
+    { value: "none", label: "No discipline" },
+    ...DISCIPLINES.map(d => ({ value: d.value, label: d.label }))
+  ];
+  
+  const userOptions = [
+    { value: "none", label: "No owner assigned" },
+    ...users.map(user => ({
+      value: user.name || user.email,
+      label: user.name || user.email,
+      badge: user.position || user.role || ""
+    }))
+  ];
+  
+  const causeOptions = [
+    { value: "none", label: t("causal.noParent") || "No linked cause" },
+    ...causeNodes.filter(c => c.is_root_cause).map(c => ({
+      value: c.id,
+      label: c.description.substring(0, 50) + (c.description.length > 50 ? "..." : "")
+    }))
+  ];
+  
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); }}>
       <DialogContent>
@@ -332,37 +353,33 @@ export const ActionDialog = ({ open, onOpenChange, editingItem, form, setForm, o
             </div>
             <div>
               <Label className="text-sm font-medium">{t("common.discipline") || "Discipline"}</Label>
-              <Select value={form.discipline || "none"} onValueChange={(v) => setForm({ ...form, discipline: v === "none" ? "" : v })}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Select discipline" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No discipline</SelectItem>
-                  {DISCIPLINES.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="mt-1">
+                <SearchableSelect
+                  options={disciplineOptions}
+                  value={form.discipline || "none"}
+                  onValueChange={(v) => setForm({ ...form, discipline: v === "none" ? "" : v })}
+                  placeholder="Select discipline"
+                  searchPlaceholder="Search disciplines..."
+                />
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-medium">{t("common.owner")}</Label>
-              {users.length > 0 ? (
-                <Select value={form.owner || "none"} onValueChange={(v) => setForm({ ...form, owner: v === "none" ? "" : v })}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select owner" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No owner assigned</SelectItem>
-                    {users.map(user => (
-                      <SelectItem key={user.id} value={user.name || user.email}>
-                        <div className="flex items-center gap-2">
-                          <User className="w-3 h-3 text-slate-400" />
-                          <span>{user.name || user.email}</span>
-                          {user.position && <span className="text-xs text-slate-400">• {user.position}</span>}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} placeholder="Person" className="mt-1" />
-              )}
+              <div className="mt-1">
+                {users.length > 0 ? (
+                  <SearchableSelect
+                    options={userOptions}
+                    value={form.owner || "none"}
+                    onValueChange={(v) => setForm({ ...form, owner: v === "none" ? "" : v })}
+                    placeholder="Select owner"
+                    searchPlaceholder="Search users..."
+                  />
+                ) : (
+                  <Input value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} placeholder="Person" />
+                )}
+              </div>
             </div>
             <div>
               <Label className="text-sm font-medium">{t("common.priority")}</Label>
@@ -376,13 +393,15 @@ export const ActionDialog = ({ open, onOpenChange, editingItem, form, setForm, o
             <div><Label className="text-sm font-medium">{t("common.dueDate")}</Label><Input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} className="mt-1" /></div>
             <div>
               <Label className="text-sm font-medium">{t("causal.linkedRootCause")}</Label>
-              <Select value={form.linked_cause_id || "none"} onValueChange={(v) => setForm({ ...form, linked_cause_id: v === "none" ? null : v })}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder={t("causal.noParent")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t("causal.noParent")}</SelectItem>
-                  {causeNodes.filter(c => c.is_root_cause).map(c => <SelectItem key={c.id} value={c.id}>{c.description.substring(0, 30)}...</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="mt-1">
+                <SearchableSelect
+                  options={causeOptions}
+                  value={form.linked_cause_id || "none"}
+                  onValueChange={(v) => setForm({ ...form, linked_cause_id: v === "none" ? null : v })}
+                  placeholder={t("causal.noParent") || "Select root cause"}
+                  searchPlaceholder="Search causes..."
+                />
+              </div>
             </div>
           </div>
           <div><Label className="text-sm font-medium">{t("common.comment")}</Label><Textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} placeholder="Add notes or comments..." rows={2} className="mt-1" /></div>

@@ -47,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { SearchableSelect } from "../components/ui/searchable-select";
 import {
   DropdownMenu,
   DropdownMenuContent,
