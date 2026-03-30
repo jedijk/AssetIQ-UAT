@@ -146,7 +146,7 @@ const Layout = () => {
     { path: "/tasks", label: t("taskScheduler.execution"), icon: Calendar, desktopOnly: true },
     { path: "/forms", label: t("forms.title"), icon: FileText, desktopOnly: true },
     { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
-    { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, desktopOnly: true },
+    { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders },
     { path: "/settings/feedback", label: t("nav.feedback") || "Feedback", icon: MessageCircleQuestion },

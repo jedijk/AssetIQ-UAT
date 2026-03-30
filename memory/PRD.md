@@ -56,6 +56,16 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - Fixed LlmChat API usage (with_model, send_message patterns)
   - Files: `/app/backend/routes/reports.py` (generate_ai_summary function)
 
+- **Added:** Mobile User Management (Full Compatibility)
+  - Created responsive mobile layout with card-based user list
+  - Role filter pills with horizontal scroll
+  - Full-screen dialogs for Edit Profile and Change Role
+  - Mobile-optimized pending approvals banner
+  - User cards show avatar, name, email, role badge, department, position
+  - Three-dot menu for all user actions (edit, role change, activate/deactivate, delete)
+  - Removed `desktopOnly` flag from User Management navigation
+  - Files: `/app/frontend/src/pages/SettingsUserManagementPage.js`, `/app/frontend/src/components/Layout.js`
+
 ### March 30, 2026 (Session 6)
 - **Added:** Report Generation for Causal Investigations (P0)
   - PowerPoint (.pptx) export with professional styling
