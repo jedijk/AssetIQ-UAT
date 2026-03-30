@@ -92,9 +92,21 @@ Build an AI-Powered Threat Capture & Prioritization Platform with features inclu
 ---
 
 ## Latest Changes (March 30, 2026)
-- **Database Cleanup:** Removed 69 test equipment nodes from the database
-- **Installation List:** Now shows only "Tyromer" instead of test data
-- **Verification:** Confirmed via API and screenshot
+- **Installation-Based Data Filtering:** Implemented comprehensive data filtering across all pages based on user's assigned installations
+  - Users with no assigned installations see NO data (zeros everywhere)
+  - Both admins and regular users are filtered by their assignments
+  - Equipment, Threats, Actions, Stats all respect installation filtering
+- **User Management Enhancements:**
+  - Added "Installations" column to user table showing assigned installations
+  - Shows proper installation names (not UUIDs)
+  - "No access" badge for users without installations
+- **Data Sharing Model:** Changed from per-user data ownership to installation-based sharing
+  - Anyone with installation access can see all equipment/threats/actions under that installation
+  - Removed `created_by` filter from equipment, threats, and actions queries
+- **Bug Fixes:**
+  - Fixed hierarchy showing "No equipment hierarchy" for users
+  - Fixed duplicate installation assignments (both UUID and name)
+  - Fixed orphaned equipment nodes by linking section_systems to Tyromer
 
 ---
 

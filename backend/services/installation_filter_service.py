@@ -38,26 +38,26 @@ class InstallationFilterService:
     async def get_all_equipment_ids_for_installations(
         self, 
         installation_ids: List[str],
-        user_id: str
+        user_id: str = None  # user_id is no longer used for filtering
     ) -> Set[str]:
         """
         Get ALL equipment node IDs (at all levels) that belong to the given installations.
         This includes the installation itself and all descendants.
+        Equipment is shared - anyone with installation access can see all equipment under it.
         """
         if not installation_ids:
             return set()
         
         all_ids = set(installation_ids)
         
-        # Recursively get all children
+        # Recursively get all children (without created_by filter - equipment is shared)
         async def get_descendants(parent_ids: List[str]) -> Set[str]:
             if not parent_ids:
                 return set()
             
             children = await self.db.equipment_nodes.find(
                 {
-                    "parent_id": {"$in": parent_ids},
-                    "created_by": user_id
+                    "parent_id": {"$in": parent_ids}
                 },
                 {"_id": 0, "id": 1}
             ).to_list(5000)
@@ -79,11 +79,12 @@ class InstallationFilterService:
     async def get_equipment_names_for_installations(
         self,
         installation_ids: List[str],
-        user_id: str
+        user_id: str = None  # user_id no longer used
     ) -> Set[str]:
         """
         Get all equipment names that belong to the given installations.
         Used for filtering threats/observations by asset name.
+        Equipment is shared - no user filtering.
         """
         if not installation_ids:
             return set()
@@ -114,13 +115,13 @@ class InstallationFilterService:
         Threats are filtered by:
         - linked_equipment_id in equipment_ids, OR
         - asset name in equipment_names
+        Note: Threats are shared - anyone with installation access can see them.
         """
         if not equipment_ids and not equipment_names:
             # No installations assigned - return impossible filter (no results)
             return {"_impossible": True}
         
         base_filter = {
-            "created_by": user_id,
             "$or": []
         }
         
@@ -137,7 +138,7 @@ class InstallationFilterService:
         # Add additional filters
         if additional_filters:
             for key, value in additional_filters.items():
-                if key not in ["$or", "created_by"]:
+                if key not in ["$or"]:
                     base_filter[key] = value
         
         return base_filter
@@ -153,12 +154,12 @@ class InstallationFilterService:
         """
         Build a MongoDB query filter for actions based on assigned installations.
         Actions are filtered by source threats that belong to assigned installations.
+        Note: Actions are shared - anyone with installation access can see them.
         """
         if not equipment_ids and not equipment_names and not threat_ids:
             return {"_impossible": True}
         
         base_filter = {
-            "created_by": user_id,
             "$or": []
         }
         
@@ -176,7 +177,7 @@ class InstallationFilterService:
         
         if additional_filters:
             for key, value in additional_filters.items():
-                if key not in ["$or", "created_by"]:
+                if key not in ["$or"]:
                     base_filter[key] = value
         
         return base_filter

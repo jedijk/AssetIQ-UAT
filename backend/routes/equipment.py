@@ -174,7 +174,7 @@ async def get_equipment_nodes(
     if not installation_ids:
         return {"nodes": []}
     
-    # Get all equipment IDs under assigned installations
+    # Get all equipment IDs under assigned installations (shared equipment - no created_by filter)
     equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
         installation_ids, current_user["id"]
     )
@@ -182,8 +182,9 @@ async def get_equipment_nodes(
     if not equipment_ids:
         return {"nodes": []}
     
+    # Get all nodes that belong to assigned installations (no created_by filter)
     nodes = await db.equipment_nodes.find(
-        {"created_by": current_user["id"], "id": {"$in": list(equipment_ids)}},
+        {"id": {"$in": list(equipment_ids)}},
         {"_id": 0}
     ).sort("sort_order", 1).to_list(5000)
     return {"nodes": nodes}
@@ -1112,7 +1113,7 @@ async def get_hierarchy_stats(
             }
         }
     
-    # Get all equipment IDs under assigned installations
+    # Get all equipment IDs under assigned installations (shared - no created_by)
     equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
         installation_ids, user_id
     )
@@ -1131,7 +1132,8 @@ async def get_hierarchy_stats(
             }
         }
     
-    base_query = {"created_by": user_id, "id": {"$in": list(equipment_ids)}}
+    # No created_by filter - equipment is shared
+    base_query = {"id": {"$in": list(equipment_ids)}}
     
     total_nodes = await db.equipment_nodes.count_documents(base_query)
     
