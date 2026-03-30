@@ -270,6 +270,10 @@ async def approve_user(
     if action == "approve" and approval_data.get("role"):
         update_data["role"] = approval_data["role"]
     
+    # Handle assigned installations
+    if action == "approve" and "assigned_installations" in approval_data:
+        update_data["assigned_installations"] = approval_data["assigned_installations"]
+    
     await db.users.update_one(
         {"id": user_id},
         {"$set": update_data}
@@ -306,6 +310,31 @@ async def update_user_profile(
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
     return result
+
+
+@router.patch("/rbac/users/{user_id}/installations")
+async def update_user_installations(
+    user_id: str,
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update user's assigned installations. Admin only."""
+    if current_user.get("role") not in ["admin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    assigned_installations = data.get("assigned_installations", [])
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"assigned_installations": assigned_installations}}
+    )
+    
+    updated_user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    return updated_user
 
 
 @router.post("/rbac/users/{user_id}/avatar")

@@ -92,6 +92,20 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - Top 10 observations now show discipline badge and owner name if assigned
   - Files: `/app/frontend/src/pages/DashboardPage.js`
 
+- **Fixed:** Email URL Configuration
+  - Added `EMAIL_FRONTEND_URL` env variable for emails (separate from preview URL)
+  - Email links now use `EMAIL_FRONTEND_URL` instead of `FRONTEND_URL`
+  - Set `EMAIL_FRONTEND_URL` in .env to your production domain for correct email links
+  - Files: `/app/backend/routes/auth.py`, `/app/backend/.env`
+
+- **Added:** Installation Assignment on User Approval
+  - Approval dialog now includes "Assign Installations" checkbox list
+  - Backend stores `assigned_installations` array on user document
+  - New endpoint: `PATCH /api/rbac/users/{user_id}/installations` for editing
+  - "Manage Installations" option added to user action dropdown menu
+  - Dedicated dialog for editing user installations post-approval
+  - Files: `/app/backend/routes/users.py`, `/app/frontend/src/lib/api.js`, `/app/frontend/src/pages/SettingsUserManagementPage.js`
+
 ### March 30, 2026 (Session 6)
 - **Added:** Report Generation for Causal Investigations (P0)
   - PowerPoint (.pptx) export with professional styling

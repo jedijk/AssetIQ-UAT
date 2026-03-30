@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+# EMAIL_FRONTEND_URL is the URL used in emails - should be the live/production URL
+EMAIL_FRONTEND_URL = os.environ.get("EMAIL_FRONTEND_URL", os.environ.get("FRONTEND_URL", "http://localhost:3000"))
 
 # Initialize Resend if available
 if RESEND_AVAILABLE and RESEND_API_KEY:
@@ -173,7 +175,7 @@ async def send_reset_email(email: str, reset_token: str, user_name: str):
         logger.warning("Resend not configured. Email not sent.")
         return False
     
-    reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
+    reset_link = f"{EMAIL_FRONTEND_URL}/reset-password?token={reset_token}"
     
     html_content = f"""
     <!DOCTYPE html>
@@ -257,7 +259,7 @@ async def send_approval_notification_email(admin_email: str, admin_name: str, ne
         logger.warning("Resend not configured. Email not sent.")
         return False
     
-    approval_link = f"{FRONTEND_URL}/settings/users"
+    approval_link = f"{EMAIL_FRONTEND_URL}/settings/users"
     
     html_content = f"""
     <!DOCTYPE html>
@@ -328,7 +330,7 @@ async def send_approval_result_email(user_email: str, user_name: str, approved: 
         logger.warning("Resend not configured. Email not sent.")
         return False
     
-    login_link = f"{FRONTEND_URL}/login"
+    login_link = f"{EMAIL_FRONTEND_URL}/login"
     
     if approved:
         subject = "Your AssetIQ Account Has Been Approved"

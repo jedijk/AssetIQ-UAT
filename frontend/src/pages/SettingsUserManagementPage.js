@@ -4,7 +4,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import ImageEditor from "../components/ImageEditor";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
-import { usersAPI } from "../lib/api";
+import { usersAPI, equipmentHierarchyAPI } from "../lib/api";
 import {
   Users,
   Search,
@@ -36,6 +36,7 @@ import {
   AlertCircle,
   UserPlus,
   Bell,
+  Factory,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -243,6 +244,11 @@ const SettingsUserManagementPage = () => {
   const [approvalAction, setApprovalAction] = useState("approve");
   const [approvalRole, setApprovalRole] = useState("viewer");
   const [rejectionReason, setRejectionReason] = useState("");
+  const [approvalInstallations, setApprovalInstallations] = useState([]);
+  
+  // Installation assignment dialog state (for editing)
+  const [installationDialogUser, setInstallationDialogUser] = useState(null);
+  const [selectedInstallations, setSelectedInstallations] = useState([]);
   
   // Image Editor State
   const [editorOpen, setEditorOpen] = useState(false);
@@ -271,6 +277,18 @@ const SettingsUserManagementPage = () => {
     queryKey: ["rbac-roles"],
     queryFn: rbacAPI.getRoles
   });
+  
+  // Equipment hierarchy query for installations
+  const { data: equipmentData } = useQuery({
+    queryKey: ["equipment-hierarchy"],
+    queryFn: equipmentHierarchyAPI.getNodes,
+    staleTime: 5 * 60 * 1000,
+  });
+  
+  // Filter to get only installations (level 1 or type "installation")
+  const installations = (equipmentData?.nodes || []).filter(
+    node => node.level === 1 || node.node_type === "installation" || node.node_type === "plant"
+  );
 
   // Approval mutation
   const approvalMutation = useMutation({
@@ -282,9 +300,24 @@ const SettingsUserManagementPage = () => {
       toast.success(`User ${action} successfully`);
       setApprovalDialogUser(null);
       setRejectionReason("");
+      setApprovalInstallations([]);
     },
     onError: (error) => {
       toast.error(error.message || "Failed to process approval");
+    },
+  });
+  
+  // Update installations mutation
+  const updateInstallationsMutation = useMutation({
+    mutationFn: ({ userId, installations }) => usersAPI.updateInstallations(userId, installations),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["rbac-users"]);
+      toast.success("Installations updated successfully");
+      setInstallationDialogUser(null);
+      setSelectedInstallations([]);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update installations");
     },
   });
 
@@ -674,6 +707,12 @@ const SettingsUserManagementPage = () => {
                         <DropdownMenuItem onClick={() => handleChangeRole(user)}>
                           <UserCog className="w-4 h-4 mr-2" /> Change Role
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          setInstallationDialogUser(user);
+                          setSelectedInstallations(user.assigned_installations || []);
+                        }}>
+                          <Factory className="w-4 h-4 mr-2" /> Manage Installations
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {user.is_active ? (
                           <DropdownMenuItem 
@@ -866,6 +905,7 @@ const SettingsUserManagementPage = () => {
                     action: approvalAction,
                     role: approvalAction === "approve" ? approvalRole : undefined,
                     rejectionReason: approvalAction === "reject" ? rejectionReason : undefined,
+                    assignedInstallations: approvalAction === "approve" ? approvalInstallations : undefined,
                   })}
                   disabled={approvalMutation.isPending}
                 >
@@ -887,21 +927,58 @@ const SettingsUserManagementPage = () => {
                   </div>
                   
                   {approvalAction === "approve" ? (
-                    <div className="space-y-2">
-                      <Label>Assign Role</Label>
-                      <Select value={approvalRole} onValueChange={setApprovalRole}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(roles).map(([roleKey, roleInfo]) => (
-                            <SelectItem key={roleKey} value={roleKey}>
-                              {roleInfo.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <>
+                      <div className="space-y-2">
+                        <Label>Assign Role</Label>
+                        <Select value={approvalRole} onValueChange={setApprovalRole}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(roles).map(([roleKey, roleInfo]) => (
+                              <SelectItem key={roleKey} value={roleKey}>
+                                {roleInfo.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Factory className="w-4 h-4" /> Assign Installations
+                        </Label>
+                        <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+                          {installations.length === 0 ? (
+                            <p className="text-sm text-slate-500 text-center py-2">No installations available</p>
+                          ) : (
+                            installations.map(inst => (
+                              <label 
+                                key={inst.id} 
+                                className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={approvalInstallations.includes(inst.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setApprovalInstallations([...approvalInstallations, inst.id]);
+                                    } else {
+                                      setApprovalInstallations(approvalInstallations.filter(id => id !== inst.id));
+                                    }
+                                  }}
+                                  className="rounded border-slate-300"
+                                />
+                                <span className="text-sm">{inst.name}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                        {approvalInstallations.length > 0 && (
+                          <p className="text-xs text-slate-500">{approvalInstallations.length} installation(s) selected</p>
+                        )}
+                      </div>
+                    </>
                   ) : (
                     <div className="space-y-2">
                       <Label>Rejection Reason (optional)</Label>
@@ -1222,6 +1299,12 @@ const SettingsUserManagementPage = () => {
                             <DropdownMenuItem onClick={() => handleChangeRole(user)}>
                               <UserCog className="w-4 h-4 mr-2" /> Change Role
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setInstallationDialogUser(user);
+                              setSelectedInstallations(user.assigned_installations || []);
+                            }}>
+                              <Factory className="w-4 h-4 mr-2" /> Manage Installations
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {user.is_active ? (
                               <DropdownMenuItem 
@@ -1456,6 +1539,42 @@ const SettingsUserManagementPage = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Factory className="w-4 h-4" /> Assign Installations
+                    </Label>
+                    <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+                      {installations.length === 0 ? (
+                        <p className="text-sm text-slate-500 text-center py-2">No installations available</p>
+                      ) : (
+                        installations.map(inst => (
+                          <label 
+                            key={inst.id} 
+                            className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={approvalInstallations.includes(inst.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setApprovalInstallations([...approvalInstallations, inst.id]);
+                                } else {
+                                  setApprovalInstallations(approvalInstallations.filter(id => id !== inst.id));
+                                }
+                              }}
+                              className="rounded border-slate-300"
+                            />
+                            <span className="text-sm">{inst.name}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    {approvalInstallations.length > 0 && (
+                      <p className="text-xs text-slate-500">{approvalInstallations.length} installation(s) selected</p>
+                    )}
+                  </div>
+                  
                   <p className="text-sm text-slate-500">
                     The user will be notified via email that their account has been approved and they can now log in.
                   </p>
@@ -1493,6 +1612,7 @@ const SettingsUserManagementPage = () => {
                 action: approvalAction,
                 role: approvalAction === "approve" ? approvalRole : undefined,
                 rejectionReason: approvalAction === "reject" ? rejectionReason : undefined,
+                assignedInstallations: approvalAction === "approve" ? approvalInstallations : undefined,
               })}
               disabled={approvalMutation.isPending}
               data-testid={`confirm-${approvalAction}-btn`}
@@ -1510,6 +1630,86 @@ const SettingsUserManagementPage = () => {
                   Reject User
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Installations Dialog */}
+      <Dialog open={!!installationDialogUser} onOpenChange={(open) => {
+        if (!open) {
+          setInstallationDialogUser(null);
+          setSelectedInstallations([]);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Factory className="w-5 h-5 text-blue-600" />
+              Manage Installations
+            </DialogTitle>
+          </DialogHeader>
+          
+          {installationDialogUser && (
+            <div className="space-y-4 py-4">
+              {/* User Info */}
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                <div className="h-10 w-10 rounded-full bg-slate-200 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-slate-600" />
+                </div>
+                <div>
+                  <p className="font-medium">{installationDialogUser.name}</p>
+                  <p className="text-sm text-slate-500">{installationDialogUser.email}</p>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Assigned Installations</Label>
+                <div className="max-h-60 overflow-y-auto border rounded-lg p-2 space-y-1">
+                  {installations.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-4">No installations available</p>
+                  ) : (
+                    installations.map(inst => (
+                      <label 
+                        key={inst.id} 
+                        className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedInstallations.includes(inst.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedInstallations([...selectedInstallations, inst.id]);
+                            } else {
+                              setSelectedInstallations(selectedInstallations.filter(id => id !== inst.id));
+                            }
+                          }}
+                          className="rounded border-slate-300"
+                        />
+                        <span className="text-sm">{inst.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {selectedInstallations.length > 0 && (
+                  <p className="text-xs text-slate-500">{selectedInstallations.length} installation(s) selected</p>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInstallationDialogUser(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => updateInstallationsMutation.mutate({
+                userId: installationDialogUser?.id,
+                installations: selectedInstallations,
+              })}
+              disabled={updateInstallationsMutation.isPending}
+            >
+              {updateInstallationsMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

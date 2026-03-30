@@ -751,11 +751,20 @@ export const usersAPI = {
   },
   
   // Approve or reject a user
-  approveUser: async (userId, action, role = null, rejectionReason = null) => {
+  approveUser: async (userId, action, role = null, rejectionReason = null, assignedInstallations = null) => {
     const response = await api.patch(`/rbac/users/${userId}/approve`, {
       action, // 'approve' or 'reject'
       role,
       rejection_reason: rejectionReason,
+      assigned_installations: assignedInstallations,
+    });
+    return response.data;
+  },
+  
+  // Update user's assigned installations
+  updateInstallations: async (userId, installations) => {
+    const response = await api.patch(`/rbac/users/${userId}/installations`, {
+      assigned_installations: installations,
     });
     return response.data;
   },
