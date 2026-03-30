@@ -174,6 +174,28 @@ async def get_equipment_nodes(
     return {"nodes": nodes}
 
 
+@router.get("/equipment-hierarchy/installations")
+async def get_all_installations(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all installation-level nodes across all users (for admin assignment)."""
+    # Get nodes that are installations (level === 'installation' or level === 'plant_unit')
+    nodes = await db.equipment_nodes.find(
+        {"level": {"$in": ["installation", "plant_unit", "plant", "unit"]}},
+        {"_id": 0, "id": 1, "name": 1, "level": 1, "created_by": 1}
+    ).sort("name", 1).to_list(500)
+    
+    # Deduplicate by name (in case same installation exists for multiple users)
+    seen_names = set()
+    unique_nodes = []
+    for node in nodes:
+        if node.get("name") not in seen_names:
+            seen_names.add(node.get("name"))
+            unique_nodes.append(node)
+    
+    return {"installations": unique_nodes}
+
+
 @router.get("/equipment-hierarchy/export")
 async def export_equipment_hierarchy_excel(
     current_user: dict = Depends(get_current_user)

@@ -278,10 +278,15 @@ const SettingsUserManagementPage = () => {
     queryFn: rbacAPI.getRoles
   });
   
-  // Equipment hierarchy query for installations
-  const { data: equipmentData } = useQuery({
-    queryKey: ["equipment-hierarchy"],
-    queryFn: equipmentHierarchyAPI.getNodes,
+  // Equipment hierarchy query for installations - use dedicated installations endpoint
+  const { data: installationsData } = useQuery({
+    queryKey: ["all-installations"],
+    queryFn: async () => {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/equipment-hierarchy/installations`, {
+        headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+      });
+      return response.json();
+    },
     staleTime: 5 * 60 * 1000,
   });
   
@@ -297,10 +302,8 @@ const SettingsUserManagementPage = () => {
     staleTime: 5 * 60 * 1000,
   });
   
-  // Filter to get only installations (level 1 or type "installation")
-  const equipmentInstallations = (equipmentData?.nodes || []).filter(
-    node => node.level === 1 || node.node_type === "installation" || node.node_type === "plant"
-  );
+  // Get installations from the API
+  const equipmentInstallations = installationsData?.installations || [];
   
   // Extract unique locations from threats as fallback installations
   const locationInstallations = useMemo(() => {
