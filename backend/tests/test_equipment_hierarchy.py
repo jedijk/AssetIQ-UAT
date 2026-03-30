@@ -12,7 +12,7 @@ if _frontend_env.exists():
             key, val = line.split('=', 1)
             os.environ.setdefault(key.strip(), val.strip())
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://assetiq-staging-1.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://threat-capture-dev.preview.emergentagent.com').rstrip('/')
 
 
 class TestEquipmentHierarchyLibrary:

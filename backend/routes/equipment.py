@@ -853,8 +853,9 @@ async def reorder_node_to_position(
                 raise HTTPException(status_code=400, detail="Only installations can be at root level")
     
     # Get all siblings at the target location (same parent as target)
+    # Equipment is shared - no created_by filter
     siblings = await db.equipment_nodes.find(
-        {"parent_id": new_parent_id, "created_by": current_user["id"]},
+        {"parent_id": new_parent_id},
         {"_id": 0}
     ).sort("sort_order", 1).to_list(1000)
     
@@ -905,23 +906,24 @@ async def move_equipment_node(
     current_user: dict = Depends(get_current_user)
 ):
     """Move a node to a new parent with ISO 14224 validation."""
+    # Equipment is shared - no created_by filter
     node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]}
+        {"id": node_id}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
+    # Equipment is shared - no created_by filter
     new_parent = await db.equipment_nodes.find_one(
-        {"id": move_request.new_parent_id, "created_by": current_user["id"]}
+        {"id": move_request.new_parent_id}
     )
     if not new_parent:
         raise HTTPException(status_code=400, detail="New parent node not found")
     
-    # Check for duplicate name under the new parent
+    # Check for duplicate name under the new parent (no created_by filter - equipment is shared)
     existing = await db.equipment_nodes.find_one({
         "name": node["name"],
         "parent_id": move_request.new_parent_id,
-        "created_by": current_user["id"],
         "id": {"$ne": node_id}  # Exclude the node itself
     })
     if existing:
@@ -960,8 +962,9 @@ async def assign_criticality(
     current_user: dict = Depends(get_current_user)
 ):
     """Assign criticality to an equipment node using 4-dimension model (Safety, Production, Environmental, Reputation)."""
+    # Equipment is shared - no created_by filter
     node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]}
+        {"id": node_id}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
@@ -1067,8 +1070,9 @@ async def assign_discipline(
     current_user: dict = Depends(get_current_user)
 ):
     """Assign discipline to an equipment node."""
+    # Equipment is shared - no created_by filter
     node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]}
+        {"id": node_id}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")

@@ -1,5 +1,8 @@
 # ThreatBase (AssetIQ) - Product Requirements Document
 
+## Recent Updates (March 30, 2026)
+- **Fixed**: Equipment move functionality - removed `created_by` ownership filters from move, criticality, discipline, and reorder endpoints to support shared equipment management across users with same installation access
+
 ## Original Problem Statement
 Build an AI-Powered Threat Capture & Prioritization Platform with features including:
 - User authentication and role-based access control
