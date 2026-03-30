@@ -740,10 +740,12 @@ const SettingsUserManagementPage = () => {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
                           setInstallationDialogUser(user);
-                          // Filter to only include valid installation IDs that exist in current installations list
-                          const validInstallationIds = installations.map(i => i.id);
-                          const filteredAssignments = (user.assigned_installations || []).filter(id => validInstallationIds.includes(id));
-                          setSelectedInstallations(filteredAssignments);
+                          // Convert user's assigned installation names to IDs for checkbox state
+                          const userInstallationNames = user.assigned_installations || [];
+                          const selectedIds = installations
+                            .filter(inst => userInstallationNames.includes(inst.name))
+                            .map(inst => inst.id);
+                          setSelectedInstallations(selectedIds);
                         }}>
                           <Factory className="w-4 h-4 mr-2" /> Manage Installations
                         </DropdownMenuItem>
@@ -1358,10 +1360,12 @@ const SettingsUserManagementPage = () => {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => {
                               setInstallationDialogUser(user);
-                              // Filter to only include valid installation IDs that exist in current installations list
-                              const validInstallationIds = installations.map(i => i.id);
-                              const filteredAssignments = (user.assigned_installations || []).filter(id => validInstallationIds.includes(id));
-                              setSelectedInstallations(filteredAssignments);
+                              // Convert user's assigned installation names to IDs for checkbox state
+                              const userInstallationNames = user.assigned_installations || [];
+                              const selectedIds = installations
+                                .filter(inst => userInstallationNames.includes(inst.name))
+                                .map(inst => inst.id);
+                              setSelectedInstallations(selectedIds);
                             }}>
                               <Factory className="w-4 h-4 mr-2" /> Manage Installations
                             </DropdownMenuItem>
@@ -1763,10 +1767,17 @@ const SettingsUserManagementPage = () => {
               Cancel
             </Button>
             <Button
-              onClick={() => updateInstallationsMutation.mutate({
-                userId: installationDialogUser?.id,
-                installations: selectedInstallations,
-              })}
+              onClick={() => {
+                // Convert selected installation IDs to names for storage
+                const selectedNames = selectedInstallations.map(id => {
+                  const inst = installations.find(i => i.id === id);
+                  return inst ? inst.name : id;
+                });
+                updateInstallationsMutation.mutate({
+                  userId: installationDialogUser?.id,
+                  installations: selectedNames,
+                });
+              }}
               disabled={updateInstallationsMutation.isPending}
             >
               {updateInstallationsMutation.isPending ? "Saving..." : "Save Changes"}
