@@ -440,6 +440,59 @@ async def forgot_password(request: ForgotPasswordRequest):
     }
 
 
+class AdminResetPasswordRequest(BaseModel):
+    user_id: str
+
+
+@router.post("/auth/admin-reset-password")
+async def admin_reset_password(request: AdminResetPasswordRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Admin endpoint to trigger password reset email for a user.
+    Only admins and owners can use this endpoint.
+    """
+    # Check if current user is admin or owner
+    if current_user.get("role") not in ["admin", "owner"]:
+        raise HTTPException(status_code=403, detail="Only admins can reset user passwords")
+    
+    # Find the target user
+    user = await db.users.find_one({"id": request.user_id}, {"_id": 0})
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Generate reset token
+    reset_token = generate_reset_token()
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)  # 24 hours for admin-initiated resets
+    
+    # Store reset token in database
+    await db.password_resets.delete_many({"email": user["email"]})  # Remove old tokens
+    await db.password_resets.insert_one({
+        "email": user["email"],
+        "token": reset_token,
+        "expires_at": expires_at,
+        "created_at": datetime.now(timezone.utc),
+        "used": False,
+        "initiated_by": current_user.get("id")
+    })
+    
+    # Send email
+    email_sent = await send_reset_email(
+        email=user["email"],
+        reset_token=reset_token,
+        user_name=user.get("name", "User")
+    )
+    
+    if not email_sent:
+        raise HTTPException(status_code=500, detail="Failed to send password reset email")
+    
+    logger.info(f"Admin {current_user.get('email')} initiated password reset for {user['email']}")
+    
+    return {
+        "status": "success",
+        "message": f"Password reset email sent to {user['email']}"
+    }
+
+
 @router.post("/auth/verify-reset-token")
 async def verify_reset_token(request: VerifyResetTokenRequest):
     """Verify if a reset token is valid."""

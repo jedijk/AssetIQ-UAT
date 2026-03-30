@@ -38,6 +38,7 @@ import {
   Bell,
   Factory,
   Crown,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -213,6 +214,22 @@ const rbacAPI = {
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.detail || "Failed to delete user");
+    }
+    return response.json();
+  },
+
+  resetPassword: async (userId) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/admin-reset-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      },
+      body: JSON.stringify({ user_id: userId })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to send password reset email");
     }
     return response.json();
   }
@@ -410,6 +427,16 @@ const SettingsUserManagementPage = () => {
     onError: (error) => {
       toast.error(error.message || "Failed to delete user");
       setDeleteConfirmUser(null);
+    }
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: rbacAPI.resetPassword,
+    onSuccess: (data) => {
+      toast.success(data.message || "Password reset email sent");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to send password reset email");
     }
   });
 
@@ -751,6 +778,12 @@ const SettingsUserManagementPage = () => {
                           setSelectedInstallations(selectedIds);
                         }}>
                           <Factory className="w-4 h-4 mr-2" /> Manage Installations
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => resetPasswordMutation.mutate(user.id)}
+                          disabled={resetPasswordMutation.isPending}
+                        >
+                          <KeyRound className="w-4 h-4 mr-2" /> Reset Password
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {user.is_active ? (
@@ -1376,6 +1409,12 @@ const SettingsUserManagementPage = () => {
                               setSelectedInstallations(selectedIds);
                             }}>
                               <Factory className="w-4 h-4 mr-2" /> Manage Installations
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => resetPasswordMutation.mutate(user.id)}
+                              disabled={resetPasswordMutation.isPending}
+                            >
+                              <KeyRound className="w-4 h-4 mr-2" /> Reset Password
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {user.is_active ? (
