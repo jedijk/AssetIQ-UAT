@@ -860,7 +860,7 @@ const TaskSchedulerPage = () => {
                 className="gap-2"
               >
                 <LayoutGrid className="w-4 h-4" />
-                Calendar
+                {t("taskScheduler.calendarView")}
               </Button>
               <Button
                 size="sm"
@@ -869,22 +869,22 @@ const TaskSchedulerPage = () => {
                 className="gap-2"
               >
                 <List className="w-4 h-4" />
-                List
+                {t("taskScheduler.listView")}
               </Button>
             </div>
             {scheduleView === "calendar" && (
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} data-testid="prev-month-btn">
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
                 <span className="font-medium text-slate-900 min-w-[140px] text-center">
                   {format(currentMonth, "MMMM yyyy")}
                 </span>
-                <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} data-testid="next-month-btn">
                   <ChevronRight className="w-4 h-4" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date())}>
-                  Today
+                <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date())} data-testid="today-btn">
+                  {t("taskScheduler.todayButton")}
                 </Button>
               </div>
             )}
@@ -924,8 +924,24 @@ const TaskSchedulerPage = () => {
                       return isSameDay(instDate, day);
                     });
                     
+                    // Also show plans with next_due_date on this day (that don't have instances yet)
+                    const dayPlans = (plans || []).filter((plan) => {
+                      if (!plan.next_due_date || !plan.is_active) return false;
+                      const planDate = parseISO(plan.next_due_date);
+                      // Check if plan has no instance on this date
+                      const hasInstance = dayInstances.some(inst => inst.task_plan_id === plan.id);
+                      return isSameDay(planDate, day) && !hasInstance;
+                    });
+                    
                     const isCurrentMonth = isSameMonth(day, currentMonth);
                     const isSelected = selectedDate && isSameDay(day, selectedDate);
+                    
+                    const allItems = [...dayInstances, ...dayPlans.map(p => ({
+                      ...p,
+                      isPlan: true,
+                      task_template_name: p.task_template_name,
+                      status: 'planned'
+                    }))];
                     
                     return (
                       <div
@@ -941,22 +957,23 @@ const TaskSchedulerPage = () => {
                           {format(day, "d")}
                         </div>
                         <div className="space-y-1">
-                          {dayInstances.slice(0, 3).map((inst) => (
+                          {allItems.slice(0, 3).map((item, idx) => (
                             <div
-                              key={inst.id}
+                              key={item.id || `plan-${idx}`}
                               className={`text-xs px-1.5 py-0.5 rounded truncate cursor-pointer
-                                ${inst.status === "completed" ? "bg-green-100 text-green-700" :
-                                  inst.status === "in_progress" ? "bg-amber-100 text-amber-700" :
-                                  inst.status === "overdue" ? "bg-red-100 text-red-700" :
+                                ${item.isPlan ? "bg-purple-100 text-purple-700 border border-purple-200 border-dashed" :
+                                  item.status === "completed" ? "bg-green-100 text-green-700" :
+                                  item.status === "in_progress" ? "bg-amber-100 text-amber-700" :
+                                  item.status === "overdue" ? "bg-red-100 text-red-700" :
                                   "bg-slate-100 text-slate-700"}`}
-                              title={inst.task_template_name}
+                              title={item.isPlan ? `${item.task_template_name} (Planned)` : item.task_template_name}
                             >
-                              {inst.task_template_name}
+                              {item.task_template_name}
                             </div>
                           ))}
-                          {dayInstances.length > 3 && (
+                          {allItems.length > 3 && (
                             <div className="text-xs text-slate-500 px-1">
-                              +{dayInstances.length - 3} more
+                              +{allItems.length - 3} more
                             </div>
                           )}
                         </div>

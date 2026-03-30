@@ -935,6 +935,9 @@ const en = {
     editPlanDesc: "Modify plan settings and scheduling",
     planStatus: "Plan Status",
     planStatusDesc: "Enable or disable this plan",
+    calendarView: "Calendar",
+    listView: "List",
+    todayButton: "Today",
   },
 
   // Forms
@@ -2085,6 +2088,9 @@ const nl = {
     editPlanDesc: "Wijzig planinstellingen en planning",
     planStatus: "Planstatus",
     planStatusDesc: "Schakel dit plan in of uit",
+    calendarView: "Kalender",
+    listView: "Lijst",
+    todayButton: "Vandaag",
   },
 
   // Forms

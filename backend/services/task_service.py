@@ -873,15 +873,50 @@ class TaskService:
         now = datetime.now(timezone.utc)
         horizon_end = now + timedelta(days=horizon_days)
         
-        # Get all active plans with due dates within horizon and not past their effective_until
-        plans = await self.plans.find({
-            "is_active": True,
-            "next_due_date": {"$lte": horizon_end},
-            "$or": [
-                {"effective_until": None},
-                {"effective_until": {"$gte": now}}
-            ]
+        # Get all active plans - we'll filter dates in Python since dates might be stored as strings
+        all_active_plans = await self.plans.find({
+            "is_active": True
         }).to_list(1000)
+        
+        # Filter plans based on next_due_date and effective_until
+        plans = []
+        for plan in all_active_plans:
+            next_due = plan.get("next_due_date")
+            effective_until = plan.get("effective_until")
+            
+            # Parse next_due_date if it's a string
+            if isinstance(next_due, str):
+                try:
+                    next_due = datetime.fromisoformat(next_due.replace("Z", "+00:00"))
+                except:
+                    continue  # Skip if can't parse
+            
+            if next_due is None:
+                continue
+            
+            # Make timezone aware if needed
+            if next_due.tzinfo is None:
+                next_due = next_due.replace(tzinfo=timezone.utc)
+            
+            # Check if next_due is within horizon
+            if next_due > horizon_end:
+                continue
+            
+            # Parse and check effective_until
+            if effective_until is not None:
+                if isinstance(effective_until, str):
+                    try:
+                        effective_until = datetime.fromisoformat(effective_until.replace("Z", "+00:00"))
+                    except:
+                        effective_until = None
+                
+                if effective_until and effective_until.tzinfo is None:
+                    effective_until = effective_until.replace(tzinfo=timezone.utc)
+                
+                if effective_until and effective_until < now:
+                    continue  # Plan has expired
+            
+            plans.append(plan)
         
         total_generated = 0
         plans_processed = 0
