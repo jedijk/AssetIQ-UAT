@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://threatbase-preview-3.preview.emergentagent.com';
+const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://assetiq-staging-1.preview.emergentagent.com';
 
 test.describe('Authentication Flows', () => {
   test.beforeEach(async ({ page }) => {
