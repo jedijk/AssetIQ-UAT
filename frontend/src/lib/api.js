@@ -515,6 +515,11 @@ export const investigationAPI = {
     });
     return response.data;
   },
+  
+  getAISummary: async (investigationId) => {
+    const response = await api.get(`/investigations/${investigationId}/ai-summary`);
+    return response.data;
+  },
 };
 
 // Centralized Actions API

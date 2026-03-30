@@ -3,11 +3,16 @@ Report generation routes for Causal Investigations.
 Generates PowerPoint and PDF reports.
 """
 from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel
+from typing import Optional
 from datetime import datetime, timezone
 import io
 import logging
-from database import db
+from database import db, EMERGENT_LLM_KEY
 from auth import get_current_user
+
+# AI Integration
+from emergentintegrations.llm.chat import LlmChat
 
 # PowerPoint imports
 from pptx import Presentation
@@ -115,7 +120,27 @@ def add_title_slide(prs, title, subtitle=""):
         sub_para.font.color.rgb = COLORS["white"]
         sub_para.alignment = PP_ALIGN.CENTER
     
+    # Add footer watermark
+    add_slide_footer(slide, prs, is_title_slide=True)
+    
     return slide
+
+
+def add_slide_footer(slide, prs, is_title_slide=False):
+    """Add 'Generated with AssetIQ' footer to a slide."""
+    footer_box = slide.shapes.add_textbox(
+        Inches(7), Inches(7.1), Inches(2.8), Inches(0.3)
+    )
+    footer_frame = footer_box.text_frame
+    footer_para = footer_frame.paragraphs[0]
+    footer_para.text = "Generated with AssetIQ"
+    footer_para.font.size = Pt(9)
+    footer_para.font.italic = True
+    footer_para.alignment = PP_ALIGN.RIGHT
+    if is_title_slide:
+        footer_para.font.color.rgb = RGBColor(200, 200, 220)  # Light on dark
+    else:
+        footer_para.font.color.rgb = RGBColor(148, 163, 184)  # slate-400
 
 
 def add_section_slide(prs, title):
@@ -138,6 +163,9 @@ def add_section_slide(prs, title):
     title_para.font.bold = True
     title_para.font.color.rgb = COLORS["white"]
     title_para.alignment = PP_ALIGN.CENTER
+    
+    # Add footer
+    add_slide_footer(slide, prs)
     
     return slide
 
@@ -177,6 +205,9 @@ def add_content_slide(prs, title, content_items):
         p.font.size = Pt(18)
         p.font.color.rgb = COLORS["dark"]
         p.space_after = Pt(12)
+    
+    # Add footer
+    add_slide_footer(slide, prs)
     
     return slide
 
@@ -233,6 +264,9 @@ def add_table_slide(prs, title, headers, rows):
             para.font.size = Pt(12)
             para.font.color.rgb = COLORS["dark"]
             cell.vertical_anchor = MSO_ANCHOR.MIDDLE
+    
+    # Add footer
+    add_slide_footer(slide, prs)
     
     return slide
 
@@ -360,6 +394,20 @@ def generate_pdf(data):
     actions = data["actions"]
     
     buffer = io.BytesIO()
+    
+    # Custom page template with footer
+    def add_page_footer(canvas, doc):
+        canvas.saveState()
+        # Right-aligned footer
+        canvas.setFont('Helvetica-Oblique', 8)
+        canvas.setFillColor(colors.HexColor('#94A3B8'))
+        canvas.drawRightString(
+            letter[0] - 72,  # Right margin
+            40,  # 40 points from bottom
+            "Generated with AssetIQ"
+        )
+        canvas.restoreState()
+    
     doc = SimpleDocTemplate(
         buffer,
         pagesize=letter,
@@ -589,7 +637,7 @@ def generate_pdf(data):
         ParagraphStyle('Footer', parent=normal_style, alignment=TA_CENTER, textColor=colors.HexColor('#94A3B8'))
     ))
     
-    doc.build(story)
+    doc.build(story, onFirstPage=add_page_footer, onLaterPages=add_page_footer)
     buffer.seek(0)
     return buffer.getvalue()
 
@@ -640,3 +688,122 @@ async def generate_pdf_report(
     except Exception as e:
         logger.error(f"Error generating PDF report: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
+
+
+# ============= AI SUMMARY =============
+
+class AISummaryResponse(BaseModel):
+    summary: str
+    key_findings: list
+    next_steps: list
+    recommendations: list
+
+
+async def generate_ai_summary(data: dict) -> dict:
+    """Generate AI-powered summary of investigation with next steps."""
+    inv = data["investigation"]
+    events = data["events"]
+    failures = data["failures"]
+    causes = data["causes"]
+    actions = data["actions"]
+    
+    # Prepare context for AI
+    context = f"""
+Investigation: {inv.get('title', 'N/A')}
+Asset: {inv.get('asset_name', 'N/A')}
+Location: {inv.get('location', 'N/A')}
+Incident Date: {inv.get('incident_date', 'N/A')}
+Status: {inv.get('status', 'N/A')}
+Description: {inv.get('description', 'N/A')}
+
+TIMELINE EVENTS ({len(events)}):
+{chr(10).join([f"- [{e.get('category', 'event')}] {e.get('description', '')}" for e in events[:10]])}
+
+IDENTIFIED FAILURES ({len(failures)}):
+{chr(10).join([f"- {f.get('asset_name', '')}: {f.get('failure_mode', '')} - {f.get('degradation_mechanism', '')}" for f in failures[:5]])}
+
+ROOT CAUSES:
+{chr(10).join([f"- [ROOT CAUSE] {c.get('description', '')}" for c in causes if c.get('is_root_cause')][:5])}
+
+CONTRIBUTING FACTORS:
+{chr(10).join([f"- [{c.get('category', 'factor')}] {c.get('description', '')}" for c in causes if not c.get('is_root_cause')][:5])}
+
+CORRECTIVE ACTIONS ({len(actions)}):
+{chr(10).join([f"- [{a.get('priority', 'medium')}] {a.get('description', '')} - Status: {a.get('status', 'open')}" for a in actions[:8]])}
+"""
+    
+    prompt = f"""You are an expert reliability engineer analyzing a causal investigation report. Based on the following investigation data, provide:
+
+1. A concise executive summary (2-3 paragraphs) covering the incident, key findings, and overall assessment
+2. A list of 3-5 key findings from the investigation
+3. A list of 4-6 specific, actionable next steps the team should take
+4. A list of 2-4 strategic recommendations for preventing similar incidents
+
+{context}
+
+Respond in JSON format with the following structure:
+{{
+  "summary": "Executive summary text here...",
+  "key_findings": ["Finding 1", "Finding 2", ...],
+  "next_steps": ["Step 1", "Step 2", ...],
+  "recommendations": ["Recommendation 1", "Recommendation 2", ...]
+}}
+
+Focus on actionable insights and practical recommendations. Be specific to this investigation."""
+
+    try:
+        chat = LlmChat(api_key=EMERGENT_LLM_KEY, model="gpt-5.2")
+        response = await chat.send_message_async(prompt)
+        
+        # Parse JSON response
+        import json
+        # Clean up response if needed
+        response_text = response.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        
+        result = json.loads(response_text.strip())
+        return result
+    except Exception as e:
+        logger.error(f"Error generating AI summary: {e}")
+        # Return a basic fallback
+        return {
+            "summary": f"Investigation '{inv.get('title', 'N/A')}' identified {len([c for c in causes if c.get('is_root_cause')])} root causes and {len(failures)} failure modes. {len(actions)} corrective actions have been defined.",
+            "key_findings": [
+                f"Identified {len(failures)} failure identification(s)",
+                f"Found {len([c for c in causes if c.get('is_root_cause')])} root cause(s)",
+                f"{len([a for a in actions if a.get('status') == 'completed'])} of {len(actions)} actions completed"
+            ],
+            "next_steps": [
+                "Review and validate all identified root causes",
+                "Prioritize and assign owners to open action items",
+                "Schedule follow-up review in 2-4 weeks",
+                "Document lessons learned"
+            ],
+            "recommendations": [
+                "Implement preventive maintenance procedures",
+                "Update equipment monitoring protocols",
+                "Share findings with relevant teams"
+            ]
+        }
+
+
+@router.get("/investigations/{investigation_id}/ai-summary")
+async def get_ai_summary(
+    investigation_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate AI-powered summary of investigation with next steps."""
+    try:
+        data = await get_investigation_data(investigation_id, current_user["id"])
+        summary = await generate_ai_summary(data)
+        return summary
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting AI summary: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate AI summary: {str(e)}")

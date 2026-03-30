@@ -49,7 +49,18 @@ AI-Powered Threat Capture & Prioritization Platform for industrial asset managem
   - PowerPoint (.pptx) export with professional styling
   - PDF export with tables and formatted sections
   - Reports include: Overview, Timeline, Failures, Root Causes, Actions, Summary
+  - "Generated with AssetIQ" watermark on every page (bottom right, subtle)
   - Export dropdown in investigation header
+  - Files: `/app/backend/routes/reports.py`, updated `CausalEnginePage.js`
+
+- **Added:** AI Investigation Summary Feature
+  - AI-powered analysis of investigation data using GPT-5.2
+  - Executive Summary with key findings overview
+  - Key Findings list (numbered)
+  - Recommended Next Steps (numbered, actionable)
+  - Strategic Recommendations (checkmark list)
+  - Regenerate button to refresh analysis
+  - Purple "AI Summary" button in investigation header
   - Files: `/app/backend/routes/reports.py`, updated `CausalEnginePage.js`
 
 - **Added:** Searchable Dropdowns across the application

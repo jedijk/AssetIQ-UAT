@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 import {
   Search, Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
   ChevronRight, Trash2, Calendar, User, MapPin,
-  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Save, Lock, ShieldCheck, UserCheck, CheckCircle, ExternalLink, FileDown, Presentation,
+  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Save, Lock, ShieldCheck, UserCheck, CheckCircle, ExternalLink, FileDown, Presentation, Sparkles, Brain,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -97,6 +97,9 @@ export default function CausalEnginePage() {
   const [localNotes, setLocalNotes] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [showAISummaryDialog, setShowAISummaryDialog] = useState(false);
+  const [aiSummary, setAISummary] = useState(null);
+  const [isGeneratingAISummary, setIsGeneratingAISummary] = useState(false);
   const fileInputRef = useRef(null);
   
   useEffect(() => {
@@ -650,6 +653,23 @@ export default function CausalEnginePage() {
     }
   };
 
+  const handleGenerateAISummary = async () => {
+    if (!selectedInvId) return;
+    setIsGeneratingAISummary(true);
+    setShowAISummaryDialog(true);
+    setAISummary(null);
+    try {
+      const summary = await investigationAPI.getAISummary(selectedInvId);
+      setAISummary(summary);
+    } catch (error) {
+      console.error("Failed to generate AI summary:", error);
+      toast.error("Failed to generate AI summary");
+      setShowAISummaryDialog(false);
+    } finally {
+      setIsGeneratingAISummary(false);
+    }
+  };
+
   const handleEditCause = useCallback((node) => {
     setEditingItem({ type: "cause", data: node });
     setCauseForm({ description: node.description, category: node.category, parent_id: node.parent_id, is_root_cause: node.is_root_cause, evidence: node.evidence || "", comment: node.comment || "" });
@@ -955,6 +975,23 @@ export default function CausalEnginePage() {
                         <p className="text-sm text-slate-600">{investigation.description}</p>
                       </div>
                       <div className="flex items-center gap-1">
+                        {/* AI Summary Button */}
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-purple-600 border-purple-200 hover:bg-purple-50 h-8"
+                          onClick={handleGenerateAISummary}
+                          disabled={isGeneratingAISummary}
+                          data-testid="ai-summary-btn"
+                        >
+                          {isGeneratingAISummary ? (
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <Brain className="w-4 h-4 mr-1" />
+                          )}
+                          AI Summary
+                        </Button>
+                        
                         {/* Export Dropdown */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1753,6 +1790,123 @@ export default function CausalEnginePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* AI Summary Dialog */}
+      <Dialog open={showAISummaryDialog} onOpenChange={setShowAISummaryDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="w-5 h-5 text-purple-600" />
+              AI Investigation Summary
+            </DialogTitle>
+            <DialogDescription>
+              AI-generated analysis and recommendations for this investigation
+            </DialogDescription>
+          </DialogHeader>
+          
+          {isGeneratingAISummary ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center">
+                  <Brain className="w-8 h-8 text-purple-600 animate-pulse" />
+                </div>
+                <Loader2 className="absolute -top-1 -right-1 w-6 h-6 text-purple-600 animate-spin" />
+              </div>
+              <p className="text-slate-600 text-sm">Analyzing investigation data...</p>
+              <p className="text-slate-400 text-xs">This may take a few moments</p>
+            </div>
+          ) : aiSummary ? (
+            <div className="space-y-6 py-4">
+              {/* Executive Summary */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-purple-600" />
+                  Executive Summary
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50 p-4 rounded-lg">
+                  {aiSummary.summary}
+                </p>
+              </div>
+              
+              {/* Key Findings */}
+              {aiSummary.key_findings?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                    <Target className="w-4 h-4 text-amber-600" />
+                    Key Findings
+                  </h3>
+                  <ul className="space-y-2">
+                    {aiSummary.key_findings.map((finding, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-medium mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span>{finding}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* Next Steps */}
+              {aiSummary.next_steps?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                    <CheckSquare className="w-4 h-4 text-blue-600" />
+                    Recommended Next Steps
+                  </h3>
+                  <ul className="space-y-2">
+                    {aiSummary.next_steps.map((step, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-medium mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* Recommendations */}
+              {aiSummary.recommendations?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-green-600" />
+                    Strategic Recommendations
+                  </h3>
+                  <ul className="space-y-2">
+                    {aiSummary.recommendations.map((rec, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-medium mt-0.5">
+                          ✓
+                        </span>
+                        <span>{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : null}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAISummaryDialog(false)}>
+              Close
+            </Button>
+            {aiSummary && (
+              <Button 
+                onClick={handleGenerateAISummary} 
+                disabled={isGeneratingAISummary}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Brain className="w-4 h-4 mr-2" />
+                Regenerate
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );
