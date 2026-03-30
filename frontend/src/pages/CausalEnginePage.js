@@ -1228,7 +1228,7 @@ export default function CausalEnginePage() {
                                 className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
                                 onClick={() => promoteToCentralActionMutation.mutate(action)} 
                                 disabled={promoteToCentralActionMutation.isPending} 
-                                title="Add to action tracker" 
+                                title="Add to action plan" 
                                 data-testid={`promote-action-${action.id}`}
                               >
                                 <ClipboardList className="w-4 h-4 mr-1" />Act

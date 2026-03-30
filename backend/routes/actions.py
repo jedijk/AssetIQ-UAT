@@ -278,4 +278,74 @@ async def delete_central_action(
     return {"message": "Action deleted"}
 
 
+# ============= ACTION VALIDATION =============
+
+class ActionValidateRequest(BaseModel):
+    """Model for validating an action."""
+    validated_by_name: str
+    validated_by_position: str
+    validated_by_id: Optional[str] = None
+
+
+@router.post("/actions/{action_id}/validate")
+async def validate_action(
+    action_id: str,
+    data: ActionValidateRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Validate an action (mark as reviewed/approved by a person)."""
+    action = await db.central_actions.find_one(
+        {"id": action_id, "created_by": current_user["id"]}
+    )
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    
+    update_data = {
+        "is_validated": True,
+        "validated_by_name": data.validated_by_name,
+        "validated_by_position": data.validated_by_position,
+        "validated_by_id": data.validated_by_id or current_user["id"],
+        "validated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.central_actions.update_one(
+        {"id": action_id},
+        {"$set": update_data}
+    )
+    
+    updated = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
+    return updated
+
+
+@router.post("/actions/{action_id}/unvalidate")
+async def unvalidate_action(
+    action_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Remove validation from an action."""
+    action = await db.central_actions.find_one(
+        {"id": action_id, "created_by": current_user["id"]}
+    )
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    
+    update_data = {
+        "is_validated": False,
+        "validated_by_name": None,
+        "validated_by_position": None,
+        "validated_by_id": None,
+        "validated_at": None,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.central_actions.update_one(
+        {"id": action_id},
+        {"$set": update_data}
+    )
+    
+    updated = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
+    return updated
+
+
 

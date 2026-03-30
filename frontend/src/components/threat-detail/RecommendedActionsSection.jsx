@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { threatsAPI, actionsAPI } from "../../lib/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Plus, ClipboardList, Loader2, Sparkles, AlertTriangle, Settings, CheckCircle, Clock, XCircle, ExternalLink } from "lucide-react";
+import { Plus, ClipboardList, Loader2, Sparkles, AlertTriangle, Settings, CheckCircle, Clock, XCircle, ExternalLink, ShieldCheck, UserCheck } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 
 const ACTION_TYPES = [
   { value: "CM", label: "CM - Corrective", color: "bg-amber-500" },
@@ -64,8 +65,13 @@ const ACTION_STATUS_CONFIG = {
 export const RecommendedActionsSection = ({ threat, threatId }) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [showAddRecommendedDialog, setShowAddRecommendedDialog] = useState(false);
   const [showCreateFMDialog, setShowCreateFMDialog] = useState(false);
+  const [showValidateDialog, setShowValidateDialog] = useState(false);
+  const [actionToValidate, setActionToValidate] = useState(null);
+  const [validatorName, setValidatorName] = useState("");
+  const [validatorPosition, setValidatorPosition] = useState("");
   const [newRecommendedAction, setNewRecommendedAction] = useState({
     action: "",
     action_type: "",
@@ -118,13 +124,63 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline", threatId] });
-      toast.success("Action created in tracker!");
+      toast.success("Action added to plan!");
     },
     onError: (error) => {
       console.error("Failed to create action:", error);
       toast.error("Failed to create action");
     },
   });
+
+  // Validate action mutation
+  const validateActionMutation = useMutation({
+    mutationFn: ({ actionId, validatorName, validatorPosition }) =>
+      actionsAPI.validate(actionId, validatorName, validatorPosition, user?.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action validated successfully!");
+      setShowValidateDialog(false);
+      setActionToValidate(null);
+      setValidatorName("");
+      setValidatorPosition("");
+    },
+    onError: (error) => {
+      console.error("Failed to validate action:", error);
+      toast.error("Failed to validate action");
+    },
+  });
+
+  // Unvalidate action mutation
+  const unvalidateActionMutation = useMutation({
+    mutationFn: (actionId) => actionsAPI.unvalidate(actionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Validation removed");
+    },
+    onError: (error) => {
+      console.error("Failed to remove validation:", error);
+      toast.error("Failed to remove validation");
+    },
+  });
+
+  const handleOpenValidateDialog = (action) => {
+    setActionToValidate(action);
+    setValidatorName(user?.name || "");
+    setValidatorPosition(user?.position || "");
+    setShowValidateDialog(true);
+  };
+
+  const handleValidateAction = () => {
+    if (!validatorName.trim() || !validatorPosition.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    validateActionMutation.mutate({
+      actionId: actionToValidate.id,
+      validatorName: validatorName.trim(),
+      validatorPosition: validatorPosition.trim(),
+    });
+  };
 
   // Add recommended action to threat mutation
   const addRecommendedActionMutation = useMutation({
@@ -369,7 +425,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                     })}
                     disabled={promoteToActionMutation.isPending}
                     className="opacity-0 group-hover:opacity-100 transition-all text-blue-600 hover:text-white hover:bg-blue-600 rounded-md px-2 py-1 h-7 text-xs"
-                    title="Add to action tracker"
+                    title="Add to action plan"
                     data-testid={`promote-action-${idx}`}
                   >
                     <ClipboardList className="w-3 h-3 mr-1" />
@@ -382,21 +438,28 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
         </div>
       </motion.div>
 
-      {/* Linked Actions Section - Shows actions created from this observation */}
+      {/* Action Plan Section - Shows actions created from this observation with validation */}
       {linkedActions.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
           className="card p-4"
-          data-testid="linked-actions-section"
+          data-testid="action-plan-section"
         >
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-slate-900 text-sm">Actions Tracker</h3>
+              <h3 className="font-semibold text-slate-900 text-sm">Action Plan</h3>
               <Badge variant="secondary" className="text-xs">
                 {linkedActions.length}
               </Badge>
+              {/* Show validated count */}
+              {linkedActions.filter(a => a.is_validated).length > 0 && (
+                <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">
+                  <ShieldCheck className="w-3 h-3 mr-1" />
+                  {linkedActions.filter(a => a.is_validated).length} validated
+                </Badge>
+              )}
             </div>
             <Button
               variant="ghost"
@@ -417,9 +480,12 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               return (
                 <div
                   key={action.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:shadow-sm transition-all ${statusCfg.bg} border-slate-200`}
-                  onClick={() => navigate(`/actions/${action.id}`)}
-                  data-testid={`linked-action-${action.id}`}
+                  className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
+                    action.is_validated 
+                      ? "bg-green-50 border-green-200" 
+                      : `${statusCfg.bg} border-slate-200 hover:shadow-sm`
+                  }`}
+                  data-testid={`action-plan-item-${action.id}`}
                 >
                   {/* Action Type Badge */}
                   <div className="flex-shrink-0">
@@ -435,8 +501,8 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/actions/${action.id}`)}>
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       {/* Status Badge */}
                       <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${statusCfg.bg} border`}>
                         <StatusIcon className={`w-3 h-3 ${statusCfg.color}`} />
@@ -445,15 +511,28 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                       {action.discipline && (
                         <span className="text-[10px] text-slate-400">{action.discipline}</span>
                       )}
+                      {/* Validation Badge */}
+                      {action.is_validated && (
+                        <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5">
+                          <ShieldCheck className="w-3 h-3 mr-0.5" />
+                          Validated
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-slate-700 leading-snug line-clamp-2">{action.title}</p>
-                    {action.owner && (
+                    {action.is_validated && action.validated_by_name && (
+                      <p className="text-[10px] text-green-600 mt-1 flex items-center gap-1">
+                        <UserCheck className="w-3 h-3" />
+                        {action.validated_by_name} ({action.validated_by_position})
+                      </p>
+                    )}
+                    {action.owner && !action.is_validated && (
                       <p className="text-[10px] text-slate-400 mt-1">Owner: {action.owner}</p>
                     )}
                   </div>
 
-                  {/* Date/Priority */}
-                  <div className="flex-shrink-0 text-right">
+                  {/* Actions Column */}
+                  <div className="flex-shrink-0 flex flex-col items-end gap-1">
                     {action.due_date && (
                       <p className="text-[10px] text-slate-500">
                         Due: {new Date(action.due_date).toLocaleDateString()}
@@ -462,7 +541,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                     {action.priority && (
                       <Badge 
                         variant="outline" 
-                        className={`text-[10px] mt-1 ${
+                        className={`text-[10px] ${
                           action.priority === 'high' ? 'border-red-300 text-red-600' :
                           action.priority === 'medium' ? 'border-amber-300 text-amber-600' :
                           'border-slate-300 text-slate-600'
@@ -470,6 +549,36 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                       >
                         {action.priority}
                       </Badge>
+                    )}
+                    {/* Validate Button */}
+                    {!action.is_validated ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenValidateDialog(action);
+                        }}
+                        className="h-6 text-[10px] px-2 text-green-600 border-green-200 hover:bg-green-50 mt-1"
+                        data-testid={`validate-action-${action.id}`}
+                      >
+                        <ShieldCheck className="w-3 h-3 mr-1" />
+                        Validate
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          unvalidateActionMutation.mutate(action.id);
+                        }}
+                        className="h-6 text-[10px] px-2 text-slate-400 hover:text-red-500 mt-1"
+                        title="Remove validation"
+                        data-testid={`unvalidate-action-${action.id}`}
+                      >
+                        Remove
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -762,6 +871,83 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                 <Plus className="w-4 h-4 mr-2" />
               )}
               Create Failure Mode
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Validate Action Dialog */}
+      <Dialog open={showValidateDialog} onOpenChange={setShowValidateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-green-600" />
+              Validate Action
+            </DialogTitle>
+            <DialogDescription>
+              Confirm this action has been reviewed and approved by a subject matter expert.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {actionToValidate && (
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <p className="text-sm font-medium text-slate-700">{actionToValidate.title}</p>
+                {actionToValidate.action_type && (
+                  <Badge className={`mt-2 text-[10px] ${
+                    actionToValidate.action_type === 'CM' ? 'bg-amber-100 text-amber-700' :
+                    actionToValidate.action_type === 'PM' ? 'bg-blue-100 text-blue-700' :
+                    'bg-purple-100 text-purple-700'
+                  }`}>
+                    {actionToValidate.action_type}
+                  </Badge>
+                )}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="validator-name">Validator Name *</Label>
+              <Input
+                id="validator-name"
+                value={validatorName}
+                onChange={(e) => setValidatorName(e.target.value)}
+                placeholder="e.g., John Smith"
+                data-testid="validator-name-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="validator-position">Position / Role *</Label>
+              <Input
+                id="validator-position"
+                value={validatorPosition}
+                onChange={(e) => setValidatorPosition(e.target.value)}
+                placeholder="e.g., Reliability Engineer"
+                data-testid="validator-position-input"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowValidateDialog(false);
+                setActionToValidate(null);
+                setValidatorName("");
+                setValidatorPosition("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleValidateAction}
+              disabled={validateActionMutation.isPending || !validatorName.trim() || !validatorPosition.trim()}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="confirm-validate-button"
+            >
+              {validateActionMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <ShieldCheck className="w-4 h-4 mr-2" />
+              )}
+              Confirm Validation
             </Button>
           </DialogFooter>
         </DialogContent>

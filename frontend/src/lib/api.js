@@ -552,6 +552,21 @@ export const actionsAPI = {
     });
     return response.data;
   },
+  
+  // Validation
+  validate: async (actionId, validatorName, validatorPosition, validatorId) => {
+    const response = await api.post(`/actions/${actionId}/validate`, {
+      validated_by_name: validatorName,
+      validated_by_position: validatorPosition,
+      validated_by_id: validatorId
+    });
+    return response.data;
+  },
+  
+  unvalidate: async (actionId) => {
+    const response = await api.post(`/actions/${actionId}/unvalidate`);
+    return response.data;
+  },
 };
 
 // AI Risk Engine API
