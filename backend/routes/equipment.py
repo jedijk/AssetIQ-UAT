@@ -403,8 +403,9 @@ async def get_equipment_node(
     current_user: dict = Depends(get_current_user)
 ):
     """Get a specific equipment node."""
+    # Equipment is shared - no created_by filter
     node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]},
+        {"id": node_id},
         {"_id": 0}
     )
     if not node:
@@ -417,11 +418,10 @@ async def create_equipment_node(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new equipment hierarchy node with ISO 14224 validation."""
-    # Check for duplicate name under the same parent
+    # Check for duplicate name under the same parent (global check, not per-user)
     existing = await db.equipment_nodes.find_one({
         "name": node_data.name,
-        "parent_id": node_data.parent_id,
-        "created_by": current_user["id"]
+        "parent_id": node_data.parent_id
     })
     if existing:
         parent_info = f"under parent '{node_data.parent_id}'" if node_data.parent_id else "at root level"
@@ -432,8 +432,9 @@ async def create_equipment_node(
     
     # Validate parent-child relationship if parent specified
     if node_data.parent_id:
+        # Parent lookup should not filter by created_by since equipment is shared
         parent = await db.equipment_nodes.find_one(
-            {"id": node_data.parent_id, "created_by": current_user["id"]},
+            {"id": node_data.parent_id},
             {"_id": 0}
         )
         if not parent:
@@ -456,9 +457,9 @@ async def create_equipment_node(
     
     node_id = str(uuid.uuid4())
     
-    # Calculate sort_order - get max sort_order for siblings and add 1
+    # Calculate sort_order - get max sort_order for siblings and add 1 (global, not per-user)
     max_sort = await db.equipment_nodes.find_one(
-        {"parent_id": node_data.parent_id, "created_by": current_user["id"]},
+        {"parent_id": node_data.parent_id},
         sort=[("sort_order", -1)],
         projection={"sort_order": 1}
     )
@@ -468,7 +469,7 @@ async def create_equipment_node(
     inherited_process_step = node_data.process_step
     if not inherited_process_step and node_data.parent_id and node_data.level in [ISOLevel.SUBUNIT, ISOLevel.MAINTAINABLE_ITEM]:
         parent = await db.equipment_nodes.find_one(
-            {"id": node_data.parent_id, "created_by": current_user["id"]},
+            {"id": node_data.parent_id},
             {"process_step": 1}
         )
         if parent and parent.get("process_step"):
@@ -516,8 +517,9 @@ async def update_equipment_node(
     current_user: dict = Depends(get_current_user)
 ):
     """Update an equipment hierarchy node."""
+    # Equipment is shared - no created_by filter for lookup
     node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]}
+        {"id": node_id}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
@@ -526,7 +528,7 @@ async def update_equipment_node(
     if update.parent_id is not None and update.parent_id != node.get("parent_id"):
         if update.parent_id:
             new_parent = await db.equipment_nodes.find_one(
-                {"id": update.parent_id, "created_by": current_user["id"]},
+                {"id": update.parent_id},
                 {"_id": 0}
             )
             if not new_parent:
@@ -588,16 +590,17 @@ async def delete_equipment_node(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete an equipment node and optionally its children."""
+    # Equipment is shared - no created_by filter
     node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]}
+        {"id": node_id}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
-    # Get all children recursively
+    # Get all children recursively (global, not per-user)
     async def get_children_ids(parent_id):
         children = await db.equipment_nodes.find(
-            {"parent_id": parent_id, "created_by": current_user["id"]},
+            {"parent_id": parent_id},
             {"_id": 0, "id": 1}
         ).to_list(1000)
         all_ids = [c["id"] for c in children]
@@ -609,7 +612,7 @@ async def delete_equipment_node(
     all_ids = [node_id] + children_ids
     
     result = await db.equipment_nodes.delete_many(
-        {"id": {"$in": all_ids}, "created_by": current_user["id"]}
+        {"id": {"$in": all_ids}}
     )
     
     return {"message": f"Deleted {result.deleted_count} nodes", "deleted_ids": all_ids}
@@ -627,8 +630,9 @@ async def change_node_level(
     current_user: dict = Depends(get_current_user)
 ):
     """Change the hierarchy level of a node (promote or demote)."""
+    # Equipment is shared - no created_by filter
     node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]}
+        {"id": node_id}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
@@ -646,11 +650,11 @@ async def change_node_level(
     is_promoting = new_idx < current_idx  # Moving up in hierarchy
     is_demoting = new_idx > current_idx   # Moving down in hierarchy
     
-    # Get current parent
+    # Get current parent (no created_by filter - equipment is shared)
     current_parent = None
     if node.get("parent_id"):
         current_parent = await db.equipment_nodes.find_one(
-            {"id": node["parent_id"], "created_by": current_user["id"]}
+            {"id": node["parent_id"]}
         )
     
     if is_promoting:
@@ -664,7 +668,7 @@ async def change_node_level(
         # Validate the new level is correct for the new parent
         if new_parent_id:
             grandparent = await db.equipment_nodes.find_one(
-                {"id": new_parent_id, "created_by": current_user["id"]}
+                {"id": new_parent_id}
             )
             if grandparent:
                 grandparent_level = normalize_level(ISOLevel(grandparent["level"]))
@@ -684,7 +688,7 @@ async def change_node_level(
             raise HTTPException(status_code=400, detail="Must specify new_parent_id when demoting")
         
         new_parent = await db.equipment_nodes.find_one(
-            {"id": request.new_parent_id, "created_by": current_user["id"]}
+            {"id": request.new_parent_id}
         )
         if not new_parent:
             raise HTTPException(status_code=400, detail="New parent node not found")
@@ -698,11 +702,10 @@ async def change_node_level(
         
         new_parent_id = request.new_parent_id
     
-    # Check for duplicate name at new location
+    # Check for duplicate name at new location (global check)
     existing = await db.equipment_nodes.find_one({
         "name": node["name"],
         "parent_id": new_parent_id,
-        "created_by": current_user["id"],
         "id": {"$ne": node_id}
     })
     if existing:
@@ -746,17 +749,18 @@ async def reorder_equipment_node(
     if request.direction not in ["up", "down"]:
         raise HTTPException(status_code=400, detail="Direction must be 'up' or 'down'")
     
+    # Equipment is shared - no created_by filter
     node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]}
+        {"id": node_id}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
     current_sort = node.get("sort_order", 0)
     
-    # Get all siblings (same parent)
+    # Get all siblings (same parent, global)
     siblings = await db.equipment_nodes.find(
-        {"parent_id": node["parent_id"], "created_by": current_user["id"]},
+        {"parent_id": node["parent_id"]},
         {"_id": 0}
     ).sort("sort_order", 1).to_list(1000)
     
@@ -811,14 +815,15 @@ async def reorder_node_to_position(
     if request.position not in ["before", "after"]:
         raise HTTPException(status_code=400, detail="Position must be 'before' or 'after'")
     
+    # Equipment is shared - no created_by filter
     node = await db.equipment_nodes.find_one(
-        {"id": node_id, "created_by": current_user["id"]}
+        {"id": node_id}
     )
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
     
     target = await db.equipment_nodes.find_one(
-        {"id": request.target_node_id, "created_by": current_user["id"]}
+        {"id": request.target_node_id}
     )
     if not target:
         raise HTTPException(status_code=404, detail="Target node not found")
@@ -830,7 +835,7 @@ async def reorder_node_to_position(
     if new_parent_id != node.get("parent_id"):
         if new_parent_id:
             new_parent = await db.equipment_nodes.find_one(
-                {"id": new_parent_id, "created_by": current_user["id"]}
+                {"id": new_parent_id}
             )
             if not new_parent:
                 raise HTTPException(status_code=400, detail="New parent not found")
@@ -1389,9 +1394,9 @@ async def assign_unstructured_to_hierarchy(
             detail=f"A node with name '{item['name']}' already exists under this parent"
         )
     
-    # Validate parent exists
+    # Validate parent exists (no created_by filter - equipment is shared)
     parent = await db.equipment_nodes.find_one(
-        {"id": assignment.parent_id, "created_by": current_user["id"]},
+        {"id": assignment.parent_id},
         {"_id": 0}
     )
     if not parent:
