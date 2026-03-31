@@ -80,34 +80,34 @@ async def register(user_data: UserCreate):
 
 
 async def notify_admins_new_user(user_email: str, user_name: str):
-    """Notify owners and admins about new user registration requiring approval."""
-    # Get all owner and admin users (owners first, then admins)
-    owners_and_admins = await db.users.find(
-        {"role": {"$in": ["owner", "admin"]}, "approval_status": {"$ne": "pending"}},
-        {"_id": 0, "email": 1, "name": 1, "role": 1}
+    """Notify owner(s) about new user registration requiring approval."""
+    # Get owner users only
+    owners = await db.users.find(
+        {"role": "owner", "approval_status": {"$ne": "pending"}},
+        {"_id": 0, "email": 1, "name": 1}
     ).to_list(100)
     
-    if not owners_and_admins:
-        logger.info(f"No owners or admins to notify about new user: {user_email}")
+    if not owners:
+        logger.info(f"No owners to notify about new user: {user_email}")
         return
     
     # Log the notification
     logger.info(f"New user registration requires approval: {user_name} ({user_email})")
-    logger.info(f"Notifying {len(owners_and_admins)} owners/admins")
+    logger.info(f"Notifying {len(owners)} owner(s)")
     
-    # If Resend is available, send email to owners and admins
+    # If Resend is available, send email to owners
     if RESEND_AVAILABLE and RESEND_API_KEY:
-        for recipient in owners_and_admins:
+        for owner in owners:
             try:
                 await send_approval_notification_email(
-                    admin_email=recipient["email"],
-                    admin_name=recipient.get("name", "Administrator"),
+                    admin_email=owner["email"],
+                    admin_name=owner.get("name", "Owner"),
                     new_user_name=user_name,
                     new_user_email=user_email
                 )
-                logger.info(f"Sent approval notification to {recipient['role']}: {recipient['email']}")
+                logger.info(f"Sent approval notification to owner: {owner['email']}")
             except Exception as e:
-                logger.error(f"Failed to send approval notification to {recipient['email']}: {e}")
+                logger.error(f"Failed to send approval notification to {owner['email']}: {e}")
 
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
