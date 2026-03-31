@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
+import { DISCIPLINES } from "../constants/disciplines";
 import {
   FileText,
   Plus,
@@ -669,10 +670,9 @@ const FormsPage = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
-                <SelectItem value="operations">Operations</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-                <SelectItem value="inspection">Inspection</SelectItem>
-                <SelectItem value="lab">Lab</SelectItem>
+                {DISCIPLINES.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -783,10 +783,9 @@ const FormsPage = () => {
                       <SelectValue placeholder={t("forms.discipline")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="operations">{t("forms.operations")}</SelectItem>
-                      <SelectItem value="maintenance">{t("forms.maintenance")}</SelectItem>
-                      <SelectItem value="inspection">{t("forms.inspection")}</SelectItem>
-                      <SelectItem value="lab">{t("forms.lab")}</SelectItem>
+                      {DISCIPLINES.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

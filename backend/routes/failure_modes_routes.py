@@ -659,6 +659,7 @@ async def validate_failure_mode(
                     fm["is_validated"] = True
                     fm["validated_by_name"] = data.validated_by_name
                     fm["validated_by_position"] = data.validated_by_position
+                    fm["validated_by_id"] = validated_by_id
                     fm["validated_at"] = datetime.now(timezone.utc).isoformat()
                     return fm
         except ValueError:

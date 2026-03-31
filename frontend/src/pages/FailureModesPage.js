@@ -38,7 +38,9 @@ import {
   History,
   Clock,
   User,
-  RotateCcw
+  RotateCcw,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -134,6 +136,7 @@ const FailureModesPage = () => {
   const [selectedFm, setSelectedFm] = useState(null); // For view panel
   const [isViewPanelEditing, setIsViewPanelEditing] = useState(false); // Edit mode for view panel
   const [viewPanelForm, setViewPanelForm] = useState(null); // Form state for view panel editing
+  const [isViewPanelFullscreen, setIsViewPanelFullscreen] = useState(false); // Fullscreen mode for view panel
   
   // Version history state
   const [showVersionHistory, setShowVersionHistory] = useState(false);
@@ -787,7 +790,7 @@ const FailureModesPage = () => {
             </div>
 
             {/* Right Panel: View/Edit Panel */}
-            {selectedFm && (
+            {selectedFm && !isViewPanelFullscreen && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -801,7 +804,7 @@ const FailureModesPage = () => {
                   onStartEdit={handleStartViewPanelEdit}
                   onSave={handleSaveViewPanelEdit}
                   onCancel={handleCancelViewPanelEdit}
-                  onClose={() => { setSelectedFm(null); setIsViewPanelEditing(false); setViewPanelForm(null); }}
+                  onClose={() => { setSelectedFm(null); setIsViewPanelEditing(false); setViewPanelForm(null); setIsViewPanelFullscreen(false); }}
                   onDelete={(id) => { 
                     const fmToDelete = failureModes.find(fm => fm.id === id);
                     setDeleteConfirmFm(fmToDelete);
@@ -813,10 +816,41 @@ const FailureModesPage = () => {
                   categories={categories}
                   currentUser={user}
                   t={t}
+                  isFullscreen={false}
+                  onToggleFullscreen={() => setIsViewPanelFullscreen(true)}
                 />
               </motion.div>
             )}
           </div>
+          
+          {/* Fullscreen View Panel Overlay */}
+          {selectedFm && isViewPanelFullscreen && (
+            <div className="fixed inset-0 z-50 bg-white overflow-hidden">
+              <FailureModeViewPanel
+                fm={selectedFm}
+                isEditing={isViewPanelEditing}
+                formData={viewPanelForm}
+                setFormData={setViewPanelForm}
+                onStartEdit={handleStartViewPanelEdit}
+                onSave={handleSaveViewPanelEdit}
+                onCancel={handleCancelViewPanelEdit}
+                onClose={() => { setSelectedFm(null); setIsViewPanelEditing(false); setViewPanelForm(null); setIsViewPanelFullscreen(false); }}
+                onDelete={(id) => { 
+                  const fmToDelete = failureModes.find(fm => fm.id === id);
+                  setDeleteConfirmFm(fmToDelete);
+                }}
+                onValidate={handleValidateFm}
+                onUnvalidate={handleUnvalidateFm}
+                onShowVersionHistory={handleShowVersionHistory}
+                equipmentTypes={equipmentTypes}
+                categories={categories}
+                currentUser={user}
+                t={t}
+                isFullscreen={true}
+                onToggleFullscreen={() => setIsViewPanelFullscreen(false)}
+              />
+            </div>
+          )}
         </TabsContent>
 
         {/* Equipment Types Tab */}

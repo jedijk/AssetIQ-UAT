@@ -164,6 +164,20 @@ const Layout = () => {
         <div className="header-content max-w-full px-4">
           {/* Left Section - Logo & Nav */}
           <div className="flex items-center gap-3 lg:gap-6">
+            {/* Mobile Menu Toggle - LEFT side on mobile */}
+            <button
+              className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 -ml-1"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              data-testid="mobile-menu-toggle"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileMenuOpen ? (
+                <X className="w-5 h-5 text-slate-600" />
+              ) : (
+                <Menu className="w-5 h-5 text-slate-600" />
+              )}
+            </button>
+
             {/* Hierarchy Toggle - Desktop */}
             <Button
               variant="outline"
@@ -366,6 +380,28 @@ const Layout = () => {
               </Tooltip>
             </TooltipProvider>
 
+            {/* Feedback Button - Prominent */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/settings/feedback")}
+                    className="hidden sm:flex h-7 sm:h-8 px-2 sm:px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300"
+                    data-testid="feedback-button"
+                    aria-label="Send Feedback"
+                  >
+                    <MessageCircleQuestion className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1.5" />
+                    <span className="hidden lg:inline text-xs sm:text-sm font-medium">{t("nav.feedback") || "Feedback"}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>{t("nav.feedback") || "Feedback"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {/* Settings Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -456,19 +492,6 @@ const Layout = () => {
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {/* Mobile Menu Toggle */}
-            <button
-              className="md:hidden p-1.5 rounded-lg hover:bg-slate-100"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              data-testid="mobile-menu-toggle"
-            >
-              {mobileMenuOpen ? (
-                <X className="w-5 h-5 text-slate-600" />
-              ) : (
-                <Menu className="w-5 h-5 text-slate-600" />
-              )}
-            </button>
           </div>
         </div>
 
@@ -691,6 +714,16 @@ const Layout = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Mobile Floating Feedback Button */}
+      <button
+        onClick={() => navigate("/settings/feedback")}
+        className="sm:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center active:scale-95"
+        data-testid="mobile-feedback-fab"
+        aria-label="Send Feedback"
+      >
+        <MessageCircleQuestion className="w-6 h-6" />
+      </button>
     </div>
   );
 };

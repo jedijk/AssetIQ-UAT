@@ -220,19 +220,50 @@ const rbacAPI = {
   },
 
   resetPassword: async (userId) => {
-    const response = await fetch(`${API_BASE_URL}/api/auth/admin-reset-password`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
-      body: JSON.stringify({ user_id: userId })
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.detail || "Failed to send password reset email");
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Not authenticated. Please log in again.");
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/api/auth/admin-reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ user_id: userId })
+      });
+      
+      // Parse response body first
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseError) {
+        console.error("Reset password response parse error:", parseError);
+        throw new Error("Server returned invalid response");
+      }
+      
+      if (!response.ok) {
+        // Log detailed error for debugging
+        console.error("Reset password API error:", {
+          status: response.status,
+          statusText: response.statusText,
+          detail: responseData?.detail,
+          response: responseData
+        });
+        throw new Error(responseData?.detail || `Failed to send password reset email (${response.status})`);
+      }
+      
+      return responseData;
+    } catch (error) {
+      // Handle network errors specifically
+      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+        console.error("Network error during password reset:", error);
+        throw new Error("Network error: Unable to reach server. Please check your connection.");
+      }
+      throw error;
     }
-    return response.json();
   }
 };
 

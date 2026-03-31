@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { 
   AlertTriangle, Edit, Trash2, X, Plus, Link, CheckCircle, 
   User, Briefcase, Calendar, History, RotateCcw, Clock, ShieldCheck,
-  Cog, Thermometer, Activity, Zap, Shield, Leaf
+  Cog, Thermometer, Activity, Zap, Shield, Leaf, Maximize2, Minimize2, Image
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -76,7 +76,9 @@ export function FailureModeViewPanel({
   equipmentTypes,
   categories,
   currentUser,
-  t 
+  t,
+  isFullscreen = false,
+  onToggleFullscreen
 }) {
   const Icon = categoryIcons[fm?.category] || AlertTriangle;
   const colors = categoryColors[fm?.category] || "bg-slate-100 text-slate-700 border-slate-200";
@@ -209,9 +211,9 @@ export function FailureModeViewPanel({
   const data = isEditing ? formData : fm;
 
   return (
-    <div className="h-full bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden" data-testid="failure-mode-view-panel">
+    <div className={`${isFullscreen ? 'h-screen w-screen' : 'h-full'} bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden`} data-testid="failure-mode-view-panel">
       {/* Header */}
-      <div className="p-4 border-b border-slate-200 flex items-center gap-3">
+      <div className={`${isFullscreen ? 'px-6 py-4' : 'p-4'} border-b border-slate-200 flex items-center gap-3`}>
         <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${colors.split(' ')[0]}`}>
           <Icon className={`w-6 h-6 ${colors.split(' ')[1]}`} />
         </div>
@@ -250,6 +252,18 @@ export function FailureModeViewPanel({
               >
                 <History className="w-4 h-4" />
               </Button>
+              {onToggleFullscreen && (
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={onToggleFullscreen}
+                  className="text-slate-500 hover:text-blue-600"
+                  title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                  data-testid="toggle-fullscreen-btn"
+                >
+                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </Button>
+              )}
               <Button size="sm" variant="outline" onClick={onStartEdit} data-testid="view-panel-edit-btn">
                 <Edit className="w-4 h-4 mr-1" /> {t("common.edit")}
               </Button>
@@ -272,7 +286,7 @@ export function FailureModeViewPanel({
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className={`flex-1 overflow-y-auto ${isFullscreen ? 'p-6 max-w-5xl mx-auto' : 'p-4'} space-y-6`}>
         {/* RPN Score Card */}
         <div className="grid grid-cols-4 gap-3">
           <div className={`bg-gradient-to-br rounded-xl p-4 text-center ${
@@ -334,12 +348,17 @@ export function FailureModeViewPanel({
                   src={validatorAvatarUrl}
                   alt={fm.validated_by_name || fm.validated_by}
                   className="w-11 h-11 rounded-full object-cover border-2 border-green-300 shadow-sm"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
                 />
-              ) : (
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-semibold text-lg border-2 border-green-300 shadow-sm">
-                  {(fm.validated_by_name || fm.validated_by)?.charAt(0)?.toUpperCase() || "V"}
-                </div>
-              )}
+              ) : null}
+              <div 
+                className={`w-11 h-11 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 items-center justify-center text-white font-semibold text-lg border-2 border-green-300 shadow-sm ${validatorAvatarUrl ? 'hidden' : 'flex'}`}
+              >
+                {(fm.validated_by_name || fm.validated_by)?.charAt(0)?.toUpperCase() || "V"}
+              </div>
             </div>
             <div className="flex-1 min-w-0">
               {/* Row 1: Validated + Date */}
