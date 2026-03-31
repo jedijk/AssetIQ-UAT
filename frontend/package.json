@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -65,8 +65,8 @@
     "zustand": "^5.0.12"
   },
   "scripts": {
-    "start": "craco start",
-    "build": "craco build",
+    "start": "REACT_APP_VERSION=$npm_package_version craco start",
+    "build": "REACT_APP_VERSION=$npm_package_version craco build",
     "test": "craco test"
   },
   "browserslist": {

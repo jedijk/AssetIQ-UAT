@@ -7,8 +7,8 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
 import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag } from "lucide-react";
 
-// App version - update this when releasing new versions
-const APP_VERSION = "1.0.0";
+// App version - automatically read from package.json via REACT_APP_VERSION
+const APP_VERSION = process.env.REACT_APP_VERSION || "1.0.0";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
