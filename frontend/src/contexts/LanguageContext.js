@@ -19,6 +19,8 @@ const en = {
     statistics: "User Statistics",
     criticalityDefinitions: "Definitions",
     feedback: "Feedback",
+    permissions: "Permissions",
+    aiUsage: "AI Usage",
   },
   
   // Settings pages
@@ -1182,6 +1184,8 @@ const nl = {
     statistics: "Gebruikersstatistieken",
     criticalityDefinitions: "Definities",
     feedback: "Feedback",
+    permissions: "Machtigingen",
+    aiUsage: "AI Gebruik",
   },
   
   // Settings pages

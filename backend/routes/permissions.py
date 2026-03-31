@@ -155,6 +155,190 @@ class PermissionsUpdate(BaseModel):
     delete: Optional[bool] = None
 
 
+class RoleCreate(BaseModel):
+    name: str
+    display_name: str
+    description: Optional[str] = None
+    base_role: Optional[str] = "viewer"  # Copy permissions from this role
+
+
+class RoleUpdate(BaseModel):
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+
+
+# Store for custom roles
+SYSTEM_ROLES = ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
+
+
+@router.get("/permissions/roles")
+async def list_roles(current_user: dict = Depends(get_current_user)):
+    """List all roles including custom roles."""
+    if current_user.get("role") != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can manage roles")
+    
+    # Get custom roles from database
+    custom_roles_doc = await db.permissions.find_one({"type": "custom_roles"})
+    custom_roles = custom_roles_doc.get("roles", []) if custom_roles_doc else []
+    
+    # Build role list with metadata
+    roles = []
+    for role in SYSTEM_ROLES:
+        roles.append({
+            "name": role,
+            "display_name": role.replace("_", " ").title(),
+            "description": f"System role: {role}",
+            "is_system": True,
+            "is_deletable": False
+        })
+    
+    for role in custom_roles:
+        roles.append({
+            "name": role["name"],
+            "display_name": role.get("display_name", role["name"]),
+            "description": role.get("description", ""),
+            "is_system": False,
+            "is_deletable": True,
+            "created_at": role.get("created_at")
+        })
+    
+    return {"roles": roles}
+
+
+@router.post("/permissions/roles")
+async def create_role(
+    role_data: RoleCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new custom role."""
+    if current_user.get("role") != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can create roles")
+    
+    # Validate role name
+    role_name = role_data.name.lower().replace(" ", "_")
+    
+    if not role_name or len(role_name) < 2:
+        raise HTTPException(status_code=400, detail="Role name must be at least 2 characters")
+    
+    if role_name in SYSTEM_ROLES:
+        raise HTTPException(status_code=400, detail="Cannot use system role name")
+    
+    # Check if role already exists
+    custom_roles_doc = await db.permissions.find_one({"type": "custom_roles"})
+    existing_roles = custom_roles_doc.get("roles", []) if custom_roles_doc else []
+    
+    if any(r["name"] == role_name for r in existing_roles):
+        raise HTTPException(status_code=400, detail=f"Role '{role_name}' already exists")
+    
+    # Get base role permissions
+    base_role = role_data.base_role or "viewer"
+    if base_role not in DEFAULT_PERMISSIONS:
+        base_role = "viewer"
+    
+    base_permissions = DEFAULT_PERMISSIONS.get(base_role, DEFAULT_PERMISSIONS["viewer"]).copy()
+    
+    # Create the new role
+    new_role = {
+        "name": role_name,
+        "display_name": role_data.display_name,
+        "description": role_data.description or "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": current_user["id"]
+    }
+    
+    # Add to custom roles list
+    await db.permissions.update_one(
+        {"type": "custom_roles"},
+        {
+            "$push": {"roles": new_role},
+            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
+        },
+        upsert=True
+    )
+    
+    # Add permissions for the new role
+    stored_perms = await db.permissions.find_one({"type": "role_permissions"})
+    if stored_perms:
+        current_perms = stored_perms.get("permissions", DEFAULT_PERMISSIONS.copy())
+    else:
+        current_perms = DEFAULT_PERMISSIONS.copy()
+    
+    current_perms[role_name] = base_permissions
+    
+    await db.permissions.update_one(
+        {"type": "role_permissions"},
+        {
+            "$set": {
+                "permissions": current_perms,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        },
+        upsert=True
+    )
+    
+    logger.info(f"Custom role '{role_name}' created by user {current_user['id']}")
+    
+    return {
+        "message": f"Role '{role_data.display_name}' created successfully",
+        "role": new_role,
+        "permissions": base_permissions
+    }
+
+
+@router.delete("/permissions/roles/{role_name}")
+async def delete_role(
+    role_name: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a custom role."""
+    if current_user.get("role") != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can delete roles")
+    
+    if role_name in SYSTEM_ROLES:
+        raise HTTPException(status_code=400, detail="Cannot delete system roles")
+    
+    # Check if role exists
+    custom_roles_doc = await db.permissions.find_one({"type": "custom_roles"})
+    if not custom_roles_doc:
+        raise HTTPException(status_code=404, detail="Role not found")
+    
+    existing_roles = custom_roles_doc.get("roles", [])
+    if not any(r["name"] == role_name for r in existing_roles):
+        raise HTTPException(status_code=404, detail="Role not found")
+    
+    # Check if any users have this role
+    users_with_role = await db.users.count_documents({"role": role_name})
+    if users_with_role > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot delete role: {users_with_role} user(s) still have this role"
+        )
+    
+    # Remove from custom roles
+    await db.permissions.update_one(
+        {"type": "custom_roles"},
+        {
+            "$pull": {"roles": {"name": role_name}},
+            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
+        }
+    )
+    
+    # Remove permissions for this role
+    stored_perms = await db.permissions.find_one({"type": "role_permissions"})
+    if stored_perms:
+        current_perms = stored_perms.get("permissions", {})
+        if role_name in current_perms:
+            del current_perms[role_name]
+            await db.permissions.update_one(
+                {"type": "role_permissions"},
+                {"$set": {"permissions": current_perms}}
+            )
+    
+    logger.info(f"Custom role '{role_name}' deleted by user {current_user['id']}")
+    
+    return {"message": f"Role '{role_name}' deleted successfully"}
+
+
 @router.get("/permissions")
 async def get_all_permissions(current_user: dict = Depends(get_current_user)):
     """Get permissions configuration for all roles."""
@@ -170,10 +354,19 @@ async def get_all_permissions(current_user: dict = Depends(get_current_user)):
     else:
         permissions = DEFAULT_PERMISSIONS.copy()
     
+    # Get custom roles
+    custom_roles_doc = await db.permissions.find_one({"type": "custom_roles"})
+    custom_role_names = [r["name"] for r in custom_roles_doc.get("roles", [])] if custom_roles_doc else []
+    
+    # All roles = system roles + custom roles
+    all_roles = SYSTEM_ROLES + custom_role_names
+    
     return {
         "permissions": permissions,
         "features": FEATURES,
-        "roles": ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
+        "roles": all_roles,
+        "system_roles": SYSTEM_ROLES,
+        "custom_roles": custom_role_names
     }
 
 

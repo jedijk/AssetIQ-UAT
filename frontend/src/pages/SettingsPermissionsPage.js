@@ -28,10 +28,15 @@ import {
   Target,
   Library,
   Loader2,
+  Plus,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Switch } from "../components/ui/switch";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -45,6 +50,21 @@ import {
   TabsList,
   TabsTrigger,
 } from "../components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -94,6 +114,8 @@ export default function SettingsPermissionsPage() {
   const queryClient = useQueryClient();
   const [selectedRole, setSelectedRole] = useState("admin");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showCreateRoleDialog, setShowCreateRoleDialog] = useState(false);
+  const [newRole, setNewRole] = useState({ name: "", display_name: "", description: "", base_role: "viewer" });
 
   // Mobile detection
   useState(() => {
@@ -118,6 +140,37 @@ export default function SettingsPermissionsPage() {
     },
     onError: (error) => {
       toast.error(error.response?.data?.detail || "Failed to update permission");
+    },
+  });
+
+  // Create role mutation
+  const createRoleMutation = useMutation({
+    mutationFn: permissionsAPI.createRole,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["permissions"] });
+      toast.success(data.message || "Role created successfully");
+      setShowCreateRoleDialog(false);
+      setNewRole({ name: "", display_name: "", description: "", base_role: "viewer" });
+      // Select the newly created role
+      if (data.role?.name) {
+        setSelectedRole(data.role.name);
+      }
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.detail || "Failed to create role");
+    },
+  });
+
+  // Delete role mutation
+  const deleteRoleMutation = useMutation({
+    mutationFn: permissionsAPI.deleteRole,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["permissions"] });
+      toast.success("Role deleted");
+      setSelectedRole("admin");
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.detail || "Failed to delete role");
     },
   });
 

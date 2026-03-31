@@ -151,7 +151,8 @@ const Layout = () => {
     { path: "/forms", label: t("forms.title"), icon: FileText, desktopOnly: true },
     { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users },
-    { path: "/settings/permissions", label: t("nav.permissions") || "Permissions", icon: Shield, ownerOnly: true },
+    { path: "/settings/permissions", label: t("nav.permissions"), icon: Shield, ownerOnly: true },
+    { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders },
     { path: "/settings/feedback", label: t("nav.feedback") || "Feedback", icon: MessageCircleQuestion },
@@ -163,6 +164,8 @@ const Layout = () => {
     if (isMobileView && item.desktopOnly) return false;
     // Filter owner-only items for non-owners
     if (item.ownerOnly && user?.role !== 'owner') return false;
+    // Filter admin-only items for non-admins (owner can also see admin items)
+    if (item.adminOnly && user?.role !== 'admin' && user?.role !== 'owner') return false;
     return true;
   });
 

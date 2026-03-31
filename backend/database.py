@@ -48,6 +48,7 @@ from services.decision_engine import DecisionEngine
 from services.analytics_service import AnalyticsService
 from services.rbac_service import RBACService
 from services.installation_filter_service import InstallationFilterService
+from services.ai_usage_service import AIUsageTracker
 
 failure_modes_service = FailureModesService(db)
 efm_service = EFMService(db)
@@ -58,3 +59,4 @@ decision_engine = DecisionEngine(db)
 analytics_service = AnalyticsService(db)
 rbac_service = RBACService(db)
 installation_filter = InstallationFilterService(db)
+ai_usage_tracker = AIUsageTracker(db)

@@ -22,6 +22,7 @@ import TaskSchedulerPage from "./pages/TaskSchedulerPage";
 import MyTasksPage from "./pages/MyTasksPage";
 import SettingsUserManagementPage from "./pages/SettingsUserManagementPage";
 import SettingsPermissionsPage from "./pages/SettingsPermissionsPage";
+import SettingsAIUsagePage from "./pages/SettingsAIUsagePage";
 import FormsPage from "./pages/FormsPage";
 import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
 import UserStatisticsPage from "./pages/UserStatisticsPage";
@@ -175,6 +176,7 @@ function App() {
                 <Route path="decision-engine" element={<UnderDevelopmentPage />} />
                 <Route path="settings/user-management" element={<SettingsUserManagementPage />} />
                 <Route path="settings/permissions" element={<SettingsPermissionsPage />} />
+                <Route path="settings/ai-usage" element={<SettingsAIUsagePage />} />
                 <Route path="settings/statistics" element={<UserStatisticsPage />} />
                 <Route path="user-statistics" element={<UserStatisticsPage />} />
                 <Route path="settings/criticality-definitions" element={<DefinitionsPage />} />

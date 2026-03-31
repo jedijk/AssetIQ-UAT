@@ -987,6 +987,24 @@ export const permissionsAPI = {
     const response = await api.get('/permissions/my');
     return response.data;
   },
+  
+  // List all roles including custom roles
+  listRoles: async () => {
+    const response = await api.get('/permissions/roles');
+    return response.data;
+  },
+  
+  // Create a new custom role
+  createRole: async (roleData) => {
+    const response = await api.post('/permissions/roles', roleData);
+    return response.data;
+  },
+  
+  // Delete a custom role
+  deleteRole: async (roleName) => {
+    const response = await api.delete(`/permissions/roles/${roleName}`);
+    return response.data;
+  },
 };
 
 
