@@ -28,8 +28,9 @@ async def analyze_threat_risk(
     current_user: dict = Depends(get_current_user)
 ):
     """AI-powered dynamic risk analysis for a threat"""
+    # Get threat without strict created_by filter - user can analyze any visible threat
     threat = await db.threats.find_one(
-        {"id": threat_id, "created_by": current_user["id"]},
+        {"id": threat_id},
         {"_id": 0}
     )
     if not threat:
@@ -40,7 +41,7 @@ async def analyze_threat_risk(
     equipment_id = threat.get("linked_equipment_id")
     if threat.get("asset"):
         equipment_node = await db.equipment_nodes.find_one(
-            {"name": threat["asset"], "created_by": current_user["id"]},
+            {"name": threat["asset"]},
             {"_id": 0}
         )
         if equipment_node:
@@ -55,10 +56,9 @@ async def analyze_threat_risk(
     }
     
     if equipment_id or threat.get("asset"):
-        # Get past observations for this equipment
+        # Get past observations for this equipment (no owner filter - installation-based access)
         past_observations = await db.threats.find(
             {
-                "created_by": current_user["id"],
                 "id": {"$ne": threat_id},
                 "$or": [
                     {"linked_equipment_id": equipment_id} if equipment_id else {"_id": None},
@@ -72,7 +72,6 @@ async def analyze_threat_risk(
         # Get actions related to this equipment
         past_actions = await db.central_actions.find(
             {
-                "created_by": current_user["id"],
                 "$or": [
                     {"linked_equipment_id": equipment_id} if equipment_id else {"_id": None},
                     {"equipment_name": threat.get("asset")} if threat.get("asset") else {"_id": None},
@@ -86,7 +85,6 @@ async def analyze_threat_risk(
         # Get completed tasks for this equipment
         past_tasks = await db.task_instances.find(
             {
-                "created_by": current_user["id"],
                 "status": "completed",
                 "$or": [
                     {"equipment_id": equipment_id} if equipment_id else {"_id": None},
@@ -102,7 +100,6 @@ async def analyze_threat_risk(
     if request and request.include_similar_incidents:
         similar = await db.threats.find(
             {
-                "created_by": current_user["id"],
                 "id": {"$ne": threat_id},
                 "$or": [
                     {"equipment_type": threat.get("equipment_type")},
@@ -148,7 +145,7 @@ async def get_risk_insights(
 ):
     """Get cached AI risk insights for a threat"""
     insight = await db.ai_risk_insights.find_one(
-        {"threat_id": threat_id, "created_by": current_user["id"]},
+        {"threat_id": threat_id},
         {"_id": 0}
     )
     if not insight:
@@ -162,9 +159,9 @@ async def get_ai_top_risks(
     current_user: dict = Depends(get_current_user)
 ):
     """Get AI-curated top risks based on dynamic scoring"""
-    # Get threats with AI insights
+    # Get threats with AI insights (no owner filter - installation-based)
     insights = await db.ai_risk_insights.find(
-        {"created_by": current_user["id"]},
+        {},
         {"_id": 0}
     ).sort("dynamic_risk.risk_score", -1).limit(limit).to_list(limit)
     
@@ -186,7 +183,6 @@ async def get_ai_top_risks(
         analyzed_ids = [r["threat"]["id"] for r in result]
         additional = await db.threats.find(
             {
-                "created_by": current_user["id"],
                 "id": {"$nin": analyzed_ids},
                 "status": {"$ne": "Closed"}
             },
@@ -210,7 +206,7 @@ async def generate_threat_causes(
 ):
     """AI-powered causal analysis - generates probable causes"""
     threat = await db.threats.find_one(
-        {"id": threat_id, "created_by": current_user["id"]},
+        {"id": threat_id},
         {"_id": 0}
     )
     if not threat:
@@ -220,7 +216,7 @@ async def generate_threat_causes(
     equipment_id = threat.get("linked_equipment_id")
     if threat.get("asset"):
         equipment_node = await db.equipment_nodes.find_one(
-            {"name": threat["asset"], "created_by": current_user["id"]},
+            {"name": threat["asset"]},
             {"_id": 0}
         )
         if equipment_node:
@@ -238,7 +234,6 @@ async def generate_threat_causes(
         # Get past observations for this equipment
         past_observations = await db.threats.find(
             {
-                "created_by": current_user["id"],
                 "id": {"$ne": threat_id},
                 "$or": [
                     {"linked_equipment_id": equipment_id} if equipment_id else {"_id": None},
@@ -252,7 +247,6 @@ async def generate_threat_causes(
         # Get completed actions
         past_actions = await db.central_actions.find(
             {
-                "created_by": current_user["id"],
                 "status": "completed",
                 "$or": [
                     {"linked_equipment_id": equipment_id} if equipment_id else {"_id": None},
@@ -297,7 +291,7 @@ async def get_causal_analysis(
 ):
     """Get cached causal analysis for a threat"""
     analysis = await db.ai_causal_analysis.find_one(
-        {"threat_id": threat_id, "created_by": current_user["id"]},
+        {"threat_id": threat_id},
         {"_id": 0}
     )
     if not analysis:
@@ -312,7 +306,7 @@ async def explain_threat(
 ):
     """'Why is this happening?' - AI explains the threat with evidence"""
     threat = await db.threats.find_one(
-        {"id": threat_id, "created_by": current_user["id"]},
+        {"id": threat_id},
         {"_id": 0}
     )
     if not threat:
@@ -320,7 +314,7 @@ async def explain_threat(
     
     # Check if we have cached causal analysis
     existing = await db.ai_causal_analysis.find_one(
-        {"threat_id": threat_id, "created_by": current_user["id"]},
+        {"threat_id": threat_id},
         {"_id": 0}
     )
     
@@ -370,7 +364,7 @@ async def generate_fault_tree(
 ):
     """Generate a fault tree diagram for the threat"""
     threat = await db.threats.find_one(
-        {"id": threat_id, "created_by": current_user["id"]},
+        {"id": threat_id},
         {"_id": 0}
     )
     if not threat:
@@ -407,7 +401,7 @@ async def get_fault_tree(
 ):
     """Get cached fault tree for a threat"""
     tree = await db.ai_fault_trees.find_one(
-        {"threat_id": threat_id, "created_by": current_user["id"]},
+        {"threat_id": threat_id},
         {"_id": 0}
     )
     if not tree:
@@ -422,7 +416,7 @@ async def generate_bow_tie(
 ):
     """Generate a bow-tie risk model for the threat"""
     threat = await db.threats.find_one(
-        {"id": threat_id, "created_by": current_user["id"]},
+        {"id": threat_id},
         {"_id": 0}
     )
     if not threat:
@@ -457,7 +451,7 @@ async def get_bow_tie(
 ):
     """Get cached bow-tie model for a threat"""
     bow_tie = await db.ai_bow_ties.find_one(
-        {"threat_id": threat_id, "created_by": current_user["id"]},
+        {"threat_id": threat_id},
         {"_id": 0}
     )
     if not bow_tie:
@@ -473,7 +467,7 @@ async def optimize_threat_actions(
 ):
     """AI-powered action optimization with ROI analysis"""
     threat = await db.threats.find_one(
-        {"id": threat_id, "created_by": current_user["id"]},
+        {"id": threat_id},
         {"_id": 0}
     )
     if not threat:
@@ -482,7 +476,7 @@ async def optimize_threat_actions(
     # Get existing causal analysis if available
     causes = None
     causal_analysis = await db.ai_causal_analysis.find_one(
-        {"threat_id": threat_id, "created_by": current_user["id"]},
+        {"threat_id": threat_id},
         {"_id": 0}
     )
     if causal_analysis:
@@ -536,7 +530,7 @@ async def get_action_optimization(
 ):
     """Get cached action optimization for a threat"""
     optimization = await db.ai_action_optimization.find_one(
-        {"threat_id": threat_id, "created_by": current_user["id"]},
+        {"threat_id": threat_id},
         {"_id": 0}
     )
     if not optimization:
