@@ -191,21 +191,37 @@ const ThreatsPage = () => {
       }
       return result;
     },
-    staleTime: 60000, // Keep data fresh for 60 seconds
-    gcTime: 300000, // Keep in cache for 5 minutes (formerly cacheTime)
+    staleTime: 5 * 60 * 1000, // Keep data fresh for 5 minutes (reduced refetches)
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     retry: 3, // Retry 3 times on failure
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff
-    refetchOnWindowFocus: false, // Don't refetch when window regains focus (prevents flickering)
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
+    refetchInterval: false, // Disable automatic background refetching
     placeholderData: (previousData) => previousData, // Keep previous data while refetching
   });
   
-  // Log error if fetch fails
+  // Log error if fetch fails - only show toast once
+  const [errorShown, setErrorShown] = useState(false);
   useEffect(() => {
-    if (threatsError) {
+    if (threatsError && !errorShown) {
       console.error("Failed to fetch observations:", threatsError);
-      toast.error("Failed to load observations. Please refresh the page.");
+      // Check if it's an auth error
+      if (threatsError.response?.status === 401) {
+        toast.error("Session expired. Please log in again.");
+        // Redirect to login
+        window.location.href = "/login";
+      } else if (threatsError.response?.status === 503) {
+        toast.error("Server temporarily unavailable. Retrying...");
+      } else {
+        toast.error("Failed to load observations. Please refresh the page.");
+      }
+      setErrorShown(true);
     }
-  }, [threatsError]);
+    // Reset error shown when error clears
+    if (!threatsError) {
+      setErrorShown(false);
+    }
+  }, [threatsError, errorShown]);
 
   // Delete mutation
   const deleteMutation = useMutation({
