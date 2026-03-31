@@ -2,9 +2,10 @@ import axios from "axios";
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Create axios instance
+// Create axios instance with timeout
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 30000, // 30 second timeout
 });
 
 // Add auth interceptor
@@ -15,6 +16,21 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Add response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Add more context to network errors
+    if (error.code === 'ECONNABORTED') {
+      error.message = 'Request timeout - please try again';
+    } else if (!error.response && error.message === 'Network Error') {
+      error.code = 'ERR_NETWORK';
+      error.message = 'Network error - please check your connection';
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Auth API (Password Reset)
 export const authAPI = {

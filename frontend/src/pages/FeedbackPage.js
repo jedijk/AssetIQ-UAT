@@ -390,6 +390,10 @@ const FeedbackPage = () => {
   };
 
   const openNewFeedbackModal = () => {
+    // Reset mutation state first
+    submitMutation.reset();
+    updateMutation.reset();
+    // Then reset form
     resetForm();
     setIsEditMode(false);
     setEditingFeedback(null);
