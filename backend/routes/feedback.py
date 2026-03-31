@@ -91,6 +91,84 @@ async def upload_screenshot(
     return {"url": result.get("url", path), "path": path}
 
 
+@router.post("/transcribe")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Transcribe audio file to text using OpenAI Whisper.
+    Supports mp3, mp4, mpeg, mpga, m4a, wav, webm formats.
+    Max file size: 25 MB.
+    """
+    import os
+    import logging
+    import tempfile
+    from emergentintegrations.llm.openai import OpenAISpeechToText
+    
+    logger = logging.getLogger(__name__)
+    
+    # Validate file type
+    ext = file.filename.split(".")[-1].lower() if file.filename else "webm"
+    allowed_formats = ["mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm"]
+    if ext not in allowed_formats:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid audio format. Allowed: {', '.join(allowed_formats)}"
+        )
+    
+    # Read file content
+    file_content = await file.read()
+    
+    # Check file size (25 MB limit)
+    if len(file_content) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 25 MB.")
+    
+    # Get API key
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Transcription service not configured")
+    
+    try:
+        # Create temp file for the audio
+        with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as temp_file:
+            temp_file.write(file_content)
+            temp_path = temp_file.name
+        
+        try:
+            # Initialize OpenAI STT
+            stt = OpenAISpeechToText(api_key=api_key)
+            
+            # Transcribe audio
+            with open(temp_path, "rb") as audio_file:
+                response = await stt.transcribe(
+                    file=audio_file,
+                    model="whisper-1",
+                    response_format="json"
+                )
+            
+            # Clean up temp file
+            os.unlink(temp_path)
+            
+            transcribed_text = response.text if hasattr(response, 'text') else str(response)
+            
+            return {
+                "text": transcribed_text,
+                "success": True
+            }
+        except Exception as e:
+            # Clean up temp file on error
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            raise e
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Transcription failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+
+
 @router.get("/my", response_model=FeedbackListResponse)
 async def get_my_feedback(current_user: dict = Depends(get_current_user)):
     """Get all feedback submitted by the current user."""

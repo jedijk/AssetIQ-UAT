@@ -187,6 +187,8 @@ const FeedbackPage = () => {
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcribedText, setTranscribedText] = useState("");
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
@@ -323,6 +325,7 @@ const FeedbackPage = () => {
     setScreenshotFile(null);
     setScreenshotPreview(null);
     clearRecording();
+    setTranscribedText("");
   };
 
   const handleSubmit = () => {
@@ -527,7 +530,7 @@ const FeedbackPage = () => {
     }
   };
   
-  const stopRecording = () => {
+  const stopRecording = async () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -538,6 +541,36 @@ const FeedbackPage = () => {
     }
   };
   
+  // Auto-transcribe when audio blob is set
+  useEffect(() => {
+    const transcribeAudio = async () => {
+      if (audioBlob && !transcribedText && !isTranscribing) {
+        setIsTranscribing(true);
+        try {
+          const result = await feedbackAPI.transcribeAudio(audioBlob);
+          if (result.success && result.text) {
+            setTranscribedText(result.text);
+            // Append transcribed text to the message if message is empty
+            if (!message.trim()) {
+              setMessage(result.text);
+            } else {
+              // Optionally append to existing message
+              setMessage(prev => prev + "\n\n[Voice transcription]: " + result.text);
+            }
+            toast.success(t("feedback.transcriptionComplete") || "Voice message transcribed!");
+          }
+        } catch (error) {
+          console.error('Transcription failed:', error);
+          toast.error(t("feedback.transcriptionFailed") || "Could not transcribe voice message. You can still submit with audio attached.");
+        } finally {
+          setIsTranscribing(false);
+        }
+      }
+    };
+    
+    transcribeAudio();
+  }, [audioBlob]); // eslint-disable-line react-hooks/exhaustive-deps
+  
   const clearRecording = () => {
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
@@ -545,6 +578,7 @@ const FeedbackPage = () => {
     setAudioBlob(null);
     setAudioUrl(null);
     setRecordingDuration(0);
+    setTranscribedText("");
   };
   
   const formatDuration = (seconds) => {
@@ -680,23 +714,41 @@ const FeedbackPage = () => {
         </label>
         
         {audioUrl ? (
-          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <Volume2 className="w-5 h-5 text-blue-600" />
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <Volume2 className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-700">{t("feedback.voiceRecorded") || "Voice message recorded"}</p>
+                <p className="text-xs text-slate-500">{formatDuration(recordingDuration)}</p>
+              </div>
+              <audio src={audioUrl} controls className="h-8 w-32" />
+              <button
+                type="button"
+                onClick={clearRecording}
+                className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                data-testid="clear-recording-btn"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-700">{t("feedback.voiceRecorded") || "Voice message recorded"}</p>
-              <p className="text-xs text-slate-500">{formatDuration(recordingDuration)}</p>
-            </div>
-            <audio src={audioUrl} controls className="h-8 w-32" />
-            <button
-              type="button"
-              onClick={clearRecording}
-              className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
-              data-testid="clear-recording-btn"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            
+            {/* Transcription status/result */}
+            {isTranscribing ? (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                <span className="text-sm text-blue-700">{t("feedback.transcribing") || "Transcribing voice message..."}</span>
+              </div>
+            ) : transcribedText ? (
+              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex items-center gap-2 mb-1">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  <span className="text-xs font-medium text-green-700">{t("feedback.transcribedText") || "Transcribed text added to message"}</span>
+                </div>
+                <p className="text-xs text-green-600 line-clamp-2">{transcribedText}</p>
+              </div>
+            ) : null}
           </div>
         ) : isRecording ? (
           <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
@@ -725,7 +777,7 @@ const FeedbackPage = () => {
             data-testid="start-recording-btn"
           >
             <Mic className="w-5 h-5" />
-            <span className="text-sm">{t("feedback.recordVoice") || "Record voice message"}</span>
+            <span className="text-sm">{t("feedback.recordVoice") || "Record voice message (auto-transcribed)"}</span>
           </button>
         )}
       </div>

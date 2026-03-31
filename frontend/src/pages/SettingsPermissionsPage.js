@@ -116,6 +116,7 @@ export default function SettingsPermissionsPage() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showCreateRoleDialog, setShowCreateRoleDialog] = useState(false);
   const [newRole, setNewRole] = useState({ name: "", display_name: "", description: "", base_role: "viewer" });
+  const [deleteRoleConfirm, setDeleteRoleConfirm] = useState(null);
 
   // Mobile detection
   useState(() => {
@@ -289,23 +290,34 @@ export default function SettingsPermissionsPage() {
       <div className="max-w-7xl mx-auto px-6 py-6">
         <Tabs value={selectedRole} onValueChange={setSelectedRole} className="w-full">
           {/* Role Tabs */}
-          <TabsList className="bg-white border border-slate-200 p-1 h-auto flex-wrap mb-6">
-            {roles?.filter(r => r !== "owner").map((role) => {
-              const config = ROLE_CONFIG[role];
-              const Icon = config?.icon || Eye;
-              return (
-                <TabsTrigger
-                  key={role}
-                  value={role}
-                  className="flex items-center gap-2 px-4 py-2 data-[state=active]:bg-slate-100"
-                  data-testid={`role-tab-${role}`}
-                >
-                  <Icon className={`w-4 h-4 ${config?.color || 'text-slate-600'}`} />
-                  <span>{config?.label || role}</span>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
+          <div className="flex items-center gap-3 mb-6">
+            <TabsList className="bg-white border border-slate-200 p-1 h-auto flex-wrap flex-1">
+              {roles?.filter(r => r !== "owner").map((role) => {
+                const config = ROLE_CONFIG[role];
+                const Icon = config?.icon || Eye;
+                return (
+                  <TabsTrigger
+                    key={role}
+                    value={role}
+                    className="flex items-center gap-2 px-4 py-2 data-[state=active]:bg-slate-100"
+                    data-testid={`role-tab-${role}`}
+                  >
+                    <Icon className={`w-4 h-4 ${config?.color || 'text-slate-600'}`} />
+                    <span>{config?.label || role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+            <Button
+              onClick={() => setShowCreateRoleDialog(true)}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 flex-shrink-0"
+              data-testid="create-role-btn"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Create Role
+            </Button>
+          </div>
 
           {/* Owner Info Card */}
           <Card className="mb-6 border-amber-200 bg-amber-50">
@@ -321,7 +333,9 @@ export default function SettingsPermissionsPage() {
           </Card>
 
           {/* Permissions Grid */}
-          {roles?.filter(r => r !== "owner").map((role) => (
+          {roles?.filter(r => r !== "owner").map((role) => {
+            const isCustomRole = !["admin", "reliability_engineer", "maintenance", "operations", "viewer"].includes(role);
+            return (
             <TabsContent key={role} value={role} className="mt-0">
               <Card>
                 <CardHeader>
@@ -331,10 +345,27 @@ export default function SettingsPermissionsPage() {
                         <RoleIcon className={`w-5 h-5 ${ROLE_CONFIG[role]?.color || 'text-slate-600'}`} />
                       </div>
                       <div>
-                        <CardTitle className="text-lg">{ROLE_CONFIG[role]?.label || role}</CardTitle>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {ROLE_CONFIG[role]?.label || role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          {isCustomRole && (
+                            <Badge variant="secondary" className="text-xs">Custom</Badge>
+                          )}
+                        </CardTitle>
                         <CardDescription>Configure what this role can do</CardDescription>
                       </div>
                     </div>
+                    {isCustomRole && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeleteRoleConfirm(role)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        data-testid={`delete-role-${role}-btn`}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete Role
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -439,7 +470,8 @@ export default function SettingsPermissionsPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-          ))}
+            );
+          })}
         </Tabs>
 
         {/* Legend */}
@@ -467,6 +499,154 @@ export default function SettingsPermissionsPage() {
           </div>
         </div>
       </div>
+
+      {/* Create Role Dialog */}
+      <Dialog open={showCreateRoleDialog} onOpenChange={setShowCreateRoleDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-blue-600" />
+              Create Custom Role
+            </DialogTitle>
+            <DialogDescription>
+              Define a new role with custom permissions. Start from an existing role's permissions as a template.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Role Name (internal identifier) */}
+            <div className="space-y-2">
+              <Label htmlFor="role-name">Role Name (internal)</Label>
+              <Input
+                id="role-name"
+                placeholder="e.g., technician, supervisor"
+                value={newRole.name}
+                onChange={(e) => setNewRole({ ...newRole, name: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                className="lowercase"
+                data-testid="role-name-input"
+              />
+              <p className="text-xs text-slate-500">Used internally. Lowercase, underscores instead of spaces.</p>
+            </div>
+
+            {/* Display Name */}
+            <div className="space-y-2">
+              <Label htmlFor="display-name">Display Name</Label>
+              <Input
+                id="display-name"
+                placeholder="e.g., Field Technician"
+                value={newRole.display_name}
+                onChange={(e) => setNewRole({ ...newRole, display_name: e.target.value })}
+                data-testid="role-display-name-input"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (optional)</Label>
+              <Textarea
+                id="description"
+                placeholder="What is this role responsible for?"
+                value={newRole.description}
+                onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
+                rows={2}
+                data-testid="role-description-input"
+              />
+            </div>
+
+            {/* Base Role */}
+            <div className="space-y-2">
+              <Label>Copy Permissions From</Label>
+              <Select 
+                value={newRole.base_role} 
+                onValueChange={(value) => setNewRole({ ...newRole, base_role: value })}
+              >
+                <SelectTrigger data-testid="base-role-select">
+                  <SelectValue placeholder="Select a base role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="viewer">
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-slate-600" />
+                      Viewer (Read-only)
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="operations">
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-4 h-4 text-purple-600" />
+                      Operations
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="maintenance">
+                    <div className="flex items-center gap-2">
+                      <Wrench className="w-4 h-4 text-green-600" />
+                      Maintenance
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="reliability_engineer">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-blue-600" />
+                      Reliability Engineer
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="admin">
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 text-red-600" />
+                      Admin
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500">The new role will start with these permissions. You can modify them after creation.</p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowCreateRoleDialog(false);
+                setNewRole({ name: "", display_name: "", description: "", base_role: "viewer" });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createRoleMutation.mutate(newRole)}
+              disabled={!newRole.name || !newRole.display_name || createRoleMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="submit-create-role-btn"
+            >
+              {createRoleMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Create Role
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Role Confirmation */}
+      <AlertDialog open={!!deleteRoleConfirm} onOpenChange={(open) => !open && setDeleteRoleConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Custom Role?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the role "{deleteRoleConfirm}". Make sure no users are assigned to this role before deleting.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                deleteRoleMutation.mutate(deleteRoleConfirm);
+                setDeleteRoleConfirm(null);
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteRoleMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Delete Role
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

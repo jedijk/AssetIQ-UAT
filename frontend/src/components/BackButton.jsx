@@ -3,14 +3,14 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "./ui/button";
 
 /**
- * BackButton - A navigation back button that appears when user has navigation history
- * Shows contextual text based on where the user came from
+ * BackButton - A navigation back button that uses browser history
+ * Falls back to dashboard if no history exists
  */
-const BackButton = ({ className = "" }) => {
+const BackButton = ({ className = "", fallbackPath = "/dashboard" }) => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Check if we have a referrer in the state (set when navigating from Reliability Dashboard)
+  // Check if we have a referrer in the state (set when navigating from specific pages)
   const fromReliability = location.state?.from === "reliability";
   const fromPage = location.state?.fromPage;
   
@@ -18,9 +18,13 @@ const BackButton = ({ className = "" }) => {
     if (fromReliability) {
       // Navigate back to reliability performance dashboard
       navigate("/dashboard", { state: { activeTab: "reliability" } });
-    } else {
-      // Use browser back
+    } else if (window.history.length > 2) {
+      // Use browser history if we have previous pages
+      // window.history.length includes current page, so >2 means we have at least one previous page
       navigate(-1);
+    } else {
+      // Fallback to dashboard if no history
+      navigate(fallbackPath);
     }
   };
   

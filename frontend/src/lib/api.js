@@ -884,6 +884,16 @@ export const feedbackAPI = {
     return response.data;
   },
   
+  // Transcribe audio to text
+  transcribeAudio: async (audioBlob) => {
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'recording.webm');
+    const response = await api.post('/feedback/transcribe', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  
   // Get user's own feedback
   getMyFeedback: async () => {
     const response = await api.get('/feedback/my');
