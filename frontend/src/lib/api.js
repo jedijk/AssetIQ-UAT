@@ -918,6 +918,12 @@ export const feedbackAPI = {
     return response.data;
   },
   
+  // Bulk update status for multiple feedback items
+  bulkUpdateStatus: async (feedbackIds, status) => {
+    const response = await api.post('/feedback/bulk-status', { feedback_ids: feedbackIds, status });
+    return response.data;
+  },
+  
   // Generate AI prompt from selected feedback items
   generatePrompt: async (feedbackIds) => {
     const response = await api.post('/feedback/generate-prompt', { feedback_ids: feedbackIds });

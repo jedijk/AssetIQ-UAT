@@ -170,3 +170,32 @@ async def delete_user_feedback(feedback_id: str, user_id: str) -> bool:
         logger.info(f"Feedback {feedback_id} deleted by user {user_id}")
         return True
     return False
+
+
+async def bulk_update_status(
+    feedback_ids: List[str],
+    status: str,
+    user_id: str
+) -> dict:
+    """User: Bulk update status for multiple feedback items (user can only update their own)."""
+    if not feedback_ids:
+        return {"updated_count": 0, "feedback_ids": []}
+    
+    update_fields = {
+        "status": status,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    result = await db.feedback.update_many(
+        {"id": {"$in": feedback_ids}, "user_id": user_id},
+        {"$set": update_fields}
+    )
+    
+    updated_count = result.modified_count
+    logger.info(f"Bulk status update to '{status}' for {updated_count} feedback items by user {user_id}")
+    
+    return {
+        "updated_count": updated_count,
+        "status": status,
+        "feedback_ids": feedback_ids[:updated_count] if updated_count > 0 else []
+    }

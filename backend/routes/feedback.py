@@ -22,6 +22,7 @@ from services.feedback_service import (
     delete_feedback,
     update_user_feedback,
     delete_user_feedback,
+    bulk_update_status,
 )
 from storage import put_object, MIME_TYPES
 
@@ -222,6 +223,29 @@ async def delete_my_feedback(
     if not success:
         raise HTTPException(status_code=404, detail="Feedback not found or not owned by user")
     return {"status": "deleted", "id": feedback_id}
+
+
+@router.post("/bulk-status")
+async def bulk_update_feedback_status(
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Bulk update status for multiple feedback items (user can only update their own)."""
+    feedback_ids = data.get("feedback_ids", [])
+    status = data.get("status")
+    
+    if not feedback_ids:
+        raise HTTPException(status_code=400, detail="No feedback IDs provided")
+    
+    if not status:
+        raise HTTPException(status_code=400, detail="Status is required")
+    
+    valid_statuses = ["new", "in_review", "resolved", "planned", "wont_fix", "implemented", "parked", "rejected"]
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+    
+    result = await bulk_update_status(feedback_ids, status, current_user["id"])
+    return result
 
 
 # ===== Admin Endpoints =====

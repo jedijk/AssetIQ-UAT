@@ -5,7 +5,7 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Core Requirements
 - Authentication with JWT
-- Role-based access control (Owner, Admin, User)
+- Role-based access control (Owner, Admin, User, Custom roles)
 - Equipment hierarchy management
 - Threat/observation tracking
 - Causal investigation engine
@@ -18,11 +18,33 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - Backend: FastAPI with Motor (async MongoDB driver)
 - Database: MongoDB
 - Storage: Emergent Object Storage
-- AI: OpenAI GPT-5.2 via Emergent LLM Key
+- AI: OpenAI GPT-5.2, OpenAI Whisper via Emergent LLM Key
 
 ---
 
 ## Changelog
+
+### March 31, 2026 - Custom Roles, Voice-to-Text & Navigation Improvements
+**New Features:**
+1. ✅ Custom Role Creation in Permission Manager
+   - Backend: `POST /api/permissions/roles` creates custom roles with permissions copied from base role
+   - Backend: `DELETE /api/permissions/roles/{role_name}` deletes custom roles (with user assignment check)
+   - Frontend: "Create Role" dialog with role name, display name, description, and base role selector
+   - Custom roles show "Custom" badge and have delete button
+   
+2. ✅ Voice-to-Text for Feedback
+   - Backend: `POST /api/feedback/transcribe` using OpenAI Whisper via emergentintegrations
+   - Frontend: Auto-transcription after recording stops, text added to message field
+   - Supports WebM, MP3, WAV, and other audio formats (max 25MB)
+   
+3. ✅ Improved Navigation Behavior
+   - BackButton now uses browser history (navigate(-1)) with fallback to dashboard
+   - Checks window.history.length > 2 before using history navigation
+   
+4. ✅ Bulk Status Update in Feedback
+   - Backend: `POST /api/feedback/bulk-status` for batch status updates
+   - Frontend: "Bulk Status" dropdown in selection mode with status options
+   - Options: Implemented, Resolved, In Review, Parked, Rejected
 
 ### March 31, 2026 - Cascade Delete & Form Attachments
 **Improvements:**
@@ -84,18 +106,22 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Prioritized Backlog
 
-### P0 - Critical (Current Sprint)
+### P0 - Critical (Completed)
 - [x] Fix "Analyse with AI" in Observations - DONE
 - [x] Fix version management on Failure Modes - DONE (March 31, 2026)
 - [x] Cascade delete for Investigations (optionally delete Actions) - DONE (March 31, 2026)
 - [x] Cascade delete for Observations (optionally delete Actions & Investigations) - DONE (March 31, 2026)
 - [x] Fix attaching files to forms (pending documents on new templates) - DONE (March 31, 2026)
 
-### P1 - High (User's Priority List)
+### P1 - High (Completed)
 - [x] Equipment Manager restriction - only owner can add new installation - DONE (March 31, 2026)
 - [x] Create Permissions page under User Management (Role-based Read/Write) - DONE (March 31, 2026)
 - [x] Merge "Task Design" and "Plan" screens - DONE (March 31, 2026)
 - [x] Allow voice recording for feedback - DONE (March 31, 2026)
+- [x] Custom Role Creation in Permission Manager - DONE (March 31, 2026)
+- [x] Voice-to-Text for Feedback - DONE (March 31, 2026)
+- [x] Improve navigation behavior (browser history) - DONE (March 31, 2026)
+- [x] Bulk Complete action in Feedback - DONE (March 31, 2026)
 
 ### P2 - Medium
 - [ ] Implement report generation (PowerPoint/PDF) for Causal Investigations
@@ -117,19 +143,25 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ### Key Files
 - `/app/backend/server.py` - Main FastAPI entry point with /health endpoint
+- `/app/backend/routes/permissions.py` - Custom role CRUD and permissions management
+- `/app/backend/routes/feedback.py` - Feedback with audio transcription endpoint
 - `/app/backend/tests/conftest.py` - Centralized test configuration
 - `/app/backend/services/failure_modes_service.py` - Failure modes CRUD with versioning
 - `/app/backend/scripts/seed_failure_modes.py` - Auto-seeds static library to MongoDB
 - `/app/frontend/src/services/secureStorage.js` - Encrypted localStorage wrapper
-- `/app/frontend/src/pages/FailureModesPage.js` - FMEA library with version history dialog
+- `/app/frontend/src/pages/SettingsPermissionsPage.js` - Role management with create/delete
+- `/app/frontend/src/pages/FeedbackPage.js` - Feedback with voice-to-text transcription
+- `/app/frontend/src/components/BackButton.jsx` - Browser history navigation
 
 ### Security Considerations
 - Test credentials loaded from environment variables
 - localStorage data encrypted with AES-GCM via Web Crypto API
 - Session-scoped encryption keys stored in sessionStorage
+- Custom roles cannot override system roles
 
 ### Deployment Requirements
 - Health check endpoint: `GET /health` returns `{"status": "healthy"}`
 - Backend runs on port 8001
 - Frontend runs on port 3000
 - MongoDB connection via MONGO_URL environment variable
+- EMERGENT_LLM_KEY for AI features (GPT-5.2, Whisper)

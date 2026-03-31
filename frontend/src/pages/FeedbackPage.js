@@ -318,6 +318,30 @@ const FeedbackPage = () => {
     },
   });
 
+  // Mutation: Bulk update status
+  const bulkUpdateStatusMutation = useMutation({
+    mutationFn: ({ feedbackIds, status }) => feedbackAPI.bulkUpdateStatus(feedbackIds, status),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["my-feedback"]);
+      toast.success(t("feedback.bulkStatusUpdated")?.replace("{count}", data.updated_count) || `Updated ${data.updated_count} items`);
+      cancelSelection();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.detail || "Failed to update status");
+    },
+  });
+
+  const handleBulkStatusUpdate = (status) => {
+    if (selectedIds.size === 0) {
+      toast.error("Please select at least one feedback item");
+      return;
+    }
+    bulkUpdateStatusMutation.mutate({
+      feedbackIds: Array.from(selectedIds),
+      status: status
+    });
+  };
+
   const resetForm = () => {
     setFeedbackType("general");
     setMessage("");
@@ -874,6 +898,50 @@ const FeedbackPage = () => {
                         </>
                       )}
                     </Button>
+                    {/* Bulk Complete Button */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={selectedIds.size === 0 || bulkUpdateStatusMutation.isPending}
+                          className="text-xs sm:text-sm text-green-600 hover:text-green-700 border-green-200"
+                          data-testid="bulk-status-btn"
+                        >
+                          {bulkUpdateStatusMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                          )}
+                          <span className="hidden sm:inline">Bulk Status</span>
+                          <span className="sm:hidden">Status</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem onClick={() => handleBulkStatusUpdate("implemented")} className="text-emerald-600">
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Mark as Implemented
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleBulkStatusUpdate("resolved")} className="text-green-600">
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Mark as Resolved
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleBulkStatusUpdate("in_review")} className="text-amber-600">
+                          <Clock className="w-4 h-4 mr-2" />
+                          Mark as In Review
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleBulkStatusUpdate("parked")} className="text-orange-500">
+                          <Archive className="w-4 h-4 mr-2" />
+                          Mark as Parked
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleBulkStatusUpdate("rejected")} className="text-red-600">
+                          <Ban className="w-4 h-4 mr-2" />
+                          Mark as Rejected
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button
                       onClick={handleGeneratePrompt}
                       disabled={selectedIds.size === 0 || isGeneratingPrompt}
