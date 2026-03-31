@@ -398,14 +398,21 @@ const ThreatDetailPage = () => {
   }
 
   if (error || !threat) {
+    const errorMessage = error?.response?.data?.detail || error?.message || "Observation not found";
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl" data-testid="observation-not-found">
         <div className="text-center py-16">
           <XCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-slate-700 mb-2">Observation not found</h2>
-          <Button onClick={() => navigate("/threats")} variant="outline">
-            Back to Observations
-          </Button>
+          <h2 className="text-xl font-semibold text-slate-700 mb-2">{errorMessage}</h2>
+          <p className="text-sm text-slate-500 mb-4">ID: {id}</p>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={() => refetchThreat()} variant="outline">
+              Try Again
+            </Button>
+            <Button onClick={() => navigate("/threats")} variant="outline">
+              Back to Observations
+            </Button>
+          </div>
         </div>
       </div>
     );
