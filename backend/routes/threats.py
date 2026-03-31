@@ -1,7 +1,7 @@
 """
 Threats routes.
 """
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from typing import List, Optional
 from datetime import datetime, timezone
 import uuid
@@ -581,8 +581,50 @@ async def update_threat(
 @router.delete("/threats/{threat_id}")
 async def delete_threat(
     threat_id: str,
+    delete_actions: bool = Query(False, description="Also delete linked Central Actions"),
+    delete_investigations: bool = Query(False, description="Also delete linked Investigations"),
     current_user: dict = Depends(get_current_user)
 ):
+    """Delete a threat/observation. Optionally delete linked Actions and Investigations."""
+    deleted_actions_count = 0
+    deleted_investigations_count = 0
+    
+    # Optionally delete linked Central Actions
+    if delete_actions:
+        result = await db.central_actions.delete_many({
+            "source_type": "threat",
+            "source_id": threat_id
+        })
+        deleted_actions_count = result.deleted_count
+        logger.info(f"Deleted {deleted_actions_count} central actions linked to threat {threat_id}")
+    
+    # Optionally delete linked Investigations
+    if delete_investigations:
+        # Find all investigations linked to this threat
+        linked_investigations = await db.investigations.find({"threat_id": threat_id}).to_list(100)
+        
+        for inv in linked_investigations:
+            inv_id = inv.get("id")
+            # Delete investigation's internal data
+            await db.timeline_events.delete_many({"investigation_id": inv_id})
+            await db.failure_identifications.delete_many({"investigation_id": inv_id})
+            await db.cause_nodes.delete_many({"investigation_id": inv_id})
+            await db.action_items.delete_many({"investigation_id": inv_id})
+            await db.evidence_items.delete_many({"investigation_id": inv_id})
+            
+            # Also delete Central Actions linked to this investigation if delete_actions is true
+            if delete_actions:
+                result = await db.central_actions.delete_many({
+                    "source_type": "investigation",
+                    "source_id": inv_id
+                })
+                deleted_actions_count += result.deleted_count
+        
+        # Delete the investigations themselves
+        result = await db.investigations.delete_many({"threat_id": threat_id})
+        deleted_investigations_count = result.deleted_count
+        logger.info(f"Deleted {deleted_investigations_count} investigations linked to threat {threat_id}")
+    
     # Owner and admin can delete any threat
     if current_user.get("role") in ["owner", "admin"]:
         result = await db.threats.delete_one({"id": threat_id})
@@ -594,7 +636,11 @@ async def delete_threat(
         raise HTTPException(status_code=404, detail="Threat not found or you don't have permission to delete it")
     
     await update_all_ranks(current_user["id"])
-    return {"message": "Threat deleted"}
+    return {
+        "message": "Threat deleted",
+        "deleted_actions": deleted_actions_count,
+        "deleted_investigations": deleted_investigations_count
+    }
 
 
 @router.post("/threats/{threat_id}/link-equipment")
@@ -1257,7 +1303,7 @@ async def get_threat_timeline(
         if isinstance(date_str, str):
             try:
                 return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-            except:
+            except (ValueError, TypeError):
                 return datetime.min.replace(tzinfo=timezone.utc)
         return datetime.min.replace(tzinfo=timezone.utc)
     

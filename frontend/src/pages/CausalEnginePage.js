@@ -81,6 +81,7 @@ export default function CausalEnginePage() {
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false); // Completion confirmation
   const [editingItem, setEditingItem] = useState(null);
+  const [deleteInvOptions, setDeleteInvOptions] = useState({ deleteCentralActions: false }); // Delete options
   
   // Validation dialog state
   const [showValidateDialog, setShowValidateDialog] = useState(false);
@@ -378,13 +379,13 @@ export default function CausalEnginePage() {
   });
   
   const deleteInvMutation = useMutation({
-    mutationFn: async (id) => {
+    mutationFn: async ({ id, options }) => {
       // Get the investigation to delete before actually deleting
       const invToDelete = investigations.find(inv => inv.id === id);
-      const result = await investigationAPI.delete(id);
+      const result = await investigationAPI.delete(id, options);
       return { result, deletedInv: invToDelete };
     },
-    onSuccess: ({ deletedInv }) => {
+    onSuccess: ({ result, deletedInv }) => {
       if (deletedInv) {
         pushUndo({
           type: "DELETE_INVESTIGATION",
@@ -405,8 +406,11 @@ export default function CausalEnginePage() {
       }
       queryClient.invalidateQueries({ queryKey: ["investigations"] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      queryClient.invalidateQueries({ queryKey: ["actions"] }); // Refresh actions list
       setSelectedInvId(null);
-      toast.success("Deleted");
+      setDeleteInvOptions({ deleteCentralActions: false }); // Reset options
+      const actionsDeleted = result?.deleted_central_actions || 0;
+      toast.success(`Investigation deleted${actionsDeleted > 0 ? ` (${actionsDeleted} actions also removed)` : ''}`);
     },
   });
   
@@ -1034,11 +1038,38 @@ export default function CausalEnginePage() {
                           </Button>
                         )}
                         {!isInvestigationLocked && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="w-4 h-4" /></Button></AlertDialogTrigger>
+                          <AlertDialog onOpenChange={(open) => { if (!open) setDeleteInvOptions({ deleteCentralActions: false }); }}>
+                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500" data-testid="delete-investigation-btn"><Trash2 className="w-4 h-4" /></Button></AlertDialogTrigger>
                             <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>Delete Investigation</AlertDialogTitle><AlertDialogDescription>This will delete all data.</AlertDialogDescription></AlertDialogHeader>
-                              <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteInvMutation.mutate(selectedInvId)} className="bg-red-600">Delete</AlertDialogAction></AlertDialogFooter>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Investigation</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete this investigation and all its internal data (timeline events, failure identifications, causes, evidence).
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <div className="py-4 space-y-3">
+                                <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={deleteInvOptions.deleteCentralActions}
+                                    onChange={(e) => setDeleteInvOptions(prev => ({ ...prev, deleteCentralActions: e.target.checked }))}
+                                    className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                  />
+                                  <div>
+                                    <div className="font-medium text-slate-900">Also delete linked Actions</div>
+                                    <div className="text-sm text-slate-500">Remove all Central Actions created from this investigation</div>
+                                  </div>
+                                </label>
+                              </div>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => deleteInvMutation.mutate({ id: selectedInvId, options: deleteInvOptions })} 
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Delete Investigation
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
                         )}

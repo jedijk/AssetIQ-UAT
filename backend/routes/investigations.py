@@ -194,16 +194,28 @@ async def update_investigation(
 @router.delete("/investigations/{inv_id}")
 async def delete_investigation(
     inv_id: str,
+    delete_central_actions: bool = Query(False, description="Also delete linked Central Actions"),
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete an investigation and all related data."""
+    """Delete an investigation and all related data. Optionally delete linked Central Actions."""
     inv = await db.investigations.find_one(
         {"id": inv_id, "created_by": current_user["id"]}
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
-    # Delete all related data
+    deleted_actions_count = 0
+    
+    # Optionally delete linked Central Actions
+    if delete_central_actions:
+        result = await db.central_actions.delete_many({
+            "source_type": "investigation",
+            "source_id": inv_id
+        })
+        deleted_actions_count = result.deleted_count
+        logger.info(f"Deleted {deleted_actions_count} central actions linked to investigation {inv_id}")
+    
+    # Delete all related internal data (action_items are investigation-specific, not Central Actions)
     await db.timeline_events.delete_many({"investigation_id": inv_id})
     await db.failure_identifications.delete_many({"investigation_id": inv_id})
     await db.cause_nodes.delete_many({"investigation_id": inv_id})
@@ -211,7 +223,10 @@ async def delete_investigation(
     await db.evidence_items.delete_many({"investigation_id": inv_id})
     await db.investigations.delete_one({"id": inv_id})
     
-    return {"message": "Investigation deleted"}
+    return {
+        "message": "Investigation deleted",
+        "deleted_central_actions": deleted_actions_count
+    }
 
 
 # ============= TIMELINE EVENTS =============

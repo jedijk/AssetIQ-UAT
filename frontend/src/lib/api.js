@@ -120,8 +120,13 @@ export const threatsAPI = {
     return response.data;
   },
   
-  delete: async (id) => {
-    const response = await api.delete(`/threats/${id}`);
+  delete: async (id, options = {}) => {
+    const params = new URLSearchParams();
+    if (options.deleteActions) params.append('delete_actions', 'true');
+    if (options.deleteInvestigations) params.append('delete_investigations', 'true');
+    const queryString = params.toString();
+    const url = `/threats/${id}${queryString ? `?${queryString}` : ''}`;
+    const response = await api.delete(url);
     return response.data;
   },
   
@@ -172,8 +177,13 @@ export const observationsAPI = {
     return response.data;
   },
   
-  delete: async (id) => {
-    const response = await api.delete(`/observations/${id}`);
+  delete: async (id, options = {}) => {
+    const params = new URLSearchParams();
+    if (options.deleteActions) params.append('delete_actions', 'true');
+    if (options.deleteInvestigations) params.append('delete_investigations', 'true');
+    const queryString = params.toString();
+    const url = `/observations/${id}${queryString ? `?${queryString}` : ''}`;
+    const response = await api.delete(url);
     return response.data;
   },
   
@@ -453,8 +463,12 @@ export const investigationAPI = {
     return response.data;
   },
   
-  delete: async (id) => {
-    const response = await api.delete(`/investigations/${id}`);
+  delete: async (id, options = {}) => {
+    const params = new URLSearchParams();
+    if (options.deleteCentralActions) params.append('delete_central_actions', 'true');
+    const queryString = params.toString();
+    const url = `/investigations/${id}${queryString ? `?${queryString}` : ''}`;
+    const response = await api.delete(url);
     return response.data;
   },
   

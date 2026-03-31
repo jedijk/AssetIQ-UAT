@@ -124,6 +124,7 @@ const ThreatsPage = () => {
   const [assetsToFilter, setAssetsToFilter] = useState([]); // Array of asset names to filter by
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [threatToDelete, setThreatToDelete] = useState(null);
+  const [deleteOptions, setDeleteOptions] = useState({ deleteActions: false, deleteInvestigations: false });
 
   // Toggle status in multi-select
   const toggleStatus = (status) => {
@@ -225,13 +226,25 @@ const ThreatsPage = () => {
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id) => threatsAPI.delete(id),
-    onSuccess: () => {
+    mutationFn: ({ id, options }) => threatsAPI.delete(id, options),
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
-      toast.success("Observation deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: ["investigations"] });
+      const actionsDeleted = result?.deleted_actions || 0;
+      const investigationsDeleted = result?.deleted_investigations || 0;
+      let msg = "Observation deleted successfully";
+      if (actionsDeleted > 0 || investigationsDeleted > 0) {
+        const parts = [];
+        if (investigationsDeleted > 0) parts.push(`${investigationsDeleted} investigation(s)`);
+        if (actionsDeleted > 0) parts.push(`${actionsDeleted} action(s)`);
+        msg += ` (${parts.join(', ')} also removed)`;
+      }
+      toast.success(msg);
       setDeleteDialogOpen(false);
       setThreatToDelete(null);
+      setDeleteOptions({ deleteActions: false, deleteInvestigations: false });
     },
     onError: () => {
       toast.error("Failed to delete observation");
@@ -241,12 +254,13 @@ const ThreatsPage = () => {
   const handleDeleteClick = (e, threat) => {
     e.stopPropagation(); // Prevent navigation to detail page
     setThreatToDelete(threat);
+    setDeleteOptions({ deleteActions: false, deleteInvestigations: false });
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
     if (threatToDelete) {
-      deleteMutation.mutate(threatToDelete.id);
+      deleteMutation.mutate({ id: threatToDelete.id, options: deleteOptions });
     }
   };
 
@@ -682,7 +696,10 @@ const ThreatsPage = () => {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => { 
+        setDeleteDialogOpen(open); 
+        if (!open) setDeleteOptions({ deleteActions: false, deleteInvestigations: false });
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Observation</AlertDialogTitle>
@@ -690,6 +707,32 @@ const ThreatsPage = () => {
               Are you sure you want to delete "{threatToDelete?.title}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="py-4 space-y-3">
+            <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={deleteOptions.deleteInvestigations}
+                onChange={(e) => setDeleteOptions(prev => ({ ...prev, deleteInvestigations: e.target.checked }))}
+                className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+              />
+              <div>
+                <div className="font-medium text-slate-900">Also delete linked Investigations</div>
+                <div className="text-sm text-slate-500">Remove all Causal Investigations started from this observation</div>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={deleteOptions.deleteActions}
+                onChange={(e) => setDeleteOptions(prev => ({ ...prev, deleteActions: e.target.checked }))}
+                className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+              />
+              <div>
+                <div className="font-medium text-slate-900">Also delete linked Actions</div>
+                <div className="text-sm text-slate-500">Remove all Central Actions created from this observation{deleteOptions.deleteInvestigations ? ' and its investigations' : ''}</div>
+              </div>
+            </label>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction

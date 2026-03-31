@@ -163,20 +163,25 @@ async def close_observation(
 @router.delete("/observations/{obs_id}")
 async def delete_observation(
     obs_id: str,
+    delete_actions: bool = Query(False, description="Also delete linked Central Actions"),
+    delete_investigations: bool = Query(False, description="Also delete linked Investigations"),
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete an observation. Requires admin, owner, or reliability_engineer role."""
+    """Delete an observation. Optionally delete linked Actions and Investigations. Requires admin, owner, or reliability_engineer role."""
     # Check if user has permission to delete
     if current_user.get("role") not in ["admin", "owner", "reliability_engineer"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions to delete observations")
     
     from bson import ObjectId
+    from bson.errors import InvalidId
+    import logging
+    logger = logging.getLogger(__name__)
     
     # Try to find by ObjectId first, then by id field
     observation = None
     try:
         observation = await db.observations.find_one({"_id": ObjectId(obs_id)})
-    except:
+    except (TypeError, ValueError, InvalidId):
         pass
     
     if not observation:
@@ -185,16 +190,63 @@ async def delete_observation(
     if not observation:
         raise HTTPException(status_code=404, detail="Observation not found")
     
+    # Get the actual observation id (string) for linked queries
+    observation_id = observation.get("id") or str(observation.get("_id"))
+    
+    deleted_actions_count = 0
+    deleted_investigations_count = 0
+    
+    # Optionally delete linked Central Actions (source_type="threat" for observations)
+    if delete_actions:
+        result = await db.central_actions.delete_many({
+            "source_type": "threat",
+            "source_id": observation_id
+        })
+        deleted_actions_count = result.deleted_count
+        logger.info(f"Deleted {deleted_actions_count} central actions linked to observation {observation_id}")
+    
+    # Optionally delete linked Investigations
+    if delete_investigations:
+        # Find all investigations linked to this observation
+        linked_investigations = await db.investigations.find({"threat_id": observation_id}).to_list(100)
+        
+        for inv in linked_investigations:
+            inv_id = inv.get("id")
+            # Delete investigation's internal data
+            await db.timeline_events.delete_many({"investigation_id": inv_id})
+            await db.failure_identifications.delete_many({"investigation_id": inv_id})
+            await db.cause_nodes.delete_many({"investigation_id": inv_id})
+            await db.action_items.delete_many({"investigation_id": inv_id})
+            await db.evidence_items.delete_many({"investigation_id": inv_id})
+            
+            # Also delete Central Actions linked to this investigation if delete_actions is true
+            if delete_actions:
+                result = await db.central_actions.delete_many({
+                    "source_type": "investigation",
+                    "source_id": inv_id
+                })
+                deleted_actions_count += result.deleted_count
+        
+        # Delete the investigations themselves
+        result = await db.investigations.delete_many({"threat_id": observation_id})
+        deleted_investigations_count = result.deleted_count
+        logger.info(f"Deleted {deleted_investigations_count} investigations linked to observation {observation_id}")
+    
     # Delete the observation
     try:
         result = await db.observations.delete_one({"_id": observation["_id"]})
-    except:
+    except (TypeError, KeyError):
         result = await db.observations.delete_one({"id": obs_id})
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=500, detail="Failed to delete observation")
     
-    return {"status": "success", "message": "Observation deleted successfully"}
+    return {
+        "status": "success", 
+        "message": "Observation deleted successfully",
+        "deleted_actions": deleted_actions_count,
+        "deleted_investigations": deleted_investigations_count
+    }
 
 # --- AI Failure Mode Suggestions ---
 

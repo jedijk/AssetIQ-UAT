@@ -1,0 +1,95 @@
+{
+  "summary": "Tested cascade delete functionality for Investigations and Observations. All 5 features verified working: Investigation delete dialog shows 'Also delete linked Actions' checkbox, Observation delete dialog shows both 'Also delete linked Investigations' and 'Also delete linked Actions' checkboxes, DELETE endpoints accept cascade query parameters, cascade delete properly removes linked data, and Actions list refreshes after cascade delete.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/observations/{id}",
+        "issue": "Missing InvalidId exception handling for bson ObjectId conversion - FIXED",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_cascade_delete.py",
+    "/app/test_reports/pytest/pytest_cascade_delete.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "The cascade delete implementation correctly uses query parameters (delete_central_actions, delete_actions, delete_investigations) to control cascade behavior",
+    "Frontend properly passes options to API via URLSearchParams",
+    "Response includes deleted_central_actions/deleted_actions/deleted_investigations counts for UI feedback"
+  ],
+  "updated_files": [
+    "/app/backend/routes/observations.py",
+    "/app/backend/tests/test_cascade_delete.py"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7 tests passed)",
+    "frontend": "100% (all UI features verified via Playwright)"
+  },
+  "test_credentials": {
+    "admin": "test@test.com / test",
+    "owner": "jedijk@gmail.com / admin123"
+  },
+  "seed_data_creation": "Created and cleaned up TEST_CASCADE_DELETE_INVESTIGATION for testing",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Cascade delete functionality is fully working. The observations.py route was fixed to handle InvalidId exception from bson. All delete dialogs show appropriate checkboxes and cascade delete properly removes linked Central Actions and Investigations.",
+  "features_tested": {
+    "feature_1_investigation_delete_dialog": {
+      "description": "Investigation delete dialog shows 'Also delete linked Actions' checkbox",
+      "status": "PASS",
+      "details": "Dialog shows checkbox with label 'Also delete linked Actions' and description 'Remove all Central Actions created from this investigation'"
+    },
+    "feature_2_observation_delete_dialog": {
+      "description": "Observation delete dialog shows 'Also delete linked Investigations' and 'Also delete linked Actions' checkboxes",
+      "status": "PASS",
+      "details": "Dialog shows both checkboxes: 'Also delete linked Investigations' (Remove all Causal Investigations started from this observation) and 'Also delete linked Actions' (Remove all Central Actions created from this observation)"
+    },
+    "feature_3_investigation_cascade_delete_api": {
+      "description": "DELETE /api/investigations/{id}?delete_central_actions=true deletes linked actions",
+      "status": "PASS",
+      "details": "API correctly accepts delete_central_actions query parameter and deletes linked Central Actions with source_type='investigation'"
+    },
+    "feature_4_threat_cascade_delete_api": {
+      "description": "DELETE /api/threats/{id}?delete_actions=true&delete_investigations=true deletes linked data",
+      "status": "PASS",
+      "details": "API correctly accepts both delete_actions and delete_investigations query parameters. Deletes linked Central Actions (source_type='threat') and linked Investigations (via threat_id field)"
+    },
+    "feature_5_actions_list_refresh": {
+      "description": "After cascade delete, Actions list refreshes and linked actions are removed",
+      "status": "PASS",
+      "details": "Frontend invalidates 'actions' query cache after delete mutation, causing Actions list to refresh and show updated data"
+    }
+  },
+  "backend_tests": {
+    "test_delete_investigation_without_cascade": "PASS - Verified actions NOT deleted without cascade option",
+    "test_delete_investigation_with_cascade_actions": "PASS - Verified 3 linked actions deleted with cascade",
+    "test_delete_threat_without_cascade": "PASS - Verified endpoint works without cascade",
+    "test_threat_delete_endpoint_accepts_cascade_params": "PASS - Verified endpoint accepts cascade parameters",
+    "test_observation_delete_endpoint_accepts_cascade_params": "PASS - Verified endpoint accepts cascade parameters (after fix)",
+    "test_full_cascade_flow_investigation": "PASS - Full e2e flow: create investigation -> create actions -> cascade delete",
+    "test_investigation_delete_returns_action_count": "PASS - Response includes deleted_central_actions count"
+  },
+  "playwright_tests": {
+    "login": "PASS",
+    "navigate_to_observations": "PASS",
+    "observation_delete_dialog_checkboxes": "PASS - Found 2 checkboxes",
+    "navigate_to_causal_engine": "PASS",
+    "investigation_delete_dialog_checkbox": "PASS - Found 1 checkbox",
+    "create_test_investigation": "PASS",
+    "cleanup_test_data": "PASS"
+  },
+  "bug_fix_applied": {
+    "file": "/app/backend/routes/observations.py",
+    "line": "175-185",
+    "issue": "Missing InvalidId exception handling when converting obs_id to ObjectId",
+    "fix": "Added 'from bson.errors import InvalidId' and included InvalidId in the exception tuple"
+  }
+}
