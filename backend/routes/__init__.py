@@ -25,6 +25,7 @@ from routes.definitions import router as definitions_router
 from routes.users import router as users_router
 from routes.reports import router as reports_router
 from routes.assets import router as assets_router
+from routes.permissions import router as permissions_router
 
 all_routers = [
     auth_router,
@@ -51,4 +52,5 @@ all_routers = [
     users_router,
     reports_router,
     assets_router,
+    permissions_router,
 ]

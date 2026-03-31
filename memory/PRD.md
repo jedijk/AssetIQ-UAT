@@ -37,6 +37,11 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 4. ✅ Equipment Manager restriction - only owner can add installations
    - Backend: Added role check in `create_equipment_node` endpoint
    - Frontend: Hidden "Add Installation" button for non-owners in `EquipmentManagerPage.js`
+5. ✅ Permissions Management page created at `/settings/permissions`
+   - Backend: New `/api/permissions` routes for CRUD operations on role-based permissions
+   - Frontend: Full UI with role tabs, feature matrix, Read/Write/Delete toggles
+   - Default permissions for 6 roles: owner, admin, reliability_engineer, maintenance, operations, viewer
+   - Stored in MongoDB `permissions` collection, with reset-to-defaults option
 
 ### March 31, 2026 - Failure Mode Versioning Fix
 **Critical Fix:**
@@ -78,7 +83,7 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ### P1 - High (User's Priority List)
 - [x] Equipment Manager restriction - only owner can add new installation - DONE (March 31, 2026)
-- [ ] Create Permissions page under User Management (Role-based Read/Write)
+- [x] Create Permissions page under User Management (Role-based Read/Write) - DONE (March 31, 2026)
 - [ ] Merge "Task Design" and "Plan" screens
 - [ ] Allow voice recording for feedback
 

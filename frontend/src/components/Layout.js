@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield } from "lucide-react";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
 const APP_VERSION = process.env.REACT_APP_VERSION || "1.0.0";
@@ -151,15 +151,20 @@ const Layout = () => {
     { path: "/forms", label: t("forms.title"), icon: FileText, desktopOnly: true },
     { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users },
+    { path: "/settings/permissions", label: t("nav.permissions") || "Permissions", icon: Shield, ownerOnly: true },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders },
     { path: "/settings/feedback", label: t("nav.feedback") || "Feedback", icon: MessageCircleQuestion },
   ];
   
-  // Filter settings items based on device
-  const settingsMenuItems = isMobileView
-    ? allSettingsMenuItems.filter(item => !item.desktopOnly)
-    : allSettingsMenuItems;
+  // Filter settings items based on device and user role
+  const settingsMenuItems = allSettingsMenuItems.filter(item => {
+    // Filter desktop-only items for mobile
+    if (isMobileView && item.desktopOnly) return false;
+    // Filter owner-only items for non-owners
+    if (item.ownerOnly && user?.role !== 'owner') return false;
+    return true;
+  });
 
   return (
     <div className="app-container">
