@@ -25,6 +25,12 @@ for router in all_routers:
 
 app.include_router(api_router)
 
+# Health check endpoint (required for Emergent deployment)
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for deployment."""
+    return {"status": "healthy"}
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
