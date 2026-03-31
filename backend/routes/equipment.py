@@ -140,6 +140,69 @@ async def get_disciplines():
     """Get all disciplines."""
     return {"disciplines": [d.value for d in Discipline]}
 
+@router.get("/equipment-hierarchy/search")
+async def search_equipment(
+    q: str,
+    limit: int = 10,
+    current_user: dict = Depends(get_current_user)
+):
+    """Search equipment hierarchy by name."""
+    if not q or len(q) < 2:
+        return {"results": []}
+    
+    # Get user's assigned installations for filtering
+    assigned = current_user.get("assigned_installations", [])
+    
+    # Build installation filter
+    installation_ids = []
+    if assigned:
+        # Get IDs of assigned installations
+        installations = await db.equipment_nodes.find(
+            {"level": "installation", "name": {"$in": assigned}},
+            {"_id": 0, "id": 1}
+        ).to_list(100)
+        installation_ids = [i["id"] for i in installations]
+    
+    # Search query - case insensitive
+    search_filter = {
+        "name": {"$regex": q, "$options": "i"}
+    }
+    
+    # Apply installation filter if user has assigned installations
+    if installation_ids:
+        search_filter["$or"] = [
+            {"installation_id": {"$in": installation_ids}},
+            {"id": {"$in": installation_ids}},  # Include the installations themselves
+        ]
+    
+    # Search equipment nodes
+    nodes = await db.equipment_nodes.find(
+        search_filter,
+        {"_id": 0, "id": 1, "name": 1, "level": 1, "parent_id": 1, "full_path": 1}
+    ).limit(limit).to_list(limit)
+    
+    # Build path for nodes without full_path
+    for node in nodes:
+        if not node.get("full_path"):
+            # Build path from parent chain
+            path_parts = [node["name"]]
+            current = node
+            depth = 0
+            while current.get("parent_id") and depth < 10:
+                parent = await db.equipment_nodes.find_one(
+                    {"id": current["parent_id"]},
+                    {"_id": 0, "name": 1, "parent_id": 1}
+                )
+                if parent:
+                    path_parts.insert(0, parent["name"])
+                    current = parent
+                else:
+                    break
+                depth += 1
+            node["path"] = " > ".join(path_parts)
+    
+    return {"results": nodes}
+
 @router.get("/equipment-hierarchy/criticality-profiles")
 async def get_criticality_profiles():
     """Get all criticality profiles."""

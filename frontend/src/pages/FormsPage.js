@@ -40,6 +40,7 @@ import {
   Loader2,
   ExternalLink,
   Sparkles,
+  Building2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -97,6 +98,7 @@ const FIELD_TYPES = [
   { value: "file", label: "File Upload", icon: Upload, description: "File attachment" },
   { value: "image", label: "Image", icon: Upload, description: "Image upload" },
   { value: "signature", label: "Signature", icon: Signature, description: "Digital signature" },
+  { value: "equipment", label: "Equipment", icon: Building2, description: "Select from equipment hierarchy" },
 ];
 
 // API functions
@@ -1385,6 +1387,12 @@ const FormsPage = () => {
                                   </div>
                                 </div>
                               )}
+                              {field.field_type === "equipment" && (
+                                <div className="flex items-center gap-2 p-2.5 border border-slate-200 rounded-lg bg-slate-50">
+                                  <Building2 className="w-4 h-4 text-slate-400" />
+                                  <span className="text-sm text-slate-500">Search equipment...</span>
+                                </div>
+                              )}
                             </div>
                           ))}
 
@@ -1514,6 +1522,12 @@ const FormsPage = () => {
                                   <span>Min</span>
                                   <span>Max</span>
                                 </div>
+                              </div>
+                            )}
+                            {field.field_type === "equipment" && (
+                              <div className="flex items-center gap-2 p-2 border border-slate-200 rounded-lg bg-slate-50">
+                                <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                                <span className="text-xs text-slate-500">Search equipment...</span>
                               </div>
                             )}
                           </div>

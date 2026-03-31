@@ -44,6 +44,7 @@ import {
   RefreshCw,
   CloudOff,
   Cloud,
+  Building2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -375,6 +376,9 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   const [analyzingImage, setAnalyzingImage] = useState(null); // Currently analyzing field id
   const [attachments, setAttachments] = useState([]); // Completion attachments
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [equipmentSearch, setEquipmentSearch] = useState({}); // Search query per equipment field
+  const [equipmentResults, setEquipmentResults] = useState({}); // Search results per equipment field
+  const [searchingEquipment, setSearchingEquipment] = useState(null); // Currently searching field id
   
   // Reset form when task changes
   useEffect(() => {
@@ -395,6 +399,30 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   
   // Build form fields from task template
   const formFields = task?.form_fields || task?.template?.form_fields || [];
+  
+  // Search equipment by name
+  const searchEquipment = async (fieldId, query) => {
+    if (!query || query.length < 2) {
+      setEquipmentResults(prev => ({ ...prev, [fieldId]: [] }));
+      return;
+    }
+    
+    setSearchingEquipment(fieldId);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/equipment-hierarchy/search?q=${encodeURIComponent(query)}&limit=10`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setEquipmentResults(prev => ({ ...prev, [fieldId]: data.results || data.nodes || [] }));
+      }
+    } catch (error) {
+      console.error("Equipment search failed:", error);
+    } finally {
+      setSearchingEquipment(null);
+    }
+  };
   
   // Check if all required fields are filled
   const validateForm = () => {
@@ -894,6 +922,104 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                 </label>
               )}
             </div>
+            {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+          </div>
+        );
+        
+      case "equipment":
+        const selectedEquipment = value;
+        const searchQuery = equipmentSearch[field.id] || "";
+        const results = equipmentResults[field.id] || [];
+        const isSearching = searchingEquipment === field.id;
+        
+        return (
+          <div key={field.id} className="space-y-1.5">
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </Label>
+            
+            {/* Selected Equipment Display */}
+            {selectedEquipment && (
+              <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-lg mb-2">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">{selectedEquipment.name}</p>
+                    {selectedEquipment.path && (
+                      <p className="text-xs text-blue-600">{selectedEquipment.path}</p>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleFieldChange(field.id, null)}
+                  className="h-7 w-7 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+            
+            {/* Search Input */}
+            {!selectedEquipment && (
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => {
+                      const q = e.target.value;
+                      setEquipmentSearch(prev => ({ ...prev, [field.id]: q }));
+                      searchEquipment(field.id, q);
+                    }}
+                    placeholder="Search equipment..."
+                    className={cn("pl-9", mobileInputClass)}
+                  />
+                  {isSearching && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
+                  )}
+                </div>
+                
+                {/* Search Results Dropdown */}
+                {results.length > 0 && searchQuery && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {results.map((eq) => (
+                      <button
+                        key={eq.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 border-b border-slate-100 last:border-0"
+                        onClick={() => {
+                          handleFieldChange(field.id, {
+                            id: eq.id,
+                            name: eq.name,
+                            path: eq.path || eq.full_path,
+                            level: eq.level
+                          });
+                          setEquipmentSearch(prev => ({ ...prev, [field.id]: "" }));
+                          setEquipmentResults(prev => ({ ...prev, [field.id]: [] }));
+                        }}
+                      >
+                        <Building2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{eq.name}</p>
+                          {(eq.path || eq.full_path) && (
+                            <p className="text-xs text-slate-500 truncate">{eq.path || eq.full_path}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {searchQuery && results.length === 0 && !isSearching && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-center">
+                    <p className="text-sm text-slate-500">No equipment found</p>
+                  </div>
+                )}
+              </div>
+            )}
+            
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
           </div>
         );
