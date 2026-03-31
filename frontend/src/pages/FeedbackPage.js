@@ -195,7 +195,15 @@ const FeedbackPage = () => {
           const uploadResult = await feedbackAPI.uploadScreenshot(screenshotFile);
           screenshotUrl = uploadResult.url;
         } catch (error) {
-          throw new Error("Failed to upload screenshot");
+          setIsUploading(false);
+          // Provide more specific error messages
+          if (error.code === 'ERR_NETWORK' || error.message?.includes('network')) {
+            throw new Error("Network error - please check your connection and try again");
+          }
+          if (error.response?.status === 413) {
+            throw new Error("Screenshot file is too large. Please use a smaller image.");
+          }
+          throw new Error("Failed to upload screenshot. Please try again.");
         }
         setIsUploading(false);
       }
@@ -213,7 +221,18 @@ const FeedbackPage = () => {
       setIsModalOpen(false);
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to submit feedback");
+      // More specific error handling
+      let errorMessage = "Failed to submit feedback";
+      if (error.code === 'ERR_NETWORK' || error.message?.includes('network')) {
+        errorMessage = "Network error - please check your connection and try again";
+      } else if (error.response?.status === 401) {
+        errorMessage = "Session expired - please log in again";
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      toast.error(errorMessage);
       setIsUploading(false);
     },
   });
