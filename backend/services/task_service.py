@@ -888,7 +888,7 @@ class TaskService:
             if isinstance(next_due, str):
                 try:
                     next_due = datetime.fromisoformat(next_due.replace("Z", "+00:00"))
-                except:
+                except (ValueError, TypeError):
                     continue  # Skip if can't parse
             
             if next_due is None:
@@ -907,7 +907,7 @@ class TaskService:
                 if isinstance(effective_until, str):
                     try:
                         effective_until = datetime.fromisoformat(effective_until.replace("Z", "+00:00"))
-                    except:
+                    except (ValueError, TypeError):
                         effective_until = None
                 
                 if effective_until and effective_until.tzinfo is None:

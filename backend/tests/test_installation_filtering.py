@@ -7,47 +7,17 @@ Key behaviors:
 - Stats, threats, actions, equipment all respect installation filtering
 """
 import pytest
-import requests
-import os
-
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
-
-# Test credentials from test_credentials.md
-TEST_USER_EMAIL = "test@test.com"
-TEST_USER_PASSWORD = "test"
-
-# Jaap user (also has Tyromer assigned per the review request)
-JAAP_USER_EMAIL = "jedijk@gmail.com"
+from conftest import BASE_URL, TEST_ADMIN_EMAIL
 
 
 class TestInstallationFiltering:
     """Test installation-based data filtering across all endpoints."""
     
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        """Setup test session with authentication."""
-        self.session = requests.Session()
-        self.session.headers.update({"Content-Type": "application/json"})
-        
-        # Login with test user
-        login_response = self.session.post(f"{BASE_URL}/api/auth/login", json={
-            "email": TEST_USER_EMAIL,
-            "password": TEST_USER_PASSWORD
-        })
-        
-        if login_response.status_code == 200:
-            data = login_response.json()
-            self.token = data.get("access_token") or data.get("token")
-            self.session.headers.update({"Authorization": f"Bearer {self.token}"})
-            self.user = data.get("user", {})
-        else:
-            pytest.skip(f"Authentication failed: {login_response.status_code}")
-    
     # ============= STATS ENDPOINT TESTS =============
     
-    def test_stats_endpoint_returns_filtered_counts(self):
+    def test_stats_endpoint_returns_filtered_counts(self, authenticated_client):
         """Test /api/stats returns counts filtered by assigned installations."""
-        response = self.session.get(f"{BASE_URL}/api/stats")
+        response = authenticated_client.get(f"{BASE_URL}/api/stats")
         assert response.status_code == 200, f"Stats endpoint failed: {response.text}"
         
         data = response.json()
@@ -67,9 +37,9 @@ class TestInstallationFiltering:
     
     # ============= THREATS ENDPOINT TESTS =============
     
-    def test_threats_endpoint_returns_filtered_threats(self):
+    def test_threats_endpoint_returns_filtered_threats(self, authenticated_client):
         """Test /api/threats returns threats filtered by assigned installations."""
-        response = self.session.get(f"{BASE_URL}/api/threats")
+        response = authenticated_client.get(f"{BASE_URL}/api/threats")
         assert response.status_code == 200, f"Threats endpoint failed: {response.text}"
         
         threats = response.json()
@@ -86,9 +56,9 @@ class TestInstallationFiltering:
             assert "title" in threat, "Threat missing title"
             assert "risk_score" in threat, "Threat missing risk_score"
     
-    def test_top_threats_endpoint_returns_filtered_threats(self):
+    def test_top_threats_endpoint_returns_filtered_threats(self, authenticated_client):
         """Test /api/threats/top returns top threats filtered by installations."""
-        response = self.session.get(f"{BASE_URL}/api/threats/top?limit=10")
+        response = authenticated_client.get(f"{BASE_URL}/api/threats/top?limit=10")
         assert response.status_code == 200, f"Top threats endpoint failed: {response.text}"
         
         threats = response.json()
@@ -99,9 +69,9 @@ class TestInstallationFiltering:
     
     # ============= ACTIONS ENDPOINT TESTS =============
     
-    def test_actions_endpoint_returns_filtered_actions(self):
+    def test_actions_endpoint_returns_filtered_actions(self, authenticated_client):
         """Test /api/actions returns actions filtered by assigned installations."""
-        response = self.session.get(f"{BASE_URL}/api/actions")
+        response = authenticated_client.get(f"{BASE_URL}/api/actions")
         assert response.status_code == 200, f"Actions endpoint failed: {response.text}"
         
         data = response.json()
@@ -119,9 +89,9 @@ class TestInstallationFiltering:
     
     # ============= EQUIPMENT HIERARCHY TESTS =============
     
-    def test_equipment_nodes_returns_filtered_nodes(self):
+    def test_equipment_nodes_returns_filtered_nodes(self, authenticated_client):
         """Test /api/equipment-hierarchy/nodes returns nodes filtered by installations."""
-        response = self.session.get(f"{BASE_URL}/api/equipment-hierarchy/nodes")
+        response = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/nodes")
         assert response.status_code == 200, f"Equipment nodes endpoint failed: {response.text}"
         
         data = response.json()
@@ -139,9 +109,9 @@ class TestInstallationFiltering:
             assert "name" in node, "Node missing name"
             assert "level" in node, "Node missing level"
     
-    def test_hierarchy_stats_returns_filtered_stats(self):
+    def test_hierarchy_stats_returns_filtered_stats(self, authenticated_client):
         """Test /api/equipment-hierarchy/stats returns stats filtered by installations."""
-        response = self.session.get(f"{BASE_URL}/api/equipment-hierarchy/stats")
+        response = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/stats")
         assert response.status_code == 200, f"Hierarchy stats endpoint failed: {response.text}"
         
         data = response.json()
@@ -153,19 +123,19 @@ class TestInstallationFiltering:
     
     # ============= USER MANAGEMENT TESTS =============
     
-    def test_user_has_assigned_installations_via_rbac(self):
+    def test_user_has_assigned_installations_via_rbac(self, authenticated_client, admin_credentials):
         """Test that user's assigned_installations can be retrieved via RBAC endpoint."""
         # Note: /api/auth/me doesn't include assigned_installations (by design)
         # The assigned_installations field is available via RBAC users endpoint
-        response = self.session.get(f"{BASE_URL}/api/rbac/users")
+        response = authenticated_client.get(f"{BASE_URL}/api/rbac/users")
         assert response.status_code == 200, f"RBAC users endpoint failed: {response.text}"
         
         data = response.json()
         users = data.get("users", [])
         
-        # Find the current user (test@test.com)
-        current_user = next((u for u in users if u.get("email") == TEST_USER_EMAIL), None)
-        assert current_user is not None, f"Current user {TEST_USER_EMAIL} not found in users list"
+        # Find the current user
+        current_user = next((u for u in users if u.get("email") == admin_credentials["email"]), None)
+        assert current_user is not None, f"Current user {admin_credentials['email']} not found in users list"
         
         # Check assigned_installations field exists
         assert "assigned_installations" in current_user, "User missing assigned_installations field"
@@ -176,9 +146,9 @@ class TestInstallationFiltering:
         # Verify the test user has Tyromer assigned (per the review request)
         assert "Tyromer" in installations, f"Expected Tyromer in installations, got: {installations}"
     
-    def test_rbac_users_includes_installations_column(self):
+    def test_rbac_users_includes_installations_column(self, authenticated_client):
         """Test that RBAC users endpoint includes assigned_installations for each user."""
-        response = self.session.get(f"{BASE_URL}/api/rbac/users")
+        response = authenticated_client.get(f"{BASE_URL}/api/rbac/users")
         assert response.status_code == 200, f"RBAC users endpoint failed: {response.text}"
         
         data = response.json()
@@ -193,9 +163,9 @@ class TestInstallationFiltering:
     
     # ============= INSTALLATIONS ENDPOINT TESTS =============
     
-    def test_get_all_installations_endpoint(self):
+    def test_get_all_installations_endpoint(self, authenticated_client):
         """Test /api/equipment-hierarchy/installations returns all available installations."""
-        response = self.session.get(f"{BASE_URL}/api/equipment-hierarchy/installations")
+        response = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/installations")
         assert response.status_code == 200, f"Installations endpoint failed: {response.text}"
         
         data = response.json()
@@ -210,15 +180,15 @@ class TestInstallationFiltering:
     
     # ============= CONSISTENCY TESTS =============
     
-    def test_stats_and_threats_count_consistency(self):
+    def test_stats_and_threats_count_consistency(self, authenticated_client):
         """Test that stats total_threats matches actual threats count."""
         # Get stats
-        stats_response = self.session.get(f"{BASE_URL}/api/stats")
+        stats_response = authenticated_client.get(f"{BASE_URL}/api/stats")
         assert stats_response.status_code == 200
         stats = stats_response.json()
         
         # Get threats
-        threats_response = self.session.get(f"{BASE_URL}/api/threats?limit=1000")
+        threats_response = authenticated_client.get(f"{BASE_URL}/api/threats?limit=1000")
         assert threats_response.status_code == 200
         threats = threats_response.json()
         
@@ -233,15 +203,15 @@ class TestInstallationFiltering:
         assert abs(stats_total - actual_count) <= actual_count * 0.5, \
             f"Stats total ({stats_total}) differs significantly from actual count ({actual_count})"
     
-    def test_equipment_stats_and_nodes_count_consistency(self):
+    def test_equipment_stats_and_nodes_count_consistency(self, authenticated_client):
         """Test that equipment stats total_nodes matches actual nodes count."""
         # Get stats
-        stats_response = self.session.get(f"{BASE_URL}/api/equipment-hierarchy/stats")
+        stats_response = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/stats")
         assert stats_response.status_code == 200
         stats = stats_response.json()
         
         # Get nodes
-        nodes_response = self.session.get(f"{BASE_URL}/api/equipment-hierarchy/nodes")
+        nodes_response = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/nodes")
         assert nodes_response.status_code == 200
         nodes_data = nodes_response.json()
         
@@ -258,28 +228,9 @@ class TestInstallationFiltering:
 class TestInstallationFilteringEdgeCases:
     """Test edge cases for installation filtering."""
     
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        """Setup test session with authentication."""
-        self.session = requests.Session()
-        self.session.headers.update({"Content-Type": "application/json"})
-        
-        # Login with test user
-        login_response = self.session.post(f"{BASE_URL}/api/auth/login", json={
-            "email": TEST_USER_EMAIL,
-            "password": TEST_USER_PASSWORD
-        })
-        
-        if login_response.status_code == 200:
-            data = login_response.json()
-            self.token = data.get("access_token") or data.get("token")
-            self.session.headers.update({"Authorization": f"Bearer {self.token}"})
-        else:
-            pytest.skip(f"Authentication failed: {login_response.status_code}")
-    
-    def test_threats_with_status_filter(self):
+    def test_threats_with_status_filter(self, authenticated_client):
         """Test threats endpoint with status filter still respects installation filtering."""
-        response = self.session.get(f"{BASE_URL}/api/threats?status=Open")
+        response = authenticated_client.get(f"{BASE_URL}/api/threats?status=Open")
         assert response.status_code == 200, f"Threats with status filter failed: {response.text}"
         
         threats = response.json()
@@ -291,10 +242,10 @@ class TestInstallationFilteringEdgeCases:
         
         print(f"Open threats: {len(threats)}")
     
-    def test_actions_with_filters(self):
+    def test_actions_with_filters(self, authenticated_client):
         """Test actions endpoint with various filters."""
         # Test with status filter
-        response = self.session.get(f"{BASE_URL}/api/actions?status=open")
+        response = authenticated_client.get(f"{BASE_URL}/api/actions?status=open")
         assert response.status_code == 200
         
         data = response.json()
@@ -306,9 +257,9 @@ class TestInstallationFilteringEdgeCases:
         
         print(f"Open actions: {len(actions)}")
     
-    def test_equipment_nodes_structure(self):
+    def test_equipment_nodes_structure(self, authenticated_client):
         """Test that equipment nodes have proper hierarchy structure."""
-        response = self.session.get(f"{BASE_URL}/api/equipment-hierarchy/nodes")
+        response = authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/nodes")
         assert response.status_code == 200
         
         nodes = response.json().get("nodes", [])

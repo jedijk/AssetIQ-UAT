@@ -2,76 +2,39 @@
 Test suite for ThreatBase v2 AI Risk Engine endpoints
 Tests: AI Risk Analysis, Causal Intelligence, Fault Tree, Bow-Tie, Action Optimization
 """
-
 import pytest
 import requests
-import os
-import time
-
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
-
-# Test credentials
-TEST_EMAIL = "test@test.com"
-TEST_PASSWORD = "test"
-
-# Test threat ID provided by main agent
-TEST_THREAT_ID = "43455566-4f46-4c54-8130-fdd7a7d009a1"
-
-
-@pytest.fixture(scope="module")
-def auth_token():
-    """Get authentication token for test user"""
-    response = requests.post(f"{BASE_URL}/api/auth/login", json={
-        "email": TEST_EMAIL,
-        "password": TEST_PASSWORD
-    })
-    if response.status_code == 200:
-        return response.json().get("token")
-    pytest.skip(f"Authentication failed: {response.status_code} - {response.text}")
-
-
-@pytest.fixture(scope="module")
-def authenticated_client(auth_token):
-    """Session with auth header"""
-    session = requests.Session()
-    session.headers.update({
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {auth_token}"
-    })
-    return session
+from conftest import BASE_URL
 
 
 class TestAuthAndThreatAccess:
     """Verify auth and threat access before AI tests"""
     
-    def test_login_success(self):
+    def test_login_success(self, api_client, admin_credentials):
         """Test login with test credentials"""
-        response = requests.post(f"{BASE_URL}/api/auth/login", json={
-            "email": TEST_EMAIL,
-            "password": TEST_PASSWORD
-        })
+        response = api_client.post(f"{BASE_URL}/api/auth/login", json=admin_credentials)
         assert response.status_code == 200, f"Login failed: {response.text}"
         data = response.json()
         assert "token" in data
         assert "user" in data
-        print(f"✓ Login successful for {TEST_EMAIL}")
+        print(f"✓ Login successful for {admin_credentials['email']}")
     
-    def test_threat_exists(self, authenticated_client):
+    def test_threat_exists(self, authenticated_client, test_threat_id):
         """Verify test threat exists"""
-        response = authenticated_client.get(f"{BASE_URL}/api/threats/{TEST_THREAT_ID}")
+        response = authenticated_client.get(f"{BASE_URL}/api/threats/{test_threat_id}")
         assert response.status_code == 200, f"Threat not found: {response.text}"
         threat = response.json()
-        assert threat["id"] == TEST_THREAT_ID
+        assert threat["id"] == test_threat_id
         print(f"✓ Test threat found: {threat.get('title', 'Unknown')}")
 
 
 class TestAIRiskAnalysis:
     """Test AI Risk Analysis endpoints (Phase 1)"""
     
-    def test_analyze_risk_endpoint(self, authenticated_client):
+    def test_analyze_risk_endpoint(self, authenticated_client, test_threat_id):
         """POST /api/ai/analyze-risk/{threat_id} - Generate AI risk analysis"""
         response = authenticated_client.post(
-            f"{BASE_URL}/api/ai/analyze-risk/{TEST_THREAT_ID}",
+            f"{BASE_URL}/api/ai/analyze-risk/{test_threat_id}",
             json={
                 "include_forecast": True,
                 "forecast_days": 7,
@@ -105,9 +68,9 @@ class TestAIRiskAnalysis:
         
         print(f"✓ AI Risk Analysis: Score={dynamic_risk['risk_score']}, Probability={dynamic_risk['failure_probability']}%, Trend={dynamic_risk['trend']}")
     
-    def test_get_risk_insights_cached(self, authenticated_client):
+    def test_get_risk_insights_cached(self, authenticated_client, test_threat_id):
         """GET /api/ai/risk-insights/{threat_id} - Get cached risk insights"""
-        response = authenticated_client.get(f"{BASE_URL}/api/ai/risk-insights/{TEST_THREAT_ID}")
+        response = authenticated_client.get(f"{BASE_URL}/api/ai/risk-insights/{test_threat_id}")
         
         # Should return cached data after analysis
         assert response.status_code == 200, f"Get risk insights failed: {response.text}"
@@ -115,7 +78,7 @@ class TestAIRiskAnalysis:
         data = response.json()
         assert "threat_id" in data
         assert "dynamic_risk" in data
-        assert data["threat_id"] == TEST_THREAT_ID
+        assert data["threat_id"] == test_threat_id
         
         print(f"✓ Cached risk insights retrieved successfully")
     
@@ -134,10 +97,10 @@ class TestAIRiskAnalysis:
 class TestCausalIntelligence:
     """Test Causal Intelligence endpoints (Phase 2)"""
     
-    def test_generate_causes_endpoint(self, authenticated_client):
+    def test_generate_causes_endpoint(self, authenticated_client, test_threat_id):
         """POST /api/ai/generate-causes/{threat_id} - Generate probable causes"""
         response = authenticated_client.post(
-            f"{BASE_URL}/api/ai/generate-causes/{TEST_THREAT_ID}",
+            f"{BASE_URL}/api/ai/generate-causes/{test_threat_id}",
             json={
                 "max_causes": 5,
                 "include_evidence": True,
@@ -175,22 +138,22 @@ class TestCausalIntelligence:
         for i, cause in enumerate(probable_causes[:3], 1):
             print(f"  {i}. {cause['description'][:50]}... ({cause['probability']}%)")
     
-    def test_get_causal_analysis_cached(self, authenticated_client):
+    def test_get_causal_analysis_cached(self, authenticated_client, test_threat_id):
         """GET /api/ai/causal-analysis/{threat_id} - Get cached causal analysis"""
-        response = authenticated_client.get(f"{BASE_URL}/api/ai/causal-analysis/{TEST_THREAT_ID}")
+        response = authenticated_client.get(f"{BASE_URL}/api/ai/causal-analysis/{test_threat_id}")
         
         assert response.status_code == 200, f"Get causal analysis failed: {response.text}"
         
         data = response.json()
         assert "threat_id" in data
         assert "probable_causes" in data
-        assert data["threat_id"] == TEST_THREAT_ID
+        assert data["threat_id"] == test_threat_id
         
         print(f"✓ Cached causal analysis retrieved successfully")
     
-    def test_explain_endpoint(self, authenticated_client):
+    def test_explain_endpoint(self, authenticated_client, test_threat_id):
         """POST /api/ai/explain/{threat_id} - 'Why is this happening?' endpoint"""
-        response = authenticated_client.post(f"{BASE_URL}/api/ai/explain/{TEST_THREAT_ID}")
+        response = authenticated_client.post(f"{BASE_URL}/api/ai/explain/{test_threat_id}")
         
         assert response.status_code == 200, f"Explain endpoint failed: {response.text}"
         
@@ -204,10 +167,10 @@ class TestCausalIntelligence:
 class TestFaultTree:
     """Test Fault Tree generation endpoints"""
     
-    def test_generate_fault_tree(self, authenticated_client):
+    def test_generate_fault_tree(self, authenticated_client, test_threat_id):
         """POST /api/ai/fault-tree/{threat_id} - Generate fault tree"""
         response = authenticated_client.post(
-            f"{BASE_URL}/api/ai/fault-tree/{TEST_THREAT_ID}",
+            f"{BASE_URL}/api/ai/fault-tree/{test_threat_id}",
             json={
                 "max_depth": 4,
                 "include_probabilities": True
@@ -235,9 +198,9 @@ class TestFaultTree:
         
         print(f"✓ Fault Tree generated: {data['total_nodes']} nodes, Top Event: {data['top_event'][:50]}...")
     
-    def test_get_fault_tree_cached(self, authenticated_client):
+    def test_get_fault_tree_cached(self, authenticated_client, test_threat_id):
         """GET /api/ai/fault-tree/{threat_id} - Get cached fault tree"""
-        response = authenticated_client.get(f"{BASE_URL}/api/ai/fault-tree/{TEST_THREAT_ID}")
+        response = authenticated_client.get(f"{BASE_URL}/api/ai/fault-tree/{test_threat_id}")
         
         assert response.status_code == 200, f"Get fault tree failed: {response.text}"
         
@@ -251,9 +214,9 @@ class TestFaultTree:
 class TestBowTieModel:
     """Test Bow-Tie model generation endpoints"""
     
-    def test_generate_bow_tie(self, authenticated_client):
+    def test_generate_bow_tie(self, authenticated_client, test_threat_id):
         """POST /api/ai/bow-tie/{threat_id} - Generate bow-tie model"""
-        response = authenticated_client.post(f"{BASE_URL}/api/ai/bow-tie/{TEST_THREAT_ID}")
+        response = authenticated_client.post(f"{BASE_URL}/api/ai/bow-tie/{test_threat_id}")
         
         assert response.status_code == 200, f"Generate bow-tie failed: {response.status_code} - {response.text}"
         
@@ -290,9 +253,9 @@ class TestBowTieModel:
         print(f"✓ Bow-Tie Model: Hazard='{data['hazard'][:30]}...', {len(data['causes'])} causes, {len(data['consequences'])} consequences")
         print(f"  Barriers: {len(data['preventive_barriers'])} preventive, {len(data['mitigative_barriers'])} mitigative")
     
-    def test_get_bow_tie_cached(self, authenticated_client):
+    def test_get_bow_tie_cached(self, authenticated_client, test_threat_id):
         """GET /api/ai/bow-tie/{threat_id} - Get cached bow-tie model"""
-        response = authenticated_client.get(f"{BASE_URL}/api/ai/bow-tie/{TEST_THREAT_ID}")
+        response = authenticated_client.get(f"{BASE_URL}/api/ai/bow-tie/{test_threat_id}")
         
         assert response.status_code == 200, f"Get bow-tie failed: {response.text}"
         
@@ -306,10 +269,10 @@ class TestBowTieModel:
 class TestActionOptimization:
     """Test Action Optimization endpoints"""
     
-    def test_optimize_actions(self, authenticated_client):
+    def test_optimize_actions(self, authenticated_client, test_threat_id):
         """POST /api/ai/optimize-actions/{threat_id} - Get optimized action recommendations"""
         response = authenticated_client.post(
-            f"{BASE_URL}/api/ai/optimize-actions/{TEST_THREAT_ID}",
+            f"{BASE_URL}/api/ai/optimize-actions/{test_threat_id}",
             json={
                 "budget_limit": None,
                 "max_downtime_hours": None,
@@ -351,9 +314,9 @@ class TestActionOptimization:
         for i, action in enumerate(recommended_actions[:3], 1):
             print(f"  {i}. [{action['urgency'].upper()}] {action['description'][:50]}... (reduces risk by {action['expected_risk_reduction']}%)")
     
-    def test_get_action_optimization_cached(self, authenticated_client):
+    def test_get_action_optimization_cached(self, authenticated_client, test_threat_id):
         """GET /api/ai/action-optimization/{threat_id} - Get cached action optimization"""
-        response = authenticated_client.get(f"{BASE_URL}/api/ai/action-optimization/{TEST_THREAT_ID}")
+        response = authenticated_client.get(f"{BASE_URL}/api/ai/action-optimization/{test_threat_id}")
         
         assert response.status_code == 200, f"Get action optimization failed: {response.text}"
         
@@ -384,9 +347,9 @@ class TestErrorHandling:
         assert response.status_code == 404
         print(f"✓ Non-analyzed threat returns 404 as expected")
     
-    def test_unauthorized_access(self):
+    def test_unauthorized_access(self, api_client, test_threat_id):
         """Test AI endpoints without authentication"""
-        response = requests.post(f"{BASE_URL}/api/ai/analyze-risk/{TEST_THREAT_ID}")
+        response = api_client.post(f"{BASE_URL}/api/ai/analyze-risk/{test_threat_id}")
         assert response.status_code in [401, 403]
         print(f"✓ Unauthorized access blocked as expected")
 

@@ -324,7 +324,7 @@ class UserStatsService:
                         if parsed.tzinfo is None:
                             return parsed.replace(tzinfo=timezone.utc)
                         return parsed
-                    except:
+                    except (ValueError, TypeError):
                         return None
                 return None
             

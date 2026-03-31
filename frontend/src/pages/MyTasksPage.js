@@ -568,7 +568,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <div className="space-y-1.5">
               {(field.items || []).map((item, idx) => (
                 <div 
-                  key={idx} 
+                  key={`${field.id}-item-${idx}-${item}`} 
                   className={cn(
                     "flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200",
                     isMobile && "min-h-[44px]"

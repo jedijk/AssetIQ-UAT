@@ -1123,8 +1123,8 @@ const FailureModesPage = () => {
                 <Button type="button" variant="outline" onClick={addKeyword}>{t("common.add")}</Button>
               </div>
               <div className="flex flex-wrap gap-2 mt-2">
-                {newFm.keywords.map((kw, i) => (
-                  <Badge key={i} variant="secondary" className="flex items-center gap-1">
+                {newFm.keywords.map((kw) => (
+                  <Badge key={kw} variant="secondary" className="flex items-center gap-1">
                     {kw}
                     <button onClick={() => removeKeyword(kw)} className="ml-1 hover:text-red-500"><X className="w-3 h-3" /></button>
                   </Badge>
@@ -1174,9 +1174,10 @@ const FailureModesPage = () => {
                   const discipline = isObject ? action.discipline : null;
                   const type = isObject ? action.action_type : null;
                   const typeConfig = ACTION_TYPE_OPTIONS.find(t => t.value === type);
+                  const actionKey = `${description}-${discipline || 'none'}-${type || 'none'}-${i}`;
                   
                   return (
-                    <li key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <li key={actionKey} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           {type && (
