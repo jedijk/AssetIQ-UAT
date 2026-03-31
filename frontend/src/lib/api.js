@@ -1,16 +1,8 @@
 import axios from "axios";
 
-// Determine API URL at runtime - supports both preview and production deployments
-const getApiUrl = () => {
-  // First check environment variable (set at build time)
-  if (process.env.REACT_APP_BACKEND_URL) {
-    return `${process.env.REACT_APP_BACKEND_URL}/api`;
-  }
-  // Fallback: use current origin (works for any deployment domain)
-  return `${window.location.origin}/api`;
-};
-
-const API_URL = getApiUrl();
+// ALWAYS use current origin for API calls - this ensures the app works on ANY domain
+// React env variables are baked at build time, so we can't rely on them for production
+const API_URL = `${window.location.origin}/api`;
 
 // Create axios instance with timeout
 const api = axios.create({

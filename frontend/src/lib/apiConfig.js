@@ -1,17 +1,18 @@
 /**
  * Runtime API URL Configuration
- * Determines the correct backend URL at runtime, supporting:
- * - Preview environments (uses REACT_APP_BACKEND_URL)
- * - Production deployments (falls back to window.location.origin)
+ * 
+ * IMPORTANT: React environment variables are baked in at BUILD time.
+ * This means REACT_APP_BACKEND_URL will contain whatever value was set
+ * when the app was built, NOT the current deployment domain.
+ * 
+ * Solution: ALWAYS use window.location.origin for API calls.
+ * This ensures the app works on ANY domain it's deployed to.
  */
 
-// Get the backend URL - works for any deployment domain
+// Get the backend URL - ALWAYS uses current origin for maximum compatibility
 export const getBackendUrl = () => {
-  // Check if we have an environment variable set
-  if (process.env.REACT_APP_BACKEND_URL) {
-    return process.env.REACT_APP_BACKEND_URL;
-  }
-  // Fallback to current origin for production deployments
+  // Always use current window origin - this works on ANY deployment domain
+  // (assetiq.tech, *.emergent.host, localhost, etc.)
   return window.location.origin;
 };
 
