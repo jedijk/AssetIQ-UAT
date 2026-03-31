@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -19,6 +19,10 @@ const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  // Refs for accessing autofilled values (Face ID, password managers)
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
 
   // Get the redirect destination from state (set by ProtectedRoute)
   const from = location.state?.from || "/";
@@ -27,8 +31,19 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
 
+    // Get values from refs to handle autofill (Face ID, password managers)
+    // Autofill doesn't always trigger onChange events in React
+    const emailValue = emailRef.current?.value || email;
+    const passwordValue = passwordRef.current?.value || password;
+
+    if (!emailValue || !passwordValue) {
+      toast.error("Please enter email and password");
+      setLoading(false);
+      return;
+    }
+
     try {
-      await login(email, password);
+      await login(emailValue, passwordValue);
       toast.success(t("chat.welcomeMessage").split("!")[0] + "!");
       // Navigate to the intended destination after successful login
       navigate(from, { replace: true });
@@ -115,8 +130,11 @@ const LoginPage = () => {
             <div className="space-y-2">
               <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
+                ref={emailRef}
                 id="email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -129,8 +147,11 @@ const LoginPage = () => {
             <div className="space-y-2">
               <Label htmlFor="password">{t("auth.password")}</Label>
               <Input
+                ref={passwordRef}
                 id="password"
+                name="password"
                 type="password"
+                autoComplete="current-password"
                 placeholder={t("auth.password")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
