@@ -24,6 +24,14 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### March 31, 2026 - Failure Mode Versioning Fix
+**Critical Fix:**
+1. ✅ Fixed Failure Mode version management - `isoformat()` error on datetime/string serialization
+   - Added `safe_isoformat()` helper in `failure_modes_service.py` to handle both datetime and string values
+   - Version history dialog now displays correctly with change diffs
+   - Rollback/Restore functionality working
+   - Auto-seed failure modes from static library on startup via `seed_failure_modes.py`
+
 ### March 31, 2026 - Code Quality & Deployment Fix
 **Critical Fixes:**
 1. ✅ Added `/health` endpoint to `server.py` - ROOT CAUSE of deployment failures
@@ -31,6 +39,7 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 3. ✅ Created `secureStorage.js` with AES-GCM encryption for localStorage
 4. ✅ Fixed 3 bare `except` clauses in backend services
 5. ✅ Fixed React array index keys in FailureModesPage and MyTasksPage
+6. ✅ Fixed "Analyse with AI" access control in Observations (removed strict created_by filters)
 
 **Previous Session Fixes (March 30-31):**
 - ✅ Database Null ID Cleanup (fix_null_ids.py)
@@ -46,21 +55,29 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Prioritized Backlog
 
-### P0 - Critical
-- [ ] Verify production deployment works after health check fix
-- [ ] Implement report generation (PowerPoint/PDF) for Causal Investigations
+### P0 - Critical (Current Sprint)
+- [x] Fix "Analyse with AI" in Observations - DONE
+- [x] Fix version management on Failure Modes - DONE (March 31, 2026)
 
-### P1 - High
-- [ ] Offline support with local storage for My Tasks execution
-- [ ] Form execution flow in mobile My Tasks
+### P1 - High (User's Priority List)
+- [ ] Deleting an Investigation should optionally delete associated Actions
+- [ ] Deleting an Observation should optionally delete associated Actions and Investigations
+- [ ] Fix attaching files to forms
+- [ ] Equipment Manager restriction - only owner can add new installation
+- [ ] Create Permissions page under User Management (Role-based Read/Write)
+- [ ] Merge "Task Design" and "Plan" screens
+- [ ] Allow voice recording for feedback
 
 ### P2 - Medium
+- [ ] Implement report generation (PowerPoint/PDF) for Causal Investigations
+- [ ] Offline support with local storage for My Tasks execution
+- [ ] Form execution flow in mobile My Tasks
 - [ ] Bulk criticality assignment for equipment
+
+### P3 - Low (Refactoring)
 - [ ] Component refactoring: CausalEnginePage (1,905 lines)
 - [ ] Component refactoring: ChatSidebar (833 lines)
 - [ ] Component refactoring: ActionsPage (1,270 lines)
-
-### P3 - Low
 - [ ] Fix remaining React hook dependency warnings (97 total)
 - [ ] Refactor TaskExecutionFrame extraction
 - [ ] Add type hints to backend files with 0% coverage
@@ -72,7 +89,10 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ### Key Files
 - `/app/backend/server.py` - Main FastAPI entry point with /health endpoint
 - `/app/backend/tests/conftest.py` - Centralized test configuration
+- `/app/backend/services/failure_modes_service.py` - Failure modes CRUD with versioning
+- `/app/backend/scripts/seed_failure_modes.py` - Auto-seeds static library to MongoDB
 - `/app/frontend/src/services/secureStorage.js` - Encrypted localStorage wrapper
+- `/app/frontend/src/pages/FailureModesPage.js` - FMEA library with version history dialog
 
 ### Security Considerations
 - Test credentials loaded from environment variables
