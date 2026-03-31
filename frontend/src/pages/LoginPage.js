@@ -48,7 +48,20 @@ const LoginPage = () => {
       // Navigate to the intended destination after successful login
       navigate(from, { replace: true });
     } catch (error) {
-      const message = error.response?.data?.detail || "Login failed. Please try again.";
+      // Handle different error types
+      let message = "Login failed. Please try again.";
+      
+      if (error.response?.data?.detail) {
+        message = error.response.data.detail;
+      } else if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
+        message = "Network error. Please check your connection and try again.";
+      } else if (error.response?.status === 503) {
+        message = "Server temporarily unavailable. Please try again in a moment.";
+      } else if (error.response?.status === 401) {
+        message = "Invalid email or password.";
+      }
+      
+      console.error("Login error:", error.response?.status, error.message);
       toast.error(message);
     } finally {
       setLoading(false);

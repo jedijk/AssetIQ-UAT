@@ -109,7 +109,12 @@ async def notify_admins_new_user(user_email: str, user_name: str):
 
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
-    user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
+    try:
+        user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
+    except Exception as e:
+        logger.error(f"Database error during login: {e}")
+        raise HTTPException(status_code=503, detail="Database connection error. Please try again.")
+    
     if not user or not verify_password(credentials.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
