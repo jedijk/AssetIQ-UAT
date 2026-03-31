@@ -13,6 +13,7 @@ from typing import Optional, List, Dict, Any
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class FormService:
                 field["order"] = i
         
         doc = {
+            "id": str(uuid.uuid4()),  # Generate unique ID
             "name": data["name"],
             "description": data.get("description"),
             "discipline": data.get("discipline"),

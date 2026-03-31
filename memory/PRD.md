@@ -2,7 +2,15 @@
 
 ## Latest Updates (March 31, 2026)
 
-### Database Stability & Bug Fixes Session
+### UI/UX Improvements & Bug Fixes Session (6 items)
+- **Fixed Password Reset "Failed to fetch":** Added robust error handling to `resetPassword` in SettingsUserManagementPage.js with network error detection and user-friendly messages
+- **Failure Mode Fullscreen View:** Added fullscreen mode to FailureModeViewPanel with `isViewPanelFullscreen` state, expand/collapse buttons, and full-screen overlay
+- **Validation Avatar Fix:** Fixed validator photo display - added fallback handling and ensured `validated_by_id` is passed to backend
+- **Form Builder Discipline Fix:** Replaced hardcoded discipline options with DISCIPLINES constant from `/constants/disciplines.js`
+- **Mobile Menu Position:** Moved hamburger menu button to the LEFT side of the header for better mobile UX
+- **Prominent Feedback Button:** Added visible feedback button in desktop header and floating action button (FAB) on mobile
+
+### Database Stability Session (earlier today)
 - **Fixed Null ID Index Errors:** Created cleanup script (`/app/backend/scripts/fix_null_ids.py`) that fixed 107 documents with `id: null` across 7 collections
   - Collections fixed: observations, task_templates, task_plans, task_instances, form_templates, form_submissions, equipment_failure_modes
   - All 7 `id_1` indexes now created successfully
@@ -12,6 +20,7 @@
   - `serverSelectionTimeoutMS=10000`, `socketTimeoutMS=30000`
   - `retryWrites=True`, `retryReads=True`
 - **Caching for Equipment Queries:** Added LRU caching to `get_descendants` in `installation_filter_service.py`
+- **Form Template ID Fix:** Added UUID generation to form_service.py create_template to prevent DuplicateKeyError
 
 ### Previous Session (March 30, 2026)
 - **Code Refactoring & Cleanup:** Fixed import errors in backend routes
