@@ -24,6 +24,20 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### March 31, 2026 - Cascade Delete & Form Attachments
+**Improvements:**
+1. ✅ Investigation delete now optionally deletes linked Central Actions
+   - Added checkbox in delete dialog: "Also delete linked Actions"
+   - DELETE endpoint accepts `?delete_central_actions=true` parameter
+2. ✅ Observation/Threat delete now optionally deletes linked Actions and Investigations
+   - Added two checkboxes: "Also delete linked Investigations", "Also delete linked Actions"
+   - DELETE endpoint accepts `?delete_actions=true&delete_investigations=true` parameters
+3. ✅ Fixed file attachment upload for new form templates
+   - Pending documents are now uploaded after template creation in `FormsPage.js`
+4. ✅ Equipment Manager restriction - only owner can add installations
+   - Backend: Added role check in `create_equipment_node` endpoint
+   - Frontend: Hidden "Add Installation" button for non-owners in `EquipmentManagerPage.js`
+
 ### March 31, 2026 - Failure Mode Versioning Fix
 **Critical Fix:**
 1. ✅ Fixed Failure Mode version management - `isoformat()` error on datetime/string serialization
@@ -58,12 +72,12 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ### P0 - Critical (Current Sprint)
 - [x] Fix "Analyse with AI" in Observations - DONE
 - [x] Fix version management on Failure Modes - DONE (March 31, 2026)
+- [x] Cascade delete for Investigations (optionally delete Actions) - DONE (March 31, 2026)
+- [x] Cascade delete for Observations (optionally delete Actions & Investigations) - DONE (March 31, 2026)
+- [x] Fix attaching files to forms (pending documents on new templates) - DONE (March 31, 2026)
 
 ### P1 - High (User's Priority List)
-- [ ] Deleting an Investigation should optionally delete associated Actions
-- [ ] Deleting an Observation should optionally delete associated Actions and Investigations
-- [ ] Fix attaching files to forms
-- [ ] Equipment Manager restriction - only owner can add new installation
+- [x] Equipment Manager restriction - only owner can add new installation - DONE (March 31, 2026)
 - [ ] Create Permissions page under User Management (Role-based Read/Write)
 - [ ] Merge "Task Design" and "Plan" screens
 - [ ] Allow voice recording for feedback

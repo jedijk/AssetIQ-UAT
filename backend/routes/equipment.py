@@ -482,6 +482,15 @@ async def create_equipment_node(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new equipment hierarchy node with ISO 14224 validation."""
+    # Check if user is trying to create an installation (root node)
+    # Only owners can create new installations
+    if not node_data.parent_id and node_data.level == ISOLevel.INSTALLATION:
+        if current_user.get("role") != "owner":
+            raise HTTPException(
+                status_code=403,
+                detail="Only owners can create new installations"
+            )
+    
     # Check for duplicate name under the same parent (global check, not per-user)
     existing = await db.equipment_nodes.find_one({
         "name": node_data.name,

@@ -5,6 +5,7 @@ import { equipmentHierarchyAPI } from "../lib/api";
 import { getBackendUrl } from "../lib/apiConfig";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import {
@@ -457,8 +458,12 @@ export default function EquipmentManagerPage() {
   const location = useLocation();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const fileInputRef = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
+  
+  // Check if user is owner (can create installations)
+  const isOwner = user?.role === 'owner';
   
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false);
@@ -960,7 +965,9 @@ export default function EquipmentManagerPage() {
           <Button onClick={handleExportExcel} size="sm" variant="outline" disabled={isExporting || nodes.length === 0} data-testid="export-excel-btn">
             <Download className="w-4 h-4 mr-1" />{isExporting ? (t("common.exporting") || "Exporting...") : (t("equipment.exportExcel") || "Export Excel")}
           </Button>
-          <Button onClick={() => { setNewNode({ name: "", level: "installation", parent_id: null }); setIsCreateOpen(true); }} size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="add-installation-btn"><Plus className="w-4 h-4 mr-1" />{t("equipment.addInstallation")}</Button>
+          {isOwner && (
+            <Button onClick={() => { setNewNode({ name: "", level: "installation", parent_id: null }); setIsCreateOpen(true); }} size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="add-installation-btn"><Plus className="w-4 h-4 mr-1" />{t("equipment.addInstallation")}</Button>
+          )}
           {selectedNode && !movingNode && (
             <>
               <Button onClick={handleAddChild} size="sm" variant="outline" disabled={selectedNode.level === "maintainable_item"} data-testid="add-child-btn"><Plus className="w-4 h-4 mr-1" />{t("equipment.addChild")}</Button>
@@ -986,10 +993,12 @@ export default function EquipmentManagerPage() {
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <Building2 className="w-12 h-12 text-slate-300 mb-3" />
               <h3 className="text-lg font-semibold text-slate-600 mb-1">{t("equipment.noEquipment")}</h3>
-              <p className="text-sm text-slate-400 mb-4">{t("equipment.addFirstEquipment")}</p>
+              <p className="text-sm text-slate-400 mb-4">{isOwner ? t("equipment.addFirstEquipment") : "Contact an owner to add installations"}</p>
               <div className="flex gap-2">
                 <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
-                <Button onClick={() => setIsCreateOpen(true)} size="sm" className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-1" />{t("equipment.addInstallation")}</Button>
+                {isOwner && (
+                  <Button onClick={() => setIsCreateOpen(true)} size="sm" className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-1" />{t("equipment.addInstallation")}</Button>
+                )}
               </div>
             </div>
           ) : (

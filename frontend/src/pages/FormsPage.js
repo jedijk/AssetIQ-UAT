@@ -470,7 +470,23 @@ const FormsPage = () => {
       }
       return formAPI.createTemplate(template);
     },
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
+      // Upload any pending documents after template creation
+      if (variables.pendingDocuments?.length > 0 && data.id) {
+        const pendingDocs = variables.pendingDocuments.filter(d => d.file);
+        for (const doc of pendingDocs) {
+          try {
+            await formAPI.uploadDocument(data.id, doc.file, "");
+          } catch (error) {
+            console.error(`Failed to upload document ${doc.name}:`, error);
+            toast.error(`Failed to upload ${doc.name}`);
+          }
+        }
+        if (pendingDocs.length > 0) {
+          toast.success(`${pendingDocs.length} document(s) uploaded`);
+        }
+      }
+      
       toast.success(variables.id ? "Form template updated" : "Form template created");
       queryClient.invalidateQueries({ queryKey: ["form-templates"] });
       setShowCreateDialog(false);
