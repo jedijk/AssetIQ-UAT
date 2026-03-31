@@ -7,7 +7,7 @@ import requests
 import os
 from datetime import datetime, timedelta
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://assetiq-dev.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://db-stabilize.preview.emergentagent.com')
 
 # Test credentials from test_credentials.md
 OWNER_EMAIL = "jedijk@gmail.com"

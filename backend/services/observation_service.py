@@ -149,11 +149,17 @@ class ObservationService:
         return {"total": total, "observations": observations}
     
     async def get_observation_by_id(self, obs_id: str) -> Optional[Dict[str, Any]]:
-        """Get a specific observation."""
-        if not ObjectId.is_valid(obs_id):
-            return None
+        """Get a specific observation by _id (ObjectId) or id (string UUID) field."""
+        doc = None
         
-        doc = await self.observations.find_one({"_id": ObjectId(obs_id)})
+        # First try to find by ObjectId (_id field)
+        if ObjectId.is_valid(obs_id):
+            doc = await self.observations.find_one({"_id": ObjectId(obs_id)})
+        
+        # If not found, try to find by string id field
+        if not doc:
+            doc = await self.observations.find_one({"id": obs_id})
+        
         if doc:
             return self._serialize_observation(doc)
         return None

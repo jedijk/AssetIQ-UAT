@@ -1,17 +1,24 @@
 # ThreatBase (AssetIQ) - Product Requirements Document
 
-## Latest Updates (March 30, 2026)
+## Latest Updates (March 31, 2026)
 
-### Code Refactoring & Cleanup Session
-- **Fixed Import Errors:** Resolved undefined imports in backend routes
-  - `maintenance.py`: Added `find_failure_modes_flexible` function to `failure_modes.py`
-  - `observations.py`: Added missing `datetime, timezone` import
-  - `stats.py`: Added missing `HTTPException` import  
-  - `threats.py`: Added `FAILURE_MODE_CAUSES` dictionary
+### Database Stability & Bug Fixes Session
+- **Fixed Null ID Index Errors:** Created cleanup script (`/app/backend/scripts/fix_null_ids.py`) that fixed 107 documents with `id: null` across 7 collections
+  - Collections fixed: observations, task_templates, task_plans, task_instances, form_templates, form_submissions, equipment_failure_modes
+  - All 7 `id_1` indexes now created successfully
+- **Fixed Observation "Not Found" Bug:** Updated `get_observation_by_id` in `observation_service.py` to handle both ObjectId (`_id`) and string UUID (`id`) lookups
+- **Database Connection Pooling:** Added MongoDB connection pooling settings to `database.py`:
+  - `maxPoolSize=50`, `minPoolSize=10`
+  - `serverSelectionTimeoutMS=10000`, `socketTimeoutMS=30000`
+  - `retryWrites=True`, `retryReads=True`
+- **Caching for Equipment Queries:** Added LRU caching to `get_descendants` in `installation_filter_service.py`
+
+### Previous Session (March 30, 2026)
+- **Code Refactoring & Cleanup:** Fixed import errors in backend routes
 - **Linting:** Fixed 7 auto-fixable issues across backend routes
 - **Testing:** All 13 core features passed comprehensive testing
 
-### Previous Session Updates
+### Earlier Updates
 - **Task Planner Fixes:** Date picker in dialogs, plan CRUD operations, translation fixes
 - **User Approval:** Fixed installation assignment during user approval
 - **Password Reset:** Added admin reset password option in User Management
@@ -160,5 +167,5 @@ Build an AI-Powered Threat Capture & Prioritization Platform with features inclu
 - **Offline Mode:** Not yet implemented for task execution
 
 ## Test Credentials
-- Email: `test@test.com`
-- Password: `test`
+- **Owner Account:** `jedijk@gmail.com` / `admin123`
+- **Admin Account:** `test@test.com` / `test`
