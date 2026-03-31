@@ -325,6 +325,7 @@ const TaskSchedulerPage = () => {
   const [editingTemplate, setEditingTemplate] = useState(null); // For editing templates
   const [editingPlan, setEditingPlan] = useState(null); // For editing plans
   const [deleteInstanceId, setDeleteInstanceId] = useState(null); // For delete confirmation
+  const [expandedTemplateId, setExpandedTemplateId] = useState(null); // For showing plans under template
 
   // Handle prefill from navigation state (e.g., from Actions page PM action)
   useEffect(() => {
@@ -370,7 +371,7 @@ const TaskSchedulerPage = () => {
   const { data: plansData, isLoading: plansLoading } = useQuery({
     queryKey: ["task-plans"],
     queryFn: () => taskAPI.getPlans(),
-    enabled: activeTab === "plans"
+    enabled: activeTab === "templates" // Plans now shown in templates tab
   });
 
   const { data: equipmentData } = useQuery({
@@ -802,13 +803,9 @@ const TaskSchedulerPage = () => {
               <ClipboardList className="w-4 h-4" />
               {t("taskScheduler.executions")}
             </TabsTrigger>
-            <TabsTrigger value="plans" className="gap-2">
-              <CalendarDays className="w-4 h-4" />
-              {t("taskScheduler.plans")}
-            </TabsTrigger>
             <TabsTrigger value="templates" className="gap-2">
               <FileText className="w-4 h-4" />
-              {t("taskScheduler.templates")}
+              {t("taskScheduler.taskLibrary") || "Task Library"}
             </TabsTrigger>
           </TabsList>
           
@@ -1123,107 +1120,14 @@ const TaskSchedulerPage = () => {
           )}
         </TabsContent>
 
-        {/* Plans Tab */}
-        <TabsContent value="plans">
-          <div className="flex justify-end mb-4">
-            <Button onClick={() => setShowPlanDialog(true)} className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="w-4 h-4 mr-2" />
+        {/* Task Library Tab (merged Templates + Plans) */}
+        <TabsContent value="templates">
+          <div className="flex justify-end mb-4 gap-2">
+            <Button onClick={() => setShowPlanDialog(true)} variant="outline" className="gap-2">
+              <CalendarDays className="w-4 h-4" />
               {t("taskScheduler.newPlan")}
             </Button>
           </div>
-          {plansLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-            </div>
-          ) : plans.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
-              <CalendarDays className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p className="text-slate-500">{t("taskScheduler.noPlansYet")}</p>
-              <p className="text-sm text-slate-400 mt-1">{t("taskScheduler.createPlansDesc")}</p>
-              <Button onClick={() => setShowPlanDialog(true)} className="mt-4 bg-blue-600 hover:bg-blue-700">
-                <Plus className="w-4 h-4 mr-2" />
-                {t("taskScheduler.createFirstPlan")}
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {plans.map((plan) => (
-                <Card key={plan.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-base">{plan.task_template_name || plan.name}</CardTitle>
-                        <CardDescription>{plan.equipment_name}</CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {plan.is_adhoc && (
-                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                            <Zap className="w-3 h-3 mr-1" />
-                            {t("taskScheduler.adhocLabel")}
-                          </Badge>
-                        )}
-                        <Badge className={plan.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}>
-                          {plan.is_active ? t("taskScheduler.active") : t("taskScheduler.inactive")}
-                        </Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`plan-menu-${plan.id}`}>
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditPlan(plan)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              {t("common.edit")}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-red-600"
-                              onClick={() => deletePlanMutation.mutate(plan.id)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              {t("taskScheduler.deletePlan")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm">
-                      {plan.is_adhoc ? (
-                        <div className="flex items-center gap-2 text-amber-600">
-                          <Zap className="w-4 h-4" />
-                          {t("taskScheduler.adhocTemplateHint")}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-slate-600">
-                          <Repeat className="w-4 h-4" />
-                          {t("taskScheduler.every")} {plan.interval_value} {plan.interval_unit}
-                        </div>
-                      )}
-                      {!plan.is_adhoc && plan.next_due_date && (
-                        <div className="flex items-center gap-2 text-slate-600">
-                          <CalendarIcon className="w-4 h-4" />
-                          {t("taskScheduler.next")}: {formatDate(plan.next_due_date)}
-                        </div>
-                      )}
-                      {plan.form_template_id && (
-                        <div className="flex items-center gap-2 text-blue-600">
-                          <FileText className="w-4 h-4" />
-                          <span className="truncate">{plan.form_template_name || t("taskScheduler.linkedForm")}</span>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Templates Tab */}
-        <TabsContent value="templates">
           {templatesLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
@@ -1237,65 +1141,158 @@ const TaskSchedulerPage = () => {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templates.map((template) => (
-                <Card key={template.id} className="hover:shadow-md transition-shadow" data-testid={`template-card-${template.id}`}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-base">{template.name}</CardTitle>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`template-menu-${template.id}`}>
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditTemplate(template)} data-testid={`template-edit-${template.id}`}>
-                            <Edit className="w-4 h-4 mr-2" /> {t("common.edit")}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            className="text-red-600"
-                            onClick={() => deleteTemplateMutation.mutate(template.id)}
-                            data-testid={`template-delete-${template.id}`}
+            <div className="space-y-4">
+              {templates.map((template) => {
+                const templatePlans = plans.filter(p => p.task_template_id === template.id);
+                const isExpanded = expandedTemplateId === template.id;
+                
+                return (
+                  <Card key={template.id} className="hover:shadow-md transition-shadow" data-testid={`template-card-${template.id}`}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-base">{template.name}</CardTitle>
+                            <DisciplineBadge discipline={template.discipline} />
+                          </div>
+                          <CardDescription className="line-clamp-2 mt-1">{template.description || t("taskScheduler.noDescription")}</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`template-menu-${template.id}`}>
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditTemplate(template)} data-testid={`template-edit-${template.id}`}>
+                                <Edit className="w-4 h-4 mr-2" /> {t("common.edit")}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                setPlanForm(prev => ({ ...prev, task_template_id: template.id }));
+                                setShowPlanDialog(true);
+                              }}>
+                                <Plus className="w-4 h-4 mr-2" /> {t("taskScheduler.createPlanForTask")}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={() => deleteTemplateMutation.mutate(template.id)}
+                                data-testid={`template-delete-${template.id}`}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" /> {t("common.delete")}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-3">
+                        {template.is_adhoc ? (
+                          <Badge className="gap-1 bg-amber-100 text-amber-700 border-amber-200">
+                            <Zap className="w-3 h-3" />
+                            {t("taskScheduler.adhocLabel")}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="gap-1">
+                            <Repeat className="w-3 h-3" />
+                            {template.default_interval} {template.default_unit}
+                          </Badge>
+                        )}
+                        {template.estimated_duration_minutes && (
+                          <Badge variant="outline" className="gap-1">
+                            <Timer className="w-3 h-3" />
+                            {template.estimated_duration_minutes} min
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      {/* Plans section */}
+                      {templatePlans.length > 0 && (
+                        <div className="border-t border-slate-100 pt-3 mt-3">
+                          <button
+                            onClick={() => setExpandedTemplateId(isExpanded ? null : template.id)}
+                            className="flex items-center justify-between w-full text-sm text-slate-600 hover:text-slate-900"
                           >
-                            <Trash2 className="w-4 h-4 mr-2" /> {t("common.delete")}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <CardDescription className="line-clamp-2">{template.description || t("taskScheduler.noDescription")}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <DisciplineBadge discipline={template.discipline} />
-                      {template.is_adhoc ? (
-                        <Badge className="gap-1 bg-amber-100 text-amber-700 border-amber-200">
-                          <Zap className="w-3 h-3" />
-                          {t("taskScheduler.adhocLabel")}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="gap-1">
-                          <Repeat className="w-3 h-3" />
-                          {template.default_interval} {template.default_unit}
-                        </Badge>
+                            <span className="flex items-center gap-2">
+                              <CalendarDays className="w-4 h-4" />
+                              {templatePlans.length} {templatePlans.length === 1 ? 'Plan' : 'Plans'}
+                            </span>
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4" />
+                            )}
+                          </button>
+                          
+                          {isExpanded && (
+                            <div className="mt-3 space-y-2">
+                              {templatePlans.map((plan) => (
+                                <div key={plan.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-sm">{plan.equipment_name || 'All Equipment'}</span>
+                                      <Badge className={plan.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"} variant="outline">
+                                        {plan.is_active ? t("taskScheduler.active") : t("taskScheduler.inactive")}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                                      {plan.is_adhoc ? (
+                                        <span className="flex items-center gap-1">
+                                          <Zap className="w-3 h-3" /> Ad-hoc
+                                        </span>
+                                      ) : (
+                                        <span className="flex items-center gap-1">
+                                          <Repeat className="w-3 h-3" /> Every {plan.interval_value} {plan.interval_unit}
+                                        </span>
+                                      )}
+                                      {!plan.is_adhoc && plan.next_due_date && (
+                                        <span className="flex items-center gap-1">
+                                          <CalendarIcon className="w-3 h-3" /> Next: {formatDate(plan.next_due_date)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="sm" onClick={() => handleEditPlan(plan)}>
+                                      <Edit className="w-3 h-3" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="text-red-600 hover:text-red-700"
+                                      onClick={() => deletePlanMutation.mutate(plan.id)}
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
-                      {template.estimated_duration_minutes && (
-                        <Badge variant="outline" className="gap-1">
-                          <Timer className="w-3 h-3" />
-                          {template.estimated_duration_minutes} min
-                        </Badge>
+                      
+                      {/* No plans indicator */}
+                      {templatePlans.length === 0 && !template.is_adhoc && (
+                        <div className="border-t border-slate-100 pt-3 mt-3">
+                          <button
+                            onClick={() => {
+                              setPlanForm(prev => ({ ...prev, task_template_id: template.id }));
+                              setShowPlanDialog(true);
+                            }}
+                            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+                          >
+                            <Plus className="w-4 h-4" />
+                            {t("taskScheduler.createPlanForTask")}
+                          </button>
+                        </div>
                       )}
-                    </div>
-                    <div className="mt-3 text-xs text-slate-500">
-                      {template.is_adhoc 
-                        ? t("taskScheduler.adhocTemplateHint")
-                        : `${t("taskScheduler.usedInPlans")} ${template.usage_count || 0} ${t("taskScheduler.plans").toLowerCase()}`
-                      }
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>

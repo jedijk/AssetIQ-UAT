@@ -17,7 +17,8 @@ async def create_feedback(
     message: str,
     severity: Optional[str] = None,
     screenshot_url: Optional[str] = None,
-    module: Optional[str] = None
+    module: Optional[str] = None,
+    audio_url: Optional[str] = None
 ) -> dict:
     """Create a new feedback entry."""
     feedback_id = str(uuid.uuid4())
@@ -33,6 +34,7 @@ async def create_feedback(
         "severity": severity,
         "user_visible_response": None,
         "module": module,
+        "audio_url": audio_url,
     }
     await db.feedback.insert_one(feedback_doc)
     logger.info(f"Feedback created: {feedback_id} by user {user_name} ({user_id})")

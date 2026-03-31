@@ -9,10 +9,12 @@ from datetime import datetime
 class FeedbackCreate(BaseModel):
     """Request model for creating feedback."""
     type: Literal["issue", "improvement", "general"]
-    message: str = Field(..., min_length=1)
+    message: str = Field(default="", min_length=0)  # Allow empty message if audio is provided
     severity: Optional[Literal["low", "medium", "high", "critical"]] = None
     screenshot_url: Optional[str] = None
     module: Optional[str] = None  # Auto-captured from frontend context
+    has_audio: Optional[bool] = False
+    audio_data: Optional[str] = None  # Base64 encoded audio data
 
 
 class FeedbackUpdate(BaseModel):
@@ -44,6 +46,7 @@ class FeedbackResponse(BaseModel):
     user_id: str
     user_name: Optional[str] = None
     updated_at: Optional[str] = None
+    audio_url: Optional[str] = None  # URL to audio file if voice message was recorded
 
 
 class FeedbackListResponse(BaseModel):

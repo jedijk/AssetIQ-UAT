@@ -42,6 +42,16 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
    - Frontend: Full UI with role tabs, feature matrix, Read/Write/Delete toggles
    - Default permissions for 6 roles: owner, admin, reliability_engineer, maintenance, operations, viewer
    - Stored in MongoDB `permissions` collection, with reset-to-defaults option
+6. ✅ Merged "Task Design" and "Plan" screens into unified "Task Library"
+   - Removed separate "Plans" tab from TaskSchedulerPage
+   - Each task design card now shows its associated plans with expandable section
+   - Plans can be created/edited/deleted inline from task cards
+   - Added "New Plan" button and "Create Plan for this Task" action
+7. ✅ Voice recording for feedback
+   - Added MediaRecorder-based audio capture in FeedbackPage
+   - Users can record, play back, and clear voice messages
+   - Audio saved as base64 WebM and stored via object storage
+   - Full translations for English and Dutch
 
 ### March 31, 2026 - Failure Mode Versioning Fix
 **Critical Fix:**
@@ -84,8 +94,8 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ### P1 - High (User's Priority List)
 - [x] Equipment Manager restriction - only owner can add new installation - DONE (March 31, 2026)
 - [x] Create Permissions page under User Management (Role-based Read/Write) - DONE (March 31, 2026)
-- [ ] Merge "Task Design" and "Plan" screens
-- [ ] Allow voice recording for feedback
+- [x] Merge "Task Design" and "Plan" screens - DONE (March 31, 2026)
+- [x] Allow voice recording for feedback - DONE (March 31, 2026)
 
 ### P2 - Medium
 - [ ] Implement report generation (PowerPoint/PDF) for Causal Investigations

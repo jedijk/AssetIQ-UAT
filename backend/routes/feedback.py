@@ -34,6 +34,28 @@ async def submit_feedback(
     current_user: dict = Depends(get_current_user)
 ):
     """Submit new feedback."""
+    audio_url = None
+    
+    # Handle audio data if provided
+    if feedback.audio_data:
+        try:
+            import base64
+            # Remove data URL prefix if present
+            audio_data = feedback.audio_data
+            if "," in audio_data:
+                audio_data = audio_data.split(",")[1]
+            
+            audio_bytes = base64.b64decode(audio_data)
+            file_id = str(uuid.uuid4())
+            path = f"feedback/audio/{current_user['id']}/{file_id}.webm"
+            
+            result = put_object(path, audio_bytes, "audio/webm")
+            audio_url = result.get("url", path)
+        except Exception as e:
+            import logging
+            logging.error(f"Error saving audio: {e}")
+            # Continue without audio if it fails
+    
     result = await create_feedback(
         user_id=current_user["id"],
         user_name=current_user.get("name", "Unknown"),
@@ -42,6 +64,7 @@ async def submit_feedback(
         severity=feedback.severity,
         screenshot_url=feedback.screenshot_url,
         module=feedback.module,
+        audio_url=audio_url,
     )
     return result
 

@@ -71,6 +71,11 @@ import {
   LayoutGrid,
   Archive,
   Ban,
+  Mic,
+  MicOff,
+  Play,
+  Pause,
+  Volume2,
 } from "lucide-react";
 import { Checkbox } from "../components/ui/checkbox";
 
@@ -176,6 +181,15 @@ const FeedbackPage = () => {
   const [screenshotFile, setScreenshotFile] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingIntervalRef = useRef(null);
 
   // Query: Get user's feedback
   const { data: feedbackData, isLoading } = useQuery({
@@ -308,11 +322,12 @@ const FeedbackPage = () => {
     setSeverity("");
     setScreenshotFile(null);
     setScreenshotPreview(null);
+    clearRecording();
   };
 
   const handleSubmit = () => {
-    if (!message.trim()) {
-      toast.error(t("feedback.messageRequired") || "Please enter a message");
+    if (!message.trim() && !audioBlob) {
+      toast.error(t("feedback.messageRequired") || "Please enter a message or record audio");
       return;
     }
 
@@ -320,12 +335,27 @@ const FeedbackPage = () => {
       type: feedbackType,
       message: message.trim(),
       severity: feedbackType === "issue" ? severity || "medium" : null,
+      has_audio: !!audioBlob,
     };
-
-    if (isEditMode && editingFeedback) {
-      updateMutation.mutate({ id: editingFeedback.id, data });
+    
+    // If there's audio, we need to convert it to base64 and include it
+    if (audioBlob) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        data.audio_data = reader.result;
+        if (isEditMode && editingFeedback) {
+          updateMutation.mutate({ id: editingFeedback.id, data });
+        } else {
+          submitMutation.mutate(data);
+        }
+      };
+      reader.readAsDataURL(audioBlob);
     } else {
-      submitMutation.mutate(data);
+      if (isEditMode && editingFeedback) {
+        updateMutation.mutate({ id: editingFeedback.id, data });
+      } else {
+        submitMutation.mutate(data);
+      }
     }
   };
 
@@ -461,6 +491,80 @@ const FeedbackPage = () => {
     }
   };
 
+  // Voice recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      
+      // Start duration counter
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      toast.error(t("feedback.microphoneError") || "Could not access microphone. Please check permissions.");
+    }
+  };
+  
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    }
+  };
+  
+  const clearRecording = () => {
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+    }
+    setAudioBlob(null);
+    setAudioUrl(null);
+    setRecordingDuration(0);
+  };
+  
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioUrl]);
+
   // Inline form content render function
   const renderFormContent = (isFullScreen = false) => (
     <div className={`space-y-4 ${isFullScreen ? 'p-4' : 'py-4'}`}>
@@ -567,6 +671,63 @@ const FeedbackPage = () => {
           onChange={handleFileSelect}
           className="hidden"
         />
+      </div>
+
+      {/* Voice Recording */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-slate-700">
+          {t("feedback.voiceMessage") || "Voice Message"} <span className="text-slate-400 font-normal">({t("common.optional") || "optional"})</span>
+        </label>
+        
+        {audioUrl ? (
+          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <Volume2 className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-700">{t("feedback.voiceRecorded") || "Voice message recorded"}</p>
+              <p className="text-xs text-slate-500">{formatDuration(recordingDuration)}</p>
+            </div>
+            <audio src={audioUrl} controls className="h-8 w-32" />
+            <button
+              type="button"
+              onClick={clearRecording}
+              className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+              data-testid="clear-recording-btn"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : isRecording ? (
+          <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="flex-shrink-0 w-10 h-10 bg-red-500 rounded-full flex items-center justify-center animate-pulse">
+              <Mic className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-700">{t("feedback.recording") || "Recording..."}</p>
+              <p className="text-xs text-red-600">{formatDuration(recordingDuration)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2"
+              data-testid="stop-recording-btn"
+            >
+              <MicOff className="w-4 h-4" />
+              {t("feedback.stopRecording") || "Stop"}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={startRecording}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-slate-200 rounded-lg text-slate-500 hover:border-blue-300 hover:text-blue-600 transition-colors"
+            data-testid="start-recording-btn"
+          >
+            <Mic className="w-5 h-5" />
+            <span className="text-sm">{t("feedback.recordVoice") || "Record voice message"}</span>
+          </button>
+        )}
       </div>
     </div>
   );
