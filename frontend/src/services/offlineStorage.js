@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { getBackendUrl } from '../lib/apiConfig';
 
 const DB_NAME = 'threatbase_offline';
 const DB_VERSION = 1;
@@ -222,7 +223,7 @@ class OfflineStorageService {
     let synced = 0;
     let failed = 0;
     
-    const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+    const API_BASE_URL = getBackendUrl();
     const token = localStorage.getItem('token');
     
     for (const completion of pending) {

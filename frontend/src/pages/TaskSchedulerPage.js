@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
@@ -68,7 +69,7 @@ import { CompleteDialog, DeleteExecutionDialog } from "../components/task-schedu
 import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 
 // Get base URL without /api suffix
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = getBackendUrl();
 
 // API functions
 const taskAPI = {

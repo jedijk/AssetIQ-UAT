@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
+import { getBackendUrl } from "../lib/apiConfig";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -65,7 +66,7 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
     if (photo.startsWith("/api/")) {
       const token = localStorage.getItem("token");
       if (token) {
-        return `${process.env.REACT_APP_BACKEND_URL}${photo}?auth=${token}`;
+        return `${getBackendUrl()}${photo}?auth=${token}`;
       }
     }
     // If it's already a full URL, use as-is

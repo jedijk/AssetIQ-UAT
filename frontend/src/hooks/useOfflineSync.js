@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import offlineQueue from '../lib/offlineQueue';
+import { getBackendUrl } from '../lib/apiConfig';
 
 /**
  * Hook for managing offline data synchronization
@@ -49,7 +50,7 @@ export const useOfflineSync = () => {
   const queueObservation = useCallback(async (data) => {
     const result = await offlineQueue.queueOfflineItem('pending_observations', {
       data,
-      url: `${process.env.REACT_APP_BACKEND_URL}/api/observations`,
+      url: `${getBackendUrl()}/api/observations`,
       method: 'POST',
     });
     if (result) {
@@ -63,7 +64,7 @@ export const useOfflineSync = () => {
   const queueTaskCompletion = useCallback(async (taskId, data) => {
     const result = await offlineQueue.queueOfflineItem('pending_tasks', {
       data,
-      url: `${process.env.REACT_APP_BACKEND_URL}/api/tasks/instances/${taskId}/complete`,
+      url: `${getBackendUrl()}/api/tasks/instances/${taskId}/complete`,
       method: 'POST',
     });
     if (result) {
@@ -77,7 +78,7 @@ export const useOfflineSync = () => {
   const queueFormSubmission = useCallback(async (data) => {
     const result = await offlineQueue.queueOfflineItem('pending_forms', {
       data,
-      url: `${process.env.REACT_APP_BACKEND_URL}/api/forms/submit`,
+      url: `${getBackendUrl()}/api/forms/submit`,
       method: 'POST',
     });
     if (result) {
@@ -91,7 +92,7 @@ export const useOfflineSync = () => {
   const queueThreat = useCallback(async (data) => {
     const result = await offlineQueue.queueOfflineItem('pending_threats', {
       data,
-      url: `${process.env.REACT_APP_BACKEND_URL}/api/chat/send`,
+      url: `${getBackendUrl()}/api/chat/send`,
       method: 'POST',
     });
     if (result) {
@@ -110,7 +111,7 @@ export const useOfflineSync = () => {
 
     setIsSyncing(true);
     const token = localStorage.getItem('token');
-    const API_URL = process.env.REACT_APP_BACKEND_URL;
+    const API_URL = getBackendUrl();
 
     try {
       const syncConfigs = [

@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../lib/apiConfig';
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,7 +40,7 @@ import { actionsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || "";
+const API_BASE_URL = getBackendUrl();
 
 const sourceConfig = {
   threat: { label: "Threat", icon: AlertTriangle, color: "text-orange-600" },

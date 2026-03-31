@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { getBackendUrl } from "../lib/apiConfig";
 import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -56,7 +57,7 @@ const Layout = () => {
       try {
         const token = localStorage.getItem("token");
         const response = await fetch(
-          `${process.env.REACT_APP_BACKEND_URL}/api/users/${user.id}/avatar?auth=${token}`,
+          `${getBackendUrl()}/api/users/${user.id}/avatar?auth=${token}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (response.ok) {

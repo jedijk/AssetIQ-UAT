@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { threatsAPI, actionsAPI } from "../../lib/api";
+import { getBackendUrl } from "../../lib/apiConfig";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Plus, ClipboardList, Loader2, Sparkles, AlertTriangle, Settings, CheckCircle, Clock, XCircle, ExternalLink, ShieldCheck, UserCheck } from "lucide-react";
@@ -206,7 +207,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   const createFailureModeMutation = useMutation({
     mutationFn: async () => {
       // Create failure mode in FMEA library
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/failure-modes`, {
+      const response = await fetch(`${getBackendUrl()}/api/failure-modes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

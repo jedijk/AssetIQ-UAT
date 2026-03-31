@@ -7,9 +7,10 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Loader2, Shield, Activity, BarChart3, CheckCircle2, Clock } from "lucide-react";
+import { getBackendUrl } from "../lib/apiConfig";
 
 // Background video for login/register (same as login)
-const BACKGROUND_VIDEO = `${process.env.REACT_APP_BACKEND_URL}/api/assets/video/background.mp4`;
+const BACKGROUND_VIDEO = `${getBackendUrl()}/api/assets/video/background.mp4`;
 
 // Styles for register page (shared between form and success states)
 const REGISTER_STYLES = `

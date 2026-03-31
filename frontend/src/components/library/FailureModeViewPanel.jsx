@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../../lib/apiConfig';
 import { useState, useEffect } from "react";
 import { 
   AlertTriangle, Edit, Trash2, X, Plus, Link, CheckCircle, 
@@ -18,7 +19,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
 
 // API base URL for avatar fetching
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = getBackendUrl();
 
 const categoryIcons = {
   Rotating: Cog,

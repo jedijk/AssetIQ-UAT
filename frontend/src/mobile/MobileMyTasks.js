@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../lib/apiConfig';
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
@@ -14,7 +15,7 @@ import {
   ClipboardList
 } from "lucide-react";
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = getBackendUrl();
 
 const MobileMyTasks = () => {
   const [filter, setFilter] = useState("today");

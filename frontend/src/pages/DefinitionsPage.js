@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Sliders, AlertTriangle, BarChart2, Eye, Info, Building2, Check, Pencil, RotateCcw, Save, X, Gauge, ArrowLeft } from "lucide-react";
@@ -37,7 +38,7 @@ import { toast } from "sonner";
 
 import { Shield, Factory, Leaf, Award } from "lucide-react";
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = getBackendUrl();
 
 // Criticality dimension icons
 const CRITICALITY_DIMENSIONS = [

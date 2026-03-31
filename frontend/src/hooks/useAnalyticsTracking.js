@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../lib/apiConfig';
 /**
  * useAnalyticsTracking - Hook for tracking user events
  * 
@@ -12,7 +13,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = getBackendUrl();
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 // Detect device type based on user agent and screen size

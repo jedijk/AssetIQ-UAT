@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../lib/apiConfig';
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import { format, subDays, subMonths, startOfMonth, endOfMonth } from "date-fns";
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = getBackendUrl();
 
 // Fetch functions
 const fetchAnalytics = async (token) => {

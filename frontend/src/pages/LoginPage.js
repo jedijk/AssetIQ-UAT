@@ -8,8 +8,9 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Loader2, Shield, Activity, BarChart3 } from "lucide-react";
 
-// Background video for login/register
-const BACKGROUND_VIDEO = `${process.env.REACT_APP_BACKEND_URL}/api/assets/video/background.mp4`;
+// Background video for login/register - use runtime URL detection
+const getBackendUrl = () => process.env.REACT_APP_BACKEND_URL || window.location.origin;
+const BACKGROUND_VIDEO = `${getBackendUrl()}/api/assets/video/background.mp4`;
 
 const LoginPage = () => {
   const { login } = useAuth();

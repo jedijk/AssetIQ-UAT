@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../lib/apiConfig';
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -67,7 +68,7 @@ import {
 import { Label } from "../components/ui/label";
 
 // Get base URL without /api suffix
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = getBackendUrl();
 
 // Role icons mapping
 const roleIcons = {
@@ -334,7 +335,7 @@ const SettingsUserManagementPage = () => {
   const { data: installationsData } = useQuery({
     queryKey: ["all-installations"],
     queryFn: async () => {
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/equipment-hierarchy/installations`, {
+      const response = await fetch(`${API_BASE_URL}/api/equipment-hierarchy/installations`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
       });
       return response.json();
@@ -346,7 +347,7 @@ const SettingsUserManagementPage = () => {
   const { data: threatsData } = useQuery({
     queryKey: ["threats-for-locations"],
     queryFn: async () => {
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/threats`, {
+      const response = await fetch(`${API_BASE_URL}/api/threats`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
       });
       return response.json();

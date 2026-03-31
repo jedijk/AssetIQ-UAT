@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -80,7 +81,7 @@ import {
 import { Switch } from "../components/ui/switch";
 
 // Get base URL without /api suffix
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = getBackendUrl();
 
 // Field type configuration
 const FIELD_TYPES = [

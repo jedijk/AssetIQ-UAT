@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { equipmentHierarchyAPI } from "../lib/api";
+import { getBackendUrl } from "../lib/apiConfig";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -879,7 +880,7 @@ export default function EquipmentManagerPage() {
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/equipment-hierarchy/export`, {
+      const response = await fetch(`${getBackendUrl()}/api/equipment-hierarchy/export`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (!response.ok) throw new Error('Export failed');

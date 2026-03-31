@@ -1,6 +1,16 @@
 import axios from "axios";
 
-const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
+// Determine API URL at runtime - supports both preview and production deployments
+const getApiUrl = () => {
+  // First check environment variable (set at build time)
+  if (process.env.REACT_APP_BACKEND_URL) {
+    return `${process.env.REACT_APP_BACKEND_URL}/api`;
+  }
+  // Fallback: use current origin (works for any deployment domain)
+  return `${window.location.origin}/api`;
+};
+
+const API_URL = getApiUrl();
 
 // Create axios instance with timeout
 const api = axios.create({

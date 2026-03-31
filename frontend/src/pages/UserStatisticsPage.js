@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../lib/apiConfig';
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -62,7 +63,7 @@ import {
   AreaChart,
 } from "recharts";
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = getBackendUrl();
 
 // API functions
 const userStatsAPI = {

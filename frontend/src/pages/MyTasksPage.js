@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../lib/apiConfig';
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -78,7 +79,7 @@ import { imageAnalysisAPI } from "../lib/api";
 import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
 import { DISCIPLINES } from "../constants/disciplines";
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = getBackendUrl();
 
 // API functions for My Tasks
 const myTasksAPI = {
