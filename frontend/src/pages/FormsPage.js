@@ -437,7 +437,13 @@ const FormsPage = () => {
     unit: "",
     thresholds: {},
     options: [],
+    linked_equipment: null, // Equipment link {id, name, path}
   });
+  
+  // Equipment search state for field linking
+  const [equipmentSearchQuery, setEquipmentSearchQuery] = useState("");
+  const [equipmentSearchResults, setEquipmentSearchResults] = useState([]);
+  const [searchingEquipment, setSearchingEquipment] = useState(false);
 
   // Fetch templates
   const { data: templatesData, isLoading: loadingTemplates } = useQuery({
@@ -510,7 +516,34 @@ const FormsPage = () => {
       unit: "",
       thresholds: {},
       options: [],
+      linked_equipment: null,
     });
+    setEquipmentSearchQuery("");
+    setEquipmentSearchResults([]);
+  };
+  
+  // Search equipment for field linking
+  const searchEquipmentForField = async (query) => {
+    if (!query || query.length < 2) {
+      setEquipmentSearchResults([]);
+      return;
+    }
+    
+    setSearchingEquipment(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/equipment-hierarchy/search?q=${encodeURIComponent(query)}&limit=10`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setEquipmentSearchResults(data.results || []);
+      }
+    } catch (error) {
+      console.error("Equipment search failed:", error);
+    } finally {
+      setSearchingEquipment(false);
+    }
   };
 
   const handleCreateTemplate = () => {
@@ -1133,6 +1166,88 @@ const FormsPage = () => {
                 placeholder="Optional help text for users"
               />
             </div>
+            
+            {/* Equipment Link */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-slate-500" />
+                Link to Equipment (optional)
+              </Label>
+              
+              {newField.linked_equipment ? (
+                <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">{newField.linked_equipment.name}</p>
+                      {newField.linked_equipment.path && (
+                        <p className="text-xs text-blue-600">{newField.linked_equipment.path}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setNewField(prev => ({ ...prev, linked_equipment: null }))}
+                    className="h-7 w-7 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      value={equipmentSearchQuery}
+                      onChange={(e) => {
+                        setEquipmentSearchQuery(e.target.value);
+                        searchEquipmentForField(e.target.value);
+                      }}
+                      placeholder="Search equipment to link..."
+                      className="pl-9"
+                    />
+                    {searchingEquipment && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
+                    )}
+                  </div>
+                  
+                  {equipmentSearchResults.length > 0 && equipmentSearchQuery && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {equipmentSearchResults.map((eq) => (
+                        <button
+                          key={eq.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 border-b border-slate-100 last:border-0"
+                          onClick={() => {
+                            setNewField(prev => ({
+                              ...prev,
+                              linked_equipment: {
+                                id: eq.id,
+                                name: eq.name,
+                                path: eq.path || eq.full_path,
+                                level: eq.level
+                              }
+                            }));
+                            setEquipmentSearchQuery("");
+                            setEquipmentSearchResults([]);
+                          }}
+                        >
+                          <Building2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-900 truncate">{eq.name}</p>
+                            {(eq.path || eq.full_path) && (
+                              <p className="text-xs text-slate-500 truncate">{eq.path || eq.full_path}</p>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-slate-500">Link this field to a specific equipment from the hierarchy</p>
+            </div>
           </div>
 
           <DialogFooter>
@@ -1303,6 +1418,13 @@ const FormsPage = () => {
                                 {field.label}
                                 {field.required && <span className="text-red-500">*</span>}
                               </label>
+                              {/* Linked Equipment Display */}
+                              {field.linked_equipment && (
+                                <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-md w-fit">
+                                  <Building2 className="w-3 h-3" />
+                                  <span>{field.linked_equipment.name}</span>
+                                </div>
+                              )}
                               {field.description && (
                                 <p className="text-xs text-slate-400">{field.description}</p>
                               )}

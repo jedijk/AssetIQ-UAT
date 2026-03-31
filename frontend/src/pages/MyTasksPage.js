@@ -557,6 +557,17 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
     const mobileLabelClass = isMobile ? "text-sm mb-1.5" : "";
     const mobileTextareaRows = isMobile ? 3 : 3;
     
+    // Linked equipment badge component
+    const LinkedEquipmentBadge = () => {
+      if (!field.linked_equipment) return null;
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded w-fit mb-1.5">
+          <Building2 className="w-3 h-3" />
+          <span>{field.linked_equipment.name}</span>
+        </div>
+      );
+    };
+    
     switch (fieldType) {
       case "boolean":
         // Single checkbox/toggle for boolean fields
@@ -633,6 +644,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
               {field.label} {field.required && <span className="text-red-500">*</span>}
               {field.unit && <span className="text-slate-400 font-normal ml-1">({field.unit})</span>}
             </Label>
+            <LinkedEquipmentBadge />
             <Input
               type="number"
               inputMode="decimal"
@@ -671,6 +683,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
+            <LinkedEquipmentBadge />
             <Textarea
               value={value || ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
@@ -689,6 +702,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
+            <LinkedEquipmentBadge />
             <div className={cn(
               "grid gap-1.5",
               isMobile ? "grid-cols-1" : "flex flex-wrap"
