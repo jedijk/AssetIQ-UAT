@@ -5,7 +5,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag } from "lucide-react";
+
+// App version - update this when releasing new versions
+const APP_VERSION = "1.0.0";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -441,6 +444,11 @@ const Layout = () => {
                     {item.label}
                   </DropdownMenuItem>
                 ))}
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1.5 text-[10px] text-slate-400 flex items-center gap-1">
+                  <Tag className="w-3 h-3" />
+                  Version {APP_VERSION}
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -561,6 +569,14 @@ const Layout = () => {
                   {item.label}
                 </NavLink>
               ))}
+            </div>
+            
+            {/* Version Info */}
+            <div className="border-t border-slate-100 pt-2 mt-2 px-3 pb-2">
+              <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                <Tag className="w-3 h-3" />
+                Version {APP_VERSION}
+              </p>
             </div>
           </nav>
         )}
