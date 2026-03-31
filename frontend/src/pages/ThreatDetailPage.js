@@ -123,6 +123,8 @@ const ThreatDetailPage = () => {
     queryFn: () => threatsAPI.getById(id),
     refetchOnMount: "always", // Always refetch when component mounts
     staleTime: 0, // Consider data always stale
+    retry: 3, // Retry up to 3 times on failure (handles 503 errors)
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff
   });
 
   // Fetch equipment hierarchy nodes for Asset dropdown
@@ -398,7 +400,19 @@ const ThreatDetailPage = () => {
   }
 
   if (error || !threat) {
-    const errorMessage = error?.response?.data?.detail || error?.message || "Observation not found";
+    let errorMessage = "Observation not found";
+    if (error?.response?.status === 503) {
+      errorMessage = "Server temporarily unavailable. Please try again.";
+    } else if (error?.response?.status === 504) {
+      errorMessage = "Request timed out. Please try again.";
+    } else if (error?.code === 'ERR_NETWORK') {
+      errorMessage = "Network error. Please check your connection.";
+    } else if (error?.response?.data?.detail) {
+      errorMessage = error.response.data.detail;
+    } else if (error?.message) {
+      errorMessage = error.message;
+    }
+    
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl" data-testid="observation-not-found">
         <div className="text-center py-16">
