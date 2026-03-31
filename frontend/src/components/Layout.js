@@ -381,7 +381,19 @@ const Layout = () => {
               </Tooltip>
             </TooltipProvider>
 
-            {/* Feedback Button - Prominent */}
+            {/* Feedback Button - Mobile in Header */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/settings/feedback")}
+              className="sm:hidden h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              data-testid="mobile-feedback-button"
+              aria-label="Send Feedback"
+            >
+              <MessageCircleQuestion className="w-4 h-4" />
+            </Button>
+
+            {/* Feedback Button - Desktop Prominent */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -715,16 +727,6 @@ const Layout = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Mobile Floating Feedback Button */}
-      <button
-        onClick={() => navigate("/settings/feedback")}
-        className="sm:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center active:scale-95"
-        data-testid="mobile-feedback-fab"
-        aria-label="Send Feedback"
-      >
-        <MessageCircleQuestion className="w-6 h-6" />
-      </button>
     </div>
   );
 };
