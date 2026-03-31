@@ -517,6 +517,16 @@ class FailureModesService:
     def _serialize(self, doc: Dict) -> Dict[str, Any]:
         """Convert MongoDB document to API response format."""
         
+        def safe_isoformat(val):
+            """Safely convert datetime to ISO string, handling already-string values."""
+            if val is None:
+                return None
+            if isinstance(val, str):
+                return val  # Already a string
+            if hasattr(val, 'isoformat'):
+                return val.isoformat()
+            return str(val)
+        
         result = {
             "id": str(doc["_id"]),
             "legacy_id": doc.get("legacy_id"),
@@ -540,13 +550,13 @@ class FailureModesService:
             "validated_by_name": doc.get("validated_by_name"),
             "validated_by_position": doc.get("validated_by_position"),
             "validated_by_id": doc.get("validated_by_id"),
-            "validated_at": doc.get("validated_at").isoformat() if doc.get("validated_at") else None,
+            "validated_at": safe_isoformat(doc.get("validated_at")),
             "is_custom": doc.get("is_custom", False),
             "is_builtin": doc.get("is_builtin", True),
             "version": doc.get("version", 1),
             "rolled_back_from_version": doc.get("rolled_back_from_version"),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
-            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
+            "created_at": safe_isoformat(doc.get("created_at")),
+            "updated_at": safe_isoformat(doc.get("updated_at")),
         }
         
         return result

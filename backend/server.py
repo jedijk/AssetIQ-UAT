@@ -43,13 +43,25 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database indexes on startup."""
+    """Initialize database indexes and seed data on startup."""
+    from database import db
+    
+    # Create indexes
     try:
         from scripts.create_indexes import create_indexes
         created, skipped = await create_indexes()
         logger.info(f"Database indexes: {created} created, {skipped} already existed")
     except Exception as e:
         logger.warning(f"Index creation skipped: {e}")
+    
+    # Seed failure modes library if empty
+    try:
+        from scripts.seed_failure_modes import ensure_failure_modes_seeded
+        seeded = await ensure_failure_modes_seeded(db)
+        if seeded:
+            logger.info("Failure modes library ready")
+    except Exception as e:
+        logger.warning(f"Failure modes seeding skipped: {e}")
 
 
 @app.on_event("shutdown")
