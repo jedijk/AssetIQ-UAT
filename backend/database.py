@@ -11,9 +11,19 @@ from motor.motor_asyncio import AsyncIOMotorClient
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
+# MongoDB connection with proper connection pooling for production
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(
+    mongo_url,
+    maxPoolSize=50,  # Maximum connections in the pool
+    minPoolSize=10,  # Minimum connections to keep alive
+    maxIdleTimeMS=30000,  # Close idle connections after 30 seconds
+    serverSelectionTimeoutMS=10000,  # 10 second timeout for server selection
+    connectTimeoutMS=10000,  # 10 second connection timeout
+    socketTimeoutMS=30000,  # 30 second socket timeout
+    retryWrites=True,  # Retry failed writes
+    retryReads=True,  # Retry failed reads
+)
 db = client[os.environ['DB_NAME']]
 
 # JWT Config

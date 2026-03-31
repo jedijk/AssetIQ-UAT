@@ -5,8 +5,14 @@ Owner role bypasses all installation filtering.
 """
 import logging
 from typing import List, Optional, Set
+from functools import lru_cache
+import asyncio
 
 logger = logging.getLogger(__name__)
+
+# Simple in-memory cache for installation equipment mappings
+_equipment_cache = {}
+_cache_ttl = 300  # 5 minutes
 
 
 class InstallationFilterService:
@@ -25,37 +31,45 @@ class InstallationFilterService:
         Returns empty list if no installations assigned (which means no data access).
         Owner role gets ALL installations.
         """
-        # Owner bypasses filtering - gets all installations
-        if self.is_owner(user):
-            all_installations = await self.db.equipment_nodes.find(
-                {"level": "installation"},
-                {"_id": 0, "id": 1}
-            ).to_list(500)
-            return [node["id"] for node in all_installations]
-        
-        assigned_installations = user.get("assigned_installations", [])
-        
-        if not assigned_installations:
+        try:
+            # Owner bypasses filtering - gets all installations
+            if self.is_owner(user):
+                all_installations = await self.db.equipment_nodes.find(
+                    {"level": "installation"},
+                    {"_id": 0, "id": 1}
+                ).to_list(500)
+                return [node["id"] for node in all_installations]
+            
+            assigned_installations = user.get("assigned_installations", [])
+            
+            if not assigned_installations:
+                return []
+            
+            # Find installation nodes matching the assigned names
+            installation_nodes = await self.db.equipment_nodes.find(
+                {
+                    "level": "installation",
+                    "name": {"$in": assigned_installations}
+                },
+                {"_id": 0, "id": 1, "name": 1}
+            ).to_list(100)
+            
+            return [node["id"] for node in installation_nodes]
+        except Exception as e:
+            logger.error(f"Error getting user installation IDs: {e}")
             return []
-        
-        # Find installation nodes matching the assigned names
-        installation_nodes = await self.db.equipment_nodes.find(
-            {
-                "level": "installation",
-                "name": {"$in": assigned_installations}
-            },
-            {"_id": 0, "id": 1, "name": 1}
-        ).to_list(100)
-        
-        return [node["id"] for node in installation_nodes]
     
     async def get_all_installation_names(self) -> List[str]:
         """Get all installation names (for owner role display)."""
-        installations = await self.db.equipment_nodes.find(
-            {"level": "installation"},
-            {"_id": 0, "name": 1}
-        ).to_list(500)
-        return [inst["name"] for inst in installations]
+        try:
+            installations = await self.db.equipment_nodes.find(
+                {"level": "installation"},
+                {"_id": 0, "name": 1}
+            ).to_list(500)
+            return [inst["name"] for inst in installations]
+        except Exception as e:
+            logger.error(f"Error getting installation names: {e}")
+            return []
     
     async def get_all_equipment_ids_for_installations(
         self, 
@@ -70,33 +84,41 @@ class InstallationFilterService:
         if not installation_ids:
             return set()
         
-        all_ids = set(installation_ids)
-        
-        # Recursively get all children (without created_by filter - equipment is shared)
-        async def get_descendants(parent_ids: List[str]) -> Set[str]:
-            if not parent_ids:
-                return set()
+        try:
+            all_ids = set(installation_ids)
             
-            children = await self.db.equipment_nodes.find(
-                {
-                    "parent_id": {"$in": parent_ids}
-                },
-                {"_id": 0, "id": 1}
-            ).to_list(5000)
+            # Recursively get all children (without created_by filter - equipment is shared)
+            # Use iteration instead of recursion to prevent stack overflow
+            parents_to_process = list(installation_ids)
+            processed = set()
             
-            child_ids = [c["id"] for c in children]
-            if not child_ids:
-                return set()
+            while parents_to_process:
+                # Process in batches to avoid memory issues
+                batch = parents_to_process[:100]
+                parents_to_process = parents_to_process[100:]
+                
+                # Skip already processed
+                batch = [p for p in batch if p not in processed]
+                if not batch:
+                    continue
+                
+                processed.update(batch)
+                
+                children = await self.db.equipment_nodes.find(
+                    {"parent_id": {"$in": batch}},
+                    {"_id": 0, "id": 1}
+                ).to_list(5000)
+                
+                for c in children:
+                    child_id = c["id"]
+                    if child_id not in all_ids:
+                        all_ids.add(child_id)
+                        parents_to_process.append(child_id)
             
-            result = set(child_ids)
-            # Recursively get descendants of children
-            result.update(await get_descendants(child_ids))
-            return result
-        
-        descendants = await get_descendants(installation_ids)
-        all_ids.update(descendants)
-        
-        return all_ids
+            return all_ids
+        except Exception as e:
+            logger.error(f"Error getting equipment IDs for installations: {e}")
+            return set(installation_ids)  # Return at least the installation IDs
     
     async def get_equipment_names_for_installations(
         self,
