@@ -14,11 +14,11 @@ from datetime import datetime
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
-# Test credentials
-TEST_ADMIN_EMAIL = "test@test.com"
-TEST_ADMIN_PASSWORD = "test"
-TEST_OWNER_EMAIL = "jedijk@gmail.com"
-TEST_OWNER_PASSWORD = "admin123"
+# Test credentials from environment variables
+TEST_ADMIN_EMAIL = os.environ.get('TEST_ADMIN_EMAIL', 'test@test.com')
+TEST_ADMIN_PASSWORD = os.environ.get('TEST_ADMIN_PASSWORD', 'test')
+TEST_OWNER_EMAIL = os.environ.get('TEST_OWNER_EMAIL', 'jedijk@gmail.com')
+TEST_OWNER_PASSWORD = os.environ.get('TEST_OWNER_PASSWORD', 'admin123')
 
 
 @pytest.fixture(scope="module")

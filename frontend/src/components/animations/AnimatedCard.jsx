@@ -14,7 +14,7 @@ const AnimatedCard = memo(forwardRef(({
   hoverEffect = true,
   layoutId,
   ...props
-}, ref)) => {
+}, ref) => {
   return (
     <motion.div
       ref={ref}
@@ -39,7 +39,7 @@ const AnimatedCard = memo(forwardRef(({
       {children}
     </motion.div>
   );
-});
+}));
 
 AnimatedCard.displayName = "AnimatedCard";
 

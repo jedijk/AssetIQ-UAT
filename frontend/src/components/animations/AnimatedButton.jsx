@@ -18,7 +18,7 @@ const AnimatedButton = memo(forwardRef(({
   hoverScale = 1.03,
   tapScale = 0.97,
   ...props
-}, ref)) => {
+}, ref) => {
   // Variant styles
   const variantClasses = {
     default: "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm",
@@ -57,7 +57,7 @@ const AnimatedButton = memo(forwardRef(({
       {children}
     </motion.button>
   );
-});
+}));
 
 AnimatedButton.displayName = "AnimatedButton";
 

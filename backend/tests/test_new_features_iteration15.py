@@ -13,9 +13,9 @@ import base64
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
-# Test credentials
-OWNER_EMAIL = "jedijk@gmail.com"
-OWNER_PASSWORD = "admin123"
+# Test credentials from environment or test_credentials.md
+OWNER_EMAIL = os.environ.get('TEST_OWNER_EMAIL', 'jedijk@gmail.com')
+OWNER_PASSWORD = os.environ.get('TEST_OWNER_PASSWORD', 'admin123')
 
 
 @pytest.fixture(scope="module")

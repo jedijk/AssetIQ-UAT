@@ -205,14 +205,14 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
           
           {/* Grid circles */}
           {gridCircles.map((r, i) => (
-            <circle key={i} cx={centerX} cy={centerY} r={r} fill="none" stroke="#e2e8f0" strokeWidth={1} strokeDasharray={i < 3 ? "3,3" : "0"} />
+            <circle key={`grid-${r}`} cx={centerX} cy={centerY} r={r} fill="none" stroke="#e2e8f0" strokeWidth={1} strokeDasharray={i < 3 ? "3,3" : "0"} />
           ))}
           
           {/* Spokes */}
-          {DIMENSIONS.map((_, i) => {
+          {DIMENSIONS.map((dim, i) => {
             const angle = -Math.PI / 2 + i * (2 * Math.PI / DIMENSIONS.length);
             return (
-              <line key={i} x1={centerX} y1={centerY} x2={centerX + radius * Math.cos(angle)} y2={centerY + radius * Math.sin(angle)} stroke="#e2e8f0" strokeWidth={1} />
+              <line key={`spoke-${dim.key}`} x1={centerX} y1={centerY} x2={centerX + radius * Math.cos(angle)} y2={centerY + radius * Math.sin(angle)} stroke="#e2e8f0" strokeWidth={1} />
             );
           })}
           
@@ -221,7 +221,7 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
           
           {/* Data points */}
           {points.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r={5} fill="#EAB308" stroke="#fff" strokeWidth={2} />
+            <circle key={`point-${DIMENSIONS[i]?.key || i}`} cx={p.x} cy={p.y} r={5} fill="#EAB308" stroke="#fff" strokeWidth={2} />
           ))}
           
           {/* Labels - Full text, proper positioning */}
@@ -235,7 +235,7 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
             
             return (
               <text 
-                key={i} 
+                key={`label-${dim.key}`} 
                 x={p.labelX} 
                 y={p.labelY} 
                 textAnchor={anchor} 
