@@ -104,21 +104,21 @@ const LoginPage = () => {
             <h1 className="login-brand-title">AssetIQ</h1>
           </div>
           <div className="login-tagline">
-            <h2>Reliability Intelligence Platform</h2>
-            <p>Capture threats, prioritize risks, and maintain equipment with AI-powered insights</p>
+            <h2>Asset Management Intelligence Platform</h2>
+            <p>Unify asset, reliability, and workforce management in one intelligent platform. Turn data into action with AI-driven insights that reduce downtime and improve operational efficiency.</p>
           </div>
           <div className="login-features">
             <div className="login-feature">
               <Shield className="w-5 h-5" />
-              <span>Risk Prioritization</span>
+              <span>Asset Management</span>
             </div>
             <div className="login-feature">
               <Activity className="w-5 h-5" />
-              <span>FMEA Analysis</span>
+              <span>Reliability Management</span>
             </div>
             <div className="login-feature">
               <BarChart3 className="w-5 h-5" />
-              <span>Real-time Analytics</span>
+              <span>Workforce Management</span>
             </div>
           </div>
         </div>

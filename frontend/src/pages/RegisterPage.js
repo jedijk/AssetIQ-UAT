@@ -265,20 +265,20 @@ const RegisterPage = () => {
             </div>
             <div className="register-tagline">
               <h2>Welcome Aboard!</h2>
-              <p>Your account has been created successfully. You're one step away from accessing powerful reliability intelligence.</p>
+              <p>Your account has been created successfully. You're one step away from accessing powerful asset management intelligence.</p>
             </div>
             <div className="register-features">
               <div className="register-feature">
                 <Shield className="w-5 h-5" />
-                <span>Risk Prioritization</span>
+                <span>Asset Management</span>
               </div>
               <div className="register-feature">
                 <Activity className="w-5 h-5" />
-                <span>FMEA Analysis</span>
+                <span>Reliability Management</span>
               </div>
               <div className="register-feature">
                 <BarChart3 className="w-5 h-5" />
-                <span>Real-time Analytics</span>
+                <span>Workforce Management</span>
               </div>
             </div>
           </div>
@@ -354,21 +354,21 @@ const RegisterPage = () => {
             <h1 className="register-brand-title">AssetIQ</h1>
           </div>
           <div className="register-tagline">
-            <h2>Reliability Intelligence Platform</h2>
-            <p>Capture threats, prioritize risks, and maintain equipment with AI-powered insights</p>
+            <h2>Asset Management Intelligence Platform</h2>
+            <p>Unify asset, reliability, and workforce management in one intelligent platform. Turn data into action with AI-driven insights.</p>
           </div>
           <div className="register-features">
             <div className="register-feature">
               <Shield className="w-5 h-5" />
-              <span>Risk Prioritization</span>
+              <span>Asset Management</span>
             </div>
             <div className="register-feature">
               <Activity className="w-5 h-5" />
-              <span>FMEA Analysis</span>
+              <span>Reliability Management</span>
             </div>
             <div className="register-feature">
               <BarChart3 className="w-5 h-5" />
-              <span>Real-time Analytics</span>
+              <span>Workforce Management</span>
             </div>
           </div>
         </div>
