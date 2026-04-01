@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { threatsAPI, statsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
+import { usePermissions } from "../contexts/PermissionsContext";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { 
@@ -114,6 +115,7 @@ const ThreatsPage = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const { hasPermission } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState([]); // Multi-select: array of selected statuses
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -125,6 +127,10 @@ const ThreatsPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [threatToDelete, setThreatToDelete] = useState(null);
   const [deleteOptions, setDeleteOptions] = useState({ deleteActions: false, deleteInvestigations: false });
+  
+  // Permission checks
+  const canWrite = hasPermission("observations", "write");
+  const canDelete = hasPermission("observations", "delete");
 
   // Toggle status in multi-select
   const toggleStatus = (status) => {
@@ -677,7 +683,8 @@ const ThreatsPage = () => {
                   })()}
                 </div>
 
-                {/* Delete Button */}
+                {/* Delete Button - only show if user has delete permission */}
+                {canDelete && (
                 <button
                   onClick={(e) => handleDeleteClick(e, threat)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
@@ -686,6 +693,7 @@ const ThreatsPage = () => {
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
+                )}
               </div>
             </motion.div>
             );

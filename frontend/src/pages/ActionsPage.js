@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { actionsAPI, usersAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { usePermissions } from "../contexts/PermissionsContext";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -130,6 +131,7 @@ export default function ActionsPage() {
   const navigate = useNavigate();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
+  const { hasPermission } = usePermissions();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState([]); // Multi-select: array of selected statuses
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -141,6 +143,10 @@ export default function ActionsPage() {
   const [editingAction, setEditingAction] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  
+  // Permission checks
+  const canWrite = hasPermission("actions", "write");
+  const canDelete = hasPermission("actions", "delete");
   
   // Mobile detection
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -714,6 +720,7 @@ export default function ActionsPage() {
                       }}>
                         <Edit2 className="w-4 h-4 mr-2" /> Edit
                       </DropdownMenuItem>
+                      {canDelete && (
                       <DropdownMenuItem 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -723,6 +730,7 @@ export default function ActionsPage() {
                       >
                         <Trash2 className="w-4 h-4 mr-2" /> Delete
                       </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

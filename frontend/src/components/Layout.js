@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
+import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
@@ -41,6 +42,7 @@ import { usePageTracking } from "../hooks/useAnalyticsTracking";
 
 const Layout = () => {
   const { user, logout } = useAuth();
+  const { hasPermission, canSeeNavItem } = usePermissions();
   const { canUndo, undo, isUndoing, getLastAction, undoCount } = useUndo();
   const { language, toggleLanguage, t } = useLanguage();
   const { isOnline, totalPending, isSyncing, syncAllPending } = useOfflineSync();
@@ -134,35 +136,41 @@ const Layout = () => {
 
   const lastAction = getLastAction();
 
+  // Navigation Items with feature permissions
   const allNavItems = [
     { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
-    { path: "/threats", label: t("nav.observations"), icon: AlertTriangle },
-    { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true },
-    { path: "/actions", label: t("nav.actions"), icon: ClipboardList },
-    { path: "/my-tasks", label: t("nav.myTasks") || "My Tasks", icon: ClipboardCheck },
-    { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true },
+    { path: "/definitions", label: t("nav.definitions") || "Definitions", icon: Tag, desktopOnly: true, feature: "equipment" },
+    { path: "/threats", label: t("nav.observations"), icon: AlertTriangle, feature: "observations" },
+    { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true, feature: "investigations" },
+    { path: "/actions", label: t("nav.actions"), icon: ClipboardList, feature: "actions" },
+    { path: "/my-tasks", label: t("nav.myTasks") || "My Tasks", icon: ClipboardCheck, feature: "tasks" },
+    { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true, feature: "library" },
   ];
   
-  // Filter nav items based on device
-  const navItems = isMobileView 
-    ? allNavItems.filter(item => !item.desktopOnly)
-    : allNavItems;
+  // Filter nav items based on device AND permissions
+  const navItems = allNavItems.filter(item => {
+    // Filter desktop-only items for mobile
+    if (isMobileView && item.desktopOnly) return false;
+    // Filter by permission if feature is specified
+    if (item.feature && !canSeeNavItem(item.path)) return false;
+    return true;
+  });
 
-  // Settings menu items (including Execution, Forms, AI Engine)
+  // Settings menu items with feature permissions
   const allSettingsMenuItems = [
-    { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2, desktopOnly: true },
-    { path: "/tasks", label: t("taskScheduler.execution"), icon: Calendar, desktopOnly: true },
-    { path: "/forms", label: t("forms.title"), icon: FileText, desktopOnly: true },
+    { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2, desktopOnly: true, feature: "equipment" },
+    { path: "/tasks", label: t("taskScheduler.execution"), icon: Calendar, desktopOnly: true, feature: "tasks" },
+    { path: "/forms", label: t("forms.title"), icon: FileText, desktopOnly: true, feature: "forms" },
     { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
-    { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users },
+    { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, feature: "users" },
     { path: "/settings/permissions", label: t("nav.permissions"), icon: Shield, ownerOnly: true, desktopOnly: true },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
-    { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders },
-    { path: "/settings/feedback", label: t("nav.feedback") || "Feedback", icon: MessageCircleQuestion },
+    { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "settings" },
+    { path: "/settings/feedback", label: t("nav.feedback") || "Feedback", icon: MessageCircleQuestion, feature: "feedback" },
   ];
   
-  // Filter settings items based on device and user role
+  // Filter settings items based on device, role, and permissions
   const settingsMenuItems = allSettingsMenuItems.filter(item => {
     // Filter desktop-only items for mobile
     if (isMobileView && item.desktopOnly) return false;
@@ -170,6 +178,8 @@ const Layout = () => {
     if (item.ownerOnly && user?.role !== 'owner') return false;
     // Filter admin-only items for non-admins (owner can also see admin items)
     if (item.adminOnly && user?.role !== 'admin' && user?.role !== 'owner') return false;
+    // Filter by permission if feature is specified
+    if (item.feature && !canSeeNavItem(item.path)) return false;
     return true;
   });
 

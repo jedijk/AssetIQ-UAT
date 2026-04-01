@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { Toaster } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { PermissionsProvider, usePermissions } from "./contexts/PermissionsContext";
 import { UndoProvider } from "./contexts/UndoContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -42,9 +43,10 @@ const queryClient = new QueryClient({
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  const { canAccessRoute, loading: permissionsLoading } = usePermissions();
   const location = useLocation();
   
-  if (loading) {
+  if (loading || permissionsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="loading-dots">
@@ -59,6 +61,12 @@ const ProtectedRoute = ({ children }) => {
   if (!user) {
     // Save the intended destination for post-login redirect
     return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
+  }
+  
+  // Check if user has permission to access this route
+  if (!canAccessRoute(location.pathname)) {
+    // Redirect to dashboard if no permission
+    return <Navigate to="/dashboard" replace />;
   }
   
   return children;
@@ -122,18 +130,19 @@ function App() {
       <ThemeProvider>
         <LanguageProvider>
           <AuthProvider>
-            <UndoProvider>
-              <BrowserRouter>
-                <Toaster 
-                  position="top-center" 
-                  richColors 
-                  closeButton
-                  toastOptions={{
-                  style: {
-                  fontFamily: 'Inter, sans-serif',
-                },
-              }}
-            />
+            <PermissionsProvider>
+              <UndoProvider>
+                <BrowserRouter>
+                  <Toaster 
+                    position="top-center" 
+                    richColors 
+                    closeButton
+                    toastOptions={{
+                    style: {
+                    fontFamily: 'Inter, sans-serif',
+                  },
+                }}
+              />
             <Routes>
               <Route path="/mobile" element={<MobileLayout />} />
               <Route path="/login" element={
@@ -186,6 +195,7 @@ function App() {
             </Routes>
           </BrowserRouter>
         </UndoProvider>
+      </PermissionsProvider>
       </AuthProvider>
     </LanguageProvider>
   </ThemeProvider>

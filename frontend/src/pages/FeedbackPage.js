@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useLanguage } from "../contexts/LanguageContext";
+import { usePermissions } from "../contexts/PermissionsContext";
 import { feedbackAPI } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -132,8 +133,13 @@ const severityColors = {
 
 const FeedbackPage = () => {
   const { t } = useLanguage();
+  const { hasPermission } = usePermissions();
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
+
+  // Permission checks
+  const canWrite = hasPermission("feedback", "write");
+  const canDelete = hasPermission("feedback", "delete");
 
   // Check if mobile viewport
   const [isMobile, setIsMobile] = useState(false);
@@ -1200,10 +1206,14 @@ const FeedbackPage = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {canWrite && (
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(item, e); }}>
                             <Pencil className="w-4 h-4 mr-2" />
                             {t("common.edit") || "Edit"}
                           </DropdownMenuItem>
+                          )}
+                          {canDelete && (
+                          <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             onClick={(e) => { e.stopPropagation(); handleDelete(item.id, e); }}
@@ -1212,6 +1222,8 @@ const FeedbackPage = () => {
                             <Trash2 className="w-4 h-4 mr-2" />
                             {t("common.delete") || "Delete"}
                           </DropdownMenuItem>
+                          </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
@@ -1294,7 +1306,7 @@ const FeedbackPage = () => {
                             </div>
                           </div>
                           
-                          {!isSelectionMode && (
+                          {!isSelectionMode && (canWrite || canDelete) && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-600 flex-shrink-0">
@@ -1302,13 +1314,19 @@ const FeedbackPage = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                {canWrite && (
                                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(item, e); }}>
                                   <Pencil className="w-4 h-4 mr-2" />Edit
                                 </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(item.id, e); }} className="text-red-600">
                                   <Trash2 className="w-4 h-4 mr-2" />Delete
                                 </DropdownMenuItem>
+                                </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
