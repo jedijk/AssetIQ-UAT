@@ -976,9 +976,8 @@ const FeedbackPage = () => {
                       className="text-xs sm:text-sm"
                       data-testid="start-selection-btn"
                     >
-                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">AI Prompt</span>
-                      <span className="sm:hidden">AI</span>
+                      <CheckSquare className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                      Select
                     </Button>
                     <Button
                       onClick={openNewFeedbackModal}
