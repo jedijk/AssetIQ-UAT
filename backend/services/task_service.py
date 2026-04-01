@@ -8,6 +8,7 @@ Implements:
 - Auto-scheduling: Generate instances from plans
 """
 
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 from bson import ObjectId
@@ -264,6 +265,7 @@ class TaskService:
             next_due = self._calculate_next_due(effective_from, 30, "days")
         
         doc = {
+            "id": str(uuid.uuid4()),  # Add explicit id field for index
             "equipment_id": data["equipment_id"],
             "equipment_name": equipment.get("name"),
             "task_template_id": data["task_template_id"],
@@ -293,11 +295,16 @@ class TaskService:
         result = await self.plans.insert_one(doc)
         doc["_id"] = result.inserted_id
         
-        # Increment template usage count
-        await self.templates.update_one(
-            {"_id": ObjectId(data["task_template_id"])},
+        # Increment template usage count - try by string id first, then ObjectId
+        update_result = await self.templates.update_one(
+            {"id": data["task_template_id"]},
             {"$inc": {"usage_count": 1}}
         )
+        if update_result.modified_count == 0 and ObjectId.is_valid(data["task_template_id"]):
+            await self.templates.update_one(
+                {"_id": ObjectId(data["task_template_id"])},
+                {"$inc": {"usage_count": 1}}
+            )
         
         return self._serialize_plan(doc)
     
@@ -1106,7 +1113,7 @@ class TaskService:
     def _serialize_plan(self, doc: Dict) -> Dict[str, Any]:
         """Serialize plan document."""
         return {
-            "id": str(doc["_id"]),
+            "id": doc.get("id") or str(doc["_id"]),
             "equipment_id": doc["equipment_id"],
             "equipment_name": doc.get("equipment_name"),
             "task_template_id": doc["task_template_id"],
