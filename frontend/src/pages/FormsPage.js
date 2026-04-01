@@ -10,37 +10,19 @@ import {
   Plus,
   Search,
   Filter,
-  Settings,
   Trash2,
   Edit,
-  Copy,
   Eye,
   ChevronRight,
   ChevronDown,
   GripVertical,
-  CheckCircle2,
-  AlertCircle,
-  AlertTriangle,
   X,
-  Hash,
-  Type,
-  ToggleLeft,
-  List,
-  Calendar,
-  Upload,
-  Signature,
-  SlidersHorizontal,
   MoreVertical,
-  Clock,
   Layers,
   RefreshCw,
   Smartphone,
   Monitor,
-  MessageSquare,
   Loader2,
-  ExternalLink,
-  Sparkles,
-  Building2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -75,318 +57,23 @@ import { Textarea } from "../components/ui/textarea";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "../components/ui/card";
 import { Switch } from "../components/ui/switch";
 
+// Import extracted form components
+import {
+  formAPI,
+  FIELD_TYPES,
+  TemplateCard,
+  FieldPreview,
+  FieldConfigDialog,
+  SubmissionRow,
+  FormStats,
+  DocumentManager,
+} from "../components/forms";
+
 // Get base URL without /api suffix
 const API_BASE_URL = getBackendUrl();
-
-// Field type configuration
-const FIELD_TYPES = [
-  { value: "numeric", label: "Numeric", icon: Hash, description: "Number with optional thresholds" },
-  { value: "text", label: "Text", icon: Type, description: "Single line text" },
-  { value: "textarea", label: "Text Area", icon: FileText, description: "Multi-line text" },
-  { value: "dropdown", label: "Dropdown", icon: List, description: "Single select from options" },
-  { value: "multi_select", label: "Multi-select", icon: List, description: "Multiple selections" },
-  { value: "boolean", label: "Yes/No", icon: ToggleLeft, description: "Checkbox toggle" },
-  { value: "range", label: "Range Slider", icon: SlidersHorizontal, description: "Slider with min/max" },
-  { value: "date", label: "Date", icon: Calendar, description: "Date picker" },
-  { value: "datetime", label: "Date & Time", icon: Calendar, description: "Date + time picker" },
-  { value: "file", label: "File Upload", icon: Upload, description: "File attachment" },
-  { value: "image", label: "Image", icon: Upload, description: "Image upload" },
-  { value: "signature", label: "Signature", icon: Signature, description: "Digital signature" },
-  { value: "equipment", label: "Equipment", icon: Building2, description: "Select from equipment hierarchy" },
-];
-
-// API functions
-const formAPI = {
-  getTemplates: async (params = {}) => {
-    const queryParams = new URLSearchParams();
-    if (params.discipline) queryParams.append("discipline", params.discipline);
-    if (params.search) queryParams.append("search", params.search);
-    const response = await fetch(`${API_BASE_URL}/api/form-templates?${queryParams}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-    });
-    if (!response.ok) throw new Error("Failed to fetch templates");
-    return response.json();
-  },
-  getTemplate: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-    });
-    if (!response.ok) throw new Error("Failed to fetch template");
-    return response.json();
-  },
-  createTemplate: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/api/form-templates`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) throw new Error("Failed to create template");
-    return response.json();
-  },
-  updateTemplate: async ({ id, data }) => {
-    const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) throw new Error("Failed to update template");
-    return response.json();
-  },
-  deleteTemplate: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-    });
-    if (!response.ok) throw new Error("Failed to delete template");
-    return response.json();
-  },
-  getSubmissions: async (params = {}) => {
-    const queryParams = new URLSearchParams();
-    if (params.form_template_id) queryParams.append("form_template_id", params.form_template_id);
-    if (params.has_warnings) queryParams.append("has_warnings", "true");
-    if (params.has_critical) queryParams.append("has_critical", "true");
-    const response = await fetch(`${API_BASE_URL}/api/form-submissions?${queryParams}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-    });
-    if (!response.ok) throw new Error("Failed to fetch submissions");
-    return response.json();
-  },
-  getAnalytics: async (templateId) => {
-    const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/analytics`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-    });
-    if (!response.ok) throw new Error("Failed to fetch analytics");
-    return response.json();
-  },
-  uploadDocument: async (templateId, file, description) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    if (description) formData.append("description", description);
-    
-    const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      body: formData
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.detail || "Failed to upload document");
-    }
-    return response.json();
-  },
-  deleteDocument: async (templateId, documentId) => {
-    const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents/${documentId}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-    });
-    if (!response.ok) throw new Error("Failed to delete document");
-    return response.json();
-  },
-  searchDocuments: async (templateId, query, documentIds = null) => {
-    const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents/search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
-      body: JSON.stringify({ query, document_ids: documentIds })
-    });
-    if (!response.ok) throw new Error("Failed to search documents");
-    return response.json();
-  },
-};
-
-// Status badge for threshold status
-const ThresholdBadge = ({ status }) => {
-  const config = {
-    normal: { color: "bg-green-100 text-green-800 border-green-200", label: "Normal" },
-    warning: { color: "bg-amber-100 text-amber-800 border-amber-200", label: "Warning" },
-    critical: { color: "bg-red-100 text-red-800 border-red-200", label: "Critical" },
-  };
-  const c = config[status] || config.normal;
-  return <Badge className={c.color}>{c.label}</Badge>;
-};
-
-// Field type icon component
-const FieldTypeIcon = ({ type }) => {
-  const fieldType = FIELD_TYPES.find(f => f.value === type);
-  if (!fieldType) return <FileText className="w-4 h-4" />;
-  const Icon = fieldType.icon;
-  return <Icon className="w-4 h-4" />;
-};
-
-// Form Template Card
-const TemplateCard = ({ template, onEdit, onDelete, onView }) => {
-  return (
-    <Card 
-      className="hover:shadow-md transition-shadow cursor-pointer group"
-      data-testid={`form-template-${template.id}`}
-    >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <CardTitle className="text-base">{template.name}</CardTitle>
-              <CardDescription className="text-sm">
-                {template.field_count || 0} fields
-                {template.discipline && ` • ${template.discipline}`}
-              </CardDescription>
-            </div>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onView(template)}>
-                <Eye className="w-4 h-4 mr-2" /> View
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(template)}>
-                <Edit className="w-4 h-4 mr-2" /> Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDelete(template)} className="text-red-600">
-                <Trash2 className="w-4 h-4 mr-2" /> Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {template.description && (
-          <p className="text-sm text-slate-500 mb-3 line-clamp-2">{template.description}</p>
-        )}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline" className="text-xs">
-            v{template.version}
-          </Badge>
-          {template.require_signature && (
-            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-              <Signature className="w-3 h-3 mr-1" /> Signature
-            </Badge>
-          )}
-          <Badge variant="outline" className="text-xs bg-slate-50">
-            {template.usage_count || 0} submissions
-          </Badge>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-// Field Preview Component
-const FieldPreview = ({ field, onEdit, onDelete }) => {
-  return (
-    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 group">
-      <GripVertical className="w-4 h-4 text-slate-400 cursor-grab" />
-      <div className="h-8 w-8 rounded bg-white border border-slate-200 flex items-center justify-center">
-        <FieldTypeIcon type={field.field_type} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-sm text-slate-800">{field.label}</span>
-          {field.required && (
-            <span className="text-red-500 text-xs">*</span>
-          )}
-        </div>
-        <div className="text-xs text-slate-500">
-          {FIELD_TYPES.find(f => f.value === field.field_type)?.label}
-          {field.unit && ` (${field.unit})`}
-        </div>
-      </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(field)}>
-          <Edit className="w-3.5 h-3.5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600" onClick={() => onDelete(field)}>
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
-      </div>
-    </div>
-  );
-};
-
-// Submission Row Component
-const SubmissionRow = ({ submission }) => {
-  const [expanded, setExpanded] = useState(false);
-  
-  return (
-    <div className="border rounded-lg bg-white overflow-hidden">
-      <div 
-        className="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <Button variant="ghost" size="icon" className="h-6 w-6">
-          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </Button>
-        <div className="flex-1">
-          <div className="font-medium text-sm">{submission.form_template_name}</div>
-          <div className="text-xs text-slate-500">
-            Submitted {new Date(submission.submitted_at).toLocaleString()}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {submission.has_critical && (
-            <Badge className="bg-red-100 text-red-800 border-red-200">
-              <AlertCircle className="w-3 h-3 mr-1" /> Critical
-            </Badge>
-          )}
-          {submission.has_warnings && !submission.has_critical && (
-            <Badge className="bg-amber-100 text-amber-800 border-amber-200">
-              <AlertTriangle className="w-3 h-3 mr-1" /> Warning
-            </Badge>
-          )}
-          {!submission.has_warnings && !submission.has_critical && (
-            <Badge className="bg-green-100 text-green-800 border-green-200">
-              <CheckCircle2 className="w-3 h-3 mr-1" /> Normal
-            </Badge>
-          )}
-        </div>
-      </div>
-      {expanded && (
-        <div className="border-t bg-slate-50 p-4 space-y-2">
-          {submission.values?.map((val, idx) => (
-            <div key={idx} className="flex items-center justify-between text-sm">
-              <span className="text-slate-600">{val.field_label || val.field_id}</span>
-              <div className="flex items-center gap-2">
-                <span className="font-medium">
-                  {typeof val.value === "boolean" ? (val.value ? "Yes" : "No") : val.value}
-                  {val.unit && ` ${val.unit}`}
-                </span>
-                {val.threshold_status && val.threshold_status !== "normal" && (
-                  <ThresholdBadge status={val.threshold_status} />
-                )}
-              </div>
-            </div>
-          ))}
-          {submission.notes && (
-            <div className="mt-3 pt-3 border-t text-sm">
-              <span className="text-slate-500">Notes: </span>
-              <span>{submission.notes}</span>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const FormsPage = () => {
   const { t } = useLanguage();

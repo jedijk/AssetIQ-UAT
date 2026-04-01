@@ -11,3 +11,6 @@ export { FIELD_TYPES, DEFAULT_TEMPLATE_STATE, DEFAULT_FIELD_STATE, getFieldTypeC
 export { TemplateCard } from './TemplateCard';
 export { FieldPreview, ThresholdBadge, FieldTypeIcon } from './FieldPreview';
 export { FieldConfigDialog } from './FieldConfigDialog';
+export { SubmissionRow } from './SubmissionRow';
+export { FormStats } from './FormStats';
+export { DocumentManager } from './DocumentManager';
