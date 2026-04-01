@@ -24,6 +24,26 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 1, 2026 - Form Integration with Task Execution
+**New Feature:**
+1. ✅ **Form Opens When Executing Task** - When opening/executing a task that has a form template linked, the form fields automatically display in the task execution view
+
+**Implementation:**
+- Task templates can be linked to form templates via `form_template_id`
+- When executing an ad-hoc task, form fields are fetched from the linked form template
+- Form fields display with proper input types (numeric with min/max, dropdowns, text areas)
+- Fixed stale `form_template_id` references in task plans
+
+**Backend Changes:**
+- `routes/my_tasks.py`: Added logic to fetch form_fields for ad-hoc tasks without plans (lines 287-305)
+- `routes/my_tasks.py`: `execute_adhoc_plan()` now properly populates `form_fields`, `form_template_name`, `form_documents`
+- Updated task plans with correct form_template_id references
+
+**Files Modified:**
+- `/app/backend/routes/my_tasks.py` - Added form field fetching for ad-hoc tasks
+
+---
+
 ### April 1, 2026 - App-Wide Permission Enforcement
 **Bug Fixes:**
 1. ✅ **Permission System Fixed** - Fixed `PermissionsContext.js` calling non-existent `getMyPermissions()` (changed to `getMy()`)

@@ -285,6 +285,23 @@ async def get_my_tasks(
                             task["form_documents"] = form_template.get("documents", [])
                     except Exception as e:
                         logger.warning(f"Failed to fetch form template {form_template_id}: {e}")
+        else:
+            # For ad-hoc/manual tasks without a plan, check if task_template has a form
+            task_template_id = task.get("task_template_id")
+            if task_template_id:
+                try:
+                    template = await db.task_templates.find_one({"_id": ObjectId(str(task_template_id))})
+                    if template:
+                        task["task_template_name"] = template.get("name", "")
+                        form_template_id = template.get("form_template_id")
+                        if form_template_id:
+                            form_template = await db.form_templates.find_one({"_id": ObjectId(str(form_template_id))})
+                            if form_template:
+                                task["form_fields"] = form_template.get("fields", [])
+                                task["form_template_name"] = form_template.get("name", "")
+                                task["form_documents"] = form_template.get("documents", [])
+                except Exception as e:
+                    logger.warning(f"Failed to fetch template/form for adhoc task: {e}")
         
         # Determine source - check after is_recurring is set
         if task.get("created_from_observation"):
