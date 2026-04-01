@@ -174,8 +174,14 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
   // Mutation to generate causes
   const generateMutation = useMutation({
     mutationFn: () => aiRiskAPI.generateCauses(threatId, { maxCauses: 5 }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ai-causal", threatId] });
+    onSuccess: (data) => {
+      // Update the cache with the new data directly
+      queryClient.setQueryData(["ai-causal", threatId], data);
+      toast.success(t("ai.analysisComplete") || "Causal analysis complete");
+    },
+    onError: (error) => {
+      console.error("Failed to generate causal analysis:", error);
+      toast.error(t("ai.analysisFailed") || "Failed to generate causal analysis");
     },
   });
 
@@ -265,7 +271,7 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
   };
   
   // No analysis yet - show generate button
-  if (causalError && !generateMutation.isPending && !generateMutation.data) {
+  if (!causalData && causalError && !generateMutation.isPending && !generateMutation.data) {
     return (
       <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 p-4">
         <div className="flex items-center justify-between mb-3">
@@ -275,7 +281,7 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
           </div>
         </div>
         <p className="text-sm text-slate-600 mb-4">
-          {t("ai.causalIntelligence")}
+          {t("ai.causalIntelligenceDesc") || "Analyze root causes and contributing factors using AI"}
         </p>
         <Button 
           onClick={handleGenerate}
@@ -286,12 +292,12 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
           {generateMutation.isPending ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              {t("ai.analyzingCauses")}
+              {t("ai.analyzingCauses") || "Analyzing causes..."}
             </>
           ) : (
             <>
               <HelpCircle className="w-4 h-4 mr-2" />
-              {t("ai.whyIsThisHappening")}
+              {t("ai.whyIsThisHappening") || "Why is this happening?"}
             </>
           )}
         </Button>
@@ -299,13 +305,25 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
     );
   }
   
-  // Loading state
-  if (loadingCausal || generateMutation.isPending) {
+  // Loading state - only show when initially loading (not during mutation)
+  if (loadingCausal && !generateMutation.data) {
     return (
       <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 p-4">
         <div className="flex items-center justify-center py-6">
           <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
-          <span className="ml-2 text-sm text-slate-600">Analyzing root causes...</span>
+          <span className="ml-2 text-sm text-slate-600">{t("ai.loadingAnalysis") || "Loading analysis..."}</span>
+        </div>
+      </div>
+    );
+  }
+  
+  // Mutation in progress - show analyzing state
+  if (generateMutation.isPending) {
+    return (
+      <div className="bg-gradient-to-br from-purple-50/50 to-slate-50 rounded-xl border border-purple-200 p-4">
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+          <span className="ml-2 text-sm text-slate-600">{t("ai.analyzingCauses") || "Analyzing root causes..."}</span>
         </div>
       </div>
     );
