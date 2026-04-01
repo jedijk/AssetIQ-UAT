@@ -24,6 +24,26 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 1, 2026 - My Tasks Deletion Bug Fix
+**Bug Fixes:**
+1. ✅ Tasks/Actions Not Removed Instantly When Deleted
+   - **Root Cause**: Frontend `deleteTask` API was only calling `/api/task-instances/{id}` for ALL deletions, but Actions require `/api/actions/{id}` endpoint
+   - **Fix**: Updated `deleteTask` function to accept `isAction` parameter and route to correct endpoint
+   - **Fix**: Updated `deleteMutation` to pass `source_type` info from task object
+   - **Fix**: Updated `handleDeleteTask` to store full task object (not just id/name)
+   - **Fix**: Extended `canDelete` logic to allow deletion of in_progress tasks OR any non-completed action
+   - **Result**: Items now disappear from My Tasks list instantly after deletion
+
+**Files Modified:**
+- `frontend/src/pages/MyTasksPage.js`:
+  - `deleteTask` API function now routes to `/api/actions/{id}` for actions, `/api/task-instances/{id}` for tasks
+  - `deleteMutation` now passes `{ taskId, isAction }` and shows correct toast message type
+  - `handleDeleteTask` stores full task object to preserve `source_type` for routing
+  - Delete confirmation dialog shows "Delete Action" or "Delete Task" based on type
+  - React Query invalidates `["actions"]` cache in addition to existing queries
+
+**Test Report:** `/app/test_reports/iteration_18.json` - 100% pass rate (7/7 backend tests, all frontend Playwright tests passed)
+
 ### April 1, 2026 - AI Security Enhancements
 **Security Features:**
 1. ✅ Input Sanitization for AI Prompts
@@ -229,6 +249,7 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - [x] Allow clearing notifications for user - DONE (April 1, 2026)
 - [x] Fix Definitions page not showing installations on desktop - DONE (April 1, 2026)
 - [x] Fix Causal Intelligence not displaying results after generation - DONE (April 1, 2026)
+- [x] Fix My Tasks deletion not syncing UI instantly - DONE (April 1, 2026)
 
 ### P1 - High (Completed)
 - [x] Equipment Manager restriction - only owner can add new installation - DONE (March 31, 2026)
