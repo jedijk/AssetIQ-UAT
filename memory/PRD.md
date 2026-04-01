@@ -24,7 +24,7 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
-### April 1, 2026 - Bug Fixes: Notification Clearing & Definitions Page
+### April 1, 2026 - Bug Fixes: Notification Clearing, Definitions Page & Causal Intelligence
 **Bug Fixes:**
 1. ✅ Notification Clearing
    - Added `dismissedNotifications` state to Layout.js (was used but never declared)
@@ -37,6 +37,12 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
    - Removed `created_by` filter that was excluding installations created by other users
    - Now matches behavior of `/api/equipment-hierarchy/installations`
    - Desktop users can now see and select installations in the dropdown
+
+3. ✅ Causal Intelligence Display After Generation
+   - Fixed rendering logic in `CausalIntelligencePanel.jsx`
+   - Reordered conditions: check mutation pending first, then check for display data
+   - `displayData` now correctly uses `generateMutation.data || causalData` 
+   - Results now display immediately after AI analysis completes (no page reload needed)
 
 ### April 1, 2026 - Premium Animation System
 **New Features:**
@@ -153,6 +159,7 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - [x] Fix attaching files to forms (pending documents on new templates) - DONE (March 31, 2026)
 - [x] Allow clearing notifications for user - DONE (April 1, 2026)
 - [x] Fix Definitions page not showing installations on desktop - DONE (April 1, 2026)
+- [x] Fix Causal Intelligence not displaying results after generation - DONE (April 1, 2026)
 
 ### P1 - High (Completed)
 - [x] Equipment Manager restriction - only owner can add new installation - DONE (March 31, 2026)

@@ -270,8 +270,41 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
     createInvestigationMutation.mutate(displayData);
   };
   
-  // No analysis yet - show generate button
-  if (!causalData && causalError && !generateMutation.isPending && !generateMutation.data) {
+  // Display data - check mutation data first (most recent), then cached query data
+  const displayData = generateMutation.data || causalData;
+  const probableCauses = displayData?.probable_causes || [];
+  const contributingFactors = displayData?.contributing_factors || [];
+  const summary = displayData?.summary || "";
+  
+  // Mutation in progress - show analyzing state (check this FIRST)
+  if (generateMutation.isPending) {
+    return (
+      <div className="bg-gradient-to-br from-purple-50/50 to-slate-50 rounded-xl border border-purple-200 p-4">
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+          <span className="ml-2 text-sm text-slate-600">{t("ai.analyzingCauses") || "Analyzing root causes..."}</span>
+        </div>
+      </div>
+    );
+  }
+  
+  // If we have display data with causes, show the results (BEFORE checking for no data)
+  if (displayData && probableCauses.length > 0) {
+    // Results are available - fall through to the main render below
+  }
+  // Loading state - only show when initially loading AND no mutation data available
+  else if (loadingCausal && !generateMutation.data) {
+    return (
+      <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 p-4">
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+          <span className="ml-2 text-sm text-slate-600">{t("ai.loadingAnalysis") || "Loading analysis..."}</span>
+        </div>
+      </div>
+    );
+  }
+  // No analysis yet - show generate button (no cached data AND no mutation data)
+  else if (!displayData || probableCauses.length === 0) {
     return (
       <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 p-4">
         <div className="flex items-center justify-between mb-3">
@@ -303,40 +336,6 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
         </Button>
       </div>
     );
-  }
-  
-  // Loading state - only show when initially loading (not during mutation)
-  if (loadingCausal && !generateMutation.data) {
-    return (
-      <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 p-4">
-        <div className="flex items-center justify-center py-6">
-          <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
-          <span className="ml-2 text-sm text-slate-600">{t("ai.loadingAnalysis") || "Loading analysis..."}</span>
-        </div>
-      </div>
-    );
-  }
-  
-  // Mutation in progress - show analyzing state
-  if (generateMutation.isPending) {
-    return (
-      <div className="bg-gradient-to-br from-purple-50/50 to-slate-50 rounded-xl border border-purple-200 p-4">
-        <div className="flex items-center justify-center py-6">
-          <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
-          <span className="ml-2 text-sm text-slate-600">{t("ai.analyzingCauses") || "Analyzing root causes..."}</span>
-        </div>
-      </div>
-    );
-  }
-  
-  // Display data
-  const displayData = generateMutation.data || causalData;
-  const probableCauses = displayData?.probable_causes || [];
-  const contributingFactors = displayData?.contributing_factors || [];
-  const summary = displayData?.summary || "";
-  
-  if (!displayData || probableCauses.length === 0) {
-    return null;
   }
   
   return (
