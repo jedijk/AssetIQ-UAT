@@ -1551,7 +1551,7 @@ const MyTasksPage = () => {
     mutationFn: ({ taskId, isAction }) => myTasksAPI.deleteTask(taskId, isAction),
     onSuccess: (_, variables) => {
       const itemType = variables.isAction ? "Action" : "Task";
-      toast.success(`${itemType} deleted successfully`);
+      toast.success(`${itemType} deleted`);
       // Invalidate all task-related queries for instant sync
       queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["task-instances"] });
@@ -1561,7 +1561,7 @@ const MyTasksPage = () => {
       setDeleteTaskData(null);
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to delete");
+      toast.error("Delete failed");
     },
   });
   
@@ -1973,18 +1973,25 @@ const MyTasksPage = () => {
       
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteTaskData} onOpenChange={(open) => !open && setDeleteTaskData(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] mx-4">
           <DialogHeader>
-            <DialogTitle>Delete {deleteTaskData?.source_type === "action" ? "Action" : "Task"}</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{deleteTaskData?.title}"? This action cannot be undone.
+            <DialogTitle className="text-base sm:text-lg">
+              Delete {deleteTaskData?.source_type === "action" ? "Action" : "Task"}
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              <span className="block">Are you sure you want to delete this item?</span>
+              <span className="block mt-2 font-medium text-slate-700 line-clamp-2 break-words">
+                "{deleteTaskData?.title}"
+              </span>
+              <span className="block mt-2 text-xs text-slate-500">This cannot be undone.</span>
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-2 mt-4">
             <Button 
               variant="outline" 
               onClick={() => setDeleteTaskData(null)}
               disabled={deleteMutation.isPending}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
@@ -1995,6 +2002,7 @@ const MyTasksPage = () => {
                 isAction: deleteTaskData?.source_type === "action" 
               })}
               disabled={deleteMutation.isPending}
+              className="w-full sm:w-auto"
             >
               {deleteMutation.isPending ? (
                 <>
