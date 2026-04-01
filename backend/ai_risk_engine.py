@@ -291,9 +291,8 @@ class AIRiskEngine:
         return LlmChat(
             api_key=self.api_key,
             session_id=session_id,
-            system_message=system_prompt,
-            max_tokens=max_tokens
-        ).with_model("openai", "gpt-5.2")
+            system_message=system_prompt
+        ).with_model("openai", "gpt-5.2").with_params(max_tokens=max_tokens)
     
     def _parse_json_response(self, response: str) -> dict:
         """Parse JSON from LLM response, handling markdown code blocks"""
