@@ -151,8 +151,8 @@ const Layout = () => {
     { path: "/forms", label: t("forms.title"), icon: FileText, desktopOnly: true },
     { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users },
-    { path: "/settings/permissions", label: t("nav.permissions"), icon: Shield, ownerOnly: true },
-    { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true },
+    { path: "/settings/permissions", label: t("nav.permissions"), icon: Shield, ownerOnly: true, desktopOnly: true },
+    { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders },
     { path: "/settings/feedback", label: t("nav.feedback") || "Feedback", icon: MessageCircleQuestion },
@@ -556,28 +556,6 @@ const Layout = () => {
                 {item.label}
               </NavLink>
             ))}
-            
-            {/* Settings Section */}
-            <div className="border-t border-slate-100 pt-2 mt-2">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-3 py-2">Settings</p>
-              {settingsMenuItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 p-3 rounded-lg ${
-                      isActive
-                        ? "bg-blue-50 text-blue-600"
-                        : "text-slate-600 hover:bg-slate-50"
-                    }`
-                  }
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
             
             {/* Version Info */}
             <div className="border-t border-slate-100 pt-2 mt-2 px-3 pb-2">
