@@ -15,6 +15,85 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Definitions"])
 
 
+async def propagate_definitions_to_threats(equipment_id: str, user_id: str, definitions: dict):
+    """
+    When FMEA definitions are updated, recalculate risk scores for threats
+    linked to this equipment and its children.
+    """
+    try:
+        # Get all equipment IDs under this installation/equipment
+        equipment_ids = [equipment_id]
+        
+        # Find children equipment
+        children = await db.equipment_nodes.find(
+            {"parent_id": equipment_id, "created_by": user_id},
+            {"_id": 0, "id": 1}
+        ).to_list(1000)
+        
+        for child in children:
+            equipment_ids.append(child["id"])
+            # Also get grandchildren (recursive would be better but this covers 2 levels)
+            grandchildren = await db.equipment_nodes.find(
+                {"parent_id": child["id"], "created_by": user_id},
+                {"_id": 0, "id": 1}
+            ).to_list(1000)
+            equipment_ids.extend([gc["id"] for gc in grandchildren])
+        
+        # Find threats linked to this equipment hierarchy
+        threats = await db.threats.find(
+            {
+                "created_by": user_id,
+                "$or": [
+                    {"linked_equipment_id": {"$in": equipment_ids}},
+                    {"installation_id": equipment_id}
+                ]
+            },
+            {"_id": 0, "id": 1, "severity": 1, "likelihood": 1, "detectability": 1}
+        ).to_list(1000)
+        
+        if not threats:
+            logger.info(f"No threats found for equipment {equipment_id}")
+            return 0
+        
+        # Recalculate risk scores using new definitions
+        severity_map = {row["rank"]: row for row in definitions.get("severity", [])}
+        occurrence_map = {row["rank"]: row for row in definitions.get("occurrence", [])}
+        detection_map = {row["rank"]: row for row in definitions.get("detection", [])}
+        
+        updated_count = 0
+        for threat in threats:
+            # Get current S, O, D values or defaults
+            severity = threat.get("severity", 5)
+            
+            # Map likelihood to occurrence score
+            likelihood_map = {"Rare": 1, "Unlikely": 2, "Possible": 3, "Likely": 4, "Almost Certain": 5}
+            occurrence = likelihood_map.get(threat.get("likelihood", "Possible"), 3)
+            
+            # Map detectability to detection score
+            detect_map = {"Easy": 1, "Moderate": 3, "Difficult": 5, "Very Difficult": 7, "Almost Impossible": 9}
+            detection = detect_map.get(threat.get("detectability", "Moderate"), 3)
+            
+            # Calculate new RPN
+            rpn = severity * occurrence * detection
+            
+            # Update threat with recalculated values
+            await db.threats.update_one(
+                {"id": threat["id"]},
+                {"$set": {
+                    "rpn": rpn,
+                    "definitions_updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            updated_count += 1
+        
+        logger.info(f"Propagated definitions to {updated_count} threats for equipment {equipment_id}")
+        return updated_count
+        
+    except Exception as e:
+        logger.error(f"Error propagating definitions: {e}")
+        return 0
+
+
 # ============= PYDANTIC MODELS =============
 
 class DefinitionRow(BaseModel):
@@ -289,9 +368,22 @@ async def create_or_update_definitions(
         }
         await db.definitions.insert_one(definitions_doc)
     
+    # Propagate definitions changes to affected threats
+    updated_threats = await propagate_definitions_to_threats(
+        data.equipment_id, 
+        current_user["id"],
+        {
+            "severity": severity_list,
+            "occurrence": occurrence_list,
+            "detection": detection_list,
+            "criticality": criticality_list
+        }
+    )
+    
     return {
         "message": "Definitions saved successfully",
-        "equipment_id": data.equipment_id
+        "equipment_id": data.equipment_id,
+        "threats_updated": updated_threats
     }
 
 
@@ -333,7 +425,17 @@ async def update_definitions(
         {"_id": 0}
     )
     
-    return updated
+    # Propagate definitions changes to affected threats
+    updated_threats = await propagate_definitions_to_threats(
+        equipment_id, 
+        current_user["id"],
+        updated
+    )
+    
+    return {
+        **updated,
+        "threats_updated": updated_threats
+    }
 
 
 @router.delete("/definitions/{equipment_id}")

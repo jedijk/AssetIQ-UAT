@@ -520,10 +520,29 @@ export default function DefinitionsPage() {
   // Mutations
   const saveMutation = useMutation({
     mutationFn: definitionsAPI.saveDefinitions,
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Invalidate definitions queries
       queryClient.invalidateQueries(["definitions", selectedInstallation]);
       queryClient.invalidateQueries(["definitions-installations"]);
-      toast.success(t("definitions.saved"));
+      
+      // Invalidate threat-related queries to reflect updated FMEA data
+      queryClient.invalidateQueries(["threats"]);
+      queryClient.invalidateQueries(["threat"]);
+      queryClient.invalidateQueries(["observations"]);
+      
+      // Invalidate chat queries to ensure chat uses latest definitions
+      queryClient.invalidateQueries(["chat"]);
+      
+      // Invalidate dashboard and stats
+      queryClient.invalidateQueries(["dashboard"]);
+      queryClient.invalidateQueries(["stats"]);
+      
+      const threatsUpdated = data?.threats_updated || 0;
+      if (threatsUpdated > 0) {
+        toast.success(`${t("definitions.saved")} - ${threatsUpdated} ${t("common.threats")} ${t("common.updated")}`);
+      } else {
+        toast.success(t("definitions.saved"));
+      }
       setIsEditing(false);
     },
     onError: () => toast.error("Failed to save definitions")
@@ -532,8 +551,18 @@ export default function DefinitionsPage() {
   const resetMutation = useMutation({
     mutationFn: definitionsAPI.resetDefinitions,
     onSuccess: () => {
+      // Invalidate definitions queries
       queryClient.invalidateQueries(["definitions", selectedInstallation]);
       queryClient.invalidateQueries(["definitions-installations"]);
+      
+      // Invalidate threat-related queries
+      queryClient.invalidateQueries(["threats"]);
+      queryClient.invalidateQueries(["threat"]);
+      queryClient.invalidateQueries(["observations"]);
+      queryClient.invalidateQueries(["chat"]);
+      queryClient.invalidateQueries(["dashboard"]);
+      queryClient.invalidateQueries(["stats"]);
+      
       toast.success("Definitions reset to defaults");
       setShowResetConfirm(false);
       setIsEditing(false);
