@@ -556,14 +556,6 @@ const Layout = () => {
                 {item.label}
               </NavLink>
             ))}
-            
-            {/* Version Info */}
-            <div className="border-t border-slate-100 pt-2 mt-2 px-3 pb-2">
-              <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                <Tag className="w-3 h-3" />
-                Version {APP_VERSION}
-              </p>
-            </div>
           </nav>
         )}
       </header>
