@@ -1,0 +1,111 @@
+{
+  "summary": "Tested My Tasks deletion bug fix. All features working correctly: Actions delete via /api/actions/{id}, Tasks delete via /api/task-instances/{id}, delete confirmation shows correct type, items removed instantly from list, toast shows correct message.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_delete_tasks_actions.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "deleteTask API function correctly routes to /api/actions/{id} for actions and /api/task-instances/{id} for tasks based on isAction parameter",
+    "deleteMutation correctly passes source_type info via isAction: deleteTaskData?.source_type === 'action'",
+    "handleDeleteTask stores full task object to preserve source_type for routing",
+    "canDelete logic allows deletion of: in_progress tasks OR any non-completed action",
+    "React Query cache invalidation properly configured with queryClient.invalidateQueries for my-tasks, task-instances, task-stats, adhoc-plans, and actions"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_delete_tasks_actions.py"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7 tests passed)",
+    "frontend": "100% (All deletion features verified via Playwright)"
+  },
+  "test_credentials": {
+    "owner": "jedijk@gmail.com / admin123"
+  },
+  "seed_data_creation": "",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "My Tasks deletion bug is fixed. Actions use /api/actions/{id} endpoint, Task Instances use /api/task-instances/{id}. The frontend deleteTask API function checks isAction parameter to route correctly. Delete buttons appear for in_progress tasks OR any non-completed action.",
+  "features_tested": {
+    "delete_action_from_my_tasks": {
+      "description": "Delete an Action from My Tasks page calls /api/actions/{id}",
+      "status": "PASS",
+      "details": "Clicked delete button on action card, confirmed deletion, action removed from list instantly"
+    },
+    "delete_confirmation_dialog_type": {
+      "description": "Delete confirmation dialog shows correct type (Action vs Task)",
+      "status": "PASS",
+      "details": "Dialog title shows 'Delete Action' for actions, includes task title in confirmation message"
+    },
+    "my_tasks_page_loads_with_delete_buttons": {
+      "description": "My Tasks page loads correctly with action cards showing delete buttons",
+      "status": "PASS",
+      "details": "Found 19 task cards with 19 delete buttons visible"
+    },
+    "toast_message_correct_type": {
+      "description": "Toast message shows correct type after deletion",
+      "status": "PASS",
+      "details": "Toast shows 'Action deleted successfully' for action deletion"
+    },
+    "react_query_cache_invalidation": {
+      "description": "Deleted items do not reappear after page interaction",
+      "status": "PASS",
+      "details": "Task count decreased from 19 to 18 after deletion, item not in list"
+    },
+    "delete_task_instance_endpoint": {
+      "description": "DELETE /api/task-instances/{id} endpoint exists and works",
+      "status": "PASS",
+      "details": "Endpoint returns 404 for non-existent task (not 405 method not allowed)"
+    },
+    "source_type_field_present": {
+      "description": "My Tasks response includes source_type field for routing",
+      "status": "PASS",
+      "details": "All tasks have source_type field with value 'action' or 'task'"
+    }
+  },
+  "backend_api_tests": {
+    "GET /api/my-tasks": {
+      "status": "PASS",
+      "response": "Returns tasks with source_type field for routing delete requests"
+    },
+    "DELETE /api/actions/{id}": {
+      "status": "PASS",
+      "response": "Returns {message: 'Action deleted'} and removes action from database"
+    },
+    "DELETE /api/task-instances/{id}": {
+      "status": "PASS",
+      "response": "Endpoint exists and returns 404 for non-existent tasks"
+    }
+  },
+  "playwright_tests": {
+    "login_as_owner": "PASS",
+    "my_tasks_page_load": "PASS",
+    "task_cards_visible": "PASS (19 cards)",
+    "delete_buttons_visible": "PASS (19 buttons)",
+    "click_delete_button": "PASS",
+    "delete_confirmation_dialog": "PASS",
+    "dialog_shows_delete_action": "PASS",
+    "click_confirm_delete": "PASS",
+    "toast_action_deleted": "PASS",
+    "task_removed_from_list": "PASS (count 19 -> 18)"
+  },
+  "unit_tests": {
+    "test_file": "/app/backend/tests/test_delete_tasks_actions.py",
+    "total_tests": 7,
+    "passed": 7,
+    "failed": 0,
+    "test_classes": [
+      "TestDeleteActions (3 tests)",
+      "TestDeleteTaskInstances (2 tests)",
+      "TestMyTasksDeleteLogic (2 tests)"
+    ]
+  }
+}

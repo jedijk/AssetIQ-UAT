@@ -176,12 +176,17 @@ const myTasksAPI = {
     }
   },
   
-  deleteTask: async (taskId) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-instances/${taskId}`, {
+  deleteTask: async (taskId, isAction = false) => {
+    // Use different endpoint for actions vs task instances
+    const endpoint = isAction 
+      ? `${API_BASE_URL}/api/actions/${taskId}`
+      : `${API_BASE_URL}/api/task-instances/${taskId}`;
+    
+    const response = await fetch(endpoint, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
-    if (!response.ok) throw new Error("Failed to delete task");
+    if (!response.ok) throw new Error(isAction ? "Failed to delete action" : "Failed to delete task");
     return response.json();
   },
 };
@@ -219,7 +224,9 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
   const isDueToday = task.due_date && isToday(parseISO(task.due_date));
   const isAction = task.source_type === "action";
   const isTask = task.source_type === "task";
-  const canDelete = isTask && task.status === "in_progress";
+  // Allow deletion of: tasks with in_progress status OR any action that's not completed
+  const canDelete = (isTask && task.status === "in_progress") || 
+                    (isAction && task.status !== "completed");
   const TypeIcon = isAction 
     ? (task.action_type === "PM" ? Wrench : task.action_type === "PDM" ? Target : AlertTriangle)
     : (taskTypeIcons[task.mitigation_strategy] || ClipboardList);
@@ -1538,30 +1545,29 @@ const MyTasksPage = () => {
   });
   
   // Delete task state and mutation
-  const [deleteTaskId, setDeleteTaskId] = useState(null);
-  const [deleteTaskName, setDeleteTaskName] = useState("");
+  const [deleteTaskData, setDeleteTaskData] = useState(null); // Store full task object for delete
   
   const deleteMutation = useMutation({
-    mutationFn: (taskId) => myTasksAPI.deleteTask(taskId),
-    onSuccess: () => {
-      toast.success("Task deleted successfully");
+    mutationFn: ({ taskId, isAction }) => myTasksAPI.deleteTask(taskId, isAction),
+    onSuccess: (_, variables) => {
+      const itemType = variables.isAction ? "Action" : "Task";
+      toast.success(`${itemType} deleted successfully`);
       // Invalidate all task-related queries for instant sync
       queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["task-instances"] });
       queryClient.invalidateQueries({ queryKey: ["task-stats"] });
       queryClient.invalidateQueries({ queryKey: ["adhoc-plans"] });
-      setDeleteTaskId(null);
-      setDeleteTaskName("");
+      queryClient.invalidateQueries({ queryKey: ["actions"] }); // Also invalidate actions
+      setDeleteTaskData(null);
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to delete task");
+      toast.error(error.message || "Failed to delete");
     },
   });
   
-  // Handle delete task
+  // Handle delete task - store full task object
   const handleDeleteTask = (task) => {
-    setDeleteTaskId(task.id);
-    setDeleteTaskName(task.title);
+    setDeleteTaskData(task);
   };
   
   // Handle task open
@@ -1966,25 +1972,28 @@ const MyTasksPage = () => {
       </div>
       
       {/* Delete Confirmation Dialog */}
-      <Dialog open={!!deleteTaskId} onOpenChange={(open) => !open && setDeleteTaskId(null)}>
+      <Dialog open={!!deleteTaskData} onOpenChange={(open) => !open && setDeleteTaskData(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete Task</DialogTitle>
+            <DialogTitle>Delete {deleteTaskData?.source_type === "action" ? "Action" : "Task"}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{deleteTaskName}"? This action cannot be undone.
+              Are you sure you want to delete "{deleteTaskData?.title}"? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button 
               variant="outline" 
-              onClick={() => setDeleteTaskId(null)}
+              onClick={() => setDeleteTaskData(null)}
               disabled={deleteMutation.isPending}
             >
               Cancel
             </Button>
             <Button 
               variant="destructive" 
-              onClick={() => deleteMutation.mutate(deleteTaskId)}
+              onClick={() => deleteMutation.mutate({ 
+                taskId: deleteTaskData?.id, 
+                isAction: deleteTaskData?.source_type === "action" 
+              })}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? (
