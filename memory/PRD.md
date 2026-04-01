@@ -24,6 +24,31 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 1, 2026 - Major Feature Improvements (7 Items)
+**New Features:**
+1. ✅ **Dashboard Form Submissions Widget** - Added widget showing last 10 form submissions with submitter, date, and status
+2. ✅ **User Management Permissions Tab** - Moved Permissions to dedicated tab in User Management page
+3. ✅ **AI Usage Logging** - Added `log_ai_usage()` helper to track all AI feature invocations
+
+**Bug Fixes:**
+4. ✅ **Form Designer Error Handling** - Added error states with retry buttons for failed API calls
+5. ✅ **AI Causal Intelligence** - Improved error handling with specific messages for rate limits and config errors
+6. ✅ **Feedback Mobile Click** - Made entire feedback card clickable with proper event propagation
+7. ✅ **Missing Translations** - Added `recentFormSubmissions`, `noFormSubmissions` to LanguageContext
+
+**Files Modified:**
+- `frontend/src/pages/FormsPage.js` - Error states, retry buttons, fixed missing imports
+- `frontend/src/pages/DashboardPage.js` - Added form submissions widget (4-column grid)
+- `frontend/src/pages/SettingsUserManagementPage.js` - Added Users/Permissions tabs
+- `frontend/src/pages/SettingsPermissionsPage.js` - Added `embedded` prop support
+- `frontend/src/pages/FeedbackPage.js` - Made cards fully clickable
+- `frontend/src/components/forms/formAPI.js` - Added error throwing for failed requests
+- `frontend/src/components/CausalIntelligencePanel.jsx` - Improved error messages
+- `backend/routes/ai_routes.py` - Added `log_ai_usage()` calls to AI endpoints
+- `frontend/src/contexts/LanguageContext.js` - Added missing translations
+
+**Test Report:** `/app/test_reports/iteration_19.json` - 100% pass rate (backend 9/9, frontend 7/7)
+
 ### April 1, 2026 - My Tasks Deletion Bug Fix
 **Bug Fixes:**
 1. ✅ Tasks/Actions Not Removed Instantly When Deleted
