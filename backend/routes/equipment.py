@@ -150,8 +150,12 @@ async def search_equipment(
     if not q or len(q) < 2:
         return {"results": []}
     
-    # Get user's assigned installations for filtering
+    # Get user's role and assigned installations
+    user_role = current_user.get("role", "viewer")
     assigned = current_user.get("assigned_installations", [])
+    
+    # Owners and admins can see ALL equipment - no filtering needed
+    is_admin_or_owner = user_role in ["owner", "admin"]
     
     # First, do the name search
     search_filter = {
@@ -162,10 +166,10 @@ async def search_equipment(
     nodes = await db.equipment_nodes.find(
         search_filter,
         {"_id": 0, "id": 1, "name": 1, "level": 1, "parent_id": 1, "full_path": 1, "installation_id": 1}
-    ).limit(limit * 3).to_list(limit * 3)  # Get more initially for filtering
+    ).limit(limit if is_admin_or_owner else limit * 3).to_list(limit if is_admin_or_owner else limit * 3)
     
-    # If user has assigned installations, filter results by hierarchy
-    if assigned:
+    # If user is NOT admin/owner and has assigned installations, filter results by hierarchy
+    if not is_admin_or_owner and assigned:
         # Get IDs of assigned installations
         installations = await db.equipment_nodes.find(
             {"level": "installation", "name": {"$in": assigned}},
