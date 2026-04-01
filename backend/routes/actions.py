@@ -78,6 +78,12 @@ class CentralActionCreate(BaseModel):
     discipline: Optional[str] = None
     due_date: Optional[str] = None
     comments: Optional[str] = None
+    # RPN and risk from original observation (optional - will be auto-fetched if not provided)
+    rpn: Optional[int] = None
+    risk_score: Optional[int] = None
+    risk_level: Optional[str] = None
+    # Original threat ID if creating from investigation
+    threat_id: Optional[str] = None
 
 
 class CentralActionUpdate(BaseModel):
@@ -166,23 +172,31 @@ async def get_all_actions(
     enriched_actions = []
     for action in actions:
         enriched_action = dict(action)
-        enriched_action["threat_rpn"] = None
-        enriched_action["threat_risk_score"] = None
-        enriched_action["threat_risk_level"] = None
         
-        # If action is linked to a threat, fetch the threat data
-        if action.get("source_type") == "threat" and action.get("source_id"):
-            try:
-                threat = await db.threats.find_one(
-                    {"id": action["source_id"]}, 
-                    {"_id": 0, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1}
-                )
-                if threat:
-                    enriched_action["threat_rpn"] = threat.get("fmea_rpn")
-                    enriched_action["threat_risk_score"] = threat.get("risk_score")
-                    enriched_action["threat_risk_level"] = threat.get("risk_level")
-            except Exception as e:
-                logger.error(f"Error fetching threat data: {e}")
+        # Use stored values if available, otherwise fetch from threat
+        if action.get("rpn") is not None:
+            enriched_action["threat_rpn"] = action.get("rpn")
+            enriched_action["threat_risk_score"] = action.get("risk_score")
+            enriched_action["threat_risk_level"] = action.get("risk_level")
+        else:
+            enriched_action["threat_rpn"] = None
+            enriched_action["threat_risk_score"] = None
+            enriched_action["threat_risk_level"] = None
+            
+            # Try to fetch from linked threat (for backwards compatibility with old actions)
+            threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
+            if threat_id:
+                try:
+                    threat = await db.threats.find_one(
+                        {"id": threat_id}, 
+                        {"_id": 0, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1}
+                    )
+                    if threat:
+                        enriched_action["threat_rpn"] = threat.get("fmea_rpn")
+                        enriched_action["threat_risk_score"] = threat.get("risk_score")
+                        enriched_action["threat_risk_level"] = threat.get("risk_level")
+                except Exception as e:
+                    logger.error(f"Error fetching threat data: {e}")
         
         enriched_actions.append(enriched_action)
     
@@ -257,6 +271,36 @@ async def create_central_action(
     count = await db.central_actions.count_documents({"created_by": current_user["id"]})
     action_number = f"ACT-{count + 1:04d}"
     
+    # Initialize RPN and risk values from input or defaults
+    rpn = data.rpn
+    risk_score = data.risk_score
+    risk_level = data.risk_level
+    threat_id = data.threat_id
+    
+    # If creating from an investigation, try to get RPN/risk from the original threat
+    if data.source_type == "investigation" and rpn is None:
+        # First, get the investigation to find the linked threat
+        investigation = await db.investigations.find_one({"id": data.source_id})
+        if investigation:
+            # The investigation should have a threat_id linking to the original observation
+            linked_threat_id = investigation.get("threat_id") or threat_id
+            if linked_threat_id:
+                threat = await db.threats.find_one({"id": linked_threat_id})
+                if threat:
+                    rpn = threat.get("fmea_rpn") or threat.get("rpn")
+                    risk_score = threat.get("risk_score")
+                    risk_level = threat.get("risk_level")
+                    threat_id = linked_threat_id
+    
+    # If creating directly from a threat, get RPN/risk from the threat
+    elif data.source_type == "threat" and rpn is None:
+        threat = await db.threats.find_one({"id": data.source_id})
+        if threat:
+            rpn = threat.get("fmea_rpn") or threat.get("rpn")
+            risk_score = threat.get("risk_score")
+            risk_level = threat.get("risk_level")
+            threat_id = data.source_id
+    
     action_doc = {
         "id": action_id,
         "action_number": action_number,
@@ -265,6 +309,7 @@ async def create_central_action(
         "source_type": data.source_type,
         "source_id": data.source_id,
         "source_name": data.source_name,
+        "threat_id": threat_id,  # Store reference to original threat
         "priority": data.priority,
         "assignee": data.assignee,
         "action_type": data.action_type,
@@ -273,6 +318,10 @@ async def create_central_action(
         "status": "open",
         "comments": data.comments or "",
         "completion_notes": None,
+        # Store RPN and risk from original observation
+        "rpn": rpn,
+        "risk_score": risk_score,
+        "risk_level": risk_level,
         "created_by": current_user["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()

@@ -545,6 +545,8 @@ export default function CausalEnginePage() {
       action_type: action.action_type || "",
       discipline: action.discipline || "",
       due_date: action.due_date || null,
+      // Pass threat_id to inherit RPN and risk from original observation
+      threat_id: investigation?.threat_id || null,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
