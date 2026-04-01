@@ -238,6 +238,11 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ai-insights", threatId] });
       setAddedRecommendations(new Set()); // Reset added state on new analysis
+      toast.success(t("ai.analysisComplete") || "AI analysis complete");
+    },
+    onError: (error) => {
+      console.error("AI analysis failed:", error);
+      toast.error(t("ai.analysisFailed") || "AI analysis failed");
     },
   });
 
