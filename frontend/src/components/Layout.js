@@ -233,16 +233,28 @@ const Layout = () => {
                   to={item.path}
                   end={item.path === "/"}
                   className={({ isActive }) =>
-                    `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150 whitespace-nowrap ${
+                    `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap ${
                       isActive 
                         ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300" 
-                        : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                     }`
                   }
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
-                  <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                  {item.label}
+                  {({ isActive }) => (
+                    <motion.div
+                      className="flex items-center gap-1.5"
+                      whileHover={{ scale: 1.03, y: -1 }}
+                      whileTap={{ scale: 0.97 }}
+                      transition={springPresets.snappy}
+                      style={{
+                        backgroundColor: isActive ? undefined : "transparent",
+                      }}
+                    >
+                      <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                      {item.label}
+                    </motion.div>
+                  )}
                 </NavLink>
               ))}
             </nav>
@@ -253,19 +265,30 @@ const Layout = () => {
             {/* Notifications Bell */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900 relative"
-                  data-testid="notifications-button"
+                <motion.div
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.92 }}
+                  transition={springPresets.snappy}
                 >
-                  <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  {overdueCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5">
-                      {overdueCount > 9 ? "9+" : overdueCount}
-                    </span>
-                  )}
-                </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900 relative"
+                    data-testid="notifications-button"
+                  >
+                    <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    {overdueCount > 0 && (
+                      <motion.span 
+                        className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={springPresets.bouncy}
+                      >
+                        {overdueCount > 9 ? "9+" : overdueCount}
+                      </motion.span>
+                    )}
+                  </Button>
+                </motion.div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
                 <DropdownMenuLabel className="flex items-center justify-between">
@@ -332,35 +355,46 @@ const Layout = () => {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`h-7 w-7 sm:h-8 sm:w-8 relative ${
-                      isOnline 
-                        ? totalPending > 0 ? "text-amber-500 hover:text-amber-600" : "text-green-500 hover:text-green-600"
-                        : "text-red-500 hover:text-red-600"
-                    }`}
-                    onClick={isOnline && totalPending > 0 ? syncAllPending : undefined}
-                    disabled={isSyncing || !isOnline}
-                    data-testid="offline-status-button"
+                  <motion.div
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.92 }}
+                    transition={springPresets.snappy}
                   >
-                    {isSyncing ? (
-                      <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
-                    ) : isOnline ? (
-                      totalPending > 0 ? (
-                        <Cloud className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-7 w-7 sm:h-8 sm:w-8 relative ${
+                        isOnline 
+                          ? totalPending > 0 ? "text-amber-500 hover:text-amber-600" : "text-green-500 hover:text-green-600"
+                          : "text-red-500 hover:text-red-600"
+                      }`}
+                      onClick={isOnline && totalPending > 0 ? syncAllPending : undefined}
+                      disabled={isSyncing || !isOnline}
+                      data-testid="offline-status-button"
+                    >
+                      {isSyncing ? (
+                        <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                      ) : isOnline ? (
+                        totalPending > 0 ? (
+                          <Cloud className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        ) : (
+                          <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        )
                       ) : (
-                        <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      )
-                    ) : (
-                      <WifiOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    )}
-                    {totalPending > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5">
-                        {totalPending > 9 ? "9+" : totalPending}
-                      </span>
-                    )}
-                  </Button>
+                        <WifiOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      )}
+                      {totalPending > 0 && (
+                        <motion.span 
+                          className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={springPresets.bouncy}
+                        >
+                          {totalPending > 9 ? "9+" : totalPending}
+                        </motion.span>
+                      )}
+                    </Button>
+                  </motion.div>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
                   {isSyncing ? (
@@ -382,15 +416,21 @@ const Layout = () => {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleLanguage}
-                    className="h-6 w-6 sm:h-7 sm:w-7 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                    data-testid="language-switcher"
+                  <motion.div
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.92 }}
+                    transition={springPresets.snappy}
                   >
-                    <span className="font-medium">{language.toUpperCase()}</span>
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={toggleLanguage}
+                      className="h-6 w-6 sm:h-7 sm:w-7 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                      data-testid="language-switcher"
+                    >
+                      <span className="font-medium">{language.toUpperCase()}</span>
+                    </Button>
+                  </motion.div>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
                   <p>{language === "en" ? "Switch to Dutch" : "Wissel naar Engels"}</p>
@@ -414,17 +454,23 @@ const Layout = () => {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate("/settings/feedback")}
-                    className="hidden sm:flex h-7 sm:h-8 px-2 sm:px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300"
-                    data-testid="feedback-button"
-                    aria-label="Send Feedback"
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={springPresets.snappy}
                   >
-                    <MessageCircleQuestion className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1.5" />
-                    <span className="hidden lg:inline text-xs sm:text-sm font-medium">{t("nav.feedback") || "Feedback"}</span>
-                  </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate("/settings/feedback")}
+                      className="hidden sm:flex h-7 sm:h-8 px-2 sm:px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300"
+                      data-testid="feedback-button"
+                      aria-label="Send Feedback"
+                    >
+                      <MessageCircleQuestion className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1.5" />
+                      <span className="hidden lg:inline text-xs sm:text-sm font-medium">{t("nav.feedback") || "Feedback"}</span>
+                    </Button>
+                  </motion.div>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
                   <p>{t("nav.feedback") || "Feedback"}</p>
@@ -435,14 +481,20 @@ const Layout = () => {
             {/* Settings Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900"
-                  data-testid="settings-menu-button"
+                <motion.div
+                  whileHover={{ scale: 1.08, rotate: 15 }}
+                  whileTap={{ scale: 0.92 }}
+                  transition={springPresets.snappy}
                 >
-                  <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900"
+                    data-testid="settings-menu-button"
+                  >
+                    <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </Button>
+                </motion.div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuLabel className="text-xs">{t("nav.settings")}</DropdownMenuLabel>
@@ -469,9 +521,12 @@ const Layout = () => {
             {/* User Avatar with Profile Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button 
-                  className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden border-2 border-slate-200 hover:border-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                <motion.button 
+                  className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden border-2 border-slate-200 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   data-testid="user-avatar-button"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={springPresets.snappy}
                 >
                   {avatarUrl ? (
                     <img
@@ -484,7 +539,7 @@ const Layout = () => {
                       {user?.name?.charAt(0)?.toUpperCase() || "U"}
                     </div>
                   )}
-                </button>
+                </motion.button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 <div className="px-3 py-3 border-b border-slate-100">
@@ -608,9 +663,22 @@ const Layout = () => {
           />
         </div>
 
-        {/* Main Content */}
+        {/* Main Content with Page Transitions */}
         <main className="flex-1 min-w-0">
-          <Outlet />
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{
+              type: "tween",
+              duration: 0.25,
+              ease: [0.25, 0.1, 0.25, 1],
+            }}
+            className="h-full"
+          >
+            <Outlet />
+          </motion.div>
         </main>
       </div>
 
