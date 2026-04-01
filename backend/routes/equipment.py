@@ -153,37 +153,68 @@ async def search_equipment(
     # Get user's assigned installations for filtering
     assigned = current_user.get("assigned_installations", [])
     
-    # Build installation filter
-    installation_ids = []
-    if assigned:
-        # Get IDs of assigned installations
-        installations = await db.equipment_nodes.find(
-            {"level": "installation", "name": {"$in": assigned}},
-            {"_id": 0, "id": 1}
-        ).to_list(100)
-        installation_ids = [i["id"] for i in installations]
-    
-    # Search query - case insensitive
+    # First, do the name search
     search_filter = {
         "name": {"$regex": q, "$options": "i"}
     }
     
-    # Apply installation filter if user has assigned installations
-    if installation_ids:
-        search_filter["$or"] = [
-            {"installation_id": {"$in": installation_ids}},
-            {"id": {"$in": installation_ids}},  # Include the installations themselves
-        ]
-    
     # Search equipment nodes
     nodes = await db.equipment_nodes.find(
         search_filter,
-        {"_id": 0, "id": 1, "name": 1, "level": 1, "parent_id": 1, "full_path": 1}
-    ).limit(limit).to_list(limit)
+        {"_id": 0, "id": 1, "name": 1, "level": 1, "parent_id": 1, "full_path": 1, "installation_id": 1}
+    ).limit(limit * 3).to_list(limit * 3)  # Get more initially for filtering
+    
+    # If user has assigned installations, filter results by hierarchy
+    if assigned:
+        # Get IDs of assigned installations
+        installations = await db.equipment_nodes.find(
+            {"level": "installation", "name": {"$in": assigned}},
+            {"_id": 0, "id": 1, "name": 1}
+        ).to_list(100)
+        installation_ids = {i["id"] for i in installations}
+        installation_names = {i["name"] for i in installations}
+        
+        # Filter nodes that belong to assigned installations
+        filtered_nodes = []
+        for node in nodes:
+            # Check if node is an installation itself
+            if node.get("level") == "installation" and node.get("id") in installation_ids:
+                filtered_nodes.append(node)
+                continue
+            
+            # Check if node has installation_id
+            if node.get("installation_id") in installation_ids:
+                filtered_nodes.append(node)
+                continue
+            
+            # Trace parent chain to find if it belongs to an assigned installation
+            current = node
+            depth = 0
+            belongs_to_assigned = False
+            while current.get("parent_id") and depth < 15:
+                parent = await db.equipment_nodes.find_one(
+                    {"id": current["parent_id"]},
+                    {"_id": 0, "id": 1, "name": 1, "parent_id": 1, "level": 1}
+                )
+                if parent:
+                    if parent.get("level") == "installation" and parent.get("id") in installation_ids:
+                        belongs_to_assigned = True
+                        break
+                    current = parent
+                else:
+                    break
+                depth += 1
+            
+            if belongs_to_assigned:
+                filtered_nodes.append(node)
+        
+        nodes = filtered_nodes[:limit]
+    else:
+        nodes = nodes[:limit]
     
     # Build path for nodes without full_path
     for node in nodes:
-        if not node.get("full_path"):
+        if not node.get("full_path") and not node.get("path"):
             # Build path from parent chain
             path_parts = [node["name"]]
             current = node
@@ -200,6 +231,8 @@ async def search_equipment(
                     break
                 depth += 1
             node["path"] = " > ".join(path_parts)
+        elif node.get("full_path"):
+            node["path"] = node["full_path"]
     
     return {"results": nodes}
 

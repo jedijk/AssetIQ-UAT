@@ -24,6 +24,19 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 1, 2026 - Equipment Hierarchy Search Fix
+**Bug Fixes:**
+1. ✅ Equipment Search Now Returns Full Hierarchy
+   - Fixed `/api/equipment-hierarchy/search` endpoint in `equipment.py`
+   - Was failing because filter required `installation_id` field that nodes don't have
+   - Now traces parent chain to verify equipment belongs to user's assigned installations
+   - Returns full hierarchy path: `Tyromer > The Netherlands - Arnhem > Extruder System > ...`
+
+2. ✅ Added Translations
+   - Added `common.view` = "View" / "Bekijken"
+   - Added `common.desktop` = "Desktop"
+   - Added `common.mobile` = "Mobile" / "Mobiel"
+
 ### April 1, 2026 - Form Designer Fixes
 **Bug Fixes:**
 1. ✅ Field Type Sub-options

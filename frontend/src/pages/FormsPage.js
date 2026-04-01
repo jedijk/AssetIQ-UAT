@@ -1525,6 +1525,7 @@ const FormsPage = () => {
                       }}
                       placeholder="Search equipment to link..."
                       className="pl-9"
+                      data-testid="equipment-link-search"
                     />
                     {searchingEquipment && (
                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
