@@ -1684,7 +1684,7 @@ const FormsPage = () => {
                     onClick={() => setPreviewMode("desktop")}
                     data-testid="preview-desktop-btn"
                   >
-                    <Monitor className="w-4 h-4 mr-1.5" /> Desktop
+                    <Monitor className="w-4 h-4 mr-1.5" /> {t("common.desktop")}
                   </Button>
                   <Button
                     variant={previewMode === "mobile" ? "default" : "ghost"}
@@ -1693,7 +1693,7 @@ const FormsPage = () => {
                     onClick={() => setPreviewMode("mobile")}
                     data-testid="preview-mobile-btn"
                   >
-                    <Smartphone className="w-4 h-4 mr-1.5" /> Mobile
+                    <Smartphone className="w-4 h-4 mr-1.5" /> {t("common.mobile")}
                   </Button>
                 </div>
               )}
