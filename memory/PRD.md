@@ -24,6 +24,37 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 1, 2026 - Form Designer Fixes
+**Bug Fixes:**
+1. ✅ Field Type Sub-options
+   - Added sub-options UI for all field types in `FormsPage.js`:
+     - Numeric: Unit input + Threshold settings (warning/critical low/high)
+     - Dropdown/Multi-select: Options list with Add Option button and Failure toggle
+     - Range: Min/Max/Step number inputs
+     - File/Image: Max file size (MB) and Allowed extensions inputs
+     - Equipment: Hierarchy preview (5 levels) and test search input
+   - Field type change now clears previous type's sub-options to prevent data contamination
+   - Added color-coded sections (slate, blue, purple, green, indigo) for visual clarity
+
+2. ✅ Upload Pending State
+   - Enhanced upload state machine: idle → uploading (spinner) → success/error
+   - Error state shows error message with retry button (RefreshCw icon)
+   - Retry clears error and re-attempts upload
+   - Remove button available when not actively uploading
+
+3. ✅ Equipment Hierarchy in Form Designer
+   - Added Equipment Selection Settings section for equipment field type
+   - Shows hierarchy levels preview: Installation → System → Unit → Subunit → Equipment
+   - Test search input verifies equipment data exists
+   - Search results show equipment name, path, and level
+
+**Tests Added:**
+- `/app/backend/tests/test_form_designer.py` - 18 unit tests covering:
+  - Field type sub-options validation
+  - Form persistence with mixed field types
+  - Equipment hierarchy data structure
+  - Upload state transitions
+
 ### April 1, 2026 - Bug Fixes: Notification Clearing, Definitions Page & Causal Intelligence
 **Bug Fixes:**
 1. ✅ Notification Clearing
