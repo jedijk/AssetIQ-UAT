@@ -43,12 +43,14 @@ class TaskService:
     
     async def create_template(self, data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
         """Create a new task template."""
+        import uuid
         now = datetime.now(timezone.utc)
         
         # Determine if ad-hoc
         is_adhoc = data.get("is_adhoc", False)
         
         doc = {
+            "id": str(uuid.uuid4()),  # Add explicit id field for index
             "name": data["name"],
             "description": data.get("description"),
             "discipline": data["discipline"],
@@ -1057,7 +1059,7 @@ class TaskService:
     def _serialize_template(self, doc: Dict) -> Dict[str, Any]:
         """Serialize template document."""
         return {
-            "id": str(doc["_id"]),
+            "id": doc.get("id") or str(doc["_id"]),
             "name": doc["name"],
             "description": doc.get("description"),
             "discipline": doc["discipline"],

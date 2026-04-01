@@ -15,11 +15,29 @@ from enum import Enum
 
 class TaskDiscipline(str, Enum):
     """Discipline responsible for task execution."""
+    # Core disciplines
     OPERATIONS = "operations"
     MAINTENANCE = "maintenance"
+    INSPECTION = "inspection"
+    
+    # Technical disciplines
+    MECHANICAL = "mechanical"
+    ELECTRICAL = "electrical"
+    INSTRUMENTATION = "instrumentation"
+    PROCESS = "process"
+    SAFETY = "safety"
+    RELIABILITY = "reliability"
+    
+    # Equipment-specific
+    ROTATING_EQUIPMENT = "rotating_equipment"
+    STATIC_EQUIPMENT = "static_equipment"
+    
+    # Multi-discipline
+    MULTI_DISCIPLINE = "multi_discipline"
+    
+    # Legacy values (for backward compatibility)
     LAB = "lab"
     LABORATORY = "laboratory"
-    INSPECTION = "inspection"
     ENGINEERING = "engineering"
 
 
