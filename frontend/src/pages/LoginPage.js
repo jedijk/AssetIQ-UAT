@@ -104,7 +104,7 @@ const LoginPage = () => {
             <h1 className="login-brand-title">AssetIQ</h1>
           </div>
           <div className="login-tagline">
-            <h2>Asset Management Intelligence Platform</h2>
+            <h2><span style={{whiteSpace: 'nowrap'}}>Asset Management Intelligence</span><br/>Platform</h2>
             <p>Unify asset, reliability, and workforce management in one intelligent platform. Turn data into action with AI-driven insights that reduce downtime and improve operational efficiency.</p>
           </div>
           <div className="login-features">
