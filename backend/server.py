@@ -2,8 +2,12 @@
 AssetIQ / ThreatBase API - Main application entry point.
 All route handlers are in /routes/, services in /services/, models in /models/.
 """
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import os
 import logging
 
@@ -15,8 +19,17 @@ from seed_database import seed_database
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 # Create app
 app = FastAPI(title="ThreatBase API")
+
+# Add rate limiter to app state
+app.state.limiter = limiter
+
+# Add rate limit exceeded handler
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Create the /api prefix router and include all sub-routers
 api_router = APIRouter(prefix="/api")

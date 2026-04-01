@@ -1,13 +1,16 @@
 """
-Authentication routes.
+Authentication routes with rate limiting.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime, timezone, timedelta
 import uuid
 import secrets
 import asyncio
 import os
 import logging
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from database import db
 from auth import hash_password, verify_password, create_token, get_current_user
 from models.api_models import UserCreate, UserLogin, UserResponse, TokenResponse
@@ -22,6 +25,13 @@ except ImportError:
 
 router = APIRouter(tags=["Authentication"])
 logger = logging.getLogger(__name__)
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
+# Rate limit configurations
+AUTH_RATE_LIMIT = "10/minute"  # 10 auth attempts per minute per IP
+STRICT_AUTH_RATE_LIMIT = "5/minute"  # 5 attempts for sensitive operations
 
 # Email configuration
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
@@ -46,7 +56,8 @@ class VerifyResetTokenRequest(BaseModel):
     token: str
 
 @router.post("/auth/register", response_model=dict)
-async def register(user_data: UserCreate):
+@limiter.limit(AUTH_RATE_LIMIT)
+async def register(request: Request, user_data: UserCreate):
     # Check if email exists
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
@@ -110,7 +121,8 @@ async def notify_admins_new_user(user_email: str, user_name: str):
                 logger.error(f"Failed to send approval notification to {owner['email']}: {e}")
 
 @router.post("/auth/login", response_model=TokenResponse)
-async def login(credentials: UserLogin):
+@limiter.limit(STRICT_AUTH_RATE_LIMIT)
+async def login(request: Request, credentials: UserLogin):
     try:
         user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
     except Exception as e:
@@ -407,13 +419,14 @@ async def send_approval_result_email(user_email: str, user_name: str, approved: 
 
 
 @router.post("/auth/forgot-password")
-async def forgot_password(request: ForgotPasswordRequest):
+@limiter.limit(STRICT_AUTH_RATE_LIMIT)
+async def forgot_password(request: Request, body: ForgotPasswordRequest):
     """
     Request a password reset. Sends an email with a reset link if the email exists.
     Always returns success to prevent email enumeration attacks.
     """
     # Find user by email
-    user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    user = await db.users.find_one({"email": body.email}, {"_id": 0})
     
     if user:
         # Generate reset token
@@ -421,9 +434,9 @@ async def forgot_password(request: ForgotPasswordRequest):
         expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
         
         # Store reset token in database
-        await db.password_resets.delete_many({"email": request.email})  # Remove old tokens
+        await db.password_resets.delete_many({"email": body.email})  # Remove old tokens
         await db.password_resets.insert_one({
-            "email": request.email,
+            "email": body.email,
             "token": reset_token,
             "expires_at": expires_at,
             "created_at": datetime.now(timezone.utc),
@@ -432,13 +445,13 @@ async def forgot_password(request: ForgotPasswordRequest):
         
         # Send email
         email_sent = await send_reset_email(
-            email=request.email,
+            email=body.email,
             reset_token=reset_token,
             user_name=user.get("name", "User")
         )
         
         if not email_sent:
-            logger.warning(f"Could not send reset email to {request.email}")
+            logger.warning(f"Could not send reset email to {body.email}")
     
     # Always return success to prevent email enumeration
     return {
@@ -501,10 +514,11 @@ async def admin_reset_password(request: AdminResetPasswordRequest, current_user:
 
 
 @router.post("/auth/verify-reset-token")
-async def verify_reset_token(request: VerifyResetTokenRequest):
+@limiter.limit(AUTH_RATE_LIMIT)
+async def verify_reset_token(request: Request, body: VerifyResetTokenRequest):
     """Verify if a reset token is valid."""
     reset_record = await db.password_resets.find_one({
-        "token": request.token,
+        "token": body.token,
         "used": False
     }, {"_id": 0})
     
@@ -531,11 +545,12 @@ async def verify_reset_token(request: VerifyResetTokenRequest):
 
 
 @router.post("/auth/reset-password")
-async def reset_password(request: ResetPasswordRequest):
+@limiter.limit(STRICT_AUTH_RATE_LIMIT)
+async def reset_password(request: Request, body: ResetPasswordRequest):
     """Reset password using a valid token."""
     # Find and validate token
     reset_record = await db.password_resets.find_one({
-        "token": request.token,
+        "token": body.token,
         "used": False
     }, {"_id": 0})
     
@@ -554,12 +569,12 @@ async def reset_password(request: ResetPasswordRequest):
             raise HTTPException(status_code=400, detail="Reset link has expired")
     
     # Validate password strength
-    if len(request.new_password) < 6:
+    if len(body.new_password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
     
     # Update user's password
     email = reset_record["email"]
-    new_hash = hash_password(request.new_password)
+    new_hash = hash_password(body.new_password)
     
     result = await db.users.update_one(
         {"email": email},
@@ -571,7 +586,7 @@ async def reset_password(request: ResetPasswordRequest):
     
     # Mark token as used
     await db.password_resets.update_one(
-        {"token": request.token},
+        {"token": body.token},
         {"$set": {"used": True, "used_at": datetime.now(timezone.utc)}}
     )
     

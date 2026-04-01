@@ -18,6 +18,11 @@ from ai_risk_models import (
     BowTieBarrier, BowTieModel,
     RecommendedAction, ActionOptimizationResult
 )
+from services.ai_security_service import (
+    sanitize_threat_context, 
+    sanitize_equipment_history,
+    sanitize_for_ai_prompt
+)
 
 logger = logging.getLogger(__name__)
 
@@ -271,12 +276,23 @@ class AIRiskEngine:
     def __init__(self, api_key: str):
         self.api_key = api_key
     
-    def _create_chat(self, system_prompt: str, session_id: str) -> LlmChat:
-        """Create a new LLM chat instance"""
+    # Token limits for different analysis types
+    TOKEN_LIMITS = {
+        'risk_analysis': 2000,
+        'cause_analysis': 2500,
+        'fault_tree': 2000,
+        'bow_tie': 2000,
+        'action_optimization': 2000
+    }
+    
+    def _create_chat(self, system_prompt: str, session_id: str, analysis_type: str = 'risk_analysis') -> LlmChat:
+        """Create a new LLM chat instance with token limits"""
+        max_tokens = self.TOKEN_LIMITS.get(analysis_type, 2000)
         return LlmChat(
             api_key=self.api_key,
             session_id=session_id,
-            system_message=system_prompt
+            system_message=system_prompt,
+            max_tokens=max_tokens
         ).with_model("openai", "gpt-5.2")
     
     def _parse_json_response(self, response: str) -> dict:
@@ -290,37 +306,47 @@ class AIRiskEngine:
         return json.loads(clean_response)
     
     def _build_threat_context(self, threat: dict, equipment_data: dict = None, historical_threats: list = None, equipment_history: dict = None) -> str:
-        """Build context string for AI analysis"""
+        """Build context string for AI analysis with sanitized inputs"""
+        # Sanitize threat data to prevent prompt injection
+        safe_threat = sanitize_threat_context(threat)
+        
         context = f"""
 THREAT DETAILS:
-- Title: {threat.get('title', 'Unknown')}
-- Asset: {threat.get('asset', 'Unknown')}
-- Equipment Type: {threat.get('equipment_type', 'Unknown')}
-- Failure Mode: {threat.get('failure_mode', 'Unknown')}
-- Cause (if known): {threat.get('cause', 'Not specified')}
-- Impact: {threat.get('impact', 'Unknown')}
-- Frequency: {threat.get('frequency', 'Unknown')}
-- Current Risk Score: {threat.get('risk_score', 'N/A')}
-- Current Risk Level: {threat.get('risk_level', 'N/A')}
-- Status: {threat.get('status', 'Open')}
-- Location: {threat.get('location', 'Not specified')}
-- Equipment Criticality: {threat.get('equipment_criticality', 'Not specified')}
-- Created: {threat.get('created_at', 'Unknown')}
+- Title: {safe_threat.get('title', 'Unknown')}
+- Asset: {safe_threat.get('asset', 'Unknown')}
+- Equipment Type: {safe_threat.get('equipment_type', 'Unknown')}
+- Failure Mode: {safe_threat.get('failure_mode', 'Unknown')}
+- Cause (if known): {safe_threat.get('cause', 'Not specified')}
+- Impact: {safe_threat.get('impact', 'Unknown')}
+- Frequency: {safe_threat.get('frequency', 'Unknown')}
+- Current Risk Score: {safe_threat.get('risk_score', 'N/A')}
+- Current Risk Level: {safe_threat.get('risk_level', 'N/A')}
+- Status: {safe_threat.get('status', 'Open')}
+- Location: {safe_threat.get('location', 'Not specified')}
+- Equipment Criticality: {safe_threat.get('equipment_criticality', 'Not specified')}
+- Created: {safe_threat.get('created_at', 'Unknown')}
 """
         
         if equipment_data:
+            # Sanitize equipment data
+            safe_equip_type = sanitize_for_ai_prompt(str(equipment_data.get('equipment_type', 'Unknown')), max_length=100)
+            safe_discipline = sanitize_for_ai_prompt(str(equipment_data.get('discipline', 'Unknown')), max_length=100)
+            criticality = equipment_data.get('criticality', {})
+            safe_crit_level = sanitize_for_ai_prompt(str(criticality.get('level', 'Unknown')), max_length=50)
+            
             context += f"""
 EQUIPMENT INFORMATION:
-- Equipment Type: {equipment_data.get('equipment_type', 'Unknown')}
-- Criticality Level: {equipment_data.get('criticality', {}).get('level', 'Unknown')}
-- Discipline: {equipment_data.get('discipline', 'Unknown')}
+- Equipment Type: {safe_equip_type}
+- Criticality Level: {safe_crit_level}
+- Discipline: {safe_discipline}
 """
         
-        # Add equipment history
+        # Sanitize and add equipment history
         if equipment_history:
-            past_obs = equipment_history.get("observations", [])
-            past_actions = equipment_history.get("actions", [])
-            past_tasks = equipment_history.get("tasks", [])
+            safe_history = sanitize_equipment_history(equipment_history)
+            past_obs = safe_history.get("observations", [])
+            past_actions = safe_history.get("actions", [])
+            past_tasks = safe_history.get("tasks", [])
             
             if past_obs:
                 context += "\nEQUIPMENT HISTORY - PAST OBSERVATIONS:\n"
@@ -343,7 +369,9 @@ EQUIPMENT INFORMATION:
         if historical_threats:
             context += "\nSIMILAR HISTORICAL THREATS (other equipment):\n"
             for i, ht in enumerate(historical_threats[:3], 1):
-                context += f"{i}. {ht.get('title', 'Unknown')} - Risk: {ht.get('risk_score', 'N/A')}, Status: {ht.get('status', 'Unknown')}\n"
+                # Sanitize historical threat titles
+                safe_title = sanitize_for_ai_prompt(str(ht.get('title', 'Unknown')), max_length=100)
+                context += f"{i}. {safe_title} - Risk: {ht.get('risk_score', 'N/A')}, Status: {ht.get('status', 'Unknown')}\n"
         
         return context
     
@@ -358,7 +386,7 @@ EQUIPMENT INFORMATION:
         """Analyze threat and generate dynamic risk assessment"""
         try:
             session_id = f"risk_analysis_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(RISK_ANALYSIS_PROMPT, session_id)
+            chat = self._create_chat(RISK_ANALYSIS_PROMPT, session_id, 'risk_analysis')
             
             context = self._build_threat_context(threat, equipment_data, historical_threats, equipment_history)
             message = UserMessage(text=f"Analyze this threat:\n{context}")
@@ -435,7 +463,7 @@ EQUIPMENT INFORMATION:
         """Generate probable causes for a threat"""
         try:
             session_id = f"cause_analysis_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(CAUSE_ANALYSIS_PROMPT, session_id)
+            chat = self._create_chat(CAUSE_ANALYSIS_PROMPT, session_id, 'cause_analysis')
             
             context = self._build_threat_context(threat, equipment_data, None, equipment_history)
             message = UserMessage(text=f"Analyze causes for this threat (max {max_causes} causes):\n{context}")
@@ -484,7 +512,7 @@ EQUIPMENT INFORMATION:
         """Generate a fault tree for the threat"""
         try:
             session_id = f"fault_tree_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(FAULT_TREE_PROMPT, session_id)
+            chat = self._create_chat(FAULT_TREE_PROMPT, session_id, 'fault_tree')
             
             context = self._build_threat_context(threat)
             message = UserMessage(text=f"Generate a fault tree (max depth {max_depth}):\n{context}")
@@ -530,7 +558,7 @@ EQUIPMENT INFORMATION:
         """Generate a bow-tie risk model"""
         try:
             session_id = f"bow_tie_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(BOW_TIE_PROMPT, session_id)
+            chat = self._create_chat(BOW_TIE_PROMPT, session_id, 'bow_tie')
             
             context = self._build_threat_context(threat)
             message = UserMessage(text=f"Generate a bow-tie model:\n{context}")
@@ -577,7 +605,7 @@ EQUIPMENT INFORMATION:
         """Optimize and recommend actions for risk reduction"""
         try:
             session_id = f"action_opt_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(ACTION_OPTIMIZATION_PROMPT, session_id)
+            chat = self._create_chat(ACTION_OPTIMIZATION_PROMPT, session_id, 'action_optimization')
             
             context = self._build_threat_context(threat)
             

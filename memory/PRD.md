@@ -24,6 +24,31 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 1, 2026 - AI Security Enhancements
+**Security Features:**
+1. ✅ Input Sanitization for AI Prompts
+   - Created `/app/backend/services/ai_security_service.py`
+   - Sanitizes all user-provided data before embedding in AI prompts
+   - Detects and filters 30+ prompt injection patterns
+   - Includes: instruction override, role hijacking, system message injection, delimiter injection
+
+2. ✅ Rate Limiting
+   - Added `slowapi` rate limiter to all AI endpoints (20/minute standard, 10/minute heavy)
+   - Added rate limiting to auth endpoints (5/minute for login, password reset)
+   - Prevents brute-force attacks and AI cost abuse
+
+3. ✅ Token Limits
+   - AI responses capped at 2000-2500 tokens per request type
+   - Configured in `ai_risk_engine.py` TOKEN_LIMITS dict
+   - Prevents excessive API costs
+
+**Files Modified:**
+- `backend/server.py` - Added rate limiter initialization
+- `backend/routes/ai_routes.py` - Added rate limiting decorators to all 12 AI endpoints
+- `backend/routes/auth.py` - Added rate limiting to auth endpoints
+- `backend/ai_risk_engine.py` - Added sanitization and token limits
+- `backend/services/ai_security_service.py` - NEW: Prompt injection detection and sanitization
+
 ### April 1, 2026 - Equipment Hierarchy Search Fix
 **Bug Fixes:**
 1. ✅ Equipment Search Now Returns Full Hierarchy
@@ -253,6 +278,15 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - localStorage data encrypted with AES-GCM via Web Crypto API
 - Session-scoped encryption keys stored in sessionStorage
 - Custom roles cannot override system roles
+
+### AI Security (Added April 1, 2026)
+- **Input Sanitization**: All user-provided data sanitized before AI prompts via `ai_security_service.py`
+- **Prompt Injection Protection**: Detects and filters 30+ injection patterns (instruction override, role hijacking, system message injection)
+- **Rate Limiting**: 
+  - AI endpoints: 20 requests/minute per IP (standard), 10/minute (heavy operations like fault tree)
+  - Auth endpoints: 5 requests/minute for login/password reset
+- **Token Limits**: AI responses capped at 2000-2500 tokens per request type
+- **All AI endpoints require authentication** via JWT token
 
 ### Deployment Requirements
 - Health check endpoint: `GET /health` returns `{"status": "healthy"}`

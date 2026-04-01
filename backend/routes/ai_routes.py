@@ -1,30 +1,56 @@
 """
-AI Risk Engine routes.
+AI Risk Engine routes with rate limiting and security.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Optional
 from datetime import datetime, timezone
 import uuid
 import json
 import logging
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from database import db, EMERGENT_LLM_KEY
 from auth import get_current_user
 from ai_risk_engine import AIRiskEngine
 from ai_risk_models import (
     AnalyzeRiskRequest, GenerateCausesRequest, GenerateFaultTreeRequest, OptimizeActionsRequest
 )
+from services.ai_security_service import detect_prompt_injection
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["AI Risk Engine"])
 
+# Rate limiter - uses same key_func as main app
+limiter = Limiter(key_func=get_remote_address)
+
 ai_engine = AIRiskEngine(api_key=EMERGENT_LLM_KEY)
+
+# Rate limit configurations
+AI_RATE_LIMIT = "20/minute"  # 20 AI calls per minute per IP
+AI_HEAVY_RATE_LIMIT = "10/minute"  # 10 heavy AI calls per minute (fault tree, bow tie)
+
+
+def check_injection_attempt(data: dict, endpoint: str) -> None:
+    """Check for prompt injection in request data and log/block if detected."""
+    for key, value in data.items():
+        if isinstance(value, str):
+            is_suspicious, matched = detect_prompt_injection(value)
+            if is_suspicious:
+                logger.warning(f"Potential prompt injection blocked on {endpoint}: {matched[:50]}")
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Request contains potentially unsafe content"
+                )
 
 
 @router.post("/ai/analyze-risk/{threat_id}")
+@limiter.limit(AI_RATE_LIMIT)
 async def analyze_threat_risk(
+    request: Request,
     threat_id: str,
-    request: AnalyzeRiskRequest = None,
+    body: AnalyzeRiskRequest = None,
     current_user: dict = Depends(get_current_user)
 ):
     """AI-powered dynamic risk analysis for a threat"""
@@ -97,7 +123,7 @@ async def analyze_threat_risk(
     
     # Get similar historical threats
     historical_threats = []
-    if request and request.include_similar_incidents:
+    if body and body.include_similar_incidents:
         similar = await db.threats.find(
             {
                 "id": {"$ne": threat_id},
@@ -110,7 +136,7 @@ async def analyze_threat_risk(
         ).limit(5).to_list(5)
         historical_threats = similar
     
-    include_forecast = request.include_forecast if request else True
+    include_forecast = body.include_forecast if body else True
     
     result = await ai_engine.analyze_risk(
         threat=threat,
@@ -139,7 +165,9 @@ async def analyze_threat_risk(
 
 
 @router.get("/ai/risk-insights/{threat_id}")
+@limiter.limit(AI_RATE_LIMIT)
 async def get_risk_insights(
+    request: Request,
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -154,7 +182,9 @@ async def get_risk_insights(
 
 
 @router.get("/ai/top-risks")
+@limiter.limit(AI_RATE_LIMIT)
 async def get_ai_top_risks(
+    request: Request,
     limit: int = 5,
     current_user: dict = Depends(get_current_user)
 ):
@@ -199,9 +229,11 @@ async def get_ai_top_risks(
 
 
 @router.post("/ai/generate-causes/{threat_id}")
+@limiter.limit(AI_RATE_LIMIT)
 async def generate_threat_causes(
+    request: Request,
     threat_id: str,
-    request: GenerateCausesRequest = None,
+    body: GenerateCausesRequest = None,
     current_user: dict = Depends(get_current_user)
 ):
     """AI-powered causal analysis - generates probable causes"""
@@ -257,7 +289,7 @@ async def generate_threat_causes(
         ).sort("created_at", -1).limit(5).to_list(5)
         equipment_history["actions"] = past_actions
     
-    max_causes = request.max_causes if request else 5
+    max_causes = body.max_causes if body else 5
     
     result = await ai_engine.generate_causes(
         threat=threat,
@@ -285,7 +317,9 @@ async def generate_threat_causes(
 
 
 @router.get("/ai/causal-analysis/{threat_id}")
+@limiter.limit(AI_RATE_LIMIT)
 async def get_causal_analysis(
+    request: Request,
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -300,7 +334,9 @@ async def get_causal_analysis(
 
 
 @router.post("/ai/explain/{threat_id}")
+@limiter.limit(AI_RATE_LIMIT)
 async def explain_threat(
+    request: Request,
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -357,9 +393,11 @@ async def explain_threat(
 
 
 @router.post("/ai/fault-tree/{threat_id}")
+@limiter.limit(AI_HEAVY_RATE_LIMIT)
 async def generate_fault_tree(
+    request: Request,
     threat_id: str,
-    request: GenerateFaultTreeRequest = None,
+    body: GenerateFaultTreeRequest = None,
     current_user: dict = Depends(get_current_user)
 ):
     """Generate a fault tree diagram for the threat"""
@@ -370,7 +408,7 @@ async def generate_fault_tree(
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
     
-    max_depth = request.max_depth if request else 4
+    max_depth = body.max_depth if body else 4
     
     result = await ai_engine.generate_fault_tree(
         threat=threat,
@@ -395,7 +433,9 @@ async def generate_fault_tree(
 
 
 @router.get("/ai/fault-tree/{threat_id}")
+@limiter.limit(AI_RATE_LIMIT)
 async def get_fault_tree(
+    request: Request,
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -410,7 +450,9 @@ async def get_fault_tree(
 
 
 @router.post("/ai/bow-tie/{threat_id}")
+@limiter.limit(AI_HEAVY_RATE_LIMIT)
 async def generate_bow_tie(
+    request: Request,
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -445,7 +487,9 @@ async def generate_bow_tie(
 
 
 @router.get("/ai/bow-tie/{threat_id}")
+@limiter.limit(AI_RATE_LIMIT)
 async def get_bow_tie(
+    request: Request,
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -460,9 +504,11 @@ async def get_bow_tie(
 
 
 @router.post("/ai/optimize-actions/{threat_id}")
+@limiter.limit(AI_RATE_LIMIT)
 async def optimize_threat_actions(
+    request: Request,
     threat_id: str,
-    request: OptimizeActionsRequest = None,
+    body: OptimizeActionsRequest = None,
     current_user: dict = Depends(get_current_user)
 ):
     """AI-powered action optimization with ROI analysis"""
@@ -495,8 +541,8 @@ async def optimize_threat_actions(
             for c in causal_analysis.get("probable_causes", [])
         ]
     
-    budget_limit = request.budget_limit if request else None
-    prioritize_by = request.prioritize_by if request else "roi"
+    budget_limit = body.budget_limit if body else None
+    prioritize_by = body.prioritize_by if body else "roi"
     
     result = await ai_engine.optimize_actions(
         threat=threat,
@@ -524,7 +570,9 @@ async def optimize_threat_actions(
 
 
 @router.get("/ai/action-optimization/{threat_id}")
+@limiter.limit(AI_RATE_LIMIT)
 async def get_action_optimization(
+    request: Request,
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
