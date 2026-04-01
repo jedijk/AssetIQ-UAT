@@ -197,14 +197,23 @@ async def get_installations_with_definitions(
     """
     Get all top-level installations that can have custom definitions.
     Also indicates which ones have custom definitions.
+    Returns ALL installations (not filtered by creator) to match equipment-hierarchy behavior.
     """
-    # Get all installations
+    # Get all installations (not filtered by created_by - same as equipment-hierarchy/installations)
     installations = await db.equipment_nodes.find(
-        {"level": "installation", "created_by": current_user["id"]},
+        {"level": "installation"},
         {"_id": 0, "id": 1, "name": 1}
-    ).to_list(100)
+    ).sort("name", 1).to_list(500)
     
-    # Get equipment IDs that have custom definitions
+    # Deduplicate by name (same logic as equipment-hierarchy/installations)
+    seen_names = set()
+    unique_installations = []
+    for inst in installations:
+        if inst.get("name") not in seen_names:
+            seen_names.add(inst.get("name"))
+            unique_installations.append(inst)
+    
+    # Get equipment IDs that have custom definitions for this user
     custom_defs = await db.definitions.find(
         {"created_by": current_user["id"]},
         {"_id": 0, "equipment_id": 1}
@@ -212,7 +221,7 @@ async def get_installations_with_definitions(
     custom_ids = {d["equipment_id"] for d in custom_defs}
     
     result = []
-    for inst in installations:
+    for inst in unique_installations:
         result.append({
             "id": inst["id"],
             "name": inst["name"],

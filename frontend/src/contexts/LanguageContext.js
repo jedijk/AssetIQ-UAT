@@ -47,6 +47,9 @@ const en = {
     dueToday: "Due today",
     overdueBy1Day: "Overdue by 1 day",
     overdueByDays: "Overdue by {days} days",
+    clearAll: "Clear",
+    cleared: "Notifications cleared",
+    showAgain: "Show notifications",
   },
   
   // Definitions Page (FMEA SOD)
@@ -1212,6 +1215,9 @@ const nl = {
     dueToday: "Vandaag verschuldigd",
     overdueBy1Day: "1 dag achterstallig",
     overdueByDays: "{days} dagen achterstallig",
+    clearAll: "Wissen",
+    cleared: "Meldingen gewist",
+    showAgain: "Meldingen tonen",
   },
   
   // Definitions Page (FMEA SOD)

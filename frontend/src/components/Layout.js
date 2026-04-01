@@ -52,6 +52,7 @@ const Layout = () => {
   const [hierarchyOpen, setHierarchyOpen] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [dismissedNotifications, setDismissedNotifications] = useState(false);
 
   // Track page views for user statistics
   usePageTracking();
