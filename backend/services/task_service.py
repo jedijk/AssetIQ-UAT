@@ -344,21 +344,30 @@ class TaskService:
         return {"total": total, "plans": plans}
     
     async def get_plan_by_id(self, plan_id: str) -> Optional[Dict[str, Any]]:
-        """Get a specific plan."""
-        if not ObjectId.is_valid(plan_id):
-            return None
-        
-        doc = await self.plans.find_one({"_id": ObjectId(plan_id)})
+        """Get a specific plan by id (string UUID) or _id (ObjectId)."""
+        # First try to find by string 'id' field
+        doc = await self.plans.find_one({"id": plan_id})
         if doc:
             return self._serialize_plan(doc)
+        
+        # Fallback to ObjectId lookup
+        if ObjectId.is_valid(plan_id):
+            doc = await self.plans.find_one({"_id": ObjectId(plan_id)})
+            if doc:
+                return self._serialize_plan(doc)
+        
         return None
     
     async def update_plan(self, plan_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a task plan."""
-        if not ObjectId.is_valid(plan_id):
-            return None
+        # First try to find by string 'id' field
+        existing = await self.plans.find_one({"id": plan_id})
+        query_field = "id" if existing else "_id"
+        query_value = plan_id if existing else (ObjectId(plan_id) if ObjectId.is_valid(plan_id) else None)
         
-        existing = await self.plans.find_one({"_id": ObjectId(plan_id)})
+        if not existing and query_value:
+            existing = await self.plans.find_one({"_id": query_value})
+        
         if not existing:
             return None
         
@@ -382,7 +391,7 @@ class TaskService:
             update["next_due_date"] = self._calculate_next_due(base_date, interval_value, interval_unit)
         
         result = await self.plans.find_one_and_update(
-            {"_id": ObjectId(plan_id)},
+            {query_field: query_value},
             {"$set": update},
             return_document=True
         )
@@ -393,24 +402,35 @@ class TaskService:
     
     async def delete_plan(self, plan_id: str) -> bool:
         """Deactivate a task plan."""
-        if not ObjectId.is_valid(plan_id):
-            return False
+        # First try to find by string 'id' field
+        plan = await self.plans.find_one({"id": plan_id})
+        query_field = "id" if plan else "_id"
+        query_value = plan_id if plan else (ObjectId(plan_id) if ObjectId.is_valid(plan_id) else None)
         
-        plan = await self.plans.find_one({"_id": ObjectId(plan_id)})
+        if not plan and query_value:
+            plan = await self.plans.find_one({"_id": query_value})
+        
         if not plan:
             return False
         
         result = await self.plans.update_one(
-            {"_id": ObjectId(plan_id)},
+            {query_field: query_value},
             {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
         )
         
         # Decrement template usage count
         if result.modified_count > 0 and plan.get("task_template_id"):
-            await self.templates.update_one(
-                {"_id": ObjectId(plan["task_template_id"])},
+            # Try by string id first, then ObjectId
+            template_id = plan["task_template_id"]
+            update_result = await self.templates.update_one(
+                {"id": template_id},
                 {"$inc": {"usage_count": -1}}
             )
+            if update_result.modified_count == 0 and ObjectId.is_valid(template_id):
+                await self.templates.update_one(
+                    {"_id": ObjectId(template_id)},
+                    {"$inc": {"usage_count": -1}}
+                )
         
         return result.modified_count > 0
     
