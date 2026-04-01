@@ -24,6 +24,20 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 1, 2026 - Bug Fixes: Notification Clearing & Definitions Page
+**Bug Fixes:**
+1. ✅ Notification Clearing
+   - Added `dismissedNotifications` state to Layout.js (was used but never declared)
+   - Users can now click "Clear" to dismiss notifications
+   - Shows "Notifications cleared" message with "Show notifications" link to restore
+   - Added translation keys: `notifications.clearAll`, `notifications.cleared`, `notifications.showAgain`
+
+2. ✅ Definitions Page Desktop Installations
+   - Fixed `/api/definitions/installations` endpoint to return ALL installations
+   - Removed `created_by` filter that was excluding installations created by other users
+   - Now matches behavior of `/api/equipment-hierarchy/installations`
+   - Desktop users can now see and select installations in the dropdown
+
 ### April 1, 2026 - Premium Animation System
 **New Features:**
 1. ✅ Framer Motion Animation System
@@ -137,6 +151,8 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - [x] Cascade delete for Investigations (optionally delete Actions) - DONE (March 31, 2026)
 - [x] Cascade delete for Observations (optionally delete Actions & Investigations) - DONE (March 31, 2026)
 - [x] Fix attaching files to forms (pending documents on new templates) - DONE (March 31, 2026)
+- [x] Allow clearing notifications for user - DONE (April 1, 2026)
+- [x] Fix Definitions page not showing installations on desktop - DONE (April 1, 2026)
 
 ### P1 - High (Completed)
 - [x] Equipment Manager restriction - only owner can add new installation - DONE (March 31, 2026)
@@ -169,6 +185,7 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ### Key Files
 - `/app/backend/server.py` - Main FastAPI entry point with /health endpoint
 - `/app/backend/routes/permissions.py` - Custom role CRUD and permissions management
+- `/app/backend/routes/definitions.py` - FMEA Definitions CRUD with installation-agnostic access
 - `/app/backend/routes/feedback.py` - Feedback with audio transcription endpoint
 - `/app/backend/tests/conftest.py` - Centralized test configuration
 - `/app/backend/services/failure_modes_service.py` - Failure modes CRUD with versioning
@@ -176,6 +193,8 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - `/app/frontend/src/services/secureStorage.js` - Encrypted localStorage wrapper
 - `/app/frontend/src/pages/SettingsPermissionsPage.js` - Role management with create/delete
 - `/app/frontend/src/pages/FeedbackPage.js` - Feedback with voice-to-text transcription
+- `/app/frontend/src/pages/DefinitionsPage.js` - FMEA SOD definitions with installation selector
+- `/app/frontend/src/components/Layout.js` - Main layout with notification clearing
 - `/app/frontend/src/components/BackButton.jsx` - Browser history navigation
 
 ### Security Considerations
