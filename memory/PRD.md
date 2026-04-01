@@ -261,9 +261,9 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - [x] Improve navigation behavior (browser history) - DONE (March 31, 2026)
 - [x] Bulk Complete action in Feedback - DONE (March 31, 2026)
 
-### P2 - Medium
-- [ ] Implement report generation (PowerPoint/PDF) for Causal Investigations
-- [ ] Offline support with local storage for My Tasks execution
+### P2 - Medium (Completed)
+- [x] Implement report generation (PowerPoint/PDF) for Causal Investigations - DONE
+- [x] Offline support with local storage for My Tasks execution - DONE
 - [ ] Form execution flow in mobile My Tasks
 - [ ] Bulk criticality assignment for equipment
 
