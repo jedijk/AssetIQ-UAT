@@ -14,6 +14,10 @@ export const formAPI = {
     const response = await fetch(`${API_BASE_URL}/api/form-templates?${queryParams}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Failed to load templates" }));
+      throw new Error(error.detail || "Failed to load templates");
+    }
     return response.json();
   },
 
@@ -21,6 +25,10 @@ export const formAPI = {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Template not found" }));
+      throw new Error(error.detail || "Template not found");
+    }
     return response.json();
   },
 
@@ -63,9 +71,14 @@ export const formAPI = {
     const queryParams = new URLSearchParams();
     if (params.templateId) queryParams.append("template_id", params.templateId);
     if (params.status) queryParams.append("status", params.status);
+    if (params.limit) queryParams.append("limit", params.limit);
     const response = await fetch(`${API_BASE_URL}/api/form-submissions?${queryParams}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Failed to load submissions" }));
+      throw new Error(error.detail || "Failed to load submissions");
+    }
     return response.json();
   },
 

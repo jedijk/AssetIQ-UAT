@@ -108,7 +108,7 @@ const FEATURE_ICONS = {
   settings: Settings,
 };
 
-export default function SettingsPermissionsPage() {
+export default function SettingsPermissionsPage({ embedded = false }) {
   const { t } = useLanguage();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -195,13 +195,13 @@ export default function SettingsPermissionsPage() {
     });
   };
 
-  // Show mobile message
-  if (isMobile) {
+  // Show mobile message (skip if embedded - parent handles this)
+  if (isMobile && !embedded) {
     return <DesktopOnlyMessage title="Permissions Management" icon={Shield} />;
   }
 
-  // Check if user is owner
-  if (user?.role !== "owner") {
+  // Check if user is owner (skip if embedded - parent handles role check)
+  if (user?.role !== "owner" && !embedded) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center">
         <Lock className="w-16 h-16 text-slate-300 mb-4" />
@@ -236,6 +236,247 @@ export default function SettingsPermissionsPage() {
   const { permissions, features, roles } = permissionsData || {};
   const roleConfig = ROLE_CONFIG[selectedRole] || ROLE_CONFIG.viewer;
   const RoleIcon = roleConfig.icon;
+
+  // Embedded layout (inside User Management tab)
+  if (embedded) {
+    return (
+      <div className="space-y-6" data-testid="permissions-embedded">
+        {/* Quick Header with Reset */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-blue-600" />
+            <h2 className="text-lg font-semibold text-slate-900">Role Permissions</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowCreateRoleDialog(true)}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Create Role
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-amber-600 hover:text-amber-700">
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  Reset
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset All Permissions?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will reset all role permissions to their default values.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => resetMutation.mutate()}
+                    className="bg-amber-600 hover:bg-amber-700"
+                    disabled={resetMutation.isPending}
+                  >
+                    Reset
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+
+        {/* Role Selector */}
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(roles && typeof roles === 'object' ? roles : ROLE_CONFIG).map(([roleKey, roleInfo]) => {
+            const Icon = ROLE_CONFIG[roleKey]?.icon || Shield;
+            const isCustom = roleInfo?.is_custom;
+            return (
+              <Button
+                key={roleKey}
+                variant={selectedRole === roleKey ? "default" : "outline"}
+                size="sm"
+                className={selectedRole === roleKey ? "" : "text-slate-600"}
+                onClick={() => setSelectedRole(roleKey)}
+              >
+                <Icon className="w-4 h-4 mr-1" />
+                {roleInfo.display_name || roleInfo.name || roleKey}
+                {isCustom && <Badge variant="secondary" className="ml-2 text-[10px] px-1">Custom</Badge>}
+              </Button>
+            );
+          })}
+        </div>
+
+        {/* Permission Matrix */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <RoleIcon className={`w-5 h-5 ${roleConfig.color}`} />
+                {roles?.[selectedRole]?.display_name || selectedRole} Permissions
+              </CardTitle>
+              {roles?.[selectedRole]?.is_custom && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Delete Role
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Custom Role?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete the "{roles?.[selectedRole]?.display_name}" role.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteRoleMutation.mutate(selectedRole)}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+            {roles?.[selectedRole]?.description && (
+              <CardDescription>{roles[selectedRole].description}</CardDescription>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b">
+                    <th className="text-left py-2 px-3 font-medium text-slate-600">Feature</th>
+                    <th className="text-center py-2 px-3 font-medium text-slate-600 w-20">
+                      <div className="flex items-center justify-center gap-1">
+                        <Eye className="w-3.5 h-3.5" />
+                        Read
+                      </div>
+                    </th>
+                    <th className="text-center py-2 px-3 font-medium text-slate-600 w-20">
+                      <div className="flex items-center justify-center gap-1">
+                        <Pencil className="w-3.5 h-3.5" />
+                        Write
+                      </div>
+                    </th>
+                    <th className="text-center py-2 px-3 font-medium text-slate-600 w-20">
+                      <div className="flex items-center justify-center gap-1">
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(Array.isArray(features) && features.length > 0 ? features : Object.keys(FEATURE_ICONS)).map((feature, idx) => {
+                    const Icon = FEATURE_ICONS[feature] || FileText;
+                    const perm = permissions?.[selectedRole]?.[feature] || {};
+                    return (
+                      <tr key={feature} className={idx % 2 === 0 ? "" : "bg-slate-50/50"}>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4 text-slate-400" />
+                            <span className="capitalize">{feature.replace(/_/g, " ")}</span>
+                          </div>
+                        </td>
+                        <td className="text-center py-2 px-3">
+                          <Switch
+                            checked={perm.read !== false}
+                            onCheckedChange={() => handleTogglePermission(selectedRole, feature, "read", perm.read !== false)}
+                            disabled={updateMutation.isPending || selectedRole === "owner"}
+                          />
+                        </td>
+                        <td className="text-center py-2 px-3">
+                          <Switch
+                            checked={perm.write || false}
+                            onCheckedChange={() => handleTogglePermission(selectedRole, feature, "write", perm.write)}
+                            disabled={updateMutation.isPending || selectedRole === "owner"}
+                          />
+                        </td>
+                        <td className="text-center py-2 px-3">
+                          <Switch
+                            checked={perm.delete || false}
+                            onCheckedChange={() => handleTogglePermission(selectedRole, feature, "delete", perm.delete)}
+                            disabled={updateMutation.isPending || selectedRole === "owner"}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Create Role Dialog */}
+        <Dialog open={showCreateRoleDialog} onOpenChange={setShowCreateRoleDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Custom Role</DialogTitle>
+              <DialogDescription>
+                Create a new role with custom permissions based on an existing role.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="role-name">Role Name (ID)</Label>
+                <Input
+                  id="role-name"
+                  value={newRole.name}
+                  onChange={(e) => setNewRole({ ...newRole, name: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                  placeholder="e.g., senior_engineer"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role-display">Display Name</Label>
+                <Input
+                  id="role-display"
+                  value={newRole.display_name}
+                  onChange={(e) => setNewRole({ ...newRole, display_name: e.target.value })}
+                  placeholder="e.g., Senior Engineer"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role-desc">Description</Label>
+                <Textarea
+                  id="role-desc"
+                  value={newRole.description}
+                  onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
+                  placeholder="Role description..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Base Permissions From</Label>
+                <Select value={newRole.base_role} onValueChange={(v) => setNewRole({ ...newRole, base_role: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(ROLE_CONFIG).filter(([k]) => k !== "owner").map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateRoleDialog(false)}>Cancel</Button>
+              <Button onClick={() => createRoleMutation.mutate(newRole)} disabled={!newRole.name || !newRole.display_name || createRoleMutation.isPending}>
+                {createRoleMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Create Role
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">

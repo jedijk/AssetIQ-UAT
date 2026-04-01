@@ -66,6 +66,8 @@ import {
   DialogFooter,
 } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import SettingsPermissionsPage from "./SettingsPermissionsPage";
 
 // Get base URL without /api suffix
 const API_BASE_URL = getBackendUrl();
@@ -310,6 +312,9 @@ const SettingsUserManagementPage = () => {
   
   // Delete confirmation state
   const [deleteConfirmUser, setDeleteConfirmUser] = useState(null);
+  
+  // Tab state for Users / Permissions
+  const [activeTab, setActiveTab] = useState("users");
 
   // Queries
   const { data: usersData, isLoading: usersLoading, refetch } = useQuery({
@@ -1180,8 +1185,23 @@ const SettingsUserManagementPage = () => {
         </Button>
       </div>
 
-      {/* Role Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      {/* Tabs for Users and Permissions */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="users" className="flex items-center gap-2" data-testid="users-tab">
+            <Users className="w-4 h-4" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="permissions" className="flex items-center gap-2" data-testid="permissions-tab">
+            <Shield className="w-4 h-4" />
+            Permissions
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Users Tab Content */}
+        <TabsContent value="users" className="space-y-6">
+          {/* Role Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {Object.entries(roles).map(([roleKey, roleInfo]) => {
           const RoleIcon = roleIcons[roleKey] || Shield;
           const count = users.filter(u => u.role === roleKey).length;
@@ -1879,6 +1899,14 @@ const SettingsUserManagementPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+        </TabsContent>
+
+        {/* Permissions Tab Content */}
+        <TabsContent value="permissions">
+          <SettingsPermissionsPage embedded={true} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

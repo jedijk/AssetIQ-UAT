@@ -1133,20 +1133,23 @@ const FeedbackPage = () => {
               return (
                 <div
                   key={item.id}
-                  className={`bg-white rounded-lg sm:rounded-xl border p-3 sm:p-4 hover:shadow-sm transition-all duration-150 ${
+                  className={`bg-white rounded-lg sm:rounded-xl border p-3 sm:p-4 transition-all duration-150 ${
                     isSelected 
                       ? "border-purple-400 bg-purple-50/50" 
-                      : "border-slate-200 hover:border-slate-300"
-                  }`}
+                      : "border-slate-200 hover:border-slate-300 hover:shadow-sm"
+                  } ${!isSelectionMode ? 'cursor-pointer active:bg-slate-50' : ''}`}
                   data-testid={`feedback-item-${item.id}`}
-                  onClick={isSelectionMode ? (e) => toggleSelection(item.id, e) : undefined}
+                  onClick={!isSelectionMode ? () => openFeedbackDetail(item) : (e) => toggleSelection(item.id, e)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && (!isSelectionMode ? openFeedbackDetail(item) : toggleSelection(item.id, e))}
                 >
                   <div className="flex items-start gap-2 sm:gap-3">
                     {/* Checkbox in selection mode */}
                     {isSelectionMode && (
                       <div 
                         className="mt-0.5 flex-shrink-0"
-                        onClick={(e) => toggleSelection(item.id, e)}
+                        onClick={(e) => { e.stopPropagation(); toggleSelection(item.id, e); }}
                       >
                         <Checkbox
                           checked={isSelected}
@@ -1156,18 +1159,12 @@ const FeedbackPage = () => {
                     )}
                     
                     {/* Type Icon */}
-                    <div 
-                      className={`mt-0.5 flex-shrink-0 ${typeColors[item.type]} ${!isSelectionMode ? 'cursor-pointer' : ''}`}
-                      onClick={!isSelectionMode ? () => openFeedbackDetail(item) : undefined}
-                    >
+                    <div className={`mt-0.5 flex-shrink-0 ${typeColors[item.type]}`}>
                       <TypeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     
                     {/* Content */}
-                    <div 
-                      className={`flex-1 min-w-0 ${!isSelectionMode ? 'cursor-pointer' : ''}`}
-                      onClick={!isSelectionMode ? () => openFeedbackDetail(item) : undefined}
-                    >
+                    <div className="flex-1 min-w-0">
                       <p className="text-slate-800 line-clamp-2 text-xs sm:text-sm">
                         {item.message}
                       </p>
@@ -1192,7 +1189,7 @@ const FeedbackPage = () => {
                     {/* Actions Menu - hide in selection mode */}
                     {!isSelectionMode && (
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1203,13 +1200,13 @@ const FeedbackPage = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => handleEdit(item, e)}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(item, e); }}>
                             <Pencil className="w-4 h-4 mr-2" />
                             {t("common.edit") || "Edit"}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onClick={(e) => handleDelete(item.id, e)}
+                            onClick={(e) => { e.stopPropagation(); handleDelete(item.id, e); }}
                             className="text-red-600 focus:text-red-600"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />

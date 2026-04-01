@@ -169,9 +169,10 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
     queryFn: () => aiRiskAPI.getCausalAnalysis(threatId),
     retry: false,
     staleTime: 5 * 60 * 1000,
+    // Don't treat 404 as an error - it just means no analysis exists yet
   });
   
-  // Mutation to generate causes
+  // Mutation to generate causes - works independently of AI Risk Insight
   const generateMutation = useMutation({
     mutationFn: () => aiRiskAPI.generateCauses(threatId, { maxCauses: 5 }),
     onSuccess: (data) => {
@@ -181,7 +182,15 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
     },
     onError: (error) => {
       console.error("Failed to generate causal analysis:", error);
-      toast.error(t("ai.analysisFailed") || "Failed to generate causal analysis");
+      // Check for specific error types
+      const errorMessage = error?.response?.data?.detail || error?.message || "Failed to generate causal analysis";
+      if (errorMessage.includes("rate limit")) {
+        toast.error(t("ai.rateLimitExceeded") || "AI rate limit exceeded. Please wait a moment and try again.");
+      } else if (errorMessage.includes("token") || errorMessage.includes("key")) {
+        toast.error(t("ai.configurationError") || "AI service configuration error. Please contact support.");
+      } else {
+        toast.error(t("ai.analysisFailed") || errorMessage);
+      }
     },
   });
 

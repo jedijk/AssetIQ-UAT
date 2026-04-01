@@ -10,7 +10,7 @@ import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from database import db, EMERGENT_LLM_KEY
+from database import db, EMERGENT_LLM_KEY, ai_usage_tracker
 from auth import get_current_user
 from ai_risk_engine import AIRiskEngine
 from ai_risk_models import (
@@ -30,6 +30,33 @@ ai_engine = AIRiskEngine(api_key=EMERGENT_LLM_KEY)
 # Rate limit configurations
 AI_RATE_LIMIT = "20/minute"  # 20 AI calls per minute per IP
 AI_HEAVY_RATE_LIMIT = "10/minute"  # 10 heavy AI calls per minute (fault tree, bow tie)
+
+
+async def log_ai_usage(
+    user_id: str,
+    feature: str,
+    model: str = "gpt-5.2",
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    installation_name: str = "default",
+    installation_id: str = "default",
+    success: bool = True,
+    metadata: dict = None
+):
+    """Helper to log AI usage to the tracking service."""
+    try:
+        await ai_usage_tracker.log_usage(
+            installation_id=installation_id,
+            installation_name=installation_name,
+            user_id=user_id,
+            model=model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            feature=feature,
+            metadata={**(metadata or {}), "success": success}
+        )
+    except Exception as e:
+        logger.error(f"Failed to log AI usage: {e}")
 
 
 def check_injection_attempt(data: dict, endpoint: str) -> None:
@@ -144,6 +171,20 @@ async def analyze_threat_risk(
         historical_threats=historical_threats,
         equipment_history=equipment_history,
         include_forecast=include_forecast
+    )
+    
+    # Log AI usage
+    installation_name = threat.get("installation", threat.get("location", "default"))
+    await log_ai_usage(
+        user_id=current_user["id"],
+        feature="risk_analysis",
+        model="gpt-5.2",
+        prompt_tokens=500,  # Estimated
+        completion_tokens=1500,  # Estimated
+        installation_name=installation_name,
+        installation_id=threat.get("installation_id", "default"),
+        success=True,
+        metadata={"threat_id": threat_id, "include_forecast": include_forecast}
     )
     
     # Store the AI insights for the threat
@@ -296,6 +337,20 @@ async def generate_threat_causes(
         equipment_data=equipment_data,
         equipment_history=equipment_history,
         max_causes=max_causes
+    )
+    
+    # Log AI usage for causal intelligence
+    installation_name = threat.get("installation", threat.get("location", "default"))
+    await log_ai_usage(
+        user_id=current_user["id"],
+        feature="causal_intelligence",
+        model="gpt-5.2",
+        prompt_tokens=600,
+        completion_tokens=1200,
+        installation_name=installation_name,
+        installation_id=threat.get("installation_id", "default"),
+        success=True,
+        metadata={"threat_id": threat_id, "max_causes": max_causes}
     )
     
     # Store the causal analysis

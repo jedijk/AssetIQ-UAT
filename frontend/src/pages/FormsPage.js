@@ -23,6 +23,13 @@ import {
   Smartphone,
   Monitor,
   Loader2,
+  AlertTriangle,
+  AlertCircle,
+  Upload,
+  Signature,
+  Building2,
+  SlidersHorizontal,
+  List,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -138,19 +145,24 @@ const FormsPage = () => {
   const [searchingEquipment, setSearchingEquipment] = useState(false);
 
   // Fetch templates
-  const { data: templatesData, isLoading: loadingTemplates } = useQuery({
+  const { data: templatesData, isLoading: loadingTemplates, isError: templatesError, error: templatesErrorDetail } = useQuery({
     queryKey: ["form-templates", disciplineFilter, searchQuery],
     queryFn: () => formAPI.getTemplates({ 
       discipline: disciplineFilter !== "all" ? disciplineFilter : undefined,
       search: searchQuery || undefined 
     }),
+    retry: 2,
+    onError: (error) => {
+      console.error("Failed to load form templates:", error);
+    }
   });
 
   // Fetch submissions
-  const { data: submissionsData, isLoading: loadingSubmissions } = useQuery({
+  const { data: submissionsData, isLoading: loadingSubmissions, isError: submissionsError } = useQuery({
     queryKey: ["form-submissions"],
     queryFn: () => formAPI.getSubmissions({}),
     enabled: activeTab === "submissions",
+    retry: 2,
   });
 
   // Create template mutation
@@ -433,6 +445,23 @@ const FormsPage = () => {
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
             </div>
+          ) : templatesError ? (
+            <Card className="py-12 border-red-200 bg-red-50">
+              <CardContent className="text-center">
+                <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-red-700 mb-2">Failed to load form templates</h3>
+                <p className="text-sm text-red-500 mb-4">
+                  {templatesErrorDetail?.message || "Please check your connection and try again"}
+                </p>
+                <Button 
+                  variant="outline"
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ["form-templates"] })}
+                  data-testid="retry-templates-btn"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" /> Retry
+                </Button>
+              </CardContent>
+            </Card>
           ) : templates.length === 0 ? (
             <Card className="py-12">
               <CardContent className="text-center">
@@ -468,6 +497,20 @@ const FormsPage = () => {
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
             </div>
+          ) : submissionsError ? (
+            <Card className="py-12 border-red-200 bg-red-50">
+              <CardContent className="text-center">
+                <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-red-700 mb-2">Failed to load submissions</h3>
+                <p className="text-sm text-red-500 mb-4">Please check your connection and try again</p>
+                <Button 
+                  variant="outline"
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ["form-submissions"] })}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" /> Retry
+                </Button>
+              </CardContent>
+            </Card>
           ) : submissions.length === 0 ? (
             <Card className="py-12">
               <CardContent className="text-center">

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI } from "../lib/api";
+import { formAPI } from "../components/forms";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
 import { motion } from "framer-motion";
@@ -391,6 +392,14 @@ export default function DashboardPage() {
     }
     return true;
   });
+
+  // Fetch recent form submissions for dashboard widget
+  const { data: formSubmissionsData = [] } = useQuery({
+    queryKey: ["form-submissions-dashboard"],
+    queryFn: () => formAPI.getSubmissions({ limit: 10 }),
+    staleTime: 60 * 1000, // 1 minute
+  });
+  const recentSubmissions = Array.isArray(formSubmissionsData) ? formSubmissionsData : (formSubmissionsData?.submissions || []);
 
   // Equipment data already fetched above as equipmentNodes
   const equipment = equipmentNodes;
@@ -807,7 +816,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <RecentItemCard
           title={t("dashboard.recentObservations") || "Recent Observations"}
           icon={AlertTriangle}
@@ -844,6 +853,47 @@ export default function DashboardPage() {
                 item.status === "Mitigated" ? "bg-green-100 text-green-700" :
                 "bg-slate-100 text-slate-700"
               }`}>{item.status}</span>
+            </div>
+          )}
+        />
+
+        <RecentItemCard
+          title={t("dashboard.recentFormSubmissions") || "Recent Form Submissions"}
+          icon={FileText}
+          items={recentSubmissions.sort((a, b) => new Date(b.submitted_at || b.created_at) - new Date(a.submitted_at || a.created_at))}
+          emptyMessage={t("dashboard.noFormSubmissions") || "No form submissions yet"}
+          clickable={true}
+          onClick={() => navigate("/forms", { state: { ...navState, tab: "submissions" } })}
+          renderItem={(item, idx) => (
+            <div 
+              key={idx} 
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+              onClick={(e) => { e.stopPropagation(); navigate(`/forms?submission=${item.id}`, { state: navState }); }}
+              data-testid={`form-submission-item-${item.id}`}
+            >
+              <UserAvatar 
+                name={item.submitted_by_name || item.submitter_name || "User"}
+                initials={(item.submitted_by_name || item.submitter_name || "U").charAt(0)}
+                size="sm"
+                showPopover={true}
+              />
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                item.status === "completed" || item.status === "approved" ? "bg-green-500" :
+                item.status === "pending" ? "bg-amber-500" :
+                item.status === "rejected" ? "bg-red-500" : "bg-blue-500"
+              }`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-slate-700 truncate">{item.template_name || item.form_name || "Form"}</p>
+                <p className="text-[10px] text-slate-400">
+                  {new Date(item.submitted_at || item.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize ${
+                item.status === "completed" || item.status === "approved" ? "bg-green-100 text-green-700" :
+                item.status === "pending" ? "bg-amber-100 text-amber-700" :
+                item.status === "rejected" ? "bg-red-100 text-red-700" :
+                "bg-blue-100 text-blue-700"
+              }`}>{item.status || "submitted"}</span>
             </div>
           )}
         />
