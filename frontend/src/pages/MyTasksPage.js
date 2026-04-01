@@ -45,6 +45,7 @@ import {
   CloudOff,
   Cloud,
   Building2,
+  Download,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -74,6 +75,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { cn } from "../lib/utils";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { imageAnalysisAPI } from "../lib/api";
@@ -386,6 +393,17 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   const [equipmentSearch, setEquipmentSearch] = useState({}); // Search query per equipment field
   const [equipmentResults, setEquipmentResults] = useState({}); // Search results per equipment field
   const [searchingEquipment, setSearchingEquipment] = useState(null); // Currently searching field id
+  const [viewingDocument, setViewingDocument] = useState(null); // Currently viewing document
+  
+  // Get form documents from task template - construct full URLs
+  const rawFormDocuments = task?.form_documents || task?.template?.documents || task?.documents || [];
+  const formDocuments = rawFormDocuments.map(doc => ({
+    ...doc,
+    // Construct full URL for documents served from backend
+    url: doc.url?.startsWith('http') 
+      ? doc.url 
+      : `${API_BASE_URL}/api/form-documents/${doc.url || doc.storage_path}`
+  }));
   
   // Reset form when task changes
   useEffect(() => {
@@ -401,6 +419,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       setAnalyzingImage(null);
       setAttachments([]);
       setUploadingAttachment(false);
+      setViewingDocument(null);
     }
   }, [task?.id]);
   
@@ -1364,6 +1383,85 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   );
   
   // Render as full-page Frame View with Back Button
+  // First check if viewing a document
+  if (viewingDocument) {
+    const isImage = viewingDocument.type?.startsWith('image/') || 
+                    viewingDocument.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+    const isPDF = viewingDocument.type === 'application/pdf' || 
+                  viewingDocument.url?.match(/\.pdf$/i);
+    
+    return (
+      <div className="h-full flex flex-col bg-white" data-testid="document-viewer">
+        {/* Document Viewer Header */}
+        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-3 py-3 sm:px-4 sm:py-4 sticky top-0 z-10">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 sm:h-9 sm:w-9 text-white hover:bg-white/20"
+              onClick={() => setViewingDocument(null)}
+              data-testid="document-back-btn"
+            >
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-white font-semibold text-base sm:text-lg truncate">{viewingDocument.name}</h3>
+              <p className="text-white/70 text-xs sm:text-sm">
+                Back to form
+              </p>
+            </div>
+            {/* Download button */}
+            <a 
+              href={viewingDocument.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              download={viewingDocument.name}
+              className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center text-white hover:bg-white/20 rounded-lg"
+              data-testid="document-download-btn"
+            >
+              <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+            </a>
+          </div>
+        </div>
+        
+        {/* Document Content */}
+        <div className="flex-1 overflow-auto bg-slate-100">
+          {isImage ? (
+            <div className="p-4 flex items-center justify-center min-h-full">
+              <img 
+                src={viewingDocument.url} 
+                alt={viewingDocument.name}
+                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+              />
+            </div>
+          ) : isPDF ? (
+            <iframe
+              src={viewingDocument.url}
+              title={viewingDocument.name}
+              className="w-full h-full border-0"
+              style={{ minHeight: '100%' }}
+            />
+          ) : (
+            <div className="p-6 text-center">
+              <FileText className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-600 mb-4">Preview not available for this file type</p>
+              <a 
+                href={viewingDocument.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                download={viewingDocument.name}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Download File
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="h-full flex flex-col bg-white" data-testid="task-execution-frame">
       {/* Purple Header with Back Button */}
@@ -1384,6 +1482,50 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
               {task?.equipment_name || task?.asset || "Complete the form below"}
             </p>
           </div>
+          {/* Documents Icon - show when form has attached documents */}
+          {formDocuments.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 sm:h-9 sm:w-9 text-white hover:bg-white/20 relative"
+                  data-testid="form-documents-btn"
+                >
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-400 text-amber-900 text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {formDocuments.length}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <div className="px-2 py-1.5 text-xs font-medium text-slate-500 border-b">
+                  Form Documents
+                </div>
+                {formDocuments.map((doc, idx) => {
+                  const isImage = doc.type?.startsWith('image/') || doc.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                  const isPDF = doc.type === 'application/pdf' || doc.url?.match(/\.pdf$/i);
+                  return (
+                    <DropdownMenuItem
+                      key={doc.id || idx}
+                      onClick={() => setViewingDocument(doc)}
+                      className="cursor-pointer"
+                      data-testid={`view-document-${idx}`}
+                    >
+                      {isImage ? (
+                        <Image className="w-4 h-4 mr-2 text-blue-500" />
+                      ) : isPDF ? (
+                        <FileText className="w-4 h-4 mr-2 text-red-500" />
+                      ) : (
+                        <FileText className="w-4 h-4 mr-2 text-slate-500" />
+                      )}
+                      <span className="truncate">{doc.name}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
       

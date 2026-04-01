@@ -315,6 +315,29 @@ async def delete_form_document(
     return {"message": "Document deleted successfully"}
 
 
+@router.get("/form-documents/{document_path:path}")
+async def serve_form_document(
+    document_path: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Serve a form document file from object storage."""
+    from fastapi.responses import Response
+    
+    try:
+        # Get the document from storage
+        content, content_type = get_object(document_path)
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f"inline; filename=\"{document_path.split('/')[-1]}\""
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to serve document {document_path}: {e}")
+        raise HTTPException(status_code=404, detail="Document not found")
+
+
 @router.get("/form-templates/{template_id}/documents")
 async def get_form_documents(
     template_id: str,

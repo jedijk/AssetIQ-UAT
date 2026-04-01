@@ -62,6 +62,7 @@ def serialize_task(task: dict) -> dict:
         "last_completed": safe_isoformat(task.get("last_completed")),
         "form_fields": task.get("form_fields", []),
         "form_template_name": task.get("form_template_name", ""),
+        "form_documents": task.get("form_documents", []),  # Documents attached to form template
         "template": task.get("template", {}),
         "estimated_duration_minutes": task.get("estimated_duration_minutes"),
         "can_quick_complete": not task.get("form_fields") and not task.get("template", {}).get("form_fields"),
@@ -117,6 +118,7 @@ def serialize_action_as_task(action: dict) -> dict:
         "assignee": action.get("assignee", ""),
         "last_completed": None,
         "form_fields": [],
+        "form_documents": action.get("form_documents", []),  # Documents attached to action/form
         "template": {},
         "estimated_duration_minutes": None,
         "can_quick_complete": True,  # Actions can be quick completed
@@ -279,6 +281,8 @@ async def get_my_tasks(
                         if form_template:
                             task["form_fields"] = form_template.get("fields", [])
                             task["form_template_name"] = form_template.get("name", "")
+                            # Include attached documents for form execution
+                            task["form_documents"] = form_template.get("documents", [])
                     except Exception as e:
                         logger.warning(f"Failed to fetch form template {form_template_id}: {e}")
         
