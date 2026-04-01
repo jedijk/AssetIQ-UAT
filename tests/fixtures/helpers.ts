@@ -1,6 +1,6 @@
 import { Page, expect } from '@playwright/test';
 
-export const BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://prod-debug-6.preview.emergentagent.com';
+export const BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://form-designer-2-1.preview.emergentagent.com';
 export const TEST_EMAIL = 'test@test.com';
 export const TEST_PASSWORD = 'test';
 export const TEST_NAME = 'Test User';
