@@ -124,20 +124,22 @@ class TaskService:
         return {"total": total, "templates": templates}
     
     async def get_template_by_id(self, template_id: str) -> Optional[Dict[str, Any]]:
-        """Get a specific template."""
-        if not ObjectId.is_valid(template_id):
-            return None
-        
-        doc = await self.templates.find_one({"_id": ObjectId(template_id)})
+        """Get a specific template by id (string UUID) or _id (ObjectId)."""
+        # First try to find by string 'id' field
+        doc = await self.templates.find_one({"id": template_id})
         if doc:
             return self._serialize_template(doc)
+        
+        # Fallback to ObjectId lookup
+        if ObjectId.is_valid(template_id):
+            doc = await self.templates.find_one({"_id": ObjectId(template_id)})
+            if doc:
+                return self._serialize_template(doc)
+        
         return None
     
     async def update_template(self, template_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a task template."""
-        if not ObjectId.is_valid(template_id):
-            return None
-        
         update = {"updated_at": datetime.now(timezone.utc)}
         
         allowed_fields = [
@@ -152,11 +154,20 @@ class TaskService:
             if field in data and data[field] is not None:
                 update[field] = data[field]
         
+        # Try to find by string 'id' field first
         result = await self.templates.find_one_and_update(
-            {"_id": ObjectId(template_id)},
+            {"id": template_id},
             {"$set": update},
             return_document=True
         )
+        
+        # Fallback to ObjectId lookup
+        if not result and ObjectId.is_valid(template_id):
+            result = await self.templates.find_one_and_update(
+                {"_id": ObjectId(template_id)},
+                {"$set": update},
+                return_document=True
+            )
         
         if result:
             return self._serialize_template(result)
@@ -164,9 +175,6 @@ class TaskService:
     
     async def delete_template(self, template_id: str) -> bool:
         """Delete a task template (soft delete by deactivating)."""
-        if not ObjectId.is_valid(template_id):
-            return False
-        
         # Check if any active plans use this template
         plans_count = await self.plans.count_documents({
             "task_template_id": template_id,
@@ -176,12 +184,24 @@ class TaskService:
         if plans_count > 0:
             raise ValueError(f"Cannot delete template: {plans_count} active plans use it")
         
+        # Try to find by string 'id' field first
         result = await self.templates.update_one(
-            {"_id": ObjectId(template_id)},
+            {"id": template_id},
             {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
         )
         
-        return result.modified_count > 0
+        if result.modified_count > 0:
+            return True
+        
+        # Fallback to ObjectId lookup
+        if ObjectId.is_valid(template_id):
+            result = await self.templates.update_one(
+                {"_id": ObjectId(template_id)},
+                {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
+            )
+            return result.modified_count > 0
+        
+        return False
     
     # ==================== TASK PLANS ====================
     

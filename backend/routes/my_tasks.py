@@ -688,9 +688,9 @@ async def get_adhoc_plans(
             "assigned_team": plan.get("assigned_team"),
             "assigned_user_id": plan.get("assigned_user_id"),
             "notes": plan.get("notes"),
-            "last_executed_at": plan.get("last_executed_at").isoformat() if plan.get("last_executed_at") else None,
+            "last_executed_at": safe_isoformat(plan.get("last_executed_at")),
             "execution_count": plan.get("execution_count", 0),
-            "created_at": plan.get("created_at").isoformat() if plan.get("created_at") else None,
+            "created_at": safe_isoformat(plan.get("created_at")),
         })
     
     return {
