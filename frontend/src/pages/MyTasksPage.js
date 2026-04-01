@@ -1545,8 +1545,11 @@ const MyTasksPage = () => {
     mutationFn: (taskId) => myTasksAPI.deleteTask(taskId),
     onSuccess: () => {
       toast.success("Task deleted successfully");
+      // Invalidate all task-related queries for instant sync
       queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["task-instances"] });
+      queryClient.invalidateQueries({ queryKey: ["task-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["adhoc-plans"] });
       setDeleteTaskId(null);
       setDeleteTaskName("");
     },

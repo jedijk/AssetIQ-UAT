@@ -422,6 +422,9 @@ const TaskSchedulerPage = () => {
     mutationFn: taskAPI.deleteTemplate,
     onSuccess: () => {
       queryClient.invalidateQueries(["task-templates"]);
+      queryClient.invalidateQueries(["task-plans"]);
+      queryClient.invalidateQueries(["task-instances"]);
+      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
       toast.success("Template deleted");
     },
     onError: (error) => toast.error(error.message || "Failed to delete template")
@@ -432,6 +435,8 @@ const TaskSchedulerPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(["task-plans"]);
       queryClient.invalidateQueries(["task-templates"]);
+      queryClient.invalidateQueries(["task-instances"]);
+      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
       toast.success("Plan deleted");
     },
     onError: (error) => toast.error(error.message || "Failed to delete plan")
@@ -452,6 +457,7 @@ const TaskSchedulerPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(["task-plans"]);
       queryClient.invalidateQueries(["task-stats"]);
+      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
       toast.success("Plan created");
       setShowPlanDialog(false);
       setPlanForm({ equipment_id: "", task_template_id: "", form_template_id: "", interval_value: null, interval_unit: null, effective_from: null, effective_until: null, notes: "" });
@@ -472,6 +478,7 @@ const TaskSchedulerPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(["task-plans"]);
       queryClient.invalidateQueries(["task-stats"]);
+      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
       toast.success("Plan updated");
       setShowPlanDialog(false);
       setEditingPlan(null);
@@ -485,6 +492,7 @@ const TaskSchedulerPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(["task-instances"]);
       queryClient.invalidateQueries(["task-stats"]);
+      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
       toast.success("Execution started");
     },
     onError: () => toast.error("Failed to start execution")
@@ -495,6 +503,7 @@ const TaskSchedulerPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(["task-instances"]);
       queryClient.invalidateQueries(["task-stats"]);
+      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
       toast.success("Execution completed");
       setShowCompleteDialog(false);
       setSelectedInstance(null);
@@ -507,6 +516,7 @@ const TaskSchedulerPage = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries(["task-instances"]);
       queryClient.invalidateQueries(["task-stats"]);
+      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
       const count = data.instances_generated ?? data.created ?? 0;
       const plansCount = data.plans_processed || 0;
       if (count > 0) {
@@ -537,6 +547,7 @@ const TaskSchedulerPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(["task-instances"]);
       queryClient.invalidateQueries(["task-stats"]);
+      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
       toast.success("Execution deleted");
       setDeleteInstanceId(null);
     },
