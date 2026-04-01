@@ -661,7 +661,10 @@ const en = {
   // AI Features
   ai: {
     riskAnalysis: "AI Risk Analysis",
+    riskAnalysisDesc: "AI-powered risk assessment and predictions",
     causalIntelligence: "Causal Intelligence",
+    causalIntelligenceDesc: "Discover root causes and contributing factors",
+    analysisComplete: "Analysis complete",
     analyzeWithAi: "Analyze with AI",
     analyzing: "Analyzing...",
     whyIsThisHappening: "Why is this happening?",
@@ -1833,7 +1836,10 @@ const nl = {
   // AI Features
   ai: {
     riskAnalysis: "AI Risicoanalyse",
+    riskAnalysisDesc: "AI-gestuurde risicobeoordeling en voorspellingen",
     causalIntelligence: "Causale Intelligentie",
+    causalIntelligenceDesc: "Ontdek grondoorzaken en bijdragende factoren",
+    analysisComplete: "Analyse voltooid",
     analyzeWithAi: "Analyseer met AI",
     analyzing: "Analyseren...",
     whyIsThisHappening: "Waarom gebeurt dit?",
