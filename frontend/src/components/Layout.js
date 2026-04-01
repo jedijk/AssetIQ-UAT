@@ -277,7 +277,7 @@ const Layout = () => {
                     data-testid="notifications-button"
                   >
                     <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    {overdueCount > 0 && (
+                    {overdueCount > 0 && !dismissedNotifications && (
                       <motion.span 
                         className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5"
                         initial={{ scale: 0 }}
@@ -293,17 +293,39 @@ const Layout = () => {
               <DropdownMenuContent align="end" className="w-80">
                 <DropdownMenuLabel className="flex items-center justify-between">
                   <span>{t("notifications.overdueActions")}</span>
-                  {overdueCount > 0 && (
-                    <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-medium">
-                      {overdueCount}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {overdueCount > 0 && (
+                      <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                        {overdueCount}
+                      </span>
+                    )}
+                    {overdueCount > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDismissedNotifications(true);
+                        }}
+                        className="text-xs text-slate-500 hover:text-slate-700 underline"
+                        data-testid="clear-notifications-btn"
+                      >
+                        {t("notifications.clearAll") || "Clear"}
+                      </button>
+                    )}
+                  </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {overdueCount === 0 ? (
+                {overdueCount === 0 || dismissedNotifications ? (
                   <div className="px-3 py-6 text-center text-slate-400 text-sm">
                     <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    {t("notifications.noOverdueActions")}
+                    {dismissedNotifications ? (t("notifications.cleared") || "Notifications cleared") : t("notifications.noOverdueActions")}
+                    {dismissedNotifications && overdueCount > 0 && (
+                      <button
+                        onClick={() => setDismissedNotifications(false)}
+                        className="block mx-auto mt-2 text-xs text-blue-600 hover:text-blue-700 underline"
+                      >
+                        {t("notifications.showAgain") || "Show notifications"}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <>
