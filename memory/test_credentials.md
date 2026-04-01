@@ -14,7 +14,15 @@
 - **Role:** admin
 - **Installations:** Tyromer
 
+### Viewer Account (Restricted Access)
+- **Email:** viewer@test.com
+- **Password:** test
+- **Role:** viewer
+- **Installations:** Tyromer
+- **Restricted Features:** No access to Causal Engine, Forms, Equipment, Users, Settings
+
 ## Notes
-- Both accounts have access to the "Tyromer" installation
+- All accounts have access to the "Tyromer" installation
 - Owner role has full system access including user management
 - Admin role has elevated privileges for configuration
+- Viewer role has read-only access with restricted features hidden from navigation

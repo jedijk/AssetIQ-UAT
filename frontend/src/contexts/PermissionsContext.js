@@ -36,7 +36,7 @@ export const PermissionsProvider = ({ children }) => {
   const fetchPermissions = async () => {
     try {
       setLoading(true);
-      const data = await permissionsAPI.getMyPermissions();
+      const data = await permissionsAPI.getMy();
       setPermissions(data);
     } catch (error) {
       console.error("Failed to fetch permissions:", error);

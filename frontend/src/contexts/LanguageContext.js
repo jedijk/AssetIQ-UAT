@@ -7,6 +7,7 @@ const en = {
   // Navigation
   nav: {
     dashboard: "Dashboard",
+    definitions: "Definitions",
     observations: "Observations",
     myTasks: "My Tasks",
     causalEngine: "Causal Engine",
@@ -1185,6 +1186,7 @@ const nl = {
   // Navigation
   nav: {
     dashboard: "Dashboard",
+    definitions: "Definities",
     observations: "Observaties",
     myTasks: "Mijn Taken",
     causalEngine: "Oorzaakanalyse",

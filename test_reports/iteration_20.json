@@ -1,0 +1,63 @@
+{
+  "summary": "Tested app-wide permission enforcement for viewer and owner roles. All tests pass - navigation items and settings menu correctly filtered based on user permissions, and direct URL access properly redirects unauthorized users to dashboard.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "viewer_nav_items": {
+      "status": "PASS",
+      "notes": "Viewer sees only: Dashboard, Observations, Actions, My Tasks, Library. Correctly hidden: Definitions, Causal Engine"
+    },
+    "viewer_settings_menu": {
+      "status": "PASS",
+      "notes": "Viewer sees only: Task Planner, Decision Engine, User Statistics, Feedback. Correctly hidden: Equipment Manager, Forms, User Management, Permissions, AI Usage"
+    },
+    "viewer_direct_url_access": {
+      "status": "PASS",
+      "notes": "/causal-engine, /forms, /equipment-manager all redirect to /dashboard for viewer"
+    },
+    "owner_nav_items": {
+      "status": "PASS",
+      "notes": "Owner sees all 7 nav items: Dashboard, Definitions, Observations, Causal Engine, Actions, My Tasks, Library"
+    },
+    "owner_settings_menu": {
+      "status": "PASS",
+      "notes": "Owner sees all 10 settings items including Equipment Manager, Form Designer, User Management, Permissions, AI Usage"
+    },
+    "owner_direct_url_access": {
+      "status": "PASS",
+      "notes": "Owner can access /causal-engine, /forms, /equipment-manager directly without redirect"
+    }
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_20.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only testing)",
+    "frontend": "100% (all 6 permission tests passed)"
+  },
+  "test_credentials": {
+    "viewer": "viewer@test.com / test",
+    "owner": "jedijk@gmail.com / admin123"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Permission enforcement is working correctly. PermissionsContext.js uses canAccessRoute() and canSeeNavItem() to filter navigation. Layout.js filters navItems and settingsMenuItems based on permissions. App.js ProtectedRoute redirects unauthorized users to /dashboard. Viewer role has read:false for investigations, forms, equipment, users, settings features.",
+  "permission_mapping_verified": {
+    "investigations_feature": "Controls: /investigations, /causal-engine",
+    "equipment_feature": "Controls: /equipment, /definitions, /equipment-manager",
+    "forms_feature": "Controls: /forms",
+    "users_feature": "Controls: /settings/user-management",
+    "settings_feature": "Controls: /settings/criticality-definitions, /settings/statistics"
+  }
+}
