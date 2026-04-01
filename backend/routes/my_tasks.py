@@ -655,11 +655,15 @@ async def get_adhoc_plans(
         # Get template details
         template_name = plan.get("task_template_name", "Unknown Task")
         template = None
-        if plan.get("task_template_id"):
-            try:
-                template = await db.task_templates.find_one({"_id": ObjectId(plan["task_template_id"])})
-            except Exception:
-                pass
+        template_id = plan.get("task_template_id")
+        if template_id:
+            # Try by string id first, then ObjectId
+            template = await db.task_templates.find_one({"id": template_id})
+            if not template:
+                try:
+                    template = await db.task_templates.find_one({"_id": ObjectId(template_id)})
+                except Exception:
+                    pass
         
         # Get equipment details
         equipment_name = plan.get("equipment_name", "Unknown Equipment")
@@ -674,7 +678,7 @@ async def get_adhoc_plans(
             form_template = await db.form_templates.find_one({"id": plan["form_template_id"]})
         
         plans.append({
-            "id": str(plan["_id"]),
+            "id": plan.get("id") or str(plan["_id"]),
             "title": template_name,
             "description": template.get("description", "") if template else "",
             "equipment_id": plan.get("equipment_id"),
@@ -706,11 +710,13 @@ async def execute_adhoc_plan(
 ):
     """Create a task instance from an ad-hoc plan for immediate execution."""
     
-    # Find the plan
-    try:
-        plan = await db.task_plans.find_one({"_id": ObjectId(plan_id)})
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid plan ID")
+    # Find the plan - try by string id first, then ObjectId
+    plan = await db.task_plans.find_one({"id": plan_id})
+    if not plan:
+        try:
+            plan = await db.task_plans.find_one({"_id": ObjectId(plan_id)})
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid plan ID")
     
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
@@ -721,13 +727,16 @@ async def execute_adhoc_plan(
     if not plan.get("is_active"):
         raise HTTPException(status_code=400, detail="This plan is inactive")
     
-    # Get template details
+    # Get template details - try by string id first, then ObjectId
     template = None
-    if plan.get("task_template_id"):
-        try:
-            template = await db.task_templates.find_one({"_id": ObjectId(plan["task_template_id"])})
-        except Exception:
-            pass
+    template_id = plan.get("task_template_id")
+    if template_id:
+        template = await db.task_templates.find_one({"id": template_id})
+        if not template:
+            try:
+                template = await db.task_templates.find_one({"_id": ObjectId(template_id)})
+            except Exception:
+                pass
     
     # Get form template and its fields
     form_fields = []
@@ -748,7 +757,8 @@ async def execute_adhoc_plan(
     now = datetime.now(timezone.utc)
     
     task_instance = {
-        "task_plan_id": plan["_id"],
+        "id": str(uuid.uuid4()),  # Add explicit id field
+        "task_plan_id": plan.get("id") or str(plan["_id"]),
         "task_template_id": plan.get("task_template_id"),
         "task_template_name": plan.get("task_template_name", "Ad-hoc Task"),
         "title": plan.get("task_template_name", "Ad-hoc Task"),
@@ -779,9 +789,10 @@ async def execute_adhoc_plan(
     result = await db.task_instances.insert_one(task_instance)
     task_instance["_id"] = result.inserted_id
     
-    # Update plan's last_executed_at and execution_count
+    # Update plan's last_executed_at and execution_count - use the correct query field
+    plan_query = {"id": plan_id} if plan.get("id") == plan_id else {"_id": plan["_id"]}
     await db.task_plans.update_one(
-        {"_id": plan["_id"]},
+        plan_query,
         {
             "$set": {"last_executed_at": now, "updated_at": now},
             "$inc": {"execution_count": 1}
