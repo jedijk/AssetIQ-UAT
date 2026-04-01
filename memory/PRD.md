@@ -24,6 +24,32 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 1, 2026 - App-Wide Permission Enforcement
+**Bug Fixes:**
+1. ✅ **Permission System Fixed** - Fixed `PermissionsContext.js` calling non-existent `getMyPermissions()` (changed to `getMy()`)
+2. ✅ **Nav Items Filtered by Permissions** - Navigation items now correctly show/hide based on user's role permissions
+3. ✅ **Settings Menu Filtered by Permissions** - Settings dropdown items filtered based on feature access
+4. ✅ **Direct URL Access Protection** - Users redirected to /dashboard when accessing routes they don't have permission for
+5. ✅ **Missing Translation** - Added `nav.definitions` translation key for English and Dutch
+
+**Permission Mapping:**
+- `investigations` → /causal-engine, /investigations
+- `equipment` → /definitions, /equipment-manager, /equipment
+- `forms` → /forms
+- `users` → /settings/user-management
+- `settings` → /settings/criticality-definitions
+
+**Test Results:**
+- Viewer user (restricted) correctly sees limited nav items
+- Owner user sees all nav items and settings
+- Direct URL access properly redirects unauthorized users
+
+**Files Modified:**
+- `frontend/src/contexts/PermissionsContext.js` - Fixed API method name
+- `frontend/src/contexts/LanguageContext.js` - Added nav.definitions translations
+
+**Test Report:** `/app/test_reports/iteration_20.json` - 100% pass rate (6/6 permission tests)
+
 ### April 1, 2026 - Major Feature Improvements (7 Items)
 **New Features:**
 1. ✅ **Dashboard Form Submissions Widget** - Added widget showing last 10 form submissions with submitter, date, and status
