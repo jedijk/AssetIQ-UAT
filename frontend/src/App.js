@@ -172,6 +172,7 @@ function App() {
               }>
                 <Route index element={<DashboardPage />} />
                 <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="definitions" element={<DefinitionsPage />} />
                 <Route path="threats" element={<ThreatsPage />} />
                 <Route path="threats/:id" element={<ThreatDetailPage />} />
                 <Route path="actions" element={<ActionsPage />} />
