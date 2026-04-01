@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
 import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield } from "lucide-react";
+import AnimatedDrawer from "./animations/AnimatedDrawer";
+import { springPresets } from "./animations/constants";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
 const APP_VERSION = process.env.REACT_APP_VERSION || "1.0.0";
@@ -177,18 +180,21 @@ const Layout = () => {
           {/* Left Section - Logo & Nav */}
           <div className="flex items-center gap-3 lg:gap-6">
             {/* Mobile Menu Toggle - LEFT side on mobile */}
-            <button
+            <motion.button
               className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 -ml-1"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               data-testid="mobile-menu-toggle"
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={springPresets.snappy}
             >
               {mobileMenuOpen ? (
                 <X className="w-5 h-5 text-slate-600" />
               ) : (
                 <Menu className="w-5 h-5 text-slate-600" />
               )}
-            </button>
+            </motion.button>
 
             {/* Hierarchy Toggle - Desktop */}
             <Button
@@ -524,40 +530,56 @@ const Layout = () => {
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        {mobileMenuOpen && (
-          <nav className="md:hidden border-t border-slate-200 p-4 bg-white max-h-[70vh] overflow-y-auto" data-testid="mobile-nav">
+        {/* Mobile Navigation - Animated Drawer */}
+        <AnimatedDrawer
+          isOpen={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+          side="left"
+          width="280px"
+          showCloseButton={false}
+          className="pt-safe"
+        >
+          <nav className="p-4 space-y-1" data-testid="mobile-nav">
             {/* Hierarchy toggle for mobile */}
-            <button
+            <motion.button
               onClick={() => { setHierarchyOpen(true); setMobileMenuOpen(false); }}
               className="flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-50 w-full"
+              whileHover={{ scale: 1.02, x: 4 }}
+              whileTap={{ scale: 0.98 }}
+              transition={springPresets.snappy}
             >
               <PanelLeftOpen className="w-5 h-5" />
               Equipment Hierarchy
-            </button>
+            </motion.button>
             
             {/* Main Navigation Items */}
-            {navItems.map((item) => (
-              <NavLink
+            {navItems.map((item, index) => (
+              <motion.div
                 key={item.path}
-                to={item.path}
-                end={item.path === "/"}
-                onClick={() => setMobileMenuOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 p-3 rounded-lg ${
-                    isActive
-                      ? "bg-blue-50 text-blue-600"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`
-                }
-                data-testid={`mobile-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05, ...springPresets.snappy }}
               >
-                <item.icon className="w-5 h-5" />
-                {item.label}
-              </NavLink>
+                <NavLink
+                  to={item.path}
+                  end={item.path === "/"}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                      isActive
+                        ? "bg-blue-50 text-blue-600"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`
+                  }
+                  data-testid={`mobile-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </NavLink>
+              </motion.div>
             ))}
           </nav>
-        )}
+        </AnimatedDrawer>
       </header>
 
       {/* Main Layout with Sidebar */}
@@ -593,15 +615,18 @@ const Layout = () => {
       </div>
 
       {/* Floating Action Button - Report Observation */}
-      <button
+      <motion.button
         onClick={() => { setChatPrefillEquipment(null); setChatOpen(true); }}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all duration-200 z-30"
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 text-white flex items-center justify-center z-30"
         style={{ boxShadow: '0 8px 24px -4px rgba(37, 99, 235, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.25)' }}
+        whileHover={{ scale: 1.08, boxShadow: '0 12px 32px -4px rgba(37, 99, 235, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.3)' }}
+        whileTap={{ scale: 0.92 }}
+        transition={springPresets.snappy}
         data-testid="fab-report-observation"
         title="Report Observation"
       >
         <Plus className="w-7 h-7" />
-      </button>
+      </motion.button>
 
       {/* Chat Sidebar */}
       <ChatSidebar isOpen={chatOpen} onClose={handleChatClose} prefillEquipment={chatPrefillEquipment} />
