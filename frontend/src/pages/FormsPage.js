@@ -437,6 +437,11 @@ const FormsPage = () => {
     unit: "",
     thresholds: {},
     options: [],
+    range_min: null,
+    range_max: null,
+    range_step: null,
+    allowed_extensions: [],
+    max_file_size_mb: null,
     linked_equipment: null, // Equipment link {id, name, path}
   });
   
@@ -532,6 +537,11 @@ const FormsPage = () => {
       unit: "",
       thresholds: {},
       options: [],
+      range_min: null,
+      range_max: null,
+      range_step: null,
+      allowed_extensions: [],
+      max_file_size_mb: null,
       linked_equipment: null,
     });
     setEquipmentSearchQuery("");
@@ -924,13 +934,13 @@ const FormsPage = () => {
                           ...prev,
                           pendingDocuments: [
                             ...(prev.pendingDocuments || []),
-                            { id: docId, name: file.name, type: file.name.split('.').pop().toLowerCase(), uploading: true }
+                            { id: docId, name: file.name, type: file.name.split('.').pop().toLowerCase(), uploading: true, file, error: null }
                           ]
                         }));
                         
                         try {
                           const result = await formAPI.uploadDocument(newTemplate.id, file, "");
-                          // Replace pending with actual document
+                          // Replace pending with actual document - SUCCESS STATE
                           setNewTemplate(prev => ({
                             ...prev,
                             pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== docId),
@@ -938,10 +948,14 @@ const FormsPage = () => {
                           }));
                           toast.success(t("forms.documentUploaded"));
                         } catch (error) {
-                          // Remove failed upload from pending
+                          // Set error state on the pending document (allow retry)
                           setNewTemplate(prev => ({
                             ...prev,
-                            pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== docId)
+                            pendingDocuments: prev.pendingDocuments?.map(d => 
+                              d.id === docId 
+                                ? { ...d, uploading: false, error: error.message || "Upload failed" }
+                                : d
+                            )
                           }));
                           toast.error(error.message || "Upload failed");
                         }
@@ -952,7 +966,7 @@ const FormsPage = () => {
                           ...prev,
                           pendingDocuments: [
                             ...(prev.pendingDocuments || []),
-                            { id: docId, file, name: file.name, type: file.name.split('.').pop().toLowerCase() }
+                            { id: docId, file, name: file.name, type: file.name.split('.').pop().toLowerCase(), uploading: false, error: null }
                           ]
                         }));
                       }
@@ -1009,33 +1023,77 @@ const FormsPage = () => {
                     </div>
                   ))}
                   {newTemplate.pendingDocuments?.map((doc) => (
-                    <div key={doc.id} className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <div key={doc.id} className={`flex items-center gap-3 p-3 rounded-lg border ${doc.error ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`} data-testid={`pending-doc-${doc.id}`}>
                       <div className="h-8 w-8 rounded bg-white border flex items-center justify-center">
                         {doc.uploading ? (
                           <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                        ) : doc.error ? (
+                          <AlertCircle className="w-4 h-4 text-red-600" />
                         ) : (
                           <Upload className="w-4 h-4 text-amber-600" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm truncate">{doc.name}</div>
-                        <div className="text-xs text-amber-600">
-                          {doc.uploading ? t("common.uploading") : t("forms.pendingUpload")}
+                        <div className={`text-xs ${doc.error ? 'text-red-600' : 'text-amber-600'}`}>
+                          {doc.uploading ? t("common.uploading") : doc.error ? doc.error : t("forms.pendingUpload")}
                         </div>
                       </div>
-                      {!doc.uploading && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-red-600"
-                          onClick={() => setNewTemplate(prev => ({
-                            ...prev,
-                            pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== doc.id)
-                          }))}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {/* Retry button for failed uploads */}
+                        {doc.error && doc.file && newTemplate.id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-amber-600 hover:text-amber-800"
+                            onClick={async () => {
+                              // Set uploading state
+                              setNewTemplate(prev => ({
+                                ...prev,
+                                pendingDocuments: prev.pendingDocuments?.map(d => 
+                                  d.id === doc.id ? { ...d, uploading: true, error: null } : d
+                                )
+                              }));
+                              
+                              try {
+                                const result = await formAPI.uploadDocument(newTemplate.id, doc.file, "");
+                                setNewTemplate(prev => ({
+                                  ...prev,
+                                  pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== doc.id),
+                                  documents: [...(prev.documents || []), result.document]
+                                }));
+                                toast.success(t("forms.documentUploaded"));
+                              } catch (error) {
+                                setNewTemplate(prev => ({
+                                  ...prev,
+                                  pendingDocuments: prev.pendingDocuments?.map(d => 
+                                    d.id === doc.id ? { ...d, uploading: false, error: error.message || "Retry failed" } : d
+                                  )
+                                }));
+                                toast.error(error.message || "Retry failed");
+                              }
+                            }}
+                            data-testid={`retry-upload-${doc.id}`}
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        {/* Remove button - only when not uploading */}
+                        {!doc.uploading && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-red-600"
+                            onClick={() => setNewTemplate(prev => ({
+                              ...prev,
+                              pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== doc.id)
+                            }))}
+                            data-testid={`remove-pending-doc-${doc.id}`}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1089,14 +1147,34 @@ const FormsPage = () => {
               <Label>{t("forms.fieldType")}</Label>
               <Select
                 value={newField.field_type}
-                onValueChange={(v) => setNewField(prev => ({ ...prev, field_type: v }))}
+                onValueChange={(v) => {
+                  // Clear type-specific sub-options when changing field type
+                  const clearedField = {
+                    ...newField,
+                    field_type: v,
+                    // Clear numeric-specific
+                    unit: v === "numeric" ? newField.unit : "",
+                    thresholds: v === "numeric" ? newField.thresholds : {},
+                    // Clear dropdown/multi_select-specific
+                    options: (v === "dropdown" || v === "multi_select") ? newField.options : [],
+                    // Clear range-specific
+                    range_min: v === "range" ? newField.range_min : null,
+                    range_max: v === "range" ? newField.range_max : null,
+                    range_step: v === "range" ? newField.range_step : null,
+                    // Clear file/image-specific
+                    allowed_extensions: (v === "file" || v === "image") ? newField.allowed_extensions : [],
+                    max_file_size_mb: (v === "file" || v === "image") ? newField.max_file_size_mb : null,
+                  };
+                  setNewField(clearedField);
+                }}
+                data-testid="field-type-select"
               >
-                <SelectTrigger>
+                <SelectTrigger data-testid="field-type-trigger">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {FIELD_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
+                    <SelectItem key={type.value} value={type.value} data-testid={`field-type-${type.value}`}>
                       <div className="flex items-center gap-2">
                         <type.icon className="w-4 h-4" />
                         {type.label}
@@ -1107,14 +1185,16 @@ const FormsPage = () => {
               </Select>
             </div>
 
+            {/* Numeric field sub-options */}
             {newField.field_type === "numeric" && (
-              <div className="space-y-4 p-3 bg-slate-50 rounded-lg">
+              <div className="space-y-4 p-3 bg-slate-50 rounded-lg" data-testid="numeric-suboptions">
                 <div className="space-y-2">
                   <Label>Unit</Label>
                   <Input
                     value={newField.unit || ""}
                     onChange={(e) => setNewField(prev => ({ ...prev, unit: e.target.value }))}
                     placeholder="e.g., °C, bar, mm"
+                    data-testid="numeric-unit-input"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1122,45 +1202,268 @@ const FormsPage = () => {
                     <Label className="text-xs text-amber-600">Warning Low</Label>
                     <Input
                       type="number"
-                      value={newField.thresholds?.warning_low || ""}
+                      value={newField.thresholds?.warning_low ?? ""}
                       onChange={(e) => setNewField(prev => ({
                         ...prev,
                         thresholds: { ...prev.thresholds, warning_low: e.target.value ? parseFloat(e.target.value) : null }
                       }))}
+                      data-testid="numeric-warning-low"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs text-amber-600">Warning High</Label>
                     <Input
                       type="number"
-                      value={newField.thresholds?.warning_high || ""}
+                      value={newField.thresholds?.warning_high ?? ""}
                       onChange={(e) => setNewField(prev => ({
                         ...prev,
                         thresholds: { ...prev.thresholds, warning_high: e.target.value ? parseFloat(e.target.value) : null }
                       }))}
+                      data-testid="numeric-warning-high"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs text-red-600">Critical Low</Label>
                     <Input
                       type="number"
-                      value={newField.thresholds?.critical_low || ""}
+                      value={newField.thresholds?.critical_low ?? ""}
                       onChange={(e) => setNewField(prev => ({
                         ...prev,
                         thresholds: { ...prev.thresholds, critical_low: e.target.value ? parseFloat(e.target.value) : null }
                       }))}
+                      data-testid="numeric-critical-low"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs text-red-600">Critical High</Label>
                     <Input
                       type="number"
-                      value={newField.thresholds?.critical_high || ""}
+                      value={newField.thresholds?.critical_high ?? ""}
                       onChange={(e) => setNewField(prev => ({
                         ...prev,
                         thresholds: { ...prev.thresholds, critical_high: e.target.value ? parseFloat(e.target.value) : null }
                       }))}
+                      data-testid="numeric-critical-high"
                     />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Dropdown/Multi-select options */}
+            {(newField.field_type === "dropdown" || newField.field_type === "multi_select") && (
+              <div className="space-y-3 p-3 bg-blue-50 rounded-lg" data-testid="dropdown-suboptions">
+                <Label className="flex items-center gap-2">
+                  <List className="w-4 h-4" />
+                  Options
+                </Label>
+                <div className="space-y-2">
+                  {(newField.options || []).map((opt, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <Input
+                        value={opt.label}
+                        onChange={(e) => {
+                          const newOptions = [...(newField.options || [])];
+                          newOptions[idx] = { ...newOptions[idx], label: e.target.value, value: e.target.value.toLowerCase().replace(/\s+/g, "_") };
+                          setNewField(prev => ({ ...prev, options: newOptions }));
+                        }}
+                        placeholder={`Option ${idx + 1}`}
+                        className="flex-1"
+                        data-testid={`option-input-${idx}`}
+                      />
+                      <div className="flex items-center gap-1">
+                        <Switch
+                          checked={opt.is_failure || false}
+                          onCheckedChange={(v) => {
+                            const newOptions = [...(newField.options || [])];
+                            newOptions[idx] = { ...newOptions[idx], is_failure: v };
+                            setNewField(prev => ({ ...prev, options: newOptions }));
+                          }}
+                          data-testid={`option-failure-${idx}`}
+                        />
+                        <span className="text-xs text-slate-500">Failure</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-500"
+                        onClick={() => {
+                          const newOptions = (newField.options || []).filter((_, i) => i !== idx);
+                          setNewField(prev => ({ ...prev, options: newOptions }));
+                        }}
+                        data-testid={`remove-option-${idx}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setNewField(prev => ({
+                        ...prev,
+                        options: [...(prev.options || []), { value: "", label: "", is_failure: false }]
+                      }));
+                    }}
+                    className="w-full"
+                    data-testid="add-option-btn"
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Add Option
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Range slider sub-options */}
+            {newField.field_type === "range" && (
+              <div className="space-y-3 p-3 bg-purple-50 rounded-lg" data-testid="range-suboptions">
+                <Label className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4" />
+                  Range Settings
+                </Label>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Min</Label>
+                    <Input
+                      type="number"
+                      value={newField.range_min ?? ""}
+                      onChange={(e) => setNewField(prev => ({ ...prev, range_min: e.target.value ? parseFloat(e.target.value) : null }))}
+                      placeholder="0"
+                      data-testid="range-min"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Max</Label>
+                    <Input
+                      type="number"
+                      value={newField.range_max ?? ""}
+                      onChange={(e) => setNewField(prev => ({ ...prev, range_max: e.target.value ? parseFloat(e.target.value) : null }))}
+                      placeholder="100"
+                      data-testid="range-max"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Step</Label>
+                    <Input
+                      type="number"
+                      value={newField.range_step ?? ""}
+                      onChange={(e) => setNewField(prev => ({ ...prev, range_step: e.target.value ? parseFloat(e.target.value) : null }))}
+                      placeholder="1"
+                      data-testid="range-step"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* File/Image upload sub-options */}
+            {(newField.field_type === "file" || newField.field_type === "image") && (
+              <div className="space-y-3 p-3 bg-green-50 rounded-lg" data-testid="file-suboptions">
+                <Label className="flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  Upload Settings
+                </Label>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Max File Size (MB)</Label>
+                    <Input
+                      type="number"
+                      value={newField.max_file_size_mb ?? ""}
+                      onChange={(e) => setNewField(prev => ({ ...prev, max_file_size_mb: e.target.value ? parseFloat(e.target.value) : null }))}
+                      placeholder="10"
+                      data-testid="file-max-size"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Allowed Extensions (comma-separated)</Label>
+                    <Input
+                      value={(newField.allowed_extensions || []).join(", ")}
+                      onChange={(e) => setNewField(prev => ({ 
+                        ...prev, 
+                        allowed_extensions: e.target.value ? e.target.value.split(",").map(s => s.trim()).filter(Boolean) : []
+                      }))}
+                      placeholder={newField.field_type === "image" ? "jpg, png, gif" : "pdf, doc, xlsx"}
+                      data-testid="file-extensions"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Equipment field sub-options - Configure hierarchy selection */}
+            {newField.field_type === "equipment" && (
+              <div className="space-y-3 p-3 bg-indigo-50 rounded-lg" data-testid="equipment-suboptions">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  Equipment Selection Settings
+                </Label>
+                <p className="text-xs text-slate-600 mb-2">
+                  This field will show a hierarchical equipment selector to the user during form execution.
+                </p>
+                
+                {/* Preview of equipment selector */}
+                <div className="space-y-2 border border-indigo-200 rounded-lg p-3 bg-white">
+                  <Label className="text-xs text-slate-500">Preview (Hierarchy Levels)</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {['Installation', 'System', 'Unit', 'Subunit', 'Equipment'].map((level, idx) => (
+                      <Badge key={level} variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+                        {idx > 0 && <ChevronRight className="w-3 h-3 mr-0.5" />}
+                        {level}
+                      </Badge>
+                    ))}
+                  </div>
+                  
+                  {/* Test equipment search to verify hierarchy data exists */}
+                  <div className="mt-3">
+                    <Label className="text-xs text-slate-500 mb-1 block">Test equipment search:</Label>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Input
+                        value={equipmentSearchQuery}
+                        onChange={(e) => {
+                          setEquipmentSearchQuery(e.target.value);
+                          searchEquipmentForField(e.target.value);
+                        }}
+                        placeholder="Type to search equipment..."
+                        className="pl-8 h-9 text-sm"
+                        data-testid="equipment-search-test"
+                      />
+                      {searchingEquipment && (
+                        <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
+                      )}
+                    </div>
+                    
+                    {/* Show search results with hierarchy path */}
+                    {equipmentSearchResults.length > 0 && equipmentSearchQuery && (
+                      <div className="mt-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg bg-white">
+                        {equipmentSearchResults.map((eq) => (
+                          <div
+                            key={eq.id}
+                            className="px-3 py-2 border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-slate-900 truncate">{eq.name}</p>
+                                <p className="text-xs text-slate-500 truncate">
+                                  {eq.path || eq.full_path || `Level: ${eq.level}`}
+                                </p>
+                              </div>
+                              <Badge variant="outline" className="text-xs capitalize">
+                                {eq.level}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {equipmentSearchQuery && equipmentSearchResults.length === 0 && !searchingEquipment && (
+                      <p className="mt-2 text-xs text-amber-600">
+                        No equipment found. Ensure equipment hierarchy is configured in Settings.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
