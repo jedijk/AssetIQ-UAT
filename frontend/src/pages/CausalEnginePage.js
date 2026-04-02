@@ -1627,6 +1627,12 @@ export default function CausalEnginePage() {
                             {/* Content */}
                             <div className="flex-1 min-w-0 cursor-pointer" onClick={() => window.location.href = `/actions/${action.id}`}>
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                {/* Action ID */}
+                                {action.action_number && (
+                                  <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                    {action.action_number}
+                                  </span>
+                                )}
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusCfg.bg} ${statusCfg.color}`}>
                                   {statusCfg.label}
                                 </span>
