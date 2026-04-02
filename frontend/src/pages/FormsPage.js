@@ -179,16 +179,27 @@ const FormsPage = () => {
       // Upload any pending documents after template creation
       if (variables.pendingDocuments?.length > 0 && data.id) {
         const pendingDocs = variables.pendingDocuments.filter(d => d.file);
-        for (const doc of pendingDocs) {
-          try {
-            await formAPI.uploadDocument(data.id, doc.file, "");
-          } catch (error) {
-            console.error(`Failed to upload document ${doc.name}:`, error);
-            toast.error(`Failed to upload ${doc.name}`);
-          }
-        }
         if (pendingDocs.length > 0) {
-          toast.success(`${pendingDocs.length} document(s) uploaded`);
+          toast.info(`Uploading ${pendingDocs.length} document(s)...`);
+          let successCount = 0;
+          let failCount = 0;
+          
+          for (const doc of pendingDocs) {
+            try {
+              await formAPI.uploadDocument(data.id, doc.file, "");
+              successCount++;
+            } catch (error) {
+              console.error(`Failed to upload document ${doc.name}:`, error);
+              failCount++;
+            }
+          }
+          
+          if (successCount > 0) {
+            toast.success(`${successCount} document(s) uploaded successfully`);
+          }
+          if (failCount > 0) {
+            toast.error(`${failCount} document(s) failed to upload`);
+          }
         }
       }
       
@@ -224,6 +235,8 @@ const FormsPage = () => {
       allow_partial_submission: false,
       fields: [],
       tags: [],
+      documents: [],
+      pendingDocuments: [], // Clear pending documents on reset
     });
   };
 
@@ -767,7 +780,13 @@ const FormsPage = () => {
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm truncate">{doc.name}</div>
                         <div className={`text-xs ${doc.error ? 'text-red-600' : 'text-amber-600'}`}>
-                          {doc.uploading ? t("common.uploading") : doc.error ? doc.error : t("forms.pendingUpload")}
+                          {doc.uploading 
+                            ? t("common.uploading") 
+                            : doc.error 
+                              ? doc.error 
+                              : newTemplate.id 
+                                ? t("forms.pendingUpload")
+                                : t("forms.willUploadOnSave") || "Will upload when form is saved"}
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
