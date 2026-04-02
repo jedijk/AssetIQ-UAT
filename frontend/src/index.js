@@ -3,28 +3,56 @@ import ReactDOM from "react-dom/client";
 import "@/index.css";
 import App from "@/App";
 
-// Suppress ResizeObserver loop error - this is a benign error that occurs 
-// in many React apps and doesn't affect functionality
-const resizeObserverErr = window.onerror;
-window.onerror = (message, source, lineno, colno, error) => {
-  if (message === 'ResizeObserver loop completed with undelivered notifications.' ||
-      message === 'ResizeObserver loop limit exceeded') {
-    return true; // Suppress the error
-  }
-  if (resizeObserverErr) {
-    return resizeObserverErr(message, source, lineno, colno, error);
-  }
-  return false;
-};
-
-// Also handle the error event
-window.addEventListener('error', (e) => {
-  if (e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
-      e.message === 'ResizeObserver loop limit exceeded') {
-    e.stopImmediatePropagation();
-    e.preventDefault();
-  }
-});
+// Patch ResizeObserver to prevent "loop completed with undelivered notifications" errors
+// This is a known issue with cmdk, Radix UI, and other libraries that use ResizeObserver
+if (typeof window !== 'undefined') {
+  const OriginalResizeObserver = window.ResizeObserver;
+  
+  window.ResizeObserver = class PatchedResizeObserver extends OriginalResizeObserver {
+    constructor(callback) {
+      const patchedCallback = (entries, observer) => {
+        // Wrap callback in requestAnimationFrame to prevent loop errors
+        window.requestAnimationFrame(() => {
+          if (typeof callback === 'function') {
+            callback(entries, observer);
+          }
+        });
+      };
+      super(patchedCallback);
+    }
+  };
+  
+  // Suppress console.error for ResizeObserver messages
+  const originalError = console.error;
+  console.error = (...args) => {
+    const message = args[0];
+    if (typeof message === 'string' && message.includes('ResizeObserver loop')) {
+      return; // Suppress ResizeObserver loop errors
+    }
+    originalError.apply(console, args);
+  };
+  
+  // Suppress window.onerror for ResizeObserver
+  const originalOnError = window.onerror;
+  window.onerror = function(message, source, lineno, colno, error) {
+    if (message && message.toString().includes('ResizeObserver loop')) {
+      return true; // Prevent default handling
+    }
+    if (originalOnError) {
+      return originalOnError(message, source, lineno, colno, error);
+    }
+    return false;
+  };
+  
+  // Suppress unhandled error events for ResizeObserver
+  window.addEventListener('error', (event) => {
+    if (event.message && event.message.includes('ResizeObserver loop')) {
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      return false;
+    }
+  }, true);
+}
 
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
