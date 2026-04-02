@@ -534,6 +534,10 @@ export default function FormSubmissionsPage() {
                     const hasAttachment = response.attachment_url || response.file_url;
                     const isImage = hasAttachment && /\.(jpg|jpeg|png|gif|webp)$/i.test(response.attachment_url || response.file_url || "");
                     
+                    // Check if this is a signature field (base64 data URL or field_type is signature)
+                    const isSignature = response.field_type === "signature" || 
+                      (typeof response.value === "string" && response.value?.startsWith("data:image/png;base64,"));
+                    
                     return (
                       <div 
                         key={idx}
@@ -558,7 +562,19 @@ export default function FormSubmissionsPage() {
                             <div className={`text-sm font-medium ${
                               isCritical ? "text-red-800" : isWarning ? "text-amber-800" : "text-slate-800"
                             }`}>
-                              {isBoolean ? (
+                              {isSignature && response.value ? (
+                                <button
+                                  onClick={() => setViewingImage({ url: response.value, name: response.field_label || "Signature" })}
+                                  className="block bg-slate-50 border border-slate-200 rounded-lg p-2 hover:border-blue-300 hover:shadow-sm transition-all"
+                                >
+                                  <img 
+                                    src={response.value} 
+                                    alt="Signature" 
+                                    className="max-h-16 sm:max-h-20 w-auto object-contain"
+                                  />
+                                  <span className="text-[10px] text-slate-500 mt-1 block">Tap to enlarge</span>
+                                </button>
+                              ) : isBoolean ? (
                                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ${
                                   response.value 
                                     ? "bg-green-100 text-green-700" 

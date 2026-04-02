@@ -1108,6 +1108,10 @@ export default function DashboardPage() {
                         const isBoolean = typeof response.value === "boolean";
                         const isArray = Array.isArray(response.value);
                         
+                        // Check if this is a signature field (base64 data URL)
+                        const isSignature = response.field_type === "signature" || 
+                          (typeof response.value === "string" && response.value?.startsWith("data:image/png;base64,"));
+                        
                         return (
                           <div 
                             key={idx}
@@ -1127,7 +1131,15 @@ export default function DashboardPage() {
                             <div className={`text-sm font-medium ${
                               isCritical ? "text-red-800" : isWarning ? "text-amber-800" : "text-slate-800"
                             }`}>
-                              {isBoolean ? (
+                              {isSignature && response.value ? (
+                                <div className="bg-white border border-slate-200 rounded-lg p-2 inline-block">
+                                  <img 
+                                    src={response.value} 
+                                    alt="Signature" 
+                                    className="max-h-12 sm:max-h-16 w-auto object-contain"
+                                  />
+                                </div>
+                              ) : isBoolean ? (
                                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ${
                                   response.value 
                                     ? "bg-green-100 text-green-700" 
