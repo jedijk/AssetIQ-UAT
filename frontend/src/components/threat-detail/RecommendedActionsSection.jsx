@@ -474,10 +474,11 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             </Button>
           </div>
           <div className="space-y-2">
-            {linkedActions.map((action) => {
+            {linkedActions.map((action, index) => {
               const statusCfg = ACTION_STATUS_CONFIG[action.status] || ACTION_STATUS_CONFIG.open;
               const StatusIcon = statusCfg.icon;
               const typeStyle = action.action_type ? TYPE_STYLES[action.action_type] : null;
+              const actionNumber = index + 1;
               
               return (
                 <div
@@ -489,15 +490,18 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                   }`}
                   data-testid={`action-plan-item-${action.id}`}
                 >
-                  {/* Action Type Badge */}
+                  {/* Action Number & Type Badge */}
                   <div className="flex-shrink-0">
                     {typeStyle ? (
-                      <div className={`w-8 h-8 rounded-md ${typeStyle.bg} ${typeStyle.text} flex flex-col items-center justify-center shadow-sm`}>
+                      <div className={`w-8 h-8 rounded-md ${typeStyle.bg} ${typeStyle.text} flex flex-col items-center justify-center shadow-sm relative`}>
                         <span className="text-[10px] font-bold">{typeStyle.label}</span>
+                        <span className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-slate-700 text-white text-[9px] font-bold flex items-center justify-center shadow">
+                          {actionNumber}
+                        </span>
                       </div>
                     ) : (
-                      <div className="w-8 h-8 rounded-md bg-slate-200 text-slate-500 flex items-center justify-center">
-                        <ClipboardList className="w-4 h-4" />
+                      <div className="w-8 h-8 rounded-md bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm">
+                        {actionNumber}
                       </div>
                     )}
                   </div>
