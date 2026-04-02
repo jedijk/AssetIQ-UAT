@@ -1,5 +1,20 @@
 """
 Equipment Hierarchy routes.
+
+This module handles all equipment hierarchy operations including:
+- Equipment Types (CRUD) - lines ~31-140
+- Search & Utils (search, disciplines, criticality profiles) - lines ~143-265
+- Node CRUD (get, create, update, delete) - lines ~265-865
+- Node Operations (change level, reorder, move) - lines ~866-1200
+- Criticality & Discipline Assignment - lines ~1198-1340
+- Stats & Unstructured Items - lines ~1340-end
+
+TODO: Consider splitting into modules:
+- equipment_types.py - Equipment type CRUD
+- equipment_nodes.py - Node CRUD operations  
+- equipment_operations.py - Move, reorder, change level
+- equipment_criticality.py - Criticality and discipline assignment
+- equipment_utils.py - Search, stats, export
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
 from fastapi.responses import StreamingResponse
@@ -22,11 +37,15 @@ from iso14224_models import (
     detect_equipment_type, EquipmentTypeCreate, EquipmentTypeUpdate, ISO_LEVEL_LABELS
 )
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from bson import ObjectId
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Equipment Hierarchy"])
 
-# ============= ISO 14224 EQUIPMENT HIERARCHY ENDPOINTS =============
+# =============================================================================
+# SECTION 1: EQUIPMENT TYPES CRUD
+# =============================================================================
 
 @router.get("/equipment-hierarchy/types")
 async def get_iso_equipment_types(
@@ -134,6 +153,11 @@ async def delete_equipment_type(
             raise HTTPException(status_code=400, detail="Cannot delete default equipment types")
         raise HTTPException(status_code=404, detail="Equipment type not found")
     return {"message": "Equipment type deleted"}
+
+
+# =============================================================================
+# SECTION 2: SEARCH & UTILITIES
+# =============================================================================
 
 @router.get("/equipment-hierarchy/disciplines")
 async def get_disciplines():
@@ -261,6 +285,11 @@ async def get_iso_levels():
             for level in ISO_LEVEL_ORDER
         }
     }
+
+
+# =============================================================================
+# SECTION 3: NODE CRUD OPERATIONS
+# =============================================================================
 
 @router.get("/equipment-hierarchy/nodes")
 async def get_equipment_nodes(
@@ -858,6 +887,10 @@ async def delete_equipment_node(
     }
 
 
+# =============================================================================
+# SECTION 4: NODE OPERATIONS (Change Level, Reorder, Move)
+# =============================================================================
+
 class ChangeLevelRequest(BaseModel):
     new_level: ISOLevel
     new_parent_id: Optional[str] = None  # Required when demoting, optional when promoting
@@ -1303,6 +1336,11 @@ async def assign_criticality(
     updated["threats_updated"] = updated_threats if asset_name else 0
     return updated
 
+
+# =============================================================================
+# SECTION 5: DISCIPLINE & CRITICALITY ASSIGNMENT
+# =============================================================================
+
 @router.post("/equipment-hierarchy/nodes/{node_id}/discipline")
 async def assign_discipline(
     node_id: str,
@@ -1336,6 +1374,11 @@ async def assign_discipline(
     
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
     return updated
+
+
+# =============================================================================
+# SECTION 6: STATS & UNSTRUCTURED ITEMS
+# =============================================================================
 
 @router.get("/equipment-hierarchy/stats")
 async def get_hierarchy_stats(
@@ -1709,7 +1752,9 @@ async def clear_unstructured_items(
 
 
 
-# ============= EQUIPMENT HISTORY TIMELINE ENDPOINT =============
+# =============================================================================
+# SECTION 7: EQUIPMENT HISTORY TIMELINE
+# =============================================================================
 
 @router.get("/equipment-hierarchy/nodes/{node_id}/history")
 async def get_equipment_history(

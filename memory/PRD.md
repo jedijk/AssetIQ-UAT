@@ -24,6 +24,35 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 2, 2026 - P3 Refactoring Complete
+**Code Quality Improvements:**
+
+**Frontend Refactoring:**
+- ✅ Extracted `TaskExecutionFrame` component (1154 lines) → `/app/frontend/src/components/task-execution/TaskExecutionFrame.js`
+- ✅ Extracted `TaskCard` component (170 lines) → `/app/frontend/src/components/task-execution/TaskCard.js`
+- ✅ Reduced `MyTasksPage.js` from **2163 lines → 843 lines** (61% reduction)
+
+**Backend Organization:**
+- ✅ Added section documentation to `routes/equipment.py` (1889 lines)
+- ✅ Organized into 7 logical sections with clear markers:
+  1. Equipment Types CRUD
+  2. Search & Utilities
+  3. Node CRUD Operations
+  4. Node Operations (Change Level, Reorder, Move)
+  5. Discipline & Criticality Assignment
+  6. Stats & Unstructured Items
+  7. Equipment History Timeline
+
+**Files Created:**
+- `/app/frontend/src/components/task-execution/TaskExecutionFrame.js`
+- `/app/frontend/src/components/task-execution/TaskCard.js`
+
+**Files Modified:**
+- `/app/frontend/src/pages/MyTasksPage.js` - Removed embedded components
+- `/app/backend/routes/equipment.py` - Added section documentation and TODO for future split
+
+---
+
 ### April 2, 2026 - P3 Refactoring: TaskExecutionFrame Extraction
 **Code Quality Improvement:**
 - ✅ Extracted `TaskExecutionFrame` component from `MyTasksPage.js` (1154 lines)
