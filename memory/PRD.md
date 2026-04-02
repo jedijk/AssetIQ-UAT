@@ -106,11 +106,17 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ### April 2, 2026 - Fix Runtime Error When Editing Causal Actions
 **BUG FIX:**
 - ✅ **Fixed runtime error in causal engine when editing actions**
-- **Root Cause:** `SearchableSelect` component's filter logic called `.toLowerCase()` on `opt.value` which could be non-string (null, number, etc.) when used with `linked_cause_id`
-- **Solution:** Added type check to ensure only string values are processed: `typeof opt.value === 'string'`
+- **Root Cause 1:** `SearchableSelect` component's filter logic called `.toLowerCase()` on `opt.value` which could be non-string (null, number, etc.)
+- **Root Cause 2:** Action form fields like `description` and `priority` weren't getting default values when undefined
+- **Solution:** 
+  - Added type check in SearchableSelect: `typeof opt.value === 'string'`
+  - Added fallback values when setting action form: `description: action.description || ""`
+  - Added fallback for Priority select: `value={form.priority || "medium"}`
 
 **Files Modified:**
 - `/app/frontend/src/components/ui/searchable-select.jsx` - Fixed filter logic for non-string values
+- `/app/frontend/src/pages/CausalEnginePage.js` - Added default values when loading action form for editing
+- `/app/frontend/src/components/causal-engine/InvestigationDialogs.js` - Added fallback for priority select value
 
 ---
 

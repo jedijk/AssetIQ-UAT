@@ -383,7 +383,7 @@ export const ActionDialog = ({ open, onOpenChange, editingItem, form, setForm, o
             </div>
             <div>
               <Label className="text-sm font-medium">{t("common.priority")}</Label>
-              <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
+              <Select value={form.priority || "medium"} onValueChange={(v) => setForm({ ...form, priority: v })}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>{ACTION_PRIORITIES.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
               </Select>

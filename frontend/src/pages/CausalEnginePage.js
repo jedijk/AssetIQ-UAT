@@ -1499,7 +1499,16 @@ export default function CausalEnginePage() {
                                 className="h-8 w-8 text-slate-500 hover:text-slate-700" 
                                 onClick={() => { 
                                   setEditingItem({ type: "action", data: action }); 
-                                  setActionForm({ description: action.description, owner: action.owner || "", priority: action.priority, due_date: action.due_date || "", linked_cause_id: action.linked_cause_id || null, action_type: action.action_type || "", discipline: action.discipline || "", comment: action.comment || "" }); 
+                                  setActionForm({ 
+                                    description: action.description || "", 
+                                    owner: action.owner || "", 
+                                    priority: action.priority || "medium", 
+                                    due_date: action.due_date || "", 
+                                    linked_cause_id: action.linked_cause_id || null, 
+                                    action_type: action.action_type || "", 
+                                    discipline: action.discipline || "", 
+                                    comment: action.comment || "" 
+                                  }); 
                                   setShowActionDialog(true); 
                                 }}
                               >
