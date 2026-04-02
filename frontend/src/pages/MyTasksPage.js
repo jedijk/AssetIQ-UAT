@@ -510,13 +510,20 @@ const MyTasksPage = () => {
     return 0;
   });
   
-  // Calculate stats
+  // Calculate stats - adjust for adhoc tab
+  const adhocPlans = adhocPlansData?.plans || [];
+  const isAdhocTab = activeFilter === "adhoc";
+  
   const stats = {
-    total: tasks.length,
+    total: isAdhocTab ? adhocPlans.length : tasks.length,
     overdue: tasks.filter(t => t.status === "overdue").length,
     today: tasks.filter(t => t.due_date && isToday(parseISO(t.due_date))).length,
-    inProgress: tasks.filter(t => t.status === "in_progress").length,
-    open: tasks.filter(t => t.source_type === "action" || (t.source_type === "task" && t.status === "in_progress")).length,
+    inProgress: isAdhocTab 
+      ? adhocPlans.filter(p => p.has_in_progress_task).length 
+      : tasks.filter(t => t.status === "in_progress").length,
+    open: isAdhocTab 
+      ? adhocPlans.filter(p => !p.has_in_progress_task).length
+      : tasks.filter(t => t.source_type === "action" || (t.source_type === "task" && t.status === "in_progress")).length,
   };
   
   // Handle back from execution frame
