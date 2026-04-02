@@ -635,7 +635,7 @@ export default function FormSubmissionsPage() {
                     <Paperclip className="w-4 h-4 text-slate-500" />
                     Attachments ({selectedSubmission.attachments.length})
                   </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="flex flex-wrap gap-2">
                     {selectedSubmission.attachments.map((att, idx) => {
                       const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name || att.filename || "");
                       const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name || att.filename || "");
@@ -658,30 +658,30 @@ export default function FormSubmissionsPage() {
                               link.click();
                             }
                           }}
-                          className="relative group bg-slate-100 rounded-xl border border-slate-200 overflow-hidden aspect-square hover:border-blue-300 hover:shadow-md transition-all"
+                          className="relative group bg-slate-100 rounded-lg border border-slate-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0"
                         >
                           {isImage && previewUrl ? (
                             <img src={previewUrl} alt={fileName} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center p-3">
+                            <div className="w-full h-full flex flex-col items-center justify-center p-2">
                               {isPdf ? (
-                                <FileText className="w-10 h-10 text-red-400 mb-2" />
+                                <FileText className="w-8 h-8 text-red-400 mb-1" />
                               ) : isDoc ? (
-                                <FileText className="w-10 h-10 text-blue-400 mb-2" />
+                                <FileText className="w-8 h-8 text-blue-400 mb-1" />
                               ) : (
-                                <File className="w-10 h-10 text-slate-400 mb-2" />
+                                <File className="w-8 h-8 text-slate-400 mb-1" />
                               )}
-                              <span className="text-xs text-slate-500 uppercase font-medium">
+                              <span className="text-[10px] text-slate-500 uppercase font-medium">
                                 {fileName.split('.').pop()}
                               </span>
                             </div>
                           )}
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2">
-                            <p className="text-[11px] text-white truncate font-medium">{fileName}</p>
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">
+                            <p className="text-[10px] text-white truncate font-medium">{fileName}</p>
                           </div>
                           <div className="absolute inset-0 bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <div className="bg-white/90 rounded-full p-2 shadow-lg">
-                              {isImage ? <ZoomIn className="w-5 h-5 text-blue-600" /> : <Eye className="w-5 h-5 text-blue-600" />}
+                            <div className="bg-white/90 rounded-full p-1.5 shadow-lg">
+                              {isImage ? <ZoomIn className="w-4 h-4 text-blue-600" /> : <Eye className="w-4 h-4 text-blue-600" />}
                             </div>
                           </div>
                         </button>
