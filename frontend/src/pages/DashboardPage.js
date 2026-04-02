@@ -935,7 +935,15 @@ export default function DashboardPage() {
               }`} />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-slate-700 truncate">{item.title}</p>
-                <p className="text-[10px] text-slate-400">{item.source_name || "Manual"}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] text-slate-400">{item.source_name || "Manual"}</p>
+                  {item.attachments?.length > 0 && (
+                    <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
+                      <Paperclip className="w-2.5 h-2.5" />
+                      {item.attachments.length}
+                    </span>
+                  )}
+                </div>
               </div>
               <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize ${
                 item.status === "completed" ? "bg-green-100 text-green-700" :
