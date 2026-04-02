@@ -335,8 +335,9 @@ async def get_my_tasks(
             "created_by": user_id,
         }
         
-        # Show actions until completed (both "open" and "in_progress" status)
-        action_query["status"] = {"$in": ["open", "in_progress"]}
+        # Show actions including completed ones (for visual feedback)
+        # Only exclude cancelled actions
+        action_query["status"] = {"$in": ["open", "in_progress", "completed"]}
         
         # Filter by discipline if specified
         if discipline:

@@ -39,6 +39,7 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
   const isDueToday = task.due_date && isToday(parseISO(task.due_date));
   const isAction = task.source_type === "action";
   const isTask = task.source_type === "task";
+  const isCompleted = task.status === "completed";
   
   // Allow deletion of: tasks with in_progress status OR any action that's not completed
   const canDelete = (isTask && task.status === "in_progress") || 
@@ -52,10 +53,11 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
     <div
       className={cn(
         "bg-white rounded-lg border p-4 cursor-pointer transition-all hover:shadow-md",
-        isOverdue && "border-l-4 border-l-red-500 bg-red-50/30",
-        isDueToday && !isOverdue && "border-l-4 border-l-blue-500",
+        isOverdue && !isCompleted && "border-l-4 border-l-red-500 bg-red-50/30",
+        isDueToday && !isOverdue && !isCompleted && "border-l-4 border-l-blue-500",
         task.status === "in_progress" && "border-l-4 border-l-amber-500 bg-amber-50/30",
-        isAction && !isOverdue && task.status !== "in_progress" && "border-l-4 border-l-indigo-400"
+        isAction && !isOverdue && task.status !== "in_progress" && !isCompleted && "border-l-4 border-l-indigo-400",
+        isCompleted && "border-l-4 border-l-green-500 bg-green-50/50 opacity-75"
       )}
       onClick={() => onOpen(task)}
       data-testid={`task-card-${task.id}`}
@@ -64,18 +66,36 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
         <div className="flex-1 min-w-0">
           {/* Title */}
           <div className="flex items-center gap-2 mb-1">
-            <TypeIcon className={cn("w-4 h-4 flex-shrink-0", isAction ? "text-indigo-500" : "text-slate-500")} />
-            <h3 className="font-medium text-slate-900 truncate">{task.title}</h3>
+            <TypeIcon className={cn(
+              "w-4 h-4 flex-shrink-0", 
+              isCompleted ? "text-green-500" : isAction ? "text-indigo-500" : "text-slate-500"
+            )} />
+            <h3 className={cn(
+              "font-medium truncate",
+              isCompleted ? "text-slate-500 line-through" : "text-slate-900"
+            )}>
+              {task.title}
+            </h3>
             {/* Action badge - Desktop only */}
-            {isAction && (
+            {isAction && !isCompleted && (
               <Badge variant="outline" className="hidden sm:flex text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
                 Action
+              </Badge>
+            )}
+            {/* Completed badge */}
+            {isCompleted && (
+              <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
+                <Check className="w-3 h-3 mr-1" />
+                Completed
               </Badge>
             )}
           </div>
           
           {/* Asset / Location */}
-          <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-2">
+          <div className={cn(
+            "flex items-center gap-1.5 text-sm mb-2",
+            isCompleted ? "text-slate-400" : "text-slate-500"
+          )}>
             <MapPin className="w-3.5 h-3.5" />
             <span className="truncate">{task.equipment_name || task.asset || (isAction ? "From " + (task.source || "observation") : "Unknown Asset")}</span>
           </div>
@@ -133,13 +153,18 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
         
         {/* Right Side - Time & Actions */}
         <div className="flex flex-col items-end gap-2">
-          {/* Due Time */}
+          {/* Due Time or Completion Time */}
           <div className={cn(
             "text-xs font-medium flex items-center gap-1",
-            isOverdue ? "text-red-600" : "text-slate-500"
+            isCompleted ? "text-green-600" : isOverdue ? "text-red-600" : "text-slate-500"
           )}>
             <Clock className="w-3.5 h-3.5" />
-            {task.due_date ? format(parseISO(task.due_date), "HH:mm") : "No time"}
+            {isCompleted && task.completed_at 
+              ? format(parseISO(task.completed_at), "HH:mm")
+              : task.due_date 
+                ? format(parseISO(task.due_date), "HH:mm") 
+                : "No time"
+            }
           </div>
           
           {/* Status Badge */}
@@ -147,8 +172,8 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
             <Badge className="bg-amber-500 text-white text-xs">In Progress</Badge>
           )}
           
-          {/* Quick Complete Button */}
-          {task.can_quick_complete && (
+          {/* Quick Complete Button - Hide for completed */}
+          {task.can_quick_complete && !isCompleted && (
             <Button
               size="sm"
               variant="outline"
