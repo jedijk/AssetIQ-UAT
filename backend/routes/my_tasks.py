@@ -237,6 +237,10 @@ async def get_my_tasks(
         
         # Get plan details for recurring info
         task_plan_id = task.get("task_plan_id")
+        plan = None
+        template = None
+        form_template_id = task.get("form_template_id")  # Check task first
+        
         if task_plan_id:
             # Handle both string and ObjectId task_plan_id
             try:
@@ -248,7 +252,6 @@ async def get_my_tasks(
             except Exception:
                 plan = None
             
-            template = None  # Initialize template variable
             if plan:
                 task["is_recurring"] = True
                 interval = plan.get("interval_value", 0)
@@ -270,38 +273,37 @@ async def get_my_tasks(
                         }
                         task["mitigation_strategy"] = template.get("mitigation_strategy", "")
                 
-                # Get form template if linked - check plan first, then template
-                form_template_id = plan.get("form_template_id")
-                if not form_template_id and template:
-                    form_template_id = template.get("form_template_id")
-                
-                if form_template_id:
-                    try:
-                        form_template = await db.form_templates.find_one({"_id": ObjectId(str(form_template_id))})
-                        if form_template:
-                            task["form_fields"] = form_template.get("fields", [])
-                            task["form_template_name"] = form_template.get("name", "")
-                            # Include attached documents for form execution
-                            task["form_documents"] = form_template.get("documents", [])
-                    except Exception as e:
-                        logger.warning(f"Failed to fetch form template {form_template_id}: {e}")
-        else:
-            # For ad-hoc/manual tasks without a plan, check if task_template has a form
+                # Get form template if not already set from task
+                if not form_template_id:
+                    form_template_id = plan.get("form_template_id")
+                    if not form_template_id and template:
+                        form_template_id = template.get("form_template_id")
+        
+        # Fallback: Try task_template_id from task itself
+        if not form_template_id:
             task_template_id = task.get("task_template_id")
             if task_template_id:
                 try:
-                    template = await db.task_templates.find_one({"_id": ObjectId(str(task_template_id))})
+                    if not template:
+                        template = await db.task_templates.find_one({"_id": ObjectId(str(task_template_id))})
                     if template:
                         task["task_template_name"] = template.get("name", "")
                         form_template_id = template.get("form_template_id")
-                        if form_template_id:
-                            form_template = await db.form_templates.find_one({"_id": ObjectId(str(form_template_id))})
-                            if form_template:
-                                task["form_fields"] = form_template.get("fields", [])
-                                task["form_template_name"] = form_template.get("name", "")
-                                task["form_documents"] = form_template.get("documents", [])
                 except Exception as e:
-                    logger.warning(f"Failed to fetch template/form for adhoc task: {e}")
+                    logger.warning(f"Failed to fetch task template: {e}")
+        
+        # Fetch form template with fields and documents
+        if form_template_id:
+            try:
+                form_template = await db.form_templates.find_one({"_id": ObjectId(str(form_template_id))})
+                if form_template:
+                    task["form_fields"] = form_template.get("fields", [])
+                    task["form_template_name"] = form_template.get("name", "")
+                    # Include attached documents for form execution
+                    task["form_documents"] = form_template.get("documents", [])
+                    task["has_form"] = True
+            except Exception as e:
+                logger.warning(f"Failed to fetch form template {form_template_id}: {e}")
         
         # Determine source - check after is_recurring is set
         if task.get("created_from_observation"):
@@ -769,6 +771,7 @@ async def execute_adhoc_plan(
     
     # Get form template and its fields
     form_fields = []
+    form_documents = []
     form_template = None
     if plan.get("form_template_id"):
         # Try finding by 'id' field first (string ID)
@@ -781,6 +784,7 @@ async def execute_adhoc_plan(
                 pass
         if form_template:
             form_fields = form_template.get("fields", [])
+            form_documents = form_template.get("documents", [])
     
     # Create a new task instance
     now = datetime.now(timezone.utc)
@@ -799,6 +803,7 @@ async def execute_adhoc_plan(
         "form_template_id": plan.get("form_template_id"),
         "form_template_name": plan.get("form_template_name") or (form_template.get("name") if form_template else None),
         "form_fields": form_fields,
+        "form_documents": form_documents,
         "status": "in_progress",  # Start immediately
         "priority": template.get("priority", "medium") if template else "medium",
         "due_date": now,  # Due immediately
