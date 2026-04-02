@@ -15,6 +15,7 @@ const DialogClose = DialogPrimitive.Close
 const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
+    data-dialog-overlay="true"
     className={cn(
       "fixed inset-0 z-[100] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
@@ -33,21 +34,25 @@ const DialogContent = React.forwardRef(({ className, children, onPointerDownOuts
         className
       )}
       onPointerDownOutside={(e) => {
-        // Prevent closing when interacting with Select/Popover portals
+        // Prevent closing when interacting with Select/Popover portals or DocumentViewer
         const target = e.target;
         if (target?.closest('[data-radix-select-content]') || 
             target?.closest('[data-radix-popper-content-wrapper]') ||
-            target?.closest('[data-radix-popover-content]')) {
+            target?.closest('[data-radix-popover-content]') ||
+            target?.closest('[data-testid="document-viewer"]') ||
+            target?.closest('[data-testid="document-viewer-error"]')) {
           e.preventDefault();
         }
         onPointerDownOutside?.(e);
       }}
       onInteractOutside={(e) => {
-        // Prevent closing when interacting with Select/Popover portals
+        // Prevent closing when interacting with Select/Popover portals or DocumentViewer
         const target = e.target;
         if (target?.closest('[data-radix-select-content]') || 
             target?.closest('[data-radix-popper-content-wrapper]') ||
-            target?.closest('[data-radix-popover-content]')) {
+            target?.closest('[data-radix-popover-content]') ||
+            target?.closest('[data-testid="document-viewer"]') ||
+            target?.closest('[data-testid="document-viewer-error"]')) {
           e.preventDefault();
         }
         onInteractOutside?.(e);

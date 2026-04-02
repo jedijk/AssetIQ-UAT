@@ -235,9 +235,15 @@ export const DocumentViewer = ({
           <div className="flex items-center gap-3">
             {showBackButton && (
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
-                onClick={onBack || onClose}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onBack) onBack();
+                  else if (onClose) onClose();
+                }}
                 className="text-white hover:bg-slate-700"
                 data-testid="doc-viewer-back"
               >

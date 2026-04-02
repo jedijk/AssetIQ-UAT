@@ -1,5 +1,6 @@
 import { getBackendUrl } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -110,6 +111,18 @@ const FormsPage = () => {
   const [docSearchResult, setDocSearchResult] = useState(null);
   const [isSearchingDocs, setIsSearchingDocs] = useState(false);
   const [viewingDocument, setViewingDocument] = useState(null); // For document viewer
+
+  // Hide dialog overlay when document viewer is open to allow clicks
+  useEffect(() => {
+    const overlays = document.querySelectorAll('[data-dialog-overlay="true"]');
+    overlays.forEach(overlay => {
+      if (viewingDocument) {
+        overlay.style.pointerEvents = 'none';
+      } else {
+        overlay.style.pointerEvents = '';
+      }
+    });
+  }, [viewingDocument]);
 
   // Form state for new template
   const [newTemplate, setNewTemplate] = useState({
@@ -1360,12 +1373,16 @@ const FormsPage = () => {
       </Dialog>
 
       {/* View Template Dialog */}
-      <Dialog open={!!selectedTemplate} onOpenChange={() => { 
-        setSelectedTemplate(null); 
-        setPreviewMode("desktop"); 
-        setViewTab("fields");
-        setDocSearchQuery("");
-        setDocSearchResult(null);
+      <Dialog open={!!selectedTemplate} onOpenChange={(open) => { 
+        // Don't close if document viewer is open
+        if (!open && viewingDocument) return;
+        if (!open) {
+          setSelectedTemplate(null); 
+          setPreviewMode("desktop"); 
+          setViewTab("fields");
+          setDocSearchQuery("");
+          setDocSearchResult(null);
+        }
       }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1894,14 +1911,15 @@ const FormsPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Document Viewer */}
-      {viewingDocument && (
+      {/* Document Viewer - rendered as portal to be above all dialogs */}
+      {viewingDocument && createPortal(
         <DocumentViewer
           document={viewingDocument}
           onClose={() => setViewingDocument(null)}
           onBack={() => setViewingDocument(null)}
           showBackButton={true}
-        />
+        />,
+        document.body
       )}
     </div>
   );
