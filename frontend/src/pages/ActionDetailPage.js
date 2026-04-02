@@ -184,8 +184,8 @@ export default function ActionDetailPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Fixed Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
+      {/* Fixed Header - starts below main nav (top-12 = 48px) */}
+      <div className="sticky top-12 z-30 bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-2xl">
           <div className="flex items-center gap-2 py-2 sm:py-3">
             <Button
@@ -417,6 +417,21 @@ export default function ActionDetailPage() {
             />
           </div>
 
+          {/* Completion Notes (show for all statuses, allows adding notes before completing) */}
+          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
+            <label className="text-xs font-medium text-slate-500 mb-1 block flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+              Completion Notes
+            </label>
+            <Textarea
+              value={editForm.completion_notes}
+              onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
+              placeholder="How was this action completed? (Optional until completion)"
+              rows={2}
+              className="text-sm"
+            />
+          </div>
+
           {/* Attachments Section */}
           <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
             <div className="flex items-center justify-between mb-3">
@@ -581,20 +596,6 @@ export default function ActionDetailPage() {
               )}
             </Button>
           </div>
-
-          {/* Completion Notes (only if completed) */}
-          {editForm.status === "completed" && (
-            <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Completion Notes</label>
-              <Textarea
-                value={editForm.completion_notes}
-                onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
-                placeholder="How was this action completed?"
-                rows={2}
-                className="text-sm"
-              />
-            </div>
-          )}
 
           {/* Timestamps */}
           <div className="text-xs text-slate-400 flex flex-wrap gap-3 px-1">
