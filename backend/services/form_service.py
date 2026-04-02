@@ -586,7 +586,15 @@ class FormService:
         
         submissions = []
         async for doc in cursor:
-            submissions.append(self._serialize_submission(doc))
+            serialized = self._serialize_submission(doc)
+            
+            # Fetch submitted_by_name if not present
+            if not serialized.get("submitted_by_name") and serialized.get("submitted_by"):
+                user = await self.db.users.find_one({"id": serialized["submitted_by"]})
+                if user:
+                    serialized["submitted_by_name"] = user.get("name", user.get("email", "Unknown"))
+            
+            submissions.append(serialized)
         
         total = await self.submissions.count_documents(query)
         
@@ -807,15 +815,19 @@ class FormService:
     
     def _serialize_submission(self, doc: Dict) -> Dict[str, Any]:
         """Serialize submission document."""
+        values = doc.get("values", [])
+        
         return {
             "id": str(doc["_id"]),
             "form_template_id": doc["form_template_id"],
             "form_template_name": doc.get("form_template_name"),
+            "template_name": doc.get("form_template_name"),  # Alias for frontend
             "form_template_version": doc.get("form_template_version"),
             "task_instance_id": doc.get("task_instance_id"),
             "equipment_id": doc.get("equipment_id"),
             "efm_id": doc.get("efm_id"),
-            "values": doc.get("values", []),
+            "values": values,
+            "responses": values,  # Alias for frontend compatibility
             "threshold_breaches": doc.get("threshold_breaches", []),
             "failure_indicators": doc.get("failure_indicators", []),
             "has_warnings": doc.get("has_warnings", False),
@@ -824,5 +836,8 @@ class FormService:
             "notes": doc.get("notes"),
             "has_signature": doc.get("signature_data") is not None,
             "submitted_by": doc.get("submitted_by"),
+            "submitted_by_name": doc.get("submitted_by_name"),  # Add name if available
             "submitted_at": doc.get("submitted_at").isoformat() if doc.get("submitted_at") and hasattr(doc.get("submitted_at"), 'isoformat') else doc.get("submitted_at"),
+            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") and hasattr(doc.get("created_at"), 'isoformat') else doc.get("created_at"),
+            "status": doc.get("status", "completed"),  # Default to completed
         }

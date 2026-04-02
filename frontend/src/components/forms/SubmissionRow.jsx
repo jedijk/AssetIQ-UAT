@@ -55,7 +55,7 @@ export const SubmissionRow = ({ submission }) => {
       {expanded && (
         <div className="p-3 bg-slate-50 border-t border-slate-200">
           <div className="space-y-2">
-            {submission.responses?.map((response, idx) => (
+            {(submission.responses || submission.values || []).map((response, idx) => (
               <div key={idx} className="flex items-center justify-between py-1 text-sm">
                 <span className="text-slate-600">{response.field_label || response.field_id}</span>
                 <div className="flex items-center gap-2">
@@ -63,6 +63,7 @@ export const SubmissionRow = ({ submission }) => {
                     {typeof response.value === 'object' 
                       ? JSON.stringify(response.value) 
                       : String(response.value ?? "—")}
+                    {response.unit && <span className="text-slate-400 ml-1">{response.unit}</span>}
                   </span>
                   {response.threshold_status && response.threshold_status !== "normal" && (
                     <ThresholdBadge status={response.threshold_status} />
@@ -70,10 +71,17 @@ export const SubmissionRow = ({ submission }) => {
                 </div>
               </div>
             ))}
-            {(!submission.responses || submission.responses.length === 0) && (
+            {((!submission.responses || submission.responses.length === 0) && 
+              (!submission.values || submission.values.length === 0)) && (
               <p className="text-sm text-slate-500 text-center py-2">No response data available</p>
             )}
           </div>
+          
+          {submission.notes && (
+            <div className="mt-3 pt-3 border-t border-slate-200">
+              <p className="text-sm text-slate-600"><strong>Notes:</strong> {submission.notes}</p>
+            </div>
+          )}
           
           {submission.submitted_by_name && (
             <div className="mt-3 pt-3 border-t border-slate-200 text-xs text-slate-500">
