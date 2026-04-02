@@ -87,6 +87,22 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 2, 2026 - Show Attachments in Action Detail Page (Mobile Compatible)
+**UX ENHANCEMENT:**
+- ✅ **Show attachments in action detail view with ability to open**
+  - Grid display with thumbnail previews for images
+  - File type icons for PDFs, DOCs, and other files
+  - Click to open: images open in new tab, documents open in DocumentViewer
+  - Eye button for preview, delete button on hover
+  - File count badge next to "Attachments" label
+  - "Add Attachment" button to upload new files
+  - Fully responsive design works on both desktop and mobile
+
+**Files Modified:**
+- `/app/frontend/src/pages/ActionDetailPage.js` - Added attachments section with viewer integration
+
+---
+
 ### April 2, 2026 - Form Execution Field Types Fix
 **UX Enhancement:**
 - ✅ **Fixed form field types not rendering correctly in Task Execution**

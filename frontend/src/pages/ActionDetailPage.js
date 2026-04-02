@@ -6,7 +6,8 @@ import { motion } from "framer-motion";
 import { 
   ArrowLeft, Save, Trash2, ExternalLink, Calendar, User,
   FileText, Brain, Search, AlertTriangle, Loader2, Check,
-  CalendarClock, CheckCircle, CheckCircle2
+  CalendarClock, CheckCircle, CheckCircle2, Paperclip, Upload,
+  X, Image, File, Download, Eye
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -39,6 +40,7 @@ import {
 import { actionsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
+import { DocumentViewer } from "../components/DocumentViewer";
 
 const API_BASE_URL = getBackendUrl();
 
@@ -71,6 +73,8 @@ export default function ActionDetailPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [usersList, setUsersList] = useState([]);
   const [closureSuggestion, setClosureSuggestion] = useState(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [viewingAttachment, setViewingAttachment] = useState(null);
 
   // Fetch action details
   const { data: action, isLoading, error } = useQuery({
@@ -112,6 +116,7 @@ export default function ActionDetailPage() {
         discipline: action.discipline || "",
         comments: action.comments || "",
         completion_notes: action.completion_notes || "",
+        attachments: action.attachments || [],
       });
     }
   }, [action]);
@@ -412,6 +417,171 @@ export default function ActionDetailPage() {
             />
           </div>
 
+          {/* Attachments Section */}
+          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                <Paperclip className="w-3.5 h-3.5" />
+                Attachments
+                {editForm.attachments?.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                    {editForm.attachments.length}
+                  </Badge>
+                )}
+              </label>
+            </div>
+            
+            {/* Attachments Grid */}
+            {editForm.attachments?.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+                {editForm.attachments.map((att, idx) => {
+                  const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
+                  const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name);
+                  const isDoc = /\.(doc|docx)$/i.test(att.name);
+                  const previewUrl = att.url || att.data;
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      className="relative group bg-slate-50 rounded-lg border border-slate-200 overflow-hidden"
+                    >
+                      {/* Clickable area */}
+                      <button
+                        onClick={() => {
+                          if (previewUrl) {
+                            if (isImage) {
+                              // Open image in new tab
+                              window.open(previewUrl, '_blank');
+                            } else if (isPdf || isDoc) {
+                              // Open document viewer
+                              setViewingAttachment(att);
+                            } else {
+                              // Download other files
+                              const link = document.createElement('a');
+                              link.href = previewUrl;
+                              link.download = att.name;
+                              link.click();
+                            }
+                          }
+                        }}
+                        className="w-full text-left"
+                      >
+                        {isImage && previewUrl ? (
+                          <div className="aspect-square">
+                            <img 
+                              src={previewUrl} 
+                              alt={att.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="aspect-square flex flex-col items-center justify-center p-2 bg-slate-50">
+                            {isPdf ? (
+                              <FileText className="w-8 h-8 text-red-400 mb-1" />
+                            ) : isDoc ? (
+                              <FileText className="w-8 h-8 text-blue-400 mb-1" />
+                            ) : (
+                              <File className="w-8 h-8 text-slate-400 mb-1" />
+                            )}
+                            <span className="text-[10px] text-slate-500 uppercase font-medium">
+                              {att.name?.split('.').pop() || 'File'}
+                            </span>
+                          </div>
+                        )}
+                      </button>
+                      
+                      {/* File name overlay */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
+                        <p className="text-[10px] text-white truncate">{att.name}</p>
+                      </div>
+                      
+                      {/* Action buttons */}
+                      <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {previewUrl && (
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-6 w-6 bg-white/90"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isImage || isPdf || isDoc) {
+                                setViewingAttachment(att);
+                              } else {
+                                window.open(previewUrl, '_blank');
+                              }
+                            }}
+                          >
+                            <Eye className="w-3 h-3" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditForm(prev => ({
+                              ...prev,
+                              attachments: prev.attachments.filter((_, i) => i !== idx)
+                            }));
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-sm text-slate-400 mb-3">
+                No attachments yet
+              </div>
+            )}
+            
+            {/* Add Attachment Button */}
+            <input
+              type="file"
+              id="action-detail-attachment"
+              className="hidden"
+              multiple
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+              onChange={async (e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length === 0) return;
+                setUploadingAttachment(true);
+                try {
+                  for (const file of files) {
+                    const result = await actionsAPI.uploadAttachment(file);
+                    setEditForm(prev => ({
+                      ...prev,
+                      attachments: [...(prev.attachments || []), result]
+                    }));
+                  }
+                  toast.success(`${files.length} file(s) uploaded`);
+                } catch (error) {
+                  toast.error("Failed to upload file(s)");
+                } finally {
+                  setUploadingAttachment(false);
+                  e.target.value = "";
+                }
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-dashed"
+              disabled={uploadingAttachment}
+              onClick={() => document.getElementById("action-detail-attachment")?.click()}
+            >
+              {uploadingAttachment ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading...</>
+              ) : (
+                <><Upload className="w-4 h-4 mr-2" />Add Attachment</>
+              )}
+            </Button>
+          </div>
+
           {/* Completion Notes (only if completed) */}
           {editForm.status === "completed" && (
             <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
@@ -545,6 +715,16 @@ export default function ActionDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Attachment Viewer */}
+      {viewingAttachment && (
+        <DocumentViewer
+          url={viewingAttachment.url || viewingAttachment.data}
+          fileName={viewingAttachment.name}
+          fileType={viewingAttachment.type}
+          onClose={() => setViewingAttachment(null)}
+        />
+      )}
     </div>
   );
 }
