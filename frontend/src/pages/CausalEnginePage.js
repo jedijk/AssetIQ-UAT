@@ -1584,13 +1584,14 @@ export default function CausalEnginePage() {
                       </Button>
                     </div>
                     <div className="space-y-2">
-                      {centralActions.map((action) => {
+                      {centralActions.map((action, index) => {
                         const statusCfg = {
                           open: { bg: "bg-slate-50", color: "text-slate-600", label: "Open" },
                           in_progress: { bg: "bg-blue-50", color: "text-blue-600", label: "In Progress" },
                           completed: { bg: "bg-green-50", color: "text-green-600", label: "Completed" },
                           closed: { bg: "bg-slate-100", color: "text-slate-500", label: "Closed" },
                         }[action.status] || { bg: "bg-slate-50", color: "text-slate-600", label: action.status };
+                        const actionNumber = index + 1;
                         
                         return (
                           <div
@@ -1602,20 +1603,23 @@ export default function CausalEnginePage() {
                             }`}
                             data-testid={`inv-action-plan-item-${action.id}`}
                           >
-                            {/* Action Type Badge */}
+                            {/* Action Number & Type Badge */}
                             <div className="flex-shrink-0">
                               {action.action_type ? (
-                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xs ${
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xs relative ${
                                   action.action_type === 'CM' ? 'bg-amber-500' :
                                   action.action_type === 'PM' ? 'bg-blue-500' :
                                   action.action_type === 'PDM' ? 'bg-purple-500' :
                                   'bg-slate-500'
                                 }`}>
                                   {action.action_type}
+                                  <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-slate-700 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                                    {actionNumber}
+                                  </span>
                                 </div>
                               ) : (
-                                <div className="w-10 h-10 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center">
-                                  <ClipboardList className="w-5 h-5" />
+                                <div className="w-10 h-10 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm">
+                                  {actionNumber}
                                 </div>
                               )}
                             </div>
