@@ -243,411 +243,354 @@ export default function ActionDetailPage() {
       </div>
 
       {/* Scrollable Content */}
-      <div className="container mx-auto px-3 sm:px-4 py-4 max-w-2xl">
+      <div className="container mx-auto px-3 sm:px-4 py-4 max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-4"
         >
-          {/* Source & Scores Card */}
-          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              {/* Source Link */}
-              {action.source_type && action.source_id && (
-                <button
-                  onClick={() => {
-                    if (action.source_type === "investigation") navigate(`/causal-engine?inv=${action.source_id}`);
-                    else if (action.source_type === "threat" || action.source_type === "ai_recommendation") navigate(`/threats/${action.source_id}`);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-50 hover:bg-slate-100 transition-colors text-xs text-slate-600"
-                >
-                  <SourceIcon className={`w-3 h-3 ${sourceConfig[action.source_type]?.color}`} />
-                  <span className="font-medium">{sourceConfig[action.source_type]?.label}:</span>
-                  <span className="truncate max-w-[120px] sm:max-w-[200px]">{action.source_name || "Unknown"}</span>
-                  <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
-                </button>
-              )}
-              
-              {/* Scores */}
-              <div className="flex items-center gap-2 sm:gap-3">
-                {action.threat_risk_score != null && (
-                  <div className="text-center">
-                    <div className="text-[10px] text-slate-400 uppercase">Score</div>
-                    <div className={`text-sm sm:text-base font-bold ${
-                      action.threat_risk_score >= 70 ? "text-red-600" :
-                      action.threat_risk_score >= 50 ? "text-orange-500" : "text-green-500"
-                    }`}>{action.threat_risk_score}</div>
-                  </div>
-                )}
-                {action.threat_rpn != null && (
-                  <div className="text-center">
-                    <div className="text-[10px] text-slate-400 uppercase">RPN</div>
-                    <div className={`text-sm sm:text-base font-bold ${
-                      action.threat_rpn >= 200 ? "text-red-600" :
-                      action.threat_rpn >= 100 ? "text-orange-500" : "text-blue-500"
-                    }`}>{action.threat_rpn}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Status & Priority */}
-          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Status</label>
-                <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Priority</label>
-                <Select value={editForm.priority} onValueChange={(v) => setEditForm({ ...editForm, priority: v })}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="critical">Critical</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* Title & Description */}
-          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4 space-y-3">
-            <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Title</label>
-              <Input
-                value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                className="h-9 text-sm"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Description</label>
-              <Textarea
-                value={editForm.description}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                rows={2}
-                className="text-sm resize-none"
-                style={{ 
-                  minHeight: '60px',
-                  height: editForm.description ? 'auto' : '60px'
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Type & Discipline */}
-          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Type</label>
-                <Select value={editForm.action_type || "none"} onValueChange={(v) => setEditForm({ ...editForm, action_type: v === "none" ? "" : v })}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    <SelectItem value="CM">CM - Corrective</SelectItem>
-                    <SelectItem value="PM">PM - Preventive</SelectItem>
-                    <SelectItem value="PDM">PDM - Predictive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Discipline</label>
-                <Input
-                  value={editForm.discipline}
-                  onChange={(e) => setEditForm({ ...editForm, discipline: e.target.value })}
-                  placeholder="e.g. Mech"
-                  className="h-9 text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Assignee & Due Date */}
-          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Assignee</label>
-                <Select value={editForm.assignee || "unassigned"} onValueChange={(v) => setEditForm({ ...editForm, assignee: v === "unassigned" ? "" : v })}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {usersList.map((u) => (
-                      <SelectItem key={u.id} value={u.name || u.email}>
-                        {u.name || u.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Due Date</label>
-                <Input
-                  type="date"
-                  value={editForm.due_date}
-                  onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
-                  className="h-9 text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Comments */}
-          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
-            <label className="text-xs font-medium text-slate-500 mb-1 block">Comments</label>
-            <Textarea
-              value={editForm.comments}
-              onChange={(e) => setEditForm({ ...editForm, comments: e.target.value })}
-              placeholder="Add comments or notes..."
-              rows={3}
-              className="text-sm"
-            />
-          </div>
-
-          {/* Completion Notes (show for all statuses, allows adding notes before completing) */}
-          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
-            <label className="text-xs font-medium text-slate-500 mb-1 block flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-              Completion Notes
-            </label>
-            <Textarea
-              value={editForm.completion_notes}
-              onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
-              placeholder="How was this action completed? (Optional until completion)"
-              rows={2}
-              className="text-sm"
-            />
-          </div>
-
-          {/* Attachments Section */}
-          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-                <Paperclip className="w-3.5 h-3.5" />
-                Attachments
-                {editForm.attachments?.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
-                    {editForm.attachments.length}
-                  </Badge>
-                )}
-              </label>
-            </div>
+          {/* Desktop: Two-column layout | Mobile: Single column */}
+          <div className="lg:grid lg:grid-cols-12 lg:gap-4">
             
-            {/* Attachments Grid */}
-            {editForm.attachments?.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
-                {editForm.attachments.map((att, idx) => {
-                  const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
-                  const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name);
-                  const isDoc = /\.(doc|docx)$/i.test(att.name);
-                  const previewUrl = att.url || att.data;
-                  
-                  return (
-                    <div 
-                      key={idx} 
-                      className="relative group bg-slate-50 rounded-lg border border-slate-200 overflow-hidden"
+            {/* LEFT COLUMN - Main content (spans 7 cols on desktop) */}
+            <div className="lg:col-span-7 space-y-3">
+              {/* Source & Scores + Status Row - Compact header */}
+              <div className="bg-white rounded-lg border border-slate-200 p-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  {/* Source Link */}
+                  {action.source_type && action.source_id && (
+                    <button
+                      onClick={() => {
+                        if (action.source_type === "investigation") navigate(`/causal-engine?inv=${action.source_id}`);
+                        else if (action.source_type === "threat" || action.source_type === "ai_recommendation") navigate(`/threats/${action.source_id}`);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-50 hover:bg-slate-100 transition-colors text-xs text-slate-600"
                     >
-                      {/* Clickable area */}
-                      <button
-                        onClick={() => {
-                          if (previewUrl) {
-                            if (isImage) {
-                              // Open image in lightbox
-                              setViewingImage({ url: previewUrl, name: att.name });
-                            } else if (isPdf || isDoc) {
-                              // Open document viewer
-                              setViewingAttachment(att);
-                            } else {
-                              // Download other files
-                              const link = document.createElement('a');
-                              link.href = previewUrl;
-                              link.download = att.name;
-                              link.click();
-                            }
-                          }
-                        }}
-                        className="w-full text-left"
-                      >
-                        {isImage && previewUrl ? (
-                          <div className="aspect-square">
-                            <img 
-                              src={previewUrl} 
-                              alt={att.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="aspect-square flex flex-col items-center justify-center p-2 bg-slate-50">
-                            {isPdf ? (
-                              <FileText className="w-8 h-8 text-red-400 mb-1" />
-                            ) : isDoc ? (
-                              <FileText className="w-8 h-8 text-blue-400 mb-1" />
-                            ) : (
-                              <File className="w-8 h-8 text-slate-400 mb-1" />
-                            )}
-                            <span className="text-[10px] text-slate-500 uppercase font-medium">
-                              {att.name?.split('.').pop() || 'File'}
-                            </span>
-                          </div>
-                        )}
-                      </button>
-                      
-                      {/* File name overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
-                        <p className="text-[10px] text-white truncate">{att.name}</p>
+                      <SourceIcon className={`w-3 h-3 ${sourceConfig[action.source_type]?.color}`} />
+                      <span className="font-medium">{sourceConfig[action.source_type]?.label}:</span>
+                      <span className="truncate max-w-[120px] lg:max-w-[200px]">{action.source_name || "Unknown"}</span>
+                      <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
+                    </button>
+                  )}
+                  
+                  {/* Scores */}
+                  <div className="flex items-center gap-3">
+                    {action.threat_risk_score != null && (
+                      <div className="text-center">
+                        <div className="text-[10px] text-slate-400 uppercase">Score</div>
+                        <div className={`text-sm font-bold ${
+                          action.threat_risk_score >= 70 ? "text-red-600" :
+                          action.threat_risk_score >= 50 ? "text-orange-500" : "text-green-500"
+                        }`}>{action.threat_risk_score}</div>
                       </div>
+                    )}
+                    {action.threat_rpn != null && (
+                      <div className="text-center">
+                        <div className="text-[10px] text-slate-400 uppercase">RPN</div>
+                        <div className={`text-sm font-bold ${
+                          action.threat_rpn >= 200 ? "text-red-600" :
+                          action.threat_rpn >= 100 ? "text-orange-500" : "text-blue-500"
+                        }`}>{action.threat_rpn}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Title & Description - Compact */}
+              <div className="bg-white rounded-lg border border-slate-200 p-3 space-y-2">
+                <div>
+                  <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Title</label>
+                  <Input
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Description</label>
+                  <Textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    rows={2}
+                    className="text-sm resize-none min-h-[50px]"
+                  />
+                </div>
+              </div>
+
+              {/* Comments & Completion Notes - Side by side on desktop */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="bg-white rounded-lg border border-slate-200 p-3">
+                  <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Comments</label>
+                  <Textarea
+                    value={editForm.comments}
+                    onChange={(e) => setEditForm({ ...editForm, comments: e.target.value })}
+                    placeholder="Notes..."
+                    rows={2}
+                    className="text-sm resize-none min-h-[50px]"
+                  />
+                </div>
+                <div className="bg-white rounded-lg border border-slate-200 p-3">
+                  <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-green-500" />
+                    Completion Notes
+                  </label>
+                  <Textarea
+                    value={editForm.completion_notes}
+                    onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
+                    placeholder="How was this resolved?"
+                    rows={2}
+                    className="text-sm resize-none min-h-[50px]"
+                  />
+                </div>
+              </div>
+
+              {/* Attachments Section - Compact */}
+              <div className="bg-white rounded-lg border border-slate-200 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[10px] font-medium text-slate-400 uppercase flex items-center gap-1">
+                    <Paperclip className="w-3 h-3" />
+                    Attachments
+                    {editForm.attachments?.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0 h-4">
+                        {editForm.attachments.length}
+                      </Badge>
+                    )}
+                  </label>
+                  <input
+                    type="file"
+                    id="action-detail-attachment"
+                    className="hidden"
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length === 0) return;
+                      setUploadingAttachment(true);
+                      try {
+                        for (const file of files) {
+                          const result = await actionsAPI.uploadAttachment(file);
+                          setEditForm(prev => ({
+                            ...prev,
+                            attachments: [...(prev.attachments || []), result]
+                          }));
+                        }
+                        toast.success(`${files.length} file(s) uploaded`);
+                      } catch (error) {
+                        toast.error("Failed to upload file(s)");
+                      } finally {
+                        setUploadingAttachment(false);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-xs px-2"
+                    disabled={uploadingAttachment}
+                    onClick={() => document.getElementById("action-detail-attachment")?.click()}
+                  >
+                    {uploadingAttachment ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <><Upload className="w-3 h-3 mr-1" />Add</>
+                    )}
+                  </Button>
+                </div>
+                
+                {/* Attachments Grid - Horizontal scroll on desktop for compactness */}
+                {editForm.attachments?.length > 0 ? (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {editForm.attachments.map((att, idx) => {
+                      const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
+                      const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name);
+                      const isDoc = /\.(doc|docx)$/i.test(att.name);
+                      const previewUrl = att.url || att.data;
                       
-                      {/* Action buttons */}
-                      <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {previewUrl && (
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-6 w-6 bg-white/90"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isImage) {
-                                setViewingImage({ url: previewUrl, name: att.name });
-                              } else if (isPdf || isDoc) {
-                                setViewingAttachment(att);
-                              } else {
-                                window.open(previewUrl, '_blank');
+                      return (
+                        <div 
+                          key={idx} 
+                          className="relative group flex-shrink-0 w-16 h-16 bg-slate-50 rounded-lg border border-slate-200 overflow-hidden"
+                        >
+                          <button
+                            onClick={() => {
+                              if (previewUrl) {
+                                if (isImage) setViewingImage({ url: previewUrl, name: att.name });
+                                else if (isPdf || isDoc) setViewingAttachment(att);
+                                else { const link = document.createElement('a'); link.href = previewUrl; link.download = att.name; link.click(); }
                               }
                             }}
+                            className="w-full h-full"
                           >
-                            <Eye className="w-3 h-3" />
+                            {isImage && previewUrl ? (
+                              <img src={previewUrl} alt={att.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center">
+                                {isPdf ? <FileText className="w-5 h-5 text-red-400" /> : isDoc ? <FileText className="w-5 h-5 text-blue-400" /> : <File className="w-5 h-5 text-slate-400" />}
+                                <span className="text-[8px] text-slate-500 uppercase mt-0.5">{att.name?.split('.').pop()}</span>
+                              </div>
+                            )}
+                          </button>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-0.5 right-0.5 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => { e.stopPropagation(); setEditForm(prev => ({ ...prev, attachments: prev.attachments.filter((_, i) => i !== idx) })); }}
+                          >
+                            <X className="w-2.5 h-2.5" />
                           </Button>
-                        )}
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditForm(prev => ({
-                              ...prev,
-                              attachments: prev.attachments.filter((_, i) => i !== idx)
-                            }));
-                          }}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-2 text-xs text-slate-400">No attachments</div>
+                )}
               </div>
-            ) : (
-              <div className="text-center py-4 text-sm text-slate-400 mb-3">
-                No attachments yet
-              </div>
-            )}
-            
-            {/* Add Attachment Button */}
-            <input
-              type="file"
-              id="action-detail-attachment"
-              className="hidden"
-              multiple
-              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-              onChange={async (e) => {
-                const files = Array.from(e.target.files || []);
-                if (files.length === 0) return;
-                setUploadingAttachment(true);
-                try {
-                  for (const file of files) {
-                    const result = await actionsAPI.uploadAttachment(file);
-                    setEditForm(prev => ({
-                      ...prev,
-                      attachments: [...(prev.attachments || []), result]
-                    }));
-                  }
-                  toast.success(`${files.length} file(s) uploaded`);
-                } catch (error) {
-                  toast.error("Failed to upload file(s)");
-                } finally {
-                  setUploadingAttachment(false);
-                  e.target.value = "";
-                }
-              }}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full border-dashed"
-              disabled={uploadingAttachment}
-              onClick={() => document.getElementById("action-detail-attachment")?.click()}
-            >
-              {uploadingAttachment ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading...</>
-              ) : (
-                <><Upload className="w-4 h-4 mr-2" />Add Attachment</>
-              )}
-            </Button>
-          </div>
-
-          {/* Timestamps */}
-          <div className="text-xs text-slate-400 flex flex-wrap gap-3 px-1">
-            {action.created_at && <span>Created: {new Date(action.created_at).toLocaleDateString()}</span>}
-            {action.updated_at && <span>Updated: {new Date(action.updated_at).toLocaleDateString()}</span>}
-          </div>
-
-          {/* Create Recurring Task Button - Only for PM actions */}
-          {editForm.action_type === "PM" && (
-            <div className="pt-4 border-t border-slate-200">
-              <Button
-                variant="outline"
-                className="w-full text-blue-600 border-blue-200 hover:bg-blue-50"
-                onClick={() => {
-                  navigate("/tasks", {
-                    state: {
-                      createTask: true,
-                      prefill: {
-                        name: editForm.title,
-                        description: editForm.description || `Recurring maintenance task from action: ${editForm.title}`,
-                        discipline: editForm.discipline || "",
-                        source_action_id: actionId,
-                        source_action_title: editForm.title,
-                      }
-                    }
-                  });
-                }}
-                data-testid="create-recurring-task-btn"
-              >
-                <CalendarClock className="w-4 h-4 mr-2" />
-                Create Recurring Task
-              </Button>
             </div>
-          )}
 
-          {/* Delete Button */}
-          <div className="pt-4 border-t border-slate-200">
-            <Button
-              variant="outline"
-              className="w-full text-red-600 border-red-200 hover:bg-red-50"
-              onClick={() => setDeleteConfirm(true)}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete Action
-            </Button>
+            {/* RIGHT COLUMN - Metadata & Actions (spans 5 cols on desktop) */}
+            <div className="lg:col-span-5 space-y-3 mt-3 lg:mt-0">
+              {/* Status & Priority - Inline */}
+              <div className="bg-white rounded-lg border border-slate-200 p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Status</label>
+                    <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="open">Open</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Priority</label>
+                    <Select value={editForm.priority} onValueChange={(v) => setEditForm({ ...editForm, priority: v })}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="critical">Critical</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Type & Discipline - Inline */}
+              <div className="bg-white rounded-lg border border-slate-200 p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Type</label>
+                    <Select value={editForm.action_type || "none"} onValueChange={(v) => setEditForm({ ...editForm, action_type: v === "none" ? "" : v })}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="CM">CM - Corrective</SelectItem>
+                        <SelectItem value="PM">PM - Preventive</SelectItem>
+                        <SelectItem value="PDM">PDM - Predictive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Discipline</label>
+                    <Input
+                      value={editForm.discipline}
+                      onChange={(e) => setEditForm({ ...editForm, discipline: e.target.value })}
+                      placeholder="Mech"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Assignee & Due Date - Inline */}
+              <div className="bg-white rounded-lg border border-slate-200 p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Assignee</label>
+                    <Select value={editForm.assignee || "unassigned"} onValueChange={(v) => setEditForm({ ...editForm, assignee: v === "unassigned" ? "" : v })}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {usersList.map((u) => (
+                          <SelectItem key={u.id} value={u.name || u.email}>
+                            {u.name || u.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Due Date</label>
+                    <Input
+                      type="date"
+                      value={editForm.due_date}
+                      onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Timestamps - Compact */}
+              <div className="text-[10px] text-slate-400 flex gap-3 px-1">
+                {action.created_at && <span>Created: {new Date(action.created_at).toLocaleDateString()}</span>}
+                {action.updated_at && <span>Updated: {new Date(action.updated_at).toLocaleDateString()}</span>}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2 border-t border-slate-200">
+                {/* Create Recurring Task Button - Only for PM actions */}
+                {editForm.action_type === "PM" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-blue-600 border-blue-200 hover:bg-blue-50 h-8 text-xs"
+                    onClick={() => {
+                      navigate("/tasks", {
+                        state: {
+                          createTask: true,
+                          prefill: {
+                            name: editForm.title,
+                            description: editForm.description || `Recurring maintenance task from action: ${editForm.title}`,
+                            discipline: editForm.discipline || "",
+                            source_action_id: actionId,
+                            source_action_title: editForm.title,
+                          }
+                        }
+                      });
+                    }}
+                    data-testid="create-recurring-task-btn"
+                  >
+                    <CalendarClock className="w-3 h-3 mr-1.5" />
+                    Create Recurring Task
+                  </Button>
+                )}
+
+                {/* Delete Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-red-600 border-red-200 hover:bg-red-50 h-8 text-xs"
+                  onClick={() => setDeleteConfirm(true)}
+                >
+                  <Trash2 className="w-3 h-3 mr-1.5" />
+                  Delete Action
+                </Button>
+              </div>
+            </div>
           </div>
         </motion.div>
       </div>
