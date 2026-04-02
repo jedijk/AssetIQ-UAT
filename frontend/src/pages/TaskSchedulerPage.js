@@ -1223,7 +1223,11 @@ const TaskSchedulerPage = () => {
                       {templatePlans.length > 0 && (
                         <div className="border-t border-slate-100 pt-3 mt-3">
                           <button
-                            onClick={() => setExpandedTemplateId(isExpanded ? null : template.id)}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedTemplateId(isExpanded ? null : template.id);
+                            }}
                             className="flex items-center justify-between w-full text-sm text-slate-600 hover:text-slate-900"
                           >
                             <span className="flex items-center gap-2">
@@ -1266,14 +1270,14 @@ const TaskSchedulerPage = () => {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1">
-                                    <Button variant="ghost" size="sm" onClick={() => handleEditPlan(plan)}>
+                                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditPlan(plan); }}>
                                       <Edit className="w-3 h-3" />
                                     </Button>
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
                                       className="text-red-600 hover:text-red-700"
-                                      onClick={() => deletePlanMutation.mutate(plan.id)}
+                                      onClick={(e) => { e.stopPropagation(); deletePlanMutation.mutate(plan.id); }}
                                     >
                                       <Trash2 className="w-3 h-3" />
                                     </Button>
@@ -1289,7 +1293,9 @@ const TaskSchedulerPage = () => {
                       {templatePlans.length === 0 && !template.is_adhoc && (
                         <div className="border-t border-slate-100 pt-3 mt-3">
                           <button
-                            onClick={() => {
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setPlanForm(prev => ({ ...prev, task_template_id: template.id }));
                               setShowPlanDialog(true);
                             }}
