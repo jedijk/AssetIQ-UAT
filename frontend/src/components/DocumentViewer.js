@@ -620,7 +620,7 @@ export const DocumentViewer = ({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto p-4 flex flex-col items-start">
+        <div className="flex-1 overflow-auto p-4 flex flex-col items-start w-full">
           {/* Loading State */}
           {loading && (
             <div className="flex-1 w-full flex items-center justify-center">
@@ -676,17 +676,32 @@ export const DocumentViewer = ({
             </div>
           )}
 
-          {/* DOCX Viewer - Starts from top, no vertical centering */}
+          {/* DOCX Viewer - Full width scrollable container for mobile */}
           {isDocx && !loading && !error && docxHtml && (
             <div 
-              className="w-full max-w-4xl mx-auto bg-white rounded-lg shadow-2xl"
-              style={{ marginTop: 0 }}
+              className="w-full overflow-x-auto"
+              style={{ WebkitOverflowScrolling: 'touch' }}
             >
               <div 
-                className="p-8 prose prose-slate max-w-none docx-content"
-                style={{ marginTop: 0, paddingTop: 32 }}
-                dangerouslySetInnerHTML={{ __html: docxHtml }}
-              />
+                className="bg-white rounded-lg shadow-2xl mx-auto"
+                style={{ 
+                  minWidth: isMobile ? '100%' : 'auto',
+                  maxWidth: isMobile ? 'none' : '896px',
+                  width: isMobile ? 'max-content' : 'auto'
+                }}
+              >
+                <div 
+                  className="p-4 sm:p-8 prose prose-slate max-w-none docx-content"
+                  style={{ 
+                    marginTop: 0, 
+                    paddingTop: 16,
+                    minWidth: isMobile ? 'fit-content' : 'auto',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word'
+                  }}
+                  dangerouslySetInnerHTML={{ __html: docxHtml }}
+                />
+              </div>
             </div>
           )}
 

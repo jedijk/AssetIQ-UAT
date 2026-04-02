@@ -48,6 +48,23 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 2, 2026 - Fix Word File Mobile Viewing (Right Side Cutoff)
+**BUG FIX:**
+- ✅ **Fixed DOCX right side content not visible on mobile**
+- **Problem:** First page of Word documents had right side cut off on mobile
+- **Solution:** Updated DOCX viewer container with proper mobile scrolling and sizing
+
+**Changes:**
+- Added `overflow-x-auto` for horizontal scrolling on mobile
+- Added `WebkitOverflowScrolling: 'touch'` for smooth iOS scrolling  
+- Made container width adaptive (`isMobile` ? full width : max 896px)
+- Added `wordBreak: 'break-word'` and `overflowWrap: 'break-word'` for text wrapping
+
+**Files Modified:**
+- `/app/frontend/src/components/DocumentViewer.js` - DOCX viewer mobile layout fix
+
+---
+
 ### April 2, 2026 - Form Execution Field Types Fix
 **UX Enhancement:**
 - ✅ **Fixed form field types not rendering correctly in Task Execution**
