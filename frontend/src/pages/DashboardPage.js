@@ -32,6 +32,8 @@ import {
   X,
   Building2,
   ChevronDown,
+  ClipboardList,
+  Paperclip,
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card";
@@ -1047,24 +1049,152 @@ export default function DashboardPage() {
               </span>
             </div>
             
-            {/* Form Data */}
-            {quickViewSubmission?.form_data && Object.keys(quickViewSubmission.form_data).length > 0 ? (
-              <div className="border rounded-lg p-4 bg-slate-50">
-                <h4 className="font-medium text-slate-700 mb-3">{t("dashboard.formResponses") || "Form Responses"}</h4>
-                <div className="space-y-3">
-                  {Object.entries(quickViewSubmission.form_data).map(([key, value]) => (
-                    <div key={key} className="flex flex-col">
-                      <Label className="text-xs text-slate-500 mb-1">{key.replace(/_/g, " ").replace(/([A-Z])/g, " $1").trim()}</Label>
-                      <div className="bg-white rounded px-3 py-2 text-sm text-slate-800 border">
-                        {typeof value === "object" ? JSON.stringify(value) : String(value) || "-"}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            {/* Equipment & Task Info */}
+            {(quickViewSubmission?.equipment_name || quickViewSubmission?.task_template_name) && (
+              <div className="flex flex-wrap gap-4 text-sm">
+                {quickViewSubmission?.equipment_name && (
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-600">{quickViewSubmission.equipment_name}</span>
+                  </div>
+                )}
+                {quickViewSubmission?.task_template_name && (
+                  <div className="flex items-center gap-1.5">
+                    <ClipboardList className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-600">{quickViewSubmission.task_template_name}</span>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-center py-6 text-slate-400">
-                {t("dashboard.noFormData") || "No form data available"}
+            )}
+            
+            {/* Form Responses - Support both values/responses and form_data formats */}
+            {(() => {
+              const responses = quickViewSubmission?.values || quickViewSubmission?.responses || [];
+              const formData = quickViewSubmission?.form_data || {};
+              const hasResponses = responses.length > 0;
+              const hasFormData = Object.keys(formData).length > 0;
+              
+              if (hasResponses) {
+                return (
+                  <div className="border rounded-lg p-4 bg-slate-50">
+                    <h4 className="font-medium text-slate-700 mb-3 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-500" />
+                      {t("dashboard.formResponses") || "Form Responses"} ({responses.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {responses.map((response, idx) => {
+                        const isWarning = response.threshold_status === "warning";
+                        const isCritical = response.threshold_status === "critical";
+                        const isBoolean = typeof response.value === "boolean";
+                        const isArray = Array.isArray(response.value);
+                        
+                        return (
+                          <div 
+                            key={idx}
+                            className={`p-3 rounded-lg border ${
+                              isCritical 
+                                ? "bg-red-50 border-red-200" 
+                                : isWarning 
+                                  ? "bg-amber-50 border-amber-200" 
+                                  : "bg-white border-slate-200"
+                            }`}
+                          >
+                            <p className={`text-xs font-medium mb-1 ${
+                              isCritical ? "text-red-600" : isWarning ? "text-amber-600" : "text-slate-500"
+                            }`}>
+                              {response.field_label || response.field_id}
+                            </p>
+                            <div className={`text-sm font-medium ${
+                              isCritical ? "text-red-800" : isWarning ? "text-amber-800" : "text-slate-800"
+                            }`}>
+                              {isBoolean ? (
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ${
+                                  response.value 
+                                    ? "bg-green-100 text-green-700" 
+                                    : "bg-slate-100 text-slate-600"
+                                }`}>
+                                  {response.value ? "Yes" : "No"}
+                                </span>
+                              ) : isArray ? (
+                                response.value.join(", ")
+                              ) : (
+                                <>
+                                  {String(response.value || "—")}
+                                  {response.unit && <span className="text-slate-500 ml-1">{response.unit}</span>}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              } else if (hasFormData) {
+                return (
+                  <div className="border rounded-lg p-4 bg-slate-50">
+                    <h4 className="font-medium text-slate-700 mb-3">{t("dashboard.formResponses") || "Form Responses"}</h4>
+                    <div className="space-y-3">
+                      {Object.entries(formData).map(([key, value]) => (
+                        <div key={key} className="flex flex-col">
+                          <Label className="text-xs text-slate-500 mb-1">{key.replace(/_/g, " ").replace(/([A-Z])/g, " $1").trim()}</Label>
+                          <div className="bg-white rounded px-3 py-2 text-sm text-slate-800 border">
+                            {typeof value === "object" ? JSON.stringify(value) : String(value) || "-"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="text-center py-6 text-slate-400">
+                    {t("dashboard.noFormData") || "No form data available"}
+                  </div>
+                );
+              }
+            })()}
+            
+            {/* Attachments */}
+            {quickViewSubmission?.attachments?.length > 0 && (
+              <div className="border rounded-lg p-4">
+                <h4 className="font-medium text-slate-700 mb-3 flex items-center gap-2">
+                  <Paperclip className="w-4 h-4 text-slate-500" />
+                  Attachments ({quickViewSubmission.attachments.length})
+                </h4>
+                <div className="grid grid-cols-3 gap-2">
+                  {quickViewSubmission.attachments.map((att, idx) => {
+                    const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name || att.filename || "");
+                    const previewUrl = att.url || att.data;
+                    const fileName = att.name || att.filename || "Attachment";
+                    
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          if (previewUrl) {
+                            window.open(previewUrl, '_blank');
+                          }
+                        }}
+                        className="relative group bg-slate-100 rounded-lg border border-slate-200 overflow-hidden aspect-square hover:border-blue-300"
+                      >
+                        {isImage && previewUrl ? (
+                          <img src={previewUrl} alt={fileName} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                            <FileText className="w-6 h-6 text-slate-400" />
+                            <span className="text-[10px] text-slate-500 uppercase mt-1">
+                              {fileName.split('.').pop()}
+                            </span>
+                          </div>
+                        )}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
+                          <p className="text-[10px] text-white truncate">{fileName}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
             
@@ -1087,11 +1217,11 @@ export default function DashboardPage() {
               <Button 
                 onClick={() => {
                   setQuickViewSubmission(null);
-                  navigate(`/forms?submission=${quickViewSubmission?.id}`, { state: navState });
+                  navigate(`/form-submissions`, { state: navState });
                 }}
               >
                 <ExternalLink className="w-4 h-4 mr-1" />
-                {t("dashboard.viewInFormDesigner") || "View in Form Designer"}
+                {t("dashboard.viewAllSubmissions") || "View All Submissions"}
               </Button>
             </div>
           </div>
