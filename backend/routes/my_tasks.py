@@ -198,8 +198,11 @@ async def get_my_tasks(
         ]
     
     elif filter == "recurring":
-        # Recurring tasks are those with a task_plan_id
-        query["task_plan_id"] = {"$exists": True, "$ne": None}
+        # Recurring tasks need a valid task_plan_id - we'll verify plans exist after fetching
+        query["task_plan_id"] = {"$exists": True, "$ne": None, "$ne": ""}
+        # Also filter out completed/cancelled to show only active recurring tasks
+        if "status" not in query:
+            query["status"] = {"$nin": ["completed", "cancelled"]}
     
     elif filter == "adhoc":
         # Adhoc tasks are those without a task_plan_id
@@ -251,6 +254,11 @@ async def get_my_tasks(
                 plan = await db.task_plans.find_one({"_id": plan_oid})
             except Exception:
                 plan = None
+            
+            # For recurring filter, skip tasks without valid plans
+            if filter == "recurring" and not plan:
+                logger.debug(f"Skipping task {task.get('_id')} - no valid plan found for task_plan_id {task_plan_id}")
+                continue
             
             if plan:
                 task["is_recurring"] = True
