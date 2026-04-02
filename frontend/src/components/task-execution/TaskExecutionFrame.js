@@ -33,6 +33,7 @@ import {
   File,
   ImageIcon,
   Trash2,
+  PenLine,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -48,6 +49,7 @@ import {
 import { Label } from "../ui/label";
 import { Checkbox } from "../ui/checkbox";
 import { cn } from "../../lib/utils";
+import { SignaturePad } from "../ui/signature-pad";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { imageAnalysisAPI } from "../../lib/api";
 import { DocumentViewer } from "../DocumentViewer";
@@ -699,33 +701,16 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
         return (
           <div key={field.id} className="space-y-2">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
+              <PenLine className="w-4 h-4 inline mr-1" />
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
             <LinkedEquipmentBadge />
-            <div className={cn(
-              "border-2 border-dashed rounded-lg p-4 text-center",
-              value ? "border-green-300 bg-green-50" : "border-slate-300"
-            )}>
-              {value ? (
-                <div className="space-y-2">
-                  <img src={value} alt="Signature" className="max-h-20 mx-auto" />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleFieldChange(field.id, null)}
-                  >
-                    Clear Signature
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Signature className="w-8 h-8 text-slate-400 mx-auto" />
-                  <p className="text-sm text-slate-600">Tap to sign</p>
-                  <p className="text-xs text-slate-400">Signature capture coming soon</p>
-                </div>
-              )}
-            </div>
+            <SignaturePad
+              value={value}
+              onSave={(dataUrl) => handleFieldChange(field.id, dataUrl)}
+              onClear={() => handleFieldChange(field.id, null)}
+              disabled={false}
+            />
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
           </div>
         );
