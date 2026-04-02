@@ -4,6 +4,7 @@
  * Handles task execution with form fields, attachments, and issue tracking
  */
 import { getBackendUrl } from '../../lib/apiConfig';
+import { compressImage, formatFileSize, getCompressionPercent } from '../../lib/imageCompression';
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -673,17 +674,39 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                   <input
                     type="file"
                     accept={fieldType === "image" ? "image/*" : field.allowed_types || "*"}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file) {
+                        let processedFile = file;
+                        
+                        // Compress images before upload
+                        if (file.type.startsWith('image/')) {
+                          try {
+                            const result = await compressImage(file, {
+                              maxWidth: 1920,
+                              maxHeight: 1920,
+                              quality: 0.8,
+                              maxSizeMB: 1,
+                            });
+                            processedFile = result.file;
+                            if (result.wasCompressed) {
+                              const savedPercent = getCompressionPercent(result.originalSize, result.compressedSize);
+                              toast.success(`Image compressed: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.compressedSize)} (${savedPercent}% smaller)`);
+                            }
+                          } catch (err) {
+                            console.error('Image compression failed:', err);
+                            // Continue with original file
+                          }
+                        }
+                        
                         const fileData = {
-                          name: file.name,
-                          size: file.size,
-                          type: file.type,
-                          file: file,
+                          name: processedFile.name,
+                          size: processedFile.size,
+                          type: processedFile.type,
+                          file: processedFile,
                         };
                         if (fieldType === "image") {
-                          fileData.preview = URL.createObjectURL(file);
+                          fileData.preview = URL.createObjectURL(processedFile);
                         }
                         handleFieldChange(field.id, fileData);
                       }
@@ -999,18 +1022,40 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
               setUploadingAttachment(true);
               try {
                 for (const file of files) {
+                  let processedFile = file;
+                  
+                  // Compress images before attaching
+                  if (file.type.startsWith('image/')) {
+                    try {
+                      const result = await compressImage(file, {
+                        maxWidth: 1920,
+                        maxHeight: 1920,
+                        quality: 0.8,
+                        maxSizeMB: 1,
+                      });
+                      processedFile = result.file;
+                      if (result.wasCompressed) {
+                        const savedPercent = getCompressionPercent(result.originalSize, result.compressedSize);
+                        toast.success(`${file.name} compressed: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.compressedSize)} (${savedPercent}% smaller)`);
+                      }
+                    } catch (err) {
+                      console.error('Image compression failed:', err);
+                      // Continue with original file
+                    }
+                  }
+                  
                   const reader = new FileReader();
                   reader.onload = () => {
-                    const isImage = file.type.startsWith('image/');
+                    const isImage = processedFile.type.startsWith('image/');
                     setAttachments(prev => [...prev, { 
-                      name: file.name, 
+                      name: processedFile.name, 
                       data: reader.result, 
-                      type: file.type,
+                      type: processedFile.type,
                       preview: isImage ? reader.result : null,
-                      size: file.size
+                      size: processedFile.size
                     }]);
                   };
-                  reader.readAsDataURL(file);
+                  reader.readAsDataURL(processedFile);
                 }
                 toast.success(`${files.length} file(s) attached`);
               } finally {

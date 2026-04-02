@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { actionsAPI, usersAPI } from "../lib/api";
+import { compressImage, formatFileSize, getCompressionPercent } from "../lib/imageCompression";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { usePermissions } from "../contexts/PermissionsContext";
@@ -977,7 +978,28 @@ export default function ActionsPage() {
                               setUploadingActionAttachment(true);
                               try {
                                 for (const file of files) {
-                                  const result = await actionsAPI.uploadAttachment(file);
+                                  let processedFile = file;
+                                  
+                                  // Compress images before upload
+                                  if (file.type.startsWith('image/')) {
+                                    try {
+                                      const result = await compressImage(file, {
+                                        maxWidth: 1920,
+                                        maxHeight: 1920,
+                                        quality: 0.8,
+                                        maxSizeMB: 1,
+                                      });
+                                      processedFile = result.file;
+                                      if (result.wasCompressed) {
+                                        const savedPercent = getCompressionPercent(result.originalSize, result.compressedSize);
+                                        toast.success(`${file.name} compressed (${savedPercent}% smaller)`);
+                                      }
+                                    } catch (err) {
+                                      console.error('Image compression failed:', err);
+                                    }
+                                  }
+                                  
+                                  const result = await actionsAPI.uploadAttachment(processedFile);
                                   setEditForm(prev => ({
                                     ...prev,
                                     attachments: [...(prev.attachments || []), result]
@@ -1253,7 +1275,28 @@ export default function ActionsPage() {
                               setUploadingActionAttachment(true);
                               try {
                                 for (const file of files) {
-                                  const result = await actionsAPI.uploadAttachment(file);
+                                  let processedFile = file;
+                                  
+                                  // Compress images before upload
+                                  if (file.type.startsWith('image/')) {
+                                    try {
+                                      const result = await compressImage(file, {
+                                        maxWidth: 1920,
+                                        maxHeight: 1920,
+                                        quality: 0.8,
+                                        maxSizeMB: 1,
+                                      });
+                                      processedFile = result.file;
+                                      if (result.wasCompressed) {
+                                        const savedPercent = getCompressionPercent(result.originalSize, result.compressedSize);
+                                        toast.success(`${file.name} compressed (${savedPercent}% smaller)`);
+                                      }
+                                    } catch (err) {
+                                      console.error('Image compression failed:', err);
+                                    }
+                                  }
+                                  
+                                  const result = await actionsAPI.uploadAttachment(processedFile);
                                   setEditForm(prev => ({
                                     ...prev,
                                     attachments: [...(prev.attachments || []), result]
