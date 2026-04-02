@@ -65,6 +65,28 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 2, 2026 - Enhanced Form Execution with Attachment Display & Draft Persistence
+**UX ENHANCEMENT:**
+- ✅ **Show attachments visually during form execution**
+  - Image attachments now show thumbnail previews in a grid layout
+  - Non-image files show file type icon with extension badge
+  - Delete button appears on hover for each attachment
+  - File count badge shown next to "Attachments" label
+
+- ✅ **Remember form information even if not submitted**
+  - Auto-saves form data, completion notes, and attachments to localStorage
+  - Debounced save (1 second) to avoid excessive writes
+  - "Draft saved" indicator shows when data is persisted
+  - Toast notification "Restored your previous draft" when reopening task
+  - "Clear" button in header to discard draft and start fresh
+  - Drafts expire after 24 hours
+  - Draft cleared automatically on successful task completion
+
+**Files Modified:**
+- `/app/frontend/src/components/task-execution/TaskExecutionFrame.js` - Added draft persistence, enhanced attachment display
+
+---
+
 ### April 2, 2026 - Form Execution Field Types Fix
 **UX Enhancement:**
 - ✅ **Fixed form field types not rendering correctly in Task Execution**

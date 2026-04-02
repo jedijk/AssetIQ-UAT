@@ -4,7 +4,7 @@
  * Handles task execution with form fields, attachments, and issue tracking
  */
 import { getBackendUrl } from '../../lib/apiConfig';
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import {
@@ -30,6 +30,9 @@ import {
   Download,
   ChevronUp,
   Signature,
+  File,
+  ImageIcon,
+  Trash2,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -51,6 +54,52 @@ import { DocumentViewer } from "../DocumentViewer";
 
 const API_BASE_URL = getBackendUrl();
 
+// Helper to get storage key for a task
+const getStorageKey = (taskId) => `task_draft_${taskId}`;
+
+// Helper to save draft to localStorage
+const saveDraft = (taskId, data) => {
+  try {
+    localStorage.setItem(getStorageKey(taskId), JSON.stringify({
+      ...data,
+      savedAt: new Date().toISOString()
+    }));
+  } catch (e) {
+    console.warn("Could not save draft:", e);
+  }
+};
+
+// Helper to load draft from localStorage
+const loadDraft = (taskId) => {
+  try {
+    const stored = localStorage.getItem(getStorageKey(taskId));
+    if (stored) {
+      const data = JSON.parse(stored);
+      // Check if draft is less than 24 hours old
+      const savedAt = new Date(data.savedAt);
+      const hoursSinceSave = (Date.now() - savedAt.getTime()) / (1000 * 60 * 60);
+      if (hoursSinceSave < 24) {
+        return data;
+      } else {
+        // Clear old draft
+        localStorage.removeItem(getStorageKey(taskId));
+      }
+    }
+  } catch (e) {
+    console.warn("Could not load draft:", e);
+  }
+  return null;
+};
+
+// Helper to clear draft
+const clearDraft = (taskId) => {
+  try {
+    localStorage.removeItem(getStorageKey(taskId));
+  } catch (e) {
+    console.warn("Could not clear draft:", e);
+  }
+};
+
 const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState({});
@@ -67,7 +116,9 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   const [searchingEquipment, setSearchingEquipment] = useState(null);
   const [viewingDocument, setViewingDocument] = useState(null);
   const [showDocumentList, setShowDocumentList] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
   const docDropdownRef = useRef(null);
+  const isInitialLoad = useRef(true);
   
   // Close document dropdown when clicking outside
   useEffect(() => {
@@ -95,20 +146,65 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       : `${API_BASE_URL}/api/form-documents/${doc.url || doc.storage_path}`
   }));
   
-  // Reset form when task changes
+  // Load draft when task changes
   useEffect(() => {
-    if (task) {
-      setFormData({});
-      setCompletionNotes("");
+    if (task?.id) {
+      isInitialLoad.current = true;
+      const draft = loadDraft(task.id);
+      if (draft) {
+        setFormData(draft.formData || {});
+        setCompletionNotes(draft.completionNotes || "");
+        // Restore attachments (without actual file data for images - those need re-upload)
+        setAttachments(draft.attachments || []);
+        setHasDraft(true);
+        toast.info("Restored your previous draft", { duration: 3000 });
+      } else {
+        setFormData({});
+        setCompletionNotes("");
+        setAttachments([]);
+        setHasDraft(false);
+      }
       setValidationErrors({});
       setImageAnalysis({});
       setAnalyzingImage(null);
-      setAttachments([]);
       setUploadingAttachment(false);
       setViewingDocument(null);
       setShowDocumentList(false);
+      
+      // Mark initial load complete after a tick
+      setTimeout(() => {
+        isInitialLoad.current = false;
+      }, 100);
     }
   }, [task?.id]);
+  
+  // Auto-save draft when form data changes (debounced)
+  useEffect(() => {
+    if (!task?.id || isInitialLoad.current) return;
+    
+    const hasData = Object.keys(formData).length > 0 || completionNotes || attachments.length > 0;
+    if (!hasData) return;
+    
+    const timeout = setTimeout(() => {
+      // Filter out file objects from attachments (can't serialize)
+      const serializableAttachments = attachments.map(att => ({
+        name: att.name,
+        type: att.type,
+        preview: att.preview, // Keep preview URL if available
+        data: att.data, // Keep base64 data if available
+        url: att.url, // Keep URL if available
+      }));
+      
+      saveDraft(task.id, {
+        formData,
+        completionNotes,
+        attachments: serializableAttachments,
+      });
+      setHasDraft(true);
+    }, 1000); // Debounce 1 second
+    
+    return () => clearTimeout(timeout);
+  }, [task?.id, formData, completionNotes, attachments]);
   
   // Build form fields from task template
   const formFields = task?.form_fields || task?.template?.form_fields || [];
@@ -188,6 +284,10 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
         completion_notes: completionNotes,
         attachments: attachments,
       });
+      // Clear draft on successful submission
+      if (task?.id) {
+        clearDraft(task.id);
+      }
       toast.success("Task completed successfully");
       onBack();
     } catch (error) {
@@ -830,33 +930,85 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
         />
       </div>
       
-      {/* Attachments Section */}
-      <div className="space-y-2">
-        <Label className={isMobile ? "text-sm" : ""}>Attachments</Label>
-        <div className="flex flex-wrap gap-2">
-          {attachments.map((att, idx) => (
-            <div key={idx} className="flex items-center gap-2 p-2 bg-slate-100 rounded-lg">
-              <Paperclip className="w-4 h-4 text-slate-500" />
-              <span className="text-sm truncate max-w-[150px]">{att.name}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
-                className="h-6 w-6 p-0"
-              >
-                <X className="w-3 h-3" />
-              </Button>
-            </div>
-          ))}
+      {/* Attachments Section - Enhanced with previews */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className={isMobile ? "text-sm" : ""}>
+            Attachments
+            {attachments.length > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {attachments.length}
+              </Badge>
+            )}
+          </Label>
+          {hasDraft && (
+            <span className="text-xs text-amber-600 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+              Draft saved
+            </span>
+          )}
         </div>
+        
+        {/* Attachment Grid - Show previews */}
+        {attachments.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {attachments.map((att, idx) => {
+              const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
+              const previewUrl = att.preview || att.data || att.url;
+              
+              return (
+                <div 
+                  key={idx} 
+                  className="relative group bg-slate-100 rounded-lg border border-slate-200 overflow-hidden"
+                >
+                  {isImage && previewUrl ? (
+                    <div className="aspect-square">
+                      <img 
+                        src={previewUrl} 
+                        alt={att.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="aspect-square flex flex-col items-center justify-center p-2 bg-slate-50">
+                      <File className="w-8 h-8 text-slate-400 mb-1" />
+                      <span className="text-[10px] text-slate-500 uppercase font-medium">
+                        {att.name?.split('.').pop() || 'File'}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* File name overlay */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
+                    <p className="text-[10px] text-white truncate">{att.name}</p>
+                  </div>
+                  
+                  {/* Delete button */}
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        
+        {/* Add Attachment Button */}
         <Button
           variant="outline"
           size="sm"
           disabled={uploadingAttachment}
+          className="w-full border-dashed"
           onClick={() => {
             const input = document.createElement('input');
             input.type = 'file';
             input.multiple = true;
+            input.accept = "image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt";
             input.onchange = async (e) => {
               const files = Array.from(e.target.files);
               setUploadingAttachment(true);
@@ -864,10 +1016,18 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                 for (const file of files) {
                   const reader = new FileReader();
                   reader.onload = () => {
-                    setAttachments(prev => [...prev, { name: file.name, data: reader.result, type: file.type }]);
+                    const isImage = file.type.startsWith('image/');
+                    setAttachments(prev => [...prev, { 
+                      name: file.name, 
+                      data: reader.result, 
+                      type: file.type,
+                      preview: isImage ? reader.result : null,
+                      size: file.size
+                    }]);
                   };
                   reader.readAsDataURL(file);
                 }
+                toast.success(`${files.length} file(s) attached`);
               } finally {
                 setUploadingAttachment(false);
               }
@@ -875,8 +1035,12 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             input.click();
           }}
         >
-          {uploadingAttachment ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
-          Add Attachment
+          {uploadingAttachment ? (
+            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+          ) : (
+            <Upload className="w-4 h-4 mr-2" />
+          )}
+          {attachments.length > 0 ? "Add More Files" : "Add Attachment"}
         </Button>
       </div>
       
@@ -942,6 +1106,26 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <p className="text-xs text-slate-500 truncate">Form: {task.form_template_name}</p>
           )}
         </div>
+        {hasDraft && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (task?.id) {
+                clearDraft(task.id);
+                setFormData({});
+                setCompletionNotes("");
+                setAttachments([]);
+                setHasDraft(false);
+                toast.info("Draft cleared");
+              }
+            }}
+            className="text-slate-500 hover:text-red-600 text-xs"
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
+            Clear
+          </Button>
+        )}
         {formDocuments.length > 0 && (
           <Button
             variant="outline"
