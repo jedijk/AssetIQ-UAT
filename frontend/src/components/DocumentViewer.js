@@ -620,10 +620,10 @@ export const DocumentViewer = ({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-auto p-4 flex flex-col items-start">
           {/* Loading State */}
           {loading && (
-            <div className="h-full flex items-center justify-center">
+            <div className="flex-1 w-full flex items-center justify-center">
               <div className="text-center p-8">
                 <Loader2 className="w-12 h-12 text-indigo-400 mx-auto mb-4 animate-spin" />
                 <p className="text-white">Loading document...</p>
@@ -633,7 +633,7 @@ export const DocumentViewer = ({
 
           {/* Error State */}
           {error && !loading && (
-            <div className="h-full flex items-center justify-center">
+            <div className="flex-1 w-full flex items-center justify-center">
               <div className="text-center p-8 bg-slate-800 rounded-xl max-w-md">
                 <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
                 <h3 className="text-white text-lg font-medium mb-2">Error Loading File</h3>
@@ -652,7 +652,7 @@ export const DocumentViewer = ({
 
           {/* Image Viewer */}
           {isImage && !loading && !error && blobUrl && (
-            <div className="h-full flex items-center justify-center">
+            <div className="flex-1 w-full flex items-center justify-center">
               <motion.img
                 src={blobUrl}
                 alt={name}
@@ -668,7 +668,7 @@ export const DocumentViewer = ({
 
           {/* PDF Viewer - Mobile friendly with page navigation */}
           {isPdf && !loading && !error && blobUrl && (
-            <div className="h-full flex items-center justify-center">
+            <div className="flex-1 w-full flex items-center justify-center">
               <MobilePdfViewer 
                 blobUrl={blobUrl}
                 isMobile={isMobile}
@@ -676,14 +676,15 @@ export const DocumentViewer = ({
             </div>
           )}
 
-          {/* DOCX Viewer - Scrollable from top */}
+          {/* DOCX Viewer - Starts from top, no vertical centering */}
           {isDocx && !loading && !error && docxHtml && (
             <div 
-              className="w-full max-w-4xl mx-auto bg-white rounded-lg shadow-2xl overflow-auto"
-              style={{ maxHeight: "calc(100vh - 120px)" }}
+              className="w-full max-w-4xl mx-auto bg-white rounded-lg shadow-2xl"
+              style={{ marginTop: 0 }}
             >
               <div 
                 className="p-8 prose prose-slate max-w-none docx-content"
+                style={{ marginTop: 0, paddingTop: 32 }}
                 dangerouslySetInnerHTML={{ __html: docxHtml }}
               />
             </div>
