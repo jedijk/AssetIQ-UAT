@@ -473,13 +473,20 @@ const MyTasksPage = () => {
     });
   };
   
-  // Filter tasks based on search
+  // Filter tasks based on search and hide completed tasks
   const tasks = tasksData?.tasks || [];
-  const filteredTasks = tasks.filter(task => 
-    !searchQuery || 
-    task.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    task.equipment_name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTasks = tasks.filter(task => {
+    // Hide completed tasks from all views
+    if (task.status === "completed" || task.status === "completed_offline") {
+      return false;
+    }
+    // Apply search filter
+    if (searchQuery) {
+      return task.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        task.equipment_name?.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    return true;
+  });
   
   // Sort tasks: Overdue -> High Priority -> Due Soon -> Others
   const sortedTasks = [...filteredTasks].sort((a, b) => {

@@ -24,6 +24,18 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 2, 2026 - Hide Completed Tasks from My Tasks
+**UX Enhancement:**
+- ✅ **Completed tasks are now hidden from My Tasks view**
+- **Backend:** Updated action query to only fetch `open` and `in_progress` actions
+- **Frontend:** Added filter to exclude `completed` and `completed_offline` status from all views
+
+**Files Modified:**
+- `/app/backend/routes/my_tasks.py` - Changed action status filter
+- `/app/frontend/src/pages/MyTasksPage.js` - Added completed task filter
+
+---
+
 ### April 2, 2026 - Form Execution Field Types Fix
 **UX Enhancement:**
 - ✅ **Fixed form field types not rendering correctly in Task Execution**
