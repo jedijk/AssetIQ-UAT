@@ -69,12 +69,6 @@ export const DocumentViewer = ({
   const isExcel = ["xls", "xlsx", "csv"].includes(type?.toLowerCase());
   const isPreviewable = isImage || isPdf || isDocx || isExcel;
 
-  // Helper to get auth headers
-  const getAuthHeaders = useCallback(() => {
-    const token = localStorage.getItem("token");
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }, []);
-
   // Fetch and parse DOCX files
   const loadDocx = useCallback(async () => {
     if (!url || !isDocx) return;
@@ -83,19 +77,29 @@ export const DocumentViewer = ({
     setError(null);
     
     try {
-      const response = await fetch(url, { headers: getAuthHeaders() });
-      if (!response.ok) throw new Error("Failed to fetch document");
+      const token = localStorage.getItem("token");
+      console.log("[DocumentViewer] Loading DOCX, token present:", !!token);
+      
+      const response = await fetch(url, { 
+        headers: token ? { Authorization: `Bearer ${token}` } : {} 
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[DocumentViewer] DOCX fetch failed:", response.status, errorText);
+        throw new Error(errorText || `Failed to fetch document (${response.status})`);
+      }
       
       const arrayBuffer = await response.arrayBuffer();
       const result = await mammoth.convertToHtml({ arrayBuffer });
       setDocxHtml(result.value);
     } catch (err) {
       console.error("Error loading DOCX:", err);
-      setError("Failed to load document. Try downloading instead.");
+      setError(err.message || "Failed to load document. Try downloading instead.");
     } finally {
       setLoading(false);
     }
-  }, [url, isDocx, getAuthHeaders]);
+  }, [url, isDocx]);
 
   // Fetch and parse Excel files
   const loadExcel = useCallback(async () => {
@@ -105,8 +109,18 @@ export const DocumentViewer = ({
     setError(null);
     
     try {
-      const response = await fetch(url, { headers: getAuthHeaders() });
-      if (!response.ok) throw new Error("Failed to fetch spreadsheet");
+      const token = localStorage.getItem("token");
+      console.log("[DocumentViewer] Loading Excel, token present:", !!token);
+      
+      const response = await fetch(url, { 
+        headers: token ? { Authorization: `Bearer ${token}` } : {} 
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[DocumentViewer] Excel fetch failed:", response.status, errorText);
+        throw new Error(errorText || `Failed to fetch spreadsheet (${response.status})`);
+      }
       
       const arrayBuffer = await response.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
@@ -125,7 +139,7 @@ export const DocumentViewer = ({
       setActiveSheet(0);
     } catch (err) {
       console.error("Error loading Excel:", err);
-      setError("Failed to load spreadsheet. Try downloading instead.");
+      setError(err.message || "Failed to load spreadsheet. Try downloading instead.");
     } finally {
       setLoading(false);
     }
@@ -153,9 +167,15 @@ export const DocumentViewer = ({
       // Load PDF/Image as blob for authenticated access
       setLoading(true);
       const token = localStorage.getItem("token");
+      console.log("[DocumentViewer] Loading PDF/Image, token present:", !!token, "URL:", url);
+      
       fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-        .then(response => {
-          if (!response.ok) throw new Error("Failed to fetch file");
+        .then(async response => {
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("[DocumentViewer] PDF/Image fetch failed:", response.status, errorText);
+            throw new Error(errorText || `Failed to fetch file (${response.status})`);
+          }
           return response.blob();
         })
         .then(blob => {
@@ -165,7 +185,7 @@ export const DocumentViewer = ({
         })
         .catch(err => {
           console.error("Error loading file:", err);
-          setError("Failed to load file. Try downloading instead.");
+          setError(err.message || "Failed to load file. Try downloading instead.");
         })
         .finally(() => setLoading(false));
     }
@@ -325,20 +345,52 @@ export const DocumentViewer = ({
             )}
 
             {/* Download button */}
-            <a href={url} download={name} target="_blank" rel="noopener noreferrer">
-              <Button variant="ghost" size="sm" className="text-white hover:bg-slate-700">
-                <Download className="w-4 h-4 mr-2" />
-                Download
-              </Button>
-            </a>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-white hover:bg-slate-700"
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem("token");
+                  const response = await fetch(url, { 
+                    headers: token ? { Authorization: `Bearer ${token}` } : {} 
+                  });
+                  if (!response.ok) throw new Error("Download failed");
+                  const blob = await response.blob();
+                  const downloadUrl = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = downloadUrl;
+                  a.download = name || "document";
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(downloadUrl);
+                } catch (err) {
+                  console.error("Download error:", err);
+                }
+              }}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </Button>
 
-            {/* Open in new tab */}
-            <a href={url} target="_blank" rel="noopener noreferrer">
-              <Button variant="ghost" size="sm" className="text-white hover:bg-slate-700">
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Open
-              </Button>
-            </a>
+            {/* Open in new tab - use blob URL if available, otherwise direct link */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-white hover:bg-slate-700"
+              onClick={() => {
+                if (blobUrl) {
+                  window.open(blobUrl, "_blank");
+                } else {
+                  // For non-blob content, open the raw URL (works for public files)
+                  window.open(url, "_blank");
+                }
+              }}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open
+            </Button>
 
             {/* Close button */}
             <Button
@@ -460,12 +512,32 @@ export const DocumentViewer = ({
                 Preview not available for .{type} files
               </p>
               <div className="flex gap-3 justify-center">
-                <a href={url} download={name}>
-                  <Button className="bg-indigo-600 hover:bg-indigo-700">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download File
-                  </Button>
-                </a>
+                <Button 
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem("token");
+                      const response = await fetch(url, { 
+                        headers: token ? { Authorization: `Bearer ${token}` } : {} 
+                      });
+                      if (!response.ok) throw new Error("Download failed");
+                      const blob = await response.blob();
+                      const downloadUrl = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = downloadUrl;
+                      a.download = name || "document";
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(downloadUrl);
+                    } catch (err) {
+                      console.error("Download error:", err);
+                    }
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download File
+                </Button>
                 <a href={url} target="_blank" rel="noopener noreferrer">
                   <Button variant="outline" className="border-slate-600 text-white hover:bg-slate-700">
                     <ExternalLink className="w-4 h-4 mr-2" />
