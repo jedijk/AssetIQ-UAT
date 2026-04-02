@@ -850,9 +850,12 @@ class FormService:
             "form_template_version": doc.get("form_template_version"),
             "task_instance_id": doc.get("task_instance_id"),
             "equipment_id": doc.get("equipment_id"),
+            "equipment_name": doc.get("equipment_name"),
+            "equipment_path": doc.get("equipment_path"),
             "efm_id": doc.get("efm_id"),
             "values": values,
             "responses": values,  # Alias for frontend compatibility
+            "attachments": doc.get("attachments", []),
             "threshold_breaches": doc.get("threshold_breaches", []),
             "failure_indicators": doc.get("failure_indicators", []),
             "has_warnings": doc.get("has_warnings", False),
@@ -865,4 +868,6 @@ class FormService:
             "submitted_at": doc.get("submitted_at").isoformat() if doc.get("submitted_at") and hasattr(doc.get("submitted_at"), 'isoformat') else doc.get("submitted_at"),
             "created_at": doc.get("created_at").isoformat() if doc.get("created_at") and hasattr(doc.get("created_at"), 'isoformat') else doc.get("created_at"),
             "status": doc.get("status", "completed"),  # Default to completed
+            "task_template_name": doc.get("task_template_name"),
+            "discipline": doc.get("discipline"),
         }

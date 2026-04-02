@@ -26,6 +26,7 @@ import {
   Image,
   File,
   ExternalLink,
+  ZoomIn,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -85,6 +86,7 @@ export default function FormSubmissionsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [viewingDocument, setViewingDocument] = useState(null);
+  const [viewingImage, setViewingImage] = useState(null);
 
   // Fetch submissions
   const { data: submissionsData, isLoading } = useQuery({
@@ -344,6 +346,22 @@ export default function FormSubmissionsPage() {
                               <span className="text-slate-600">{submission.task_template_name}</span>
                             </div>
                           )}
+                          
+                          {/* Attachment indicator */}
+                          {submission.attachments?.length > 0 && (
+                            <div className="flex items-center gap-1 text-slate-500">
+                              <Paperclip className="w-3 h-3" />
+                              <span className="text-xs">{submission.attachments.length}</span>
+                            </div>
+                          )}
+                          
+                          {/* Response count */}
+                          {(submission.responses?.length || submission.values?.length) > 0 && (
+                            <div className="flex items-center gap-1 text-slate-500">
+                              <FileText className="w-3 h-3" />
+                              <span className="text-xs">{submission.responses?.length || submission.values?.length} fields</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
@@ -422,11 +440,19 @@ export default function FormSubmissionsPage() {
               
               {/* Form Responses */}
               <div>
-                <h4 className="text-sm font-semibold text-slate-700 mb-2">Form Responses</h4>
+                <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-blue-500" />
+                  Form Responses ({(selectedSubmission.responses || selectedSubmission.values || []).length})
+                </h4>
                 <div className="space-y-2">
                   {(selectedSubmission.responses || selectedSubmission.values || []).map((response, idx) => {
                     const isWarning = response.threshold_status === "warning";
                     const isCritical = response.threshold_status === "critical";
+                    const isBoolean = typeof response.value === "boolean";
+                    const isArray = Array.isArray(response.value);
+                    const isNumeric = typeof response.value === "number";
+                    const hasAttachment = response.attachment_url || response.file_url;
+                    const isImage = hasAttachment && /\.(jpg|jpeg|png|gif|webp)$/i.test(response.attachment_url || response.file_url || "");
                     
                     return (
                       <div 
@@ -440,33 +466,84 @@ export default function FormSubmissionsPage() {
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
-                            <p className={`text-xs font-medium ${
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-medium mb-1 ${
                               isCritical ? "text-red-600" : isWarning ? "text-amber-600" : "text-slate-500"
                             }`}>
                               {response.field_label || response.field_id}
+                              {response.required && <span className="text-red-400 ml-0.5">*</span>}
                             </p>
-                            <p className={`text-sm font-medium mt-0.5 ${
+                            
+                            {/* Value display based on type */}
+                            <div className={`text-sm font-medium ${
                               isCritical ? "text-red-800" : isWarning ? "text-amber-800" : "text-slate-800"
                             }`}>
-                              {Array.isArray(response.value) 
-                                ? response.value.join(", ") 
-                                : String(response.value || "—")}
-                              {response.unit && <span className="text-slate-500 ml-1">{response.unit}</span>}
-                            </p>
+                              {isBoolean ? (
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ${
+                                  response.value 
+                                    ? "bg-green-100 text-green-700" 
+                                    : "bg-slate-100 text-slate-600"
+                                }`}>
+                                  {response.value ? (
+                                    <><CheckCircle2 className="w-3 h-3" /> Yes</>
+                                  ) : (
+                                    <><X className="w-3 h-3" /> No</>
+                                  )}
+                                </span>
+                              ) : isArray ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {response.value.map((v, i) => (
+                                    <Badge key={i} variant="secondary" className="text-xs">
+                                      {String(v)}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : isNumeric ? (
+                                <span className="font-mono text-base">
+                                  {response.value}
+                                  {response.unit && <span className="text-slate-500 ml-1 text-sm">{response.unit}</span>}
+                                </span>
+                              ) : hasAttachment ? (
+                                <button
+                                  onClick={() => {
+                                    const url = response.attachment_url || response.file_url;
+                                    if (isImage) {
+                                      setViewingImage({ url, name: response.field_label || "Image" });
+                                    } else {
+                                      window.open(url, '_blank');
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800"
+                                >
+                                  {isImage ? <Image className="w-4 h-4" /> : <Paperclip className="w-4 h-4" />}
+                                  <span className="underline">View attachment</span>
+                                </button>
+                              ) : (
+                                <span className="whitespace-pre-wrap break-words">
+                                  {String(response.value || "—")}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          {(isWarning || isCritical) && (
-                            <Badge className={isCritical ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}>
-                              {isCritical ? "Critical" : "Warning"}
-                            </Badge>
-                          )}
+                          
+                          {/* Status badges */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {(isWarning || isCritical) && (
+                              <Badge className={`text-[10px] ${isCritical ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                                {isCritical ? "Critical" : "Warning"}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                   
                   {(!selectedSubmission.responses?.length && !selectedSubmission.values?.length) && (
-                    <p className="text-sm text-slate-500 text-center py-4">No responses recorded</p>
+                    <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                      <FileText className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                      <p className="text-sm text-slate-500">No responses recorded</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -474,55 +551,58 @@ export default function FormSubmissionsPage() {
               {/* Attachments */}
               {selectedSubmission.attachments?.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
-                    <Paperclip className="w-4 h-4" />
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                    <Paperclip className="w-4 h-4 text-slate-500" />
                     Attachments ({selectedSubmission.attachments.length})
                   </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {selectedSubmission.attachments.map((att, idx) => {
-                      const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
-                      const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name);
-                      const isDoc = /\.(doc|docx)$/i.test(att.name);
+                      const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name || att.filename || "");
+                      const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name || att.filename || "");
+                      const isDoc = /\.(doc|docx)$/i.test(att.name || att.filename || "");
                       const previewUrl = att.url || att.data;
+                      const fileName = att.name || att.filename || "Attachment";
                       
                       return (
                         <button
                           key={idx}
                           onClick={() => {
-                            if (isImage) {
-                              window.open(previewUrl, '_blank');
-                            } else if (isPdf || isDoc) {
-                              setViewingDocument(att);
+                            if (isImage && previewUrl) {
+                              setViewingImage({ url: previewUrl, name: fileName });
+                            } else if ((isPdf || isDoc) && previewUrl) {
+                              setViewingDocument({ url: previewUrl, name: fileName, type: att.type });
                             } else if (previewUrl) {
                               const link = document.createElement('a');
                               link.href = previewUrl;
-                              link.download = att.name;
+                              link.download = fileName;
                               link.click();
                             }
                           }}
-                          className="relative group bg-slate-100 rounded-lg border border-slate-200 overflow-hidden aspect-square"
+                          className="relative group bg-slate-100 rounded-xl border border-slate-200 overflow-hidden aspect-square hover:border-blue-300 hover:shadow-md transition-all"
                         >
                           {isImage && previewUrl ? (
-                            <img src={previewUrl} alt={att.name} className="w-full h-full object-cover" />
+                            <img src={previewUrl} alt={fileName} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                            <div className="w-full h-full flex flex-col items-center justify-center p-3">
                               {isPdf ? (
-                                <FileText className="w-8 h-8 text-red-400" />
+                                <FileText className="w-10 h-10 text-red-400 mb-2" />
                               ) : isDoc ? (
-                                <FileText className="w-8 h-8 text-blue-400" />
+                                <FileText className="w-10 h-10 text-blue-400 mb-2" />
                               ) : (
-                                <File className="w-8 h-8 text-slate-400" />
+                                <File className="w-10 h-10 text-slate-400 mb-2" />
                               )}
-                              <span className="text-[10px] text-slate-500 uppercase mt-1">
-                                {att.name?.split('.').pop()}
+                              <span className="text-xs text-slate-500 uppercase font-medium">
+                                {fileName.split('.').pop()}
                               </span>
                             </div>
                           )}
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
-                            <p className="text-[10px] text-white truncate">{att.name}</p>
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2">
+                            <p className="text-[11px] text-white truncate font-medium">{fileName}</p>
                           </div>
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Eye className="w-6 h-6 text-white" />
+                          <div className="absolute inset-0 bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div className="bg-white/90 rounded-full p-2 shadow-lg">
+                              {isImage ? <ZoomIn className="w-5 h-5 text-blue-600" /> : <Eye className="w-5 h-5 text-blue-600" />}
+                            </div>
                           </div>
                         </button>
                       );
@@ -561,6 +641,56 @@ export default function FormSubmissionsPage() {
           fileType={viewingDocument.type}
           onClose={() => setViewingDocument(null)}
         />
+      )}
+
+      {/* Image Lightbox */}
+      {viewingImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setViewingImage(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            {/* Close button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute -top-12 right-0 text-white hover:bg-white/20"
+              onClick={() => setViewingImage(null)}
+            >
+              <X className="w-6 h-6" />
+            </Button>
+            
+            {/* Image */}
+            <img
+              src={viewingImage.url}
+              alt={viewingImage.name}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            
+            {/* File name */}
+            <div className="absolute -bottom-10 left-0 right-0 text-center">
+              <p className="text-white/80 text-sm">{viewingImage.name}</p>
+            </div>
+            
+            {/* Download button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute -top-12 left-0 text-white hover:bg-white/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                const link = document.createElement('a');
+                link.href = viewingImage.url;
+                link.download = viewingImage.name;
+                link.click();
+              }}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
