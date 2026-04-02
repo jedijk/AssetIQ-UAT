@@ -287,23 +287,39 @@ export default function SettingsPermissionsPage({ embedded = false }) {
 
         {/* Role Selector */}
         <div className="flex flex-wrap gap-2">
-          {Object.entries(roles && typeof roles === 'object' ? roles : ROLE_CONFIG).map(([roleKey, roleInfo]) => {
-            const Icon = ROLE_CONFIG[roleKey]?.icon || Shield;
-            const isCustom = roleInfo?.is_custom;
-            return (
-              <Button
-                key={roleKey}
-                variant={selectedRole === roleKey ? "default" : "outline"}
-                size="sm"
-                className={selectedRole === roleKey ? "" : "text-slate-600"}
-                onClick={() => setSelectedRole(roleKey)}
-              >
-                <Icon className="w-4 h-4 mr-1" />
-                {roleInfo.display_name || roleInfo.name || roleKey}
-                {isCustom && <Badge variant="secondary" className="ml-2 text-[10px] px-1">Custom</Badge>}
-              </Button>
-            );
-          })}
+          {(() => {
+            // Handle both array and object formats for roles
+            let roleEntries = [];
+            if (Array.isArray(roles)) {
+              // roles is an array of role names like ['admin', 'viewer', ...]
+              roleEntries = roles.map(roleKey => [roleKey, ROLE_CONFIG[roleKey] || { name: roleKey }]);
+            } else if (roles && typeof roles === 'object') {
+              // roles is an object like { admin: { name: 'Admin', ... } }
+              roleEntries = Object.entries(roles);
+            } else {
+              // fallback to ROLE_CONFIG
+              roleEntries = Object.entries(ROLE_CONFIG);
+            }
+            
+            return roleEntries.map(([roleKey, roleInfo]) => {
+              const Icon = ROLE_CONFIG[roleKey]?.icon || Shield;
+              const isCustom = roleInfo?.is_custom;
+              const displayName = ROLE_CONFIG[roleKey]?.label || roleInfo?.display_name || roleInfo?.name || roleKey;
+              return (
+                <Button
+                  key={roleKey}
+                  variant={selectedRole === roleKey ? "default" : "outline"}
+                  size="sm"
+                  className={selectedRole === roleKey ? "" : "text-slate-600"}
+                  onClick={() => setSelectedRole(roleKey)}
+                >
+                  <Icon className="w-4 h-4 mr-1" />
+                  {displayName}
+                  {isCustom && <Badge variant="secondary" className="ml-2 text-[10px] px-1">Custom</Badge>}
+                </Button>
+              );
+            });
+          })()}
         </div>
 
         {/* Permission Matrix */}
