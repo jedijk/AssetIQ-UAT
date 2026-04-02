@@ -357,171 +357,180 @@ async def get_threat(
     threat_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    # Remove created_by filter - threats are shared tenant entities
-    # Access is controlled by installation assignment, not ownership
-    threat = await db.threats.find_one(
-        {"id": threat_id},
-        {"_id": 0}
-    )
-    if not threat:
-        raise HTTPException(status_code=404, detail="Threat not found")
-    
-    # Auto-sync criticality from linked equipment if available
-    linked_equipment_id = threat.get("linked_equipment_id")
-    asset_name = threat.get("asset")
-    
-    # Try to find linked equipment node (shared entity - no created_by filter)
-    equipment_node = None
-    if linked_equipment_id:
-        equipment_node = await db.equipment_nodes.find_one(
-            {"id": linked_equipment_id}
+    try:
+        # Remove created_by filter - threats are shared tenant entities
+        # Access is controlled by installation assignment, not ownership
+        threat = await db.threats.find_one(
+            {"id": threat_id},
+            {"_id": 0}
         )
-    elif asset_name:
-        # Fallback: try to find by asset name
-        equipment_node = await db.equipment_nodes.find_one(
-            {"name": asset_name}
-        )
-    
-    # Auto-sync FMEA score from linked failure mode
-    failure_mode_name = threat.get("failure_mode")
-    failure_mode_id = threat.get("failure_mode_id")
-    fmea_score = threat.get("fmea_score", threat.get("base_risk_score", 50))
-    fmea_changed = False
-    
-    if failure_mode_name and failure_mode_name != "Unknown":
-        # Look up current failure mode data
-        for fm in FAILURE_MODES_LIBRARY:
-            if (failure_mode_id and fm["id"] == failure_mode_id) or \
-               fm["failure_mode"].lower() == failure_mode_name.lower():
-                # Calculate current FMEA score from failure mode
-                current_fmea = min(100, int((fm["severity"] * fm["occurrence"] * fm["detectability"]) / 10))
-                if current_fmea != fmea_score:
-                    fmea_score = current_fmea
-                    fmea_changed = True
-                    logger.info(f"Auto-synced FMEA score for threat {threat_id}: {fmea_score}")
-                break
-    
-    # Calculate criticality score from equipment
-    new_criticality_score = threat.get("criticality_score", 0)
-    criticality_level = threat.get("equipment_criticality", "low")
-    criticality_data = threat.get("equipment_criticality_data")
-    criticality_changed = False
-    
-    if equipment_node and equipment_node.get("criticality"):
-        criticality = equipment_node["criticality"]
-        safety_impact = criticality.get("safety_impact", 0) or 0
-        production_impact = criticality.get("production_impact", 0) or 0
-        environmental_impact = criticality.get("environmental_impact", 0) or 0
-        reputation_impact = criticality.get("reputation_impact", 0) or 0
+        if not threat:
+            raise HTTPException(status_code=404, detail="Threat not found")
         
-        # Calculate criticality score
-        calc_criticality_score = (
-            (safety_impact * 25) + 
-            (production_impact * 20) + 
-            (environmental_impact * 15) + 
-            (reputation_impact * 10)
-        ) / 3.5
-        calc_criticality_score = min(100, int(calc_criticality_score))
+        # Auto-sync criticality from linked equipment if available
+        linked_equipment_id = threat.get("linked_equipment_id")
+        asset_name = threat.get("asset")
         
-        if calc_criticality_score != new_criticality_score:
-            new_criticality_score = calc_criticality_score
-            criticality_changed = True
+        # Try to find linked equipment node (shared entity - no created_by filter)
+        equipment_node = None
+        try:
+            if linked_equipment_id:
+                equipment_node = await db.equipment_nodes.find_one(
+                    {"id": linked_equipment_id}
+                )
+            elif asset_name:
+                # Fallback: try to find by asset name
+                equipment_node = await db.equipment_nodes.find_one(
+                    {"name": asset_name}
+                )
+        except Exception as e:
+            logger.warning(f"Could not fetch equipment node for threat {threat_id}: {e}")
         
-        # Determine criticality level
-        max_impact = max(safety_impact, production_impact, environmental_impact, reputation_impact)
-        if max_impact >= 5:
-            criticality_level = "safety_critical"
-        elif max_impact >= 4:
-            criticality_level = "production_critical"
-        elif max_impact >= 3:
-            criticality_level = "medium"
-        else:
-            criticality_level = "low"
+        # Auto-sync FMEA score from linked failure mode
+        failure_mode_name = threat.get("failure_mode")
+        failure_mode_id = threat.get("failure_mode_id")
+        fmea_score = threat.get("fmea_score", threat.get("base_risk_score", 50))
+        fmea_changed = False
         
-        criticality_data = {
-            "safety_impact": safety_impact,
-            "production_impact": production_impact,
-            "environmental_impact": environmental_impact,
-            "reputation_impact": reputation_impact,
-            "level": criticality_level,
-            "criticality_score": new_criticality_score
-        }
-    
-    # If either changed, recalculate risk score
-    if fmea_changed or criticality_changed:
-        # Calculate new risk score: (Criticality × 0.75) + (Likelihood Score × 0.25)
-        new_risk_score = int((new_criticality_score * 0.75) + (fmea_score * 0.25))
-        new_risk_score = min(100, max(0, new_risk_score))
+        if failure_mode_name and failure_mode_name != "Unknown":
+            # Look up current failure mode data
+            for fm in FAILURE_MODES_LIBRARY:
+                if (failure_mode_id and fm["id"] == failure_mode_id) or \
+                   fm["failure_mode"].lower() == failure_mode_name.lower():
+                    # Calculate current FMEA score from failure mode
+                    current_fmea = min(100, int((fm["severity"] * fm["occurrence"] * fm["detectability"]) / 10))
+                    if current_fmea != fmea_score:
+                        fmea_score = current_fmea
+                        fmea_changed = True
+                        logger.info(f"Auto-synced FMEA score for threat {threat_id}: {fmea_score}")
+                    break
         
-        # Determine risk level
-        if new_risk_score >= 70:
-            risk_level = "Critical"
-        elif new_risk_score >= 50:
-            risk_level = "High"
-        elif new_risk_score >= 30:
-            risk_level = "Medium"
-        else:
-            risk_level = "Low"
+        # Calculate criticality score from equipment
+        new_criticality_score = threat.get("criticality_score", 0)
+        criticality_level = threat.get("equipment_criticality", "low")
+        criticality_data = threat.get("equipment_criticality_data")
+        criticality_changed = False
         
-        # Update the threat in database
-        update_data = {
-            "risk_score": new_risk_score,
-            "fmea_score": fmea_score,
-            "criticality_score": new_criticality_score,
-            "risk_level": risk_level,
-            "equipment_criticality": criticality_level,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
+        if equipment_node and equipment_node.get("criticality"):
+            criticality = equipment_node["criticality"]
+            safety_impact = criticality.get("safety_impact", 0) or 0
+            production_impact = criticality.get("production_impact", 0) or 0
+            environmental_impact = criticality.get("environmental_impact", 0) or 0
+            reputation_impact = criticality.get("reputation_impact", 0) or 0
+            
+            # Calculate criticality score
+            calc_criticality_score = (
+                (safety_impact * 25) + 
+                (production_impact * 20) + 
+                (environmental_impact * 15) + 
+                (reputation_impact * 10)
+            ) / 3.5
+            calc_criticality_score = min(100, int(calc_criticality_score))
+            
+            if calc_criticality_score != new_criticality_score:
+                new_criticality_score = calc_criticality_score
+                criticality_changed = True
+            
+            # Determine criticality level
+            max_impact = max(safety_impact, production_impact, environmental_impact, reputation_impact)
+            if max_impact >= 5:
+                criticality_level = "safety_critical"
+            elif max_impact >= 4:
+                criticality_level = "production_critical"
+            elif max_impact >= 3:
+                criticality_level = "medium"
+            else:
+                criticality_level = "low"
+            
+            criticality_data = {
+                "safety_impact": safety_impact,
+                "production_impact": production_impact,
+                "environmental_impact": environmental_impact,
+                "reputation_impact": reputation_impact,
+                "level": criticality_level,
+                "criticality_score": new_criticality_score
+            }
         
-        if criticality_data:
-            update_data["equipment_criticality_data"] = criticality_data
+        # If either changed, recalculate risk score
+        if fmea_changed or criticality_changed:
+            # Calculate new risk score: (Criticality × 0.75) + (Likelihood Score × 0.25)
+            new_risk_score = int((new_criticality_score * 0.75) + (fmea_score * 0.25))
+            new_risk_score = min(100, max(0, new_risk_score))
+            
+            # Determine risk level
+            if new_risk_score >= 70:
+                risk_level = "Critical"
+            elif new_risk_score >= 50:
+                risk_level = "High"
+            elif new_risk_score >= 30:
+                risk_level = "Medium"
+            else:
+                risk_level = "Low"
+            
+            # Update the threat in database
+            update_data = {
+                "risk_score": new_risk_score,
+                "fmea_score": fmea_score,
+                "criticality_score": new_criticality_score,
+                "risk_level": risk_level,
+                "equipment_criticality": criticality_level,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            if criticality_data:
+                update_data["equipment_criticality_data"] = criticality_data
+            
+            if equipment_node:
+                update_data["linked_equipment_id"] = equipment_node["id"]
+            
+            await db.threats.update_one({"id": threat_id}, {"$set": update_data})
+            
+            # Return updated values
+            threat["risk_score"] = new_risk_score
+            threat["fmea_score"] = fmea_score
+            threat["criticality_score"] = new_criticality_score
+            threat["risk_level"] = risk_level
+            threat["equipment_criticality"] = criticality_level
+            if criticality_data:
+                threat["equipment_criticality_data"] = criticality_data
+            if equipment_node:
+                threat["linked_equipment_id"] = equipment_node["id"]
+            
+            logger.info(f"Auto-synced threat {threat_id}: risk={new_risk_score}, crit={new_criticality_score}, fmea={fmea_score}")
         
-        if equipment_node:
-            update_data["linked_equipment_id"] = equipment_node["id"]
+        # Ensure risk_score is int
+        if isinstance(threat.get("risk_score"), float):
+            threat["risk_score"] = int(threat["risk_score"])
         
-        await db.threats.update_one({"id": threat_id}, {"$set": update_data})
+        # Add required fields that may be missing
+        if "rank" not in threat:
+            threat["rank"] = 1
+        if "total_threats" not in threat:
+            threat["total_threats"] = 1
+        if "recommended_actions" not in threat:
+            threat["recommended_actions"] = []
+        if "occurrence_count" not in threat:
+            threat["occurrence_count"] = 1
+        if not threat.get("frequency"):
+            threat["frequency"] = "Unknown"
+        if not threat.get("likelihood"):
+            threat["likelihood"] = "Unknown"
+        if not threat.get("detectability"):
+            threat["detectability"] = "Unknown"
+        if not threat.get("equipment_type"):
+            threat["equipment_type"] = "Equipment"
+        if not threat.get("impact"):
+            threat["impact"] = "Unknown"
+        # Ensure created_at is string
+        if threat.get("created_at") and not isinstance(threat["created_at"], str):
+            threat["created_at"] = threat["created_at"].isoformat() if hasattr(threat["created_at"], 'isoformat') else str(threat["created_at"])
         
-        # Return updated values
-        threat["risk_score"] = new_risk_score
-        threat["fmea_score"] = fmea_score
-        threat["criticality_score"] = new_criticality_score
-        threat["risk_level"] = risk_level
-        threat["equipment_criticality"] = criticality_level
-        if criticality_data:
-            threat["equipment_criticality_data"] = criticality_data
-        if equipment_node:
-            threat["linked_equipment_id"] = equipment_node["id"]
-        
-        logger.info(f"Auto-synced threat {threat_id}: risk={new_risk_score}, crit={new_criticality_score}, fmea={fmea_score}")
-    
-    # Ensure risk_score is int
-    if isinstance(threat.get("risk_score"), float):
-        threat["risk_score"] = int(threat["risk_score"])
-    
-    # Add required fields that may be missing
-    if "rank" not in threat:
-        threat["rank"] = 1
-    if "total_threats" not in threat:
-        threat["total_threats"] = 1
-    if "recommended_actions" not in threat:
-        threat["recommended_actions"] = []
-    if "occurrence_count" not in threat:
-        threat["occurrence_count"] = 1
-    if not threat.get("frequency"):
-        threat["frequency"] = "Unknown"
-    if not threat.get("likelihood"):
-        threat["likelihood"] = "Unknown"
-    if not threat.get("detectability"):
-        threat["detectability"] = "Unknown"
-    if not threat.get("equipment_type"):
-        threat["equipment_type"] = "Equipment"
-    if not threat.get("impact"):
-        threat["impact"] = "Unknown"
-    # Ensure created_at is string
-    if threat.get("created_at") and not isinstance(threat["created_at"], str):
-        threat["created_at"] = threat["created_at"].isoformat() if hasattr(threat["created_at"], 'isoformat') else str(threat["created_at"])
-    
-    return threat
+        return threat
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching threat {threat_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching threat data")
 
 @router.patch("/threats/{threat_id}", response_model=ThreatResponse)
 async def update_threat(
