@@ -4,7 +4,7 @@
  * Handles task execution with form fields, attachments, and issue tracking
  */
 import { getBackendUrl } from '../../lib/apiConfig';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import {
@@ -66,6 +66,25 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   const [equipmentResults, setEquipmentResults] = useState({});
   const [searchingEquipment, setSearchingEquipment] = useState(null);
   const [viewingDocument, setViewingDocument] = useState(null);
+  const [showDocumentList, setShowDocumentList] = useState(false);
+  const docDropdownRef = useRef(null);
+  
+  // Close document dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (docDropdownRef.current && !docDropdownRef.current.contains(event.target)) {
+        setShowDocumentList(false);
+      }
+    };
+    
+    if (showDocumentList) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDocumentList]);
   
   // Get form documents from task template - construct full URLs
   const rawFormDocuments = task?.form_documents || task?.template?.documents || task?.documents || [];
@@ -87,6 +106,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       setAttachments([]);
       setUploadingAttachment(false);
       setViewingDocument(null);
+      setShowDocumentList(false);
     }
   }, [task?.id]);
   
@@ -694,11 +714,11 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   // Task context section
   const TaskContext = (
     <div className={cn(
-      "bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-4 rounded-lg",
+      "bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-4 rounded-lg relative",
       isMobile ? "mx-0" : "mx-4 mt-4"
     )}>
       <div className="flex items-start justify-between">
-        <div className="flex-1">
+        <div className="flex-1 pr-12">
           <h3 className="font-semibold text-lg">{task?.title || task?.task_template_name || "Task"}</h3>
           {task?.equipment_name && (
             <p className="text-sm text-white/80 mt-1 flex items-center gap-1">
@@ -710,69 +730,82 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <p className="text-sm text-white/70 mt-2">{task.description}</p>
           )}
         </div>
+        
+        {/* Document Icon Button - Top Right */}
+        {formDocuments.length > 0 && (
+          <div className="absolute top-3 right-3" ref={docDropdownRef}>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDocumentList(!showDocumentList)}
+                className="text-white hover:bg-white/20 h-10 w-10 p-0 rounded-full"
+              >
+                <FileText className="w-5 h-5" />
+                {formDocuments.length > 1 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    {formDocuments.length}
+                  </span>
+                )}
+              </Button>
+              
+              {/* Document Dropdown */}
+              {showDocumentList && (
+                <div className="absolute right-0 top-12 bg-white rounded-lg shadow-xl border z-50 min-w-[280px] max-w-[350px]">
+                  <div className="p-3 border-b bg-slate-50 rounded-t-lg">
+                    <h4 className="font-medium text-slate-800 text-sm">Reference Documents</h4>
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {formDocuments.map((doc, idx) => (
+                      <div 
+                        key={idx} 
+                        className="flex items-center justify-between p-3 hover:bg-slate-50 border-b last:border-b-0 cursor-pointer"
+                        onClick={() => {
+                          setViewingDocument(doc);
+                          setShowDocumentList(false);
+                        }}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-800 truncate">
+                              {doc.name || doc.filename || `Document ${idx + 1}`}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {doc.type || doc.name?.split('.').pop()?.toUpperCase() || 'Document'}
+                            </p>
+                          </div>
+                        </div>
+                        <Eye className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setExpandedContext(!expandedContext)}
-          className="text-white hover:bg-white/20 -mr-2"
+          className={cn(
+            "text-white hover:bg-white/20 -mr-2",
+            formDocuments.length > 0 && "mr-8"
+          )}
         >
           {expandedContext ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </Button>
       </div>
-      
-      {/* Documents Badge */}
-      {formDocuments.length > 0 && (
-        <div className="mt-3 flex items-center gap-2">
-          <Badge variant="secondary" className="bg-white/20 text-white border-0">
-            <FileText className="w-3 h-3 mr-1" />
-            {formDocuments.length} Document{formDocuments.length > 1 ? 's' : ''}
-          </Badge>
-        </div>
-      )}
     </div>
   );
 
   // Form content
   const TaskFormContent = (
     <div className="p-4 space-y-4">
-      {/* Documents Section */}
-      {formDocuments.length > 0 && (
-        <div className="border rounded-lg p-3 bg-blue-50/50">
-          <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-blue-600" />
-            Reference Documents
-          </h4>
-          <div className="space-y-2">
-            {formDocuments.map((doc, idx) => (
-              <div key={idx} className="flex items-center justify-between p-2 bg-white rounded border">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <FileText className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span className="text-sm truncate">{doc.name || doc.filename || `Document ${idx + 1}`}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setViewingDocument(doc)}
-                    className="h-8 px-2"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => window.open(doc.url, '_blank')}
-                    className="h-8 px-2"
-                  >
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      
       {/* Form Fields */}
       {formFields.length > 0 ? (
         <div className="space-y-4">
