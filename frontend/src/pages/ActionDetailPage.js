@@ -7,7 +7,7 @@ import {
   ArrowLeft, Save, Trash2, ExternalLink, Calendar, User,
   FileText, Brain, Search, AlertTriangle, Loader2, Check,
   CalendarClock, CheckCircle, CheckCircle2, Paperclip, Upload,
-  X, Image, File, Download, Eye
+  X, Image, File, Download, Eye, Share2, Link2, Copy
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -36,7 +36,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "../components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { actionsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -76,6 +83,44 @@ export default function ActionDetailPage() {
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [viewingAttachment, setViewingAttachment] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+
+  // Generate shareable link
+  const shareableLink = `${window.location.origin}/actions/${actionId}`;
+  
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareableLink);
+      toast.success("Link copied to clipboard");
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = shareableLink;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      toast.success("Link copied to clipboard");
+    }
+  };
+
+  const shareLink = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Action: ${action?.title || "Action Details"}`,
+          text: `${action?.action_number} - ${action?.title}`,
+          url: shareableLink,
+        });
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          copyLink(); // Fallback to copy
+        }
+      }
+    } else {
+      setShareDialogOpen(true);
+    }
+  };
 
   // Fetch action details
   const { data: action, isLoading, error } = useQuery({
@@ -210,6 +255,17 @@ export default function ActionDetailPage() {
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Share Button */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={shareLink}
+                className="h-7 sm:h-8 px-2 text-slate-500 hover:text-slate-700"
+                title="Share link"
+              >
+                <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </Button>
+              
               {/* Quick Status Buttons */}
               {action.status !== "completed" && (
                 <Button
@@ -726,6 +782,41 @@ export default function ActionDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Share Link Dialog */}
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="w-5 h-5 text-blue-600" />
+              Share Action
+            </DialogTitle>
+            <DialogDescription>
+              Share this action with others using the link below
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 p-3 bg-slate-100 rounded-lg border text-sm font-mono text-slate-600 truncate">
+                {shareableLink}
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  copyLink();
+                  setShareDialogOpen(false);
+                }}
+              >
+                <Copy className="w-4 h-4 mr-1" />
+                Copy
+              </Button>
+            </div>
+            <div className="text-xs text-slate-500">
+              Anyone with this link and access to the application can view this action.
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

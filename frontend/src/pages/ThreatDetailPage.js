@@ -40,6 +40,8 @@ import {
   FileImage,
   Maximize2,
   User,
+  Share2,
+  Copy,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -103,6 +105,44 @@ const ThreatDetailPage = () => {
   // Sticky header visibility state (must be before any early returns)
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const headerRef = useRef(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+
+  // Generate shareable link
+  const shareableLink = `${window.location.origin}/threats/${id}`;
+  
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareableLink);
+      toast.success("Link copied to clipboard");
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = shareableLink;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      toast.success("Link copied to clipboard");
+    }
+  };
+
+  const shareLink = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Observation: ${threat?.title || "Observation Details"}`,
+          text: `${threat?.threat_number} - ${threat?.title}`,
+          url: shareableLink,
+        });
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          copyLink(); // Fallback to copy
+        }
+      }
+    } else {
+      setShareDialogOpen(true);
+    }
+  };
 
   // Sticky header scroll effect (must be before any early returns)
   useEffect(() => {
@@ -542,6 +582,15 @@ const ThreatDetailPage = () => {
                 </>
               ) : (
                 <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={shareLink}
+                    className="h-7 px-2 text-slate-500 hover:text-slate-700"
+                    title="Share link"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -1324,6 +1373,41 @@ const ThreatDetailPage = () => {
           />
         </div>
       )}
+
+      {/* Share Link Dialog */}
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="w-5 h-5 text-blue-600" />
+              Share Observation
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-500">
+              Share this observation with others using the link below
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 p-3 bg-slate-100 rounded-lg border text-sm font-mono text-slate-600 truncate">
+                {shareableLink}
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  copyLink();
+                  setShareDialogOpen(false);
+                }}
+              >
+                <Copy className="w-4 h-4 mr-1" />
+                Copy
+              </Button>
+            </div>
+            <div className="text-xs text-slate-500">
+              Anyone with this link and access to the application can view this observation.
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
