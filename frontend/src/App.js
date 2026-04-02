@@ -183,7 +183,7 @@ function App() {
                 <Route path="causal-engine" element={<CausalEnginePage />} />
                 <Route path="tasks" element={<TaskSchedulerPage />} />
                 <Route path="my-tasks" element={<MyTasksPage />} />
-                <Route path="forms" element={<FormsPage />} />
+                <Route path="forms" element={<Navigate to="/tasks?tab=forms" replace />} />
                 <Route path="form-submissions" element={<FormSubmissionsPage />} />
                 <Route path="decision-engine" element={<UnderDevelopmentPage />} />
                 <Route path="settings/user-management" element={<SettingsUserManagementPage />} />

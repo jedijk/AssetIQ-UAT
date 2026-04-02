@@ -1,11 +1,12 @@
 import { getBackendUrl } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, isSameMonth, addMonths, subMonths, parseISO } from "date-fns";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
+import FormsPageContent from "./FormsPage";
 import {
   Calendar as CalendarIcon,
   ClipboardList,
@@ -36,6 +37,7 @@ import {
   X,
   List,
   LayoutGrid,
+  Layers,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -282,7 +284,28 @@ const TaskSchedulerPage = () => {
   }, []);
   
   // State
-  const [activeTab, setActiveTab] = useState("instances");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(tabFromUrl === "forms" ? "forms" : tabFromUrl === "templates" ? "templates" : "instances");
+  
+  // Sync tab with URL
+  useEffect(() => {
+    if (tabFromUrl && ["instances", "templates", "forms"].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
+  
+  // Update URL when tab changes
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    if (newTab === "instances") {
+      searchParams.delete("tab");
+    } else {
+      searchParams.set("tab", newTab);
+    }
+    setSearchParams(searchParams, { replace: true });
+  };
+  
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
@@ -807,7 +830,7 @@ const TaskSchedulerPage = () => {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
           <TabsList>
             <TabsTrigger value="instances" className="gap-2">
@@ -817,6 +840,10 @@ const TaskSchedulerPage = () => {
             <TabsTrigger value="templates" className="gap-2">
               <FileText className="w-4 h-4" />
               {t("taskScheduler.taskLibrary") || "Task Library"}
+            </TabsTrigger>
+            <TabsTrigger value="forms" className="gap-2">
+              <Layers className="w-4 h-4" />
+              {t("forms.title") || "Form Designer"}
             </TabsTrigger>
           </TabsList>
           
@@ -1312,6 +1339,11 @@ const TaskSchedulerPage = () => {
               })}
             </div>
           )}
+        </TabsContent>
+
+        {/* Forms Tab - Embedded Form Designer */}
+        <TabsContent value="forms" className="-mx-6 -mb-6">
+          <FormsPageContent embedded={true} />
         </TabsContent>
       </Tabs>
 
