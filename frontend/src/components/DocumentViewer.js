@@ -54,13 +54,17 @@ export const DocumentViewer = ({
   
   // Construct proper URL - if it's a storage path (not full URL), proxy through API
   const url = useMemo(() => {
+    console.log("[DocumentViewer] rawUrl:", rawUrl);
     if (!rawUrl) return null;
     // If already a full URL, use as-is
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      console.log("[DocumentViewer] Using rawUrl as full URL");
       return rawUrl;
     }
     // Otherwise, proxy through the form-documents endpoint
-    return `${API_BASE_URL}/api/form-documents/${rawUrl}`;
+    const constructedUrl = `${API_BASE_URL}/api/form-documents/${rawUrl}`;
+    console.log("[DocumentViewer] Constructed URL:", constructedUrl);
+    return constructedUrl;
   }, [rawUrl]);
   
   const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(type?.toLowerCase());
