@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { getBackendUrl } from '../lib/apiConfig';
 import { useLanguage } from "../contexts/LanguageContext";
@@ -27,6 +27,8 @@ import {
   File,
   ExternalLink,
   ZoomIn,
+  Trash2,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -43,7 +45,24 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "../components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import BackButton from "../components/BackButton";
 import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
@@ -81,20 +100,45 @@ const fetchSubmission = async (id) => {
 export default function FormSubmissionsPage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [viewingDocument, setViewingDocument] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Fetch submissions
-  const { data: submissionsData, isLoading } = useQuery({
+  const { data: submissionsData, isLoading, refetch } = useQuery({
     queryKey: ["form-submissions", { hasWarnings: statusFilter === "warnings", hasCritical: statusFilter === "critical" }],
     queryFn: () => fetchSubmissions({
       hasWarnings: statusFilter === "warnings",
       hasCritical: statusFilter === "critical",
     }),
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (submissionId) => {
+      const response = await fetch(`${API_BASE_URL}/api/form-submissions/${submissionId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      if (!response.ok) throw new Error("Failed to delete submission");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success("Form submission deleted");
+      queryClient.invalidateQueries({ queryKey: ["form-submissions"] });
+      setDeleteConfirm(null);
+      setSelectedSubmission(null);
+    },
+    onError: () => {
+      toast.error("Failed to delete submission");
+    },
   });
 
   const submissions = submissionsData?.submissions || [];
@@ -161,16 +205,16 @@ export default function FormSubmissionsPage() {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="sticky top-12 z-30 bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3">
               <BackButton />
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-800 flex items-center gap-2">
-                  <FileText className="w-6 h-6 text-blue-600" />
-                  Form Submissions
+                <h1 className="text-lg sm:text-2xl font-bold text-slate-800 flex items-center gap-1.5 sm:gap-2">
+                  <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+                  <span className="hidden xs:inline">Form</span> Submissions
                 </h1>
-                <p className="text-sm text-slate-500 hidden sm:block">
+                <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">
                   View all submitted forms and their responses
                 </p>
               </div>
@@ -180,109 +224,112 @@ export default function FormSubmissionsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <FileText className="w-5 h-5 text-blue-600" />
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
+        <div className="grid grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-white rounded-lg sm:rounded-xl border border-slate-200 p-2 sm:p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center sm:gap-3">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-blue-100 flex items-center justify-center mb-1 sm:mb-0">
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
               </div>
-              <div>
-                <p className="text-xs text-slate-500">Total</p>
-                <p className="text-xl font-bold text-slate-800">{stats.total}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Today</p>
-                <p className="text-xl font-bold text-slate-800">{stats.today}</p>
+              <div className="text-center sm:text-left">
+                <p className="text-[10px] sm:text-xs text-slate-500">Total</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-800">{stats.total}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
+          <div className="bg-white rounded-lg sm:rounded-xl border border-slate-200 p-2 sm:p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center sm:gap-3">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-green-100 flex items-center justify-center mb-1 sm:mb-0">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
               </div>
-              <div>
-                <p className="text-xs text-slate-500">Warnings</p>
-                <p className="text-xl font-bold text-slate-800">{stats.withWarnings}</p>
+              <div className="text-center sm:text-left">
+                <p className="text-[10px] sm:text-xs text-slate-500">Today</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-800">{stats.today}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center">
-                <AlertCircle className="w-5 h-5 text-red-600" />
+          <div className="bg-white rounded-lg sm:rounded-xl border border-slate-200 p-2 sm:p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center sm:gap-3">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-amber-100 flex items-center justify-center mb-1 sm:mb-0">
+                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
               </div>
-              <div>
-                <p className="text-xs text-slate-500">Critical</p>
-                <p className="text-xl font-bold text-slate-800">{stats.withCritical}</p>
+              <div className="text-center sm:text-left">
+                <p className="text-[10px] sm:text-xs text-slate-500">Warn</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-800">{stats.withWarnings}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg sm:rounded-xl border border-slate-200 p-2 sm:p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center sm:gap-3">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-red-100 flex items-center justify-center mb-1 sm:mb-0">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+              </div>
+              <div className="text-center sm:text-left">
+                <p className="text-[10px] sm:text-xs text-slate-500">Critical</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-800">{stats.withCritical}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row gap-3">
+        <div className="bg-white rounded-lg sm:rounded-xl border border-slate-200 p-3 sm:p-4 mb-4 sm:mb-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search by form, equipment, task, or user..."
+                placeholder="Search forms..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-9 h-9 text-sm"
               />
             </div>
-            <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <Wrench className="w-4 h-4 mr-2 text-slate-400" />
-                <SelectValue placeholder="Discipline" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Disciplines</SelectItem>
-                {DISCIPLINES.map(d => (
-                  <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[150px]">
-                <Filter className="w-4 h-4 mr-2 text-slate-400" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="warnings">With Warnings</SelectItem>
-                <SelectItem value="critical">Critical Only</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
+                <SelectTrigger className="w-full sm:w-[150px] h-9 text-sm">
+                  <Wrench className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                  <SelectValue placeholder="Discipline" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Disciplines</SelectItem>
+                  {DISCIPLINES.map(d => (
+                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-[130px] h-9 text-sm">
+                  <Filter className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="warnings">Warnings</SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
         {/* Submissions List */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-lg sm:rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           {isLoading ? (
-            <div className="p-8 text-center text-slate-500">
-              <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
-              Loading submissions...
+            <div className="p-6 sm:p-8 text-center text-slate-500">
+              <div className="animate-spin w-6 h-6 sm:w-8 sm:h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
+              <span className="text-sm">Loading submissions...</span>
             </div>
           ) : filteredSubmissions.length === 0 ? (
-            <div className="p-8 text-center text-slate-500">
-              <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p className="font-medium">No submissions found</p>
-              <p className="text-sm">Form submissions will appear here when tasks are completed</p>
+            <div className="p-6 sm:p-8 text-center text-slate-500">
+              <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-slate-300" />
+              <p className="font-medium text-sm sm:text-base">No submissions found</p>
+              <p className="text-xs sm:text-sm">Form submissions will appear here when tasks are completed</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
               {filteredSubmissions.map((submission, idx) => {
                 const discInfo = getDisciplineInfo(submission.discipline);
+                const hasAttachments = submission.attachments?.length > 0;
                 
                 return (
                   <motion.div
@@ -290,31 +337,38 @@ export default function FormSubmissionsPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.03 }}
-                    className="p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                    className="p-3 sm:p-4 hover:bg-slate-50 cursor-pointer transition-colors"
                     onClick={() => setSelectedSubmission(submission)}
                     data-testid={`submission-row-${submission.id}`}
                   >
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start justify-between gap-2 sm:gap-4">
                       <div className="flex-1 min-w-0">
-                        {/* Form Name & Status */}
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <h3 className="font-semibold text-slate-800 truncate">
+                        {/* Form Name & Status & Attachment Badge */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+                          <h3 className="font-semibold text-slate-800 text-sm sm:text-base truncate max-w-[180px] sm:max-w-none">
                             {submission.form_template_name || "Unknown Form"}
                           </h3>
                           {getStatusBadge(submission)}
+                          {hasAttachments && (
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0 gap-0.5 border-blue-200 text-blue-600">
+                              <Paperclip className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                              {submission.attachments.length}
+                            </Badge>
+                          )}
                         </div>
                         
-                        {/* Meta Info Row */}
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
+                        {/* Meta Info Row - Simplified on mobile */}
+                        <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-4 gap-y-0.5 text-xs sm:text-sm text-slate-500">
                           {/* Date & Time */}
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>{formatDate(submission.submitted_at)}</span>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                            <span className="hidden sm:inline">{formatDate(submission.submitted_at)}</span>
+                            <span className="sm:hidden">{submission.submitted_at ? format(parseISO(submission.submitted_at), "MMM d") : "N/A"}</span>
                           </div>
                           
-                          {/* Submitted By */}
+                          {/* Submitted By - Hide name on mobile */}
                           {submission.submitted_by_name && (
-                            <div className="flex items-center gap-1.5">
+                            <div className="hidden sm:flex items-center gap-1.5">
                               <User className="w-3.5 h-3.5" />
                               <span>{submission.submitted_by_name}</span>
                             </div>
@@ -322,15 +376,23 @@ export default function FormSubmissionsPage() {
                           
                           {/* Discipline */}
                           {submission.discipline && (
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1">
                               <span className={`w-2 h-2 rounded-full ${discInfo.color}`} />
-                              <span>{discInfo.label}</span>
+                              <span className="hidden sm:inline">{discInfo.label}</span>
+                            </div>
+                          )}
+                          
+                          {/* Response count */}
+                          {(submission.responses?.length || submission.values?.length) > 0 && (
+                            <div className="flex items-center gap-0.5 text-slate-400">
+                              <FileText className="w-3 h-3" />
+                              <span className="text-[10px] sm:text-xs">{submission.responses?.length || submission.values?.length}</span>
                             </div>
                           )}
                         </div>
                         
-                        {/* Equipment & Task Row */}
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
+                        {/* Equipment & Task Row - Only on larger screens */}
+                        <div className="hidden sm:flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
                           {/* Equipment */}
                           {submission.equipment_name && (
                             <div className="flex items-center gap-1.5">
@@ -346,38 +408,56 @@ export default function FormSubmissionsPage() {
                               <span className="text-slate-600">{submission.task_template_name}</span>
                             </div>
                           )}
-                          
-                          {/* Attachment indicator */}
-                          {submission.attachments?.length > 0 && (
-                            <div className="flex items-center gap-1 text-slate-500">
-                              <Paperclip className="w-3 h-3" />
-                              <span className="text-xs">{submission.attachments.length}</span>
-                            </div>
-                          )}
-                          
-                          {/* Response count */}
-                          {(submission.responses?.length || submission.values?.length) > 0 && (
-                            <div className="flex items-center gap-1 text-slate-500">
-                              <FileText className="w-3 h-3" />
-                              <span className="text-xs">{submission.responses?.length || submission.values?.length} fields</span>
-                            </div>
-                          )}
                         </div>
                       </div>
                       
-                      {/* View Button */}
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedSubmission(submission);
-                        }}
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </Button>
+                      {/* Actions - Desktop: View button, Mobile: Menu */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {/* View Button - Desktop only */}
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="hidden sm:flex"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedSubmission(submission);
+                          }}
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                        
+                        {/* More Menu */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedSubmission(submission);
+                            }}>
+                              <Eye className="w-4 h-4 mr-2" /> View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirm(submission);
+                              }}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </motion.div>
                 );
@@ -389,30 +469,30 @@ export default function FormSubmissionsPage() {
 
       {/* Submission Detail Dialog */}
       <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600" />
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
               {selectedSubmission?.form_template_name || "Form Submission"}
             </DialogTitle>
           </DialogHeader>
           
           {selectedSubmission && (
-            <div className="space-y-4 mt-4">
-              {/* Submission Info */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+            <div className="space-y-4 mt-2 sm:mt-4">
+              {/* Submission Info - Responsive grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 rounded-lg">
                 <div>
-                  <p className="text-xs text-slate-500 mb-0.5">Submitted At</p>
-                  <p className="text-sm font-medium">{formatDate(selectedSubmission.submitted_at)}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Submitted At</p>
+                  <p className="text-xs sm:text-sm font-medium">{formatDate(selectedSubmission.submitted_at)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 mb-0.5">Submitted By</p>
-                  <p className="text-sm font-medium">{selectedSubmission.submitted_by_name || "Unknown"}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Submitted By</p>
+                  <p className="text-xs sm:text-sm font-medium">{selectedSubmission.submitted_by_name || "Unknown"}</p>
                 </div>
                 {selectedSubmission.discipline && (
                   <div>
-                    <p className="text-xs text-slate-500 mb-0.5">Discipline</p>
-                    <p className="text-sm font-medium flex items-center gap-1.5">
+                    <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Discipline</p>
+                    <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
                       <span className={`w-2 h-2 rounded-full ${getDisciplineInfo(selectedSubmission.discipline).color}`} />
                       {getDisciplineInfo(selectedSubmission.discipline).label}
                     </p>
@@ -420,18 +500,18 @@ export default function FormSubmissionsPage() {
                 )}
                 {selectedSubmission.equipment_name && (
                   <div>
-                    <p className="text-xs text-slate-500 mb-0.5">Equipment</p>
-                    <p className="text-sm font-medium flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                      {selectedSubmission.equipment_name}
+                    <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Equipment</p>
+                    <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                      <Building2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400" />
+                      <span className="truncate">{selectedSubmission.equipment_name}</span>
                     </p>
                   </div>
                 )}
                 {selectedSubmission.task_template_name && (
-                  <div className="col-span-2">
-                    <p className="text-xs text-slate-500 mb-0.5">Originating Task</p>
-                    <p className="text-sm font-medium flex items-center gap-1.5">
-                      <ClipboardList className="w-3.5 h-3.5 text-slate-400" />
+                  <div className="sm:col-span-2">
+                    <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Originating Task</p>
+                    <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                      <ClipboardList className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400" />
                       {selectedSubmission.task_template_name}
                     </p>
                   </div>
@@ -628,10 +708,46 @@ export default function FormSubmissionsPage() {
                   <span>Digitally signed</span>
                 </div>
               )}
+              
+              {/* Delete Button */}
+              <div className="pt-4 border-t border-slate-200">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => setDeleteConfirm(selectedSubmission)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Submission
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Form Submission</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this form submission "{deleteConfirm?.form_template_name}"? 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate(deleteConfirm?.id)}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Document Viewer */}
       {viewingDocument && (

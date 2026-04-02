@@ -226,6 +226,26 @@ async def submit_form(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@router.delete("/form-submissions/{submission_id}")
+async def delete_form_submission(
+    submission_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a form submission."""
+    from bson import ObjectId
+    
+    if not ObjectId.is_valid(submission_id):
+        raise HTTPException(status_code=400, detail="Invalid submission ID")
+    
+    result = await db.form_submissions.delete_one({"_id": ObjectId(submission_id)})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Form submission not found")
+    
+    return {"message": "Form submission deleted successfully"}
+
+
 # --- Form Analytics ---
 
 @router.get("/form-templates/{template_id}/analytics")
