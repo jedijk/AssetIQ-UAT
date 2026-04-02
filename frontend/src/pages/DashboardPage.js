@@ -833,7 +833,7 @@ export default function DashboardPage() {
           onClick={() => navigate("/threats", { state: navState })}
           renderItem={(item, idx) => (
             <div 
-              key={idx} 
+              key={item.id || `observation-${idx}`} 
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
               onClick={(e) => { e.stopPropagation(); navigate(`/threats/${item.id}`, { state: navState }); }}
               data-testid={`observation-item-${item.id}`}
@@ -873,7 +873,7 @@ export default function DashboardPage() {
           onClick={() => navigate("/forms", { state: { ...navState, tab: "submissions" } })}
           renderItem={(item, idx) => (
             <div 
-              key={idx} 
+              key={item.id || `submission-${idx}`} 
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
               onClick={(e) => { e.stopPropagation(); setQuickViewSubmission(item); }}
               data-testid={`form-submission-item-${item.id}`}
@@ -915,7 +915,7 @@ export default function DashboardPage() {
           onClick={() => navigate("/actions", { state: navState })}
           renderItem={(item, idx) => (
             <div 
-              key={idx} 
+              key={item.id || `action-${idx}`} 
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
               onClick={(e) => { e.stopPropagation(); navigate(`/actions/${item.id}`, { state: navState }); }}
               data-testid={`action-item-${item.id}`}
@@ -963,7 +963,7 @@ export default function DashboardPage() {
           onClick={() => navigate("/causal-engine", { state: navState })}
           renderItem={(item, idx) => (
             <div 
-              key={idx} 
+              key={item.id || `investigation-${idx}`} 
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
               onClick={(e) => { e.stopPropagation(); navigate(`/causal-engine?inv=${item.id}`, { state: navState }); }}
               data-testid={`investigation-item-${item.id}`}
@@ -1114,7 +1114,7 @@ export default function DashboardPage() {
                         
                         return (
                           <div 
-                            key={idx}
+                            key={response.field_id || `response-${idx}`}
                             className={`p-3 rounded-lg border ${
                               isCritical 
                                 ? "bg-red-50 border-red-200" 
@@ -1202,7 +1202,7 @@ export default function DashboardPage() {
                     
                     return (
                       <button
-                        key={idx}
+                        key={att.url || att.id || `attachment-${idx}`}
                         onClick={() => {
                           if (previewUrl) {
                             window.open(previewUrl, '_blank');

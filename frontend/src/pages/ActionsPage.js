@@ -942,7 +942,7 @@ export default function ActionsPage() {
                         {editForm.attachments?.length > 0 && (
                           <div className="space-y-1">
                             {editForm.attachments.map((att, idx) => (
-                              <div key={idx} className="flex items-center gap-2 p-1.5 bg-slate-50 rounded border border-slate-200 text-xs">
+                              <div key={att.url || att.id || `att-${idx}`} className="flex items-center gap-2 p-1.5 bg-slate-50 rounded border border-slate-200 text-xs">
                                 {att.type?.startsWith("image/") ? (
                                   <Image className="w-3.5 h-3.5 text-blue-500" />
                                 ) : (
@@ -1238,7 +1238,7 @@ export default function ActionsPage() {
                         {editForm.attachments?.length > 0 && (
                           <div className="space-y-1.5">
                             {editForm.attachments.map((att, idx) => (
-                              <div key={idx} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                              <div key={att.url || att.id || `att-desktop-${idx}`} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
                                 {att.type?.startsWith("image/") ? (
                                   <Image className="w-4 h-4 text-blue-500 flex-shrink-0" />
                                 ) : (

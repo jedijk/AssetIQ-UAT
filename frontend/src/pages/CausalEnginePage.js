@@ -1917,7 +1917,7 @@ export default function CausalEnginePage() {
                   </h3>
                   <ul className="space-y-2">
                     {aiSummary.key_findings.map((finding, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
+                      <li key={`finding-${idx}-${finding.slice(0,20)}`} className="flex items-start gap-2 text-sm text-slate-600">
                         <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-medium mt-0.5">
                           {idx + 1}
                         </span>
@@ -1937,7 +1937,7 @@ export default function CausalEnginePage() {
                   </h3>
                   <ul className="space-y-2">
                     {aiSummary.next_steps.map((step, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
+                      <li key={`step-${idx}-${step.slice(0,20)}`} className="flex items-start gap-2 text-sm text-slate-600">
                         <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-medium mt-0.5">
                           {idx + 1}
                         </span>
@@ -1957,7 +1957,7 @@ export default function CausalEnginePage() {
                   </h3>
                   <ul className="space-y-2">
                     {aiSummary.recommendations.map((rec, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
+                      <li key={`rec-${idx}-${rec.slice(0,20)}`} className="flex items-start gap-2 text-sm text-slate-600">
                         <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-medium mt-0.5">
                           ✓
                         </span>

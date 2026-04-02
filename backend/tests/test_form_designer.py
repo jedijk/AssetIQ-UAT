@@ -46,7 +46,7 @@ class TestFieldTypeSubOptions:
         )
         
         assert len(field.options) == 2
-        assert field.options[1].is_failure is True
+        assert field.options[1].is_failure
     
     def test_multi_select_field_has_options(self):
         """Multi-select fields should have options list."""
@@ -143,7 +143,7 @@ class TestFieldTypeValidation:
             severity="critical"
         )
         
-        assert option.is_failure is True
+        assert option.is_failure
         assert option.severity == "critical"
 
 
@@ -191,7 +191,7 @@ class TestFormTemplatePersistence:
         # Check dropdown field preserved
         dropdown_field = next(f for f in template.fields if f.id == "status")
         assert len(dropdown_field.options) == 2
-        assert dropdown_field.options[1].is_failure is True
+        assert dropdown_field.options[1].is_failure
         
         # Check textarea has no sub-options contamination
         textarea_field = next(f for f in template.fields if f.id == "notes")
@@ -284,7 +284,7 @@ class TestUploadStateTransitions:
             "error": None
         }
         
-        assert pending_doc["uploading"] is True
+        assert pending_doc["uploading"]
         assert pending_doc["error"] is None
     
     def test_error_state(self):
@@ -312,7 +312,7 @@ class TestUploadStateTransitions:
         pending_doc["uploading"] = True
         pending_doc["error"] = None
         
-        assert pending_doc["uploading"] is True
+        assert pending_doc["uploading"]
         assert pending_doc["error"] is None
 
 

@@ -1403,7 +1403,7 @@ const SettingsUserManagementPage = () => {
                             </Badge>
                           ) : user.assigned_installations && user.assigned_installations.length > 0 ? (
                             user.assigned_installations.slice(0, 2).map((inst, idx) => (
-                              <Badge key={idx} variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                              <Badge key={`${user.id}-inst-${inst}`} variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
                                 <Factory className="w-3 h-3 mr-1" />
                                 {inst}
                               </Badge>

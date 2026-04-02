@@ -1236,7 +1236,7 @@ const ThreatDetailPage = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {threat.attachments.map((attachment, idx) => (
               <div
-                key={idx}
+                key={attachment.id || attachment.url || `attachment-${idx}-${attachment.created_at || ''}`}
                 className="relative group cursor-pointer rounded-lg overflow-hidden border border-slate-200 hover:border-blue-400 transition-colors"
                 onClick={() => setSelectedImage(attachment.data)}
                 data-testid={`attachment-${idx}`}
