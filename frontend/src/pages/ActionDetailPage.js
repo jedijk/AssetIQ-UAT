@@ -75,6 +75,7 @@ export default function ActionDetailPage() {
   const [closureSuggestion, setClosureSuggestion] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [viewingAttachment, setViewingAttachment] = useState(null);
+  const [viewingImage, setViewingImage] = useState(null);
 
   // Fetch action details
   const { data: action, isLoading, error } = useQuery({
@@ -482,8 +483,8 @@ export default function ActionDetailPage() {
                         onClick={() => {
                           if (previewUrl) {
                             if (isImage) {
-                              // Open image in new tab
-                              window.open(previewUrl, '_blank');
+                              // Open image in lightbox
+                              setViewingImage({ url: previewUrl, name: att.name });
                             } else if (isPdf || isDoc) {
                               // Open document viewer
                               setViewingAttachment(att);
@@ -536,7 +537,9 @@ export default function ActionDetailPage() {
                             className="h-6 w-6 bg-white/90"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (isImage || isPdf || isDoc) {
+                              if (isImage) {
+                                setViewingImage({ url: previewUrl, name: att.name });
+                              } else if (isPdf || isDoc) {
                                 setViewingAttachment(att);
                               } else {
                                 window.open(previewUrl, '_blank');
@@ -742,6 +745,56 @@ export default function ActionDetailPage() {
           fileType={viewingAttachment.type}
           onClose={() => setViewingAttachment(null)}
         />
+      )}
+
+      {/* Image Lightbox */}
+      {viewingImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setViewingImage(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            {/* Close button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute -top-12 right-0 text-white hover:bg-white/20"
+              onClick={() => setViewingImage(null)}
+            >
+              <X className="w-6 h-6" />
+            </Button>
+            
+            {/* Image */}
+            <img
+              src={viewingImage.url}
+              alt={viewingImage.name}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            
+            {/* File name */}
+            <div className="absolute -bottom-10 left-0 right-0 text-center">
+              <p className="text-white/80 text-sm">{viewingImage.name}</p>
+            </div>
+            
+            {/* Download button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute -top-12 left-0 text-white hover:bg-white/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                const link = document.createElement('a');
+                link.href = viewingImage.url;
+                link.download = viewingImage.name;
+                link.click();
+              }}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
