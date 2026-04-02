@@ -384,6 +384,16 @@ export default function ActionsPage() {
       const rpnA = a.threat_rpn || 0;
       const rpnB = b.threat_rpn || 0;
       return rpnB - rpnA;
+    } else if (sortBy === "latest") {
+      // Sort by created_at (newest first)
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateB - dateA;
+    } else if (sortBy === "oldest") {
+      // Sort by created_at (oldest first)
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateA - dateB;
     } else {
       // Default: sort by risk score (higher first)
       const scoreA = a.threat_risk_score || 0;
@@ -543,9 +553,9 @@ export default function ActionsPage() {
             </SelectContent>
           </Select>
 
-          {/* Sort By - Hidden on mobile */}
+          {/* Sort By - Shown on all screens */}
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="hidden sm:flex w-36 h-9 text-sm" data-testid="sort-by-select">
+            <SelectTrigger className="w-[90px] sm:w-36 h-9 text-xs sm:text-sm" data-testid="sort-by-select">
               <BarChart3 className="w-3.5 h-3.5 mr-1 text-slate-400" />
               <SelectValue placeholder="Sort" />
             </SelectTrigger>
@@ -560,6 +570,18 @@ export default function ActionsPage() {
                 <span className="flex items-center gap-2">
                   <Activity className="w-3.5 h-3.5 text-blue-500" />
                   RPN
+                </span>
+              </SelectItem>
+              <SelectItem value="latest">
+                <span className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-green-500" />
+                  Latest First
+                </span>
+              </SelectItem>
+              <SelectItem value="oldest">
+                <span className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  Oldest First
                 </span>
               </SelectItem>
             </SelectContent>
