@@ -708,8 +708,15 @@ async def get_adhoc_plans(
         if plan.get("form_template_id"):
             form_template = await db.form_templates.find_one({"id": plan["form_template_id"]})
         
+        # Check if there's an in-progress task for this plan
+        plan_str_id = plan.get("id") or str(plan["_id"])
+        in_progress_task = await db.task_instances.find_one({
+            "task_plan_id": plan_str_id,
+            "status": "in_progress"
+        })
+        
         plans.append({
-            "id": plan.get("id") or str(plan["_id"]),
+            "id": plan_str_id,
             "title": template_name,
             "description": template.get("description", "") if template else "",
             "equipment_id": plan.get("equipment_id"),
@@ -726,6 +733,8 @@ async def get_adhoc_plans(
             "last_executed_at": safe_isoformat(plan.get("last_executed_at")),
             "execution_count": plan.get("execution_count", 0),
             "created_at": safe_isoformat(plan.get("created_at")),
+            "has_in_progress_task": bool(in_progress_task),
+            "in_progress_task_id": str(in_progress_task["_id"]) if in_progress_task else None,
         })
     
     return {
@@ -757,6 +766,19 @@ async def execute_adhoc_plan(
     
     if not plan.get("is_active"):
         raise HTTPException(status_code=400, detail="This plan is inactive")
+    
+    # Check if there's already an in-progress task for this plan
+    plan_str_id = plan.get("id") or str(plan["_id"])
+    existing_task = await db.task_instances.find_one({
+        "task_plan_id": plan_str_id,
+        "status": "in_progress"
+    })
+    
+    if existing_task:
+        # Return the existing task instead of creating a new one
+        existing_task["id"] = existing_task.get("id") or str(existing_task["_id"])
+        del existing_task["_id"]
+        return existing_task
     
     # Get template details - try by string id first, then ObjectId
     template = None

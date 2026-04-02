@@ -372,6 +372,8 @@ const MyTasksPage = () => {
     queryFn: () => myTasksAPI.getAdhocPlans(),
     enabled: activeFilter === "adhoc",
     refetchInterval: 30000,
+    staleTime: 10000, // Consider data fresh for 10 seconds
+    refetchOnWindowFocus: true,
   });
   
   // Execute ad-hoc plan mutation
@@ -773,24 +775,47 @@ const MyTasksPage = () => {
                     </div>
                   </div>
                   
-                  {/* Right Side - Execute Button */}
+                  {/* Right Side - Execute/Continue Button */}
                   <div className="flex flex-col items-end gap-2">
-                    <Button
-                      size="sm"
-                      className="bg-amber-500 hover:bg-amber-600 text-white"
-                      onClick={() => executeAdhocMutation.mutate(plan.id)}
-                      disabled={executeAdhocMutation.isPending}
-                      data-testid={`execute-adhoc-${plan.id}`}
-                    >
-                      {executeAdhocMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Play className="w-4 h-4 mr-1" />
-                          Execute
-                        </>
-                      )}
-                    </Button>
+                    {plan.has_in_progress_task ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-amber-500 text-amber-600 hover:bg-amber-50"
+                        onClick={() => {
+                          // Load the in-progress task and open execution view
+                          const task = tasksData?.tasks?.find(t => t.id === plan.in_progress_task_id);
+                          if (task) {
+                            setSelectedTask(task);
+                            setViewMode("execution");
+                          } else {
+                            // Fetch and start the task
+                            executeAdhocMutation.mutate(plan.id);
+                          }
+                        }}
+                        data-testid={`continue-adhoc-${plan.id}`}
+                      >
+                        <Play className="w-4 h-4 mr-1" />
+                        Continue
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="bg-amber-500 hover:bg-amber-600 text-white"
+                        onClick={() => executeAdhocMutation.mutate(plan.id)}
+                        disabled={executeAdhocMutation.isPending}
+                        data-testid={`execute-adhoc-${plan.id}`}
+                      >
+                        {executeAdhocMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Play className="w-4 h-4 mr-1" />
+                            Execute
+                          </>
+                        )}
+                      </Button>
+                    )}
                     {plan.last_executed_at && (
                       <span className="text-xs text-slate-400">
                         Last: {format(parseISO(plan.last_executed_at), "MMM d")}
