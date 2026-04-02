@@ -112,18 +112,6 @@ const FormsPage = () => {
   const [isSearchingDocs, setIsSearchingDocs] = useState(false);
   const [viewingDocument, setViewingDocument] = useState(null); // For document viewer
 
-  // Hide dialog overlay when document viewer is open to allow clicks
-  useEffect(() => {
-    const overlays = document.querySelectorAll('[data-dialog-overlay="true"]');
-    overlays.forEach(overlay => {
-      if (viewingDocument) {
-        overlay.style.pointerEvents = 'none';
-      } else {
-        overlay.style.pointerEvents = '';
-      }
-    });
-  }, [viewingDocument]);
-
   // Form state for new template
   const [newTemplate, setNewTemplate] = useState({
     name: "",
