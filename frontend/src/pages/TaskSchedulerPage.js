@@ -410,7 +410,7 @@ const TaskSchedulerPage = () => {
   const createTemplateMutation = useMutation({
     mutationFn: taskAPI.createTemplate,
     onSuccess: () => {
-      queryClient.invalidateQueries(["task-templates"]);
+      queryClient.invalidateQueries({ queryKey: ["task-templates"] });
       toast.success("Template created");
       setShowTemplateDialog(false);
       resetTemplateForm();
@@ -421,10 +421,10 @@ const TaskSchedulerPage = () => {
   const deleteTemplateMutation = useMutation({
     mutationFn: taskAPI.deleteTemplate,
     onSuccess: () => {
-      queryClient.invalidateQueries(["task-templates"]);
-      queryClient.invalidateQueries(["task-plans"]);
-      queryClient.invalidateQueries(["task-instances"]);
-      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
+      queryClient.invalidateQueries({ queryKey: ["task-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["task-plans"] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "task-instances" });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "my-tasks" });
       toast.success("Template deleted");
     },
     onError: (error) => toast.error(error.message || "Failed to delete template")
@@ -433,10 +433,10 @@ const TaskSchedulerPage = () => {
   const deletePlanMutation = useMutation({
     mutationFn: taskAPI.deletePlan,
     onSuccess: () => {
-      queryClient.invalidateQueries(["task-plans"]);
-      queryClient.invalidateQueries(["task-templates"]);
-      queryClient.invalidateQueries(["task-instances"]);
-      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
+      queryClient.invalidateQueries({ queryKey: ["task-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["task-templates"] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "task-instances" });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "my-tasks" });
       toast.success("Plan deleted");
     },
     onError: (error) => toast.error(error.message || "Failed to delete plan")
@@ -455,9 +455,9 @@ const TaskSchedulerPage = () => {
       return taskAPI.createPlan(submitData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["task-plans"]);
-      queryClient.invalidateQueries(["task-stats"]);
-      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
+      queryClient.invalidateQueries({ queryKey: ["task-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["task-stats"] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "my-tasks" });
       toast.success("Plan created");
       setShowPlanDialog(false);
       setPlanForm({ equipment_id: "", task_template_id: "", form_template_id: "", interval_value: null, interval_unit: null, effective_from: null, effective_until: null, notes: "" });
@@ -476,9 +476,9 @@ const TaskSchedulerPage = () => {
       return taskAPI.updatePlan(id, submitData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["task-plans"]);
-      queryClient.invalidateQueries(["task-stats"]);
-      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
+      queryClient.invalidateQueries({ queryKey: ["task-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["task-stats"] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "my-tasks" });
       toast.success("Plan updated");
       setShowPlanDialog(false);
       setEditingPlan(null);
@@ -490,9 +490,9 @@ const TaskSchedulerPage = () => {
   const startInstanceMutation = useMutation({
     mutationFn: taskAPI.startInstance,
     onSuccess: () => {
-      queryClient.invalidateQueries(["task-instances"]);
-      queryClient.invalidateQueries(["task-stats"]);
-      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "task-instances" });
+      queryClient.invalidateQueries({ queryKey: ["task-stats"] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "my-tasks" });
       toast.success("Execution started");
     },
     onError: () => toast.error("Failed to start execution")
@@ -501,9 +501,9 @@ const TaskSchedulerPage = () => {
   const completeInstanceMutation = useMutation({
     mutationFn: taskAPI.completeInstance,
     onSuccess: () => {
-      queryClient.invalidateQueries(["task-instances"]);
-      queryClient.invalidateQueries(["task-stats"]);
-      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "task-instances" });
+      queryClient.invalidateQueries({ queryKey: ["task-stats"] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "my-tasks" });
       toast.success("Execution completed");
       setShowCompleteDialog(false);
       setSelectedInstance(null);
@@ -514,9 +514,9 @@ const TaskSchedulerPage = () => {
   const generateInstancesMutation = useMutation({
     mutationFn: taskAPI.generateInstances,
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["task-instances"]);
-      queryClient.invalidateQueries(["task-stats"]);
-      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "task-instances" });
+      queryClient.invalidateQueries({ queryKey: ["task-stats"] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "my-tasks" });
       const count = data.instances_generated ?? data.created ?? 0;
       const plansCount = data.plans_processed || 0;
       if (count > 0) {
@@ -533,7 +533,7 @@ const TaskSchedulerPage = () => {
   const updateTemplateMutation = useMutation({
     mutationFn: ({ id, data }) => taskAPI.updateTemplate(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries(["task-templates"]);
+      queryClient.invalidateQueries({ queryKey: ["task-templates"] });
       toast.success("Template updated");
       setShowTemplateDialog(false);
       setEditingTemplate(null);
@@ -545,9 +545,9 @@ const TaskSchedulerPage = () => {
   const deleteInstanceMutation = useMutation({
     mutationFn: taskAPI.deleteInstance,
     onSuccess: () => {
-      queryClient.invalidateQueries(["task-instances"]);
-      queryClient.invalidateQueries(["task-stats"]);
-      queryClient.invalidateQueries(["my-tasks"]); // Sync with My Tasks page
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "task-instances" });
+      queryClient.invalidateQueries({ queryKey: ["task-stats"] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "my-tasks" });
       toast.success("Execution deleted");
       setDeleteInstanceId(null);
     },

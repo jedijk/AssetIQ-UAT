@@ -246,7 +246,13 @@ const MyTasksPage = () => {
       const result = await offlineStorage.syncPendingCompletions();
       if (result.synced > 0) {
         toast.success(`Synced ${result.synced} completed task(s)`);
-        queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+        // Invalidate all my-tasks queries regardless of filters
+        queryClient.invalidateQueries({ 
+          predicate: (query) => query.queryKey[0] === "my-tasks" 
+        });
+        queryClient.invalidateQueries({ 
+          predicate: (query) => query.queryKey[0] === "task-instances" 
+        });
       }
       if (result.failed > 0) {
         toast.error(`Failed to sync ${result.failed} task(s)`);
@@ -265,7 +271,7 @@ const MyTasksPage = () => {
   const disciplines = DISCIPLINES;
   
   // Fetch tasks with offline caching
-  const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useQuery({
+  const { data: tasksData, isLoading: tasksLoading, error: tasksError, refetch: refetchTasks } = useQuery({
     queryKey: ["my-tasks", activeFilter, selectedDate, selectedDiscipline],
     queryFn: async () => {
       try {
@@ -291,6 +297,8 @@ const MyTasksPage = () => {
       }
     },
     refetchInterval: offlineStatus.isOnline ? 30000 : false, // Only refresh when online
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    staleTime: 5000, // Consider data stale after 5 seconds for faster updates
     retry: offlineStatus.isOnline ? 3 : 0,
   });
   
@@ -316,8 +324,14 @@ const MyTasksPage = () => {
       } else {
         toast.success("Task completed successfully!");
       }
-      queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["task-instances"] });
+      // Invalidate all my-tasks queries regardless of filters
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "my-tasks" 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "task-instances" 
+      });
+      queryClient.invalidateQueries({ queryKey: ["task-stats"] });
       setViewMode("list");
       setSelectedTask(null);
     },
@@ -330,7 +344,10 @@ const MyTasksPage = () => {
   const startMutation = useMutation({
     mutationFn: ({ taskId, isAction }) => myTasksAPI.startTask(taskId, isAction),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+      // Invalidate all my-tasks queries regardless of filters
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "my-tasks" 
+      });
       setSelectedTask(data);
     },
   });
@@ -349,7 +366,10 @@ const MyTasksPage = () => {
     onSuccess: (newTask) => {
       toast.success("Task started! Redirecting to execution...");
       queryClient.invalidateQueries({ queryKey: ["adhoc-plans"] });
-      queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+      // Invalidate all my-tasks queries regardless of filters
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "my-tasks" 
+      });
       // Open the new task for execution
       setSelectedTask(newTask);
       setViewMode("execution");
@@ -367,16 +387,22 @@ const MyTasksPage = () => {
     onSuccess: (_, variables) => {
       const itemType = variables.isAction ? "Action" : "Task";
       toast.success(`${itemType} deleted`);
-      // Invalidate all task-related queries for instant sync
-      queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["task-instances"] });
+      // Invalidate all task-related queries for instant sync (use predicate for partial match)
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "my-tasks" 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "task-instances" 
+      });
       queryClient.invalidateQueries({ queryKey: ["task-stats"] });
       queryClient.invalidateQueries({ queryKey: ["adhoc-plans"] });
-      queryClient.invalidateQueries({ queryKey: ["actions"] }); // Also invalidate actions
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "actions" 
+      });
       setDeleteTaskData(null);
     },
     onError: (error) => {
-      toast.error("Delete failed");
+      toast.error("Delete failed: " + (error.message || "Unknown error"));
     },
   });
   
