@@ -220,6 +220,40 @@ class TaskService:
         if not template:
             raise ValueError("Task template not found")
         
+        # === EQUIPMENT TYPE VALIDATION FOR SYSTEM AND BELOW ===
+        # Levels that require equipment type matching
+        system_and_below_levels = [
+            "section_system", "system",  # Level 3
+            "equipment_unit", "equipment",  # Level 4
+            "subunit",  # Level 5
+            "maintainable_item"  # Level 6
+        ]
+        
+        equipment_level = equipment.get("level", "").lower()
+        
+        if equipment_level in system_and_below_levels:
+            # Get the equipment type
+            equipment_type_id = equipment.get("equipment_type_id")
+            
+            # Get the template's applicable equipment types
+            template_equipment_types = template.get("equipment_type_ids", [])
+            
+            # If template has specific equipment types defined, validate match
+            if template_equipment_types and len(template_equipment_types) > 0:
+                if not equipment_type_id:
+                    raise ValueError(
+                        f"Equipment '{equipment.get('name')}' at level '{equipment_level}' "
+                        f"has no equipment type defined. Cannot create plan with this template."
+                    )
+                
+                if equipment_type_id not in template_equipment_types:
+                    raise ValueError(
+                        f"Equipment type '{equipment_type_id}' does not match template's "
+                        f"applicable types: {', '.join(template_equipment_types)}. "
+                        f"Plan creation is only allowed for matching equipment types at "
+                        f"system level and below."
+                    )
+        
         # Check if template is ad-hoc
         is_adhoc_template = template.get("is_adhoc", False)
         
