@@ -503,6 +503,8 @@ export default function EquipmentManagerPage() {
   const [assignDialog, setAssignDialog] = useState({ open: false, item: null, parentNode: null, selectedLevel: "" });
   // State for move mode (legacy - kept for compatibility but not actively used with drag-drop)
   const [movingNode, setMovingNode] = useState(null);
+  // State for delete confirmation with impact analysis
+  const [deleteConfirmation, setDeleteConfirmation] = useState({ open: false, node: null, impact: null, loading: false });
 
   const { data: nodesData, isLoading } = useQuery({ queryKey: ["equipment-nodes"], queryFn: equipmentHierarchyAPI.getNodes });
   const { data: typesData } = useQuery({ queryKey: ["equipment-types"], queryFn: equipmentHierarchyAPI.getEquipmentTypes });
@@ -689,6 +691,25 @@ export default function EquipmentManagerPage() {
   // Cancel move mode handler
   const handleCancelMove = () => setMovingNode(null);
   
+  // Handle delete with impact analysis
+  const handleDeleteWithConfirmation = async (node) => {
+    setDeleteConfirmation({ open: true, node, impact: null, loading: true });
+    try {
+      const impact = await equipmentHierarchyAPI.getDeletionImpact(node.id);
+      setDeleteConfirmation({ open: true, node, impact, loading: false });
+    } catch (error) {
+      toast.error("Failed to analyze deletion impact");
+      setDeleteConfirmation({ open: false, node: null, impact: null, loading: false });
+    }
+  };
+  
+  const confirmDelete = () => {
+    if (deleteConfirmation.node) {
+      deleteMutation.mutate(deleteConfirmation.node.id);
+      setDeleteConfirmation({ open: false, node: null, impact: null, loading: false });
+    }
+  };
+
   const handlePromote = () => {
     if (!selectedNode) return;
     const normalizedLevel = normalizeLevel(selectedNode.level);
@@ -867,9 +888,7 @@ export default function EquipmentManagerPage() {
   };
   
   const handleContextDelete = (node) => {
-    if (window.confirm(`Are you sure you want to delete "${node.name}"?`)) {
-      deleteMutation.mutate(node.id);
-    }
+    handleDeleteWithConfirmation(node);
   };
   
   const handleContextMoveUp = (node) => {
@@ -971,7 +990,7 @@ export default function EquipmentManagerPage() {
           {selectedNode && !movingNode && (
             <>
               <Button onClick={handleAddChild} size="sm" variant="outline" disabled={selectedNode.level === "maintainable_item"} data-testid="add-child-btn"><Plus className="w-4 h-4 mr-1" />{t("equipment.addChild")}</Button>
-              <Button onClick={() => deleteMutation.mutate(selectedNode.id)} size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50" data-testid="delete-node-btn"><Trash2 className="w-4 h-4" /></Button>
+              <Button onClick={() => handleDeleteWithConfirmation(selectedNode)} size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50" data-testid="delete-node-btn"><Trash2 className="w-4 h-4" /></Button>
             </>
           )}
         </div>
@@ -1186,6 +1205,107 @@ export default function EquipmentManagerPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDemoteDialog({ open: false, node: null, newLevel: null })}>
               {t("common.cancel")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog with Impact Analysis */}
+      <Dialog open={deleteConfirmation.open} onOpenChange={(open) => !open && setDeleteConfirmation({ open: false, node: null, impact: null, loading: false })}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              {t("equipment.confirmDelete")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("equipment.deleteWarning")} "{deleteConfirmation.node?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          
+          {deleteConfirmation.loading ? (
+            <div className="py-8 text-center">
+              <div className="animate-spin w-8 h-8 border-2 border-slate-300 border-t-indigo-600 rounded-full mx-auto mb-3" />
+              <p className="text-sm text-slate-500">{t("equipment.analyzingImpact")}</p>
+            </div>
+          ) : deleteConfirmation.impact && (
+            <div className="space-y-4 py-4">
+              {/* Children Count */}
+              {deleteConfirmation.impact.children_count > 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-amber-700 font-medium">
+                    <Box className="w-4 h-4" />
+                    {deleteConfirmation.impact.children_count} {t("equipment.childrenWillBeDeleted")}
+                  </div>
+                  {deleteConfirmation.impact.children?.length > 0 && (
+                    <div className="mt-2 text-sm text-amber-600">
+                      {deleteConfirmation.impact.children.slice(0, 5).map(c => c.name).join(", ")}
+                      {deleteConfirmation.impact.children.length > 5 && ` +${deleteConfirmation.impact.children.length - 5} more...`}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Impact Summary */}
+              {deleteConfirmation.impact.total_impacted > 0 && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="text-red-700 font-medium mb-2">
+                    {t("equipment.relatedItemsImpacted")}
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {deleteConfirmation.impact.impact?.tasks?.count > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">{t("equipment.openTasks")}:</span>
+                        <span className="font-medium text-red-600">{deleteConfirmation.impact.impact.tasks.count}</span>
+                      </div>
+                    )}
+                    {deleteConfirmation.impact.impact?.actions?.count > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">{t("equipment.openActions")}:</span>
+                        <span className="font-medium text-red-600">{deleteConfirmation.impact.impact.actions.count}</span>
+                      </div>
+                    )}
+                    {deleteConfirmation.impact.impact?.investigations?.count > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">{t("equipment.openInvestigations")}:</span>
+                        <span className="font-medium text-red-600">{deleteConfirmation.impact.impact.investigations.count}</span>
+                      </div>
+                    )}
+                    {deleteConfirmation.impact.impact?.task_plans?.count > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">{t("equipment.activeTaskPlans")}:</span>
+                        <span className="font-medium text-red-600">{deleteConfirmation.impact.impact.task_plans.count}</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-red-600">
+                    {t("equipment.itemsWillBeOrphaned")}
+                  </p>
+                </div>
+              )}
+              
+              {deleteConfirmation.impact.total_impacted === 0 && deleteConfirmation.impact.children_count === 0 && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700">
+                  {t("equipment.noRelatedItems")}
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteConfirmation({ open: false, node: null, impact: null, loading: false })}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDelete}
+              disabled={deleteConfirmation.loading || deleteMutation.isPending}
+              data-testid="confirm-delete-btn"
+            >
+              {deleteMutation.isPending ? t("common.deleting") : t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

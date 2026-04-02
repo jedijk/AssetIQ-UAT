@@ -455,23 +455,12 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
     const errors = {};
     formFields.forEach(field => {
       const fieldType = field.type || field.field_type;
-      if (field.required && !formData[field.id] && formData[field.id] !== false) {
+      // Only check required fields - don't block on threshold warnings
+      if (field.required && !formData[field.id] && formData[field.id] !== false && formData[field.id] !== 0) {
         errors[field.id] = "This field is required";
       }
-      // Check thresholds for numeric fields
-      if (fieldType === "numeric" && formData[field.id]) {
-        const value = parseFloat(formData[field.id]);
-        const thresholds = field.thresholds || {};
-        const minThreshold = field.min_threshold ?? thresholds.critical_low ?? thresholds.warning_low;
-        const maxThreshold = field.max_threshold ?? thresholds.critical_high ?? thresholds.warning_high;
-        
-        if (minThreshold != null && value < minThreshold) {
-          errors[field.id] = `Value below minimum threshold (${minThreshold})`;
-        }
-        if (maxThreshold != null && value > maxThreshold) {
-          errors[field.id] = `Value exceeds maximum threshold (${maxThreshold})`;
-        }
-      }
+      // Note: Threshold violations are warnings, not errors that block submission
+      // They will be handled by the issue prompt flow
     });
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -557,9 +546,12 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
         create_observation: issueAction === "log_observation" || issueAction === "create_task",
         attachments: attachments, // Include uploaded attachments
       });
+      toast.success("Task completed successfully");
       onBack();
     } catch (error) {
-      toast.error(error.message || "Failed to complete task");
+      console.error("Task completion error:", error);
+      const errorMsg = error?.response?.data?.detail || error.message || "Failed to complete task. Please try again.";
+      toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }

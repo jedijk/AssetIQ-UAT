@@ -38,6 +38,8 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
+import { Label } from "../components/ui/label";
 import ReliabilityPerformancePage from "./ReliabilityPerformancePage";
 import { DISCIPLINES } from "../constants/disciplines";
 
@@ -276,6 +278,9 @@ export default function DashboardPage() {
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [plantUnitFilter, setPlantUnitFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Quick View states
+  const [quickViewSubmission, setQuickViewSubmission] = useState(null);
 
   // Navigation state for back button support
   const navState = { from: "dashboard", fromPage: "Dashboard" };
@@ -868,7 +873,7 @@ export default function DashboardPage() {
             <div 
               key={idx} 
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
-              onClick={(e) => { e.stopPropagation(); navigate(`/forms?submission=${item.id}`, { state: navState }); }}
+              onClick={(e) => { e.stopPropagation(); setQuickViewSubmission(item); }}
               data-testid={`form-submission-item-${item.id}`}
             >
               <UserAvatar 
@@ -1011,6 +1016,87 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      
+      {/* Quick View Modal for Form Submissions */}
+      <Dialog open={!!quickViewSubmission} onOpenChange={() => setQuickViewSubmission(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-indigo-500" />
+              {quickViewSubmission?.template_name || quickViewSubmission?.form_name || "Form Submission"}
+            </DialogTitle>
+            <DialogDescription>
+              {t("dashboard.submittedBy")} {quickViewSubmission?.submitted_by_name || "Unknown"} {t("dashboard.on")} {quickViewSubmission?.submitted_at ? new Date(quickViewSubmission.submitted_at).toLocaleString() : "Unknown date"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Status Badge */}
+            <div className="flex items-center gap-2">
+              <Label className="text-slate-500">{t("common.status")}:</Label>
+              <span className={`px-2 py-1 rounded text-sm font-medium capitalize ${
+                quickViewSubmission?.status === "completed" || quickViewSubmission?.status === "approved" 
+                  ? "bg-green-100 text-green-700" 
+                  : quickViewSubmission?.status === "pending" 
+                    ? "bg-amber-100 text-amber-700"
+                    : quickViewSubmission?.status === "rejected"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-blue-100 text-blue-700"
+              }`}>
+                {quickViewSubmission?.status || "submitted"}
+              </span>
+            </div>
+            
+            {/* Form Data */}
+            {quickViewSubmission?.form_data && Object.keys(quickViewSubmission.form_data).length > 0 ? (
+              <div className="border rounded-lg p-4 bg-slate-50">
+                <h4 className="font-medium text-slate-700 mb-3">{t("dashboard.formResponses") || "Form Responses"}</h4>
+                <div className="space-y-3">
+                  {Object.entries(quickViewSubmission.form_data).map(([key, value]) => (
+                    <div key={key} className="flex flex-col">
+                      <Label className="text-xs text-slate-500 mb-1">{key.replace(/_/g, " ").replace(/([A-Z])/g, " $1").trim()}</Label>
+                      <div className="bg-white rounded px-3 py-2 text-sm text-slate-800 border">
+                        {typeof value === "object" ? JSON.stringify(value) : String(value) || "-"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-slate-400">
+                {t("dashboard.noFormData") || "No form data available"}
+              </div>
+            )}
+            
+            {/* Notes */}
+            {quickViewSubmission?.notes && (
+              <div className="border rounded-lg p-4">
+                <h4 className="font-medium text-slate-700 mb-2">{t("common.notes")}</h4>
+                <p className="text-sm text-slate-600 whitespace-pre-wrap">{quickViewSubmission.notes}</p>
+              </div>
+            )}
+            
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button 
+                variant="outline" 
+                onClick={() => setQuickViewSubmission(null)}
+              >
+                {t("common.close")}
+              </Button>
+              <Button 
+                onClick={() => {
+                  setQuickViewSubmission(null);
+                  navigate(`/forms?submission=${quickViewSubmission?.id}`, { state: navState });
+                }}
+              >
+                <ExternalLink className="w-4 h-4 mr-1" />
+                {t("dashboard.viewInFormDesigner") || "View in Form Designer"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

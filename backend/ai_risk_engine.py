@@ -452,6 +452,45 @@ EQUIPMENT INFORMATION:
                 recommendations=threat.get("recommended_actions", [])
             )
     
+    def _normalize_probability_level(self, level: str) -> str:
+        """Normalize AI-returned probability levels to valid enum values"""
+        level_lower = str(level).lower().strip()
+        mapping = {
+            "very_likely": "very_likely",
+            "very likely": "very_likely",
+            "high": "very_likely",
+            "very high": "very_likely",
+            "likely": "likely",
+            "probable": "likely",
+            "medium_high": "likely",
+            "possible": "possible",
+            "medium": "possible",
+            "moderate": "possible",
+            "uncertain": "possible",
+            "unlikely": "unlikely",
+            "low": "unlikely",
+            "improbable": "unlikely",
+            "very_unlikely": "unlikely",
+            "very unlikely": "unlikely",
+        }
+        return mapping.get(level_lower, "possible")
+    
+    def _normalize_confidence_level(self, level: str) -> str:
+        """Normalize AI-returned confidence levels to valid enum values"""
+        level_lower = str(level).lower().strip()
+        mapping = {
+            "high": "high",
+            "very_high": "high",
+            "confident": "high",
+            "medium": "medium",
+            "moderate": "medium",
+            "average": "medium",
+            "low": "low",
+            "uncertain": "low",
+            "very_low": "low",
+        }
+        return mapping.get(level_lower, "medium")
+
     async def generate_causes(
         self, 
         threat: dict,
@@ -470,19 +509,26 @@ EQUIPMENT INFORMATION:
             response = await chat.send_message(message)
             data = self._parse_json_response(response)
             
-            # Build probable causes
+            # Build probable causes with normalized probability levels
             probable_causes = []
             for cause_data in data.get("probable_causes", [])[:max_causes]:
+                raw_prob_level = cause_data.get("probability_level", "possible")
+                normalized_prob_level = self._normalize_probability_level(raw_prob_level)
+                
                 probable_causes.append(ProbableCause(
                     id=cause_data.get("id", str(uuid.uuid4())[:8]),
                     description=cause_data["description"],
                     category=cause_data.get("category", "technical_cause"),
                     probability=cause_data.get("probability", 50.0),
-                    probability_level=CauseProbability(cause_data.get("probability_level", "possible")),
+                    probability_level=CauseProbability(normalized_prob_level),
                     evidence=cause_data.get("evidence", []),
                     supporting_data=cause_data.get("supporting_data", []),
                     mitigation_actions=cause_data.get("mitigation_actions", [])
                 ))
+            
+            # Normalize confidence level
+            raw_confidence = data.get("confidence", "medium")
+            normalized_confidence = self._normalize_confidence_level(raw_confidence)
             
             return CausalExplanation(
                 threat_id=threat.get("id", "unknown"),
@@ -490,7 +536,7 @@ EQUIPMENT INFORMATION:
                 probable_causes=probable_causes,
                 contributing_factors=data.get("contributing_factors", []),
                 historical_matches=[],
-                confidence=ConfidenceLevel(data.get("confidence", "medium"))
+                confidence=ConfidenceLevel(normalized_confidence)
             )
             
         except Exception as e:

@@ -238,6 +238,8 @@ const ThreatsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       queryClient.invalidateQueries({ queryKey: ["investigations"] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      queryClient.invalidateQueries({ queryKey: ["equipmentHistory"] });
       const actionsDeleted = result?.deleted_actions || 0;
       const investigationsDeleted = result?.deleted_investigations || 0;
       let msg = "Observation deleted successfully";

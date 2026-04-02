@@ -694,12 +694,98 @@ async def update_equipment_node(
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
     return updated
 
-@router.delete("/equipment-hierarchy/nodes/{node_id}")
-async def delete_equipment_node(
+
+@router.get("/equipment-hierarchy/nodes/{node_id}/deletion-impact")
+async def get_deletion_impact(
     node_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete an equipment node and optionally its children. Installations can only be deleted by Owner."""
+    """Get impact analysis for deleting an equipment node - shows related tasks, actions, and investigations."""
+    # Find the node
+    node = await db.equipment_nodes.find_one({"id": node_id})
+    if not node:
+        raise HTTPException(status_code=404, detail="Equipment node not found")
+    
+    # Get all children recursively
+    async def get_children_ids(parent_id):
+        children = await db.equipment_nodes.find(
+            {"parent_id": parent_id},
+            {"_id": 0, "id": 1, "name": 1}
+        ).to_list(1000)
+        all_items = [{"id": c["id"], "name": c["name"]} for c in children]
+        for child in children:
+            all_items.extend(await get_children_ids(child["id"]))
+        return all_items
+    
+    children = await get_children_ids(node_id)
+    all_equipment_ids = [node_id] + [c["id"] for c in children]
+    all_equipment_names = [node.get("name")] + [c["name"] for c in children]
+    
+    # Find impacted tasks
+    impacted_tasks = await db.task_instances.find(
+        {"equipment_id": {"$in": all_equipment_ids}, "status": {"$ne": "completed"}},
+        {"_id": 0, "id": 1, "title": 1, "status": 1, "equipment_name": 1}
+    ).to_list(100)
+    
+    # Find impacted actions
+    impacted_actions = await db.central_actions.find(
+        {"equipment_id": {"$in": all_equipment_ids}, "status": {"$nin": ["completed", "closed"]}},
+        {"_id": 0, "id": 1, "title": 1, "status": 1, "equipment_name": 1}
+    ).to_list(100)
+    
+    # Find impacted investigations/threats
+    impacted_investigations = await db.threats.find(
+        {"asset_id": {"$in": all_equipment_ids}, "status": {"$nin": ["closed", "mitigated"]}},
+        {"_id": 0, "id": 1, "title": 1, "status": 1, "asset": 1}
+    ).to_list(100)
+    
+    # Find task plans linked to this equipment
+    impacted_plans = await db.task_plans.find(
+        {"equipment_id": {"$in": all_equipment_ids}, "is_active": True},
+        {"_id": 0, "id": 1, "task_template_name": 1, "equipment_name": 1}
+    ).to_list(100)
+    
+    return {
+        "node": {
+            "id": node_id,
+            "name": node.get("name"),
+            "level": node.get("level")
+        },
+        "children_count": len(children),
+        "children": children[:10],  # First 10 for display
+        "impact": {
+            "tasks": {
+                "count": len(impacted_tasks),
+                "items": impacted_tasks[:5],
+                "will_be": "orphaned (equipment reference cleared)"
+            },
+            "actions": {
+                "count": len(impacted_actions),
+                "items": impacted_actions[:5],
+                "will_be": "orphaned (equipment reference cleared)"
+            },
+            "investigations": {
+                "count": len(impacted_investigations),
+                "items": impacted_investigations[:5],
+                "will_be": "orphaned (asset reference cleared)"
+            },
+            "task_plans": {
+                "count": len(impacted_plans),
+                "items": impacted_plans[:5],
+                "will_be": "deactivated"
+            }
+        },
+        "total_impacted": len(impacted_tasks) + len(impacted_actions) + len(impacted_investigations) + len(impacted_plans)
+    }
+
+
+@router.delete("/equipment-hierarchy/nodes/{node_id}")
+async def delete_equipment_node(
+    node_id: str,
+    cascade: bool = False,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete an equipment node and optionally cascade to related items. Installations can only be deleted by Owner."""
     # Equipment is shared - no created_by filter
     node = await db.equipment_nodes.find_one(
         {"id": node_id}
@@ -729,11 +815,47 @@ async def delete_equipment_node(
     children_ids = await get_children_ids(node_id)
     all_ids = [node_id] + children_ids
     
+    # Clear equipment references in related items (orphan them rather than delete)
+    orphaned_tasks = await db.task_instances.update_many(
+        {"equipment_id": {"$in": all_ids}},
+        {"$set": {"equipment_id": None, "equipment_name": f"[Deleted: {node.get('name')}]"}}
+    )
+    
+    orphaned_actions = await db.central_actions.update_many(
+        {"equipment_id": {"$in": all_ids}},
+        {"$set": {"equipment_id": None, "equipment_name": f"[Deleted: {node.get('name')}]"}}
+    )
+    
+    orphaned_investigations = await db.threats.update_many(
+        {"asset_id": {"$in": all_ids}},
+        {"$set": {"asset_id": None, "asset": f"[Deleted: {node.get('name')}]"}}
+    )
+    
+    # Deactivate task plans linked to this equipment
+    deactivated_plans = await db.task_plans.update_many(
+        {"equipment_id": {"$in": all_ids}},
+        {"$set": {"is_active": False, "deactivation_reason": f"Equipment deleted: {node.get('name')}"}}
+    )
+    
+    # Delete the equipment nodes
     result = await db.equipment_nodes.delete_many(
         {"id": {"$in": all_ids}}
     )
     
-    return {"message": f"Deleted {result.deleted_count} nodes", "deleted_ids": all_ids}
+    logger.info(f"Deleted equipment node {node_id} ({node.get('name')}) and {len(children_ids)} children. " 
+                f"Orphaned: {orphaned_tasks.modified_count} tasks, {orphaned_actions.modified_count} actions, "
+                f"{orphaned_investigations.modified_count} investigations. Deactivated {deactivated_plans.modified_count} plans.")
+    
+    return {
+        "message": f"Deleted {result.deleted_count} nodes", 
+        "deleted_ids": all_ids,
+        "orphaned": {
+            "tasks": orphaned_tasks.modified_count,
+            "actions": orphaned_actions.modified_count,
+            "investigations": orphaned_investigations.modified_count,
+            "plans_deactivated": deactivated_plans.modified_count
+        }
+    }
 
 
 class ChangeLevelRequest(BaseModel):

@@ -571,12 +571,20 @@ async def complete_my_action(
         "status": "completed",
         "completed_at": now.isoformat(),
         "completed_by": user_id,
+        "completed_by_name": current_user.get("name", "Unknown"),
         "updated_at": now.isoformat(),
     }
     
     # Add completion notes if provided
-    if data and data.get("completion_notes"):
-        update_data["completion_notes"] = data["completion_notes"]
+    if data:
+        if data.get("completion_notes"):
+            update_data["completion_notes"] = data["completion_notes"]
+        # Store form data if provided
+        if data.get("form_data"):
+            update_data["form_data"] = data["form_data"]
+        # Store attachments if provided
+        if data.get("attachments"):
+            update_data["attachments"] = data["attachments"]
     
     await db.central_actions.update_one(
         {"id": action_id},

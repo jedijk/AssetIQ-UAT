@@ -325,6 +325,11 @@ export const equipmentHierarchyAPI = {
     return response.data;
   },
   
+  getDeletionImpact: async (nodeId) => {
+    const response = await api.get(`/equipment-hierarchy/nodes/${nodeId}/deletion-impact`);
+    return response.data;
+  },
+  
   moveNode: async (nodeId, newParentId, recalculateCriticality = true) => {
     const response = await api.post(`/equipment-hierarchy/nodes/${nodeId}/move`, {
       node_id: nodeId,
