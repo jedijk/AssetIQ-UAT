@@ -661,6 +661,13 @@ export default function ActionsPage() {
                     {overdue && (
                       <Badge className="bg-red-100 text-red-700 text-[10px] sm:text-xs px-1.5 py-0">{t("taskScheduler.overdue")}</Badge>
                     )}
+                    {/* Attachment indicator */}
+                    {action.attachments?.length > 0 && (
+                      <span className="inline-flex items-center gap-0.5 text-slate-400" title={`${action.attachments.length} attachment(s)`}>
+                        <Paperclip className="w-3 h-3" />
+                        <span className="text-[10px]">{action.attachments.length}</span>
+                      </span>
+                    )}
                   </div>
                   {/* Source info - Simplified on mobile */}
                   <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 truncate">
