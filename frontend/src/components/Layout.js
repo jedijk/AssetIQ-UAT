@@ -12,7 +12,7 @@ import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { springPresets } from "./animations/constants";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "2.1.0";
+const APP_VERSION = process.env.REACT_APP_VERSION || "2.5.0";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
