@@ -46,6 +46,7 @@ import { Checkbox } from "../ui/checkbox";
 import { cn } from "../../lib/utils";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { imageAnalysisAPI } from "../../lib/api";
+import { DocumentViewer } from "../DocumentViewer";
 
 const API_BASE_URL = getBackendUrl();
 
@@ -779,59 +780,27 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
     );
   }
 
-  // Document Viewer Modal
+  // Document Viewer Modal - Use authenticated DocumentViewer component
   if (viewingDocument) {
+    // Prepare document object for DocumentViewer with proper type extraction
+    const docName = viewingDocument.name || "Document";
+    const docUrl = viewingDocument.url || viewingDocument.storage_path || "";
+    const docType = docName.split('.').pop()?.toLowerCase() || 
+                    docUrl.split('.').pop()?.toLowerCase() || "unknown";
+    
+    const documentForViewer = {
+      name: docName,
+      url: docUrl,
+      type: docType
+    };
+    
     return (
-      <div className="h-full flex flex-col bg-white" data-testid="document-viewer">
-        {/* Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-slate-200 bg-white sticky top-0 z-10">
-          <Button variant="ghost" size="sm" onClick={() => setViewingDocument(null)}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-slate-800 truncate">{viewingDocument.name || "Document"}</h2>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.open(viewingDocument.url, '_blank')}
-          >
-            <Download className="w-4 h-4 mr-1" />
-            Download
-          </Button>
-        </div>
-        
-        {/* Document Preview */}
-        <div className="flex-1 overflow-auto p-4">
-          {viewingDocument.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-            <img 
-              src={viewingDocument.url} 
-              alt={viewingDocument.name} 
-              className="max-w-full h-auto mx-auto rounded-lg shadow"
-            />
-          ) : viewingDocument.url?.match(/\.pdf$/i) ? (
-            <iframe
-              src={viewingDocument.url}
-              className="w-full h-full min-h-[600px] border rounded-lg"
-              title={viewingDocument.name}
-            />
-          ) : (
-            <div className="text-center py-12 text-slate-400">
-              <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Preview not available for this file type</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={() => window.open(viewingDocument.url, '_blank')}
-              >
-                <Download className="w-4 h-4 mr-1" />
-                Download to view
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+      <DocumentViewer
+        document={documentForViewer}
+        onBack={() => setViewingDocument(null)}
+        onClose={() => setViewingDocument(null)}
+        showBackButton={true}
+      />
     );
   }
 

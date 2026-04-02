@@ -24,6 +24,23 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 2, 2026 - Task Execution Document Viewer Authentication Fix (P0)
+**CRITICAL Fix:**
+- ✅ **Fixed "Not authenticated" error when viewing documents during Task Execution**
+- **Root Cause:** `TaskExecutionFrame.js` had an inline document viewer using raw `<img>` and `<iframe>` tags with direct URLs that bypassed JWT authentication
+- **Solution:** Replaced inline viewer (lines 783-835) with the authenticated `DocumentViewer` component that fetches files using JWT tokens and renders them as blob URLs
+- Documents now load correctly with proper authentication through the storage proxy endpoint
+
+**Files Modified:**
+- `/app/frontend/src/components/task-execution/TaskExecutionFrame.js` - Added `DocumentViewer` import, replaced inline document viewer with authenticated component
+
+**Testing:**
+- Verified PDF documents load correctly in Task Execution view
+- Confirmed Back button, Download, and Open buttons work correctly
+- No authentication errors in browser console
+
+---
+
 ### April 2, 2026 - Form Designer Bug Fixes (3 Issues)
 **CRITICAL Fix:**
 1. ✅ **Template Edit Save/Update Fixed** - Fixed `formAPI.updateTemplate` to accept `{ id, data }` object format (was expecting separate args). Added payload cleaning to remove non-serializable fields. Enhanced error propagation to surface backend error messages in UI.
