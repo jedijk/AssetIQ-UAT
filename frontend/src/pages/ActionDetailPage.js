@@ -339,25 +339,12 @@ export default function ActionDetailPage() {
               <label className="text-xs font-medium text-slate-500 mb-1 block">Description</label>
               <Textarea
                 value={editForm.description}
-                onChange={(e) => {
-                  setEditForm({ ...editForm, description: e.target.value });
-                  // Auto-resize
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }}
-                onFocus={(e) => {
-                  // Auto-resize on focus too
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }}
-                rows={1}
-                className="text-sm min-h-[36px] resize-none overflow-hidden"
-                style={{ height: 'auto' }}
-                ref={(el) => {
-                  if (el) {
-                    el.style.height = 'auto';
-                    el.style.height = el.scrollHeight + 'px';
-                  }
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={2}
+                className="text-sm resize-none"
+                style={{ 
+                  minHeight: '60px',
+                  height: editForm.description ? 'auto' : '60px'
                 }}
               />
             </div>
