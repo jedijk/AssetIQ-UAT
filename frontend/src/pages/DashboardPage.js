@@ -880,6 +880,7 @@ export default function DashboardPage() {
             >
               <UserAvatar 
                 name={item.submitted_by_name || item.submitter_name || "User"}
+                photo={item.submitted_by_photo}
                 initials={(item.submitted_by_name || item.submitter_name || "U").charAt(0)}
                 size="sm"
                 showPopover={true}
@@ -1027,8 +1028,19 @@ export default function DashboardPage() {
               <FileText className="w-5 h-5 text-indigo-500" />
               {quickViewSubmission?.template_name || quickViewSubmission?.form_name || "Form Submission"}
             </DialogTitle>
-            <DialogDescription>
-              {t("dashboard.submittedBy")} {quickViewSubmission?.submitted_by_name || "Unknown"} {t("dashboard.on")} {quickViewSubmission?.submitted_at ? new Date(quickViewSubmission.submitted_at).toLocaleString() : "Unknown date"}
+            <DialogDescription className="flex items-center gap-2 mt-2">
+              <UserAvatar 
+                name={quickViewSubmission?.submitted_by_name || "User"}
+                photo={quickViewSubmission?.submitted_by_photo}
+                initials={(quickViewSubmission?.submitted_by_name || "U").charAt(0)}
+                size="md"
+                showPopover={false}
+              />
+              <div>
+                <span className="font-medium text-slate-700">{quickViewSubmission?.submitted_by_name || "Unknown"}</span>
+                <span className="text-slate-400 mx-1">•</span>
+                <span>{quickViewSubmission?.submitted_at ? new Date(quickViewSubmission.submitted_at).toLocaleString() : "Unknown date"}</span>
+              </div>
             </DialogDescription>
           </DialogHeader>
           

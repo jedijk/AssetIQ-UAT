@@ -865,6 +865,7 @@ class FormService:
             "has_signature": doc.get("signature_data") is not None,
             "submitted_by": doc.get("submitted_by"),
             "submitted_by_name": doc.get("submitted_by_name"),  # Add name if available
+            "submitted_by_photo": doc.get("submitted_by_photo"),  # Avatar path
             "submitted_at": doc.get("submitted_at").isoformat() if doc.get("submitted_at") and hasattr(doc.get("submitted_at"), 'isoformat') else doc.get("submitted_at"),
             "created_at": doc.get("created_at").isoformat() if doc.get("created_at") and hasattr(doc.get("created_at"), 'isoformat') else doc.get("created_at"),
             "status": doc.get("status", "completed"),  # Default to completed

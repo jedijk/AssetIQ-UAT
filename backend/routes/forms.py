@@ -192,7 +192,7 @@ async def get_form_submissions(
     from_dt = datetime.fromisoformat(from_date) if from_date else None
     to_dt = datetime.fromisoformat(to_date) if to_date else None
     
-    return await form_service.get_submissions(
+    result = await form_service.get_submissions(
         form_template_id=form_template_id,
         task_instance_id=task_instance_id,
         equipment_id=equipment_id,
@@ -203,6 +203,22 @@ async def get_form_submissions(
         skip=skip,
         limit=limit
     )
+    
+    # Enrich with submitter photos
+    user_ids = list(set(s.get("submitted_by") for s in result.get("submissions", []) if s.get("submitted_by")))
+    if user_ids:
+        users_cursor = db.users.find(
+            {"id": {"$in": user_ids}},
+            {"_id": 0, "id": 1, "avatar_path": 1}
+        )
+        users_photos = {u["id"]: u.get("avatar_path") for u in await users_cursor.to_list(length=100)}
+        for submission in result.get("submissions", []):
+            if submission.get("submitted_by"):
+                avatar_path = users_photos.get(submission["submitted_by"])
+                if avatar_path:
+                    submission["submitted_by_photo"] = f"/api/users/{submission['submitted_by']}/avatar"
+    
+    return result
 
 @router.get("/form-submissions/{submission_id}")
 async def get_form_submission(
