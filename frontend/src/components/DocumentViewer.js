@@ -122,7 +122,7 @@ export const DocumentViewer = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-slate-900/95 flex flex-col items-center justify-center"
+        className="fixed inset-0 z-[100] bg-slate-900/95 flex flex-col items-center justify-center"
         data-testid="document-viewer-error"
       >
         <div className="bg-slate-800 rounded-lg p-8 text-center max-w-md mx-auto border border-slate-700">
@@ -164,7 +164,8 @@ export const DocumentViewer = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-slate-900/95 flex flex-col"
+        className="fixed inset-0 z-[100] bg-slate-900/95 flex flex-col"
+        data-testid="document-viewer"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-slate-700">
