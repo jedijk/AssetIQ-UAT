@@ -54,13 +54,9 @@ const API_BASE_URL = getBackendUrl();
 const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState({});
-  const [issueFound, setIssueFound] = useState(false);
-  const [issueDetails, setIssueDetails] = useState({ severity: "medium", description: "", photo: null });
   const [completionNotes, setCompletionNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
-  const [showIssuePrompt, setShowIssuePrompt] = useState(false);
-  const [issueAction, setIssueAction] = useState(null);
   const [expandedContext, setExpandedContext] = useState(!isMobile);
   const [imageAnalysis, setImageAnalysis] = useState({});
   const [analyzingImage, setAnalyzingImage] = useState(null);
@@ -84,12 +80,8 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   useEffect(() => {
     if (task) {
       setFormData({});
-      setIssueFound(false);
-      setIssueDetails({ severity: "medium", description: "", photo: null });
       setCompletionNotes("");
       setValidationErrors({});
-      setShowIssuePrompt(false);
-      setIssueAction(null);
       setImageAnalysis({});
       setAnalyzingImage(null);
       setAttachments([]);
@@ -152,12 +144,6 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   // Handle numeric field with threshold check
   const handleNumericChange = (fieldId, value, field) => {
     handleFieldChange(fieldId, value);
-    if (value && field.max_threshold && parseFloat(value) > field.max_threshold) {
-      setIssueFound(true);
-    }
-    if (value && field.min_threshold && parseFloat(value) < field.min_threshold) {
-      setIssueFound(true);
-    }
   };
   
   // Handle checklist item toggle
@@ -175,21 +161,11 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       return;
     }
     
-    if (issueFound && !showIssuePrompt) {
-      setShowIssuePrompt(true);
-      return;
-    }
-    
     setIsSubmitting(true);
     try {
       await onComplete({
         form_data: formData,
         completion_notes: completionNotes,
-        issues_found: issueFound ? [issueDetails.description] : [],
-        follow_up_required: issueAction === "create_task",
-        follow_up_notes: issueAction === "create_task" ? issueDetails.description : null,
-        issue_severity: issueFound ? issueDetails.severity : null,
-        create_observation: issueAction === "log_observation" || issueAction === "create_task",
         attachments: attachments,
       });
       toast.success("Task completed successfully");
@@ -871,20 +847,6 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
         </Button>
       </div>
       
-      {/* Issue Toggle */}
-      <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
-        <Checkbox
-          id="issue-found"
-          checked={issueFound}
-          onCheckedChange={setIssueFound}
-          className={cn(isMobile && "h-5 w-5")}
-        />
-        <label htmlFor="issue-found" className="cursor-pointer flex-1">
-          <span className="font-medium text-sm text-amber-700">Issue Found</span>
-          <p className="text-xs text-amber-600 mt-0.5">Check if you found any issues during this task</p>
-        </label>
-      </div>
-      
       {/* Submit Button */}
       <div className="pt-4">
         <Button
@@ -908,131 +870,6 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       </div>
     </div>
   );
-
-  // Issue Prompt Modal
-  if (showIssuePrompt) {
-    return (
-      <div className="h-full flex flex-col bg-white">
-        {/* Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-slate-200 bg-white sticky top-0 z-10">
-          <Button variant="ghost" size="sm" onClick={() => setShowIssuePrompt(false)}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex-1">
-            <h2 className="font-semibold text-slate-800">Issue Found</h2>
-          </div>
-        </div>
-        
-        {/* Issue Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <p className="text-sm text-slate-600 mb-4">
-            An issue was found during task execution. What would you like to do?
-          </p>
-          
-          <div className="space-y-3">
-            <Button
-              variant={issueAction === "create_task" ? "default" : "outline"}
-              className="w-full justify-start h-auto py-4 px-4"
-              onClick={() => setIssueAction("create_task")}
-            >
-              <div className="text-left">
-                <div className="font-medium flex items-center gap-2">
-                  <Plus className="w-4 h-4" />
-                  Create follow-up task
-                </div>
-                <p className="text-muted-foreground font-normal mt-1 text-sm">
-                  Create a corrective task and log observation
-                </p>
-              </div>
-            </Button>
-            
-            <Button
-              variant={issueAction === "log_observation" ? "default" : "outline"}
-              className="w-full justify-start h-auto py-4 px-4"
-              onClick={() => setIssueAction("log_observation")}
-            >
-              <div className="text-left">
-                <div className="font-medium flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Log observation only
-                </div>
-                <p className="text-muted-foreground font-normal mt-1 text-sm">
-                  Record the issue without creating a task
-                </p>
-              </div>
-            </Button>
-            
-            <Button
-              variant={issueAction === "ignore" ? "default" : "outline"}
-              className="w-full justify-start h-auto py-4 px-4"
-              onClick={() => setIssueAction("ignore")}
-            >
-              <div className="text-left">
-                <div className="font-medium flex items-center gap-2">
-                  <X className="w-4 h-4" />
-                  Ignore
-                </div>
-                <p className="text-muted-foreground font-normal mt-1 text-sm">
-                  Complete without logging the issue
-                </p>
-              </div>
-            </Button>
-          </div>
-          
-          {/* Issue Details */}
-          {(issueAction === "create_task" || issueAction === "log_observation") && (
-            <div className="space-y-4 border-t mt-4 pt-4">
-              <div className="space-y-2">
-                <Label>Severity</Label>
-                <Select
-                  value={issueDetails.severity}
-                  onValueChange={(v) => setIssueDetails(prev => ({ ...prev, severity: v }))}
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Description <span className="text-red-500">*</span></Label>
-                <Textarea
-                  value={issueDetails.description}
-                  onChange={(e) => setIssueDetails(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Describe the issue..."
-                  rows={4}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-        
-        {/* Footer Actions */}
-        <div className="flex gap-3 p-4 border-t border-slate-200 bg-white">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowIssuePrompt(false)}
-            className="flex-1 h-11"
-          >
-            Back
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || ((issueAction === "create_task" || issueAction === "log_observation") && !issueDetails.description)}
-            className="flex-1 h-11"
-          >
-            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Check className="w-4 h-4 mr-1" />}
-            Submit
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   // Document Viewer Modal - Use authenticated DocumentViewer component
   if (viewingDocument) {
