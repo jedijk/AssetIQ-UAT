@@ -31,6 +31,7 @@ const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin
 /**
  * Mobile-friendly PDF viewer using canvas rendering
  * Uses pdfjs-dist directly for reliable rendering
+ * Supports page navigation, zoom, and scrolling
  */
 const MobilePdfViewer = ({ blobUrl, isMobile }) => {
   const [pdfDoc, setPdfDoc] = useState(null);
@@ -38,8 +39,10 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
   const [numPages, setNumPages] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState(null);
+  const [zoom, setZoom] = useState(100);
   const canvasRef = React.useRef(null);
   const renderTaskRef = React.useRef(null);
+  const containerRef = React.useRef(null);
   
   // Load PDF document
   useEffect(() => {
@@ -57,6 +60,7 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
           setPdfDoc(doc);
           setNumPages(doc.numPages);
           setPageNumber(1);
+          setZoom(100);
         }
       } catch (err) {
         console.error("PDF loading error:", err);
@@ -77,7 +81,7 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
     };
   }, [blobUrl]);
   
-  // Render current page
+  // Render current page with zoom
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return;
     
@@ -92,10 +96,11 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
         const canvas = canvasRef.current;
         const context = canvas.getContext("2d");
         
-        // Calculate scale based on viewport width
-        const containerWidth = isMobile ? 350 : 700;
+        // Calculate scale based on zoom level
+        const baseWidth = isMobile ? 350 : 700;
         const viewport = page.getViewport({ scale: 1 });
-        const scale = containerWidth / viewport.width;
+        const baseScale = baseWidth / viewport.width;
+        const scale = baseScale * (zoom / 100);
         const scaledViewport = page.getViewport({ scale });
         
         // Set canvas dimensions
@@ -124,7 +129,11 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
         renderTaskRef.current.cancel();
       }
     };
-  }, [pdfDoc, pageNumber, isMobile]);
+  }, [pdfDoc, pageNumber, isMobile, zoom]);
+  
+  const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 200));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 50));
+  const handleZoomReset = () => setZoom(100);
   
   if (pdfLoading) {
     return (
@@ -146,34 +155,77 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
   
   return (
     <div className="w-full h-full flex flex-col items-center">
-      {/* PDF Navigation Controls */}
-      <div className="flex items-center gap-2 mb-4 bg-slate-700 rounded-lg px-4 py-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setPageNumber(prev => Math.max(1, prev - 1))}
-          disabled={pageNumber <= 1}
-          className="text-white hover:bg-slate-600 h-8 w-8"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </Button>
-        <span className="text-white text-sm min-w-[100px] text-center">
-          Page {pageNumber} of {numPages || '?'}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setPageNumber(prev => Math.min(numPages || prev, prev + 1))}
-          disabled={pageNumber >= (numPages || 1)}
-          className="text-white hover:bg-slate-600 h-8 w-8"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </Button>
+      {/* PDF Controls - Page Navigation + Zoom */}
+      <div className="flex items-center gap-2 mb-4 bg-slate-700 rounded-lg px-3 py-2 flex-wrap justify-center">
+        {/* Page Navigation */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setPageNumber(prev => Math.max(1, prev - 1))}
+            disabled={pageNumber <= 1}
+            className="text-white hover:bg-slate-600 h-8 w-8"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <span className="text-white text-sm min-w-[80px] text-center">
+            {pageNumber} / {numPages || '?'}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setPageNumber(prev => Math.min(numPages || prev, prev + 1))}
+            disabled={pageNumber >= (numPages || 1)}
+            className="text-white hover:bg-slate-600 h-8 w-8"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </Button>
+        </div>
+        
+        {/* Divider */}
+        <div className="w-px h-6 bg-slate-500 mx-1" />
+        
+        {/* Zoom Controls */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleZoomOut}
+            disabled={zoom <= 50}
+            className="text-white hover:bg-slate-600 h-8 w-8"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </Button>
+          <button
+            onClick={handleZoomReset}
+            className="text-white text-xs min-w-[45px] text-center hover:bg-slate-600 px-1 py-1 rounded"
+          >
+            {zoom}%
+          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleZoomIn}
+            disabled={zoom >= 200}
+            className="text-white hover:bg-slate-600 h-8 w-8"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
       
-      {/* PDF Canvas */}
-      <div className="flex-1 overflow-auto bg-white rounded-lg shadow-2xl p-4">
-        <canvas ref={canvasRef} className="block mx-auto" />
+      {/* PDF Canvas - Scrollable container */}
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-auto bg-white rounded-lg shadow-2xl w-full"
+        style={{ 
+          maxHeight: 'calc(100vh - 200px)',
+          touchAction: 'pan-x pan-y pinch-zoom'
+        }}
+      >
+        <div className="p-4 min-w-fit">
+          <canvas ref={canvasRef} className="block mx-auto" />
+        </div>
       </div>
     </div>
   );
