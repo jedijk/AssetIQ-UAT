@@ -162,7 +162,6 @@ const Layout = () => {
     { path: "/forms", label: t("forms.title"), icon: FileText, desktopOnly: true, feature: "forms" },
     { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, feature: "users" },
-    { path: "/settings/permissions", label: t("nav.permissions"), icon: Shield, ownerOnly: true, desktopOnly: true },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "settings" },

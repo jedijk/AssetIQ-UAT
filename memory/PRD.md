@@ -24,6 +24,18 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 2, 2026 - Settings Menu Cleanup
+**Quick Fix:**
+- ✅ Verified Permissions page is functioning correctly (roles displayed, permission toggles working)
+- ✅ Removed "Permissions" menu item from Settings dropdown per user request
+- Settings menu now contains: Equipment Manager, Task Planner, Form Designer, Decision Engine, User Management, AI Usage, User Statistics, Definitions, Feedback
+
+**Files Modified:**
+- `/app/frontend/src/components/Layout.js` - Removed permissions menu item from `allSettingsMenuItems`
+
+---
+
+
 ### April 2, 2026 - P3 Refactoring Complete
 **Code Quality Improvements:**
 
