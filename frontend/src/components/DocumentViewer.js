@@ -620,60 +620,70 @@ export const DocumentViewer = ({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+        <div className="flex-1 overflow-auto p-4">
           {/* Loading State */}
           {loading && (
-            <div className="text-center p-8">
-              <Loader2 className="w-12 h-12 text-indigo-400 mx-auto mb-4 animate-spin" />
-              <p className="text-white">Loading document...</p>
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center p-8">
+                <Loader2 className="w-12 h-12 text-indigo-400 mx-auto mb-4 animate-spin" />
+                <p className="text-white">Loading document...</p>
+              </div>
             </div>
           )}
 
           {/* Error State */}
           {error && !loading && (
-            <div className="text-center p-8 bg-slate-800 rounded-xl max-w-md">
-              <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-              <h3 className="text-white text-lg font-medium mb-2">Error Loading File</h3>
-              <p className="text-slate-400 text-sm mb-6">{error}</p>
-              <div className="flex gap-3 justify-center">
-                <a href={url} download={name}>
-                  <Button className="bg-indigo-600 hover:bg-indigo-700">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download File
-                  </Button>
-                </a>
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center p-8 bg-slate-800 rounded-xl max-w-md">
+                <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                <h3 className="text-white text-lg font-medium mb-2">Error Loading File</h3>
+                <p className="text-slate-400 text-sm mb-6">{error}</p>
+                <div className="flex gap-3 justify-center">
+                  <a href={url} download={name}>
+                    <Button className="bg-indigo-600 hover:bg-indigo-700">
+                      <Download className="w-4 h-4 mr-2" />
+                      Download File
+                    </Button>
+                  </a>
+                </div>
               </div>
             </div>
           )}
 
           {/* Image Viewer */}
           {isImage && !loading && !error && blobUrl && (
-            <motion.img
-              src={blobUrl}
-              alt={name}
-              className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
-              style={{
-                transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
-                transition: "transform 0.2s ease"
-              }}
-              draggable={false}
-            />
+            <div className="h-full flex items-center justify-center">
+              <motion.img
+                src={blobUrl}
+                alt={name}
+                className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
+                style={{
+                  transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                  transition: "transform 0.2s ease"
+                }}
+                draggable={false}
+              />
+            </div>
           )}
 
           {/* PDF Viewer - Mobile friendly with page navigation */}
           {isPdf && !loading && !error && blobUrl && (
-            <MobilePdfViewer 
-              blobUrl={blobUrl}
-              isMobile={isMobile}
-            />
+            <div className="h-full flex items-center justify-center">
+              <MobilePdfViewer 
+                blobUrl={blobUrl}
+                isMobile={isMobile}
+              />
+            </div>
           )}
 
-          {/* DOCX Viewer */}
+          {/* DOCX Viewer - Scrollable from top */}
           {isDocx && !loading && !error && docxHtml && (
-            <div className="w-full max-w-4xl mx-auto bg-white rounded-lg shadow-2xl overflow-hidden">
+            <div 
+              className="w-full max-w-4xl mx-auto bg-white rounded-lg shadow-2xl overflow-auto"
+              style={{ maxHeight: "calc(100vh - 120px)" }}
+            >
               <div 
                 className="p-8 prose prose-slate max-w-none docx-content"
-                style={{ minHeight: "70vh" }}
                 dangerouslySetInnerHTML={{ __html: docxHtml }}
               />
             </div>
