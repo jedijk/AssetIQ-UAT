@@ -64,12 +64,15 @@ export const TemplateCard = ({ template, onEdit, onDelete, onView }) => {
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline" className="text-xs">
             {template.discipline || "General"}
           </Badge>
           <Badge variant="secondary" className="text-xs">
             {template.fields?.length || 0} fields
+          </Badge>
+          <Badge className="text-xs bg-slate-100 text-slate-700 border-slate-200">
+            v{template.version || 1}
           </Badge>
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500">
