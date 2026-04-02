@@ -42,6 +42,8 @@ import {
   User,
   Share2,
   Copy,
+  ChevronDown,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -66,6 +68,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -531,20 +539,44 @@ const ThreatDetailPage = () => {
             </Button>
             
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <RiskBadge level={threat.risk_level} size="sm" />
-                <span className="text-slate-400 font-mono text-[10px] sm:text-xs">
-                  #{threat.rank}/{threat.total_threats}
-                </span>
-              </div>
-              <h1 className="font-semibold text-sm sm:text-base text-slate-900 truncate">
+              {/* Mobile: Just title, no risk badge */}
+              <h1 className="font-semibold text-sm sm:text-base text-slate-900 truncate sm:hidden">
                 {threat.title}
               </h1>
+              {/* Desktop: Risk badge + rank + title */}
+              <div className="hidden sm:block">
+                <div className="flex items-center gap-2">
+                  <RiskBadge level={threat.risk_level} size="sm" />
+                  <span className="text-slate-400 font-mono text-xs">
+                    #{threat.rank}/{threat.total_threats}
+                  </span>
+                </div>
+                <h1 className="font-semibold text-base text-slate-900 truncate">
+                  {threat.title}
+                </h1>
+              </div>
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-              {/* Scores */}
-              <div className="flex items-center gap-1 text-xs">
+              {/* Mobile: Score + RPN badges */}
+              <div className="flex items-center gap-1 text-xs sm:hidden">
+                <span className="px-1.5 py-0.5 bg-slate-100 rounded font-medium text-slate-700">
+                  {threat.risk_score}
+                </span>
+                {rpnValue && (
+                  <span className={`px-1.5 py-0.5 rounded font-medium ${
+                    rpnValue >= 300 ? "bg-red-100 text-red-700" :
+                    rpnValue >= 200 ? "bg-orange-100 text-orange-700" :
+                    rpnValue >= 100 ? "bg-yellow-100 text-yellow-700" :
+                    "bg-green-100 text-green-700"
+                  }`}>
+                    {rpnValue}
+                  </span>
+                )}
+              </div>
+              
+              {/* Desktop: Score badges */}
+              <div className="hidden sm:flex items-center gap-1 text-xs">
                 <span className="px-1.5 py-0.5 bg-slate-100 rounded font-medium text-slate-700">
                   {threat.risk_score}
                 </span>
@@ -582,38 +614,85 @@ const ThreatDetailPage = () => {
                 </>
               ) : (
                 <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={shareLink}
-                    className="h-7 px-2 text-slate-500 hover:text-slate-700"
-                    title="Share link"
-                  >
-                    <Share2 className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={startEditing}
-                    className="h-7 px-2 text-xs"
-                  >
-                    <Edit className="w-3 h-3 sm:mr-1" />
-                    <span className="hidden sm:inline">Edit</span>
-                  </Button>
-                  <Select
-                    value={threat.status}
-                    onValueChange={(value) => updateMutation.mutate({ status: value })}
-                    disabled={updateMutation.isPending}
-                  >
-                    <SelectTrigger className="h-7 w-20 sm:w-24 text-[10px] sm:text-xs px-2">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map(s => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Mobile: Status dropdown + 3-dot menu */}
+                  <div className="sm:hidden flex items-center gap-1">
+                    <Select
+                      value={threat.status}
+                      onValueChange={(value) => updateMutation.mutate({ status: value })}
+                      disabled={updateMutation.isPending}
+                    >
+                      <SelectTrigger className="h-7 w-auto px-2 text-[10px] gap-0.5">
+                        <span className={`${
+                          threat.status === "Open" ? "text-blue-600" :
+                          threat.status === "In Progress" ? "text-amber-600" :
+                          threat.status === "Mitigated" ? "text-green-600" :
+                          "text-slate-600"
+                        }`}>
+                          {threat.status === "In Progress" ? "In Prog." : threat.status}
+                        </span>
+                        <ChevronDown className="w-3 h-3 text-slate-400" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map(s => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem onClick={startEditing}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={shareLink}>
+                          <Share2 className="w-4 h-4 mr-2" />
+                          Share Link
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  
+                  {/* Desktop: Full buttons */}
+                  <div className="hidden sm:flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={shareLink}
+                      className="h-7 px-2 text-slate-500 hover:text-slate-700"
+                      title="Share link"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={startEditing}
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Edit className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                    <Select
+                      value={threat.status}
+                      onValueChange={(value) => updateMutation.mutate({ status: value })}
+                      disabled={updateMutation.isPending}
+                    >
+                      <SelectTrigger className="h-7 w-24 text-xs px-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map(s => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </>
               )}
             </div>
