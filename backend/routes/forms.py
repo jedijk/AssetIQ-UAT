@@ -78,14 +78,33 @@ async def update_form_template(
     current_user: dict = Depends(get_current_user)
 ):
     """Update a form template. Creates new version if template has been used."""
-    result = await form_service.update_template(
-        template_id,
-        data.model_dump(exclude_unset=True),
-        create_new_version=create_version
-    )
-    if not result:
-        raise HTTPException(status_code=404, detail="Form template not found")
-    return result
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Log update attempt
+    logger.info(f"[FormTemplateUpdate] template_id={template_id} user={current_user.get('id')} create_version={create_version}")
+    
+    try:
+        update_data = data.model_dump(exclude_unset=True)
+        logger.info(f"[FormTemplateUpdate] payload_keys={list(update_data.keys())}")
+        
+        result = await form_service.update_template(
+            template_id,
+            update_data,
+            create_new_version=create_version
+        )
+        
+        if not result:
+            logger.warning(f"[FormTemplateUpdate] template_id={template_id} not found")
+            raise HTTPException(status_code=404, detail="Form template not found")
+        
+        logger.info(f"[FormTemplateUpdate] success template_id={template_id} version={result.get('version')}")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[FormTemplateUpdate] error template_id={template_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update template: {str(e)}")
 
 @router.delete("/form-templates/{template_id}")
 async def delete_form_template(

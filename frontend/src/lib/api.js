@@ -675,10 +675,49 @@ export const actionsAPI = {
 };
 
 // AI Risk Engine API
+// Extended timeout axios instance for AI operations (2 minutes)
+const aiApi = axios.create({
+  baseURL: API_URL,
+  timeout: 120000, // 2 minutes for AI operations
+});
+
+// Add auth interceptor for AI API
+aiApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// AI-specific error handling
+aiApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Handle 401 Unauthorized
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = "/login";
+      }
+    }
+    
+    // Better error messages for AI timeouts
+    if (error.code === 'ECONNABORTED') {
+      error.message = 'AI analysis taking longer than expected. Please try again.';
+      error.isTimeout = true;
+    } else if (!error.response && error.message === 'Network Error') {
+      error.code = 'ERR_NETWORK';
+      error.message = 'Network error - please check your connection';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const aiRiskAPI = {
-  // Risk Analysis
+  // Risk Analysis - uses extended timeout
   analyzeRisk: async (threatId, options = {}) => {
-    const response = await api.post(`/ai/analyze-risk/${threatId}`, {
+    const response = await aiApi.post(`/ai/analyze-risk/${threatId}`, {
       include_forecast: options.includeForecast ?? true,
       forecast_days: options.forecastDays ?? 7,
       include_similar_incidents: options.includeSimilarIncidents ?? true,
@@ -696,9 +735,9 @@ export const aiRiskAPI = {
     return response.data;
   },
   
-  // Causal Analysis
+  // Causal Analysis - uses extended timeout
   generateCauses: async (threatId, options = {}) => {
-    const response = await api.post(`/ai/generate-causes/${threatId}`, {
+    const response = await aiApi.post(`/ai/generate-causes/${threatId}`, {
       max_causes: options.maxCauses ?? 5,
       include_evidence: options.includeEvidence ?? true,
       include_mitigations: options.includeMitigations ?? true,
@@ -712,13 +751,13 @@ export const aiRiskAPI = {
   },
   
   explain: async (threatId) => {
-    const response = await api.post(`/ai/explain/${threatId}`);
+    const response = await aiApi.post(`/ai/explain/${threatId}`);
     return response.data;
   },
   
-  // Fault Tree
+  // Fault Tree - uses extended timeout
   generateFaultTree: async (threatId, options = {}) => {
-    const response = await api.post(`/ai/fault-tree/${threatId}`, {
+    const response = await aiApi.post(`/ai/fault-tree/${threatId}`, {
       max_depth: options.maxDepth ?? 4,
       include_probabilities: options.includeProbabilities ?? true,
     });
@@ -730,9 +769,9 @@ export const aiRiskAPI = {
     return response.data;
   },
   
-  // Bow-Tie Model
+  // Bow-Tie Model - uses extended timeout
   generateBowTie: async (threatId) => {
-    const response = await api.post(`/ai/bow-tie/${threatId}`);
+    const response = await aiApi.post(`/ai/bow-tie/${threatId}`);
     return response.data;
   },
   
@@ -741,9 +780,9 @@ export const aiRiskAPI = {
     return response.data;
   },
   
-  // Action Optimization
+  // Action Optimization - uses extended timeout
   optimizeActions: async (threatId, options = {}) => {
-    const response = await api.post(`/ai/optimize-actions/${threatId}`, {
+    const response = await aiApi.post(`/ai/optimize-actions/${threatId}`, {
       budget_limit: options.budgetLimit ?? null,
       max_downtime_hours: options.maxDowntimeHours ?? null,
       prioritize_by: options.prioritizeBy ?? "roi",

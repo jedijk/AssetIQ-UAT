@@ -45,17 +45,47 @@ export const formAPI = {
     return response.json();
   },
 
-  updateTemplate: async (id, data) => {
+  updateTemplate: async (params) => {
+    // Support both { id, data } object and (id, data) separate args
+    let id, data;
+    if (typeof params === 'object' && params.id && params.data) {
+      id = params.id;
+      data = params.data;
+    } else if (typeof params === 'string') {
+      // Legacy support for (id, data) - shouldn't happen but safe guard
+      id = params;
+      data = arguments[1];
+    } else {
+      throw new Error("Invalid arguments for updateTemplate. Expected { id, data } object.");
+    }
+    
+    // Clean the data - remove non-serializable or unwanted fields
+    const cleanedData = { ...data };
+    delete cleanedData.id; // Don't send ID in body
+    delete cleanedData.pendingDocuments; // Don't send pending docs to backend
+    
+    console.log('[formAPI] Updating template:', { templateId: id, payloadKeys: Object.keys(cleanedData) });
+    
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(cleanedData),
     });
-    if (!response.ok) throw new Error("Failed to update template");
-    return response.json();
+    
+    if (!response.ok) {
+      // Surface detailed error from backend
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.detail || errorData.message || `Failed to update template (${response.status})`;
+      console.error('[formAPI] Update template failed:', { status: response.status, error: errorData });
+      throw new Error(errorMessage);
+    }
+    
+    const result = await response.json();
+    console.log('[formAPI] Template updated successfully:', { templateId: id, version: result.version });
+    return result;
   },
 
   deleteTemplate: async (id) => {

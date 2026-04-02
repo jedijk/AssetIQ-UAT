@@ -242,7 +242,22 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
     },
     onError: (error) => {
       console.error("AI analysis failed:", error);
-      toast.error(t("ai.analysisFailed") || "AI analysis failed");
+      
+      // Check for timeout errors - show different message
+      if (error?.isTimeout || error?.code === 'ECONNABORTED') {
+        toast.error(t("ai.analysisTakingLonger") || "AI analysis taking longer than expected. Please wait and try again.");
+        return;
+      }
+      
+      // Check for specific error types
+      const errorMessage = error?.response?.data?.detail || error?.message;
+      if (errorMessage?.includes("rate limit")) {
+        toast.error(t("ai.rateLimitExceeded") || "AI rate limit exceeded. Please wait a moment and try again.");
+      } else if (errorMessage?.includes("token") || errorMessage?.includes("key")) {
+        toast.error(t("ai.configurationError") || "AI service configuration error. Please contact support.");
+      } else {
+        toast.error(t("ai.analysisFailed") || errorMessage || "AI analysis failed");
+      }
     },
   });
 

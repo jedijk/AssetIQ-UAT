@@ -182,6 +182,13 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
     },
     onError: (error) => {
       console.error("Failed to generate causal analysis:", error);
+      
+      // Check for timeout errors
+      if (error?.isTimeout || error?.code === 'ECONNABORTED') {
+        toast.error(t("ai.analysisTakingLonger") || "AI analysis taking longer than expected. Please wait and try again.");
+        return;
+      }
+      
       // Check for specific error types
       const errorMessage = error?.response?.data?.detail || error?.message || "Failed to generate causal analysis";
       if (errorMessage.includes("rate limit")) {

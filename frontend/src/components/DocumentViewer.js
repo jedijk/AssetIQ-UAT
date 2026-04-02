@@ -116,7 +116,34 @@ export const DocumentViewer = ({
     }
   }, [isDocx, isExcel, loadDocx, loadExcel]);
 
-  if (!document) return null;
+  if (!document) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 bg-slate-900/95 flex flex-col items-center justify-center"
+        data-testid="document-viewer-error"
+      >
+        <div className="bg-slate-800 rounded-lg p-8 text-center max-w-md mx-auto border border-slate-700">
+          <AlertCircle className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">Document Unavailable</h3>
+          <p className="text-slate-400 mb-6">
+            The document could not be loaded. It may have been deleted or is temporarily unavailable.
+          </p>
+          <Button
+            onClick={onClose || onBack}
+            variant="outline"
+            className="text-white border-slate-600 hover:bg-slate-700"
+            data-testid="doc-viewer-close-error"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Go Back
+          </Button>
+        </div>
+      </motion.div>
+    );
+  }
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 200));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 50));

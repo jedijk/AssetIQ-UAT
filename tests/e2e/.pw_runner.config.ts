@@ -11,7 +11,7 @@ export default defineConfig({
     ['json', { outputFile: '/root/.emergent/automation_output/20260319_195234/results.json' }],
   ],
   use: {
-    baseURL: 'https://form-designer-2-1.preview.emergentagent.com',
+    baseURL: 'https://reliability-intel-1.preview.emergentagent.com',
     screenshot: 'only-on-failure',
     trace: 'off',
     headless: true,

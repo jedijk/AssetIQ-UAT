@@ -30,6 +30,7 @@ import {
   Building2,
   SlidersHorizontal,
   List,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -1725,115 +1726,137 @@ const FormsPage = () => {
 
             {/* Documents Tab */}
             {viewTab === "documents" && (
-              <div className="space-y-4">
-                {/* AI Search Section */}
-                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className="w-5 h-5 text-indigo-600" />
-                    <h4 className="font-medium text-sm text-indigo-900">{t("forms.aiDocumentSearch")}</h4>
+              <div className="space-y-4" data-testid="documents-tab-content">
+                {/* Check if selectedTemplate exists and is valid */}
+                {!selectedTemplate ? (
+                  <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                    <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-slate-700 mb-2">Template data unavailable</h3>
+                    <p className="text-sm text-slate-500">Please close and reopen the template to view documents.</p>
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={docSearchQuery}
-                      onChange={(e) => setDocSearchQuery(e.target.value)}
-                      placeholder={t("forms.searchDocumentsPlaceholder")}
-                      className="flex-1"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && docSearchQuery.trim() && selectedTemplate?.id) {
-                          setIsSearchingDocs(true);
-                          formAPI.searchDocuments(selectedTemplate.id, docSearchQuery.trim())
-                            .then(setDocSearchResult)
-                            .catch(() => toast.error("Search failed"))
-                            .finally(() => setIsSearchingDocs(false));
-                        }
-                      }}
-                    />
-                    <Button
-                      onClick={() => {
-                        if (docSearchQuery.trim() && selectedTemplate?.id) {
-                          setIsSearchingDocs(true);
-                          formAPI.searchDocuments(selectedTemplate.id, docSearchQuery.trim())
-                            .then(setDocSearchResult)
-                            .catch(() => toast.error("Search failed"))
-                            .finally(() => setIsSearchingDocs(false));
-                        }
-                      }}
-                      disabled={isSearchingDocs || !docSearchQuery.trim()}
-                      className="bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      {isSearchingDocs ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <><Search className="w-4 h-4 mr-1" /> {t("forms.askAI")}</>
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* AI Search Result */}
-                  {docSearchResult && (
-                    <div className="mt-4 bg-white rounded-lg p-4 border">
-                      <div className="flex items-start gap-3">
-                        <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0">
-                          <Sparkles className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-slate-700 whitespace-pre-wrap">{docSearchResult.answer}</p>
-                          {docSearchResult.relevant_documents?.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {docSearchResult.relevant_documents.map((doc) => (
-                                <button
-                                  key={doc.id}
-                                  onClick={() => setViewingDocument(doc)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded text-xs text-slate-600 hover:bg-slate-200 transition-colors"
-                                >
-                                  <FileText className="w-3 h-3" />
-                                  {doc.name}
-                                  <Eye className="w-3 h-3" />
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                ) : (
+                  <>
+                    {/* AI Search Section */}
+                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles className="w-5 h-5 text-indigo-600" />
+                        <h4 className="font-medium text-sm text-indigo-900">{t("forms.aiDocumentSearch")}</h4>
                       </div>
-                    </div>
-                  )}
-                </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={docSearchQuery}
+                          onChange={(e) => setDocSearchQuery(e.target.value)}
+                          placeholder={t("forms.searchDocumentsPlaceholder")}
+                          className="flex-1"
+                          data-testid="doc-search-input"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && docSearchQuery.trim() && selectedTemplate?.id) {
+                              setIsSearchingDocs(true);
+                              formAPI.searchDocuments(selectedTemplate.id, docSearchQuery.trim())
+                                .then(setDocSearchResult)
+                                .catch((err) => {
+                                  console.error("Document search failed:", err);
+                                  toast.error("Search failed: " + (err.message || "Unknown error"));
+                                })
+                                .finally(() => setIsSearchingDocs(false));
+                            }
+                          }}
+                        />
+                        <Button
+                          onClick={() => {
+                            if (docSearchQuery.trim() && selectedTemplate?.id) {
+                              setIsSearchingDocs(true);
+                              formAPI.searchDocuments(selectedTemplate.id, docSearchQuery.trim())
+                                .then(setDocSearchResult)
+                                .catch((err) => {
+                                  console.error("Document search failed:", err);
+                                  toast.error("Search failed: " + (err.message || "Unknown error"));
+                                })
+                                .finally(() => setIsSearchingDocs(false));
+                            }
+                          }}
+                          disabled={isSearchingDocs || !docSearchQuery.trim()}
+                          className="bg-indigo-600 hover:bg-indigo-700"
+                          data-testid="doc-search-btn"
+                        >
+                          {isSearchingDocs ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <><Search className="w-4 h-4 mr-1" /> {t("forms.askAI")}</>
+                          )}
+                        </Button>
+                      </div>
 
-                {/* Document List */}
-                <div>
-                  <h4 className="font-medium text-sm text-slate-700 mb-2">{t("forms.attachedDocuments")}</h4>
-                  {selectedTemplate?.documents?.length > 0 ? (
-                    <div className="space-y-2">
-                      {selectedTemplate.documents.map((doc) => (
-                        <div key={doc.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border hover:bg-slate-100 transition-colors">
-                          <div className="h-10 w-10 rounded bg-white border flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-slate-500" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm truncate">{doc.name}</div>
-                            <div className="text-xs text-slate-500">
-                              {doc.type?.toUpperCase()} 
-                              {doc.description && ` • ${doc.description}`}
+                      {/* AI Search Result */}
+                      {docSearchResult && (
+                        <div className="mt-4 bg-white rounded-lg p-4 border" data-testid="doc-search-result">
+                          <div className="flex items-start gap-3">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                              <Sparkles className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-slate-700 whitespace-pre-wrap">{docSearchResult.answer}</p>
+                              {docSearchResult.relevant_documents?.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {docSearchResult.relevant_documents.map((doc) => (
+                                    <button
+                                      key={doc.id}
+                                      onClick={() => setViewingDocument(doc)}
+                                      className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded text-xs text-slate-600 hover:bg-slate-200 transition-colors"
+                                      data-testid={`view-doc-${doc.id}`}
+                                    >
+                                      <FileText className="w-3 h-3" />
+                                      {doc.name}
+                                      <Eye className="w-3 h-3" />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setViewingDocument(doc)}
-                            className="text-indigo-600 hover:text-indigo-700"
-                          >
-                            <Eye className="w-4 h-4 mr-1" /> {t("common.view")}
-                          </Button>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  ) : (
-                    <div className="text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                      <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                      <p className="text-sm text-slate-500">{t("forms.noDocumentsAttached")}</p>
+
+                    {/* Document List */}
+                    <div data-testid="document-list-section">
+                      <h4 className="font-medium text-sm text-slate-700 mb-2">{t("forms.attachedDocuments")}</h4>
+                      {selectedTemplate?.documents?.length > 0 ? (
+                        <div className="space-y-2">
+                          {selectedTemplate.documents.map((doc) => (
+                            <div key={doc.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border hover:bg-slate-100 transition-colors" data-testid={`document-row-${doc.id}`}>
+                              <div className="h-10 w-10 rounded bg-white border flex items-center justify-center">
+                                <FileText className="w-5 h-5 text-slate-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm truncate">{doc.name || "Unnamed document"}</div>
+                                <div className="text-xs text-slate-500">
+                                  {doc.type?.toUpperCase() || "FILE"} 
+                                  {doc.description && ` • ${doc.description}`}
+                                </div>
+                              </div>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setViewingDocument(doc)}
+                                className="text-indigo-600 hover:text-indigo-700"
+                                data-testid={`view-doc-btn-${doc.id}`}
+                              >
+                                <Eye className="w-4 h-4 mr-1" /> {t("common.view")}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-300" data-testid="no-documents-message">
+                          <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                          <p className="text-sm text-slate-500">{t("forms.noDocumentsAttached")}</p>
+                          <p className="text-xs text-slate-400 mt-1">Upload documents in the Edit mode to attach reference materials</p>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
             )}
           </div>
