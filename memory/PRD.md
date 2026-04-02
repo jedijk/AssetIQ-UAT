@@ -24,6 +24,27 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 2, 2026 - Mobile PDF Page Navigation Fix
+**UX Enhancement:**
+- ✅ **Fixed PDF page navigation on mobile devices**
+- **Problem:** PDFs rendered via `<iframe>` couldn't be navigated on mobile browsers (no page flip controls)
+- **Solution:** Implemented custom PDF viewer using `pdfjs-dist` directly with canvas rendering
+- Added page navigation controls (Previous/Next) with "Page X of Y" indicator
+- PDF pages render correctly on both mobile (350px width) and desktop (700px width)
+
+**Dependencies Added:**
+- `pdfjs-dist@4.8.69` (via `react-pdf@9.2.1` dependency)
+
+**Files Modified:**
+- `/app/frontend/src/components/DocumentViewer.js` - Added `MobilePdfViewer` component with canvas-based PDF rendering and page navigation
+
+**Testing:**
+- Verified page navigation works on mobile (Page 1 → 2 → 3 etc.)
+- Verified PDF renders correctly on desktop with navigation controls
+- Confirmed Download and Open buttons still work
+
+---
+
 ### April 2, 2026 - Task Execution Document Viewer Authentication Fix (P0)
 **CRITICAL Fix:**
 - ✅ **Fixed "Not authenticated" error when viewing documents during Task Execution**

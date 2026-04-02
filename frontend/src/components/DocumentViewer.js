@@ -20,9 +20,164 @@ import {
 import { Button } from "./ui/button";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs`;
 
 // Get the API base URL for document proxying
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+
+/**
+ * Mobile-friendly PDF viewer using canvas rendering
+ * Uses pdfjs-dist directly for reliable rendering
+ */
+const MobilePdfViewer = ({ blobUrl, isMobile }) => {
+  const [pdfDoc, setPdfDoc] = useState(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [numPages, setNumPages] = useState(null);
+  const [pdfLoading, setPdfLoading] = useState(true);
+  const [pdfError, setPdfError] = useState(null);
+  const canvasRef = React.useRef(null);
+  const renderTaskRef = React.useRef(null);
+  
+  // Load PDF document
+  useEffect(() => {
+    if (!blobUrl) return;
+    
+    let cancelled = false;
+    setPdfLoading(true);
+    setPdfError(null);
+    
+    const loadPdf = async () => {
+      try {
+        const loadingTask = pdfjsLib.getDocument(blobUrl);
+        const doc = await loadingTask.promise;
+        if (!cancelled) {
+          setPdfDoc(doc);
+          setNumPages(doc.numPages);
+          setPageNumber(1);
+        }
+      } catch (err) {
+        console.error("PDF loading error:", err);
+        if (!cancelled) {
+          setPdfError("Failed to load PDF");
+        }
+      } finally {
+        if (!cancelled) {
+          setPdfLoading(false);
+        }
+      }
+    };
+    
+    loadPdf();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [blobUrl]);
+  
+  // Render current page
+  useEffect(() => {
+    if (!pdfDoc || !canvasRef.current) return;
+    
+    const renderPage = async () => {
+      // Cancel any ongoing render
+      if (renderTaskRef.current) {
+        renderTaskRef.current.cancel();
+      }
+      
+      try {
+        const page = await pdfDoc.getPage(pageNumber);
+        const canvas = canvasRef.current;
+        const context = canvas.getContext("2d");
+        
+        // Calculate scale based on viewport width
+        const containerWidth = isMobile ? 350 : 700;
+        const viewport = page.getViewport({ scale: 1 });
+        const scale = containerWidth / viewport.width;
+        const scaledViewport = page.getViewport({ scale });
+        
+        // Set canvas dimensions
+        canvas.height = scaledViewport.height;
+        canvas.width = scaledViewport.width;
+        
+        // Render the page
+        const renderContext = {
+          canvasContext: context,
+          viewport: scaledViewport,
+        };
+        
+        renderTaskRef.current = page.render(renderContext);
+        await renderTaskRef.current.promise;
+      } catch (err) {
+        if (err.name !== "RenderingCancelledException") {
+          console.error("Page render error:", err);
+        }
+      }
+    };
+    
+    renderPage();
+    
+    return () => {
+      if (renderTaskRef.current) {
+        renderTaskRef.current.cancel();
+      }
+    };
+  }, [pdfDoc, pageNumber, isMobile]);
+  
+  if (pdfLoading) {
+    return (
+      <div className="p-8 text-center">
+        <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
+        <p className="text-slate-500 mt-2">Loading PDF...</p>
+      </div>
+    );
+  }
+  
+  if (pdfError) {
+    return (
+      <div className="p-8 text-center">
+        <AlertCircle className="w-8 h-8 mx-auto text-red-400" />
+        <p className="text-slate-500 mt-2">{pdfError}</p>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="w-full h-full flex flex-col items-center">
+      {/* PDF Navigation Controls */}
+      <div className="flex items-center gap-2 mb-4 bg-slate-700 rounded-lg px-4 py-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setPageNumber(prev => Math.max(1, prev - 1))}
+          disabled={pageNumber <= 1}
+          className="text-white hover:bg-slate-600 h-8 w-8"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </Button>
+        <span className="text-white text-sm min-w-[100px] text-center">
+          Page {pageNumber} of {numPages || '?'}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setPageNumber(prev => Math.min(numPages || prev, prev + 1))}
+          disabled={pageNumber >= (numPages || 1)}
+          className="text-white hover:bg-slate-600 h-8 w-8"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </Button>
+      </div>
+      
+      {/* PDF Canvas */}
+      <div className="flex-1 overflow-auto bg-white rounded-lg shadow-2xl p-4">
+        <canvas ref={canvasRef} className="block mx-auto" />
+      </div>
+    </div>
+  );
+};
 
 /**
  * In-app Document Viewer with back button
@@ -49,6 +204,9 @@ export const DocumentViewer = ({
   // Blob URL for PDF/Image (needed for authenticated fetching)
   const [blobUrl, setBlobUrl] = useState(null);
   const blobUrlRef = React.useRef(null);
+  
+  // Detect mobile
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   
   const { name, url: rawUrl, type } = document || {};
   
@@ -450,13 +608,11 @@ export const DocumentViewer = ({
             />
           )}
 
-          {/* PDF Viewer */}
+          {/* PDF Viewer - Mobile friendly with page navigation */}
           {isPdf && !loading && !error && blobUrl && (
-            <iframe
-              src={`${blobUrl}#toolbar=1&navpanes=0`}
-              title={name}
-              className="w-full h-full rounded-lg shadow-2xl bg-white"
-              style={{ minHeight: "80vh" }}
+            <MobilePdfViewer 
+              blobUrl={blobUrl}
+              isMobile={isMobile}
             />
           )}
 
