@@ -36,6 +36,18 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 2, 2026 - Fix Adhoc Task Completion (UUID vs ObjectId)
+**BUG FIX:**
+- ✅ **Fixed "Failed to complete task" error for adhoc tasks**
+- **Root Cause:** Adhoc tasks have a UUID `id` field, but `complete_task` and `start_task` methods only looked up by ObjectId `_id`
+- **Solution:** Updated both methods to search by ObjectId first, then fall back to UUID `id` field
+- Also fixed `_serialize_instance` to handle missing `equipment_id` and `status` fields gracefully
+
+**Files Modified:**
+- `/app/backend/services/task_service.py` - Fixed `start_task`, `complete_task`, and `_serialize_instance` methods
+
+---
+
 ### April 2, 2026 - Form Execution Field Types Fix
 **UX Enhancement:**
 - ✅ **Fixed form field types not rendering correctly in Task Execution**

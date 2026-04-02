@@ -683,11 +683,26 @@ class TaskService:
     
     async def start_task(self, instance_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Mark a task as started."""
-        if not ObjectId.is_valid(instance_id):
+        # Build query to find by either ObjectId or string 'id' field
+        query = None
+        if ObjectId.is_valid(instance_id):
+            query = {"_id": ObjectId(instance_id)}
+        
+        # Try ObjectId first
+        instance = None
+        if query:
+            instance = await self.instances.find_one(query)
+        
+        # If not found, try by 'id' field (UUID string)
+        if not instance:
+            query = {"id": instance_id}
+            instance = await self.instances.find_one(query)
+        
+        if not instance:
             return None
         
         result = await self.instances.find_one_and_update(
-            {"_id": ObjectId(instance_id)},
+            {"_id": instance["_id"]},
             {"$set": {
                 "status": "in_progress",
                 "started_at": datetime.now(timezone.utc),
@@ -703,10 +718,19 @@ class TaskService:
     
     async def complete_task(self, instance_id: str, data: Dict[str, Any], completed_by_id: str = None, completed_by_name: str = None) -> Optional[Dict[str, Any]]:
         """Mark a task as completed and update plan."""
-        if not ObjectId.is_valid(instance_id):
-            return None
+        # Try to find the task instance by ObjectId first, then by string 'id' field
+        instance = None
+        query = None
         
-        instance = await self.instances.find_one({"_id": ObjectId(instance_id)})
+        if ObjectId.is_valid(instance_id):
+            query = {"_id": ObjectId(instance_id)}
+            instance = await self.instances.find_one(query)
+        
+        # If not found by ObjectId, try by 'id' field (UUID string)
+        if not instance:
+            query = {"id": instance_id}
+            instance = await self.instances.find_one(query)
+        
         if not instance:
             return None
         
@@ -738,8 +762,9 @@ class TaskService:
             "updated_at": now,
         }
         
+        # Use _id from the found instance for the update query
         result = await self.instances.find_one_and_update(
-            {"_id": ObjectId(instance_id)},
+            {"_id": instance["_id"]},
             {"$set": update},
             return_document=True
         )
@@ -1213,12 +1238,12 @@ class TaskService:
             "task_plan_id": task_plan_id,
             "task_template_id": doc.get("task_template_id"),
             "task_template_name": doc.get("task_template_name"),
-            "equipment_id": doc["equipment_id"],
+            "equipment_id": doc.get("equipment_id"),  # Optional - adhoc tasks may not have equipment
             "equipment_name": doc.get("equipment_name"),
             "efm_id": doc.get("efm_id"),
             "scheduled_date": _safe_isoformat(doc.get("scheduled_date")),
             "due_date": _safe_isoformat(doc.get("due_date")),
-            "status": doc["status"],
+            "status": doc.get("status", "pending"),  # Default to pending if not set
             "priority": doc.get("priority", "medium"),
             "assigned_team": doc.get("assigned_team"),
             "assigned_user_id": doc.get("assigned_user_id"),
