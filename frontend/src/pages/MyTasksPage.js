@@ -332,6 +332,13 @@ const MyTasksPage = () => {
         predicate: (query) => query.queryKey[0] === "task-instances" 
       });
       queryClient.invalidateQueries({ queryKey: ["task-stats"] });
+      // Also invalidate actions list since action status changed
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "actions" 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "central-actions" 
+      });
       setViewMode("list");
       setSelectedTask(null);
     },
@@ -347,6 +354,13 @@ const MyTasksPage = () => {
       // Invalidate all my-tasks queries regardless of filters
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === "my-tasks" 
+      });
+      // Also invalidate actions list since action status changed
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "actions" 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "central-actions" 
       });
       setSelectedTask(data);
     },
@@ -369,6 +383,13 @@ const MyTasksPage = () => {
       // Invalidate all my-tasks queries regardless of filters
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === "my-tasks" 
+      });
+      // Also invalidate actions list
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "actions" 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "central-actions" 
       });
       // Open the new task for execution
       setSelectedTask(newTask);
@@ -398,6 +419,9 @@ const MyTasksPage = () => {
       queryClient.invalidateQueries({ queryKey: ["adhoc-plans"] });
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === "actions" 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "central-actions" 
       });
       setDeleteTaskData(null);
     },

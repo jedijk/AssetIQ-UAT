@@ -228,12 +228,15 @@ export default function ActionsPage() {
           data: { oldData, newData: data },
           undo: async () => {
             await actionsAPI.update(actionId, oldData);
-            queryClient.invalidateQueries(["actions"]);
+            queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "actions" });
           },
         });
       }
-      queryClient.invalidateQueries(["actions"]);
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "actions" });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      // Sync with My Tasks when action status changes
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "my-tasks" });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "central-actions" });
       toast.success("Action updated");
       setIsEditDialogOpen(false);
       setEditingAction(null);
@@ -272,12 +275,15 @@ export default function ActionsPage() {
               discipline: deletedAction.discipline,
               due_date: deletedAction.due_date,
             });
-            queryClient.invalidateQueries(["actions"]);
+            queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "actions" });
           },
         });
       }
-      queryClient.invalidateQueries(["actions"]);
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "actions" });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      // Sync with My Tasks when action deleted
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "my-tasks" });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "central-actions" });
       toast.success("Action deleted");
       setDeleteConfirm(null);
     },
