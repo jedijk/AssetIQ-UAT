@@ -103,6 +103,17 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 2, 2026 - Fix Runtime Error When Editing Causal Actions
+**BUG FIX:**
+- ✅ **Fixed runtime error in causal engine when editing actions**
+- **Root Cause:** `SearchableSelect` component's filter logic called `.toLowerCase()` on `opt.value` which could be non-string (null, number, etc.) when used with `linked_cause_id`
+- **Solution:** Added type check to ensure only string values are processed: `typeof opt.value === 'string'`
+
+**Files Modified:**
+- `/app/frontend/src/components/ui/searchable-select.jsx` - Fixed filter logic for non-string values
+
+---
+
 ### April 2, 2026 - Form Execution Field Types Fix
 **UX Enhancement:**
 - ✅ **Fixed form field types not rendering correctly in Task Execution**

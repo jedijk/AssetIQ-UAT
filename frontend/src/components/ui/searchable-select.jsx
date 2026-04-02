@@ -54,7 +54,7 @@ export function SearchableSelect({
     return options.filter(
       (opt) =>
         opt.label?.toLowerCase().includes(search) ||
-        opt.value?.toLowerCase().includes(search)
+        (typeof opt.value === 'string' && opt.value.toLowerCase().includes(search))
     );
   }, [options, searchValue]);
 
