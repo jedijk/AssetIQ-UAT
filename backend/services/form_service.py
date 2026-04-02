@@ -594,6 +594,31 @@ class FormService:
                 if user:
                     serialized["submitted_by_name"] = user.get("name", user.get("email", "Unknown"))
             
+            # Fetch equipment info if present
+            if serialized.get("equipment_id"):
+                equipment = await self.db.equipment_nodes.find_one({"id": serialized["equipment_id"]})
+                if equipment:
+                    serialized["equipment_name"] = equipment.get("name", "Unknown Equipment")
+                    serialized["equipment_path"] = equipment.get("path", "")
+            
+            # Fetch task info if present
+            if serialized.get("task_instance_id"):
+                # Try by string id first
+                task = await self.db.task_instances.find_one({"id": serialized["task_instance_id"]})
+                if not task and ObjectId.is_valid(serialized["task_instance_id"]):
+                    task = await self.db.task_instances.find_one({"_id": ObjectId(serialized["task_instance_id"])})
+                if task:
+                    serialized["task_template_name"] = task.get("task_template_name", "Unknown Task")
+                    serialized["discipline"] = task.get("discipline")
+            
+            # Fetch form template for discipline if not in task
+            if not serialized.get("discipline") and serialized.get("form_template_id"):
+                template = await self.templates.find_one({"id": serialized["form_template_id"]})
+                if not template and ObjectId.is_valid(serialized["form_template_id"]):
+                    template = await self.templates.find_one({"_id": ObjectId(serialized["form_template_id"])})
+                if template:
+                    serialized["discipline"] = template.get("discipline")
+            
             submissions.append(serialized)
         
         total = await self.submissions.count_documents(query)

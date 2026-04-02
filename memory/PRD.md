@@ -24,6 +24,32 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 2, 2026 - Form Submissions Page (New Feature)
+**NEW PAGE:**
+- ✅ **Created Form Submissions page to view all submitted forms**
+- Features:
+  - Stats cards: Total, Today, Warnings, Critical counts
+  - Search by form name, equipment, task, or user
+  - Filter by Discipline and Status (warnings/critical)
+  - List view showing: Form name, date/time, user, discipline, equipment, task
+  - Detail dialog showing: Full submission info with all form responses
+  - Support for attachments (images, PDFs, documents)
+  - Color-coded threshold status (Normal/Warning/Critical)
+  - Mobile-responsive design
+
+**Backend Enhancement:**
+- Updated `form_service.py` to include equipment name, task template name, and discipline
+
+**Files Created:**
+- `/app/frontend/src/pages/FormSubmissionsPage.js` - New page
+
+**Files Modified:**
+- `/app/frontend/src/App.js` - Added route `/form-submissions`
+- `/app/frontend/src/components/Layout.js` - Added navigation link in Settings menu
+- `/app/backend/services/form_service.py` - Enhanced submission data with equipment/task info
+
+---
+
 ### April 2, 2026 - Hide Completed Tasks from My Tasks
 **UX Enhancement:**
 - ✅ **Completed tasks are now hidden from My Tasks view**

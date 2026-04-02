@@ -160,6 +160,7 @@ const Layout = () => {
     { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2, desktopOnly: true, feature: "equipment" },
     { path: "/tasks", label: t("taskScheduler.execution"), icon: Calendar, desktopOnly: true, feature: "tasks" },
     { path: "/forms", label: t("forms.title"), icon: FileText, desktopOnly: true, feature: "forms" },
+    { path: "/form-submissions", label: "Form Submissions", icon: ClipboardCheck, desktopOnly: true, feature: "forms" },
     { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, feature: "users" },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },

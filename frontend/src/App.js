@@ -25,6 +25,7 @@ import SettingsUserManagementPage from "./pages/SettingsUserManagementPage";
 import SettingsPermissionsPage from "./pages/SettingsPermissionsPage";
 import SettingsAIUsagePage from "./pages/SettingsAIUsagePage";
 import FormsPage from "./pages/FormsPage";
+import FormSubmissionsPage from "./pages/FormSubmissionsPage";
 import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
 import UserStatisticsPage from "./pages/UserStatisticsPage";
 import FeedbackPage from "./pages/FeedbackPage";
@@ -183,6 +184,7 @@ function App() {
                 <Route path="tasks" element={<TaskSchedulerPage />} />
                 <Route path="my-tasks" element={<MyTasksPage />} />
                 <Route path="forms" element={<FormsPage />} />
+                <Route path="form-submissions" element={<FormSubmissionsPage />} />
                 <Route path="decision-engine" element={<UnderDevelopmentPage />} />
                 <Route path="settings/user-management" element={<SettingsUserManagementPage />} />
                 <Route path="settings/permissions" element={<SettingsPermissionsPage />} />
