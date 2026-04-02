@@ -24,6 +24,32 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 2, 2026 - Form Execution Field Types Fix
+**UX Enhancement:**
+- ✅ **Fixed form field types not rendering correctly in Task Execution**
+- **Problem:** Dropdown and multi_select fields were rendering incorrectly (not as actual dropdowns/checkboxes)
+- **Solution:** Added proper handlers for all field types in `TaskExecutionFrame.js`
+
+**Field Types Now Supported:**
+- `dropdown` - Proper Select dropdown component
+- `multi_select` - Checkbox list with selected badges
+- `date` - Native date picker input
+- `datetime` - Native datetime-local picker
+- `range` - Slider with min/max/step and value display
+- `file` - File upload with preview
+- `image` - Image upload with preview thumbnail
+- `signature` - Signature placeholder (capture coming soon)
+- All existing types (text, textarea, numeric, boolean, checklist, equipment)
+
+**Files Modified:**
+- `/app/frontend/src/components/task-execution/TaskExecutionFrame.js` - Added proper rendering for dropdown, multi_select, date, datetime, range, file, image, signature field types
+
+**Testing:**
+- Verified multi_select shows as checkboxes with selection badges
+- Verified selections highlight correctly and display selected values
+
+---
+
 ### April 2, 2026 - Mobile PDF Page Navigation Fix
 **UX Enhancement:**
 - ✅ **Fixed PDF page navigation on mobile devices**

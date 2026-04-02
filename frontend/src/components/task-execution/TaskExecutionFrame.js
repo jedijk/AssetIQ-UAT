@@ -29,6 +29,7 @@ import {
   Building2,
   Download,
   ChevronUp,
+  Signature,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -375,6 +376,259 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                   </Button>
                 );
               })}
+            </div>
+            {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+          </div>
+        );
+      
+      case "dropdown":
+        return (
+          <div key={field.id} className="space-y-2">
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </Label>
+            <LinkedEquipmentBadge />
+            <Select
+              value={value || ""}
+              onValueChange={(v) => handleFieldChange(field.id, v)}
+            >
+              <SelectTrigger className={cn(mobileInputClass, hasError && "border-red-500")}>
+                <SelectValue placeholder={field.placeholder || `Select ${field.label.toLowerCase()}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {(field.options || []).map((option) => {
+                  const optionValue = typeof option === 'object' ? option.value : option;
+                  const optionLabel = typeof option === 'object' ? option.label : option;
+                  return (
+                    <SelectItem key={optionValue} value={optionValue}>
+                      {optionLabel}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+          </div>
+        );
+      
+      case "multi_select":
+        const selectedValues = Array.isArray(value) ? value : [];
+        return (
+          <div key={field.id} className="space-y-2">
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </Label>
+            <LinkedEquipmentBadge />
+            <div className="space-y-2">
+              {(field.options || []).map((option) => {
+                const optionValue = typeof option === 'object' ? option.value : option;
+                const optionLabel = typeof option === 'object' ? option.label : option;
+                const isSelected = selectedValues.includes(optionValue);
+                return (
+                  <div
+                    key={optionValue}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                      isSelected 
+                        ? "bg-indigo-50 border-indigo-300" 
+                        : "bg-slate-50 border-slate-200 hover:bg-slate-100",
+                      isMobile && "min-h-[48px]"
+                    )}
+                    onClick={() => {
+                      const newValues = isSelected
+                        ? selectedValues.filter(v => v !== optionValue)
+                        : [...selectedValues, optionValue];
+                      handleFieldChange(field.id, newValues);
+                    }}
+                  >
+                    <Checkbox
+                      checked={isSelected}
+                      className={cn(isMobile && "h-5 w-5")}
+                    />
+                    <span className="text-sm">{optionLabel}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {selectedValues.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {selectedValues.map(v => {
+                  const opt = (field.options || []).find(o => 
+                    (typeof o === 'object' ? o.value : o) === v
+                  );
+                  const label = typeof opt === 'object' ? opt.label : opt;
+                  return (
+                    <Badge key={v} variant="secondary" className="text-xs">
+                      {label || v}
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
+            {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+          </div>
+        );
+      
+      case "date":
+        return (
+          <div key={field.id} className="space-y-1.5">
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </Label>
+            <LinkedEquipmentBadge />
+            <Input
+              type="date"
+              value={value || ""}
+              onChange={(e) => handleFieldChange(field.id, e.target.value)}
+              className={cn(mobileInputClass, hasError && "border-red-500")}
+            />
+            {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+          </div>
+        );
+      
+      case "datetime":
+        return (
+          <div key={field.id} className="space-y-1.5">
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </Label>
+            <LinkedEquipmentBadge />
+            <Input
+              type="datetime-local"
+              value={value || ""}
+              onChange={(e) => handleFieldChange(field.id, e.target.value)}
+              className={cn(mobileInputClass, hasError && "border-red-500")}
+            />
+            {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+          </div>
+        );
+      
+      case "range":
+        const rangeMin = field.range_min ?? 0;
+        const rangeMax = field.range_max ?? 100;
+        const rangeStep = field.range_step ?? 1;
+        const rangeValue = value ?? rangeMin;
+        return (
+          <div key={field.id} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
+                {field.label} {field.required && <span className="text-red-500">*</span>}
+              </Label>
+              <span className="text-sm font-medium text-indigo-600">{rangeValue}</span>
+            </div>
+            <LinkedEquipmentBadge />
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-500">{rangeMin}</span>
+              <input
+                type="range"
+                min={rangeMin}
+                max={rangeMax}
+                step={rangeStep}
+                value={rangeValue}
+                onChange={(e) => handleFieldChange(field.id, parseFloat(e.target.value))}
+                className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+              />
+              <span className="text-xs text-slate-500">{rangeMax}</span>
+            </div>
+            {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+          </div>
+        );
+      
+      case "file":
+      case "image":
+        return (
+          <div key={field.id} className="space-y-2">
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </Label>
+            <LinkedEquipmentBadge />
+            <div className="border-2 border-dashed border-slate-300 rounded-lg p-4">
+              {value ? (
+                <div className="flex items-center gap-3">
+                  {fieldType === "image" && value.preview ? (
+                    <img src={value.preview} alt="Preview" className="w-16 h-16 object-cover rounded" />
+                  ) : (
+                    <FileText className="w-10 h-10 text-slate-400" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{value.name || "Uploaded file"}</p>
+                    <p className="text-xs text-slate-500">{value.size ? `${(value.size / 1024).toFixed(1)} KB` : ""}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleFieldChange(field.id, null)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center cursor-pointer">
+                  <Upload className="w-8 h-8 text-slate-400 mb-2" />
+                  <span className="text-sm text-slate-600">
+                    {fieldType === "image" ? "Upload image" : "Upload file"}
+                  </span>
+                  <span className="text-xs text-slate-400 mt-1">
+                    {field.allowed_types || (fieldType === "image" ? "jpg, png, gif" : "Any file")}
+                  </span>
+                  <input
+                    type="file"
+                    accept={fieldType === "image" ? "image/*" : field.allowed_types || "*"}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const fileData = {
+                          name: file.name,
+                          size: file.size,
+                          type: file.type,
+                          file: file,
+                        };
+                        if (fieldType === "image") {
+                          fileData.preview = URL.createObjectURL(file);
+                        }
+                        handleFieldChange(field.id, fileData);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+            {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+          </div>
+        );
+      
+      case "signature":
+        return (
+          <div key={field.id} className="space-y-2">
+            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </Label>
+            <LinkedEquipmentBadge />
+            <div className={cn(
+              "border-2 border-dashed rounded-lg p-4 text-center",
+              value ? "border-green-300 bg-green-50" : "border-slate-300"
+            )}>
+              {value ? (
+                <div className="space-y-2">
+                  <img src={value} alt="Signature" className="max-h-20 mx-auto" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleFieldChange(field.id, null)}
+                  >
+                    Clear Signature
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Signature className="w-8 h-8 text-slate-400 mx-auto" />
+                  <p className="text-sm text-slate-600">Tap to sign</p>
+                  <p className="text-xs text-slate-400">Signature capture coming soon</p>
+                </div>
+              )}
             </div>
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
           </div>
