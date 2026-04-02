@@ -179,9 +179,8 @@ async def get_my_tasks(
     today_end = today_start + timedelta(days=1)
     
     if filter == "open":
-        # Open: show only open actions and in_progress tasks
-        # For tasks: only show those with status "in_progress"
-        query["status"] = "in_progress"
+        # Open: show both pending and in_progress tasks (not completed/cancelled)
+        query["status"] = {"$in": ["pending", "in_progress"]}
         if date:
             try:
                 filter_date = datetime.fromisoformat(date)

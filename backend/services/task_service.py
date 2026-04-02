@@ -714,7 +714,15 @@ class TaskService:
             # Update plan: set last_executed_at and calculate next_due_date
             plan_id = instance.get("task_plan_id")
             if plan_id:
-                plan = await self.plans.find_one({"_id": ObjectId(plan_id)})
+                # Handle both ObjectId string and UUID formats
+                plan = None
+                try:
+                    plan = await self.plans.find_one({"_id": ObjectId(plan_id)})
+                except Exception:
+                    # If ObjectId conversion fails, the plan_id might be a UUID
+                    # which means there's no valid plan to update
+                    pass
+                
                 if plan:
                     next_due = self._calculate_next_due(
                         now,
@@ -722,7 +730,7 @@ class TaskService:
                         plan["interval_unit"]
                     )
                     await self.plans.update_one(
-                        {"_id": ObjectId(plan_id)},
+                        {"_id": plan["_id"]},
                         {"$set": {
                             "last_executed_at": now,
                             "next_due_date": next_due,
