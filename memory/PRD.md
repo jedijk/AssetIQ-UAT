@@ -24,6 +24,30 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 2, 2026 - Form Designer Bug Fixes (3 Issues)
+**CRITICAL Fix:**
+1. ✅ **Template Edit Save/Update Fixed** - Fixed `formAPI.updateTemplate` to accept `{ id, data }` object format (was expecting separate args). Added payload cleaning to remove non-serializable fields. Enhanced error propagation to surface backend error messages in UI.
+
+**HIGH Priority Fix:**
+2. ✅ **Document View Page Blank Issue Fixed** - Added missing `Sparkles` import to `FormsPage.js`. Enhanced `DocumentViewer` component to show proper error UI when document is null (instead of blank page). Added data-testid attributes for testing.
+
+**MEDIUM Priority Fix:**
+3. ✅ **AI Analysis Timeout Issue Fixed** - Created dedicated `aiApi` axios instance with 2-minute timeout (120000ms) for AI operations. Updated error handling to differentiate between timeouts and actual failures. Shows "AI analysis taking longer than expected" message on timeout instead of "ai.analysisFailed".
+
+**Files Modified:**
+- `/app/frontend/src/components/forms/formAPI.js` - Enhanced updateTemplate with object param support, payload cleaning, logging
+- `/app/frontend/src/pages/FormsPage.js` - Added Sparkles import, improved Documents tab with data-testid attributes
+- `/app/frontend/src/components/DocumentViewer.js` - Added proper null document error state UI
+- `/app/frontend/src/lib/api.js` - Added aiApi instance with 2-min timeout, AI-specific error handling
+- `/app/frontend/src/components/AIInsightsPanel.jsx` - Enhanced error handling for timeouts
+- `/app/frontend/src/components/CausalIntelligencePanel.jsx` - Enhanced error handling for timeouts
+- `/app/backend/routes/forms.py` - Added enhanced logging for template update endpoint
+
+**Tests Added:**
+- `/app/backend/tests/test_form_designer_fixes.py` - Comprehensive pytest tests for template CRUD, document operations, AI endpoints
+
+---
+
 ### April 2, 2026 - Settings Menu Cleanup
 **Quick Fix:**
 - ✅ Verified Permissions page is functioning correctly (roles displayed, permission toggles working)
