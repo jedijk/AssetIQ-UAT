@@ -24,6 +24,24 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 2, 2026 - P3 Refactoring: TaskExecutionFrame Extraction
+**Code Quality Improvement:**
+- ✅ Extracted `TaskExecutionFrame` component from `MyTasksPage.js` (1154 lines)
+- ✅ Created new file: `/app/frontend/src/components/task-execution/TaskExecutionFrame.js`
+- ✅ Reduced `MyTasksPage.js` from 2163 lines to 1009 lines (53% reduction)
+
+**Benefits:**
+- Improved maintainability and testability
+- Cleaner separation of concerns
+- Easier to add new task execution features
+- Reusable component for other contexts
+
+**Files Modified:**
+- `frontend/src/pages/MyTasksPage.js` - Removed embedded TaskExecutionFrame, added import
+- `frontend/src/components/task-execution/TaskExecutionFrame.js` - New file with extracted component
+
+---
+
 ### April 1, 2026 - Major Bug Fixes and Feature Improvements (8 Items)
 **CRITICAL Fixes:**
 1. ✅ **Causal Intelligence Fixed** - AI engine now normalizes probability levels (medium→possible, high→very_likely) to avoid enum validation errors
