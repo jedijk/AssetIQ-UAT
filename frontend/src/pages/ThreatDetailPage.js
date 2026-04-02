@@ -527,95 +527,53 @@ const ThreatDetailPage = () => {
       {/* Fixed Header - Below main app header */}
       <div className="sticky top-12 z-40 bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-4xl">
-          <div className="flex items-center gap-2 py-2 sm:py-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/threats")}
-              className="p-1.5 sm:p-2 -ml-1"
-              data-testid="back-to-threats-button"
-            >
-              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-            </Button>
-            
-            <div className="flex-1 min-w-0">
-              {/* Mobile: Just title, no risk badge */}
-              <h1 className="font-semibold text-sm sm:text-base text-slate-900 truncate sm:hidden">
+          {/* Mobile Header - Two rows for better readability */}
+          <div className="sm:hidden py-2">
+            {/* Row 1: Back + Title */}
+            <div className="flex items-center gap-2 mb-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/threats")}
+                className="p-1 -ml-1 flex-shrink-0"
+                data-testid="back-to-threats-button"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <h1 className="font-semibold text-sm text-slate-900 line-clamp-2 leading-tight flex-1">
                 {threat.title}
               </h1>
-              {/* Desktop: Risk badge + rank + title */}
-              <div className="hidden sm:block">
-                <div className="flex items-center gap-2">
-                  <RiskBadge level={threat.risk_level} size="sm" />
-                  <span className="text-slate-400 font-mono text-xs">
-                    #{threat.rank}/{threat.total_threats}
-                  </span>
-                </div>
-                <h1 className="font-semibold text-base text-slate-900 truncate">
-                  {threat.title}
-                </h1>
-              </div>
             </div>
-
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-              {/* Mobile: Score + RPN badges */}
-              <div className="flex items-center gap-1 text-xs sm:hidden">
-                <span className="px-1.5 py-0.5 bg-slate-100 rounded font-medium text-slate-700">
+            {/* Row 2: Scores + Status + Menu */}
+            <div className="flex items-center justify-between pl-7">
+              <div className="flex items-center gap-2">
+                <RiskBadge level={threat.risk_level} size="sm" />
+                <span className="text-[10px] font-medium text-slate-500">
                   {threat.risk_score}
                 </span>
                 {rpnValue && (
-                  <span className={`px-1.5 py-0.5 rounded font-medium ${
+                  <span className={`text-[10px] font-medium px-1 py-0.5 rounded ${
                     rpnValue >= 300 ? "bg-red-100 text-red-700" :
                     rpnValue >= 200 ? "bg-orange-100 text-orange-700" :
                     rpnValue >= 100 ? "bg-yellow-100 text-yellow-700" :
                     "bg-green-100 text-green-700"
                   }`}>
-                    {rpnValue}
+                    RPN {rpnValue}
                   </span>
                 )}
               </div>
-              
-              {/* Desktop: Score badges */}
-              <div className="hidden sm:flex items-center gap-1 text-xs">
-                <span className="px-1.5 py-0.5 bg-slate-100 rounded font-medium text-slate-700">
-                  {threat.risk_score}
-                </span>
-                {rpnValue && (
-                  <span className={`px-1.5 py-0.5 rounded font-medium ${
-                    rpnValue >= 300 ? "bg-red-100 text-red-700" :
-                    rpnValue >= 200 ? "bg-orange-100 text-orange-700" :
-                    rpnValue >= 100 ? "bg-yellow-100 text-yellow-700" :
-                    "bg-green-100 text-green-700"
-                  }`}>
-                    {rpnValue}
-                  </span>
-                )}
-              </div>
-              
-              {/* Quick Actions */}
-              {isEditing ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={cancelEditing}
-                    className="h-7 px-2 text-xs"
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={saveChanges}
-                    disabled={updateMutation.isPending}
-                    className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700"
-                  >
-                    {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {/* Mobile: Status dropdown + 3-dot menu */}
-                  <div className="sm:hidden flex items-center gap-1">
+              <div className="flex items-center gap-1">
+                {isEditing ? (
+                  <>
+                    <Button size="sm" variant="ghost" onClick={cancelEditing} className="h-7 w-7 p-0">
+                      <X className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" onClick={saveChanges} disabled={updateMutation.isPending} className="h-7 w-7 p-0 bg-green-600 hover:bg-green-700">
+                      {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    </Button>
+                  </>
+                ) : (
+                  <>
                     <Select
                       value={threat.status}
                       onValueChange={(value) => updateMutation.mutate({ status: value })}
@@ -656,43 +614,87 @@ const ThreatDetailPage = () => {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  </div>
-                  
-                  {/* Desktop: Full buttons */}
-                  <div className="hidden sm:flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={shareLink}
-                      className="h-7 px-2 text-slate-500 hover:text-slate-700"
-                      title="Share link"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={startEditing}
-                      className="h-7 px-2 text-xs"
-                    >
-                      <Edit className="w-3 h-3 mr-1" />
-                      Edit
-                    </Button>
-                    <Select
-                      value={threat.status}
-                      onValueChange={(value) => updateMutation.mutate({ status: value })}
-                      disabled={updateMutation.isPending}
-                    >
-                      <SelectTrigger className="h-7 w-24 text-xs px-2">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map(s => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Desktop Header - Single row */}
+          <div className="hidden sm:flex items-center gap-2 py-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/threats")}
+              className="p-2 -ml-1"
+              data-testid="back-to-threats-button-desktop"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <RiskBadge level={threat.risk_level} size="sm" />
+                <span className="text-slate-400 font-mono text-xs">
+                  #{threat.rank}/{threat.total_threats}
+                </span>
+              </div>
+              <h1 className="font-semibold text-base text-slate-900 truncate">
+                {threat.title}
+              </h1>
+            </div>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1 text-xs">
+                <span className="px-1.5 py-0.5 bg-slate-100 rounded font-medium text-slate-700">
+                  {threat.risk_score}
+                </span>
+                {rpnValue && (
+                  <span className={`px-1.5 py-0.5 rounded font-medium ${
+                    rpnValue >= 300 ? "bg-red-100 text-red-700" :
+                    rpnValue >= 200 ? "bg-orange-100 text-orange-700" :
+                    rpnValue >= 100 ? "bg-yellow-100 text-yellow-700" :
+                    "bg-green-100 text-green-700"
+                  }`}>
+                    {rpnValue}
+                  </span>
+                )}
+              </div>
+              
+              {isEditing ? (
+                <>
+                  <Button size="sm" variant="outline" onClick={cancelEditing} className="h-7 px-2 text-xs">
+                    <X className="w-3 h-3 mr-1" />
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={saveChanges} disabled={updateMutation.isPending} className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700">
+                    {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
+                    Save
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button size="sm" variant="ghost" onClick={shareLink} className="h-7 px-2 text-slate-500 hover:text-slate-700" title="Share link">
+                    <Share2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={startEditing} className="h-7 px-2 text-xs">
+                    <Edit className="w-3 h-3 mr-1" />
+                    Edit
+                  </Button>
+                  <Select
+                    value={threat.status}
+                    onValueChange={(value) => updateMutation.mutate({ status: value })}
+                    disabled={updateMutation.isPending}
+                  >
+                    <SelectTrigger className="h-7 w-24 text-xs px-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </>
               )}
             </div>
