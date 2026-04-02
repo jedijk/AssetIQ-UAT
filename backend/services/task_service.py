@@ -770,6 +770,10 @@ class TaskService:
         )
         
         if result:
+            # Create form submission if form_data is present
+            if data.get("form_data") and instance.get("form_template_id"):
+                await self._create_form_submission(instance, data, now, completed_by_id, completed_by_name)
+            
             # Update plan: set last_executed_at and calculate next_due_date
             plan_id = instance.get("task_plan_id")
             if plan_id:
@@ -859,6 +863,61 @@ class TaskService:
             return observation_doc["id"]
         except Exception as e:
             logger.error(f"Failed to create observation from task: {e}")
+            return None
+    
+    async def _create_form_submission(
+        self,
+        task_instance: Dict[str, Any],
+        completion_data: Dict[str, Any],
+        timestamp: datetime,
+        submitted_by_id: str,
+        submitted_by_name: str
+    ) -> Optional[str]:
+        """Create a form submission record when a task with form is completed."""
+        import uuid
+        
+        form_data = completion_data.get("form_data", {})
+        
+        # Convert form_data to values array format
+        values = []
+        if isinstance(form_data, dict):
+            for field_id, value in form_data.items():
+                values.append({
+                    "field_id": field_id,
+                    "field_label": field_id,  # Will be enriched by form_service
+                    "value": value,
+                })
+        elif isinstance(form_data, list):
+            values = form_data
+        
+        submission_doc = {
+            "id": str(uuid.uuid4()),
+            "form_template_id": task_instance.get("form_template_id"),
+            "form_template_name": task_instance.get("form_template_name"),
+            "task_instance_id": str(task_instance.get("_id")) if task_instance.get("_id") else task_instance.get("id"),
+            "task_template_name": task_instance.get("task_template_name"),
+            "equipment_id": task_instance.get("equipment_id"),
+            "equipment_name": task_instance.get("equipment_name"),
+            "discipline": task_instance.get("discipline"),
+            "values": values,
+            "attachments": completion_data.get("attachments", []),
+            "notes": completion_data.get("completion_notes"),
+            "submitted_by": submitted_by_id,
+            "submitted_by_name": submitted_by_name,
+            "submitted_at": timestamp,
+            "has_warnings": False,
+            "has_critical": False,
+            "has_signature": False,
+            "status": "completed",
+            "created_at": timestamp,
+        }
+        
+        try:
+            await self.db.form_submissions.insert_one(submission_doc)
+            logger.info(f"Created form submission: {submission_doc['id']}")
+            return submission_doc["id"]
+        except Exception as e:
+            logger.error(f"Failed to create form submission: {e}")
             return None
     
     async def delete_instance(self, instance_id: str) -> bool:
