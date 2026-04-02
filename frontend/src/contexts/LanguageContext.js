@@ -149,6 +149,11 @@ const en = {
     dimensionDetails: "Dimension Details",
     quickStats: "Quick Stats",
     addEquipmentFirst: "Add equipment to your hierarchy to see reliability scores",
+    submittedBy: "Submitted by",
+    on: "on",
+    formResponses: "Form Responses",
+    noFormData: "No form data available",
+    viewInFormDesigner: "View in Form Designer",
   },
   
   // Common
@@ -1339,6 +1344,11 @@ const nl = {
     dimensionDetails: "Dimensie details",
     quickStats: "Snelle statistieken",
     addEquipmentFirst: "Voeg apparatuur toe aan uw hiërarchie om betrouwbaarheidsscores te zien",
+    submittedBy: "Ingediend door",
+    on: "op",
+    formResponses: "Formulierantwoorden",
+    noFormData: "Geen formuliergegevens beschikbaar",
+    viewInFormDesigner: "Bekijken in Formulierontwerper",
   },
   
   // Common

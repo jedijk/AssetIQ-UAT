@@ -24,6 +24,38 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 1, 2026 - Major Bug Fixes and Feature Improvements (8 Items)
+**CRITICAL Fixes:**
+1. ✅ **Causal Intelligence Fixed** - AI engine now normalizes probability levels (medium→possible, high→very_likely) to avoid enum validation errors
+2. ✅ **Form Completion Improved** - Form validation no longer blocks submission on threshold violations (warnings only), added better error messages
+
+**HIGH Priority Fixes:**
+3. ✅ **Equipment Deletion Cascade** - Added impact analysis modal showing affected tasks, actions, investigations, and task plans before deletion. Cascade clears references and deactivates plans.
+4. ✅ **Observations Timeline Refresh** - Added `threatTimeline` and `equipmentHistory` query invalidation on deletion
+5. ✅ **Task/Action Execution Results** - Action completion now stores `form_data`, `attachments`, and `completed_by_name`
+
+**MEDIUM Priority Features:**
+6. ✅ **Dashboard Quick View** - Clicking form submissions in dashboard opens read-only preview modal instead of navigating to Form Designer
+7. ✅ **Feedback View/Edit Parity** - Already consistent layout (verified)
+
+**LOW Priority:**
+8. ⚪ **Observation fixed plan z-index** - No issue found (z-index values appropriate)
+
+**Files Modified:**
+- `backend/ai_risk_engine.py` - Added `_normalize_probability_level()` and `_normalize_confidence_level()` methods
+- `backend/routes/equipment.py` - Added `/equipment-hierarchy/nodes/{id}/deletion-impact` endpoint, updated delete with cascade
+- `backend/routes/my_tasks.py` - Action completion stores form_data/attachments
+- `frontend/src/pages/MyTasksPage.js` - Form validation simplified
+- `frontend/src/pages/EquipmentManagerPage.js` - Delete confirmation with impact dialog
+- `frontend/src/pages/DashboardPage.js` - Quick View modal for form submissions
+- `frontend/src/pages/ThreatsPage.js` - Timeline query invalidation
+- `frontend/src/lib/api.js` - Added `getDeletionImpact()` API method
+- `frontend/src/contexts/LanguageContext.js` - Added equipment deletion and dashboard translations
+
+**Test Report:** `/app/test_reports/iteration_21.json` - 100% pass rate
+
+---
+
 ### April 1, 2026 - Form Integration with Task Execution
 **New Feature:**
 1. ✅ **Form Opens When Executing Task** - When opening/executing a task that has a form template linked, the form fields automatically display in the task execution view
