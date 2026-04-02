@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowLeft, 
@@ -20,6 +20,9 @@ import {
 import { Button } from "./ui/button";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
+
+// Get the API base URL for document proxying
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 
 /**
  * In-app Document Viewer with back button
@@ -43,13 +46,34 @@ export const DocumentViewer = ({
   const [excelData, setExcelData] = useState(null);
   const [activeSheet, setActiveSheet] = useState(0);
   
-  const { name, url, type } = document || {};
+  // Blob URL for PDF/Image (needed for authenticated fetching)
+  const [blobUrl, setBlobUrl] = useState(null);
+  const blobUrlRef = React.useRef(null);
+  
+  const { name, url: rawUrl, type } = document || {};
+  
+  // Construct proper URL - if it's a storage path (not full URL), proxy through API
+  const url = useMemo(() => {
+    if (!rawUrl) return null;
+    // If already a full URL, use as-is
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      return rawUrl;
+    }
+    // Otherwise, proxy through the form-documents endpoint
+    return `${API_BASE_URL}/api/form-documents/${rawUrl}`;
+  }, [rawUrl]);
   
   const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(type?.toLowerCase());
   const isPdf = type?.toLowerCase() === "pdf";
   const isDocx = ["docx", "doc"].includes(type?.toLowerCase());
   const isExcel = ["xls", "xlsx", "csv"].includes(type?.toLowerCase());
   const isPreviewable = isImage || isPdf || isDocx || isExcel;
+
+  // Helper to get auth headers
+  const getAuthHeaders = useCallback(() => {
+    const token = localStorage.getItem("token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, []);
 
   // Fetch and parse DOCX files
   const loadDocx = useCallback(async () => {
@@ -59,7 +83,7 @@ export const DocumentViewer = ({
     setError(null);
     
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error("Failed to fetch document");
       
       const arrayBuffer = await response.arrayBuffer();
@@ -71,7 +95,7 @@ export const DocumentViewer = ({
     } finally {
       setLoading(false);
     }
-  }, [url, isDocx]);
+  }, [url, isDocx, getAuthHeaders]);
 
   // Fetch and parse Excel files
   const loadExcel = useCallback(async () => {
@@ -81,7 +105,7 @@ export const DocumentViewer = ({
     setError(null);
     
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error("Failed to fetch spreadsheet");
       
       const arrayBuffer = await response.arrayBuffer();
@@ -109,12 +133,51 @@ export const DocumentViewer = ({
 
   // Load document on mount
   useEffect(() => {
+    // Cleanup previous blob URL
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    
+    // Reset states on document change
+    setBlobUrl(null);
+    setError(null);
+    setDocxHtml(null);
+    setExcelData(null);
+    
     if (isDocx) {
       loadDocx();
     } else if (isExcel) {
       loadExcel();
+    } else if ((isPdf || isImage) && url) {
+      // Load PDF/Image as blob for authenticated access
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+        .then(response => {
+          if (!response.ok) throw new Error("Failed to fetch file");
+          return response.blob();
+        })
+        .then(blob => {
+          const objectUrl = URL.createObjectURL(blob);
+          blobUrlRef.current = objectUrl;
+          setBlobUrl(objectUrl);
+        })
+        .catch(err => {
+          console.error("Error loading file:", err);
+          setError("Failed to load file. Try downloading instead.");
+        })
+        .finally(() => setLoading(false));
     }
-  }, [isDocx, isExcel, loadDocx, loadExcel]);
+    
+    // Cleanup on unmount
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, [isDocx, isExcel, isPdf, isImage, loadDocx, loadExcel, url]);
 
   if (!document) {
     return (
@@ -122,7 +185,7 @@ export const DocumentViewer = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] bg-slate-900/95 flex flex-col items-center justify-center"
+        className="fixed inset-0 z-[200] bg-slate-900/95 flex flex-col items-center justify-center"
         data-testid="document-viewer-error"
       >
         <div className="bg-slate-800 rounded-lg p-8 text-center max-w-md mx-auto border border-slate-700">
@@ -164,7 +227,7 @@ export const DocumentViewer = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] bg-slate-900/95 flex flex-col"
+        className="fixed inset-0 z-[200] bg-slate-900/95 flex flex-col"
         data-testid="document-viewer"
       >
         {/* Header */}
@@ -311,9 +374,9 @@ export const DocumentViewer = ({
           )}
 
           {/* Image Viewer */}
-          {isImage && !loading && (
+          {isImage && !loading && !error && blobUrl && (
             <motion.img
-              src={url}
+              src={blobUrl}
               alt={name}
               className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
               style={{
@@ -325,9 +388,9 @@ export const DocumentViewer = ({
           )}
 
           {/* PDF Viewer */}
-          {isPdf && !loading && (
+          {isPdf && !loading && !error && blobUrl && (
             <iframe
-              src={`${url}#toolbar=1&navpanes=0`}
+              src={`${blobUrl}#toolbar=1&navpanes=0`}
               title={name}
               className="w-full h-full rounded-lg shadow-2xl bg-white"
               style={{ minHeight: "80vh" }}
