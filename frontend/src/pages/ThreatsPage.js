@@ -677,7 +677,7 @@ const ThreatsPage = () => {
               {/* Score Display - Compact on mobile, full on desktop */}
               <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                 {/* Business Risk Score */}
-                <div className="text-right">
+                <div className="text-right w-10 sm:w-14">
                   <div className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">Score</div>
                   <div className="text-sm sm:text-base font-semibold text-slate-700">
                     {threat.risk_score}
@@ -685,7 +685,7 @@ const ThreatsPage = () => {
                 </div>
                 
                 {/* RPN - Compact on mobile */}
-                <div className="text-right">
+                <div className="text-right w-10 sm:w-14">
                   <div className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">RPN</div>
                   {rpnValue ? (
                     <div className={`text-sm sm:text-base font-semibold ${
@@ -702,7 +702,7 @@ const ThreatsPage = () => {
                 </div>
                 
                 {/* Actions Count - Hidden on mobile */}
-                <div className="text-right hidden sm:block">
+                <div className="text-right hidden sm:block w-14">
                   <div className="text-xs text-slate-400">Actions</div>
                   <div className="text-sm sm:text-base font-semibold text-slate-700">
                     {threat.recommended_actions?.length || 0}
