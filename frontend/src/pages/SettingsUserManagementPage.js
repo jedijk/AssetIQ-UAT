@@ -306,6 +306,7 @@ const SettingsUserManagementPage = () => {
     location: "",
     plant_unit: "",
     send_email: true,
+    installations: [],
   });
   
   // Approval workflow state
@@ -524,6 +525,7 @@ const SettingsUserManagementPage = () => {
         location: "",
         plant_unit: "",
         send_email: true,
+        installations: [],
       });
     },
     onError: (error) => {
@@ -2057,6 +2059,50 @@ const SettingsUserManagementPage = () => {
                   onChange={(e) => setCreateUserForm({ ...createUserForm, location: e.target.value })}
                 />
               </div>
+            </div>
+            
+            {/* Installations Assignment */}
+            <div className="space-y-2">
+              <Label>Assign to Installations</Label>
+              <div className="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto bg-slate-50">
+                {installations.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-2">No installations available</p>
+                ) : (
+                  <div className="space-y-2">
+                    {installations.map((installation) => {
+                      const installationName = installation.name || installation;
+                      const isSelected = createUserForm.installations.includes(installationName);
+                      return (
+                        <label 
+                          key={installation.id || installationName} 
+                          className="flex items-center gap-2 cursor-pointer hover:bg-white p-1.5 rounded"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setCreateUserForm({
+                                  ...createUserForm,
+                                  installations: [...createUserForm.installations, installationName]
+                                });
+                              } else {
+                                setCreateUserForm({
+                                  ...createUserForm,
+                                  installations: createUserForm.installations.filter(i => i !== installationName)
+                                });
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-slate-700">{installationName}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-slate-500">Select which installations this user can access</p>
             </div>
             
             {/* Send welcome email checkbox */}

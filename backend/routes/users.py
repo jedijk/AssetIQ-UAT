@@ -62,6 +62,7 @@ class AdminCreateUser(BaseModel):
     location: str = ""
     plant_unit: str = ""
     send_email: bool = True
+    installations: list = []
 
 
 async def send_welcome_email(user_email: str, user_name: str, password: str, role: str):
@@ -232,10 +233,11 @@ async def admin_create_user(
         "plant_unit": user_data.plant_unit,
         "created_by": current_user["id"],
         "must_change_password": True,  # Require password change on first login
+        "assigned_installations": user_data.installations,  # Assign to installations
     }
     await db.users.insert_one(user_doc)
     
-    logger.info(f"User created by admin {current_user['email']}: {user_data.email} with role {user_data.role}")
+    logger.info(f"User created by admin {current_user['email']}: {user_data.email} with role {user_data.role}, installations: {user_data.installations}")
     
     # Send welcome email if requested
     email_sent = False
@@ -256,6 +258,7 @@ async def admin_create_user(
             "name": user_data.name,
             "role": user_data.role,
             "approval_status": "approved",
+            "assigned_installations": user_data.installations,
         }
     }
 
