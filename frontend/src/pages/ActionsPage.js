@@ -698,29 +698,32 @@ export default function ActionsPage() {
                   </div>
                 </div>
 
-                {/* Score Column - Visible on mobile, compact */}
-                <div className="flex flex-col items-end w-10 sm:w-14">
-                  <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">{t("observations.riskScore")}</span>
-                  <span className={`text-sm sm:text-lg font-bold ${
-                    action.threat_risk_score >= 70 ? "text-red-600" :
-                    action.threat_risk_score >= 50 ? "text-orange-500" :
-                    action.threat_risk_score >= 30 ? "text-yellow-500" :
-                    action.threat_risk_score ? "text-green-500" : "text-slate-300"
-                  }`}>
-                    {action.threat_risk_score ?? "—"}
-                  </span>
-                </div>
+                {/* Score & RPN Columns - Fixed width container for alignment */}
+                <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+                  {/* Score Column */}
+                  <div className="flex flex-col items-end w-10 sm:w-12">
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">{t("observations.riskScore")}</span>
+                    <span className={`text-sm sm:text-lg font-bold tabular-nums ${
+                      action.threat_risk_score >= 70 ? "text-red-600" :
+                      action.threat_risk_score >= 50 ? "text-orange-500" :
+                      action.threat_risk_score >= 30 ? "text-yellow-500" :
+                      action.threat_risk_score ? "text-green-500" : "text-slate-300"
+                    }`}>
+                      {action.threat_risk_score ?? "—"}
+                    </span>
+                  </div>
 
-                {/* RPN Column - Show on mobile too */}
-                <div className="flex flex-col items-end w-10 sm:w-14">
-                  <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">RPN</span>
-                  <span className={`text-sm sm:text-lg font-bold ${
-                    action.threat_rpn >= 200 ? "text-red-600" :
-                    action.threat_rpn >= 100 ? "text-orange-500" :
-                    action.threat_rpn ? "text-blue-500" : "text-slate-300"
-                  }`}>
-                    {action.threat_rpn ?? "—"}
-                  </span>
+                  {/* RPN Column */}
+                  <div className="flex flex-col items-end w-10 sm:w-12">
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">RPN</span>
+                    <span className={`text-sm sm:text-lg font-bold tabular-nums ${
+                      action.threat_rpn >= 200 ? "text-red-600" :
+                      action.threat_rpn >= 100 ? "text-orange-500" :
+                      action.threat_rpn ? "text-blue-500" : "text-slate-300"
+                    }`}>
+                      {action.threat_rpn ?? "—"}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Right side - Due date & Status - Hidden on mobile except status */}
