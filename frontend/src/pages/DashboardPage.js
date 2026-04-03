@@ -301,8 +301,20 @@ export default function DashboardPage() {
       }
     };
     
+    // Disable pointer events on dialog overlay when lightbox is open
+    const dialogOverlay = document.querySelector('[data-dialog-overlay="true"]');
+    if (dialogOverlay) {
+      dialogOverlay.style.pointerEvents = 'none';
+    }
+    
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      // Re-enable pointer events when lightbox closes
+      if (dialogOverlay) {
+        dialogOverlay.style.pointerEvents = '';
+      }
+    };
   }, [viewingImage, closeImageLightbox]);
 
   // Navigation state for back button support
