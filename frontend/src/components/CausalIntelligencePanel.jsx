@@ -216,10 +216,46 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
       
       // Add AI-generated causes as CauseNodes
       if (causalAnalysis?.probable_causes?.length > 0) {
+        // Valid category values for the backend
+        const validCategories = [
+          "technical_cause",
+          "human_factor", 
+          "maintenance_issue",
+          "design_issue",
+          "organizational_factor",
+          "external_condition"
+        ];
+        
+        // Map common AI variations to valid categories
+        const mapCategory = (cat) => {
+          if (!cat) return "technical_cause";
+          const normalized = cat.toLowerCase().replace(/[^a-z_]/g, '_');
+          
+          // Direct match
+          if (validCategories.includes(normalized)) return normalized;
+          
+          // Common variations mapping
+          if (normalized.includes("technical") || normalized.includes("equipment") || normalized.includes("mechanical")) 
+            return "technical_cause";
+          if (normalized.includes("human") || normalized.includes("operator") || normalized.includes("error"))
+            return "human_factor";
+          if (normalized.includes("maintenance") || normalized.includes("repair"))
+            return "maintenance_issue";
+          if (normalized.includes("design") || normalized.includes("engineering"))
+            return "design_issue";
+          if (normalized.includes("organization") || normalized.includes("management") || normalized.includes("process"))
+            return "organizational_factor";
+          if (normalized.includes("external") || normalized.includes("environment") || normalized.includes("weather"))
+            return "external_condition";
+          
+          // Default fallback
+          return "technical_cause";
+        };
+        
         for (const cause of causalAnalysis.probable_causes) {
           await investigationAPI.createCause(investigation.id, {
             description: cause.description,
-            category: cause.category || "technical_cause",
+            category: mapCategory(cause.category),
             is_root_cause: cause.probability >= 60,
             comment: `AI-identified cause (${cause.probability}% probability). Evidence: ${cause.evidence?.join('; ') || 'N/A'}`,
           });
