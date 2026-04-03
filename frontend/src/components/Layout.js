@@ -81,12 +81,9 @@ const Layout = () => {
 
   // Touch event handlers for pull-to-refresh
   useEffect(() => {
-    const mainContent = mainContentRef.current;
-    if (!mainContent) return;
-
     const handleTouchStart = (e) => {
       // Only enable pull-to-refresh when at the top of the page
-      if (mainContent.scrollTop === 0) {
+      if (window.scrollY === 0) {
         touchStartY.current = e.touches[0].clientY;
         setIsPulling(true);
       }
@@ -99,7 +96,7 @@ const Layout = () => {
       const distance = touchY - touchStartY.current;
       
       // Only pull down, not up
-      if (distance > 0 && mainContent.scrollTop === 0) {
+      if (distance > 0 && window.scrollY === 0) {
         // Apply resistance to the pull
         const resistedDistance = Math.min(distance * 0.5, 120);
         setPullDistance(resistedDistance);
@@ -120,14 +117,14 @@ const Layout = () => {
       setIsPulling(false);
     };
 
-    mainContent.addEventListener('touchstart', handleTouchStart, { passive: true });
-    mainContent.addEventListener('touchmove', handleTouchMove, { passive: false });
-    mainContent.addEventListener('touchend', handleTouchEnd, { passive: true });
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
 
     return () => {
-      mainContent.removeEventListener('touchstart', handleTouchStart);
-      mainContent.removeEventListener('touchmove', handleTouchMove);
-      mainContent.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
     };
   }, [isPulling, isRefreshing, pullDistance, handleRefresh]);
 
@@ -769,36 +766,33 @@ const Layout = () => {
         {/* Main Content with Page Transitions */}
         <main 
           ref={mainContentRef}
-          className="flex-1 min-w-0 overflow-y-auto"
-          style={{ 
-            height: 'calc(100vh - 48px)',
-            WebkitOverflowScrolling: 'touch' 
-          }}
+          className="flex-1 min-w-0 relative"
         >
-          {/* Pull-to-refresh indicator */}
-          <div 
-            className="flex items-center justify-center transition-all duration-200 overflow-hidden"
-            style={{ 
-              height: isRefreshing ? 48 : pullDistance,
-              opacity: pullDistance > 0 || isRefreshing ? 1 : 0 
-            }}
-          >
-            {isRefreshing ? (
-              <div className="flex items-center gap-2 text-blue-600">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span className="text-sm font-medium">Refreshing...</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-slate-500">
-                <RefreshCw 
-                  className={`w-5 h-5 transition-transform duration-200 ${pullDistance >= PULL_THRESHOLD ? 'rotate-180 text-blue-600' : ''}`} 
-                />
-                <span className={`text-sm ${pullDistance >= PULL_THRESHOLD ? 'text-blue-600 font-medium' : ''}`}>
-                  {pullDistance >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull down to refresh'}
-                </span>
-              </div>
-            )}
-          </div>
+          {/* Pull-to-refresh indicator - positioned absolutely */}
+          {(pullDistance > 0 || isRefreshing) && (
+            <div 
+              className="absolute top-0 left-0 right-0 flex items-center justify-center bg-white/95 backdrop-blur-sm z-30 transition-all duration-200"
+              style={{ 
+                height: isRefreshing ? 48 : pullDistance,
+              }}
+            >
+              {isRefreshing ? (
+                <div className="flex items-center gap-2 text-blue-600">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm font-medium">Refreshing...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-slate-500">
+                  <RefreshCw 
+                    className={`w-5 h-5 transition-transform duration-200 ${pullDistance >= PULL_THRESHOLD ? 'rotate-180 text-blue-600' : ''}`} 
+                  />
+                  <span className={`text-sm ${pullDistance >= PULL_THRESHOLD ? 'text-blue-600 font-medium' : ''}`}>
+                    {pullDistance >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull down to refresh'}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
           
           <motion.div
             key={location.pathname}
@@ -811,6 +805,10 @@ const Layout = () => {
               ease: [0.25, 0.1, 0.25, 1],
             }}
             className="h-full"
+            style={{ 
+              paddingTop: isRefreshing ? 48 : pullDistance,
+              transition: 'padding-top 0.2s ease'
+            }}
           >
             <Outlet />
           </motion.div>
