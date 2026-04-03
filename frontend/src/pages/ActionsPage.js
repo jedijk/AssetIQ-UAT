@@ -699,7 +699,7 @@ export default function ActionsPage() {
                 </div>
 
                 {/* Score Column - Visible on mobile, compact */}
-                <div className="flex flex-col items-end min-w-[40px] sm:min-w-[50px]">
+                <div className="flex flex-col items-end w-10 sm:w-14">
                   <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">{t("observations.riskScore")}</span>
                   <span className={`text-sm sm:text-lg font-bold ${
                     action.threat_risk_score >= 70 ? "text-red-600" :
@@ -712,7 +712,7 @@ export default function ActionsPage() {
                 </div>
 
                 {/* RPN Column - Show on mobile too */}
-                <div className="flex flex-col items-end min-w-[35px] sm:min-w-[50px]">
+                <div className="flex flex-col items-end w-10 sm:w-14">
                   <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">RPN</span>
                   <span className={`text-sm sm:text-lg font-bold ${
                     action.threat_rpn >= 200 ? "text-red-600" :
