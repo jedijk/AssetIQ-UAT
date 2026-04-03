@@ -1,7 +1,7 @@
 {
   "name": "AssetIQ",
   "short_name": "AssetIQ",
-  "description": "AI-Powered Reliability Intelligence Platform",
+  "description": "AI-Powered Asset Management Platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1e3a5f",
