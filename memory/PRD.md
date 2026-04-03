@@ -24,6 +24,17 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 3, 2026 - Actions List UI Alignment Fix
+**UX Enhancement:**
+- ✅ **Fixed Risk Score and RPN column alignment in Actions list**
+- Columns now align perfectly vertically from row to row regardless of action title length
+- Fixed by restructuring flex container to place Score/RPN in fixed-width container
+
+**Files Modified:**
+- `/app/frontend/src/pages/ActionsPage.js` - Restructured flexbox layout for column alignment
+
+---
+
 ### April 2, 2026 - Form Submissions Page (New Feature)
 **NEW PAGE:**
 - ✅ **Created Form Submissions page to view all submitted forms**
