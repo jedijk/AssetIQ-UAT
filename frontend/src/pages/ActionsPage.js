@@ -626,108 +626,110 @@ export default function ActionsPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className={`priority-item group cursor-pointer ${overdue ? "border-l-4 border-l-red-400" : ""}`}
+                className={`group cursor-pointer p-3 sm:p-4 bg-white rounded-xl border border-slate-200 hover:shadow-md hover:border-slate-300 transition-all duration-200 ${overdue ? "border-l-4 border-l-red-400" : ""}`}
                 data-testid={`action-row-${action.id}`}
                 onClick={() => navigate(`/actions/${action.id}`)}
               >
-                {/* Status Icon */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const nextStatus = action.status === "open" ? "in_progress" : 
-                      action.status === "in_progress" ? "completed" : "open";
-                    quickStatusUpdate(action, nextStatus);
-                  }}
-                  className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center ${priority.iconBg}`}
-                  title={`Status: ${statusConfig[action.status]?.label}. Click to change.`}
-                >
-                  <StatusIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${priority.iconColor}`} />
-                </button>
+                {/* Grid layout for perfect column alignment */}
+                <div className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_auto_1fr_auto_auto] items-center gap-2 sm:gap-4">
+                  {/* Status Icon */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const nextStatus = action.status === "open" ? "in_progress" : 
+                        action.status === "in_progress" ? "completed" : "open";
+                      quickStatusUpdate(action, nextStatus);
+                    }}
+                    className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center ${priority.iconBg}`}
+                    title={`Status: ${statusConfig[action.status]?.label}. Click to change.`}
+                  >
+                    <StatusIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${priority.iconColor}`} />
+                  </button>
 
-                {/* Action Number Badge - Hidden on mobile */}
-                <div 
-                  className="hidden sm:flex items-center justify-center px-2 py-1 bg-slate-100 rounded-md text-xs font-mono text-slate-500 min-w-[60px]" 
-                  data-testid={`action-number-${action.id}`}
-                >
-                  {action.action_number}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1">
-                      {action.title}
-                    </h3>
+                  {/* Action Number Badge - Hidden on mobile */}
+                  <div 
+                    className="hidden sm:flex items-center justify-center px-2 py-1 bg-slate-100 rounded-md text-xs font-mono text-slate-500 min-w-[60px]" 
+                    data-testid={`action-number-${action.id}`}
+                  >
+                    {action.action_number}
                   </div>
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                    {/* Priority Badge - Always show */}
-                    <Badge className={`${priority.color} text-[10px] sm:text-xs px-1.5 py-0`}>
-                      {priority.label}
-                    </Badge>
-                    {/* Action Type Badge - Hidden on mobile */}
-                    {action.action_type && (
-                      <Badge className={`hidden sm:inline-flex text-xs ${
-                        action.action_type === 'PM' ? 'bg-blue-100 text-blue-700' :
-                        action.action_type === 'CM' ? 'bg-amber-100 text-amber-700' :
-                        action.action_type === 'PDM' ? 'bg-purple-100 text-purple-700' :
-                        'bg-slate-100 text-slate-700'
+
+                  {/* Content - Takes remaining space but doesn't push columns */}
+                  <div className="min-w-0 overflow-hidden">
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+                      <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1">
+                        {action.title}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      {/* Priority Badge - Always show */}
+                      <Badge className={`${priority.color} text-[10px] sm:text-xs px-1.5 py-0`}>
+                        {priority.label}
+                      </Badge>
+                      {/* Action Type Badge - Hidden on mobile */}
+                      {action.action_type && (
+                        <Badge className={`hidden sm:inline-flex text-xs ${
+                          action.action_type === 'PM' ? 'bg-blue-100 text-blue-700' :
+                          action.action_type === 'CM' ? 'bg-amber-100 text-amber-700' :
+                          action.action_type === 'PDM' ? 'bg-purple-100 text-purple-700' :
+                          'bg-slate-100 text-slate-700'
+                        }`}>
+                          {action.action_type}
+                        </Badge>
+                      )}
+                      {/* Discipline Badge - Hidden on mobile */}
+                      {action.discipline && (
+                        <Badge className="hidden sm:inline-flex bg-slate-100 text-slate-600 text-xs">
+                          {action.discipline}
+                        </Badge>
+                      )}
+                      {overdue && (
+                        <Badge className="bg-red-100 text-red-700 text-[10px] sm:text-xs px-1.5 py-0">{t("taskScheduler.overdue")}</Badge>
+                      )}
+                      {/* Attachment indicator */}
+                      {action.attachments?.length > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-slate-400" title={`${action.attachments.length} attachment(s)`}>
+                          <Paperclip className="w-3 h-3" />
+                          <span className="text-[10px]">{action.attachments.length}</span>
+                        </span>
+                      )}
+                    </div>
+                    {/* Source info - Simplified on mobile */}
+                    <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 truncate">
+                      {action.source_name || action.assignee || "No source"}
+                    </div>
+                  </div>
+
+                  {/* Score & RPN Columns - Fixed width for perfect alignment */}
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    {/* Score Column */}
+                    <div className="flex flex-col items-end w-10 sm:w-14">
+                      <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">{t("observations.riskScore")}</span>
+                      <span className={`text-sm sm:text-lg font-bold tabular-nums ${
+                        action.threat_risk_score >= 70 ? "text-red-600" :
+                        action.threat_risk_score >= 50 ? "text-orange-500" :
+                        action.threat_risk_score >= 30 ? "text-yellow-500" :
+                        action.threat_risk_score ? "text-green-500" : "text-slate-300"
                       }`}>
-                        {action.action_type}
-                      </Badge>
-                    )}
-                    {/* Discipline Badge - Hidden on mobile */}
-                    {action.discipline && (
-                      <Badge className="hidden sm:inline-flex bg-slate-100 text-slate-600 text-xs">
-                        {action.discipline}
-                      </Badge>
-                    )}
-                    {overdue && (
-                      <Badge className="bg-red-100 text-red-700 text-[10px] sm:text-xs px-1.5 py-0">{t("taskScheduler.overdue")}</Badge>
-                    )}
-                    {/* Attachment indicator */}
-                    {action.attachments?.length > 0 && (
-                      <span className="inline-flex items-center gap-0.5 text-slate-400" title={`${action.attachments.length} attachment(s)`}>
-                        <Paperclip className="w-3 h-3" />
-                        <span className="text-[10px]">{action.attachments.length}</span>
+                        {action.threat_risk_score ?? "—"}
                       </span>
-                    )}
-                  </div>
-                  {/* Source info - Simplified on mobile */}
-                  <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 truncate">
-                    {action.source_name || action.assignee || "No source"}
-                  </div>
-                </div>
+                    </div>
 
-                {/* Score & RPN Columns - Fixed width container for alignment */}
-                <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
-                  {/* Score Column */}
-                  <div className="flex flex-col items-end w-10 sm:w-12">
-                    <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">{t("observations.riskScore")}</span>
-                    <span className={`text-sm sm:text-lg font-bold tabular-nums ${
-                      action.threat_risk_score >= 70 ? "text-red-600" :
-                      action.threat_risk_score >= 50 ? "text-orange-500" :
-                      action.threat_risk_score >= 30 ? "text-yellow-500" :
-                      action.threat_risk_score ? "text-green-500" : "text-slate-300"
-                    }`}>
-                      {action.threat_risk_score ?? "—"}
-                    </span>
+                    {/* RPN Column */}
+                    <div className="flex flex-col items-end w-10 sm:w-14">
+                      <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">RPN</span>
+                      <span className={`text-sm sm:text-lg font-bold tabular-nums ${
+                        action.threat_rpn >= 200 ? "text-red-600" :
+                        action.threat_rpn >= 100 ? "text-orange-500" :
+                        action.threat_rpn ? "text-blue-500" : "text-slate-300"
+                      }`}>
+                        {action.threat_rpn ?? "—"}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* RPN Column */}
-                  <div className="flex flex-col items-end w-10 sm:w-12">
-                    <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">RPN</span>
-                    <span className={`text-sm sm:text-lg font-bold tabular-nums ${
-                      action.threat_rpn >= 200 ? "text-red-600" :
-                      action.threat_rpn >= 100 ? "text-orange-500" :
-                      action.threat_rpn ? "text-blue-500" : "text-slate-300"
-                    }`}>
-                      {action.threat_rpn ?? "—"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Right side - Due date & Status - Hidden on mobile except status */}
-                <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+                  {/* Right side - Due date & Status - Hidden on mobile except status */}
+                  <div className="flex items-center gap-1.5 sm:gap-3">
                   {/* Due date - Hidden on mobile */}
                   <div className="hidden sm:block text-right">
                     <div className={`text-xs sm:text-sm font-medium ${overdue ? "text-red-600" : "text-slate-700"}`}>
@@ -773,6 +775,7 @@ export default function ActionsPage() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+                </div>{/* Close grid */}
               </motion.div>
             );
           })}
