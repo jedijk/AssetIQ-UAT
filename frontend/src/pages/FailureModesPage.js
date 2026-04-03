@@ -58,7 +58,7 @@ import { Button } from "../components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { toast } from "sonner";
-import api, { equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
+import api, { equipmentHierarchyAPI, failureModesAPI, getErrorMessage } from "../lib/api";
 import MaintenanceStrategiesPanel from "../components/MaintenanceStrategiesPanel";
 import BackButton from "../components/BackButton";
 
@@ -252,7 +252,7 @@ const FailureModesPage = () => {
       setIsTypeDialogOpen(false); 
       resetTypeForm(); 
     }, 
-    onError: e => toast.error(e.response?.data?.detail || "Failed") 
+    onError: e => toast.error(getErrorMessage(e, "Failed")) 
   });
   
   const updateTypeMutation = useMutation({ 
@@ -264,7 +264,7 @@ const FailureModesPage = () => {
       setEditingType(null); 
       resetTypeForm(); 
     }, 
-    onError: e => toast.error(e.response?.data?.detail || "Failed") 
+    onError: e => toast.error(getErrorMessage(e, "Failed")) 
   });
   
   const deleteTypeMutation = useMutation({ 
@@ -273,7 +273,7 @@ const FailureModesPage = () => {
       queryClient.invalidateQueries(["equipment-types"]); 
       toast.success("Equipment type deleted"); 
     }, 
-    onError: e => toast.error(e.response?.data?.detail || "Failed") 
+    onError: e => toast.error(getErrorMessage(e, "Failed")) 
   });
 
   // Failure mode mutations
@@ -285,7 +285,7 @@ const FailureModesPage = () => {
       setIsFmDialogOpen(false);
       resetFmForm();
     },
-    onError: e => toast.error(e.response?.data?.detail || "Failed to create")
+    onError: e => toast.error(getErrorMessage(e, "Failed to create"))
   });
 
   const updateFmMutation = useMutation({
@@ -322,7 +322,7 @@ const FailureModesPage = () => {
       setEditingFm(null);
       resetFmForm();
     },
-    onError: e => toast.error(e.response?.data?.detail || "Failed to update")
+    onError: e => toast.error(getErrorMessage(e, "Failed to update"))
   });
 
   const deleteFmMutation = useMutation({
@@ -357,7 +357,7 @@ const FailureModesPage = () => {
       queryClient.invalidateQueries(["failureModes"]);
       toast.success("Failure mode deleted");
     },
-    onError: e => toast.error(e.response?.data?.detail || "Cannot delete built-in failure modes")
+    onError: e => toast.error(getErrorMessage(e, "Cannot delete built-in failure modes"))
   });
 
   // Validation mutations
@@ -372,7 +372,7 @@ const FailureModesPage = () => {
       }
       toast.success(t("library.validationAdded"));
     },
-    onError: e => toast.error(e.response?.data?.detail || "Failed to validate")
+    onError: e => toast.error(getErrorMessage(e, "Failed to validate"))
   });
 
   const unvalidateFmMutation = useMutation({
@@ -385,7 +385,7 @@ const FailureModesPage = () => {
       }
       toast.success(t("library.validationRemoved"));
     },
-    onError: e => toast.error(e.response?.data?.detail || "Failed to remove validation")
+    onError: e => toast.error(getErrorMessage(e, "Failed to remove validation"))
   });
 
   const handleValidateFm = (id, validatorName, validatorPosition, validatorId) => {
@@ -423,7 +423,7 @@ const FailureModesPage = () => {
       toast.success(`Rolled back to version ${data.rolled_back_from_version}`);
       setShowVersionHistory(false);
     },
-    onError: (e) => toast.error(e.response?.data?.detail || "Failed to rollback")
+    onError: (e) => toast.error(getErrorMessage(e, "Failed to rollback"))
   });
 
   const handleRollback = (versionId) => {

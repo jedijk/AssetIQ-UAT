@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useLanguage } from "../contexts/LanguageContext";
 import { usePermissions } from "../contexts/PermissionsContext";
-import { feedbackAPI } from "../lib/api";
+import { feedbackAPI, getErrorMessage } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import {
@@ -333,7 +333,7 @@ const FeedbackPage = () => {
       cancelSelection();
     },
     onError: (error) => {
-      toast.error(error.response?.data?.detail || "Failed to update status");
+      toast.error(getErrorMessage(error, "Failed to update status"));
     },
   });
 
@@ -507,7 +507,7 @@ const FeedbackPage = () => {
       setGeneratedPrompt(result.prompt);
       setIsPromptDialogOpen(true);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to generate prompt");
+      toast.error(getErrorMessage(error, "Failed to generate prompt"));
     } finally {
       setIsGeneratingPrompt(false);
     }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { aiRiskAPI, investigationAPI } from "../lib/api";
+import { aiRiskAPI, investigationAPI, getErrorMessage } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -273,9 +273,7 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
     },
     onError: (error) => {
       console.error("Failed to create investigation:", error);
-      // Show more detailed error message
-      const errorMessage = error?.response?.data?.detail || error?.message || "Failed to create investigation";
-      toast.error(errorMessage);
+      toast.error(getErrorMessage(error, "Failed to create investigation"));
     },
   });
   

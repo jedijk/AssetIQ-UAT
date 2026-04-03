@@ -1067,5 +1067,31 @@ export const permissionsAPI = {
   },
 };
 
+/**
+ * Safely extract error message from API error response.
+ * Handles Pydantic validation errors (array of objects) and standard error formats.
+ * @param {Error} error - The error object from axios
+ * @param {string} fallback - Fallback message if extraction fails
+ * @returns {string} The error message as a string
+ */
+export const getErrorMessage = (error, fallback = "An error occurred") => {
+  const detail = error?.response?.data?.detail;
+  
+  if (typeof detail === 'string') {
+    return detail;
+  }
+  
+  if (Array.isArray(detail)) {
+    // Pydantic validation errors
+    return detail[0]?.msg || detail[0]?.message || fallback;
+  }
+  
+  if (error?.message) {
+    return error.message;
+  }
+  
+  return fallback;
+};
+
 
 export default api;
