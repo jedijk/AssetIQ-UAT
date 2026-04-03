@@ -206,6 +206,32 @@ const ThreatsPage = () => {
     refetchInterval: false, // Disable automatic background refetching
     placeholderData: (previousData) => previousData, // Keep previous data while refetching
   });
+
+  // Prefetch first 10 observation details to prevent 520 errors
+  useEffect(() => {
+    if (threats && threats.length > 0) {
+      // Sort threats by risk score (same as display order) and prefetch top 10
+      const sortedThreats = [...threats].sort((a, b) => {
+        if (sortBy === "rpn") {
+          return ((b.rpn || b.risk_priority_number || 0) - (a.rpn || a.risk_priority_number || 0));
+        }
+        return ((b.risk_score || 0) - (a.risk_score || 0));
+      });
+      
+      // Prefetch top 10 with staggered delays to avoid overwhelming the server
+      const threatsToPreload = sortedThreats.slice(0, 10);
+      threatsToPreload.forEach((threat, index) => {
+        // Stagger prefetch requests by 200ms each to avoid concurrent load
+        setTimeout(() => {
+          queryClient.prefetchQuery({
+            queryKey: ["threat", threat.id],
+            queryFn: () => threatsAPI.getById(threat.id),
+            staleTime: 5 * 60 * 1000, // Keep prefetched data fresh for 5 minutes
+          });
+        }, index * 200);
+      });
+    }
+  }, [threats, sortBy, queryClient]);
   
   // Log error if fetch fails - only show toast once
   const [errorShown, setErrorShown] = useState(false);
@@ -588,6 +614,16 @@ const ThreatsPage = () => {
           {sortedThreats.map((threat, idx) => {
             const EquipmentIcon = getEquipmentIcon(threat.equipment_type, threat.asset);
             const rpnValue = threat.fmea_rpn || threat.rpn || threat.failure_mode_data?.rpn || null;
+            
+            // Prefetch threat details on hover
+            const handleMouseEnter = () => {
+              queryClient.prefetchQuery({
+                queryKey: ["threat", threat.id],
+                queryFn: () => threatsAPI.getById(threat.id),
+                staleTime: 5 * 60 * 1000,
+              });
+            };
+            
             return (
             <motion.div
               key={threat.id}
@@ -595,6 +631,7 @@ const ThreatsPage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
               onClick={() => navigate(`/threats/${threat.id}`)}
+              onMouseEnter={handleMouseEnter}
               className="priority-item group"
               data-testid={`threat-item-${threat.id}`}
             >
