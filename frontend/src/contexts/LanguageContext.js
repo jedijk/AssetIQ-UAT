@@ -154,6 +154,7 @@ const en = {
     formResponses: "Form Responses",
     noFormData: "No form data available",
     viewInFormDesigner: "View in Form Designer",
+    viewAllSubmissions: "View All Submissions",
   },
   
   // Common
@@ -1350,6 +1351,7 @@ const nl = {
     formResponses: "Formulierantwoorden",
     noFormData: "Geen formuliergegevens beschikbaar",
     viewInFormDesigner: "Bekijken in Formulierontwerper",
+    viewAllSubmissions: "Alle Inzendingen Bekijken",
   },
   
   // Common

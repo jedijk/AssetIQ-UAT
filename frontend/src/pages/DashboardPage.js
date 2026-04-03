@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI } from "../lib/api";
@@ -34,6 +35,7 @@ import {
   ChevronDown,
   ClipboardList,
   Paperclip,
+  Download,
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card";
@@ -283,6 +285,25 @@ export default function DashboardPage() {
   
   // Quick View states
   const [quickViewSubmission, setQuickViewSubmission] = useState(null);
+  const [viewingImage, setViewingImage] = useState(null);
+
+  // Close image lightbox with Escape key
+  const closeImageLightbox = useCallback(() => {
+    setViewingImage(null);
+  }, []);
+  
+  useEffect(() => {
+    if (!viewingImage) return;
+    
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        closeImageLightbox();
+      }
+    };
+    
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [viewingImage, closeImageLightbox]);
 
   // Navigation state for back button support
   const navState = { from: "dashboard", fromPage: "Dashboard" };
@@ -1205,7 +1226,11 @@ export default function DashboardPage() {
                         key={att.url || att.id || `attachment-${idx}`}
                         onClick={() => {
                           if (previewUrl) {
-                            window.open(previewUrl, '_blank');
+                            if (isImage) {
+                              setViewingImage({ url: previewUrl, name: fileName });
+                            } else {
+                              window.open(previewUrl, '_blank');
+                            }
                           }
                         }}
                         className="relative group bg-slate-100 rounded-lg border border-slate-200 overflow-hidden aspect-square hover:border-blue-300"
@@ -1259,6 +1284,61 @@ export default function DashboardPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Image Lightbox - Using Portal to render above all dialogs */}
+      {viewingImage && createPortal(
+        <div 
+          data-testid="image-lightbox"
+          className="fixed inset-0 z-[9999] bg-black flex items-center justify-center p-4"
+          onClick={() => setViewingImage(null)}
+        >
+          {/* Close button - Fixed position in top right corner */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              setViewingImage(null);
+            }}
+          >
+            <X className="w-8 h-8" />
+          </Button>
+          
+          {/* Download button - Fixed position in top left corner */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute top-4 left-4 text-white hover:bg-white/20 z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              const link = document.createElement('a');
+              link.href = viewingImage.url;
+              link.download = viewingImage.name;
+              link.click();
+            }}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+          
+          <div className="relative max-w-full max-h-full">
+            {/* Image */}
+            <img
+              src={viewingImage.url}
+              alt={viewingImage.name}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            
+            {/* File name */}
+            <div className="absolute -bottom-10 left-0 right-0 text-center">
+              <p className="text-white/80 text-sm">{viewingImage.name}</p>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
