@@ -198,7 +198,7 @@ async def get_my_tasks(
     
     elif filter == "recurring":
         # Recurring tasks need a valid task_plan_id - we'll verify plans exist after fetching
-        query["task_plan_id"] = {"$exists": True, "$ne": None, "$ne": ""}
+        query["task_plan_id"] = {"$exists": True, "$nin": [None, ""]}
         # Also filter out completed/cancelled to show only active recurring tasks
         if "status" not in query:
             query["status"] = {"$nin": ["completed", "cancelled"]}
@@ -229,13 +229,103 @@ async def get_my_tasks(
         ("due_date", 1)  # earliest due date first
     ]).limit(100)
     
-    tasks = []
-    async for task in tasks_cursor:
-        # Get equipment name if not cached
+    # Collect all tasks first to batch lookups
+    raw_tasks = await tasks_cursor.to_list(length=100)
+    
+    # ============================================
+    # BATCH LOOKUP: Extract all unique IDs upfront
+    # ============================================
+    equipment_ids = set()
+    plan_ids_str = set()
+    plan_ids_oid = set()
+    
+    for task in raw_tasks:
         if task.get("equipment_id") and not task.get("equipment_name"):
-            equipment = await db.equipment.find_one({"_id": task["equipment_id"]})
-            if equipment:
-                task["equipment_name"] = equipment.get("name", "Unknown")
+            equipment_ids.add(task["equipment_id"])
+        task_plan_id = task.get("task_plan_id")
+        if task_plan_id:
+            if isinstance(task_plan_id, str):
+                try:
+                    plan_ids_oid.add(ObjectId(task_plan_id))
+                    plan_ids_str.add(task_plan_id)
+                except Exception:
+                    pass
+            else:
+                plan_ids_oid.add(task_plan_id)
+    
+    # Batch fetch equipment
+    equipment_map = {}
+    if equipment_ids:
+        equipment_cursor = db.equipment.find(
+            {"_id": {"$in": list(equipment_ids)}},
+            {"_id": 1, "name": 1}
+        )
+        async for eq in equipment_cursor:
+            equipment_map[eq["_id"]] = eq.get("name", "Unknown")
+    
+    # Batch fetch plans
+    plan_map = {}
+    if plan_ids_oid:
+        plans_cursor = db.task_plans.find({"_id": {"$in": list(plan_ids_oid)}})
+        async for plan in plans_cursor:
+            plan_map[str(plan["_id"])] = plan
+    
+    # Extract template IDs from plans and tasks
+    template_ids_oid = set()
+    for plan in plan_map.values():
+        if plan.get("task_template_id"):
+            try:
+                template_ids_oid.add(ObjectId(str(plan["task_template_id"])))
+            except Exception:
+                pass
+    for task in raw_tasks:
+        if task.get("task_template_id"):
+            try:
+                template_ids_oid.add(ObjectId(str(task["task_template_id"])))
+            except Exception:
+                pass
+    
+    # Batch fetch task templates
+    template_map = {}
+    if template_ids_oid:
+        templates_cursor = db.task_templates.find({"_id": {"$in": list(template_ids_oid)}})
+        async for tmpl in templates_cursor:
+            template_map[str(tmpl["_id"])] = tmpl
+    
+    # Extract form template IDs from plans, templates, and tasks
+    form_template_ids = set()
+    for plan in plan_map.values():
+        if plan.get("form_template_id"):
+            form_template_ids.add(str(plan["form_template_id"]))
+    for tmpl in template_map.values():
+        if tmpl.get("form_template_id"):
+            form_template_ids.add(str(tmpl["form_template_id"]))
+    for task in raw_tasks:
+        if task.get("form_template_id"):
+            form_template_ids.add(str(task["form_template_id"]))
+    
+    # Batch fetch form templates
+    form_template_map = {}
+    if form_template_ids:
+        form_ids_oid = []
+        for fid in form_template_ids:
+            try:
+                form_ids_oid.append(ObjectId(fid))
+            except Exception:
+                pass
+        if form_ids_oid:
+            form_cursor = db.form_templates.find({"_id": {"$in": form_ids_oid}})
+            async for ft in form_cursor:
+                form_template_map[str(ft["_id"])] = ft
+    
+    # ============================================
+    # PROCESS TASKS using pre-fetched lookups
+    # ============================================
+    tasks = []
+    for task in raw_tasks:
+        # Get equipment name from map
+        if task.get("equipment_id") and not task.get("equipment_name"):
+            task["equipment_name"] = equipment_map.get(task["equipment_id"], "Unknown")
         
         # Get plan details for recurring info
         task_plan_id = task.get("task_plan_id")
@@ -244,15 +334,8 @@ async def get_my_tasks(
         form_template_id = task.get("form_template_id")  # Check task first
         
         if task_plan_id:
-            # Handle both string and ObjectId task_plan_id
-            try:
-                if isinstance(task_plan_id, str):
-                    plan_oid = ObjectId(task_plan_id)
-                else:
-                    plan_oid = task_plan_id
-                plan = await db.task_plans.find_one({"_id": plan_oid})
-            except Exception:
-                plan = None
+            plan_key = str(task_plan_id) if isinstance(task_plan_id, ObjectId) else task_plan_id
+            plan = plan_map.get(plan_key)
             
             # For recurring filter, skip tasks without valid plans
             if filter == "recurring" and not plan:
@@ -265,9 +348,9 @@ async def get_my_tasks(
                 unit = plan.get("interval_unit", "days")
                 task["frequency_display"] = f"Every {interval} {unit}"
                 
-                # Get template for form fields
+                # Get template for form fields from map
                 if plan.get("task_template_id"):
-                    template = await db.task_templates.find_one({"_id": plan["task_template_id"]})
+                    template = template_map.get(str(plan["task_template_id"]))
                     if template:
                         # Use template name as task title if not set
                         if not task.get("title"):
@@ -290,27 +373,21 @@ async def get_my_tasks(
         if not form_template_id:
             task_template_id = task.get("task_template_id")
             if task_template_id:
-                try:
-                    if not template:
-                        template = await db.task_templates.find_one({"_id": ObjectId(str(task_template_id))})
-                    if template:
-                        task["task_template_name"] = template.get("name", "")
-                        form_template_id = template.get("form_template_id")
-                except Exception as e:
-                    logger.warning(f"Failed to fetch task template: {e}")
+                if not template:
+                    template = template_map.get(str(task_template_id))
+                if template:
+                    task["task_template_name"] = template.get("name", "")
+                    form_template_id = template.get("form_template_id")
         
-        # Fetch form template with fields and documents
+        # Fetch form template with fields and documents from map
         if form_template_id:
-            try:
-                form_template = await db.form_templates.find_one({"_id": ObjectId(str(form_template_id))})
-                if form_template:
-                    task["form_fields"] = form_template.get("fields", [])
-                    task["form_template_name"] = form_template.get("name", "")
-                    # Include attached documents for form execution
-                    task["form_documents"] = form_template.get("documents", [])
-                    task["has_form"] = True
-            except Exception as e:
-                logger.warning(f"Failed to fetch form template {form_template_id}: {e}")
+            form_template = form_template_map.get(str(form_template_id))
+            if form_template:
+                task["form_fields"] = form_template.get("fields", [])
+                task["form_template_name"] = form_template.get("name", "")
+                # Include attached documents for form execution
+                task["form_documents"] = form_template.get("documents", [])
+                task["has_form"] = True
         
         # Determine source - check after is_recurring is set
         if task.get("created_from_observation"):
@@ -360,14 +437,24 @@ async def get_my_tasks(
             ]
         # For 'adhoc' and 'all', include all open actions
         
-        actions_cursor = db.central_actions.find(action_query, {"_id": 0})
-        async for action in actions_cursor:
-            # Enrich action with threat risk data
+        # Collect all actions first to batch threat lookup
+        raw_actions = await db.central_actions.find(action_query, {"_id": 0}).to_list(length=100)
+        
+        # Batch fetch threat risk data
+        source_ids = [a["source_id"] for a in raw_actions if a.get("source_id")]
+        threat_map = {}
+        if source_ids:
+            threats_cursor = db.threats.find(
+                {"id": {"$in": source_ids}},
+                {"_id": 0, "id": 1, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1}
+            )
+            async for threat in threats_cursor:
+                threat_map[threat["id"]] = threat
+        
+        # Process actions with pre-fetched threat data
+        for action in raw_actions:
             if action.get("source_id"):
-                threat = await db.threats.find_one(
-                    {"id": action["source_id"]},
-                    {"_id": 0, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1}
-                )
+                threat = threat_map.get(action["source_id"])
                 if threat:
                     action["threat_rpn"] = threat.get("fmea_rpn")
                     action["threat_risk_score"] = threat.get("risk_score")
@@ -686,41 +773,98 @@ async def get_adhoc_plans(
         "is_adhoc": True
     }
     
-    plans_cursor = db.task_plans.find(query).sort("created_at", -1)
+    # Collect all plans first to batch lookups
+    raw_plans = await db.task_plans.find(query).sort("created_at", -1).to_list(length=100)
     
+    # ============================================
+    # BATCH LOOKUP: Extract all unique IDs upfront
+    # ============================================
+    template_ids_str = set()
+    template_ids_oid = set()
+    equipment_ids = set()
+    form_template_ids = set()
+    plan_str_ids = []
+    
+    for plan in raw_plans:
+        template_id = plan.get("task_template_id")
+        if template_id:
+            template_ids_str.add(str(template_id))
+            try:
+                template_ids_oid.add(ObjectId(str(template_id)))
+            except Exception:
+                pass
+        
+        if plan.get("equipment_id") and not plan.get("equipment_name"):
+            equipment_ids.add(plan["equipment_id"])
+        
+        if plan.get("form_template_id"):
+            form_template_ids.add(str(plan["form_template_id"]))
+        
+        plan_str_ids.append(plan.get("id") or str(plan["_id"]))
+    
+    # Batch fetch task templates (try by _id ObjectId)
+    template_map = {}
+    if template_ids_oid:
+        templates_cursor = db.task_templates.find({"_id": {"$in": list(template_ids_oid)}})
+        async for tmpl in templates_cursor:
+            template_map[str(tmpl["_id"])] = tmpl
+    
+    # Also try by string 'id' field for any missing templates
+    missing_ids = template_ids_str - set(template_map.keys())
+    if missing_ids:
+        templates_cursor = db.task_templates.find({"id": {"$in": list(missing_ids)}})
+        async for tmpl in templates_cursor:
+            template_map[tmpl.get("id")] = tmpl
+    
+    # Batch fetch equipment
+    equipment_map = {}
+    if equipment_ids:
+        equipment_cursor = db.equipment.find({"id": {"$in": list(equipment_ids)}}, {"id": 1, "name": 1})
+        async for eq in equipment_cursor:
+            equipment_map[eq["id"]] = eq.get("name", "Unknown Equipment")
+    
+    # Batch fetch form templates
+    form_template_map = {}
+    if form_template_ids:
+        form_cursor = db.form_templates.find({"id": {"$in": list(form_template_ids)}})
+        async for ft in form_cursor:
+            form_template_map[ft.get("id")] = ft
+    
+    # Batch check for in-progress tasks
+    in_progress_map = {}
+    if plan_str_ids:
+        ip_cursor = db.task_instances.find(
+            {"task_plan_id": {"$in": plan_str_ids}, "status": "in_progress"},
+            {"_id": 1, "task_plan_id": 1}
+        )
+        async for ip_task in ip_cursor:
+            in_progress_map[ip_task["task_plan_id"]] = str(ip_task["_id"])
+    
+    # ============================================
+    # PROCESS PLANS using pre-fetched lookups
+    # ============================================
     plans = []
-    async for plan in plans_cursor:
-        # Get template details
+    for plan in raw_plans:
+        # Get template from map
         template_name = plan.get("task_template_name", "Unknown Task")
         template = None
         template_id = plan.get("task_template_id")
         if template_id:
-            # Try by string id first, then ObjectId
-            template = await db.task_templates.find_one({"id": template_id})
-            if not template:
-                try:
-                    template = await db.task_templates.find_one({"_id": ObjectId(template_id)})
-                except Exception:
-                    pass
+            template = template_map.get(str(template_id))
         
-        # Get equipment details
+        # Get equipment name from map
         equipment_name = plan.get("equipment_name", "Unknown Equipment")
         if plan.get("equipment_id") and not equipment_name:
-            equipment = await db.equipment.find_one({"id": plan["equipment_id"]})
-            if equipment:
-                equipment_name = equipment.get("name", "Unknown Equipment")
+            equipment_name = equipment_map.get(plan["equipment_id"], "Unknown Equipment")
         
-        # Get form template details
+        # Get form template from map
         form_template = None
         if plan.get("form_template_id"):
-            form_template = await db.form_templates.find_one({"id": plan["form_template_id"]})
+            form_template = form_template_map.get(str(plan["form_template_id"]))
         
-        # Check if there's an in-progress task for this plan
+        # Check for in-progress task from map
         plan_str_id = plan.get("id") or str(plan["_id"])
-        in_progress_task = await db.task_instances.find_one({
-            "task_plan_id": plan_str_id,
-            "status": "in_progress"
-        })
+        in_progress_task_id = in_progress_map.get(plan_str_id)
         
         plans.append({
             "id": plan_str_id,
@@ -740,8 +884,8 @@ async def get_adhoc_plans(
             "last_executed_at": safe_isoformat(plan.get("last_executed_at")),
             "execution_count": plan.get("execution_count", 0),
             "created_at": safe_isoformat(plan.get("created_at")),
-            "has_in_progress_task": bool(in_progress_task),
-            "in_progress_task_id": str(in_progress_task["_id"]) if in_progress_task else None,
+            "has_in_progress_task": bool(in_progress_task_id),
+            "in_progress_task_id": in_progress_task_id,
         })
     
     return {
