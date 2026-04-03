@@ -210,10 +210,14 @@ const ThreatsPage = () => {
   // Prefetch first 10 observation details to prevent 520 errors
   useEffect(() => {
     if (threats && threats.length > 0) {
-      // Sort threats by risk score (same as display order) and prefetch top 10
+      // Sort threats by current sort order and prefetch top 10
       const sortedThreats = [...threats].sort((a, b) => {
         if (sortBy === "rpn") {
           return ((b.rpn || b.risk_priority_number || 0) - (a.rpn || a.risk_priority_number || 0));
+        } else if (sortBy === "latest") {
+          return new Date(b?.created_at || 0) - new Date(a?.created_at || 0);
+        } else if (sortBy === "oldest") {
+          return new Date(a?.created_at || 0) - new Date(b?.created_at || 0);
         }
         return ((b.risk_score || 0) - (a.risk_score || 0));
       });
@@ -349,6 +353,16 @@ const ThreatsPage = () => {
           const rpnA = a?.fmea_rpn || a?.rpn || a?.failure_mode_data?.rpn || 0;
           const rpnB = b?.fmea_rpn || b?.rpn || b?.failure_mode_data?.rpn || 0;
           return rpnB - rpnA;
+        } else if (sortBy === "latest") {
+          // Sort by created_at (newest first)
+          const dateA = new Date(a?.created_at || 0);
+          const dateB = new Date(b?.created_at || 0);
+          return dateB - dateA;
+        } else if (sortBy === "oldest") {
+          // Sort by created_at (oldest first)
+          const dateA = new Date(a?.created_at || 0);
+          const dateB = new Date(b?.created_at || 0);
+          return dateA - dateB;
         } else {
           // Default: sort by business risk score (higher first)
           return (b?.risk_score || 0) - (a?.risk_score || 0);
@@ -575,6 +589,18 @@ const ThreatsPage = () => {
               <span className="flex items-center gap-2">
                 <Activity className="w-3.5 h-3.5 text-blue-500" />
                 RPN (FMEA)
+              </span>
+            </SelectItem>
+            <SelectItem value="latest">
+              <span className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-green-500" />
+                Latest First
+              </span>
+            </SelectItem>
+            <SelectItem value="oldest">
+              <span className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                Oldest First
               </span>
             </SelectItem>
           </SelectContent>
