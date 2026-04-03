@@ -630,8 +630,8 @@ export default function ActionsPage() {
                 data-testid={`action-row-${action.id}`}
                 onClick={() => navigate(`/actions/${action.id}`)}
               >
-                {/* Grid layout for perfect column alignment */}
-                <div className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_auto_1fr_auto_auto] items-center gap-2 sm:gap-4">
+                {/* Grid layout for perfect column alignment - Score and RPN as separate fixed columns */}
+                <div className="grid grid-cols-[auto_1fr_3rem_3rem_auto] sm:grid-cols-[auto_auto_1fr_4rem_4rem_auto] items-center gap-2 sm:gap-4">
                   {/* Status Icon */}
                   <button
                     onClick={(e) => {
@@ -700,32 +700,29 @@ export default function ActionsPage() {
                     </div>
                   </div>
 
-                  {/* Score & RPN Columns - Fixed width for perfect alignment */}
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    {/* Score Column */}
-                    <div className="flex flex-col items-end w-10 sm:w-14">
-                      <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">{t("observations.riskScore")}</span>
-                      <span className={`text-sm sm:text-lg font-bold tabular-nums ${
-                        action.threat_risk_score >= 70 ? "text-red-600" :
-                        action.threat_risk_score >= 50 ? "text-orange-500" :
-                        action.threat_risk_score >= 30 ? "text-yellow-500" :
-                        action.threat_risk_score ? "text-green-500" : "text-slate-300"
-                      }`}>
-                        {action.threat_risk_score ?? "—"}
-                      </span>
-                    </div>
+                  {/* Score Column - Fixed width */}
+                  <div className="flex flex-col items-end w-12 sm:w-16">
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">{t("observations.riskScore")}</span>
+                    <span className={`text-sm sm:text-lg font-bold tabular-nums ${
+                      action.threat_risk_score >= 70 ? "text-red-600" :
+                      action.threat_risk_score >= 50 ? "text-orange-500" :
+                      action.threat_risk_score >= 30 ? "text-yellow-500" :
+                      action.threat_risk_score ? "text-green-500" : "text-slate-300"
+                    }`}>
+                      {action.threat_risk_score ?? "—"}
+                    </span>
+                  </div>
 
-                    {/* RPN Column */}
-                    <div className="flex flex-col items-end w-10 sm:w-14">
-                      <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">RPN</span>
-                      <span className={`text-sm sm:text-lg font-bold tabular-nums ${
-                        action.threat_rpn >= 200 ? "text-red-600" :
-                        action.threat_rpn >= 100 ? "text-orange-500" :
-                        action.threat_rpn ? "text-blue-500" : "text-slate-300"
-                      }`}>
-                        {action.threat_rpn ?? "—"}
-                      </span>
-                    </div>
+                  {/* RPN Column - Fixed width */}
+                  <div className="flex flex-col items-end w-12 sm:w-16">
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">RPN</span>
+                    <span className={`text-sm sm:text-lg font-bold tabular-nums ${
+                      action.threat_rpn >= 200 ? "text-red-600" :
+                      action.threat_rpn >= 100 ? "text-orange-500" :
+                      action.threat_rpn ? "text-blue-500" : "text-slate-300"
+                    }`}>
+                      {action.threat_rpn ?? "—"}
+                    </span>
                   </div>
 
                   {/* Right side - Due date & Status - Hidden on mobile except status */}
