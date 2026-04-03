@@ -39,30 +39,51 @@ class AnalyticsService:
     async def get_risk_overview(self, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Get overall risk metrics."""
         
-        # Count threats by risk level
-        risk_levels = {}
-        for level in ["Critical", "High", "Medium", "Low"]:
-            query = {"risk_level": level}
-            if user_id:
-                query["created_by"] = user_id
-            risk_levels[level.lower()] = await self.threats.count_documents(query)
+        # Use aggregation pipeline to get all stats in one query
+        match_stage = {"$match": {"created_by": user_id}} if user_id else {"$match": {}}
         
-        # Average risk score
         pipeline = [
-            {"$group": {
-                "_id": None,
-                "avg_risk": {"$avg": "$risk_score"},
-                "max_risk": {"$max": "$risk_score"},
-                "total": {"$sum": 1}
+            match_stage,
+            {"$facet": {
+                "by_risk_level": [
+                    {"$group": {
+                        "_id": "$risk_level",
+                        "count": {"$sum": 1}
+                    }}
+                ],
+                "overall_stats": [
+                    {"$group": {
+                        "_id": None,
+                        "avg_risk": {"$avg": "$risk_score"},
+                        "max_risk": {"$max": "$risk_score"},
+                        "total": {"$sum": 1}
+                    }}
+                ]
             }}
         ]
-        if user_id:
-            pipeline.insert(0, {"$match": {"created_by": user_id}})
         
         result = await self.threats.aggregate(pipeline).to_list(1)
-        avg_risk = result[0]["avg_risk"] if result else 0
-        max_risk = result[0]["max_risk"] if result else 0
-        total_threats = result[0]["total"] if result else 0
+        
+        risk_levels = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+        avg_risk = 0
+        max_risk = 0
+        total_threats = 0
+        
+        if result:
+            facets = result[0]
+            
+            # Extract risk level counts
+            for item in facets.get("by_risk_level", []):
+                level = (item.get("_id") or "").lower()
+                if level in risk_levels:
+                    risk_levels[level] = item["count"]
+            
+            # Extract overall stats
+            if facets.get("overall_stats"):
+                stats = facets["overall_stats"][0]
+                avg_risk = stats.get("avg_risk") or 0
+                max_risk = stats.get("max_risk") or 0
+                total_threats = stats.get("total") or 0
         
         # EFM risk distribution
         efm_pipeline = [

@@ -103,23 +103,35 @@ async def get_reliability_scores(
     """
     user_id = current_user["id"]
     
-    # Get all hierarchy nodes (from equipment_nodes collection)
-    nodes = await db.equipment_nodes.find({"created_by": user_id}, {"_id": 0}).to_list(1000)
+    # Get all hierarchy nodes with only needed fields
+    nodes = await db.equipment_nodes.find(
+        {"created_by": user_id}, 
+        {"_id": 0, "id": 1, "name": 1, "level": 1, "equipment_type": 1, "criticality": 1, "description": 1, "parent_id": 1}
+    ).to_list(1000)
     
-    # Get all threats
-    threats = await db.threats.find({"created_by": user_id}).to_list(1000)
+    # Get all threats with only needed fields
+    threats = await db.threats.find(
+        {"created_by": user_id},
+        {"_id": 0, "id": 1, "asset_name": 1, "status": 1}
+    ).to_list(1000)
     
-    # Get all investigations
-    investigations = await db.investigations.find({"created_by": user_id}).to_list(1000)
+    # Get all investigations with only needed fields
+    investigations = await db.investigations.find(
+        {"created_by": user_id},
+        {"_id": 0, "id": 1, "threat_id": 1, "asset_name": 1}
+    ).to_list(1000)
     
-    # Get all actions
-    actions = await db.actions.find({"created_by": user_id}).to_list(1000)
+    # Get all actions with only needed fields
+    actions = await db.actions.find(
+        {"created_by": user_id},
+        {"_id": 0, "id": 1, "threat_id": 1, "asset_name": 1, "status": 1}
+    ).to_list(1000)
     
     # Get maintenance strategies
-    strategies = await db.maintenance_strategies.find({}).to_list(1000)
+    strategies = await db.maintenance_strategies.find({}, {"_id": 0, "equipment_id": 1}).to_list(1000)
     
     # Get equipment types
-    equipment_types = await db.equipment_types.find({}).to_list(1000)
+    equipment_types = await db.equipment_types.find({}, {"_id": 0, "id": 1}).to_list(1000)
     eq_type_ids = {et["id"] for et in equipment_types}
     
     # Calculate scores for each equipment node

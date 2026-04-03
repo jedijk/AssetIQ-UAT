@@ -178,15 +178,32 @@ async def get_all_actions(
     
     actions = await db.central_actions.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     
-    # Enrich with creator info
+    # Enrich with creator info (uses caching)
     actions = await enrich_with_creator_info(actions)
     
-    # Enrich actions with threat data (RPN and risk score)
+    # Batch fetch threat data for actions that need enrichment
+    threat_ids_to_fetch = []
+    for action in actions:
+        if action.get("rpn") is None:
+            threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
+            if threat_id:
+                threat_ids_to_fetch.append(threat_id)
+    
+    # Fetch all threats in one query
+    threat_data_map = {}
+    if threat_ids_to_fetch:
+        threats = await db.threats.find(
+            {"id": {"$in": list(set(threat_ids_to_fetch))}},
+            {"_id": 0, "id": 1, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1}
+        ).to_list(500)
+        threat_data_map = {t["id"]: t for t in threats}
+    
+    # Enrich actions with threat data
     enriched_actions = []
     for action in actions:
         enriched_action = dict(action)
         
-        # Use stored values if available, otherwise fetch from threat
+        # Use stored values if available
         if action.get("rpn") is not None:
             enriched_action["threat_rpn"] = action.get("rpn")
             enriched_action["threat_risk_score"] = action.get("risk_score")
@@ -196,24 +213,17 @@ async def get_all_actions(
             enriched_action["threat_risk_score"] = None
             enriched_action["threat_risk_level"] = None
             
-            # Try to fetch from linked threat (for backwards compatibility with old actions)
+            # Use batch-fetched threat data
             threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
-            if threat_id:
-                try:
-                    threat = await db.threats.find_one(
-                        {"id": threat_id}, 
-                        {"_id": 0, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1}
-                    )
-                    if threat:
-                        enriched_action["threat_rpn"] = threat.get("fmea_rpn")
-                        enriched_action["threat_risk_score"] = threat.get("risk_score")
-                        enriched_action["threat_risk_level"] = threat.get("risk_level")
-                except Exception as e:
-                    logger.error(f"Error fetching threat data: {e}")
+            if threat_id and threat_id in threat_data_map:
+                threat = threat_data_map[threat_id]
+                enriched_action["threat_rpn"] = threat.get("fmea_rpn")
+                enriched_action["threat_risk_score"] = threat.get("risk_score")
+                enriched_action["threat_risk_level"] = threat.get("risk_level")
         
         enriched_actions.append(enriched_action)
     
-    # Get stats (also filtered by installation)
+    # Get stats using aggregation pipeline (single query instead of 5)
     base_stats_query = installation_filter.build_action_filter(
         current_user["id"], equipment_ids, equipment_names, threat_ids
     )
@@ -221,31 +231,36 @@ async def get_all_actions(
     if base_stats_query.get("_impossible"):
         stats = {"total": 0, "open": 0, "in_progress": 0, "completed": 0, "overdue": 0}
     else:
-        total = await db.central_actions.count_documents(base_stats_query)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        pipeline = [
+            {"$match": base_stats_query},
+            {"$facet": {
+                "total": [{"$count": "count"}],
+                "open": [{"$match": {"status": "open"}}, {"$count": "count"}],
+                "in_progress": [{"$match": {"status": "in_progress"}}, {"$count": "count"}],
+                "completed": [{"$match": {"status": "completed"}}, {"$count": "count"}],
+                "overdue": [
+                    {"$match": {
+                        "status": {"$in": ["open", "in_progress"]},
+                        "due_date": {"$lt": now_iso, "$ne": None}
+                    }},
+                    {"$count": "count"}
+                ]
+            }}
+        ]
         
-        open_query = {**base_stats_query, "status": "open"}
-        open_count = await db.central_actions.count_documents(open_query)
-        
-        in_progress_query = {**base_stats_query, "status": "in_progress"}
-        in_progress_count = await db.central_actions.count_documents(in_progress_query)
-        
-        completed_query = {**base_stats_query, "status": "completed"}
-        completed_count = await db.central_actions.count_documents(completed_query)
-        
-        overdue_query = {
-            **base_stats_query,
-            "status": {"$in": ["open", "in_progress"]},
-            "due_date": {"$lt": datetime.now(timezone.utc).isoformat(), "$ne": None}
-        }
-        overdue_count = await db.central_actions.count_documents(overdue_query)
-        
-        stats = {
-            "total": total,
-            "open": open_count,
-            "in_progress": in_progress_count,
-            "completed": completed_count,
-            "overdue": overdue_count
-        }
+        result = await db.central_actions.aggregate(pipeline).to_list(1)
+        if result:
+            facets = result[0]
+            stats = {
+                "total": facets["total"][0]["count"] if facets["total"] else 0,
+                "open": facets["open"][0]["count"] if facets["open"] else 0,
+                "in_progress": facets["in_progress"][0]["count"] if facets["in_progress"] else 0,
+                "completed": facets["completed"][0]["count"] if facets["completed"] else 0,
+                "overdue": facets["overdue"][0]["count"] if facets["overdue"] else 0
+            }
+        else:
+            stats = {"total": 0, "open": 0, "in_progress": 0, "completed": 0, "overdue": 0}
     
     return {
         "actions": enriched_actions,
