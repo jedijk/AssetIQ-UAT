@@ -3,10 +3,12 @@ User profile and avatar routes.
 Handles user profile photos using object storage.
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Header, Response
+from pydantic import BaseModel, EmailStr
 from datetime import datetime, timezone
 import logging
+import uuid
 from database import db, rbac_service
-from auth import get_current_user
+from auth import get_current_user, hash_password
 from services.storage_service import upload_avatar, get_object, get_mime_type
 
 logger = logging.getLogger(__name__)
@@ -18,6 +20,79 @@ MAX_AVATAR_SIZE = 5 * 1024 * 1024
 
 # Allowed image types
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+
+# Available roles for user creation
+AVAILABLE_ROLES = ["owner", "admin", "reliability_engineer", "maintenance", "operator", "viewer"]
+
+
+class AdminCreateUser(BaseModel):
+    """Schema for admin creating a new user."""
+    email: EmailStr
+    name: str
+    password: str
+    role: str = "viewer"
+    position: str = ""
+    phone: str = ""
+    location: str = ""
+    plant_unit: str = ""
+
+
+@router.post("/users/create")
+async def admin_create_user(
+    user_data: AdminCreateUser,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Create a new user (admin/owner only).
+    The user is automatically approved and can login immediately.
+    """
+    # Check if current user has permission to create users
+    if current_user.get("role") not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Only admins and owners can create users")
+    
+    # Validate role
+    if user_data.role not in AVAILABLE_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(AVAILABLE_ROLES)}")
+    
+    # Only owners can create other owners or admins
+    if user_data.role in ["owner", "admin"] and current_user.get("role") != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can create admin or owner accounts")
+    
+    # Check if email exists
+    existing = await db.users.find_one({"email": user_data.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    user_id = str(uuid.uuid4())
+    user_doc = {
+        "id": user_id,
+        "email": user_data.email,
+        "name": user_data.name,
+        "password_hash": hash_password(user_data.password),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "approval_status": "approved",  # Admin-created users are auto-approved
+        "role": user_data.role,
+        "is_active": True,
+        "position": user_data.position,
+        "phone": user_data.phone,
+        "location": user_data.location,
+        "plant_unit": user_data.plant_unit,
+        "created_by": current_user["id"],
+    }
+    await db.users.insert_one(user_doc)
+    
+    logger.info(f"User created by admin {current_user['email']}: {user_data.email} with role {user_data.role}")
+    
+    return {
+        "message": "User created successfully",
+        "user": {
+            "id": user_id,
+            "email": user_data.email,
+            "name": user_data.name,
+            "role": user_data.role,
+            "approval_status": "approved",
+        }
+    }
 
 
 @router.post("/users/me/avatar")

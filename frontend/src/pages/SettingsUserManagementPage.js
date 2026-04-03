@@ -294,6 +294,19 @@ const SettingsUserManagementPage = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(null);
   const [avatarUrls, setAvatarUrls] = useState({});
   
+  // Create user dialog state
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({
+    email: "",
+    name: "",
+    password: "Welcome123!",
+    role: "viewer",
+    position: "",
+    phone: "",
+    location: "",
+    plant_unit: "",
+  });
+  
   // Approval workflow state
   const [approvalDialogUser, setApprovalDialogUser] = useState(null);
   const [approvalAction, setApprovalAction] = useState("approve");
@@ -475,6 +488,43 @@ const SettingsUserManagementPage = () => {
     },
     onError: (error) => {
       toast.error(error.message || "Failed to send password reset email");
+    }
+  });
+
+  // Create user mutation
+  const createUserMutation = useMutation({
+    mutationFn: async (userData) => {
+      const response = await fetch(`${API_BASE_URL}/api/users/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify(userData)
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Failed to create user");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["rbac-users"]);
+      toast.success(`User "${data.user.name}" created successfully`);
+      setShowCreateUser(false);
+      setCreateUserForm({
+        email: "",
+        name: "",
+        password: "Welcome123!",
+        role: "viewer",
+        position: "",
+        phone: "",
+        location: "",
+        plant_unit: "",
+      });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to create user");
     }
   });
 
@@ -1179,10 +1229,20 @@ const SettingsUserManagementPage = () => {
             <p className="text-sm text-slate-500">Manage user roles and permissions</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowCreateUser(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            data-testid="create-user-btn"
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Add User
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Tabs for Users and Permissions */}
@@ -1895,6 +1955,119 @@ const SettingsUserManagementPage = () => {
               disabled={updateInstallationsMutation.isPending}
             >
               {updateInstallationsMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User Dialog */}
+      <Dialog open={showCreateUser} onOpenChange={setShowCreateUser}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-blue-600" />
+              Create New User
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="create-name">Full Name *</Label>
+              <Input
+                id="create-name"
+                placeholder="John Doe"
+                value={createUserForm.name}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, name: e.target.value })}
+                data-testid="create-user-name"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="create-email">Email *</Label>
+              <Input
+                id="create-email"
+                type="email"
+                placeholder="john@company.com"
+                value={createUserForm.email}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, email: e.target.value })}
+                data-testid="create-user-email"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="create-password">Password</Label>
+              <Input
+                id="create-password"
+                value={createUserForm.password}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, password: e.target.value })}
+                data-testid="create-user-password"
+              />
+              <p className="text-xs text-slate-500">Default password. User should change it on first login.</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="create-role">Role</Label>
+              <Select 
+                value={createUserForm.role} 
+                onValueChange={(val) => setCreateUserForm({ ...createUserForm, role: val })}
+              >
+                <SelectTrigger id="create-role" data-testid="create-user-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(roles).map(([key, role]) => (
+                    <SelectItem key={key} value={key}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="create-position">Position</Label>
+              <Input
+                id="create-position"
+                placeholder="Reliability Engineer"
+                value={createUserForm.position}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, position: e.target.value })}
+                data-testid="create-user-position"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-phone">Phone</Label>
+                <Input
+                  id="create-phone"
+                  placeholder="+31 6 12345678"
+                  value={createUserForm.phone}
+                  onChange={(e) => setCreateUserForm({ ...createUserForm, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-location">Location</Label>
+                <Input
+                  id="create-location"
+                  placeholder="Amsterdam"
+                  value={createUserForm.location}
+                  onChange={(e) => setCreateUserForm({ ...createUserForm, location: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateUser(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createUserMutation.mutate(createUserForm)}
+              disabled={!createUserForm.name || !createUserForm.email || createUserMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="create-user-submit"
+            >
+              {createUserMutation.isPending ? "Creating..." : "Create User"}
             </Button>
           </DialogFooter>
         </DialogContent>
