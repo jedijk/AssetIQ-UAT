@@ -8,6 +8,7 @@ import json
 from database import db, installation_filter
 from auth import get_current_user
 from failure_modes import FAILURE_MODES_LIBRARY
+from services.cache_service import cache
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Stats"])
@@ -16,17 +17,25 @@ router = APIRouter(tags=["Stats"])
 async def get_stats(current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
     
+    # Check cache first
+    cache_key = f"stats:{user_id}"
+    cached = cache.get_stats(cache_key)
+    if cached:
+        return cached
+    
     # Get user's installation filter data
     installation_ids = await installation_filter.get_user_installation_ids(current_user)
     
     # If no installations assigned, return zeros
     if not installation_ids:
-        return {
+        result = {
             "total_threats": 0,
             "open_threats": 0,
             "critical_count": 0,
             "high_count": 0
         }
+        cache.set_stats(cache_key, result)
+        return result
     
     equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
         installation_ids, user_id
@@ -41,12 +50,14 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
     )
     
     if base_filter.get("_impossible"):
-        return {
+        result = {
             "total_threats": 0,
             "open_threats": 0,
             "critical_count": 0,
             "high_count": 0
         }
+        cache.set_stats(cache_key, result)
+        return result
     
     total = await db.threats.count_documents(base_filter)
     
@@ -59,12 +70,17 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
     high_filter = {**base_filter, "risk_level": "High", "status": {"$ne": "Closed"}}
     high = await db.threats.count_documents(high_filter)
     
-    return {
+    result = {
         "total_threats": total,
         "open_threats": open_count,
         "critical_count": critical,
         "high_count": high
     }
+    
+    # Cache for 1 minute
+    cache.set_stats(cache_key, result)
+    
+    return result
 
 # ============= RELIABILITY PERFORMANCE SCORES =============
 

@@ -11,6 +11,7 @@ from auth import get_current_user
 from models.api_models import ThreatResponse, ThreatUpdate
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.threat_score_service import calculate_rank, update_all_ranks, recalculate_threat_scores_for_asset, recalculate_threat_scores_for_failure_mode
+from services.cache_service import cache
 from investigation_models import (
     InvestigationCreate, InvestigationUpdate, InvestigationStatus,
     TimelineEventCreate, EventCategory, ConfidenceLevel,
@@ -48,23 +49,35 @@ async def generate_case_number(user_id: str) -> str:
 
 # Helper function to enrich items with creator info
 async def enrich_with_creator_info(items: list) -> list:
-    """Add creator name and initials to items based on created_by field"""
+    """Add creator name and initials to items based on created_by field.
+    Uses caching to reduce database queries."""
     if not items:
         return items
     
     # Collect unique creator IDs
-    creator_ids = set(item.get("created_by") for item in items if item.get("created_by"))
+    creator_ids = list(set(item.get("created_by") for item in items if item.get("created_by")))
     if not creator_ids:
         return items
     
-    # Fetch all creators in one query
-    creators = await db.users.find(
-        {"id": {"$in": list(creator_ids)}},
-        {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "position": 1, "role": 1}
-    ).to_list(100)
+    # Check cache first
+    cached_creators = cache.get_users_batch(creator_ids)
+    uncached_ids = [uid for uid in creator_ids if uid not in cached_creators]
     
-    # Create a lookup map
-    creator_map = {c["id"]: c for c in creators}
+    # Only fetch uncached users from database
+    if uncached_ids:
+        creators = await db.users.find(
+            {"id": {"$in": uncached_ids}},
+            {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "position": 1, "role": 1}
+        ).to_list(100)
+        
+        # Cache the fetched users
+        fetched_map = {c["id"]: c for c in creators}
+        cache.set_users_batch(fetched_map)
+        
+        # Merge with cached
+        cached_creators.update(fetched_map)
+    
+    creator_map = cached_creators
     
     # Enrich items
     for item in items:
@@ -379,14 +392,26 @@ async def get_threat(
         equipment_node = None
         try:
             if linked_equipment_id:
-                equipment_node = await db.equipment_nodes.find_one(
-                    {"id": linked_equipment_id}
-                )
+                # Check cache first
+                equipment_node = cache.get_equipment(linked_equipment_id)
+                if not equipment_node:
+                    equipment_node = await db.equipment_nodes.find_one(
+                        {"id": linked_equipment_id},
+                        {"_id": 0}
+                    )
+                    if equipment_node:
+                        cache.set_equipment(linked_equipment_id, equipment_node)
             elif asset_name:
-                # Fallback: try to find by asset name
-                equipment_node = await db.equipment_nodes.find_one(
-                    {"name": asset_name}
-                )
+                # Fallback: try to find by asset name (cache by name)
+                cache_key = f"name:{asset_name}"
+                equipment_node = cache.get_equipment(cache_key)
+                if not equipment_node:
+                    equipment_node = await db.equipment_nodes.find_one(
+                        {"name": asset_name},
+                        {"_id": 0}
+                    )
+                    if equipment_node:
+                        cache.set_equipment(cache_key, equipment_node)
         except Exception as e:
             logger.warning(f"Could not fetch equipment node for threat {threat_id}: {e}")
         

@@ -9,29 +9,42 @@ import uuid
 import logging
 from database import db, installation_filter
 from auth import get_current_user
+from services.cache_service import cache
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Actions"])
 
-# Helper function to enrich items with creator info
+# Helper function to enrich items with creator info (with caching)
 async def enrich_with_creator_info(items: list) -> list:
-    """Add creator name and initials to items based on created_by field"""
+    """Add creator name and initials to items based on created_by field.
+    Uses caching to reduce database queries."""
     if not items:
         return items
     
     # Collect unique creator IDs
-    creator_ids = set(item.get("created_by") for item in items if item.get("created_by"))
+    creator_ids = list(set(item.get("created_by") for item in items if item.get("created_by")))
     if not creator_ids:
         return items
     
-    # Fetch all creators in one query
-    creators = await db.users.find(
-        {"id": {"$in": list(creator_ids)}},
-        {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "position": 1, "role": 1}
-    ).to_list(100)
+    # Check cache first
+    cached_creators = cache.get_users_batch(creator_ids)
+    uncached_ids = [uid for uid in creator_ids if uid not in cached_creators]
     
-    # Create a lookup map
-    creator_map = {c["id"]: c for c in creators}
+    # Only fetch uncached users from database
+    if uncached_ids:
+        creators = await db.users.find(
+            {"id": {"$in": uncached_ids}},
+            {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "position": 1, "role": 1}
+        ).to_list(100)
+        
+        # Cache the fetched users
+        fetched_map = {c["id"]: c for c in creators}
+        cache.set_users_batch(fetched_map)
+        
+        # Merge with cached
+        cached_creators.update(fetched_map)
+    
+    creator_map = cached_creators
     
     # Enrich items
     for item in items:
