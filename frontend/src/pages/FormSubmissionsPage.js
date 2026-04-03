@@ -30,6 +30,7 @@ import {
   ZoomIn,
   Trash2,
   MoreVertical,
+  Monitor,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -72,6 +73,23 @@ import { format, parseISO } from "date-fns";
 
 const API_BASE_URL = getBackendUrl();
 
+// Hook to detect mobile
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  return isMobile;
+};
+
 // Fetch form submissions
 const fetchSubmissions = async (filters) => {
   const params = new URLSearchParams();
@@ -102,6 +120,7 @@ export default function FormSubmissionsPage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -147,9 +166,10 @@ export default function FormSubmissionsPage() {
       hasWarnings: statusFilter === "warnings",
       hasCritical: statusFilter === "critical",
     }),
+    enabled: !isMobile, // Don't fetch on mobile
   });
 
-  // Delete mutation
+  // Delete mutation - must be before any early returns
   const deleteMutation = useMutation({
     mutationFn: async (submissionId) => {
       const response = await fetch(`${API_BASE_URL}/api/form-submissions/${submissionId}`, {
@@ -171,6 +191,35 @@ export default function FormSubmissionsPage() {
       toast.error("Failed to delete submission");
     },
   });
+
+  // Show mobile restriction message
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center max-w-sm"
+        >
+          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center">
+            <Monitor className="w-8 h-8 text-blue-400" />
+          </div>
+          <h2 className="text-xl font-semibold text-white mb-3">
+            {t("Desktop Only", "formSubmissions")}
+          </h2>
+          <p className="text-gray-400 mb-6">
+            {t("Form submissions viewing is optimized for desktop. Please use a larger screen for the best experience.", "formSubmissions")}
+          </p>
+          <Button
+            onClick={() => navigate(-1)}
+            className="bg-white/10 hover:bg-white/20 text-white border-0"
+          >
+            {t("Go Back", "common")}
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
 
   const submissions = submissionsData?.submissions || [];
 
