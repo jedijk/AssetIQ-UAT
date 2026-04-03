@@ -2,6 +2,7 @@ import { getBackendUrl } from '../lib/apiConfig';
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import ImageEditor from "../components/ImageEditor";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
@@ -272,8 +273,12 @@ const rbacAPI = {
 
 const SettingsUserManagementPage = () => {
   const { t } = useLanguage();
+  const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
+  
+  // Check if current user is owner
+  const isOwner = currentUser?.role === "owner";
   
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false);
@@ -1235,14 +1240,16 @@ const SettingsUserManagementPage = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button 
-            onClick={() => setShowCreateUser(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            data-testid="create-user-btn"
-          >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Add User
-          </Button>
+          {isOwner && (
+            <Button 
+              onClick={() => setShowCreateUser(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="create-user-btn"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Add User
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh

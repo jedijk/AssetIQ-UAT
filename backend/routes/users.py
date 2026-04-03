@@ -196,13 +196,13 @@ async def admin_create_user(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Create a new user (admin/owner only).
+    Create a new user (owner only).
     The user is automatically approved and can login immediately.
     Optionally sends a welcome email with login credentials.
     """
-    # Check if current user has permission to create users
-    if current_user.get("role") not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="Only admins and owners can create users")
+    # Check if current user has permission to create users - only owners can create users
+    if current_user.get("role") != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can create new users")
     
     # Validate role
     if user_data.role not in AVAILABLE_ROLES:
