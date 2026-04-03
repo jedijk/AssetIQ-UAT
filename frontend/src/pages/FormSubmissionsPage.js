@@ -798,27 +798,27 @@ export default function FormSubmissionsPage() {
       {viewingImage && createPortal(
         <div 
           data-testid="image-lightbox"
-          className="fixed inset-0 z-[9999] bg-black flex items-center justify-center p-4"
+          className="fixed inset-0 z-[9999] bg-black flex items-center justify-center p-2 sm:p-4"
           onClick={() => setViewingImage(null)}
         >
-          {/* Close button - Fixed position in top right corner */}
+          {/* Close button - Fixed position in top right corner, larger on mobile */}
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
+            className="absolute top-2 right-2 sm:top-4 sm:right-4 text-white hover:bg-white/20 active:bg-white/30 z-10 w-12 h-12 sm:w-10 sm:h-10 rounded-full bg-black/40"
             onClick={(e) => {
               e.stopPropagation();
               setViewingImage(null);
             }}
           >
-            <X className="w-8 h-8" />
+            <X className="w-7 h-7 sm:w-6 sm:h-6" />
           </Button>
           
-          {/* Download button - Fixed position in top left corner */}
+          {/* Download button - Fixed position in top left corner, icon-only on mobile */}
           <Button
             variant="ghost"
             size="sm"
-            className="absolute top-4 left-4 text-white hover:bg-white/20 z-10"
+            className="absolute top-2 left-2 sm:top-4 sm:left-4 text-white hover:bg-white/20 active:bg-white/30 z-10 h-12 sm:h-auto px-3 sm:px-4 rounded-full sm:rounded-md bg-black/40"
             onClick={(e) => {
               e.stopPropagation();
               const link = document.createElement('a');
@@ -827,24 +827,29 @@ export default function FormSubmissionsPage() {
               link.click();
             }}
           >
-            <Download className="w-4 h-4 mr-2" />
-            Download
+            <Download className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Download</span>
           </Button>
           
-          <div className="relative max-w-full max-h-full">
-            {/* Image */}
+          <div className="relative max-w-full max-h-full flex items-center justify-center">
+            {/* Image - Tap anywhere outside to close */}
             <img
               src={viewingImage.url}
               alt={viewingImage.name}
-              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              className="max-w-full max-h-[80vh] sm:max-h-[85vh] object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             />
             
-            {/* File name */}
-            <div className="absolute -bottom-10 left-0 right-0 text-center">
-              <p className="text-white/80 text-sm">{viewingImage.name}</p>
+            {/* File name - Positioned below image */}
+            <div className="absolute -bottom-8 sm:-bottom-10 left-0 right-0 text-center px-4">
+              <p className="text-white/80 text-xs sm:text-sm truncate">{viewingImage.name}</p>
             </div>
           </div>
+          
+          {/* Tap to close hint on mobile */}
+          <p className="absolute bottom-4 left-0 right-0 text-center text-white/50 text-xs sm:hidden">
+            Tap outside image to close
+          </p>
         </div>,
         document.body
       )}
