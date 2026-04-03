@@ -339,12 +339,45 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
 
 async def transcribe_audio_with_ai(audio_base64: str) -> str:
     """Transcribe audio using OpenAI Whisper via emergentintegrations."""
+    temp_path = None
     try:
         from emergentintegrations.llm.openai import OpenAISpeechToText
 
+        # Strip data URL prefix if present (e.g., "data:audio/webm;base64,...")
+        if ',' in audio_base64:
+            audio_base64 = audio_base64.split(',')[1]
+        
+        # Decode the base64 audio data
         audio_data = base64.b64decode(audio_base64)
+        
+        # Check if the audio data starts with common audio file headers
+        # WebM files start with 0x1A 0x45 0xDF 0xA3
+        # OGG files start with 'OggS'
+        # WAV files start with 'RIFF'
+        
+        # Determine file extension based on magic bytes
+        if len(audio_data) >= 4:
+            if audio_data[:4] == b'\x1a\x45\xdf\xa3':
+                suffix = ".webm"
+            elif audio_data[:4] == b'OggS':
+                suffix = ".ogg"
+            elif audio_data[:4] == b'RIFF':
+                suffix = ".wav"
+            elif audio_data[:3] == b'ID3' or (len(audio_data) >= 2 and audio_data[:2] == b'\xff\xfb'):
+                suffix = ".mp3"
+            elif audio_data[:4] == b'fLaC':
+                suffix = ".flac"
+            elif audio_data[:4] == b'ftyp' or audio_data[4:8] == b'ftyp':
+                suffix = ".m4a"
+            else:
+                # Default to webm as that's what MediaRecorder typically produces
+                suffix = ".webm"
+        else:
+            suffix = ".webm"
+        
+        logger.info(f"Detected audio format: {suffix}, data size: {len(audio_data)} bytes, first bytes: {audio_data[:8].hex() if len(audio_data) >= 8 else audio_data.hex()}")
 
-        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
             f.write(audio_data)
             temp_path = f.name
 
@@ -364,5 +397,5 @@ async def transcribe_audio_with_ai(audio_base64: str) -> str:
         logger.error(f"Transcription error: {e}")
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
     finally:
-        if 'temp_path' in locals():
+        if temp_path and os.path.exists(temp_path):
             os.unlink(temp_path)
