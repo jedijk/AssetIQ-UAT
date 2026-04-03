@@ -775,10 +775,10 @@ export default function FormSubmissionsPage() {
         />
       )}
 
-      {/* Image Lightbox */}
+      {/* Image Lightbox - Must be higher z-index than Dialog (z-[100]) */}
       {viewingImage && (
         <div 
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[200] bg-black flex items-center justify-center p-4"
           onClick={() => setViewingImage(null)}
         >
           <div className="relative max-w-full max-h-full">
