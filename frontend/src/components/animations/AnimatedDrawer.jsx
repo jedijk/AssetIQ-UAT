@@ -68,7 +68,7 @@ const AnimatedDrawer = memo(({
         <>
           {/* Overlay */}
           <motion.div
-            className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-50 ${overlayClassName}`}
+            className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] ${overlayClassName}`}
             variants={overlayVariants}
             initial="initial"
             animate="animate"
@@ -83,7 +83,7 @@ const AnimatedDrawer = memo(({
             className={`
               fixed top-0 ${side === "left" ? "left-0" : "right-0"} 
               h-full bg-white dark:bg-slate-900 
-              shadow-2xl z-50 flex flex-col
+              shadow-2xl z-[60] flex flex-col
               ${className}
             `}
             style={{ 
