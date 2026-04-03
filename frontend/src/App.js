@@ -7,6 +7,7 @@ import { UndoProvider } from "./contexts/UndoContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Layout from "./components/Layout";
+import ChangePasswordDialog from "./components/ChangePasswordDialog";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -168,6 +169,7 @@ function App() {
               } />
               <Route path="/" element={
                 <ProtectedRoute>
+                  <ChangePasswordDialog />
                   <Layout />
                 </ProtectedRoute>
               }>

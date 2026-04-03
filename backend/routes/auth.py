@@ -153,8 +153,10 @@ async def login(request: Request, credentials: UserLogin):
         )
     
     token = create_token(user["id"])
+    must_change_password = user.get("must_change_password", False)
     return TokenResponse(
         token=token,
+        must_change_password=must_change_password,
         user=UserResponse(
             id=user["id"],
             email=user["email"],
@@ -163,7 +165,8 @@ async def login(request: Request, credentials: UserLogin):
             department=user.get("department"),
             position=user.get("position"),
             role=user.get("role"),
-            phone=user.get("phone")
+            phone=user.get("phone"),
+            must_change_password=must_change_password
         )
     )
 
@@ -177,8 +180,49 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         department=current_user.get("department"),
         position=current_user.get("position"),
         role=current_user.get("role"),
-        phone=current_user.get("phone")
+        phone=current_user.get("phone"),
+        must_change_password=current_user.get("must_change_password", False)
     )
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/auth/change-password")
+async def change_password(
+    request: Request,
+    data: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Change user's password. Used for first-time login password change."""
+    # Verify current password
+    if not verify_password(data.current_password, current_user.get("password_hash", "")):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Validate new password
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    
+    if data.current_password == data.new_password:
+        raise HTTPException(status_code=400, detail="New password must be different from current password")
+    
+    # Update password and clear must_change_password flag
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {
+            "$set": {
+                "password_hash": hash_password(data.new_password),
+                "must_change_password": False,
+                "password_changed_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    logger.info(f"Password changed for user {current_user['email']}")
+    
+    return {"message": "Password changed successfully"}
 
 
 

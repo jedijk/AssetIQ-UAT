@@ -21,15 +21,27 @@
 - **Installations:** Tyromer
 - **Restricted Features:** No access to Causal Engine, Forms, Equipment, Users, Settings
 
-### Test User (Created via Admin)
-- **Email:** newuser@test.com
-- **Password:** Welcome123!
+### Test User (Created via Admin - Password Changed)
+- **Email:** emailtest@example.com
+- **Password:** NewPassword123!
 - **Role:** viewer
 - **Created By:** Admin user creation feature
 
+### Test User (Must Change Password)
+- **Email:** changepwd@test.com
+- **Password:** Welcome123! (temporary)
+- **Role:** viewer
+- **Note:** Will be prompted to change password on first login
+
 ## Default Password for New Users
 When admins create new users via User Management, the default password is: `Welcome123!`
-Users should change this on first login.
+Users are required to change this password on their first login.
+
+## Welcome Email Feature
+- When creating users, admins can check "Send welcome email"
+- User receives email with login credentials
+- Email includes temporary password and login link
+- User must change password on first login
 
 ## Notes
 - All accounts have access to the "Tyromer" installation

@@ -7,13 +7,29 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime, timezone
 import logging
 import uuid
+import os
 from database import db, rbac_service
 from auth import get_current_user, hash_password
 from services.storage_service import upload_avatar, get_object, get_mime_type
 
+# Try to import resend for email
+try:
+    import resend
+    RESEND_AVAILABLE = True
+except ImportError:
+    RESEND_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["User Profile"])
 
+# Email configuration
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+EMAIL_FRONTEND_URL = os.environ.get("EMAIL_FRONTEND_URL", os.environ.get("FRONTEND_URL", "http://localhost:3000"))
+
+# Initialize Resend if available
+if RESEND_AVAILABLE and RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 
 # Maximum file size for avatars (5MB)
 MAX_AVATAR_SIZE = 5 * 1024 * 1024
@@ -23,6 +39,16 @@ ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 # Available roles for user creation
 AVAILABLE_ROLES = ["owner", "admin", "reliability_engineer", "maintenance", "operator", "viewer"]
+
+# Role display names
+ROLE_NAMES = {
+    "owner": "Owner",
+    "admin": "Administrator",
+    "reliability_engineer": "Reliability Engineer",
+    "maintenance": "Maintenance",
+    "operator": "Operator",
+    "viewer": "Viewer"
+}
 
 
 class AdminCreateUser(BaseModel):
@@ -35,6 +61,114 @@ class AdminCreateUser(BaseModel):
     phone: str = ""
     location: str = ""
     plant_unit: str = ""
+    send_email: bool = True
+
+
+async def send_welcome_email(user_email: str, user_name: str, password: str, role: str):
+    """Send welcome email to newly created user with login credentials."""
+    if not RESEND_AVAILABLE or not RESEND_API_KEY:
+        logger.warning("Resend not configured. Welcome email not sent.")
+        return False
+    
+    login_link = f"{EMAIL_FRONTEND_URL}/login"
+    role_name = ROLE_NAMES.get(role, role.title())
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+            <tr>
+                <td>
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                        <tr>
+                            <td style="padding: 40px;">
+                                <!-- Logo -->
+                                <div style="text-align: center; margin-bottom: 32px;">
+                                    <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #1e40af;">AssetIQ</h1>
+                                    <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Reliability Intelligence Platform</p>
+                                </div>
+                                
+                                <!-- Welcome Message -->
+                                <h2 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #1e293b;">Welcome to AssetIQ, {user_name}!</h2>
+                                
+                                <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #475569;">
+                                    Your account has been created and you can now access the AssetIQ platform. Here are your login credentials:
+                                </p>
+                                
+                                <!-- Credentials Box -->
+                                <div style="background-color: #f1f5f9; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                        <tr>
+                                            <td style="padding: 8px 0;">
+                                                <span style="color: #64748b; font-size: 14px;">Email:</span><br>
+                                                <span style="color: #1e293b; font-size: 16px; font-weight: 600;">{user_email}</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px 0;">
+                                                <span style="color: #64748b; font-size: 14px;">Temporary Password:</span><br>
+                                                <span style="color: #1e293b; font-size: 16px; font-weight: 600; font-family: monospace; background: #e2e8f0; padding: 4px 8px; border-radius: 4px;">{password}</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px 0;">
+                                                <span style="color: #64748b; font-size: 14px;">Role:</span><br>
+                                                <span style="color: #1e293b; font-size: 16px; font-weight: 600;">{role_name}</span>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                
+                                <!-- Important Notice -->
+                                <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
+                                    <p style="margin: 0; font-size: 14px; color: #92400e;">
+                                        <strong>Important:</strong> You will be required to change your password when you first log in.
+                                    </p>
+                                </div>
+                                
+                                <!-- Login Button -->
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <a href="{login_link}" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+                                        Login to AssetIQ
+                                    </a>
+                                </div>
+                                
+                                <p style="margin: 0; font-size: 14px; color: #64748b; text-align: center;">
+                                    If the button doesn't work, copy and paste this link into your browser:<br>
+                                    <a href="{login_link}" style="color: #2563eb;">{login_link}</a>
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <!-- Footer -->
+                    <p style="margin: 24px 0 0; font-size: 12px; color: #94a3b8; text-align: center;">
+                        This is an automated message from AssetIQ. If you did not expect this email, please contact your administrator.
+                    </p>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+    
+    try:
+        resend.Emails.send({
+            "from": SENDER_EMAIL,
+            "to": user_email,
+            "subject": "Welcome to AssetIQ - Your Account is Ready",
+            "html": html_content
+        })
+        logger.info(f"Welcome email sent to {user_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send welcome email to {user_email}: {e}")
+        return False
 
 
 @router.post("/users/create")
@@ -45,6 +179,7 @@ async def admin_create_user(
     """
     Create a new user (admin/owner only).
     The user is automatically approved and can login immediately.
+    Optionally sends a welcome email with login credentials.
     """
     # Check if current user has permission to create users
     if current_user.get("role") not in ["owner", "admin"]:
@@ -78,13 +213,25 @@ async def admin_create_user(
         "location": user_data.location,
         "plant_unit": user_data.plant_unit,
         "created_by": current_user["id"],
+        "must_change_password": True,  # Require password change on first login
     }
     await db.users.insert_one(user_doc)
     
     logger.info(f"User created by admin {current_user['email']}: {user_data.email} with role {user_data.role}")
     
+    # Send welcome email if requested
+    email_sent = False
+    if user_data.send_email:
+        email_sent = await send_welcome_email(
+            user_email=user_data.email,
+            user_name=user_data.name,
+            password=user_data.password,
+            role=user_data.role
+        )
+    
     return {
         "message": "User created successfully",
+        "email_sent": email_sent,
         "user": {
             "id": user_id,
             "email": user_data.email,

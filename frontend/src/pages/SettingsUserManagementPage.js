@@ -305,6 +305,7 @@ const SettingsUserManagementPage = () => {
     phone: "",
     location: "",
     plant_unit: "",
+    send_email: true,
   });
   
   // Approval workflow state
@@ -510,7 +511,8 @@ const SettingsUserManagementPage = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries(["rbac-users"]);
-      toast.success(`User "${data.user.name}" created successfully`);
+      const emailMsg = data.email_sent ? " Welcome email sent." : "";
+      toast.success(`User "${data.user.name}" created successfully.${emailMsg}`);
       setShowCreateUser(false);
       setCreateUserForm({
         email: "",
@@ -521,6 +523,7 @@ const SettingsUserManagementPage = () => {
         phone: "",
         location: "",
         plant_unit: "",
+        send_email: true,
       });
     },
     onError: (error) => {
@@ -2053,6 +2056,21 @@ const SettingsUserManagementPage = () => {
                   value={createUserForm.location}
                   onChange={(e) => setCreateUserForm({ ...createUserForm, location: e.target.value })}
                 />
+              </div>
+            </div>
+            
+            {/* Send welcome email checkbox */}
+            <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+              <input
+                type="checkbox"
+                id="send-email"
+                checked={createUserForm.send_email}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, send_email: e.target.checked })}
+                className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+              />
+              <div>
+                <Label htmlFor="send-email" className="cursor-pointer">Send welcome email</Label>
+                <p className="text-xs text-slate-500">User will receive login credentials and must change password on first login</p>
               </div>
             </div>
           </div>

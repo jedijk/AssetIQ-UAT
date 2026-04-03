@@ -25,11 +25,13 @@ class UserResponse(BaseModel):
     position: Optional[str] = None
     role: Optional[str] = None
     phone: Optional[str] = None
+    must_change_password: Optional[bool] = False
 
 
 class TokenResponse(BaseModel):
     token: str
     user: UserResponse
+    must_change_password: Optional[bool] = False
 
 
 class ChatMessageCreate(BaseModel):

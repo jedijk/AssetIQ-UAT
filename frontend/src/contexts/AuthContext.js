@@ -10,6 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -24,6 +25,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.get(`${API_URL}/auth/me`);
       setUser(response.data);
+      setMustChangePassword(response.data.must_change_password || false);
     } catch (error) {
       console.error("Failed to fetch user:", error);
       logout();
@@ -34,14 +36,30 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-    const { token: newToken, user: userData } = response.data;
+    const { token: newToken, user: userData, must_change_password } = response.data;
     
     localStorage.setItem("token", newToken);
     axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
     setToken(newToken);
     setUser(userData);
+    setMustChangePassword(must_change_password || userData.must_change_password || false);
     
-    return userData;
+    return { ...userData, must_change_password: must_change_password || userData.must_change_password };
+  };
+
+  const changePassword = async (currentPassword, newPassword) => {
+    const response = await axios.post(`${API_URL}/auth/change-password`, {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    
+    // Clear the must_change_password flag after successful change
+    setMustChangePassword(false);
+    if (user) {
+      setUser({ ...user, must_change_password: false });
+    }
+    
+    return response.data;
   };
 
   const register = async (name, email, password) => {
@@ -69,10 +87,11 @@ export const AuthProvider = ({ children }) => {
     delete axios.defaults.headers.common["Authorization"];
     setToken(null);
     setUser(null);
+    setMustChangePassword(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, mustChangePassword, changePassword }}>
       {children}
     </AuthContext.Provider>
   );
