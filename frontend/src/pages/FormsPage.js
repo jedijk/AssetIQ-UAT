@@ -300,6 +300,26 @@ const FormsPage = ({ embedded = false }) => {
       toast.error("Field label is required");
       return;
     }
+    
+    // When editing an existing field, update it in place
+    if (editingField) {
+      const updatedField = {
+        ...newField,
+        id: editingField.id, // Preserve original ID
+        order: editingField.order, // Preserve original order
+      };
+      setNewTemplate(prev => ({
+        ...prev,
+        fields: prev.fields.map(f => f.id === editingField.id ? updatedField : f),
+      }));
+      setShowFieldDialog(false);
+      setEditingField(null);
+      resetNewField();
+      toast.success("Field updated");
+      return;
+    }
+    
+    // Adding a new field
     const fieldId = newField.id || newField.label.toLowerCase().replace(/\s+/g, "_");
     const field = {
       ...newField,
@@ -354,7 +374,10 @@ const FormsPage = ({ embedded = false }) => {
             </div>
           </div>
           <Button 
-            onClick={() => setShowCreateDialog(true)}
+            onClick={() => {
+              resetNewTemplate();
+              setShowCreateDialog(true);
+            }}
             className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
             data-testid="create-form-btn"
           >
@@ -368,7 +391,10 @@ const FormsPage = ({ embedded = false }) => {
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-slate-500">Create and manage data collection forms for your tasks</p>
           <Button 
-            onClick={() => setShowCreateDialog(true)}
+            onClick={() => {
+              resetNewTemplate();
+              setShowCreateDialog(true);
+            }}
             size="sm"
             className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
             data-testid="create-form-btn"
@@ -501,7 +527,10 @@ const FormsPage = ({ embedded = false }) => {
                 <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-slate-700 mb-2">No form templates yet</h3>
                 <p className="text-sm text-slate-500 mb-4">Create your first form template to start collecting data</p>
-                <Button onClick={() => setShowCreateDialog(true)}>
+                <Button onClick={() => {
+                  resetNewTemplate();
+                  setShowCreateDialog(true);
+                }}>
                   <Plus className="w-4 h-4 mr-2" /> Create Template
                 </Button>
               </CardContent>

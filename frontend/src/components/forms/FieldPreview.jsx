@@ -25,6 +25,10 @@ export const FieldTypeIcon = ({ type }) => {
 };
 
 export const FieldPreview = ({ field, onEdit, onDelete, isDraggable = false }) => {
+  // Support both field_type (frontend) and type (backend) for compatibility
+  const fieldType = field.field_type || field.type;
+  const thresholds = field.thresholds || {};
+  
   return (
     <div 
       className="bg-white border border-slate-200 rounded-lg p-3 group hover:border-indigo-300 transition-colors"
@@ -36,7 +40,7 @@ export const FieldPreview = ({ field, onEdit, onDelete, isDraggable = false }) =
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <FieldTypeIcon type={field.type} />
+            <FieldTypeIcon type={fieldType} />
             <span className="font-medium text-slate-900 truncate">{field.label}</span>
             {field.required && (
               <Badge variant="destructive" className="text-xs">Required</Badge>
@@ -45,14 +49,14 @@ export const FieldPreview = ({ field, onEdit, onDelete, isDraggable = false }) =
           {field.description && (
             <p className="text-xs text-slate-500 mt-1 truncate">{field.description}</p>
           )}
-          {field.type === "numeric" && (field.warning_low || field.warning_high || field.critical_low || field.critical_high) && (
+          {fieldType === "numeric" && (thresholds.warning_low || thresholds.warning_high || thresholds.critical_low || thresholds.critical_high) && (
             <div className="flex items-center gap-1 mt-2">
               <span className="text-xs text-slate-400">Thresholds:</span>
-              {(field.critical_low || field.critical_high) && <ThresholdBadge status="critical" />}
-              {(field.warning_low || field.warning_high) && <ThresholdBadge status="warning" />}
+              {(thresholds.critical_low || thresholds.critical_high) && <ThresholdBadge status="critical" />}
+              {(thresholds.warning_low || thresholds.warning_high) && <ThresholdBadge status="warning" />}
             </div>
           )}
-          {field.type === "dropdown" && field.options?.length > 0 && (
+          {(fieldType === "dropdown" || fieldType === "multi_select") && field.options?.length > 0 && (
             <div className="flex items-center gap-1 mt-2 flex-wrap">
               <span className="text-xs text-slate-400">Options:</span>
               {field.options.slice(0, 3).map((opt, i) => (
@@ -65,7 +69,7 @@ export const FieldPreview = ({ field, onEdit, onDelete, isDraggable = false }) =
               )}
             </div>
           )}
-          {field.type === "equipment" && (
+          {fieldType === "equipment" && (
             <div className="flex items-center gap-1 mt-2">
               <span className="text-xs text-slate-400">Equipment levels:</span>
               {(field.equipment_levels || ["equipment"]).map((level, i) => (
@@ -80,6 +84,7 @@ export const FieldPreview = ({ field, onEdit, onDelete, isDraggable = false }) =
             size="icon" 
             className="h-7 w-7"
             onClick={(e) => { e.stopPropagation(); onEdit(field); }}
+            data-testid={`edit-field-${field.id}`}
           >
             <Edit className="h-3.5 w-3.5" />
           </Button>
@@ -88,6 +93,7 @@ export const FieldPreview = ({ field, onEdit, onDelete, isDraggable = false }) =
             size="icon" 
             className="h-7 w-7 text-red-600 hover:text-red-700"
             onClick={(e) => { e.stopPropagation(); onDelete(field.id); }}
+            data-testid={`delete-field-${field.id}`}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
