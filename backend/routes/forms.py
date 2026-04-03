@@ -205,29 +205,7 @@ async def get_form_submissions(
         limit=limit
     )
     
-    # Enrich with submitter photos (with caching)
-    user_ids = list(set(s.get("submitted_by") for s in result.get("submissions", []) if s.get("submitted_by")))
-    if user_ids:
-        # Check cache first
-        cached_users = cache.get_users_batch(user_ids)
-        uncached_ids = [uid for uid in user_ids if uid not in cached_users]
-        
-        if uncached_ids:
-            users_cursor = db.users.find(
-                {"id": {"$in": uncached_ids}},
-                {"_id": 0, "id": 1, "avatar_path": 1, "name": 1, "email": 1}
-            )
-            fetched_users = {u["id"]: u for u in await users_cursor.to_list(length=100)}
-            cache.set_users_batch(fetched_users)
-            cached_users.update(fetched_users)
-        
-        for submission in result.get("submissions", []):
-            if submission.get("submitted_by"):
-                user = cached_users.get(submission["submitted_by"], {})
-                avatar_path = user.get("avatar_path")
-                if avatar_path:
-                    submission["submitted_by_photo"] = f"/api/users/{submission['submitted_by']}/avatar"
-    
+    # User photos are now fetched directly in form_service.get_submissions
     return result
 
 @router.get("/form-submissions/{submission_id}")

@@ -582,46 +582,132 @@ class FormService:
             if to_date:
                 query["submitted_at"]["$lte"] = to_date
         
-        cursor = self.submissions.find(query).sort("submitted_at", -1).skip(skip).limit(limit)
+        import asyncio
         
+        # Run count and fetch in parallel
+        count_task = self.submissions.count_documents(query)
+        fetch_task = self.submissions.find(query).sort("submitted_at", -1).skip(skip).limit(limit).to_list(length=limit)
+        
+        total, raw_submissions = await asyncio.gather(count_task, fetch_task)
+        
+        # ============================================
+        # BATCH LOOKUP: Extract all unique IDs upfront
+        # ============================================
+        user_ids = set()
+        equipment_ids = set()
+        task_ids_str = set()
+        task_ids_oid = set()
+        form_template_ids = set()
+        
+        for doc in raw_submissions:
+            if doc.get("submitted_by"):
+                user_ids.add(doc["submitted_by"])
+            if doc.get("equipment_id"):
+                equipment_ids.add(doc["equipment_id"])
+            if doc.get("task_instance_id"):
+                task_ids_str.add(doc["task_instance_id"])
+                if ObjectId.is_valid(doc["task_instance_id"]):
+                    task_ids_oid.add(ObjectId(doc["task_instance_id"]))
+            if doc.get("form_template_id"):
+                form_template_ids.add(doc["form_template_id"])
+        
+        # Run all batch lookups in parallel
+        async def fetch_users():
+            if not user_ids:
+                return {}
+            users = await self.db.users.find(
+                {"id": {"$in": list(user_ids)}}, 
+                {"_id": 0, "id": 1, "name": 1, "email": 1, "avatar_path": 1}
+            ).to_list(length=100)
+            return {u["id"]: {
+                "name": u.get("name", u.get("email", "Unknown")),
+                "avatar_path": u.get("avatar_path")
+            } for u in users}
+        
+        async def fetch_equipment():
+            if not equipment_ids:
+                return {}
+            equipment = await self.db.equipment_nodes.find(
+                {"id": {"$in": list(equipment_ids)}}, 
+                {"_id": 0, "id": 1, "name": 1, "path": 1}
+            ).to_list(length=100)
+            return {eq["id"]: {"name": eq.get("name", "Unknown Equipment"), "path": eq.get("path", "")} for eq in equipment}
+        
+        async def fetch_tasks():
+            result = {}
+            if task_ids_str:
+                tasks = await self.db.task_instances.find({"id": {"$in": list(task_ids_str)}}).to_list(length=100)
+                for task in tasks:
+                    result[task.get("id")] = task
+            if task_ids_oid:
+                tasks = await self.db.task_instances.find({"_id": {"$in": list(task_ids_oid)}}).to_list(length=100)
+                for task in tasks:
+                    result[str(task["_id"])] = task
+            return result
+        
+        async def fetch_templates():
+            result = {}
+            if not form_template_ids:
+                return result
+            # Try by string id
+            templates = await self.templates.find({"id": {"$in": list(form_template_ids)}}).to_list(length=100)
+            for tmpl in templates:
+                result[tmpl.get("id")] = tmpl
+            # Also try by ObjectId for any missing
+            missing_ids = form_template_ids - set(result.keys())
+            if missing_ids:
+                oid_list = [ObjectId(fid) for fid in missing_ids if ObjectId.is_valid(fid)]
+                if oid_list:
+                    templates = await self.templates.find({"_id": {"$in": oid_list}}).to_list(length=100)
+                    for tmpl in templates:
+                        result[str(tmpl["_id"])] = tmpl
+            return result
+        
+        # Execute all lookups in parallel
+        user_map, equipment_map, task_map, template_map = await asyncio.gather(
+            fetch_users(),
+            fetch_equipment(),
+            fetch_tasks(),
+            fetch_templates()
+        )
+        
+        # ============================================
+        # PROCESS SUBMISSIONS using pre-fetched lookups
+        # ============================================
         submissions = []
-        async for doc in cursor:
+        for doc in raw_submissions:
             serialized = self._serialize_submission(doc)
             
-            # Fetch submitted_by_name if not present
-            if not serialized.get("submitted_by_name") and serialized.get("submitted_by"):
-                user = await self.db.users.find_one({"id": serialized["submitted_by"]})
-                if user:
-                    serialized["submitted_by_name"] = user.get("name", user.get("email", "Unknown"))
+            # Get submitted_by info from map (name and avatar)
+            if serialized.get("submitted_by"):
+                user_data = user_map.get(serialized["submitted_by"])
+                if user_data:
+                    if not serialized.get("submitted_by_name"):
+                        serialized["submitted_by_name"] = user_data.get("name", "Unknown")
+                    if user_data.get("avatar_path"):
+                        serialized["submitted_by_photo"] = f"/api/users/{serialized['submitted_by']}/avatar"
             
-            # Fetch equipment info if present
+            # Get equipment info from map
             if serialized.get("equipment_id"):
-                equipment = await self.db.equipment_nodes.find_one({"id": serialized["equipment_id"]})
-                if equipment:
-                    serialized["equipment_name"] = equipment.get("name", "Unknown Equipment")
-                    serialized["equipment_path"] = equipment.get("path", "")
+                eq_data = equipment_map.get(serialized["equipment_id"])
+                if eq_data:
+                    serialized["equipment_name"] = eq_data["name"]
+                    serialized["equipment_path"] = eq_data["path"]
             
-            # Fetch task info if present
+            # Get task info from map
             if serialized.get("task_instance_id"):
-                # Try by string id first
-                task = await self.db.task_instances.find_one({"id": serialized["task_instance_id"]})
-                if not task and ObjectId.is_valid(serialized["task_instance_id"]):
-                    task = await self.db.task_instances.find_one({"_id": ObjectId(serialized["task_instance_id"])})
+                task = task_map.get(serialized["task_instance_id"])
                 if task:
                     serialized["task_template_name"] = task.get("task_template_name", "Unknown Task")
                     serialized["discipline"] = task.get("discipline")
             
-            # Fetch form template for discipline if not in task
+            # Get form template discipline from map if not in task
             if not serialized.get("discipline") and serialized.get("form_template_id"):
-                template = await self.templates.find_one({"id": serialized["form_template_id"]})
-                if not template and ObjectId.is_valid(serialized["form_template_id"]):
-                    template = await self.templates.find_one({"_id": ObjectId(serialized["form_template_id"])})
+                template = template_map.get(serialized["form_template_id"])
                 if template:
                     serialized["discipline"] = template.get("discipline")
             
             submissions.append(serialized)
-        
-        total = await self.submissions.count_documents(query)
         
         return {"total": total, "submissions": submissions}
     
