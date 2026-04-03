@@ -20,6 +20,10 @@ from investigation_models import (
 )
 logger = logging.getLogger(__name__)
 
+# Pre-build optimized lookup dictionaries for failure modes (O(1) lookup instead of O(n))
+FAILURE_MODES_BY_ID = {fm["id"]: fm for fm in FAILURE_MODES_LIBRARY if "id" in fm}
+FAILURE_MODES_BY_NAME = {fm["failure_mode"].lower(): fm for fm in FAILURE_MODES_LIBRARY if "failure_mode" in fm}
+
 # Common failure mode causes for investigation root cause analysis
 FAILURE_MODE_CAUSES = {
     "wear": ["Normal wear and tear", "Inadequate lubrication", "Abrasive particles", "Improper material selection"],
@@ -393,17 +397,20 @@ async def get_threat(
         fmea_changed = False
         
         if failure_mode_name and failure_mode_name != "Unknown":
-            # Look up current failure mode data
-            for fm in FAILURE_MODES_LIBRARY:
-                if (failure_mode_id and fm["id"] == failure_mode_id) or \
-                   fm["failure_mode"].lower() == failure_mode_name.lower():
-                    # Calculate current FMEA score from failure mode
-                    current_fmea = min(100, int((fm["severity"] * fm["occurrence"] * fm["detectability"]) / 10))
-                    if current_fmea != fmea_score:
-                        fmea_score = current_fmea
-                        fmea_changed = True
-                        logger.info(f"Auto-synced FMEA score for threat {threat_id}: {fmea_score}")
-                    break
+            # Use optimized O(1) lookup instead of O(n) iteration
+            fm = None
+            if failure_mode_id and failure_mode_id in FAILURE_MODES_BY_ID:
+                fm = FAILURE_MODES_BY_ID[failure_mode_id]
+            elif failure_mode_name.lower() in FAILURE_MODES_BY_NAME:
+                fm = FAILURE_MODES_BY_NAME[failure_mode_name.lower()]
+            
+            if fm:
+                # Calculate current FMEA score from failure mode
+                current_fmea = min(100, int((fm["severity"] * fm["occurrence"] * fm["detectability"]) / 10))
+                if current_fmea != fmea_score:
+                    fmea_score = current_fmea
+                    fmea_changed = True
+                    logger.info(f"Auto-synced FMEA score for threat {threat_id}: {fmea_score}")
         
         # Calculate criticality score from equipment
         new_criticality_score = threat.get("criticality_score", 0)

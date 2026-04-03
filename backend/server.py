@@ -5,11 +5,14 @@ All route handlers are in /routes/, services in /services/, models in /models/.
 from fastapi import FastAPI, APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import os
 import logging
+import asyncio
+import time
 
 from database import client
 from routes import all_routers
@@ -18,6 +21,31 @@ from seed_database import seed_database
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Request timeout middleware to prevent 520 errors
+class TimeoutMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, timeout: float = 25.0):
+        super().__init__(app)
+        self.timeout = timeout
+
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.time()
+        try:
+            response = await asyncio.wait_for(
+                call_next(request),
+                timeout=self.timeout
+            )
+            # Log slow requests
+            duration = time.time() - start_time
+            if duration > 5.0:
+                logger.warning(f"Slow request: {request.method} {request.url.path} took {duration:.2f}s")
+            return response
+        except asyncio.TimeoutError:
+            logger.error(f"Request timeout: {request.method} {request.url.path} exceeded {self.timeout}s")
+            return JSONResponse(
+                status_code=504,
+                content={"detail": "Request timeout - please try again"}
+            )
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -52,6 +80,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add timeout middleware to prevent 520 errors (25s timeout, Cloudflare times out at 30s)
+app.add_middleware(TimeoutMiddleware, timeout=25.0)
 
 
 @app.on_event("startup")
