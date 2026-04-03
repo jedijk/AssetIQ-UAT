@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://reliability-intel-1.preview.emergentagent.com';
+const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://asset-iq-preview.preview.emergentagent.com';
 
 test.describe('Create Investigation from Threat', () => {
   test.beforeEach(async ({ page }) => {
