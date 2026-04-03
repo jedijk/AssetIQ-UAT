@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2 } from "lucide-react";
 import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { springPresets } from "./animations/constants";
 
@@ -48,6 +48,7 @@ const Layout = () => {
   const { isOnline, totalPending, isSyncing, syncAllPending } = useOfflineSync();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
@@ -55,9 +56,80 @@ const Layout = () => {
   const [infoOpen, setInfoOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [dismissedNotifications, setDismissedNotifications] = useState(false);
+  
+  // Pull-to-refresh state
+  const [isPulling, setIsPulling] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const touchStartY = useRef(0);
+  const mainContentRef = useRef(null);
+  const PULL_THRESHOLD = 80;
 
   // Track page views for user statistics
   usePageTracking();
+  
+  // Pull-to-refresh handler
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    // Invalidate all queries to refetch data
+    await queryClient.invalidateQueries();
+    // Small delay for visual feedback
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setIsRefreshing(false);
+    setPullDistance(0);
+  }, [queryClient]);
+
+  // Touch event handlers for pull-to-refresh
+  useEffect(() => {
+    const mainContent = mainContentRef.current;
+    if (!mainContent) return;
+
+    const handleTouchStart = (e) => {
+      // Only enable pull-to-refresh when at the top of the page
+      if (mainContent.scrollTop === 0) {
+        touchStartY.current = e.touches[0].clientY;
+        setIsPulling(true);
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (!isPulling || isRefreshing) return;
+      
+      const touchY = e.touches[0].clientY;
+      const distance = touchY - touchStartY.current;
+      
+      // Only pull down, not up
+      if (distance > 0 && mainContent.scrollTop === 0) {
+        // Apply resistance to the pull
+        const resistedDistance = Math.min(distance * 0.5, 120);
+        setPullDistance(resistedDistance);
+        
+        // Prevent default scroll when pulling
+        if (distance > 10) {
+          e.preventDefault();
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (pullDistance >= PULL_THRESHOLD && !isRefreshing) {
+        handleRefresh();
+      } else {
+        setPullDistance(0);
+      }
+      setIsPulling(false);
+    };
+
+    mainContent.addEventListener('touchstart', handleTouchStart, { passive: true });
+    mainContent.addEventListener('touchmove', handleTouchMove, { passive: false });
+    mainContent.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      mainContent.removeEventListener('touchstart', handleTouchStart);
+      mainContent.removeEventListener('touchmove', handleTouchMove);
+      mainContent.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isPulling, isRefreshing, pullDistance, handleRefresh]);
 
   // Fetch user avatar
   useEffect(() => {
@@ -695,7 +767,39 @@ const Layout = () => {
         </div>
 
         {/* Main Content with Page Transitions */}
-        <main className="flex-1 min-w-0">
+        <main 
+          ref={mainContentRef}
+          className="flex-1 min-w-0 overflow-y-auto"
+          style={{ 
+            height: 'calc(100vh - 48px)',
+            WebkitOverflowScrolling: 'touch' 
+          }}
+        >
+          {/* Pull-to-refresh indicator */}
+          <div 
+            className="flex items-center justify-center transition-all duration-200 overflow-hidden"
+            style={{ 
+              height: isRefreshing ? 48 : pullDistance,
+              opacity: pullDistance > 0 || isRefreshing ? 1 : 0 
+            }}
+          >
+            {isRefreshing ? (
+              <div className="flex items-center gap-2 text-blue-600">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span className="text-sm font-medium">Refreshing...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-slate-500">
+                <RefreshCw 
+                  className={`w-5 h-5 transition-transform duration-200 ${pullDistance >= PULL_THRESHOLD ? 'rotate-180 text-blue-600' : ''}`} 
+                />
+                <span className={`text-sm ${pullDistance >= PULL_THRESHOLD ? 'text-blue-600 font-medium' : ''}`}>
+                  {pullDistance >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull down to refresh'}
+                </span>
+              </div>
+            )}
+          </div>
+          
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 8 }}
