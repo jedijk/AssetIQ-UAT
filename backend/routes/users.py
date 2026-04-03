@@ -72,6 +72,7 @@ async def send_welcome_email(user_email: str, user_name: str, password: str, rol
     
     login_link = f"{EMAIL_FRONTEND_URL}/login"
     role_name = ROLE_NAMES.get(role, role.title())
+    mobile_guide_image = "https://customer-assets.emergentagent.com/job_6a729e6c-f1da-4ef5-9bc4-3f27b6dedd78/artifacts/lzzxzaqo_AssetIQ%20-%20Mobile%20.png"
     
     html_content = f"""
     <!DOCTYPE html>
@@ -132,16 +133,33 @@ async def send_welcome_email(user_email: str, user_name: str, password: str, rol
                                 </div>
                                 
                                 <!-- Login Button -->
-                                <div style="text-align: center; margin-bottom: 24px;">
+                                <div style="text-align: center; margin-bottom: 32px;">
                                     <a href="{login_link}" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
                                         Login to AssetIQ
                                     </a>
                                 </div>
                                 
-                                <p style="margin: 0; font-size: 14px; color: #64748b; text-align: center;">
+                                <p style="margin: 0 0 32px; font-size: 14px; color: #64748b; text-align: center;">
                                     If the button doesn't work, copy and paste this link into your browser:<br>
                                     <a href="{login_link}" style="color: #2563eb;">{login_link}</a>
                                 </p>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <!-- Mobile App Installation Guide -->
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); margin-top: 24px;">
+                        <tr>
+                            <td style="padding: 32px;">
+                                <h3 style="margin: 0 0 16px; font-size: 20px; font-weight: 600; color: #1e293b; text-align: center;">
+                                    Add AssetIQ to Your Home Screen
+                                </h3>
+                                <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #475569; text-align: center;">
+                                    Get faster access and work like a native app on your mobile device. Follow the instructions below for Android or iOS.
+                                </p>
+                                <div style="text-align: center;">
+                                    <img src="{mobile_guide_image}" alt="Add AssetIQ to Home Screen - Installation Guide for Android and iOS" style="max-width: 100%; height: auto; border-radius: 8px;" />
+                                </div>
                             </td>
                         </tr>
                     </table>
