@@ -5,15 +5,34 @@ from fastapi import APIRouter, Depends, Form
 from typing import Optional
 from datetime import datetime, timezone
 import uuid
-from database import db
+from database import db, failure_modes_service
 from auth import get_current_user
 from models.api_models import ChatMessageCreate, ChatResponse, ThreatResponse, VoiceTranscriptionResponse
 from ai_helpers import classify_user_intent, get_data_context, answer_data_query, analyze_threat_with_ai, transcribe_audio_with_ai
 from chat_handler_v2 import process_chat_message, ChatState
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.threat_score_service import calculate_rank, update_all_ranks
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Chat"])
+
+
+async def get_failure_modes_from_db():
+    """Fetch failure modes from MongoDB, fallback to static library if empty."""
+    try:
+        result = await failure_modes_service.get_all(limit=1000)
+        failure_modes = result.get("failure_modes", [])
+        if failure_modes and len(failure_modes) > 0:
+            logger.info(f"Using {len(failure_modes)} failure modes from database")
+            return failure_modes
+    except Exception as e:
+        logger.warning(f"Failed to fetch failure modes from DB: {e}")
+    
+    # Fallback to static library
+    logger.info(f"Using static FAILURE_MODES_LIBRARY with {len(FAILURE_MODES_LIBRARY)} entries")
+    return FAILURE_MODES_LIBRARY
 
 @router.post("/chat/send", response_model=ChatResponse)
 async def send_chat_message(
@@ -71,11 +90,14 @@ async def send_chat_message(
             )
     
     # Process with clean 2-step chat handler
+    # Fetch latest failure modes from database
+    failure_modes_library = await get_failure_modes_from_db()
+    
     result = await process_chat_message(
         db=db,
         user_id=user_id,
         message_content=message.content,
-        failure_modes_library=FAILURE_MODES_LIBRARY,
+        failure_modes_library=failure_modes_library,
         session_id=session_id,
         image_base64=message.image_base64
     )
