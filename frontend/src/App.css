@@ -1,5 +1,11 @@
 /* ThreatBase App Styles */
 
+/* ==================== IMAGE LIGHTBOX FIX ==================== */
+/* When image lightbox is open, disable pointer events on dialog overlays */
+body:has([data-testid="image-lightbox"]) [data-dialog-overlay="true"] {
+  pointer-events: none !important;
+}
+
 /* ==================== THEME VARIABLES ==================== */
 
 /* Light Theme (Default) */

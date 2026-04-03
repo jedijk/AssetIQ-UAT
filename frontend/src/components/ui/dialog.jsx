@@ -34,25 +34,27 @@ const DialogContent = React.forwardRef(({ className, children, onPointerDownOuts
         className
       )}
       onPointerDownOutside={(e) => {
-        // Prevent closing when interacting with Select/Popover portals or DocumentViewer
+        // Prevent closing when interacting with Select/Popover portals, DocumentViewer, or image lightbox
         const target = e.target;
         if (target?.closest('[data-radix-select-content]') || 
             target?.closest('[data-radix-popper-content-wrapper]') ||
             target?.closest('[data-radix-popover-content]') ||
             target?.closest('[data-testid="document-viewer"]') ||
-            target?.closest('[data-testid="document-viewer-error"]')) {
+            target?.closest('[data-testid="document-viewer-error"]') ||
+            target?.closest('[data-testid="image-lightbox"]')) {
           e.preventDefault();
         }
         onPointerDownOutside?.(e);
       }}
       onInteractOutside={(e) => {
-        // Prevent closing when interacting with Select/Popover portals or DocumentViewer
+        // Prevent closing when interacting with Select/Popover portals, DocumentViewer, or image lightbox
         const target = e.target;
         if (target?.closest('[data-radix-select-content]') || 
             target?.closest('[data-radix-popper-content-wrapper]') ||
             target?.closest('[data-radix-popover-content]') ||
             target?.closest('[data-testid="document-viewer"]') ||
-            target?.closest('[data-testid="document-viewer-error"]')) {
+            target?.closest('[data-testid="document-viewer-error"]') ||
+            target?.closest('[data-testid="image-lightbox"]')) {
           e.preventDefault();
         }
         onInteractOutside?.(e);

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { getBackendUrl } from '../lib/apiConfig';
@@ -108,6 +109,24 @@ export default function FormSubmissionsPage() {
   const [viewingDocument, setViewingDocument] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // Close image lightbox with Escape key
+  const closeImageLightbox = useCallback(() => {
+    setViewingImage(null);
+  }, []);
+  
+  useEffect(() => {
+    if (!viewingImage) return;
+    
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        closeImageLightbox();
+      }
+    };
+    
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [viewingImage, closeImageLightbox]);
 
   // Fetch submissions
   const { data: submissionsData, isLoading, refetch } = useQuery({
@@ -775,23 +794,44 @@ export default function FormSubmissionsPage() {
         />
       )}
 
-      {/* Image Lightbox - Must be higher z-index than Dialog (z-[100]) */}
-      {viewingImage && (
+      {/* Image Lightbox - Using Portal to render above all dialogs */}
+      {viewingImage && createPortal(
         <div 
-          className="fixed inset-0 z-[200] bg-black flex items-center justify-center p-4"
+          data-testid="image-lightbox"
+          className="fixed inset-0 z-[9999] bg-black flex items-center justify-center p-4"
           onClick={() => setViewingImage(null)}
         >
+          {/* Close button - Fixed position in top right corner */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              setViewingImage(null);
+            }}
+          >
+            <X className="w-8 h-8" />
+          </Button>
+          
+          {/* Download button - Fixed position in top left corner */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute top-4 left-4 text-white hover:bg-white/20 z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              const link = document.createElement('a');
+              link.href = viewingImage.url;
+              link.download = viewingImage.name;
+              link.click();
+            }}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+          
           <div className="relative max-w-full max-h-full">
-            {/* Close button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute -top-12 right-0 text-white hover:bg-white/20"
-              onClick={() => setViewingImage(null)}
-            >
-              <X className="w-6 h-6" />
-            </Button>
-            
             {/* Image */}
             <img
               src={viewingImage.url}
@@ -804,25 +844,9 @@ export default function FormSubmissionsPage() {
             <div className="absolute -bottom-10 left-0 right-0 text-center">
               <p className="text-white/80 text-sm">{viewingImage.name}</p>
             </div>
-            
-            {/* Download button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute -top-12 left-0 text-white hover:bg-white/20"
-              onClick={(e) => {
-                e.stopPropagation();
-                const link = document.createElement('a');
-                link.href = viewingImage.url;
-                link.download = viewingImage.name;
-                link.click();
-              }}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </Button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
