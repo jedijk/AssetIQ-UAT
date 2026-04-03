@@ -273,7 +273,9 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
     },
     onError: (error) => {
       console.error("Failed to create investigation:", error);
-      toast.error("Failed to create investigation");
+      // Show more detailed error message
+      const errorMessage = error?.response?.data?.detail || error?.message || "Failed to create investigation";
+      toast.error(errorMessage);
     },
   });
   
