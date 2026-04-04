@@ -808,22 +808,29 @@ const ThreatDetailPage = () => {
 
               {/* Exact Calculation Box - WEIGHTED METHODOLOGY */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 mb-4 border border-blue-100">
-                <div className="text-xs text-blue-600 font-medium mb-2">{t("observations.exactCalculation")}</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-blue-600 font-medium">{t("observations.exactCalculation")}</div>
+                  {threat.risk_settings_used && (
+                    <div className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border">
+                      Weights: {Math.round((threat.risk_settings_used.criticality_weight || 0.75) * 100)}% / {Math.round((threat.risk_settings_used.fmea_weight || 0.25) * 100)}%
+                    </div>
+                  )}
+                </div>
                 <div className="font-mono text-lg text-slate-800 text-center py-2">
                   <span className="text-slate-500">(</span>
                   <span className="text-purple-600">{criticalityScore}</span>
                   <span className="text-slate-400 mx-1">×</span>
-                  <span className="text-purple-400">0.7</span>
+                  <span className="text-purple-400">{threat.risk_settings_used?.criticality_weight || 0.75}</span>
                   <span className="text-slate-500">)</span>
                   <span className="text-slate-400 mx-1">+</span>
                   <span className="text-slate-500">(</span>
                   <span className="text-blue-600">{fmBaseScore}</span>
                   <span className="text-slate-400 mx-1">×</span>
-                  <span className="text-blue-400">0.3</span>
+                  <span className="text-blue-400">{threat.risk_settings_used?.fmea_weight || 0.25}</span>
                   <span className="text-slate-500">)</span>
                 </div>
                 <div className="text-center text-[10px] text-slate-500 mt-1">
-                  ({t("observations.criticalityScoreLabel")} × 75%) + ({t("observations.fmeaScoreLabel")} × 25%)
+                  ({t("observations.criticalityScoreLabel")} × {Math.round((threat.risk_settings_used?.criticality_weight || 0.75) * 100)}%) + ({t("observations.fmeaScoreLabel")} × {Math.round((threat.risk_settings_used?.fmea_weight || 0.25) * 100)}%)
                 </div>
                 <div className="text-center mt-2 pt-2 border-t border-blue-200">
                   <span className="text-slate-500 text-sm">=</span>

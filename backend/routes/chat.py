@@ -134,6 +134,9 @@ async def send_chat_message(
         # Get equipment_type - prefer from equipment hierarchy, fallback to FMEA data
         equipment_type = obs_data.get("equipment_type") or fmea_data.get("equipment") or "Equipment"
         
+        # Get installation_id for this observation
+        installation_id = obs_data.get("installation_id")
+        
         # Get criticality data if available
         criticality = obs_data.get("criticality", {})
         criticality_score = 0
@@ -145,19 +148,12 @@ async def send_chat_message(
             criticality_score = int(((safety * 25) + (production * 20) + (environmental * 15) + (reputation * 10)) / 3.5)
             criticality_score = min(100, criticality_score)
         
-        # Calculate risk score: (Criticality × 0.75) + (FMEA × 0.25)
-        final_risk_score = int((criticality_score * 0.75) + (fmea_score * 0.25))
-        final_risk_score = min(100, max(0, final_risk_score))
+        # Get installation-specific risk settings
+        from services.threat_score_service import get_risk_settings_for_installation, calculate_risk_score
+        risk_settings = await get_risk_settings_for_installation(installation_id)
         
-        # Determine risk level
-        if final_risk_score >= 70:
-            risk_level = "Critical"
-        elif final_risk_score >= 50:
-            risk_level = "High"
-        elif final_risk_score >= 30:
-            risk_level = "Medium"
-        else:
-            risk_level = "Low"
+        # Calculate risk score using installation settings
+        final_risk_score, risk_level = calculate_risk_score(criticality_score, fmea_score, risk_settings)
         
         # Calculate rank
         rank, total = await calculate_rank(final_risk_score, user_id)
@@ -193,6 +189,12 @@ async def send_chat_message(
             "image_url": None,
             "location": None,
             "linked_equipment_id": obs_data.get("equipment_id"),
+            "installation_id": installation_id,
+            "risk_settings_used": {
+                "criticality_weight": risk_settings["criticality_weight"],
+                "fmea_weight": risk_settings["fmea_weight"],
+                "installation_id": installation_id
+            },
             "equipment_criticality": criticality.get("level") if isinstance(criticality, dict) else None,
             "equipment_criticality_data": criticality if isinstance(criticality, dict) else None,
             "session_id": session_id,

@@ -7,8 +7,55 @@ from datetime import datetime, timezone
 
 from database import db
 from failure_modes import FAILURE_MODES_LIBRARY
+from models.risk_settings import DEFAULT_RISK_SETTINGS
 
 logger = logging.getLogger(__name__)
+
+
+async def get_risk_settings_for_installation(installation_id: str) -> dict:
+    """Get risk calculation settings for an installation, or defaults if not set."""
+    if not installation_id:
+        return DEFAULT_RISK_SETTINGS.copy()
+    
+    settings = await db.risk_settings.find_one(
+        {"installation_id": installation_id},
+        {"_id": 0}
+    )
+    
+    if settings:
+        return {
+            "criticality_weight": settings.get("criticality_weight", DEFAULT_RISK_SETTINGS["criticality_weight"]),
+            "fmea_weight": settings.get("fmea_weight", DEFAULT_RISK_SETTINGS["fmea_weight"]),
+            "critical_threshold": settings.get("critical_threshold", DEFAULT_RISK_SETTINGS["critical_threshold"]),
+            "high_threshold": settings.get("high_threshold", DEFAULT_RISK_SETTINGS["high_threshold"]),
+            "medium_threshold": settings.get("medium_threshold", DEFAULT_RISK_SETTINGS["medium_threshold"]),
+        }
+    
+    return DEFAULT_RISK_SETTINGS.copy()
+
+
+def calculate_risk_score(criticality_score: int, fmea_score: int, settings: dict) -> tuple:
+    """Calculate final risk score and level based on settings."""
+    crit_weight = settings.get("criticality_weight", 0.75)
+    fmea_weight = settings.get("fmea_weight", 0.25)
+    
+    final_risk_score = int((criticality_score * crit_weight) + (fmea_score * fmea_weight))
+    final_risk_score = min(100, max(0, final_risk_score))
+    
+    critical_threshold = settings.get("critical_threshold", 70)
+    high_threshold = settings.get("high_threshold", 50)
+    medium_threshold = settings.get("medium_threshold", 30)
+    
+    if final_risk_score >= critical_threshold:
+        risk_level = "Critical"
+    elif final_risk_score >= high_threshold:
+        risk_level = "High"
+    elif final_risk_score >= medium_threshold:
+        risk_level = "Medium"
+    else:
+        risk_level = "Low"
+    
+    return final_risk_score, risk_level
 
 
 async def calculate_rank(risk_score: int, user_id: str) -> tuple:
@@ -35,7 +82,7 @@ async def update_all_ranks(user_id: str):
         )
 
 
-async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new_criticality: dict = None, equipment_node_id: str = None):
+async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new_criticality: dict = None, equipment_node_id: str = None, installation_id: str = None):
     query_conditions = [{"asset": asset_name, "created_by": user_id}]
     if equipment_node_id:
         query_conditions.append({"linked_equipment_id": equipment_node_id, "created_by": user_id})
@@ -43,6 +90,9 @@ async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new
     threats = await db.threats.find({"$or": query_conditions}).to_list(1000)
     if not threats:
         return 0
+
+    # Get installation-specific risk settings
+    risk_settings = await get_risk_settings_for_installation(installation_id)
 
     if new_criticality:
         safety_impact = new_criticality.get("safety_impact", 0) or 0
@@ -92,17 +142,8 @@ async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new
                     fmea_score = min(100, int(fm["rpn"] / 10))
                     break
 
-        final_risk_score = int((criticality_score * 0.75) + (fmea_score * 0.25))
-        final_risk_score = min(100, max(0, final_risk_score))
-
-        if final_risk_score >= 70:
-            risk_level = "Critical"
-        elif final_risk_score >= 50:
-            risk_level = "High"
-        elif final_risk_score >= 30:
-            risk_level = "Medium"
-        else:
-            risk_level = "Low"
+        # Use installation-specific settings for calculation
+        final_risk_score, risk_level = calculate_risk_score(criticality_score, fmea_score, risk_settings)
 
         update_data = {
             "risk_score": final_risk_score,
@@ -111,6 +152,11 @@ async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new
             "base_risk_score": fmea_score,
             "risk_level": risk_level,
             "equipment_criticality": criticality_level,
+            "risk_settings_used": {
+                "criticality_weight": risk_settings["criticality_weight"],
+                "fmea_weight": risk_settings["fmea_weight"],
+                "installation_id": installation_id
+            },
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
 
@@ -136,8 +182,19 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
 
     updated_count = 0
     users_updated = set()
+    
+    # Cache settings by installation to avoid repeated DB calls
+    settings_cache = {}
 
     for threat in threats:
+        # Get installation ID for this threat
+        installation_id = threat.get("installation_id")
+        
+        # Get or cache settings for this installation
+        if installation_id not in settings_cache:
+            settings_cache[installation_id] = await get_risk_settings_for_installation(installation_id)
+        risk_settings = settings_cache[installation_id]
+        
         criticality_score = threat.get("criticality_score", 0)
         criticality_data = threat.get("equipment_criticality_data")
 
@@ -155,17 +212,8 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
             ) / 3.5
             criticality_score = min(100, int(criticality_score))
 
-        final_risk_score = int((criticality_score * 0.75) + (new_fmea_score * 0.25))
-        final_risk_score = min(100, max(0, final_risk_score))
-
-        if final_risk_score >= 70:
-            risk_level = "Critical"
-        elif final_risk_score >= 50:
-            risk_level = "High"
-        elif final_risk_score >= 30:
-            risk_level = "Medium"
-        else:
-            risk_level = "Low"
+        # Use installation-specific settings
+        final_risk_score, risk_level = calculate_risk_score(criticality_score, new_fmea_score, risk_settings)
 
         await db.threats.update_one(
             {"id": threat["id"]},
@@ -175,6 +223,11 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
                 "criticality_score": criticality_score,
                 "base_risk_score": new_fmea_score,
                 "risk_level": risk_level,
+                "risk_settings_used": {
+                    "criticality_weight": risk_settings["criticality_weight"],
+                    "fmea_weight": risk_settings["fmea_weight"],
+                    "installation_id": installation_id
+                },
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
@@ -186,3 +239,85 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
             await update_all_ranks(user_id)
 
     return updated_count
+
+
+async def recalculate_all_for_installation(installation_id: str) -> dict:
+    """
+    Recalculate all risk scores for an installation when settings change.
+    Updates: observations (threats), actions, and investigations.
+    """
+    if not installation_id:
+        return {"error": "Installation ID required"}
+    
+    risk_settings = await get_risk_settings_for_installation(installation_id)
+    
+    # Find all threats linked to this installation
+    threats = await db.threats.find({
+        "installation_id": installation_id
+    }).to_list(10000)
+    
+    threats_updated = 0
+    users_updated = set()
+    
+    for threat in threats:
+        criticality_score = threat.get("criticality_score", 0)
+        fmea_score = threat.get("fmea_score", threat.get("base_risk_score", 50))
+        
+        # Recalculate with new settings
+        final_risk_score, risk_level = calculate_risk_score(criticality_score, fmea_score, risk_settings)
+        
+        await db.threats.update_one(
+            {"id": threat["id"]},
+            {"$set": {
+                "risk_score": final_risk_score,
+                "risk_level": risk_level,
+                "risk_settings_used": {
+                    "criticality_weight": risk_settings["criticality_weight"],
+                    "fmea_weight": risk_settings["fmea_weight"],
+                    "installation_id": installation_id
+                },
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        threats_updated += 1
+        users_updated.add(threat.get("created_by"))
+    
+    # Update actions linked to these threats
+    actions_updated = 0
+    if threats:
+        threat_ids = [t["id"] for t in threats]
+        actions = await db.central_actions.find({
+            "threat_id": {"$in": threat_ids}
+        }).to_list(10000)
+        
+        for action in actions:
+            # Get the parent threat's new risk score
+            parent_threat = next((t for t in threats if t["id"] == action.get("threat_id")), None)
+            if parent_threat:
+                new_threat_risk = parent_threat.get("risk_score", 0)
+                # Recalculate with new settings
+                crit_score = parent_threat.get("criticality_score", 0)
+                fmea = parent_threat.get("fmea_score", 50)
+                new_score, _ = calculate_risk_score(crit_score, fmea, risk_settings)
+                
+                await db.central_actions.update_one(
+                    {"id": action["id"]},
+                    {"$set": {
+                        "threat_risk_score": new_score,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                actions_updated += 1
+    
+    # Update ranks for all affected users
+    for user_id in users_updated:
+        if user_id:
+            await update_all_ranks(user_id)
+    
+    return {
+        "installation_id": installation_id,
+        "threats_updated": threats_updated,
+        "actions_updated": actions_updated,
+        "settings_applied": risk_settings
+    }
+

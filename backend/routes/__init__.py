@@ -27,6 +27,7 @@ from routes.reports import router as reports_router
 from routes.assets import router as assets_router
 from routes.permissions import router as permissions_router
 from routes.admin import router as admin_router
+from routes.risk_settings import router as risk_settings_router
 
 all_routers = [
     auth_router,
@@ -55,4 +56,5 @@ all_routers = [
     assets_router,
     permissions_router,
     admin_router,
+    risk_settings_router,
 ]
