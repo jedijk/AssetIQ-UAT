@@ -619,6 +619,8 @@ export default function ActionsPage() {
             const SourceIcon = sourceConfig[action.source_type]?.icon || FileText;
             const priority = priorityConfig[action.priority] || priorityConfig.medium;
             const overdue = isOverdue(action);
+            const isCompleted = action.status === "completed";
+            const isClosed = action.status === "closed";
 
             return (
               <motion.div
@@ -626,10 +628,27 @@ export default function ActionsPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className={`group cursor-pointer p-3 sm:p-4 bg-white rounded-xl border border-slate-200 hover:shadow-md hover:border-slate-300 transition-all duration-200 ${overdue ? "border-l-4 border-l-red-400" : ""}`}
+                className={`group cursor-pointer p-3 sm:p-4 bg-white rounded-xl border border-slate-200 hover:shadow-md hover:border-slate-300 transition-all duration-200 relative ${
+                  overdue ? "border-l-4 border-l-red-400" : 
+                  isCompleted ? "border-l-4 border-l-green-500 bg-green-50/30" :
+                  isClosed ? "border-l-4 border-l-slate-400 bg-slate-50/50" : ""
+                }`}
                 data-testid={`action-row-${action.id}`}
                 onClick={() => navigate(`/actions/${action.id}`)}
               >
+                {/* Mobile Status Indicator - Only visible on mobile for Completed/Closed */}
+                {(isCompleted || isClosed) && (
+                  <div className="sm:hidden absolute top-2 right-2">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                      isCompleted 
+                        ? "bg-green-100 text-green-700" 
+                        : "bg-slate-200 text-slate-600"
+                    }`}>
+                      {isCompleted ? "✓" : "—"} {isCompleted ? "Completed" : "Closed"}
+                    </span>
+                  </div>
+                )}
+                
                 {/* Grid layout for perfect column alignment - Score and RPN as separate fixed columns */}
                 <div className="grid grid-cols-[auto_1fr_3rem_3rem_auto] sm:grid-cols-[auto_auto_1fr_4rem_4rem_auto] items-center gap-2 sm:gap-4">
                   {/* Status Icon */}
