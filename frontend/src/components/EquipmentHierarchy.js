@@ -93,8 +93,6 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   const [showDetails, setShowDetails] = useState(false);
   const contextMenuRef = useRef(null);
   const detailsRef = useRef(null);
-  const lastTapTime = useRef(0);
-  const singleTapTimer = useRef(null);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -122,57 +120,31 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     setContextMenu({ show: true, x: e.clientX, y: e.clientY });
   };
 
-  // Handle click/tap with double-tap detection for mobile
+  // Handle click/tap on the equipment name/info area (NOT the arrow)
   const handleClick = (e) => {
     if (isMobile) {
-      const currentTime = new Date().getTime();
-      const tapGap = currentTime - lastTapTime.current;
-      
-      // Capture position data immediately before it's lost
+      // On mobile: single tap immediately shows context menu (no delay, no double-tap)
       const rect = e.currentTarget.getBoundingClientRect();
       const menuX = Math.min(rect.left + 20, window.innerWidth - 200);
       const menuY = Math.min(rect.bottom + 5, window.innerHeight - 150);
       
-      if (tapGap < 300 && tapGap > 0) {
-        // Double tap detected - navigate to observations
-        if (singleTapTimer.current) {
-          clearTimeout(singleTapTimer.current);
-          singleTapTimer.current = null;
-        }
-        lastTapTime.current = 0;
-        // Double tap action: navigate to filtered observations
-        onClick?.();
-      } else {
-        // Single tap - wait to see if it's a double tap
-        lastTapTime.current = currentTime;
-        singleTapTimer.current = setTimeout(() => {
-          // Single tap confirmed - show details popup
-          setContextMenu({ 
-            show: true, 
-            x: menuX, 
-            y: menuY 
-          });
-          singleTapTimer.current = null;
-        }, 300);
-      }
-      
-      // Still toggle children if has children
-      if (hasChildren) onToggle?.();
+      setContextMenu({ 
+        show: true, 
+        x: menuX, 
+        y: menuY 
+      });
     } else {
-      // Desktop behavior - single click navigates
+      // Desktop behavior - single click navigates and toggles if has children
       if (hasChildren) onToggle?.();
       onClick?.();
     }
   };
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (singleTapTimer.current) {
-        clearTimeout(singleTapTimer.current);
-      }
-    };
-  }, []);
+  
+  // Handle arrow click (expand/collapse only)
+  const handleArrowClick = (e) => {
+    e.stopPropagation();
+    onToggle?.();
+  };
 
   const handleAddThreatClick = () => {
     setContextMenu({ show: false, x: 0, y: 0 });
@@ -224,43 +196,52 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   return (
     <div>
       <div
-        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
+        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors ${
           isActive ? "bg-blue-50 text-blue-700" : "hover:bg-slate-100 text-slate-700"
         }`}
         style={{ paddingLeft: `${8 + level * 16}px` }}
-        onClick={handleClick}
         onContextMenu={handleContextMenu}
         data-testid={`hierarchy-node-${node.id}`}
       >
+        {/* Arrow button - expand/collapse only, larger tap area on mobile */}
         {hasChildren ? (
           <button 
-            className="p-0.5 hover:bg-slate-200 rounded" 
-            onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
+            className={`flex items-center justify-center hover:bg-slate-200 rounded transition-colors ${isMobile ? 'p-2 -m-1' : 'p-0.5'}`}
+            onClick={handleArrowClick}
+            data-testid={`hierarchy-expand-${node.id}`}
           >
             {isOpen ? (
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown className={`${isMobile ? 'w-5 h-5' : 'w-3.5 h-3.5'} text-slate-400`} />
             ) : (
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <ChevronRight className={`${isMobile ? 'w-5 h-5' : 'w-3.5 h-3.5'} text-slate-400`} />
             )}
           </button>
         ) : (
-          <span className="w-4.5" />
+          <span className={isMobile ? 'w-7' : 'w-4.5'} />
         )}
-        <Icon className={`w-4 h-4 ${critColor || config.color} flex-shrink-0`} />
-        <span className="text-sm font-medium truncate flex-1">{node.name}</span>
-        {threatCount > 0 && (
-          <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3" />
-            {threatCount}
-          </span>
-        )}
-        {node.criticality?.level && (
-          <span className={`w-2 h-2 rounded-full ${
-            node.criticality.level === 'safety_critical' ? 'bg-red-500' :
-            node.criticality.level === 'production_critical' ? 'bg-orange-500' :
-            node.criticality.level === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-          }`} />
-        )}
+        
+        {/* Equipment info - clickable area for context menu on mobile */}
+        <div 
+          className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
+          onClick={handleClick}
+          data-testid={`hierarchy-item-${node.id}`}
+        >
+          <Icon className={`w-4 h-4 ${critColor || config.color} flex-shrink-0`} />
+          <span className="text-sm font-medium truncate flex-1">{node.name}</span>
+          {threatCount > 0 && (
+            <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              {threatCount}
+            </span>
+          )}
+          {node.criticality?.level && (
+            <span className={`w-2 h-2 rounded-full ${
+              node.criticality.level === 'safety_critical' ? 'bg-red-500' :
+              node.criticality.level === 'production_critical' ? 'bg-orange-500' :
+              node.criticality.level === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+            }`} />
+          )}
+        </div>
       </div>
       
       {/* Context Menu */}
@@ -734,7 +715,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
       <div className="p-3 border-t border-slate-200 bg-slate-50 flex-shrink-0">
         {isMobile && (
           <p className="text-xs text-slate-400 mb-2 text-center">
-            Tap for menu • Double-tap to filter
+            Tap item for options • Tap arrow to expand
           </p>
         )}
         <div className="flex items-center justify-between text-xs text-slate-500">

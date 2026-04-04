@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI } from "../lib/api";
 import { 
   ChevronRight, 
@@ -11,13 +12,19 @@ import {
   Cpu, 
   Settings,
   CircleDot,
-  Filter
+  Filter,
+  Plus,
+  Info,
+  X
 } from "lucide-react";
 
 const MobileHierarchy = () => {
+  const navigate = useNavigate();
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [selectedNode, setSelectedNode] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, node: null });
+  const contextMenuRef = useRef(null);
 
   const { data: nodesData = {}, isLoading } = useQuery({
     queryKey: ["equipmentNodes"],
@@ -25,6 +32,23 @@ const MobileHierarchy = () => {
   });
 
   const nodes = nodesData.nodes || [];
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+        setContextMenu({ show: false, x: 0, y: 0, node: null });
+      }
+    };
+    if (contextMenu.show) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("touchstart", handleClickOutside);
+      };
+    }
+  }, [contextMenu.show]);
 
   const toggleExpand = (nodeId, e) => {
     e.stopPropagation();
@@ -35,6 +59,32 @@ const MobileHierarchy = () => {
       newExpanded.add(nodeId);
     }
     setExpandedNodes(newExpanded);
+  };
+
+  // Handle tap on equipment item - show context menu
+  const handleItemTap = (node, e) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuX = Math.min(rect.left + 20, window.innerWidth - 200);
+    const menuY = Math.min(rect.bottom + 5, window.innerHeight - 200);
+    setContextMenu({ show: true, x: menuX, y: menuY, node });
+    setSelectedNode(node.id);
+  };
+
+  // Navigate to filtered observations
+  const handleFilterOn = () => {
+    if (contextMenu.node) {
+      navigate(`/threats?assets=${encodeURIComponent(contextMenu.node.name)}&assetName=${encodeURIComponent(contextMenu.node.name)}`);
+    }
+    setContextMenu({ show: false, x: 0, y: 0, node: null });
+  };
+
+  // Show details panel
+  const handleShowDetails = () => {
+    if (contextMenu.node) {
+      setSelectedNode(contextMenu.node.id);
+    }
+    setContextMenu({ show: false, x: 0, y: 0, node: null });
   };
 
   const buildTree = (nodes, parentId = null) => {
@@ -70,39 +120,45 @@ const MobileHierarchy = () => {
 
     return (
       <div key={node.id} className="hierarchy-node">
-        <button
-          onClick={() => setSelectedNode(isSelected ? null : node.id)}
+        <div
           className={`node-button ${isSelected ? "selected" : ""}`}
           style={{ paddingLeft: `${depth * 20 + 16}px` }}
           data-testid={`hierarchy-node-${node.id}`}
         >
+          {/* Arrow button - expand/collapse only */}
           <span 
             className="expand-icon"
             onClick={(e) => hasChildren && toggleExpand(node.id, e)}
           >
             {hasChildren ? (
-              isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />
+              isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />
             ) : (
-              <span style={{ width: 18 }} />
+              <span style={{ width: 20 }} />
             )}
           </span>
           
+          {/* Clickable equipment info area */}
           <div 
-            className="level-icon"
-            style={{ backgroundColor: config.bg }}
+            className="node-content"
+            onClick={(e) => handleItemTap(node, e)}
           >
-            <Icon size={16} color={config.color} />
+            <div 
+              className="level-icon"
+              style={{ backgroundColor: config.bg }}
+            >
+              <Icon size={16} color={config.color} />
+            </div>
+            
+            <div className="node-info">
+              <span className="node-name">{node.name}</span>
+              <span className="node-level" style={{ color: config.color }}>{config.label}</span>
+            </div>
+            
+            {node.process_step && (
+              <span className="process-badge">{node.process_step}</span>
+            )}
           </div>
-          
-          <div className="node-info">
-            <span className="node-name">{node.name}</span>
-            <span className="node-level" style={{ color: config.color }}>{config.label}</span>
-          </div>
-          
-          {node.process_step && (
-            <span className="process-badge">{node.process_step}</span>
-          )}
-        </button>
+        </div>
 
         {hasChildren && isExpanded && (
           <div className="node-children">
@@ -219,6 +275,30 @@ const MobileHierarchy = () => {
               </>
             );
           })()}
+        </div>
+      )}
+
+      {/* Context Menu */}
+      {contextMenu.show && (
+        <div 
+          ref={contextMenuRef}
+          className="context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button onClick={handleFilterOn} className="context-menu-item">
+            <Filter size={16} />
+            <span>Filter Observations</span>
+          </button>
+          <div className="context-menu-divider" />
+          <button onClick={handleShowDetails} className="context-menu-item">
+            <Info size={16} />
+            <span>Show Details</span>
+          </button>
+          <div className="context-menu-divider" />
+          <button onClick={() => setContextMenu({ show: false, x: 0, y: 0, node: null })} className="context-menu-item cancel">
+            <X size={16} />
+            <span>Cancel</span>
+          </button>
         </div>
       )}
 
@@ -344,19 +424,13 @@ const MobileHierarchy = () => {
           width: 100%;
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 14px 16px;
+          gap: 8px;
+          padding: 10px 16px;
           background: none;
           border: none;
           border-bottom: 1px solid #f5f5f5;
           color: #1f2937;
           text-align: left;
-          cursor: pointer;
-          transition: background 0.15s;
-        }
-
-        .node-button:active {
-          background: #f9fafb;
         }
 
         .node-button.selected {
@@ -367,8 +441,30 @@ const MobileHierarchy = () => {
           color: #9ca3af;
           display: flex;
           align-items: center;
-          padding: 4px;
+          justify-content: center;
+          padding: 8px;
           margin: -4px;
+          border-radius: 8px;
+          min-width: 36px;
+          min-height: 36px;
+        }
+
+        .expand-icon:active {
+          background: #e5e7eb;
+        }
+
+        .node-content {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 4px 0;
+          cursor: pointer;
+          min-width: 0;
+        }
+
+        .node-content:active {
+          opacity: 0.7;
         }
 
         .level-icon {
@@ -543,6 +639,59 @@ const MobileHierarchy = () => {
           font-size: 13px;
           font-weight: 600;
           color: #1f2937;
+        }
+
+        /* Context Menu Styles */
+        .context-menu {
+          position: fixed;
+          background: #ffffff;
+          border-radius: 12px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+          border: 1px solid #e5e7eb;
+          padding: 8px 0;
+          z-index: 9999;
+          min-width: 180px;
+          animation: menuSlideIn 0.15s ease-out;
+        }
+
+        @keyframes menuSlideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .context-menu-item {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 16px;
+          background: none;
+          border: none;
+          color: #374151;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .context-menu-item:active {
+          background: #f3f4f6;
+        }
+
+        .context-menu-item.cancel {
+          color: #6b7280;
+        }
+
+        .context-menu-divider {
+          height: 1px;
+          background: #f3f4f6;
+          margin: 4px 0;
         }
       `}</style>
     </div>

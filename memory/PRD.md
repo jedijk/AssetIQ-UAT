@@ -24,6 +24,24 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 4, 2026 - Mobile Hierarchy Click Behavior Fix
+**UX Enhancement:**
+- ✅ **Fixed mobile hierarchy interaction behavior**
+- **Arrow click** → Expands/collapses the hierarchy node (fold/unfold)
+- **Equipment item click** → Shows context menu with options:
+  - Filter on (navigate to filtered observations)
+  - Show Details
+  - Add Observation
+- Removed confusing double-tap requirement for navigation
+- Added larger touch targets for mobile (arrow button has 36px minimum tap area)
+- Updated footer hint: "Tap item for options • Tap arrow to expand"
+
+**Files Modified:**
+- `/app/frontend/src/components/EquipmentHierarchy.js` - Separated arrow click from item click handlers
+- `/app/frontend/src/mobile/MobileHierarchy.js` - Added context menu and separated expand/item interaction
+
+---
+
 ### April 4, 2026 - Dashboard Recent Observations Compact Risk Score & RPN
 **UI Enhancement:**
 - ✅ **Added compact Risk Score and RPN badges to Recent Observations widget**
