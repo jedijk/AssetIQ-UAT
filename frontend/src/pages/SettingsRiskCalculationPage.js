@@ -19,11 +19,14 @@ import { Button } from "../components/ui/button";
 import { Slider } from "../components/ui/slider";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
+import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const SettingsRiskCalculationPage = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [installations, setInstallations] = useState([]);
   const [selectedInstallation, setSelectedInstallation] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -231,6 +234,11 @@ const SettingsRiskCalculationPage = () => {
         <RefreshCw className="w-8 h-8 animate-spin text-indigo-600" />
       </div>
     );
+  }
+
+  // Show desktop-only message on mobile
+  if (isMobile) {
+    return <DesktopOnlyMessage title="Risk Calculation" icon={Calculator} />;
   }
 
   return (
