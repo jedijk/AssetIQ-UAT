@@ -786,14 +786,14 @@ const ThreatDetailPage = () => {
           return (
             <div 
               ref={scorePopupRef}
-              className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 p-5 z-50 w-96"
+              className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 z-50 w-96 max-h-[85vh] flex flex-col"
               style={{ 
-                left: Math.min(scoreCalcPopup.x, window.innerWidth - 420), 
-                top: Math.min(scoreCalcPopup.y, window.innerHeight - 580) 
+                left: Math.min(Math.max(scoreCalcPopup.x, 16), window.innerWidth - 420), 
+                top: Math.min(Math.max(scoreCalcPopup.y, 16), window.innerHeight - 100)
               }}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
+              {/* Header - Fixed */}
+              <div className="flex items-center justify-between p-4 pb-3 border-b border-slate-100 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Calculator className="w-5 h-5 text-blue-600" />
                   <h3 className="font-semibold text-slate-900">{t("observations.scoreCalculation")}</h3>
@@ -805,7 +805,9 @@ const ThreatDetailPage = () => {
                   <X className="w-4 h-4 text-slate-400" />
                 </button>
               </div>
-
+              
+              {/* Scrollable Content */}
+              <div className="overflow-y-auto flex-1 p-4 pt-3">
               {/* Exact Calculation Box - WEIGHTED METHODOLOGY */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 mb-4 border border-blue-100">
                 <div className="flex items-center justify-between mb-2">
@@ -971,13 +973,14 @@ const ThreatDetailPage = () => {
               {/* Risk Level Legend */}
               <div className="mt-3 pt-3 border-t border-slate-200">
                 <div className="text-[10px] text-slate-400 mb-1">{t("observations.riskLevelThresholds")}:</div>
-                <div className="flex gap-2 text-[10px]">
+                <div className="flex flex-wrap gap-2 text-[10px]">
                   <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-600">≥70 Critical</span>
                   <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-600">50-69 High</span>
                   <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-600">30-49 Medium</span>
                   <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-600">&lt;30 Low</span>
                 </div>
               </div>
+              </div> {/* End scrollable content */}
             </div>
           );
         })()}
