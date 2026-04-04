@@ -701,20 +701,20 @@ const ThreatsPage = () => {
               </div>
 
               {/* Score Display - Compact on mobile, full on desktop */}
-              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              <div className="flex items-center gap-3 sm:gap-6 flex-shrink-0">
                 {/* Business Risk Score */}
-                <div className="text-right w-10 sm:w-14">
-                  <div className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">Score</div>
-                  <div className="text-sm sm:text-base font-semibold text-slate-700">
+                <div className="text-center w-12 sm:w-16">
+                  <div className="text-[10px] sm:text-xs text-slate-400 hidden sm:block mb-0.5">Score</div>
+                  <div className="text-sm sm:text-lg font-bold text-slate-700 tabular-nums">
                     {threat.risk_score}
                   </div>
                 </div>
                 
                 {/* RPN - Compact on mobile */}
-                <div className="text-right w-10 sm:w-14">
-                  <div className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">RPN</div>
+                <div className="text-center w-12 sm:w-16">
+                  <div className="text-[10px] sm:text-xs text-slate-400 hidden sm:block mb-0.5">RPN</div>
                   {rpnValue ? (
-                    <div className={`text-sm sm:text-base font-semibold ${
+                    <div className={`text-sm sm:text-lg font-bold tabular-nums ${
                       rpnValue >= 300 ? "text-red-600" :
                       rpnValue >= 200 ? "text-orange-600" :
                       rpnValue >= 100 ? "text-yellow-600" :
@@ -723,25 +723,25 @@ const ThreatsPage = () => {
                       {rpnValue}
                     </div>
                   ) : (
-                    <div className="text-sm text-slate-300">—</div>
+                    <div className="text-sm sm:text-lg text-slate-300">—</div>
                   )}
                 </div>
                 
                 {/* Actions Count - Hidden on mobile */}
-                <div className="text-right hidden sm:block w-14">
-                  <div className="text-xs text-slate-400">Actions</div>
-                  <div className="text-sm sm:text-base font-semibold text-slate-700">
+                <div className="text-center hidden sm:block w-16">
+                  <div className="text-xs text-slate-400 mb-0.5">Actions</div>
+                  <div className="text-lg font-bold text-slate-700 tabular-nums">
                     {threat.recommended_actions?.length || 0}
                   </div>
                 </div>
 
                 {/* Status Badge - Hidden on mobile */}
-                <div className="hidden sm:block">
+                <div className="hidden sm:block w-20">
                   {(() => {
                     const statusConfig = STATUS_OPTIONS.find(s => s.value === threat.status) || 
                       { bgColor: "bg-slate-100", textColor: "text-slate-600" };
                     return (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}>
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}>
                         {threat.status}
                       </span>
                     );
