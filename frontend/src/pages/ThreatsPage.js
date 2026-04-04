@@ -658,9 +658,26 @@ const ThreatsPage = () => {
               transition={{ delay: idx * 0.05 }}
               onClick={() => navigate(`/threats/${threat.id}`)}
               onMouseEnter={handleMouseEnter}
-              className="priority-item group"
+              className={`priority-item group relative ${
+                threat.status === "Mitigated" || threat.status === "Closed" 
+                  ? "sm:opacity-100 border-l-4 " + (threat.status === "Mitigated" ? "border-l-green-500 bg-green-50/30" : "border-l-slate-400 bg-slate-50/50")
+                  : ""
+              }`}
               data-testid={`threat-item-${threat.id}`}
             >
+              {/* Mobile Status Indicator - Only visible on mobile for Mitigated/Closed */}
+              {(threat.status === "Mitigated" || threat.status === "Closed") && (
+                <div className="sm:hidden absolute top-2 right-2">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                    threat.status === "Mitigated" 
+                      ? "bg-green-100 text-green-700" 
+                      : "bg-slate-200 text-slate-600"
+                  }`}>
+                    {threat.status === "Mitigated" ? "✓" : "—"} {threat.status}
+                  </span>
+                </div>
+              )}
+              
               {/* Equipment Icon */}
               <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${
                 threat.risk_level === "Critical" ? "bg-red-50" :
