@@ -1453,3 +1453,64 @@ html.theme-transitioning * {
 [data-theme="assetiq"] [data-radix-dialog-overlay] {
   background-color: rgba(0, 0, 0, 0.7) !important;
 }
+
+
+/* ==================== MOBILE LANDSCAPE BLOCK ==================== */
+/* Block landscape orientation on mobile devices */
+@media screen and (max-width: 896px) and (orientation: landscape) {
+  .landscape-blocker {
+    display: flex !important;
+  }
+  
+  .app-content {
+    display: none !important;
+  }
+}
+
+.landscape-blocker {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99999;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.landscape-blocker .rotate-icon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 24px;
+  animation: rotatePhone 2s ease-in-out infinite;
+}
+
+.landscape-blocker h2 {
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.landscape-blocker p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1rem;
+  max-width: 280px;
+}
+
+@keyframes rotatePhone {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-15deg);
+  }
+  75% {
+    transform: rotate(15deg);
+  }
+}

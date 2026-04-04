@@ -8,6 +8,7 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Layout from "./components/Layout";
 import ChangePasswordDialog from "./components/ChangePasswordDialog";
+import LandscapeBlocker from "./components/LandscapeBlocker";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -146,6 +147,7 @@ function App() {
                   },
                 }}
               />
+              <LandscapeBlocker />
             <Routes>
               <Route path="/mobile" element={<MobileLayout />} />
               <Route path="/login" element={
