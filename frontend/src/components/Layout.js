@@ -81,35 +81,57 @@ const Layout = () => {
 
   // Touch event handlers for pull-to-refresh
   useEffect(() => {
+    let startScrollY = 0;
+    
     const handleTouchStart = (e) => {
-      // Only enable pull-to-refresh when at the top of the page
-      if (window.scrollY === 0) {
-        touchStartY.current = e.touches[0].clientY;
+      // Store the initial scroll position and touch position
+      startScrollY = window.scrollY;
+      touchStartY.current = e.touches[0].clientY;
+      
+      // Only enable pull-to-refresh when truly at the top (scrollY === 0)
+      if (startScrollY === 0) {
         setIsPulling(true);
+      } else {
+        setIsPulling(false);
       }
     };
 
     const handleTouchMove = (e) => {
+      // Exit early if not pulling or already refreshing
       if (!isPulling || isRefreshing) return;
+      
+      // Double-check we're still at the top of the page
+      // This prevents triggering when scrolling back up
+      if (window.scrollY > 0) {
+        setPullDistance(0);
+        setIsPulling(false);
+        return;
+      }
       
       const touchY = e.touches[0].clientY;
       const distance = touchY - touchStartY.current;
       
-      // Only pull down, not up
-      if (distance > 0 && window.scrollY === 0) {
+      // Only pull down (positive distance), not up
+      // AND only when we started at the very top
+      if (distance > 0 && window.scrollY === 0 && startScrollY === 0) {
         // Apply resistance to the pull
         const resistedDistance = Math.min(distance * 0.5, 120);
         setPullDistance(resistedDistance);
         
-        // Prevent default scroll when pulling
+        // Prevent default scroll when pulling down
         if (distance > 10) {
           e.preventDefault();
+        }
+      } else {
+        // Reset if scrolling up or not at top
+        if (pullDistance > 0) {
+          setPullDistance(0);
         }
       }
     };
 
     const handleTouchEnd = () => {
-      if (pullDistance >= PULL_THRESHOLD && !isRefreshing) {
+      if (pullDistance >= PULL_THRESHOLD && !isRefreshing && window.scrollY === 0) {
         handleRefresh();
       } else {
         setPullDistance(0);
