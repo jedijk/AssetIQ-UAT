@@ -12,15 +12,15 @@ import {
   AlertTriangle,
   Activity,
   Wifi,
-  WifiOff
+  WifiOff,
+  ShieldX
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
-import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
-import { useIsMobile } from "../hooks/useIsMobile";
+import { useAuth } from "../contexts/AuthContext";
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -172,7 +172,7 @@ const Sparkline = ({ data, color }) => {
 
 const SettingsServerPerformancePage = () => {
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  const { user } = useAuth();
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -184,7 +184,12 @@ const SettingsServerPerformancePage = () => {
   const [cpuHistory, setCpuHistory] = useState([]);
   const [ramHistory, setRamHistory] = useState([]);
   
+  // Check if user is owner
+  const isOwner = user?.role === "owner";
+  
   const fetchMetrics = useCallback(async (showRefreshIndicator = false) => {
+    if (!isOwner) return;
+    
     if (showRefreshIndicator) setIsRefreshing(true);
     
     try {
@@ -244,6 +249,11 @@ const SettingsServerPerformancePage = () => {
   
   // Initial fetch and auto-refresh
   useEffect(() => {
+    if (!isOwner) {
+      setLoading(false);
+      return;
+    }
+    
     fetchMetrics();
     
     let interval;
@@ -254,11 +264,27 @@ const SettingsServerPerformancePage = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [fetchMetrics, autoRefresh]);
+  }, [fetchMetrics, autoRefresh, isOwner]);
   
-  // Show desktop-only message on mobile
-  if (isMobile) {
-    return <DesktopOnlyMessage title="Server Performance" icon={Server} />;
+  // Show access denied for non-owners
+  if (!isOwner) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-6 text-center">
+            <ShieldX className="w-16 h-16 text-red-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-slate-900 mb-2">Access Restricted</h2>
+            <p className="text-slate-500 mb-6">
+              Server Performance metrics are only available to account owners.
+            </p>
+            <Button onClick={() => navigate(-1)} variant="outline">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Go Back
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
   
   // Loading skeleton

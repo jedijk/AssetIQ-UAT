@@ -34,11 +34,11 @@ async def get_system_metrics(
     Returns:
         CPU usage, RAM usage, Disk usage, and server uptime.
     """
-    # Restrict to admin/owner only
-    if current_user.get("role") not in ["owner", "admin"]:
+    # Restrict to owner only
+    if current_user.get("role") != "owner":
         raise HTTPException(
             status_code=403, 
-            detail="Only admins can access server metrics"
+            detail="Only owners can access server metrics"
         )
     
     if not PSUTIL_AVAILABLE:
