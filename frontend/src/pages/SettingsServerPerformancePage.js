@@ -93,8 +93,8 @@ const CircularProgress = ({ percent, size = 120, strokeWidth = 10, color }) => {
 };
 
 // Metric Card component
-const MetricCard = ({ title, icon: Icon, value, subValue, percent, children, animate = true }) => {
-  const color = getStatusColor(percent);
+const MetricCard = ({ title, icon: Icon, value, subValue, percent, children, animate = true, compact = false }) => {
+  const color = percent !== undefined ? getStatusColor(percent) : null;
   
   return (
     <motion.div
@@ -103,20 +103,20 @@ const MetricCard = ({ title, icon: Icon, value, subValue, percent, children, ani
       transition={{ duration: 0.3 }}
     >
       <Card className="h-full">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center justify-between">
-            <div className="flex items-center gap-2 text-slate-600">
-              <Icon className="w-4 h-4" />
-              {title}
+        <CardHeader className={compact ? "pb-1 pt-2 px-2 sm:px-4 sm:pt-4 sm:pb-2" : "pb-2"}>
+          <CardTitle className="text-xs sm:text-sm font-medium flex items-center justify-between">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-slate-600">
+              <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="truncate">{title}</span>
             </div>
-            {percent !== undefined && (
-              <Badge className={`${color.light} ${color.text} border-0`}>
-                {color.status === "critical" ? "Critical" : color.status === "warning" ? "Warning" : "Normal"}
+            {color && (
+              <Badge className={`${color.light} ${color.text} border-0 text-[9px] sm:text-xs px-1 sm:px-1.5 py-0`}>
+                {color.status === "critical" ? "!" : color.status === "warning" ? "⚠" : "✓"}
               </Badge>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className={compact ? "px-2 pb-2 pt-0 sm:px-4 sm:pb-4" : ""}>
           {children || (
             <div className="space-y-3">
               <div className="text-3xl font-bold text-slate-900">{value}</div>
@@ -126,7 +126,7 @@ const MetricCard = ({ title, icon: Icon, value, subValue, percent, children, ani
                   <Progress 
                     value={percent} 
                     className="h-2"
-                    indicatorClassName={color.bg}
+                    indicatorClassName={color?.bg}
                   />
                   <p className="text-xs text-slate-400 text-right">{percent.toFixed(1)}%</p>
                 </div>
@@ -323,38 +323,40 @@ const SettingsServerPerformancePage = () => {
   const diskColor = getStatusColor(metrics?.disk_percent || 0);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
+    <div className="min-h-screen bg-slate-50 pb-20 sm:pb-6">
+      {/* Header - Compact on mobile */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
+          {/* Mobile: Two rows */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate("/settings")}
-                className="gap-2"
+                onClick={() => navigate(-1)}
+                className="p-2 sm:px-3"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Back</span>
               </Button>
               <div>
-                <h1 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
-                  <Server className="w-5 h-5 text-indigo-600" />
+                <h1 className="text-base sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
+                  <Server className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
                   Server Performance
                 </h1>
-                <p className="text-sm text-slate-500">Real-time server metrics and monitoring</p>
+                <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">Real-time server metrics</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            
+            {/* Controls */}
+            <div className="flex items-center gap-1.5 sm:gap-3">
               {/* Connection Status */}
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                 {error ? (
-                  <WifiOff className="w-4 h-4 text-red-500" />
+                  <WifiOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
                 ) : (
-                  <Wifi className="w-4 h-4 text-green-500" />
+                  <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" />
                 )}
-                <span className={error ? "text-red-500" : "text-green-600"}>
+                <span className={`hidden sm:inline ${error ? "text-red-500" : "text-green-600"}`}>
                   {error ? "Offline" : "Live"}
                 </span>
               </div>
@@ -364,10 +366,10 @@ const SettingsServerPerformancePage = () => {
                 variant={autoRefresh ? "default" : "outline"}
                 size="sm"
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                className="gap-2"
+                className="gap-1 px-2 sm:px-3 text-xs sm:text-sm"
               >
-                <Activity className={`w-4 h-4 ${autoRefresh ? "animate-pulse" : ""}`} />
-                {autoRefresh ? "Auto" : "Manual"}
+                <Activity className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${autoRefresh ? "animate-pulse" : ""}`} />
+                <span className="hidden sm:inline">{autoRefresh ? "Auto" : "Manual"}</span>
               </Button>
               
               {/* Manual refresh */}
@@ -376,10 +378,9 @@ const SettingsServerPerformancePage = () => {
                 size="sm"
                 onClick={() => fetchMetrics(true)}
                 disabled={isRefreshing}
-                className="gap-2"
+                className="p-2 sm:px-3"
               >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                Refresh
+                <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isRefreshing ? "animate-spin" : ""}`} />
               </Button>
             </div>
           </div>
@@ -387,7 +388,7 @@ const SettingsServerPerformancePage = () => {
       </div>
 
       {/* Content */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         {/* Warning Alert */}
         <AnimatePresence>
           {metrics && (metrics.cpu_percent >= 85 || metrics.ram_percent >= 85 || metrics.disk_percent >= 85) && (
@@ -395,16 +396,16 @@ const SettingsServerPerformancePage = () => {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3"
+              className="mb-4 sm:mb-6 p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2 sm:gap-3"
             >
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 mt-0.5" />
               <div>
-                <p className="font-medium text-amber-800">High Resource Usage Detected</p>
-                <p className="text-sm text-amber-600">
-                  {metrics.cpu_percent >= 85 && "CPU usage is above 85%. "}
-                  {metrics.ram_percent >= 85 && "RAM usage is above 85%. "}
-                  {metrics.disk_percent >= 85 && "Disk usage is above 85%. "}
-                  Consider scaling resources or investigating processes.
+                <p className="font-medium text-amber-800 text-sm sm:text-base">High Resource Usage</p>
+                <p className="text-xs sm:text-sm text-amber-600">
+                  {metrics.cpu_percent >= 85 && "CPU "}
+                  {metrics.ram_percent >= 85 && "RAM "}
+                  {metrics.disk_percent >= 85 && "Disk "}
+                  above 85%
                 </p>
               </div>
             </motion.div>
@@ -413,126 +414,120 @@ const SettingsServerPerformancePage = () => {
 
         {/* Mock Data Warning */}
         {metrics?.mock && (
-          <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
-            <Activity className="w-4 h-4 text-blue-600" />
-            <p className="text-sm text-blue-700">
-              Displaying mock data. Actual server metrics unavailable.
+          <div className="mb-4 sm:mb-6 p-2.5 sm:p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 sm:gap-3">
+            <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
+            <p className="text-xs sm:text-sm text-blue-700">
+              Mock data - actual metrics unavailable
             </p>
           </div>
         )}
 
-        {/* Main Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* Main Metrics Grid - 2x2 on mobile, 4 columns on desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           {/* CPU */}
-          <MetricCard title="CPU Usage" icon={Cpu} percent={metrics?.cpu_percent}>
+          <MetricCard title="CPU" icon={Cpu} percent={metrics?.cpu_percent} compact>
             <div className="flex flex-col items-center">
               <CircularProgress 
                 percent={metrics?.cpu_percent || 0} 
                 color={cpuColor}
-                size={100}
-                strokeWidth={8}
+                size={80}
+                strokeWidth={6}
               />
-              <p className="text-sm text-slate-500 mt-2">
-                {metrics?.cpu_count_logical || "-"} Logical Cores
+              <p className="text-xs text-slate-500 mt-1.5">
+                {metrics?.cpu_count_logical || "-"} Cores
               </p>
               <Sparkline data={cpuHistory} color={cpuColor.text} />
             </div>
           </MetricCard>
 
           {/* RAM */}
-          <MetricCard title="RAM Usage" icon={MemoryStick} percent={metrics?.ram_percent}>
-            <div className="space-y-3">
+          <MetricCard title="RAM" icon={MemoryStick} percent={metrics?.ram_percent} compact>
+            <div className="space-y-2">
               <div className="text-center">
-                <span className="text-3xl font-bold text-slate-900">
+                <span className="text-xl sm:text-2xl font-bold text-slate-900">
                   {metrics?.ram_used?.toFixed(1) || "-"}
                 </span>
-                <span className="text-lg text-slate-500"> / {metrics?.ram_total?.toFixed(1) || "-"} GB</span>
+                <span className="text-xs sm:text-sm text-slate-500">/{metrics?.ram_total?.toFixed(0)}GB</span>
               </div>
               <Progress 
                 value={metrics?.ram_percent || 0} 
-                className="h-3"
+                className="h-2"
                 indicatorClassName={ramColor.bg}
               />
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>Used: {metrics?.ram_percent?.toFixed(1)}%</span>
-                <span>Free: {(100 - (metrics?.ram_percent || 0)).toFixed(1)}%</span>
-              </div>
+              <p className="text-[10px] sm:text-xs text-slate-400 text-center">
+                {metrics?.ram_percent?.toFixed(0)}% used
+              </p>
               <Sparkline data={ramHistory} color={ramColor.text} />
             </div>
           </MetricCard>
 
           {/* Disk */}
-          <MetricCard title="Disk Usage" icon={HardDrive} percent={metrics?.disk_percent}>
-            <div className="space-y-3">
+          <MetricCard title="Disk" icon={HardDrive} percent={metrics?.disk_percent} compact>
+            <div className="space-y-2">
               <div className="text-center">
-                <span className="text-3xl font-bold text-slate-900">
-                  {metrics?.disk_used?.toFixed(1) || "-"}
+                <span className="text-xl sm:text-2xl font-bold text-slate-900">
+                  {metrics?.disk_used?.toFixed(0) || "-"}
                 </span>
-                <span className="text-lg text-slate-500"> / {metrics?.disk_total?.toFixed(1) || "-"} GB</span>
+                <span className="text-xs sm:text-sm text-slate-500">/{metrics?.disk_total?.toFixed(0)}GB</span>
               </div>
               <Progress 
                 value={metrics?.disk_percent || 0} 
-                className="h-3"
+                className="h-2"
                 indicatorClassName={diskColor.bg}
               />
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>Used: {metrics?.disk_percent?.toFixed(1)}%</span>
-                <span>Free: {(100 - (metrics?.disk_percent || 0)).toFixed(1)}%</span>
-              </div>
+              <p className="text-[10px] sm:text-xs text-slate-400 text-center">
+                {metrics?.disk_percent?.toFixed(0)}% used
+              </p>
             </div>
           </MetricCard>
 
           {/* Uptime */}
-          <MetricCard title="Server Uptime" icon={Clock}>
-            <div className="space-y-3">
+          <MetricCard title="Uptime" icon={Clock} compact>
+            <div className="space-y-2">
               <div className="text-center">
-                <span className="text-3xl font-bold text-slate-900">
+                <span className="text-lg sm:text-xl font-bold text-slate-900">
                   {formatUptime(metrics?.uptime)}
                 </span>
               </div>
               <div className="text-center">
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px] sm:text-xs px-1.5 py-0.5">
                   Running
                 </Badge>
               </div>
-              <p className="text-xs text-slate-400 text-center">
-                {metrics?.uptime ? `${Math.floor(metrics.uptime / 86400)} days continuous` : ""}
+              <p className="text-[10px] text-slate-400 text-center">
+                {metrics?.uptime ? `${Math.floor(metrics.uptime / 86400)}d uptime` : ""}
               </p>
             </div>
           </MetricCard>
         </div>
 
-        {/* Detailed Stats */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Detailed Stats - Collapsible on mobile */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
           {/* System Info */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Server className="w-4 h-4" />
-                System Information
+            <CardHeader className="py-2 sm:py-4 px-3 sm:px-6">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-2">
+                <Server className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                System Info
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between py-2 border-b border-slate-100">
-                  <span className="text-sm text-slate-500">CPU Cores (Physical)</span>
-                  <span className="text-sm font-medium">{metrics?.cpu_count || "-"}</span>
+            <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6 pt-0">
+              <div className="space-y-1.5 sm:space-y-2">
+                <div className="flex justify-between py-1 sm:py-1.5 border-b border-slate-100">
+                  <span className="text-xs sm:text-sm text-slate-500">CPU Cores</span>
+                  <span className="text-xs sm:text-sm font-medium">{metrics?.cpu_count_logical || "-"}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-slate-100">
-                  <span className="text-sm text-slate-500">CPU Cores (Logical)</span>
-                  <span className="text-sm font-medium">{metrics?.cpu_count_logical || "-"}</span>
+                <div className="flex justify-between py-1 sm:py-1.5 border-b border-slate-100">
+                  <span className="text-xs sm:text-sm text-slate-500">Total RAM</span>
+                  <span className="text-xs sm:text-sm font-medium">{metrics?.ram_total?.toFixed(1) || "-"} GB</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-slate-100">
-                  <span className="text-sm text-slate-500">Total RAM</span>
-                  <span className="text-sm font-medium">{metrics?.ram_total?.toFixed(2) || "-"} GB</span>
+                <div className="flex justify-between py-1 sm:py-1.5 border-b border-slate-100">
+                  <span className="text-xs sm:text-sm text-slate-500">Total Disk</span>
+                  <span className="text-xs sm:text-sm font-medium">{metrics?.disk_total?.toFixed(0) || "-"} GB</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-slate-100">
-                  <span className="text-sm text-slate-500">Total Disk Space</span>
-                  <span className="text-sm font-medium">{metrics?.disk_total?.toFixed(2) || "-"} GB</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-sm text-slate-500">Data Source</span>
-                  <span className="text-sm font-medium">{metrics?.mock ? "Mock Data" : "Live Server"}</span>
+                <div className="flex justify-between py-1 sm:py-1.5">
+                  <span className="text-xs sm:text-sm text-slate-500">Source</span>
+                  <span className="text-xs sm:text-sm font-medium">{metrics?.mock ? "Mock" : "Live"}</span>
                 </div>
               </div>
             </CardContent>
@@ -540,58 +535,42 @@ const SettingsServerPerformancePage = () => {
 
           {/* Status Overview */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Activity className="w-4 h-4" />
-                Status Overview
+            <CardHeader className="py-2 sm:py-4 px-3 sm:px-6">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-2">
+                <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                Status
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* CPU Status */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${cpuColor.bg}`} />
-                    <span className="text-sm">CPU</span>
-                  </div>
-                  <span className={`text-sm font-medium ${cpuColor.text}`}>
-                    {metrics?.cpu_percent?.toFixed(1)}%
+            <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6 pt-0">
+              <div className="space-y-2 sm:space-y-3">
+                {/* Status Bars */}
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${cpuColor.bg}`} />
+                  <span className="text-xs sm:text-sm flex-1">CPU</span>
+                  <span className={`text-xs sm:text-sm font-medium ${cpuColor.text}`}>
+                    {metrics?.cpu_percent?.toFixed(0)}%
                   </span>
                 </div>
-                
-                {/* RAM Status */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${ramColor.bg}`} />
-                    <span className="text-sm">RAM</span>
-                  </div>
-                  <span className={`text-sm font-medium ${ramColor.text}`}>
-                    {metrics?.ram_percent?.toFixed(1)}%
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${ramColor.bg}`} />
+                  <span className="text-xs sm:text-sm flex-1">RAM</span>
+                  <span className={`text-xs sm:text-sm font-medium ${ramColor.text}`}>
+                    {metrics?.ram_percent?.toFixed(0)}%
                   </span>
                 </div>
-                
-                {/* Disk Status */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${diskColor.bg}`} />
-                    <span className="text-sm">Disk</span>
-                  </div>
-                  <span className={`text-sm font-medium ${diskColor.text}`}>
-                    {metrics?.disk_percent?.toFixed(1)}%
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${diskColor.bg}`} />
+                  <span className="text-xs sm:text-sm flex-1">Disk</span>
+                  <span className={`text-xs sm:text-sm font-medium ${diskColor.text}`}>
+                    {metrics?.disk_percent?.toFixed(0)}%
                   </span>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>Last updated</span>
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-400">
+                    <span>Updated</span>
                     <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "-"}</span>
                   </div>
-                  {autoRefresh && (
-                    <div className="flex items-center justify-between text-xs text-slate-400 mt-1">
-                      <span>Refresh interval</span>
-                      <span>5 seconds</span>
-                    </div>
-                  )}
                 </div>
               </div>
             </CardContent>
