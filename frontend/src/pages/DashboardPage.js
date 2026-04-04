@@ -1071,33 +1071,35 @@ export default function DashboardPage() {
       
       {/* Quick View Modal for Form Submissions */}
       <Dialog open={!!quickViewSubmission} onOpenChange={() => setQuickViewSubmission(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-indigo-500" />
-              {quickViewSubmission?.template_name || quickViewSubmission?.form_name || "Form Submission"}
+        <DialogContent className="w-[95vw] max-w-2xl h-[85vh] sm:h-auto sm:max-h-[80vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 border-b border-slate-100 flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
+              <span className="truncate">{quickViewSubmission?.template_name || quickViewSubmission?.form_name || "Form Submission"}</span>
             </DialogTitle>
             <DialogDescription className="flex items-center gap-2 mt-2">
               <UserAvatar 
                 name={quickViewSubmission?.submitted_by_name || "User"}
                 photo={quickViewSubmission?.submitted_by_photo}
                 initials={(quickViewSubmission?.submitted_by_name || "U").charAt(0)}
-                size="md"
+                size="sm"
                 showPopover={false}
               />
-              <div>
+              <div className="text-xs sm:text-sm">
                 <span className="font-medium text-slate-700">{quickViewSubmission?.submitted_by_name || "Unknown"}</span>
                 <span className="text-slate-400 mx-1">•</span>
-                <span>{quickViewSubmission?.submitted_at ? new Date(quickViewSubmission.submitted_at).toLocaleString() : "Unknown date"}</span>
+                <span className="text-slate-500">{quickViewSubmission?.submitted_at ? new Date(quickViewSubmission.submitted_at).toLocaleDateString() : "Unknown"}</span>
               </div>
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+            <div className="space-y-4">
             {/* Status Badge */}
             <div className="flex items-center gap-2">
-              <Label className="text-slate-500">{t("common.status")}:</Label>
-              <span className={`px-2 py-1 rounded text-sm font-medium capitalize ${
+              <Label className="text-slate-500 text-xs sm:text-sm">{t("common.status")}:</Label>
+              <span className={`px-2 py-0.5 sm:py-1 rounded text-xs sm:text-sm font-medium capitalize ${
                 quickViewSubmission?.status === "completed" || quickViewSubmission?.status === "approved" 
                   ? "bg-green-100 text-green-700" 
                   : quickViewSubmission?.status === "pending" 
@@ -1112,17 +1114,17 @@ export default function DashboardPage() {
             
             {/* Equipment & Task Info */}
             {(quickViewSubmission?.equipment_name || quickViewSubmission?.task_template_name) && (
-              <div className="flex flex-wrap gap-4 text-sm">
+              <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
                 {quickViewSubmission?.equipment_name && (
-                  <div className="flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-600">{quickViewSubmission.equipment_name}</span>
+                  <div className="flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+                    <span className="text-slate-600 truncate max-w-[150px] sm:max-w-none">{quickViewSubmission.equipment_name}</span>
                   </div>
                 )}
                 {quickViewSubmission?.task_template_name && (
-                  <div className="flex items-center gap-1.5">
-                    <ClipboardList className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-600">{quickViewSubmission.task_template_name}</span>
+                  <div className="flex items-center gap-1">
+                    <ClipboardList className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+                    <span className="text-slate-600 truncate max-w-[150px] sm:max-w-none">{quickViewSubmission.task_template_name}</span>
                   </div>
                 )}
               </div>
@@ -1137,9 +1139,9 @@ export default function DashboardPage() {
               
               if (hasResponses) {
                 return (
-                  <div className="border rounded-lg p-4 bg-slate-50">
-                    <h4 className="font-medium text-slate-700 mb-3 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-500" />
+                  <div className="border rounded-lg p-3 sm:p-4 bg-slate-50">
+                    <h4 className="font-medium text-slate-700 mb-2 sm:mb-3 flex items-center gap-2 text-sm">
+                      <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
                       {t("dashboard.formResponses") || "Form Responses"} ({responses.length})
                     </h4>
                     <div className="space-y-2">
@@ -1156,7 +1158,7 @@ export default function DashboardPage() {
                         return (
                           <div 
                             key={response.field_id || `response-${idx}`}
-                            className={`p-3 rounded-lg border ${
+                            className={`p-2 sm:p-3 rounded-lg border ${
                               isCritical 
                                 ? "bg-red-50 border-red-200" 
                                 : isWarning 
@@ -1164,12 +1166,12 @@ export default function DashboardPage() {
                                   : "bg-white border-slate-200"
                             }`}
                           >
-                            <p className={`text-xs font-medium mb-1 ${
+                            <p className={`text-[10px] sm:text-xs font-medium mb-0.5 sm:mb-1 ${
                               isCritical ? "text-red-600" : isWarning ? "text-amber-600" : "text-slate-500"
                             }`}>
                               {response.field_label || response.field_id}
                             </p>
-                            <div className={`text-sm font-medium ${
+                            <div className={`text-xs sm:text-sm font-medium ${
                               isCritical ? "text-red-800" : isWarning ? "text-amber-800" : "text-slate-800"
                             }`}>
                               {isSignature && response.value ? (
@@ -1277,30 +1279,34 @@ export default function DashboardPage() {
             
             {/* Notes */}
             {quickViewSubmission?.notes && (
-              <div className="border rounded-lg p-4">
-                <h4 className="font-medium text-slate-700 mb-2">{t("common.notes")}</h4>
-                <p className="text-sm text-slate-600 whitespace-pre-wrap">{quickViewSubmission.notes}</p>
+              <div className="border rounded-lg p-3 sm:p-4">
+                <h4 className="font-medium text-slate-700 mb-2 text-sm">{t("common.notes")}</h4>
+                <p className="text-xs sm:text-sm text-slate-600 whitespace-pre-wrap">{quickViewSubmission.notes}</p>
               </div>
             )}
-            
-            {/* Actions */}
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button 
-                variant="outline" 
-                onClick={() => setQuickViewSubmission(null)}
-              >
-                {t("common.close")}
-              </Button>
-              <Button 
-                onClick={() => {
-                  setQuickViewSubmission(null);
-                  navigate(`/form-submissions`, { state: navState });
-                }}
-              >
-                <ExternalLink className="w-4 h-4 mr-1" />
-                {t("dashboard.viewAllSubmissions") || "View All Submissions"}
-              </Button>
             </div>
+          </div>
+          
+          {/* Fixed footer with actions */}
+          <div className="flex justify-end gap-2 px-4 py-3 sm:px-6 sm:py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setQuickViewSubmission(null)}
+            >
+              {t("common.close")}
+            </Button>
+            <Button 
+              size="sm"
+              onClick={() => {
+                setQuickViewSubmission(null);
+                navigate(`/form-submissions`, { state: navState });
+              }}
+            >
+              <ExternalLink className="w-3.5 h-3.5 mr-1" />
+              <span className="hidden sm:inline">{t("dashboard.viewAllSubmissions") || "View All"}</span>
+              <span className="sm:hidden">View All</span>
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
