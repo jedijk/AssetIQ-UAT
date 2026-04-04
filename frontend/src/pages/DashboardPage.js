@@ -896,7 +896,18 @@ export default function DashboardPage() {
                 <p className="text-xs font-medium text-slate-700 truncate">{item.title}</p>
                 <p className="text-[10px] text-slate-400">{item.asset}</p>
               </div>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+              {/* Compact Risk Score & RPN */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <span className="text-[9px] px-1 py-0.5 rounded bg-slate-100 text-slate-600 font-medium tabular-nums" title="Risk Score">
+                  {typeof item.risk_score === 'number' ? Math.round(item.risk_score) : item.risk_score || 0}
+                </span>
+                {item.fmea_rpn && (
+                  <span className="text-[9px] px-1 py-0.5 rounded bg-purple-100 text-purple-600 font-medium tabular-nums" title="RPN">
+                    {item.fmea_rpn}
+                  </span>
+                )}
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
                 item.status === "Open" ? "bg-blue-100 text-blue-700" :
                 item.status === "Mitigated" ? "bg-green-100 text-green-700" :
                 "bg-slate-100 text-slate-700"

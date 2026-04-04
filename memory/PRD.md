@@ -24,6 +24,21 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 4, 2026 - Dashboard Recent Observations Compact Risk Score & RPN
+**UI Enhancement:**
+- ✅ **Added compact Risk Score and RPN badges to Recent Observations widget**
+- Each observation row now displays:
+  - Risk Score (gray badge with numeric value)
+  - RPN (purple badge, only when available)
+  - Status badge (colored by status)
+- Badges use tabular-nums for consistent digit alignment
+- Maintains compact, scannable layout
+
+**Files Modified:**
+- `/app/frontend/src/pages/DashboardPage.js` - Updated Recent Observations renderItem function
+
+---
+
 ### April 3, 2026 - Database N+1 Query Optimization
 **PERFORMANCE IMPROVEMENT:**
 - ✅ **Eliminated N+1 queries in `/api/my-tasks` endpoint**
