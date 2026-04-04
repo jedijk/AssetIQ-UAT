@@ -405,7 +405,7 @@ const FormsPage = ({ embedded = false }) => {
       )}
 
       {/* Stats Cards */}
-      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 ${embedded ? 'mb-4' : 'mb-6'}`}>
+      <div className={`grid ${embedded ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-4'} gap-3 ${embedded ? 'mb-4' : 'mb-6'}`}>
         <Card>
           <CardContent className="p-3">
             <div className="flex items-center justify-between">
@@ -419,45 +419,49 @@ const FormsPage = ({ embedded = false }) => {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500">Submissions</p>
-                <p className="text-xl font-bold text-slate-900">{stats.totalSubmissions}</p>
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <FileText className="h-4 w-4 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500">Warnings</p>
-                <p className="text-xl font-bold text-amber-600">{stats.warningCount}</p>
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500">Critical</p>
-                <p className="text-xl font-bold text-red-600">{stats.criticalCount}</p>
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {!embedded && (
+          <>
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500">Submissions</p>
+                    <p className="text-xl font-bold text-slate-900">{stats.totalSubmissions}</p>
+                  </div>
+                  <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500">Warnings</p>
+                    <p className="text-xl font-bold text-amber-600">{stats.warningCount}</p>
+                  </div>
+                  <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500">Critical</p>
+                    <p className="text-xl font-bold text-red-600">{stats.criticalCount}</p>
+                  </div>
+                  <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Tabs */}
@@ -467,9 +471,11 @@ const FormsPage = ({ embedded = false }) => {
             <TabsTrigger value="templates" data-testid="templates-tab">
               <Layers className="w-4 h-4 mr-2" /> Templates
             </TabsTrigger>
-            <TabsTrigger value="submissions" data-testid="submissions-tab">
-              <FileText className="w-4 h-4 mr-2" /> Submissions
-            </TabsTrigger>
+            {!embedded && (
+              <TabsTrigger value="submissions" data-testid="submissions-tab">
+                <FileText className="w-4 h-4 mr-2" /> Submissions
+              </TabsTrigger>
+            )}
           </TabsList>
           
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -553,42 +559,44 @@ const FormsPage = ({ embedded = false }) => {
           )}
         </TabsContent>
 
-        {/* Submissions Tab */}
-        <TabsContent value="submissions" className="mt-4">
-          {loadingSubmissions ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
-            </div>
-          ) : submissionsError ? (
-            <Card className="py-12 border-red-200 bg-red-50">
-              <CardContent className="text-center">
-                <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-red-700 mb-2">Failed to load submissions</h3>
-                <p className="text-sm text-red-500 mb-4">Please check your connection and try again</p>
-                <Button 
-                  variant="outline"
-                  onClick={() => queryClient.invalidateQueries({ queryKey: ["form-submissions"] })}
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" /> Retry
-                </Button>
-              </CardContent>
-            </Card>
-          ) : submissions.length === 0 ? (
-            <Card className="py-12">
-              <CardContent className="text-center">
-                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-700 mb-2">No submissions yet</h3>
-                <p className="text-sm text-slate-500">Submissions will appear here when forms are filled</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {submissions.map((submission) => (
-                <SubmissionRow key={submission.id} submission={submission} />
-              ))}
-            </div>
-          )}
-        </TabsContent>
+        {/* Submissions Tab - Only shown when not embedded */}
+        {!embedded && (
+          <TabsContent value="submissions" className="mt-4">
+            {loadingSubmissions ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
+              </div>
+            ) : submissionsError ? (
+              <Card className="py-12 border-red-200 bg-red-50">
+                <CardContent className="text-center">
+                  <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-red-700 mb-2">Failed to load submissions</h3>
+                  <p className="text-sm text-red-500 mb-4">Please check your connection and try again</p>
+                  <Button 
+                    variant="outline"
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ["form-submissions"] })}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> Retry
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : submissions.length === 0 ? (
+              <Card className="py-12">
+                <CardContent className="text-center">
+                  <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-700 mb-2">No submissions yet</h3>
+                  <p className="text-sm text-slate-500">Submissions will appear here when forms are filled</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {submissions.map((submission) => (
+                  <SubmissionRow key={submission.id} submission={submission} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Create/Edit Template Dialog */}
