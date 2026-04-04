@@ -797,25 +797,33 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   
-                  {/* RPN Badge */}
-                  {obs.fmea_rpn && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium flex-shrink-0" title="Risk Priority Number">
-                      RPN: {obs.fmea_rpn}
+                  {/* RPN Badge - Fixed width for alignment */}
+                  <div className="w-16 flex-shrink-0 text-right">
+                    {obs.fmea_rpn ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium inline-block" title="Risk Priority Number">
+                        RPN: {obs.fmea_rpn}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-300">—</span>
+                    )}
+                  </div>
+                  
+                  {/* Risk Score - Fixed width for alignment */}
+                  <div className="w-8 flex-shrink-0 text-right">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold tabular-nums inline-block" title="Risk Score">
+                      {typeof obs.risk_score === 'number' ? Math.round(obs.risk_score) : obs.risk_score || 0}
                     </span>
-                  )}
+                  </div>
                   
-                  {/* Risk Score */}
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold flex-shrink-0" title="Risk Score">
-                    {typeof obs.risk_score === 'number' ? Math.round(obs.risk_score) : obs.risk_score || 0}
-                  </span>
-                  
-                  {/* Status Badge */}
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
-                    obs.status === "Open" ? "bg-blue-100 text-blue-700" :
-                    obs.status === "Mitigated" ? "bg-green-100 text-green-700" :
-                    obs.status === "In Progress" ? "bg-amber-100 text-amber-700" :
-                    "bg-slate-100 text-slate-700"
-                  }`}>{obs.status || "Open"}</span>
+                  {/* Status Badge - Fixed width for alignment */}
+                  <div className="w-16 flex-shrink-0 text-right">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded inline-block ${
+                      obs.status === "Open" ? "bg-blue-100 text-blue-700" :
+                      obs.status === "Mitigated" ? "bg-green-100 text-green-700" :
+                      obs.status === "In Progress" ? "bg-amber-100 text-amber-700" :
+                      "bg-slate-100 text-slate-700"
+                    }`}>{obs.status || "Open"}</span>
+                  </div>
                 </div>
               ))}
             </div>
