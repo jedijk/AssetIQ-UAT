@@ -786,17 +786,17 @@ const ThreatDetailPage = () => {
           return (
             <div 
               ref={scorePopupRef}
-              className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 z-50 w-96 max-h-[85vh] flex flex-col"
+              className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 z-50 w-80 max-h-[80vh] flex flex-col"
               style={{ 
-                left: Math.min(Math.max(scoreCalcPopup.x, 16), window.innerWidth - 420), 
+                left: Math.min(Math.max(scoreCalcPopup.x, 16), window.innerWidth - 340), 
                 top: Math.min(Math.max(scoreCalcPopup.y, 16), window.innerHeight - 100)
               }}
             >
               {/* Header - Fixed */}
-              <div className="flex items-center justify-between p-4 pb-3 border-b border-slate-100 flex-shrink-0">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 flex-shrink-0">
                 <div className="flex items-center gap-2">
-                  <Calculator className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-slate-900">{t("observations.scoreCalculation")}</h3>
+                  <Calculator className="w-4 h-4 text-blue-600" />
+                  <h3 className="font-semibold text-sm text-slate-900">{t("observations.scoreCalculation")}</h3>
                 </div>
                 <button 
                   onClick={() => setScoreCalcPopup({ show: false, x: 0, y: 0 })}
@@ -807,41 +807,26 @@ const ThreatDetailPage = () => {
               </div>
               
               {/* Scrollable Content */}
-              <div className="overflow-y-auto flex-1 p-4 pt-3">
-              {/* Exact Calculation Box - WEIGHTED METHODOLOGY */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 mb-4 border border-blue-100">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs text-blue-600 font-medium">{t("observations.exactCalculation")}</div>
-                  {threat.risk_settings_used && (
-                    <div className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border">
-                      Weights: {Math.round((threat.risk_settings_used.criticality_weight || 0.75) * 100)}% / {Math.round((threat.risk_settings_used.fmea_weight || 0.25) * 100)}%
-                    </div>
-                  )}
-                </div>
-                <div className="font-mono text-lg text-slate-800 text-center py-2">
-                  <span className="text-slate-500">(</span>
-                  <span className="text-purple-600">{criticalityScore}</span>
+              <div className="overflow-y-auto flex-1 p-3">
+              {/* Result Box */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 mb-3 border border-blue-100">
+                <div className="font-mono text-sm text-slate-800 text-center">
+                  <span className="text-purple-600 font-semibold">{criticalityScore}</span>
                   <span className="text-slate-400 mx-1">×</span>
-                  <span className="text-purple-400">{threat.risk_settings_used?.criticality_weight || 0.75}</span>
-                  <span className="text-slate-500">)</span>
-                  <span className="text-slate-400 mx-1">+</span>
-                  <span className="text-slate-500">(</span>
-                  <span className="text-blue-600">{fmBaseScore}</span>
+                  <span className="text-purple-400 text-xs">{threat.risk_settings_used?.criticality_weight || 0.75}</span>
+                  <span className="text-slate-400 mx-2">+</span>
+                  <span className="text-blue-600 font-semibold">{fmBaseScore}</span>
                   <span className="text-slate-400 mx-1">×</span>
-                  <span className="text-blue-400">{threat.risk_settings_used?.fmea_weight || 0.25}</span>
-                  <span className="text-slate-500">)</span>
-                </div>
-                <div className="text-center text-[10px] text-slate-500 mt-1">
-                  ({t("observations.criticalityScoreLabel")} × {Math.round((threat.risk_settings_used?.criticality_weight || 0.75) * 100)}%) + ({t("observations.fmeaScoreLabel")} × {Math.round((threat.risk_settings_used?.fmea_weight || 0.25) * 100)}%)
-                </div>
-                <div className="text-center mt-2 pt-2 border-t border-blue-200">
-                  <span className="text-slate-500 text-sm">=</span>
-                  <span className={`text-3xl font-bold ml-2 ${
+                  <span className="text-blue-400 text-xs">{threat.risk_settings_used?.fmea_weight || 0.25}</span>
+                  <span className="text-slate-400 mx-2">=</span>
+                  <span className={`text-xl font-bold ${
                     threat.risk_level === "Critical" ? "text-red-600" :
                     threat.risk_level === "High" ? "text-orange-600" :
                     threat.risk_level === "Medium" ? "text-yellow-600" : "text-green-600"
                   }`}>{threat.risk_score}</span>
-                  <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
+                </div>
+                <div className="text-center mt-1">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                     threat.risk_level === "Critical" ? "bg-red-100 text-red-700" :
                     threat.risk_level === "High" ? "bg-orange-100 text-orange-700" :
                     threat.risk_level === "Medium" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
@@ -849,131 +834,78 @@ const ThreatDetailPage = () => {
                 </div>
               </div>
 
-              {/* Step-by-Step Breakdown */}
-              <div className="space-y-3">
-                {/* Step 1: FMEA */}
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</div>
-                      <span className="text-xs font-medium text-slate-700">{t("observations.fmeaScores")}</span>
-                    </div>
+              {/* Compact Breakdown */}
+              <div className="space-y-2">
+                {/* FMEA Score */}
+                <div className="bg-slate-50 rounded-lg p-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-medium text-slate-700">FMEA Score</span>
                     <button
                       onClick={() => setShowLinkFailureModeDialog(true)}
-                      className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                      data-testid="link-failure-mode-btn"
+                      className="text-[9px] text-blue-600 hover:underline"
                     >
-                      <Link className="w-3 h-3" />
-                      {linkedFmData ? t("observations.relink") : t("observations.linkFailureMode")}
+                      {linkedFmData ? "Relink" : "Link"}
                     </button>
                   </div>
                   {linkedFmData ? (
-                    <>
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        <div className="bg-white rounded p-2 text-center border border-red-200">
-                          <div className="text-xl font-bold text-red-600">{linkedFmData.severity}</div>
-                          <div className="text-[10px] text-red-500">{t("library.severity")}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1 flex-1">
+                        <div className="bg-white rounded px-2 py-1 text-center flex-1 border border-slate-200">
+                          <div className="text-sm font-bold text-red-600">{linkedFmData.severity}</div>
+                          <div className="text-[8px] text-slate-400">S</div>
                         </div>
-                        <div className="bg-white rounded p-2 text-center border border-amber-200">
-                          <div className="text-xl font-bold text-amber-600">{linkedFmData.occurrence}</div>
-                          <div className="text-[10px] text-amber-500">{t("library.occurrence")}</div>
+                        <div className="bg-white rounded px-2 py-1 text-center flex-1 border border-slate-200">
+                          <div className="text-sm font-bold text-amber-600">{linkedFmData.occurrence}</div>
+                          <div className="text-[8px] text-slate-400">O</div>
                         </div>
-                        <div className="bg-white rounded p-2 text-center border border-blue-200">
-                          <div className="text-xl font-bold text-blue-600">{linkedFmData.detectability}</div>
-                          <div className="text-[10px] text-blue-500">{t("library.detectability")}</div>
+                        <div className="bg-white rounded px-2 py-1 text-center flex-1 border border-slate-200">
+                          <div className="text-sm font-bold text-blue-600">{linkedFmData.detectability}</div>
+                          <div className="text-[8px] text-slate-400">D</div>
                         </div>
                       </div>
-                      <div className="text-xs text-slate-600 bg-white rounded px-2 py-1.5 font-mono">
-                        ({linkedFmData.severity} × {linkedFmData.occurrence} × {linkedFmData.detectability}) ÷ 10 = <span className="font-bold text-blue-600">{fmBaseScore}</span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-1">{t("observations.linkedTo")}: {threat.failure_mode}</div>
-                    </>
-                  ) : (
-                    <div className="text-sm text-slate-400 italic bg-white rounded px-3 py-2">
-                      {t("observations.noFmeaLinked")} — {t("observations.fmeaScoreLabel")}: <span className="font-bold text-slate-600">{fmBaseScore}</span>
+                      <div className="text-lg font-bold text-blue-600">= {fmBaseScore}</div>
                     </div>
+                  ) : (
+                    <div className="text-xs text-slate-400 italic">Not linked — Score: <span className="font-bold text-slate-600">{fmBaseScore}</span></div>
                   )}
                 </div>
 
-                {/* Step 2: Criticality */}
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">2</div>
-                    <span className="text-xs font-medium text-slate-700">{t("observations.equipmentCriticality")}</span>
+                {/* Criticality Score */}
+                <div className="bg-slate-50 rounded-lg p-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-medium text-slate-700">Criticality Score</span>
                   </div>
                   {linkedCriticalityData ? (
-                    <>
-                      <div className="grid grid-cols-4 gap-1 mb-2">
-                        <div className="text-center bg-white rounded p-1.5 border border-slate-200">
-                          <Shield className="w-3 h-3 text-red-500 mx-auto mb-0.5" />
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1 flex-1">
+                        <div className="bg-white rounded px-1.5 py-1 text-center flex-1 border border-slate-200">
                           <div className="text-sm font-bold text-red-600">{linkedCriticalityData.safety_impact || 0}</div>
-                          <div className="text-[8px] text-slate-400">{t("equipment.safetyImpact")}</div>
+                          <div className="text-[8px] text-slate-400">Safe</div>
                         </div>
-                        <div className="text-center bg-white rounded p-1.5 border border-slate-200">
-                          <Cog className="w-3 h-3 text-orange-500 mx-auto mb-0.5" />
+                        <div className="bg-white rounded px-1.5 py-1 text-center flex-1 border border-slate-200">
                           <div className="text-sm font-bold text-orange-600">{linkedCriticalityData.production_impact || 0}</div>
-                          <div className="text-[8px] text-slate-400">{t("equipment.productionImpact")}</div>
+                          <div className="text-[8px] text-slate-400">Prod</div>
                         </div>
-                        <div className="text-center bg-white rounded p-1.5 border border-slate-200">
-                          <Leaf className="w-3 h-3 text-green-500 mx-auto mb-0.5" />
+                        <div className="bg-white rounded px-1.5 py-1 text-center flex-1 border border-slate-200">
                           <div className="text-sm font-bold text-green-600">{linkedCriticalityData.environmental_impact || 0}</div>
-                          <div className="text-[8px] text-slate-400">{t("equipment.environmentalImpact")}</div>
+                          <div className="text-[8px] text-slate-400">Env</div>
                         </div>
-                        <div className="text-center bg-white rounded p-1.5 border border-slate-200">
-                          <Star className="w-3 h-3 text-purple-500 mx-auto mb-0.5" />
+                        <div className="bg-white rounded px-1.5 py-1 text-center flex-1 border border-slate-200">
                           <div className="text-sm font-bold text-purple-600">{linkedCriticalityData.reputation_impact || 0}</div>
-                          <div className="text-[8px] text-slate-400">{t("equipment.reputationImpact")}</div>
+                          <div className="text-[8px] text-slate-400">Rep</div>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between bg-white rounded px-2 py-1.5">
-                        <span className="text-xs text-slate-500">{t("observations.criticalityScoreLabel")}:</span>
-                        <span className="text-lg font-bold text-purple-600">{criticalityScore}</span>
-                      </div>
-                      <div className="text-xs text-slate-600 bg-white rounded px-2 py-1.5 font-mono mt-2">
-                        ({linkedCriticalityData.safety_impact || 0}×25 + {linkedCriticalityData.production_impact || 0}×20 + {linkedCriticalityData.environmental_impact || 0}×15 + {linkedCriticalityData.reputation_impact || 0}×10) ÷ 3.5 = <span className="font-bold text-purple-600">{criticalityScore}</span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-1">{t("observations.linkedTo")}: {threat.asset}</div>
-                    </>
-                  ) : (
-                    <div className="text-sm text-slate-400 italic bg-white rounded px-3 py-2">
-                      {t("observations.noCriticalityLinked")} — {t("observations.criticalityScoreLabel")}: <span className="font-bold text-slate-600">0</span>
+                      <div className="text-lg font-bold text-purple-600">= {criticalityScore}</div>
                     </div>
+                  ) : (
+                    <div className="text-xs text-slate-400 italic">Not linked — Score: <span className="font-bold text-slate-600">0</span></div>
                   )}
-                </div>
-
-                {/* Step 3: Final Result */}
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">3</div>
-                    <span className="text-xs font-medium text-slate-700">{t("observations.finalCalculation")}</span>
-                  </div>
-                  <div className="bg-white rounded px-3 py-2 font-mono text-sm">
-                    <span className="text-slate-500">(</span>
-                    <span className="text-purple-600">{criticalityScore}</span>
-                    <span className="text-slate-400">×0.75</span>
-                    <span className="text-slate-500">)</span>
-                    <span className="text-slate-400 mx-1">+</span>
-                    <span className="text-slate-500">(</span>
-                    <span className="text-blue-600">{fmBaseScore}</span>
-                    <span className="text-slate-400">×0.25</span>
-                    <span className="text-slate-500">)</span>
-                    <span className="text-slate-400 mx-1">=</span>
-                    <span className={`font-bold ${
-                      threat.risk_level === "Critical" ? "text-red-600" :
-                      threat.risk_level === "High" ? "text-orange-600" :
-                      threat.risk_level === "Medium" ? "text-yellow-600" : "text-green-600"
-                    }`}>{calculatedScore}</span>
-                    {calculatedScore !== threat.risk_score && (
-                      <span className="text-slate-400 text-xs ml-1">(stored: {threat.risk_score})</span>
-                    )}
-                  </div>
                 </div>
               </div>
 
-              {/* Risk Level Legend */}
-              <div className="mt-3 pt-3 border-t border-slate-200">
-                <div className="text-[10px] text-slate-400 mb-1">{t("observations.riskLevelThresholds")}:</div>
-                <div className="flex flex-wrap gap-2 text-[10px]">
+              {/* Risk Levels */}
+              <div className="mt-2 pt-2 border-t border-slate-200">
+                <div className="flex flex-wrap gap-1.5 text-[9px]">
                   <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-600">≥70 Critical</span>
                   <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-600">50-69 High</span>
                   <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-600">30-49 Medium</span>
