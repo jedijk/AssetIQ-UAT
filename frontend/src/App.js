@@ -27,6 +27,7 @@ import SettingsUserManagementPage from "./pages/SettingsUserManagementPage";
 import SettingsPermissionsPage from "./pages/SettingsPermissionsPage";
 import SettingsAIUsagePage from "./pages/SettingsAIUsagePage";
 import SettingsRiskCalculationPage from "./pages/SettingsRiskCalculationPage";
+import SettingsServerPerformancePage from "./pages/SettingsServerPerformancePage";
 import FormsPage from "./pages/FormsPage";
 import FormSubmissionsPage from "./pages/FormSubmissionsPage";
 import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
@@ -195,6 +196,7 @@ function App() {
                 <Route path="settings/permissions" element={<SettingsPermissionsPage />} />
                 <Route path="settings/ai-usage" element={<SettingsAIUsagePage />} />
                 <Route path="settings/risk-calculation" element={<SettingsRiskCalculationPage />} />
+                <Route path="settings/server-performance" element={<SettingsServerPerformancePage />} />
                 <Route path="settings/statistics" element={<UserStatisticsPage />} />
                 <Route path="user-statistics" element={<UserStatisticsPage />} />
                 <Route path="settings/criticality-definitions" element={<DefinitionsPage />} />

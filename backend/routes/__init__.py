@@ -28,6 +28,7 @@ from routes.assets import router as assets_router
 from routes.permissions import router as permissions_router
 from routes.admin import router as admin_router
 from routes.risk_settings import router as risk_settings_router
+from routes.system import router as system_router
 
 all_routers = [
     auth_router,
@@ -57,4 +58,5 @@ all_routers = [
     permissions_router,
     admin_router,
     risk_settings_router,
+    system_router,
 ]
