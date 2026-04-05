@@ -73,6 +73,7 @@ async def register(request: Request, user_data: UserCreate):
         "approval_status": "pending",  # New users require approval
         "role": "viewer",  # Default role for new users
         "is_active": True,
+        "has_seen_intro": False,  # Show intro tour on first login
     }
     await db.users.insert_one(user_doc)
     

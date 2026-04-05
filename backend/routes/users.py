@@ -235,6 +235,7 @@ async def admin_create_user(
         "created_by": current_user["id"],
         "must_change_password": True,  # Require password change on first login
         "assigned_installations": user_data.installations,  # Assign to installations
+        "has_seen_intro": False,  # Show intro tour on first login
     }
     await db.users.insert_one(user_doc)
     
