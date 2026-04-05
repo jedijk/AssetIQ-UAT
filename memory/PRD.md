@@ -23,6 +23,61 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ---
 
 
+### April 5, 2026 - Execution & Reliability Insights Page (NEW)
+**NEW FEATURE:**
+- ✅ **Execution & Reliability Insights** - Comprehensive analytics dashboard for reliability intelligence
+- ✅ **7 Key Sections**:
+  1. Key Insights Summary (4 stat cards)
+  2. Execution Performance (action metrics)
+  3. Task Execution Overview (recurring vs ad-hoc)
+  4. Discipline Performance (good/average/bad actor classification)
+  5. Data Completeness (criticality, FMEA, type coverage progress bars)
+  6. Reliability Gaps (observations without actions, investigations without follow-up)
+  7. AI Recommendations (GPT-5.2 powered suggestions with manual Generate button)
+
+**Backend APIs Created:**
+- `GET /api/insights/summary` - Key metrics overview
+- `GET /api/execution/actions` - Action execution metrics
+- `GET /api/execution/tasks` - Task execution comparison
+- `GET /api/execution/disciplines` - Discipline performance with classification
+- `GET /api/reliability/data-quality` - Data completeness metrics
+- `GET /api/reliability/gaps` - Reliability gap identification
+- `POST /api/ai/recommendations` - AI-generated recommendations
+
+**Files Created:**
+- `/app/backend/routes/insights.py` - All backend endpoints
+- `/app/frontend/src/pages/InsightsPage.js` - Full analytics page
+
+**Access:**
+- All roles can access (desktop only)
+- Navigate via Settings → Reliability Insights
+
+---
+
+### April 5, 2026 - Server Startup Detection
+**NEW FEATURE:**
+- ✅ **Server startup detection on login** - Auto-detects when server is unavailable
+- ✅ **Auto-retry with visual feedback** - Retries every 3 seconds, up to 5 attempts
+- ✅ **Clear UI overlay** - Shows "Server Starting Up" with progress bar
+- ✅ **Manual retry option** - Cancel or Retry Now buttons
+
+**Files Modified:**
+- `/app/frontend/src/pages/LoginPage.js` - Added server startup state and overlay UI
+
+---
+
+### April 5, 2026 - Minor Updates
+- ✅ Removed feedback button from header (desktop + mobile)
+- ✅ Removed feedback from settings menu (use Help menu instead)
+- ✅ Updated version to 2.5.2
+- ✅ Fixed intro tour timing - only shows after password change for invited users
+- ✅ Updated email branding to "Asset Management Intelligence Platform"
+- ✅ Fixed role names in welcome emails to match RBAC
+- ✅ Set `has_seen_intro: False` for new users created via admin
+
+---
+
+
 ### April 5, 2026 - Mobile Intro Overlay Fix
 **BUG FIX:**
 - ✅ **Fixed mobile intro card overflow** - Card was extending beyond viewport, hiding "Next" button
