@@ -181,10 +181,14 @@ async def get_database_storage(
             capacity = round(configured_capacity_gb, 1)
             unit = "GB"
         
+        # Get database name
+        db_name = db.name
+        
         return {
             "used": used,
             "capacity": capacity,
             "unit": unit,
+            "database_name": db_name,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         

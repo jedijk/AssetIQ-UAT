@@ -588,6 +588,11 @@ const SettingsServerPerformancePage = () => {
                 <div className="flex items-center gap-1.5 sm:gap-2 text-slate-600">
                   <Database className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>Database Storage</span>
+                  {dbStorage?.database_name && (
+                    <span className="text-[10px] sm:text-xs font-normal text-slate-400 ml-1">
+                      ({dbStorage.database_name})
+                    </span>
+                  )}
                 </div>
                 {dbStorage && !dbStorageLoading && !dbStorageError && (() => {
                   const usagePercent = Math.round((dbStorage.used / dbStorage.capacity) * 100);
