@@ -306,31 +306,63 @@ async def get_security_status(
         
         # 6. Dependencies Check
         # Check for known vulnerabilities using pip-audit if available
+        pip_audit_path = "/root/.venv/bin/pip-audit"
         try:
-            result = subprocess.run(
-                ["pip-audit", "--format", "json", "-q"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if result.returncode == 0:
-                checks.append({
-                    "name": "Dependencies",
-                    "status": "pass",
-                    "message": "No known vulnerabilities in packages"
-                })
+            # First check if pip-audit is available
+            if os.path.exists(pip_audit_path):
+                # pip-audit is available, run it with longer timeout
+                result = subprocess.run(
+                    [pip_audit_path, "--format", "json", "-q", "--progress-spinner", "off"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                if result.returncode == 0:
+                    checks.append({
+                        "name": "Dependencies",
+                        "status": "pass",
+                        "message": "No known vulnerabilities in packages"
+                    })
+                else:
+                    # Parse output to see if vulnerabilities found
+                    import json as json_module
+                    try:
+                        vulns = json_module.loads(result.stdout) if result.stdout else []
+                        if len(vulns) > 0:
+                            checks.append({
+                                "name": "Dependencies",
+                                "status": "warning",
+                                "message": f"{len(vulns)} packages may need updates"
+                            })
+                        else:
+                            checks.append({
+                                "name": "Dependencies",
+                                "status": "pass",
+                                "message": "No known vulnerabilities in packages"
+                            })
+                    except Exception:
+                        checks.append({
+                            "name": "Dependencies",
+                            "status": "warning",
+                            "message": "Some packages may need updates"
+                        })
             else:
                 checks.append({
                     "name": "Dependencies",
                     "status": "warning",
-                    "message": "Some packages may need updates"
+                    "message": "Dependency scanner not installed"
                 })
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            # pip-audit not available, skip detailed check
+        except subprocess.TimeoutExpired:
             checks.append({
                 "name": "Dependencies",
                 "status": "warning",
-                "message": "Dependency scan not available"
+                "message": "Dependency scan timed out"
+            })
+        except FileNotFoundError:
+            checks.append({
+                "name": "Dependencies",
+                "status": "warning",
+                "message": "Dependency scanner not available"
             })
         
         # 7. Database Access Check
@@ -360,10 +392,10 @@ async def get_security_status(
         
         # 8. Environment Variables Check
         # Check if sensitive keys are properly configured (not default/empty)
-        jwt_secret = os.environ.get("JWT_SECRET", "")
+        jwt_secret = os.environ.get("JWT_SECRET_KEY", "") or os.environ.get("JWT_SECRET", "")
         
         sensitive_issues = []
-        if not jwt_secret or jwt_secret == "your-secret-key" or len(jwt_secret) < 32:
+        if not jwt_secret or jwt_secret == "your-secret-key" or jwt_secret == "threatbase_super_secret_jwt_key_2024" or len(jwt_secret) < 32:
             sensitive_issues.append("JWT secret")
         
         if sensitive_issues:

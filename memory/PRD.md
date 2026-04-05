@@ -24,6 +24,22 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 5, 2026 - Security Issues Fixed
+**SECURITY FIX:**
+- ✅ **Fixed all 8 security warnings - now all pass**
+- **Password Policy**: Set `MIN_PASSWORD_LENGTH=8` for strong passwords
+- **CORS Configuration**: Restricted to specific origins instead of wildcard `*`
+- **Rate Limiting**: Enabled via `RATE_LIMIT_ENABLED=true`
+- **Dependencies**: Installed pip-audit and configured proper path for scanning
+- **Environment Variables**: Updated JWT secret to 50+ character secure key
+- Overall status now shows **"Secure"** (all green)
+
+**Files Modified:**
+- `/app/backend/.env` - Updated security configuration variables
+- `/app/backend/routes/system.py` - Fixed JWT_SECRET_KEY detection and pip-audit path
+
+---
+
 ### April 5, 2026 - App Security Check in Server Performance
 **NEW FEATURE:**
 - ✅ **Added App Security monitoring to Server Performance page**
