@@ -11,17 +11,21 @@ import {
   GitBranch,
   Settings,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  Menu,
+  Plus,
+  MessageSquare
 } from "lucide-react";
 import { Button } from "./ui/button";
 
-const INTRO_STEPS = [
+// Desktop steps - highlights sidebar navigation
+const DESKTOP_STEPS = [
   {
     id: "welcome",
     title: "Welcome to AssetIQ",
     description: "Your AI-powered asset management platform. Let's take a quick tour of the key features.",
     icon: Sparkles,
-    target: null, // No spotlight for welcome
+    target: null,
     position: "center"
   },
   {
@@ -82,15 +86,89 @@ const INTRO_STEPS = [
   }
 ];
 
-const IntroOverlay = ({ onComplete, onSkip }) => {
+// Mobile steps - highlights mobile-specific UI elements
+const MOBILE_STEPS = [
+  {
+    id: "welcome",
+    title: "Welcome to AssetIQ",
+    description: "Your AI-powered asset management platform. Let's take a quick tour of the mobile experience.",
+    icon: Sparkles,
+    target: null,
+    position: "center"
+  },
+  {
+    id: "menu",
+    title: "Navigation Menu",
+    description: "Tap the menu icon to access all features: Dashboard, Observations, Actions, Tasks, and more.",
+    icon: Menu,
+    target: '[data-testid="mobile-menu-toggle"]',
+    position: "bottom"
+  },
+  {
+    id: "dashboard",
+    title: "Dashboard",
+    description: "View your operational metrics, risk scores, and recent activity in a mobile-optimized layout.",
+    icon: LayoutDashboard,
+    target: null,
+    position: "center"
+  },
+  {
+    id: "observations",
+    title: "Observations",
+    description: "Track equipment issues on the go. Swipe cards for quick actions, tap for details.",
+    icon: AlertTriangle,
+    target: null,
+    position: "center"
+  },
+  {
+    id: "quick-add",
+    title: "Quick Add",
+    description: "Tap the + button to quickly create new observations, actions, or tasks from anywhere.",
+    icon: Plus,
+    target: '[data-testid="quick-add-button"], .fixed.bottom-4.right-4 button',
+    position: "top"
+  },
+  {
+    id: "ai-chat",
+    title: "AI Assistant",
+    description: "Get instant help with equipment analysis, failure modes, and reliability insights.",
+    icon: MessageSquare,
+    target: '[data-testid="ai-chat-button"]',
+    position: "top"
+  },
+  {
+    id: "complete",
+    title: "You're Ready!",
+    description: "Start exploring AssetIQ on mobile. Access the tour anytime from the menu.",
+    icon: CheckCircle2,
+    target: null,
+    position: "center"
+  }
+];
+
+const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState(null);
   const [isVisible, setIsVisible] = useState(true);
+  const [detectedMobile, setDetectedMobile] = useState(false);
 
-  const step = INTRO_STEPS[currentStep];
+  // Detect mobile on mount
+  useEffect(() => {
+    const checkMobile = () => {
+      setDetectedMobile(window.innerWidth < 640);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const useMobileSteps = isMobile || detectedMobile;
+  const STEPS = useMobileSteps ? MOBILE_STEPS : DESKTOP_STEPS;
+  
+  const step = STEPS[currentStep];
   const isFirstStep = currentStep === 0;
-  const isLastStep = currentStep === INTRO_STEPS.length - 1;
-  const progress = ((currentStep + 1) / INTRO_STEPS.length) * 100;
+  const isLastStep = currentStep === STEPS.length - 1;
+  const progress = ((currentStep + 1) / STEPS.length) * 100;
 
   // Find and highlight target element
   const updateTargetPosition = useCallback(() => {
@@ -115,7 +193,11 @@ const IntroOverlay = ({ onComplete, onSkip }) => {
   useEffect(() => {
     updateTargetPosition();
     window.addEventListener("resize", updateTargetPosition);
-    return () => window.removeEventListener("resize", updateTargetPosition);
+    window.addEventListener("scroll", updateTargetPosition);
+    return () => {
+      window.removeEventListener("resize", updateTargetPosition);
+      window.removeEventListener("scroll", updateTargetPosition);
+    };
   }, [currentStep, updateTargetPosition]);
 
   const handleNext = () => {
@@ -148,12 +230,20 @@ const IntroOverlay = ({ onComplete, onSkip }) => {
     }, 300);
   };
 
-  // Calculate tooltip position
+  // Calculate tooltip position based on screen size and target
   const getTooltipStyle = () => {
-    // Check if mobile (width < 640px)
-    const isMobile = window.innerWidth < 640;
+    // For mobile, center the tooltip more towards the top
+    if (useMobileSteps) {
+      return {
+        position: "fixed",
+        top: "40%",
+        left: "50%",
+        transform: "translate(-50%, -50%)"
+      };
+    }
     
-    if (step.position === "center" || !targetRect || isMobile) {
+    // For desktop center position or no target
+    if (step.position === "center" || !targetRect) {
       return {
         position: "fixed",
         top: "50%",
@@ -162,6 +252,7 @@ const IntroOverlay = ({ onComplete, onSkip }) => {
       };
     }
 
+    // Desktop positioning with spotlight
     const padding = 20;
     const tooltipWidth = 360;
     
@@ -215,7 +306,7 @@ const IntroOverlay = ({ onComplete, onSkip }) => {
                     y={targetRect.top}
                     width={targetRect.width}
                     height={targetRect.height}
-                    rx="8"
+                    rx="12"
                     fill="black"
                   />
                 )}
@@ -226,7 +317,7 @@ const IntroOverlay = ({ onComplete, onSkip }) => {
               y="0"
               width="100%"
               height="100%"
-              fill="rgba(0, 0, 0, 0.75)"
+              fill="rgba(0, 0, 0, 0.8)"
               mask="url(#spotlight-mask)"
             />
           </svg>
@@ -242,9 +333,9 @@ const IntroOverlay = ({ onComplete, onSkip }) => {
                 left: targetRect.left - 4,
                 width: targetRect.width + 8,
                 height: targetRect.height + 8,
-                borderRadius: 12,
-                border: "2px solid rgba(59, 130, 246, 0.8)",
-                boxShadow: "0 0 20px rgba(59, 130, 246, 0.4)"
+                borderRadius: 16,
+                border: "3px solid rgba(59, 130, 246, 0.9)",
+                boxShadow: "0 0 30px rgba(59, 130, 246, 0.5), inset 0 0 20px rgba(59, 130, 246, 0.1)"
               }}
             />
           )}
@@ -257,13 +348,13 @@ const IntroOverlay = ({ onComplete, onSkip }) => {
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
             style={getTooltipStyle()}
-            className="w-[360px] max-w-[calc(100vw-40px)]"
+            className={`${useMobileSteps ? 'w-[300px]' : 'w-[360px]'} max-w-[calc(100vw-32px)]`}
           >
-            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
               {/* Progress bar */}
-              <div className="h-1 bg-slate-100">
+              <div className={`${useMobileSteps ? 'h-1' : 'h-1.5'} bg-slate-100`}>
                 <motion.div
-                  className="h-full bg-blue-500"
+                  className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
                   initial={{ width: 0 }}
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.3 }}
@@ -271,24 +362,24 @@ const IntroOverlay = ({ onComplete, onSkip }) => {
               </div>
 
               {/* Content */}
-              <div className="p-5">
+              <div className={`${useMobileSteps ? 'p-3' : 'p-5'}`}>
                 {/* Icon and step indicator */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2.5 rounded-xl ${
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`${useMobileSteps ? 'p-1.5' : 'p-2.5'} rounded-xl ${
                       isLastStep ? "bg-green-100" : "bg-blue-100"
                     }`}>
-                      <StepIcon className={`w-5 h-5 ${
+                      <StepIcon className={`${useMobileSteps ? 'w-4 h-4' : 'w-5 h-5'} ${
                         isLastStep ? "text-green-600" : "text-blue-600"
                       }`} />
                     </div>
-                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
-                      Step {currentStep + 1} of {INTRO_STEPS.length}
+                    <span className={`${useMobileSteps ? 'text-[10px]' : 'text-xs'} font-medium text-slate-400 uppercase tracking-wide`}>
+                      Step {currentStep + 1} of {STEPS.length}
                     </span>
                   </div>
                   <button
                     onClick={handleSkip}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                    className="p-1 rounded-lg hover:bg-slate-100 transition-colors"
                     data-testid="intro-skip-btn"
                   >
                     <X className="w-4 h-4 text-slate-400" />
@@ -296,38 +387,38 @@ const IntroOverlay = ({ onComplete, onSkip }) => {
                 </div>
 
                 {/* Title and description */}
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                <h3 className={`${useMobileSteps ? 'text-sm' : 'text-lg'} font-semibold text-slate-900 mb-1`}>
                   {step.title}
                 </h3>
-                <p className="text-sm text-slate-600 leading-relaxed mb-5">
+                <p className={`${useMobileSteps ? 'text-[11px] leading-relaxed' : 'text-sm leading-relaxed'} text-slate-600 mb-3`}>
                   {step.description}
                 </p>
 
                 {/* Progress dots */}
-                <div className="flex items-center justify-center gap-1.5 mb-5">
-                  {INTRO_STEPS.map((_, index) => (
+                <div className={`flex items-center justify-center gap-1 ${useMobileSteps ? 'mb-3' : 'mb-4'}`}>
+                  {STEPS.map((_, index) => (
                     <button
                       key={index}
                       onClick={() => setCurrentStep(index)}
-                      className={`w-2 h-2 rounded-full transition-all ${
+                      className={`${useMobileSteps ? 'h-1.5' : 'h-2'} rounded-full transition-all ${
                         index === currentStep
-                          ? "w-6 bg-blue-500"
+                          ? `${useMobileSteps ? 'w-4' : 'w-6'} bg-blue-500`
                           : index < currentStep
-                            ? "bg-blue-300"
-                            : "bg-slate-200"
+                            ? `${useMobileSteps ? 'w-1.5' : 'w-2'} bg-blue-300`
+                            : `${useMobileSteps ? 'w-1.5' : 'w-2'} bg-slate-200`
                       }`}
                     />
                   ))}
                 </div>
 
                 {/* Navigation buttons */}
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleBack}
                     disabled={isFirstStep}
-                    className={`${isFirstStep ? "invisible" : ""}`}
+                    className={`${isFirstStep ? "invisible" : ""} ${useMobileSteps ? 'text-xs h-8' : ''}`}
                   >
                     <ChevronLeft className="w-4 h-4 mr-1" />
                     Back
@@ -340,7 +431,7 @@ const IntroOverlay = ({ onComplete, onSkip }) => {
                       isLastStep 
                         ? "bg-green-600 hover:bg-green-700" 
                         : "bg-blue-600 hover:bg-blue-700"
-                    } text-white px-6`}
+                    } text-white ${useMobileSteps ? 'px-4 text-xs h-8' : 'px-6'}`}
                     data-testid="intro-next-btn"
                   >
                     {isLastStep ? (

@@ -27,26 +27,20 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ### April 5, 2026 - Introduction Overlay / Onboarding Tour
 **NEW FEATURE:**
 - ✅ **Added step-by-step introduction overlay for new users**
-- 8-step guided tour covering:
-  1. Welcome screen
-  2. Dashboard overview
-  3. Observations tracking
-  4. Causal Engine (AI analysis)
-  5. My Tasks
-  6. Equipment Hierarchy
-  7. Settings
-  8. Completion screen
+- **Desktop tour (8 steps):** Welcome → Dashboard → Observations → Causal Engine → My Tasks → Hierarchy → Settings → Complete
+- **Mobile tour (7 steps):** Welcome → Navigation Menu → Dashboard → Observations → Quick Add → AI Chat → Complete
 - Features:
   - Spotlight effect highlighting UI elements
   - Progress bar and step dots
   - Skip/Back/Next navigation
   - Stores completion in localStorage
   - Help menu with "Replay Tour" option
-- Responsive for desktop and mobile
+  - Auto-detects mobile vs desktop
+  - Mobile-optimized compact card design
 - Triggers automatically on first login
 
 **Files Created:**
-- `/app/frontend/src/components/IntroOverlay.js` - Main overlay component with tour steps
+- `/app/frontend/src/components/IntroOverlay.js` - Main overlay component with desktop and mobile tour steps
 
 **Files Modified:**
 - `/app/frontend/src/components/Layout.js` - Integrated IntroOverlay and Help menu
