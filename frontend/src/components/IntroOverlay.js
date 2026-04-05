@@ -102,49 +102,80 @@ const MOBILE_STEPS = [
     description: "Your AI-powered asset management platform. Let's take a quick tour of the mobile experience.",
     icon: Sparkles,
     target: null,
-    position: "center"
+    position: "center",
+    mobileAction: null
   },
   {
-    id: "menu",
-    title: "Navigation Menu",
-    description: "Tap this menu icon to access Dashboard, Observations, Actions, Tasks, and all other features.",
+    id: "menu-button",
+    title: "Open the Menu",
+    description: "Tap the menu icon in the top-left corner to access all navigation options.",
     icon: Menu,
     target: '[data-testid="mobile-menu-toggle"]',
     position: "center",
-    mobileAction: "highlight-menu"
+    mobileAction: "highlight-menu-button"
+  },
+  {
+    id: "menu-dashboard",
+    title: "Dashboard",
+    description: "View your operational metrics, risk scores, and recent activity at a glance.",
+    icon: LayoutDashboard,
+    target: '[data-testid="mobile-nav-dashboard"]',
+    position: "center",
+    mobileAction: "open-menu"
+  },
+  {
+    id: "menu-observations",
+    title: "Observations",
+    description: "Track equipment issues and safety concerns. Each observation is automatically risk-scored.",
+    icon: AlertTriangle,
+    target: '[data-testid="mobile-nav-observations"]',
+    position: "center",
+    mobileAction: "keep-menu-open"
+  },
+  {
+    id: "menu-actions",
+    title: "Actions",
+    description: "Manage corrective and preventive actions assigned to your team.",
+    icon: ClipboardList,
+    target: '[data-testid="mobile-nav-actions"]',
+    position: "center",
+    mobileAction: "keep-menu-open"
+  },
+  {
+    id: "menu-tasks",
+    title: "My Tasks",
+    description: "View and complete your assigned inspections and form submissions.",
+    icon: ClipboardList,
+    target: '[data-testid="mobile-nav-my-tasks"]',
+    position: "center",
+    mobileAction: "keep-menu-open"
+  },
+  {
+    id: "close-menu",
+    title: "Close Menu",
+    description: "Tap the X or anywhere outside to close the menu.",
+    icon: X,
+    target: null,
+    position: "center",
+    mobileAction: "close-menu"
   },
   {
     id: "quick-add",
     title: "Quick Add",
-    description: "Tap this + button to quickly report a new observation from anywhere. You can also use voice input!",
+    description: "Tap the + button to quickly report a new observation. You can also use voice input!",
     icon: Plus,
     target: '[data-testid="fab-report-observation"]',
     position: "center",
     mobileAction: "highlight-fab"
   },
   {
-    id: "swipe-tip",
-    title: "Swipe Actions",
-    description: "On list items, swipe left or right for quick actions like edit, delete, or change status.",
-    icon: AlertTriangle,
-    target: null,
-    position: "center"
-  },
-  {
-    id: "pull-refresh",
-    title: "Pull to Refresh",
-    description: "Pull down from the top of any list to refresh and get the latest data.",
-    icon: LayoutDashboard,
-    target: null,
-    position: "center"
-  },
-  {
     id: "complete",
     title: "You're Ready!",
-    description: "Start exploring AssetIQ on mobile. Tap the menu icon anytime to navigate.",
+    description: "Start exploring AssetIQ on mobile. Some advanced features like Causal Engine are available on desktop.",
     icon: CheckCircle2,
     target: null,
-    position: "center"
+    position: "center",
+    mobileAction: null
   }
 ];
 
@@ -191,6 +222,47 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
       setTargetRect(null);
     }
   }, [step.target]);
+
+  // Handle mobile menu open/close based on step
+  useEffect(() => {
+    if (!useMobileSteps) return;
+    
+    const mobileAction = step.mobileAction;
+    const menuToggle = document.querySelector('[data-testid="mobile-menu-toggle"]');
+    
+    if (mobileAction === "open-menu" || mobileAction === "keep-menu-open") {
+      // Check if menu is already open by looking for the mobile nav
+      const mobileNav = document.querySelector('[data-testid="mobile-nav"]');
+      if (!mobileNav && menuToggle) {
+        // Menu is closed, need to open it
+        menuToggle.click();
+        // Wait for menu to open, then update target position
+        setTimeout(() => {
+          updateTargetPosition();
+        }, 350);
+      } else {
+        // Menu already open, just update position
+        setTimeout(() => {
+          updateTargetPosition();
+        }, 100);
+      }
+    } else if (mobileAction === "close-menu") {
+      // Close the menu if open
+      const mobileNav = document.querySelector('[data-testid="mobile-nav"]');
+      if (mobileNav && menuToggle) {
+        menuToggle.click();
+      }
+    } else if (mobileAction === "highlight-fab" || mobileAction === null || mobileAction === "highlight-menu-button") {
+      // Close menu before showing FAB or final steps
+      const mobileNav = document.querySelector('[data-testid="mobile-nav"]');
+      if (mobileNav && menuToggle) {
+        menuToggle.click();
+        setTimeout(() => {
+          updateTargetPosition();
+        }, 350);
+      }
+    }
+  }, [currentStep, step.mobileAction, useMobileSteps, updateTargetPosition]);
 
   useEffect(() => {
     updateTargetPosition();

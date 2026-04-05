@@ -30,14 +30,23 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - ✅ **Made spotlight rings smaller on mobile** - Reduced border width and pulsing effect
 - ✅ **Made "Tap" arrow indicator more compact** - Smaller arrow and label
 
+**ENHANCEMENT:**
+- ✅ **Updated mobile intro to show menu items** - Tour now automatically opens hamburger menu
+- ✅ **Shows only mobile-available features** - Dashboard, Observations, Actions, My Tasks
+- ✅ **Removed desktop-only features from tour** - No more Causal Engine, Library, Equipment Manager in mobile intro
+- ✅ **Added step-by-step menu navigation** - Each menu item is highlighted individually
+- ✅ **Added "Close Menu" step** - Teaches users how to close the drawer
+- ✅ **Final step mentions desktop features** - Users informed that advanced features are on desktop
+
 **Technical Changes:**
-- Updated `getTooltipStyle()` to use explicit left/right positioning instead of translateX centering
-- Changed progress dots from `<button>` with classes to `<span>` with inline styles for precise sizing
-- Mobile spotlight ring now uses 2px border (was 3px) with smaller glow effect
-- Arrow indicator reduced from 24px to 16px
+- Updated `MOBILE_STEPS` array with 9 steps covering menu navigation
+- Added `mobileAction` property to control menu open/close during tour
+- Added `useEffect` hook to programmatically open/close mobile menu based on step
+- Progress dots use inline styles for precise 4px sizing
+- Mobile spotlight ring uses 2px border with smaller glow effect
 
 **Files Modified:**
-- `/app/frontend/src/components/IntroOverlay.js` - All mobile styling improvements
+- `/app/frontend/src/components/IntroOverlay.js` - Complete mobile intro overhaul
 
 ---
 
