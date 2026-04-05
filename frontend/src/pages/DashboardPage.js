@@ -44,7 +44,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
-import ReliabilityPerformancePage from "./ReliabilityPerformancePage";
+import InsightsPage from "./InsightsPage";
 import { DISCIPLINES } from "../constants/disciplines";
 
 // User avatar component with optional hover card
@@ -534,9 +534,9 @@ export default function DashboardPage() {
               className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
               data-testid="reliability-tab"
             >
-              <Gauge className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline">{t("dashboard.reliabilityPerformance") || "Reliability Performance"}</span>
-              <span className="sm:hidden">Reliability</span>
+              <Activity className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Reliability Insights</span>
+              <span className="sm:hidden">Insights</span>
             </button>
           </div>
           
@@ -1071,10 +1071,10 @@ export default function DashboardPage() {
             </div>
           )}
           
-          {/* Reliability Performance Tab */}
+          {/* Reliability Insights Tab */}
           {activeTab === "reliability" && (
-            <div className="animate-fade-in">
-              <ReliabilityPerformancePage />
+            <div className="animate-fade-in -mx-4 sm:-mx-6">
+              <InsightsPage embedded={true} />
             </div>
           )}
         </div>

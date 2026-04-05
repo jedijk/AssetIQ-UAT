@@ -31,7 +31,7 @@ import { toast } from "sonner";
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
-const InsightsPage = () => {
+const InsightsPage = ({ embedded = false }) => {
   const { t } = useLanguage();
   
   // State for all data sections
@@ -131,11 +131,13 @@ const InsightsPage = () => {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6" data-testid="insights-loading">
-        <div className="flex items-center gap-2 mb-6">
-          <Activity className="w-6 h-6 text-blue-600" />
-          <h1 className="text-2xl font-bold text-slate-900">Execution & Reliability Insights</h1>
-        </div>
+      <div className={`${embedded ? 'p-4 sm:p-6' : 'p-6'} space-y-6`} data-testid="insights-loading">
+        {!embedded && (
+          <div className="flex items-center gap-2 mb-6">
+            <Activity className="w-6 h-6 text-blue-600" />
+            <h1 className="text-2xl font-bold text-slate-900">Execution & Reliability Insights</h1>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1,2,3,4].map(i => (
             <Card key={i}>
@@ -153,11 +155,13 @@ const InsightsPage = () => {
 
   if (error) {
     return (
-      <div className="p-6" data-testid="insights-error">
-        <div className="flex items-center gap-2 mb-6">
-          <Activity className="w-6 h-6 text-blue-600" />
-          <h1 className="text-2xl font-bold text-slate-900">Execution & Reliability Insights</h1>
-        </div>
+      <div className={`${embedded ? 'p-4 sm:p-6' : 'p-6'}`} data-testid="insights-error">
+        {!embedded && (
+          <div className="flex items-center gap-2 mb-6">
+            <Activity className="w-6 h-6 text-blue-600" />
+            <h1 className="text-2xl font-bold text-slate-900">Execution & Reliability Insights</h1>
+          </div>
+        )}
         <Card className="border-red-200 bg-red-50">
           <CardContent className="p-6 text-center">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
@@ -175,18 +179,29 @@ const InsightsPage = () => {
   const hasData = summary?.total_actions > 0 || summary?.total_assets > 0;
 
   return (
-    <div className="p-6 space-y-6" data-testid="insights-page">
+    <div className={`${embedded ? 'p-4 sm:p-6' : 'p-6'} space-y-6`} data-testid="insights-page">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity className="w-6 h-6 text-blue-600" />
-          <h1 className="text-2xl font-bold text-slate-900">Execution & Reliability Insights</h1>
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Activity className="w-6 h-6 text-blue-600" />
+            <h1 className="text-2xl font-bold text-slate-900">Execution & Reliability Insights</h1>
+          </div>
+          <Button onClick={fetchAllData} variant="outline" size="sm">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
         </div>
-        <Button onClick={fetchAllData} variant="outline" size="sm">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
+      )}
+      
+      {embedded && (
+        <div className="flex items-center justify-end">
+          <Button onClick={fetchAllData} variant="outline" size="sm">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+      )}
 
       {/* Section 7: Key Insights Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="insights-summary">

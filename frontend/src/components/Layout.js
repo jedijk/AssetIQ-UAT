@@ -259,7 +259,6 @@ const Layout = () => {
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, feature: "users" },
     { path: "/settings/risk-calculation", label: "Risk Calculation", icon: Sliders, adminOnly: true, desktopOnly: true },
     { path: "/settings/server-performance", label: "Server Performance", icon: Server, ownerOnly: true },
-    { path: "/settings/insights", label: "Reliability Insights", icon: Activity, desktopOnly: true },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "settings" },
