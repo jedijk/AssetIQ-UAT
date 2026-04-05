@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -6,11 +6,15 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Loader2, Shield, Activity, BarChart3 } from "lucide-react";
+import { Loader2, Shield, Activity, BarChart3, RefreshCw, Server, WifiOff } from "lucide-react";
 import { getBackendUrl } from "../lib/apiConfig";
 
 // Background video for login/register - use runtime URL detection
 const BACKGROUND_VIDEO = `${getBackendUrl()}/api/assets/video/background.mp4`;
+
+// Max retry attempts for server connection
+const MAX_RETRY_ATTEMPTS = 5;
+const RETRY_DELAY_MS = 3000;
 
 const LoginPage = () => {
   const { login } = useAuth();
@@ -21,6 +25,13 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   
+  // Server startup state
+  const [serverStarting, setServerStarting] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [autoRetrying, setAutoRetrying] = useState(false);
+  const retryTimeoutRef = useRef(null);
+  const pendingLoginRef = useRef(null);
+  
   // Refs for accessing autofilled values (Face ID, password managers)
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
@@ -28,12 +39,108 @@ const LoginPage = () => {
   // Get the redirect destination from state (set by ProtectedRoute)
   const from = location.state?.from || "/";
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Check if error indicates server is starting/unavailable
+  const isServerStartupError = (error) => {
+    if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
+      return true;
+    }
+    if (error.response?.status >= 502 && error.response?.status <= 504) {
+      return true;
+    }
+    if (error.code === "ECONNREFUSED" || error.code === "ETIMEDOUT") {
+      return true;
+    }
+    return false;
+  };
+
+  // Perform login attempt
+  const performLogin = useCallback(async (emailValue, passwordValue, isRetry = false) => {
+    try {
+      await login(emailValue, passwordValue);
+      
+      // Success - clear server starting state
+      setServerStarting(false);
+      setRetryCount(0);
+      setAutoRetrying(false);
+      pendingLoginRef.current = null;
+      
+      toast.success(t("chat.welcomeMessage").split("!")[0] + "!");
+      navigate(from, { replace: true });
+      return true;
+    } catch (error) {
+      // Check if this is a server startup error
+      if (isServerStartupError(error)) {
+        setServerStarting(true);
+        pendingLoginRef.current = { email: emailValue, password: passwordValue };
+        
+        if (!isRetry) {
+          setRetryCount(1);
+          toast.info("Server is starting up. Retrying automatically...");
+        }
+        
+        return false;
+      }
+      
+      // Regular error - not a server issue
+      setServerStarting(false);
+      setAutoRetrying(false);
+      pendingLoginRef.current = null;
+      
+      let message = "Login failed. Please try again.";
+      if (error.response?.data?.detail) {
+        message = error.response.data.detail;
+      } else if (error.response?.status === 401) {
+        message = "Invalid email or password.";
+      }
+      
+      console.error("Login error:", error.response?.status, error.message);
+      toast.error(message);
+      return true; // Return true to stop retrying
+    }
+  }, [login, navigate, from, t]);
+
+  // Auto-retry logic
+  useEffect(() => {
+    if (serverStarting && retryCount > 0 && retryCount <= MAX_RETRY_ATTEMPTS && pendingLoginRef.current) {
+      setAutoRetrying(true);
+      
+      retryTimeoutRef.current = setTimeout(async () => {
+        const { email: savedEmail, password: savedPassword } = pendingLoginRef.current;
+        const success = await performLogin(savedEmail, savedPassword, true);
+        
+        if (!success && retryCount < MAX_RETRY_ATTEMPTS) {
+          setRetryCount(prev => prev + 1);
+        } else if (!success) {
+          // Max retries reached
+          setAutoRetrying(false);
+          toast.error("Server is taking longer than expected. Please try again later.");
+        }
+      }, RETRY_DELAY_MS);
+    }
+    
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, [serverStarting, retryCount, performLogin]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setServerStarting(false);
+    setRetryCount(0);
 
     // Get values from refs to handle autofill (Face ID, password managers)
-    // Autofill doesn't always trigger onChange events in React
     const emailValue = emailRef.current?.value || email;
     const passwordValue = passwordRef.current?.value || password;
 
@@ -43,30 +150,30 @@ const LoginPage = () => {
       return;
     }
 
-    try {
-      await login(emailValue, passwordValue);
-      toast.success(t("chat.welcomeMessage").split("!")[0] + "!");
-      // Navigate to the intended destination after successful login
-      navigate(from, { replace: true });
-    } catch (error) {
-      // Handle different error types
-      let message = "Login failed. Please try again.";
-      
-      if (error.response?.data?.detail) {
-        message = error.response.data.detail;
-      } else if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
-        message = "Network error. Please check your connection and try again.";
-      } else if (error.response?.status === 503) {
-        message = "Server temporarily unavailable. Please try again in a moment.";
-      } else if (error.response?.status === 401) {
-        message = "Invalid email or password.";
+    await performLogin(emailValue, passwordValue);
+    setLoading(false);
+  };
+
+  const handleManualRetry = async () => {
+    if (pendingLoginRef.current) {
+      setRetryCount(1);
+      setAutoRetrying(true);
+      const { email: savedEmail, password: savedPassword } = pendingLoginRef.current;
+      const success = await performLogin(savedEmail, savedPassword, true);
+      if (success) {
+        setAutoRetrying(false);
       }
-      
-      console.error("Login error:", error.response?.status, error.message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
     }
+  };
+
+  const handleCancelRetry = () => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+    }
+    setServerStarting(false);
+    setRetryCount(0);
+    setAutoRetrying(false);
+    pendingLoginRef.current = null;
   };
 
   return (
@@ -136,6 +243,66 @@ const LoginPage = () => {
             />
             <span className="text-xl font-bold text-slate-900">AssetIQ</span>
           </div>
+
+          {/* Server Starting Overlay */}
+          {serverStarting && (
+            <div className="server-starting-overlay" data-testid="server-starting-overlay">
+              <div className="server-starting-content">
+                <div className="server-starting-icon">
+                  <Server className="w-8 h-8 text-blue-600" />
+                  <div className="server-starting-pulse" />
+                </div>
+                <h2 className="text-xl font-semibold text-slate-900 mt-4">
+                  Server Starting Up
+                </h2>
+                <p className="text-sm text-slate-500 mt-2 text-center max-w-xs">
+                  Please wait while we connect to the server. This usually takes a few seconds.
+                </p>
+                
+                {/* Progress indicator */}
+                <div className="server-starting-progress mt-4">
+                  <div className="progress-bar">
+                    <div 
+                      className="progress-fill"
+                      style={{ width: `${(retryCount / MAX_RETRY_ATTEMPTS) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2">
+                    {autoRetrying ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 inline mr-1 animate-spin" />
+                        Connecting... Attempt {retryCount} of {MAX_RETRY_ATTEMPTS}
+                      </>
+                    ) : (
+                      "Connection paused"
+                    )}
+                  </p>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-3 mt-5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelRetry}
+                    className="text-slate-600"
+                  >
+                    Cancel
+                  </Button>
+                  {!autoRetrying && (
+                    <Button
+                      size="sm"
+                      onClick={handleManualRetry}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                      Retry Now
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <h1 className="auth-title" data-testid="login-title">{t("auth.loginTitle")}</h1>
           <p className="auth-subtitle">{t("auth.loginSubtitle")}</p>
@@ -398,6 +565,79 @@ const LoginPage = () => {
             background: rgba(255, 255, 255, 0.97);
             backdrop-filter: blur(12px);
           }
+        }
+
+        /* Server Starting Overlay Styles */
+        .server-starting-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(255, 255, 255, 0.98);
+          backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 50;
+          border-radius: 20px;
+        }
+
+        .server-starting-content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 24px;
+        }
+
+        .server-starting-icon {
+          position: relative;
+          width: 64px;
+          height: 64px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+          border-radius: 16px;
+        }
+
+        .server-starting-pulse {
+          position: absolute;
+          inset: -4px;
+          border-radius: 20px;
+          border: 2px solid #3b82f6;
+          animation: pulse-ring 1.5s ease-out infinite;
+        }
+
+        @keyframes pulse-ring {
+          0% {
+            transform: scale(1);
+            opacity: 0.8;
+          }
+          100% {
+            transform: scale(1.2);
+            opacity: 0;
+          }
+        }
+
+        .server-starting-progress {
+          width: 100%;
+          max-width: 200px;
+        }
+
+        .progress-bar {
+          height: 4px;
+          background: #e2e8f0;
+          border-radius: 2px;
+          overflow: hidden;
+        }
+
+        .progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #3b82f6, #60a5fa);
+          border-radius: 2px;
+          transition: width 0.5s ease-out;
+        }
+
+        .login-form-wrapper {
+          position: relative;
         }
       `}</style>
     </div>
