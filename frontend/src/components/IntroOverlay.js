@@ -107,47 +107,41 @@ const MOBILE_STEPS = [
   {
     id: "menu",
     title: "Navigation Menu",
-    description: "Tap the menu icon to access all features: Dashboard, Observations, Actions, Tasks, and more.",
+    description: "Tap this menu icon to access Dashboard, Observations, Actions, Tasks, and all other features.",
     icon: Menu,
     target: '[data-testid="mobile-menu-toggle"]',
-    position: "bottom"
+    position: "center",
+    mobileAction: "highlight-menu"
   },
   {
-    id: "dashboard",
-    title: "Dashboard",
-    description: "View your operational metrics, risk scores, and recent activity in a mobile-optimized layout.",
-    icon: LayoutDashboard,
-    target: null,
-    position: "center"
+    id: "quick-add",
+    title: "Quick Add",
+    description: "Tap this + button to quickly report a new observation from anywhere. You can also use voice input!",
+    icon: Plus,
+    target: '[data-testid="fab-report-observation"]',
+    position: "center",
+    mobileAction: "highlight-fab"
   },
   {
-    id: "observations",
-    title: "Observations",
-    description: "Track equipment issues on the go. Swipe cards for quick actions, tap for details.",
+    id: "swipe-tip",
+    title: "Swipe Actions",
+    description: "On list items, swipe left or right for quick actions like edit, delete, or change status.",
     icon: AlertTriangle,
     target: null,
     position: "center"
   },
   {
-    id: "quick-add",
-    title: "Quick Add",
-    description: "Tap the + button to quickly create new observations, actions, or tasks from anywhere.",
-    icon: Plus,
-    target: '[data-testid="quick-add-button"], .fixed.bottom-4.right-4 button',
-    position: "top"
-  },
-  {
-    id: "ai-chat",
-    title: "AI Assistant",
-    description: "Get instant help with equipment analysis, failure modes, and reliability insights.",
-    icon: MessageSquare,
-    target: '[data-testid="ai-chat-button"]',
-    position: "top"
+    id: "pull-refresh",
+    title: "Pull to Refresh",
+    description: "Pull down from the top of any list to refresh and get the latest data.",
+    icon: LayoutDashboard,
+    target: null,
+    position: "center"
   },
   {
     id: "complete",
     title: "You're Ready!",
-    description: "Start exploring AssetIQ on mobile. Access the tour anytime from the menu.",
+    description: "Start exploring AssetIQ on mobile. Tap the menu icon anytime to navigate.",
     icon: CheckCircle2,
     target: null,
     position: "center"
@@ -240,13 +234,38 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
 
   // Calculate tooltip position based on screen size and target
   const getTooltipStyle = () => {
-    // For mobile, center the tooltip more towards the top
+    // For mobile, use fixed positioning with safe margins
     if (useMobileSteps) {
+      if (targetRect) {
+        const viewportHeight = window.innerHeight;
+        const targetCenterY = targetRect.top + targetRect.height / 2;
+        
+        // If target is in top third, show tooltip lower
+        if (targetCenterY < viewportHeight / 3) {
+          return {
+            position: "fixed",
+            top: "auto",
+            bottom: "30%",
+            left: "50%",
+            transform: "translateX(-50%)"
+          };
+        } else {
+          // If target is lower, show tooltip higher
+          return {
+            position: "fixed",
+            top: "25%",
+            left: "50%",
+            transform: "translateX(-50%)"
+          };
+        }
+      }
+      
+      // No target - center safely
       return {
         position: "fixed",
-        top: "40%",
+        top: "30%",
         left: "50%",
-        transform: "translate(-50%, -50%)"
+        transform: "translateX(-50%)"
       };
     }
     
@@ -332,20 +351,60 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
 
           {/* Spotlight ring animation */}
           {targetRect && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="absolute pointer-events-none"
-              style={{
-                top: targetRect.top - 4,
-                left: targetRect.left - 4,
-                width: targetRect.width + 8,
-                height: targetRect.height + 8,
-                borderRadius: 16,
-                border: "3px solid rgba(59, 130, 246, 0.9)",
-                boxShadow: "0 0 30px rgba(59, 130, 246, 0.5), inset 0 0 20px rgba(59, 130, 246, 0.1)"
-              }}
-            />
+            <>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="absolute pointer-events-none"
+                style={{
+                  top: targetRect.top - 4,
+                  left: targetRect.left - 4,
+                  width: targetRect.width + 8,
+                  height: targetRect.height + 8,
+                  borderRadius: 16,
+                  border: "3px solid rgba(59, 130, 246, 0.9)",
+                  boxShadow: "0 0 30px rgba(59, 130, 246, 0.5), inset 0 0 20px rgba(59, 130, 246, 0.1)"
+                }}
+              />
+              {/* Pulsing ring for mobile */}
+              {useMobileSteps && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 1 }}
+                  animate={{ opacity: [0.5, 0], scale: [1, 1.5] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
+                  className="absolute pointer-events-none"
+                  style={{
+                    top: targetRect.top - 4,
+                    left: targetRect.left - 4,
+                    width: targetRect.width + 8,
+                    height: targetRect.height + 8,
+                    borderRadius: 16,
+                    border: "3px solid rgba(59, 130, 246, 0.6)"
+                  }}
+                />
+              )}
+              {/* Arrow indicator pointing to element on mobile */}
+              {useMobileSteps && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: [0, 8, 0] }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute pointer-events-none text-blue-500 flex flex-col items-center"
+                  style={{
+                    top: targetRect.top + targetRect.height + 12,
+                    left: targetRect.left + targetRect.width / 2,
+                    transform: "translateX(-50%)"
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style={{ transform: "rotate(180deg)" }}>
+                    <path d="M12 4l-8 8h6v8h4v-8h6z" />
+                  </svg>
+                  <span className="text-xs font-semibold mt-1 bg-blue-500 text-white px-2 py-0.5 rounded-full whitespace-nowrap">
+                    Tap here
+                  </span>
+                </motion.div>
+              )}
+            </>
           )}
 
           {/* Tooltip card */}
@@ -356,7 +415,7 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
             style={getTooltipStyle()}
-            className={`${useMobileSteps ? 'w-[300px]' : 'w-[360px]'} max-w-[calc(100vw-32px)]`}
+            className={`${useMobileSteps ? 'w-[85vw] max-w-[320px]' : 'w-[360px] max-w-[calc(100vw-32px)]'}`}
           >
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
               {/* Progress bar */}
@@ -370,18 +429,18 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
               </div>
 
               {/* Content */}
-              <div className={`${useMobileSteps ? 'p-3' : 'p-5'}`}>
+              <div className={`${useMobileSteps ? 'p-3 pb-2' : 'p-5'}`}>
                 {/* Icon and step indicator */}
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <div className={`${useMobileSteps ? 'p-1.5' : 'p-2.5'} rounded-xl ${
+                    <div className={`${useMobileSteps ? 'p-1' : 'p-2.5'} rounded-xl ${
                       isLastStep ? "bg-green-100" : "bg-blue-100"
                     }`}>
-                      <StepIcon className={`${useMobileSteps ? 'w-4 h-4' : 'w-5 h-5'} ${
+                      <StepIcon className={`${useMobileSteps ? 'w-3.5 h-3.5' : 'w-5 h-5'} ${
                         isLastStep ? "text-green-600" : "text-blue-600"
                       }`} />
                     </div>
-                    <span className={`${useMobileSteps ? 'text-[10px]' : 'text-xs'} font-medium text-slate-400 uppercase tracking-wide`}>
+                    <span className={`${useMobileSteps ? 'text-[9px]' : 'text-xs'} font-medium text-slate-400 uppercase tracking-wide`}>
                       Step {currentStep + 1} of {STEPS.length}
                     </span>
                   </div>
@@ -395,66 +454,113 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
                 </div>
 
                 {/* Title and description */}
-                <h3 className={`${useMobileSteps ? 'text-sm' : 'text-lg'} font-semibold text-slate-900 mb-1`}>
+                <h3 className={`${useMobileSteps ? 'text-sm' : 'text-lg'} font-semibold text-slate-900 mb-0.5`}>
                   {step.title}
                 </h3>
-                <p className={`${useMobileSteps ? 'text-[11px] leading-relaxed' : 'text-sm leading-relaxed'} text-slate-600 mb-3`}>
+                <p className={`${useMobileSteps ? 'text-[10px] leading-snug' : 'text-sm leading-relaxed'} text-slate-600 mb-2`}>
                   {step.description}
                 </p>
 
-                {/* Progress dots */}
-                <div className={`flex items-center justify-center gap-1 ${useMobileSteps ? 'mb-3' : 'mb-4'}`}>
-                  {STEPS.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentStep(index)}
-                      className={`${useMobileSteps ? 'h-1.5' : 'h-2'} rounded-full transition-all ${
-                        index === currentStep
-                          ? `${useMobileSteps ? 'w-4' : 'w-6'} bg-blue-500`
-                          : index < currentStep
-                            ? `${useMobileSteps ? 'w-1.5' : 'w-2'} bg-blue-300`
-                            : `${useMobileSteps ? 'w-1.5' : 'w-2'} bg-slate-200`
-                      }`}
-                    />
-                  ))}
-                </div>
+                {/* Progress dots and Navigation buttons */}
+                {useMobileSteps ? (
+                  // Mobile: Combined row with back, dots, next
+                  <div className="flex items-center justify-between gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleBack}
+                      disabled={isFirstStep}
+                      className={`${isFirstStep ? "opacity-0 pointer-events-none" : ""} text-xs h-7 px-2`}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {STEPS.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentStep(index)}
+                          className={`h-1.5 rounded-full transition-all ${
+                            index === currentStep
+                              ? "w-3 bg-blue-500"
+                              : index < currentStep
+                                ? "w-1.5 bg-blue-300"
+                                : "w-1.5 bg-slate-200"
+                          }`}
+                        />
+                      ))}
+                    </div>
 
-                {/* Navigation buttons */}
-                <div className="flex items-center justify-between gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBack}
-                    disabled={isFirstStep}
-                    className={`${isFirstStep ? "invisible" : ""} ${useMobileSteps ? 'text-xs h-8' : ''}`}
-                  >
-                    <ChevronLeft className="w-4 h-4 mr-1" />
-                    Back
-                  </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleNext}
+                      className={`${
+                        isLastStep 
+                          ? "bg-green-600 hover:bg-green-700" 
+                          : "bg-blue-600 hover:bg-blue-700"
+                      } text-white px-3 text-xs h-7`}
+                      data-testid="intro-next-btn"
+                    >
+                      {isLastStep ? "Start" : "Next"}
+                      <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  // Desktop: Separate progress dots and buttons
+                  <>
+                    <div className="flex items-center justify-center gap-1.5 mb-4">
+                      {STEPS.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentStep(index)}
+                          className={`h-2 rounded-full transition-all ${
+                            index === currentStep
+                              ? "w-6 bg-blue-500"
+                              : index < currentStep
+                                ? "w-2 bg-blue-300"
+                                : "w-2 bg-slate-200"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    
+                    <div className="flex items-center justify-between gap-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleBack}
+                        disabled={isFirstStep}
+                        className={isFirstStep ? "invisible" : ""}
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" />
+                        Back
+                      </Button>
 
-                  <Button
-                    size="sm"
-                    onClick={handleNext}
-                    className={`${
-                      isLastStep 
-                        ? "bg-green-600 hover:bg-green-700" 
-                        : "bg-blue-600 hover:bg-blue-700"
-                    } text-white ${useMobileSteps ? 'px-4 text-xs h-8' : 'px-6'}`}
-                    data-testid="intro-next-btn"
-                  >
-                    {isLastStep ? (
-                      <>
-                        Get Started
-                        <CheckCircle2 className="w-4 h-4 ml-1" />
-                      </>
-                    ) : (
-                      <>
-                        Next
-                        <ChevronRight className="w-4 h-4 ml-1" />
-                      </>
-                    )}
-                  </Button>
-                </div>
+                      <Button
+                        size="sm"
+                        onClick={handleNext}
+                        className={`${
+                          isLastStep 
+                            ? "bg-green-600 hover:bg-green-700" 
+                            : "bg-blue-600 hover:bg-blue-700"
+                        } text-white px-6`}
+                        data-testid="intro-next-btn"
+                      >
+                        {isLastStep ? (
+                          <>
+                            Get Started
+                            <CheckCircle2 className="w-4 h-4 ml-1" />
+                          </>
+                        ) : (
+                          <>
+                            Next
+                            <ChevronRight className="w-4 h-4 ml-1" />
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
