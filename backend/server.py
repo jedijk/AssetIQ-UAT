@@ -72,11 +72,23 @@ async def health_check():
     """Health check endpoint for deployment."""
     return {"status": "healthy"}
 
-# CORS
+# CORS - Restrict to production domain
+ALLOWED_ORIGINS = [
+    "https://assetiq.tech",
+    "https://www.assetiq.tech",
+    "https://asset-iq-preview.preview.emergentagent.com",  # Preview environment
+    "http://localhost:3000",  # Local development
+]
+
+# Override with environment variable if set
+env_origins = os.environ.get('CORS_ORIGINS', '')
+if env_origins and env_origins != '*':
+    ALLOWED_ORIGINS = [origin.strip() for origin in env_origins.split(',')]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
