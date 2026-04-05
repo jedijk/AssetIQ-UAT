@@ -24,6 +24,27 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 5, 2026 - Database Storage in Server Performance
+**NEW FEATURE:**
+- ✅ **Added Database Storage monitoring to Server Performance page**
+- Backend endpoint `GET /api/system/database` returns:
+  - `used`: Current database size (MB or GB)
+  - `capacity`: Total configured capacity (default 5GB, configurable via `DB_CAPACITY_GB` env var)
+  - `unit`: "MB" or "GB" based on size
+- Frontend displays:
+  - Progress bar with percentage inside
+  - Color states: Green (0-69%), Orange (70-89%), Red (90-100%)
+  - Usage text: "{used} {unit} of {capacity} {unit} used"
+  - Status badge (checkmark/warning/critical)
+- Auto-refreshes every 30 seconds
+- Handles loading, error, and empty states
+
+**Files Created/Modified:**
+- `/app/backend/routes/system.py` - Added `GET /api/system/database` endpoint
+- `/app/frontend/src/pages/SettingsServerPerformancePage.js` - Added Database Storage card
+
+---
+
 ### April 4, 2026 - Mobile Hierarchy Click Behavior Fix
 **UX Enhancement:**
 - ✅ **Fixed mobile hierarchy interaction behavior**

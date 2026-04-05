@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime, timezone
 import time
 import logging
+import os
 
 try:
     import psutil
@@ -16,6 +17,7 @@ except ImportError:
     PSUTIL_AVAILABLE = False
 
 from auth import get_current_user
+from database import db
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +89,7 @@ async def get_system_metrics(
                 "bytes_sent": net_io.bytes_sent,
                 "bytes_recv": net_io.bytes_recv
             }
-        except:
+        except Exception:
             network = None
         
         return {
@@ -124,3 +126,70 @@ async def get_system_health():
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+
+@router.get("/system/database")
+async def get_database_storage(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get MongoDB database storage usage.
+    
+    Only accessible by owner users.
+    
+    Returns:
+        used: Current database size
+        capacity: Total available capacity (based on disk or configured limit)
+        unit: "MB" or "GB"
+    """
+    # Restrict to owner only
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can access database metrics"
+        )
+    
+    try:
+        # Get database stats from MongoDB
+        db_stats = await db.command("dbStats")
+        
+        # storageSize is the actual storage on disk (includes padding/fragmentation)
+        storage_size_bytes = db_stats.get("storageSize", 0)
+        # indexSize is the total size of all indexes
+        index_size_bytes = db_stats.get("indexSize", 0)
+        
+        # Total used = storage + indexes
+        total_used_bytes = storage_size_bytes + index_size_bytes
+        
+        # For capacity, we'll use a configurable limit or default to disk-based estimate
+        # Check environment variable for configured limit (in GB)
+        configured_capacity_gb = float(os.environ.get("DB_CAPACITY_GB", "5"))
+        
+        # Convert to appropriate unit
+        total_used_gb = total_used_bytes / (1024 ** 3)
+        
+        # Determine if we should use MB or GB based on size
+        if total_used_gb < 1 and configured_capacity_gb < 10:
+            # Use MB for smaller databases
+            used = round(total_used_bytes / (1024 ** 2), 2)
+            capacity = round(configured_capacity_gb * 1024, 0)  # Convert GB to MB
+            unit = "MB"
+        else:
+            # Use GB for larger databases
+            used = round(total_used_gb, 2)
+            capacity = round(configured_capacity_gb, 1)
+            unit = "GB"
+        
+        return {
+            "used": used,
+            "capacity": capacity,
+            "unit": unit,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get database storage: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve database storage: {str(e)}"
+        )

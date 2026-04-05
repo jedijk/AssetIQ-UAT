@@ -13,7 +13,8 @@ import {
   Activity,
   Wifi,
   WifiOff,
-  ShieldX
+  ShieldX,
+  Database
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -180,12 +181,42 @@ const SettingsServerPerformancePage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   
+  // Database storage state
+  const [dbStorage, setDbStorage] = useState(null);
+  const [dbStorageLoading, setDbStorageLoading] = useState(true);
+  const [dbStorageError, setDbStorageError] = useState(null);
+  
   // History for sparklines (last 12 data points = ~1 minute at 5s intervals)
   const [cpuHistory, setCpuHistory] = useState([]);
   const [ramHistory, setRamHistory] = useState([]);
   
   // Check if user is owner
   const isOwner = user?.role === "owner";
+  
+  // Fetch database storage
+  const fetchDbStorage = useCallback(async () => {
+    if (!isOwner) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/api/system/database`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch database storage");
+      }
+      
+      const data = await response.json();
+      setDbStorage(data);
+      setDbStorageError(null);
+    } catch (err) {
+      console.error("Failed to fetch database storage:", err);
+      setDbStorageError(err.message);
+    } finally {
+      setDbStorageLoading(false);
+    }
+  }, [isOwner]);
   
   const fetchMetrics = useCallback(async (showRefreshIndicator = false) => {
     if (!isOwner) return;
@@ -251,20 +282,25 @@ const SettingsServerPerformancePage = () => {
   useEffect(() => {
     if (!isOwner) {
       setLoading(false);
+      setDbStorageLoading(false);
       return;
     }
     
     fetchMetrics();
+    fetchDbStorage();
     
     let interval;
+    let dbInterval;
     if (autoRefresh) {
       interval = setInterval(() => fetchMetrics(), 5000); // Refresh every 5 seconds
+      dbInterval = setInterval(() => fetchDbStorage(), 30000); // Refresh DB storage every 30 seconds
     }
     
     return () => {
       if (interval) clearInterval(interval);
+      if (dbInterval) clearInterval(dbInterval);
     };
-  }, [fetchMetrics, autoRefresh, isOwner]);
+  }, [fetchMetrics, fetchDbStorage, autoRefresh, isOwner]);
   
   // Show access denied for non-owners
   if (!isOwner) {
@@ -499,6 +535,69 @@ const SettingsServerPerformancePage = () => {
               </p>
             </div>
           </MetricCard>
+        </div>
+
+        {/* Database Storage Card - Separate Section */}
+        <div className="mb-4 sm:mb-6">
+          <Card>
+            <CardHeader className="py-2 sm:py-4 px-3 sm:px-6">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center justify-between">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-slate-600">
+                  <Database className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>Database Storage</span>
+                </div>
+                {dbStorage && !dbStorageLoading && !dbStorageError && (() => {
+                  const usagePercent = Math.round((dbStorage.used / dbStorage.capacity) * 100);
+                  const color = getStatusColor(usagePercent);
+                  return (
+                    <Badge className={`${color.light} ${color.text} border-0 text-[9px] sm:text-xs px-1 sm:px-1.5 py-0`}>
+                      {color.status === "critical" ? "!" : color.status === "warning" ? "⚠" : "✓"}
+                    </Badge>
+                  );
+                })()}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6 pt-0">
+              {dbStorageLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-xs sm:text-sm text-slate-400">Loading...</span>
+                </div>
+              ) : dbStorageError ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-xs sm:text-sm text-red-500">Unable to load database storage</span>
+                </div>
+              ) : !dbStorage ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-xs sm:text-sm text-slate-400">No storage data available</span>
+                </div>
+              ) : (() => {
+                const usagePercent = Math.round((dbStorage.used / dbStorage.capacity) * 100);
+                const color = getStatusColor(usagePercent);
+                return (
+                  <div className="space-y-2 sm:space-y-3">
+                    {/* Progress Bar with percentage inside */}
+                    <div className="relative">
+                      <Progress 
+                        value={usagePercent} 
+                        className="h-5 sm:h-6"
+                        indicatorClassName={color.bg}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-xs sm:text-sm font-semibold text-white drop-shadow-sm">
+                          {usagePercent}%
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Usage Text */}
+                    <p className="text-xs sm:text-sm text-slate-500 text-center">
+                      {dbStorage.used} {dbStorage.unit} of {dbStorage.capacity} {dbStorage.unit} used
+                    </p>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Detailed Stats - Collapsible on mobile */}
