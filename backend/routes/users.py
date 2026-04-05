@@ -38,15 +38,15 @@ MAX_AVATAR_SIZE = 5 * 1024 * 1024
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 # Available roles for user creation
-AVAILABLE_ROLES = ["owner", "admin", "reliability_engineer", "maintenance", "operator", "viewer"]
+AVAILABLE_ROLES = ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
 
-# Role display names
+# Role display names (must match RBAC service roles)
 ROLE_NAMES = {
     "owner": "Owner",
-    "admin": "Administrator",
+    "admin": "Admin",
     "reliability_engineer": "Reliability Engineer",
     "maintenance": "Maintenance",
-    "operator": "Operator",
+    "operations": "Operations",
     "viewer": "Viewer"
 }
 
