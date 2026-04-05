@@ -668,6 +668,17 @@ export const useIntroOverlay = () => {
       // Small delay to let the app render first
       setTimeout(() => setShowIntro(true), 1000);
     }
+    
+    // Listen for password change event to trigger intro
+    const handlePasswordChanged = () => {
+      // Small delay to let password dialog close
+      setTimeout(() => setShowIntro(true), 500);
+    };
+    
+    window.addEventListener("assetiq-password-changed", handlePasswordChanged);
+    return () => {
+      window.removeEventListener("assetiq-password-changed", handlePasswordChanged);
+    };
   }, []);
 
   const triggerIntro = () => {

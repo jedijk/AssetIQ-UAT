@@ -56,6 +56,8 @@ export default function ChangePasswordDialog() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      // Dispatch event to trigger intro tour
+      window.dispatchEvent(new CustomEvent("assetiq-password-changed"));
     } catch (err) {
       const message = err.response?.data?.detail || "Failed to change password";
       setError(message);
