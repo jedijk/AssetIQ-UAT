@@ -97,6 +97,44 @@ app.add_middleware(
 app.add_middleware(TimeoutMiddleware, timeout=25.0)
 
 
+# Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    
+    # Strict Transport Security (HSTS) - force HTTPS
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    
+    # Prevent clickjacking
+    response.headers["X-Frame-Options"] = "DENY"
+    
+    # Prevent MIME type sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    
+    # XSS Protection (legacy, but still useful)
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    
+    # Referrer Policy
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    
+    # Permissions Policy (restrict browser features)
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
+    
+    # Content Security Policy (allow same origin and specific trusted sources)
+    # Note: This is permissive for development. Tighten for production.
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https: blob:; "
+        "font-src 'self' data:; "
+        "connect-src 'self' https:; "
+        "frame-ancestors 'none';"
+    )
+    
+    return response
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize database indexes and seed data on startup."""

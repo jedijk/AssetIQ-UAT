@@ -1,5 +1,5 @@
 """
-Authentication routes with rate limiting.
+Authentication routes with rate limiting and security features.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime, timezone, timedelta
@@ -7,6 +7,7 @@ import uuid
 import secrets
 import asyncio
 import os
+import re
 import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -14,7 +15,7 @@ from slowapi.util import get_remote_address
 from database import db
 from auth import hash_password, verify_password, create_token, get_current_user
 from models.api_models import UserCreate, UserLogin, UserResponse, TokenResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 # Try to import resend for email functionality
 try:
@@ -33,6 +34,12 @@ limiter = Limiter(key_func=get_remote_address)
 AUTH_RATE_LIMIT = "10/minute"  # 10 auth attempts per minute per IP
 STRICT_AUTH_RATE_LIMIT = "5/minute"  # 5 attempts for sensitive operations
 
+# Security configurations
+MAX_LOGIN_ATTEMPTS = int(os.environ.get("MAX_LOGIN_ATTEMPTS", "5"))
+LOCKOUT_DURATION_MINUTES = int(os.environ.get("LOCKOUT_DURATION_MINUTES", "15"))
+MIN_PASSWORD_LENGTH = int(os.environ.get("MIN_PASSWORD_LENGTH", "8"))
+REQUIRE_PASSWORD_COMPLEXITY = os.environ.get("REQUIRE_PASSWORD_COMPLEXITY", "true").lower() == "true"
+
 # Email configuration
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
@@ -43,6 +50,123 @@ EMAIL_FRONTEND_URL = os.environ.get("EMAIL_FRONTEND_URL", os.environ.get("FRONTE
 # Initialize Resend if available
 if RESEND_AVAILABLE and RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
+
+
+def validate_password_complexity(password: str) -> tuple[bool, str]:
+    """
+    Validate password meets complexity requirements.
+    Returns (is_valid, error_message)
+    """
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return False, f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+    
+    if not REQUIRE_PASSWORD_COMPLEXITY:
+        return True, ""
+    
+    errors = []
+    if not re.search(r'[A-Z]', password):
+        errors.append("uppercase letter")
+    if not re.search(r'[a-z]', password):
+        errors.append("lowercase letter")
+    if not re.search(r'\d', password):
+        errors.append("number")
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;\'`~]', password):
+        errors.append("special character")
+    
+    if errors:
+        return False, f"Password must contain: {', '.join(errors)}"
+    
+    return True, ""
+
+
+async def check_account_lockout(email: str) -> tuple[bool, int]:
+    """
+    Check if account is locked due to failed login attempts.
+    Returns (is_locked, remaining_minutes)
+    """
+    lockout = await db.login_attempts.find_one({"email": email.lower()})
+    
+    if not lockout:
+        return False, 0
+    
+    if lockout.get("locked_until"):
+        locked_until = lockout["locked_until"]
+        if isinstance(locked_until, str):
+            locked_until = datetime.fromisoformat(locked_until.replace("Z", "+00:00"))
+        
+        now = datetime.now(timezone.utc)
+        if now < locked_until:
+            remaining = (locked_until - now).total_seconds() / 60
+            return True, int(remaining) + 1
+    
+    return False, 0
+
+
+async def record_login_attempt(email: str, success: bool, ip_address: str = None):
+    """
+    Record login attempt for brute force protection.
+    """
+    email_lower = email.lower()
+    now = datetime.now(timezone.utc)
+    
+    if success:
+        # Clear failed attempts on successful login
+        await db.login_attempts.delete_one({"email": email_lower})
+        
+        # Log successful login for audit
+        await db.security_audit_log.insert_one({
+            "event": "login_success",
+            "email": email_lower,
+            "ip_address": ip_address,
+            "timestamp": now.isoformat(),
+        })
+        return
+    
+    # Get or create login attempt record
+    attempt = await db.login_attempts.find_one({"email": email_lower})
+    
+    if attempt:
+        failed_count = attempt.get("failed_count", 0) + 1
+        
+        update_data = {
+            "failed_count": failed_count,
+            "last_attempt": now.isoformat(),
+        }
+        
+        # Lock account if max attempts reached
+        if failed_count >= MAX_LOGIN_ATTEMPTS:
+            locked_until = now + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+            update_data["locked_until"] = locked_until.isoformat()
+            
+            # Log lockout event
+            await db.security_audit_log.insert_one({
+                "event": "account_locked",
+                "email": email_lower,
+                "ip_address": ip_address,
+                "failed_count": failed_count,
+                "locked_until": locked_until.isoformat(),
+                "timestamp": now.isoformat(),
+            })
+            logger.warning(f"Account locked due to failed attempts: {email_lower}")
+        
+        await db.login_attempts.update_one(
+            {"email": email_lower},
+            {"$set": update_data}
+        )
+    else:
+        await db.login_attempts.insert_one({
+            "email": email_lower,
+            "failed_count": 1,
+            "last_attempt": now.isoformat(),
+        })
+    
+    # Log failed attempt
+    await db.security_audit_log.insert_one({
+        "event": "login_failed",
+        "email": email_lower,
+        "ip_address": ip_address,
+        "timestamp": now.isoformat(),
+    })
 
 # Pydantic models for password reset
 class ForgotPasswordRequest(BaseModel):
@@ -124,6 +248,17 @@ async def notify_admins_new_user(user_email: str, user_name: str):
 @router.post("/auth/login", response_model=TokenResponse)
 @limiter.limit(STRICT_AUTH_RATE_LIMIT)
 async def login(request: Request, credentials: UserLogin):
+    # Get client IP for audit logging
+    ip_address = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
+    
+    # Check if account is locked
+    is_locked, remaining_minutes = await check_account_lockout(credentials.email)
+    if is_locked:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Account is temporarily locked due to too many failed attempts. Try again in {remaining_minutes} minutes."
+        )
+    
     try:
         user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
     except Exception as e:
@@ -131,6 +266,8 @@ async def login(request: Request, credentials: UserLogin):
         raise HTTPException(status_code=503, detail="Database connection error. Please try again.")
     
     if not user or not verify_password(credentials.password, user["password_hash"]):
+        # Record failed attempt
+        await record_login_attempt(credentials.email, success=False, ip_address=ip_address)
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     # Check approval status
@@ -152,6 +289,9 @@ async def login(request: Request, credentials: UserLogin):
             status_code=403,
             detail="Your account has been deactivated. Please contact an administrator."
         )
+    
+    # Record successful login
+    await record_login_attempt(credentials.email, success=True, ip_address=ip_address)
     
     token = create_token(user["id"])
     must_change_password = user.get("must_change_password", False)
@@ -201,13 +341,17 @@ async def change_password(
     current_user: dict = Depends(get_current_user)
 ):
     """Change user's password. Used for first-time login password change."""
+    # Get client IP for audit logging
+    ip_address = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
+    
     # Verify current password
     if not verify_password(data.current_password, current_user.get("password_hash", "")):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     
-    # Validate new password
-    if len(data.new_password) < 6:
-        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    # Validate new password complexity
+    is_valid, error_msg = validate_password_complexity(data.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
     
     if data.current_password == data.new_password:
         raise HTTPException(status_code=400, detail="New password must be different from current password")
@@ -225,6 +369,15 @@ async def change_password(
             }
         }
     )
+    
+    # Log password change for audit
+    await db.security_audit_log.insert_one({
+        "event": "password_changed",
+        "user_id": current_user["id"],
+        "email": current_user["email"],
+        "ip_address": ip_address,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
     
     logger.info(f"Password changed for user {current_user['email']}")
     
