@@ -45,10 +45,14 @@ export const AuthProvider = ({ children }) => {
     setMustChangePassword(must_change_password || userData.must_change_password || false);
     
     // Sync intro seen status with localStorage
-    // If backend says user hasn't seen intro, clear localStorage to trigger it
-    if (userData.has_seen_intro === false) {
+    // If user must change password, don't show intro yet (will show after password change)
+    if (must_change_password || userData.must_change_password) {
+      localStorage.setItem("assetiq_intro_seen", "true");
+    } else if (userData.has_seen_intro === false) {
+      // User doesn't need to change password and hasn't seen intro - show it
       localStorage.removeItem("assetiq_intro_seen");
     } else if (userData.has_seen_intro === true) {
+      // User has already seen intro
       localStorage.setItem("assetiq_intro_seen", "true");
     }
     
