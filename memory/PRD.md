@@ -22,6 +22,25 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+
+### April 5, 2026 - Mobile Intro Overlay Fix
+**BUG FIX:**
+- ✅ **Fixed mobile intro card overflow** - Card was extending beyond viewport, hiding "Next" button
+- ✅ **Reduced progress dots size** - Changed from large circles to tiny 4px dots
+- ✅ **Made spotlight rings smaller on mobile** - Reduced border width and pulsing effect
+- ✅ **Made "Tap" arrow indicator more compact** - Smaller arrow and label
+
+**Technical Changes:**
+- Updated `getTooltipStyle()` to use explicit left/right positioning instead of translateX centering
+- Changed progress dots from `<button>` with classes to `<span>` with inline styles for precise sizing
+- Mobile spotlight ring now uses 2px border (was 3px) with smaller glow effect
+- Arrow indicator reduced from 24px to 16px
+
+**Files Modified:**
+- `/app/frontend/src/components/IntroOverlay.js` - All mobile styling improvements
+
+---
+
 ## Changelog
 
 ### April 5, 2026 - User Management: Reset Intro Tour

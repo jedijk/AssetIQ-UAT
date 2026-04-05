@@ -234,7 +234,7 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
 
   // Calculate tooltip position based on screen size and target
   const getTooltipStyle = () => {
-    // For mobile, use fixed positioning with safe margins
+    // For mobile, use fixed positioning with strict centering
     if (useMobileSteps) {
       if (targetRect) {
         const viewportHeight = window.innerHeight;
@@ -245,17 +245,23 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
           return {
             position: "fixed",
             top: "auto",
-            bottom: "30%",
-            left: "50%",
-            transform: "translateX(-50%)"
+            bottom: "25%",
+            left: "5vw",
+            right: "5vw",
+            width: "90vw",
+            maxWidth: "90vw",
+            transform: "none"
           };
         } else {
           // If target is lower, show tooltip higher
           return {
             position: "fixed",
-            top: "25%",
-            left: "50%",
-            transform: "translateX(-50%)"
+            top: "20%",
+            left: "5vw",
+            right: "5vw",
+            width: "90vw",
+            maxWidth: "90vw",
+            transform: "none"
           };
         }
       }
@@ -264,8 +270,11 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
       return {
         position: "fixed",
         top: "30%",
-        left: "50%",
-        transform: "translateX(-50%)"
+        left: "5vw",
+        right: "5vw",
+        width: "90vw",
+        maxWidth: "90vw",
+        transform: "none"
       };
     }
     
@@ -357,50 +366,52 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
                 animate={{ opacity: 1, scale: 1 }}
                 className="absolute pointer-events-none"
                 style={{
-                  top: targetRect.top - 4,
-                  left: targetRect.left - 4,
-                  width: targetRect.width + 8,
-                  height: targetRect.height + 8,
-                  borderRadius: 16,
-                  border: "3px solid rgba(59, 130, 246, 0.9)",
-                  boxShadow: "0 0 30px rgba(59, 130, 246, 0.5), inset 0 0 20px rgba(59, 130, 246, 0.1)"
+                  top: targetRect.top - (useMobileSteps ? 2 : 4),
+                  left: targetRect.left - (useMobileSteps ? 2 : 4),
+                  width: targetRect.width + (useMobileSteps ? 4 : 8),
+                  height: targetRect.height + (useMobileSteps ? 4 : 8),
+                  borderRadius: useMobileSteps ? 10 : 16,
+                  border: useMobileSteps ? "2px solid rgba(59, 130, 246, 0.8)" : "3px solid rgba(59, 130, 246, 0.9)",
+                  boxShadow: useMobileSteps 
+                    ? "0 0 15px rgba(59, 130, 246, 0.4)" 
+                    : "0 0 30px rgba(59, 130, 246, 0.5), inset 0 0 20px rgba(59, 130, 246, 0.1)"
                 }}
               />
-              {/* Pulsing ring for mobile */}
+              {/* Pulsing ring for mobile - smaller and subtler */}
               {useMobileSteps && (
                 <motion.div
                   initial={{ opacity: 0, scale: 1 }}
-                  animate={{ opacity: [0.5, 0], scale: [1, 1.5] }}
+                  animate={{ opacity: [0.4, 0], scale: [1, 1.3] }}
                   transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
                   className="absolute pointer-events-none"
                   style={{
-                    top: targetRect.top - 4,
-                    left: targetRect.left - 4,
-                    width: targetRect.width + 8,
-                    height: targetRect.height + 8,
-                    borderRadius: 16,
-                    border: "3px solid rgba(59, 130, 246, 0.6)"
+                    top: targetRect.top - 2,
+                    left: targetRect.left - 2,
+                    width: targetRect.width + 4,
+                    height: targetRect.height + 4,
+                    borderRadius: 10,
+                    border: "1.5px solid rgba(59, 130, 246, 0.5)"
                   }}
                 />
               )}
-              {/* Arrow indicator pointing to element on mobile */}
+              {/* Arrow indicator pointing to element on mobile - compact */}
               {useMobileSteps && (
                 <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: [0, 8, 0] }}
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: [0, 4, 0] }}
                   transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
                   className="absolute pointer-events-none text-blue-500 flex flex-col items-center"
                   style={{
-                    top: targetRect.top + targetRect.height + 12,
+                    top: targetRect.top + targetRect.height + 6,
                     left: targetRect.left + targetRect.width / 2,
                     transform: "translateX(-50%)"
                   }}
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style={{ transform: "rotate(180deg)" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ transform: "rotate(180deg)" }}>
                     <path d="M12 4l-8 8h6v8h4v-8h6z" />
                   </svg>
-                  <span className="text-xs font-semibold mt-1 bg-blue-500 text-white px-2 py-0.5 rounded-full whitespace-nowrap">
-                    Tap here
+                  <span className="text-[8px] font-medium mt-0.5 bg-blue-500 text-white px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                    Tap
                   </span>
                 </motion.div>
               )}
@@ -415,11 +426,11 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
             style={getTooltipStyle()}
-            className={`${useMobileSteps ? 'w-[85vw] max-w-[320px]' : 'w-[360px] max-w-[calc(100vw-32px)]'}`}
+            className={useMobileSteps ? '' : 'w-[360px] max-w-[calc(100vw-32px)]'}
           >
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
               {/* Progress bar */}
-              <div className={`${useMobileSteps ? 'h-1' : 'h-1.5'} bg-slate-100`}>
+              <div className={`${useMobileSteps ? 'h-0.5' : 'h-1.5'} bg-slate-100`}>
                 <motion.div
                   className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
                   initial={{ width: 0 }}
@@ -429,7 +440,7 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
               </div>
 
               {/* Content */}
-              <div className={`${useMobileSteps ? 'p-3 pb-2' : 'p-5'}`}>
+              <div className={`${useMobileSteps ? 'p-2.5 pb-2' : 'p-5'}`}>
                 {/* Icon and step indicator */}
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
@@ -463,30 +474,34 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
 
                 {/* Progress dots and Navigation buttons */}
                 {useMobileSteps ? (
-                  // Mobile: Combined row with back, dots, next
-                  <div className="flex items-center justify-between gap-1">
+                  // Mobile: Compact combined row with back, dots, next
+                  <div className="flex items-center justify-between">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={handleBack}
                       disabled={isFirstStep}
-                      className={`${isFirstStep ? "opacity-0 pointer-events-none" : ""} text-xs h-7 px-2`}
+                      className={`${isFirstStep ? "opacity-0 pointer-events-none" : ""} text-[10px] h-6 px-1.5 min-w-0`}
                     >
-                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <ChevronLeft className="w-3 h-3" />
                     </Button>
                     
                     <div className="flex items-center gap-1">
                       {STEPS.map((_, index) => (
-                        <button
+                        <span
                           key={index}
                           onClick={() => setCurrentStep(index)}
-                          className={`h-1.5 rounded-full transition-all ${
-                            index === currentStep
-                              ? "w-3 bg-blue-500"
-                              : index < currentStep
-                                ? "w-1.5 bg-blue-300"
-                                : "w-1.5 bg-slate-200"
-                          }`}
+                          style={{
+                            height: index === currentStep ? '4px' : '4px',
+                            width: index === currentStep ? '12px' : '4px',
+                            borderRadius: '2px',
+                            cursor: 'pointer',
+                            backgroundColor: index === currentStep 
+                              ? '#3b82f6' 
+                              : index < currentStep 
+                                ? '#93c5fd' 
+                                : '#e2e8f0'
+                          }}
                         />
                       ))}
                     </div>
@@ -498,11 +513,11 @@ const IntroOverlay = ({ onComplete, onSkip, isMobile = false }) => {
                         isLastStep 
                           ? "bg-green-600 hover:bg-green-700" 
                           : "bg-blue-600 hover:bg-blue-700"
-                      } text-white px-3 text-xs h-7`}
+                      } text-white px-2 text-[10px] h-6 min-w-0`}
                       data-testid="intro-next-btn"
                     >
                       {isLastStep ? "Start" : "Next"}
-                      <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                      <ChevronRight className="w-3 h-3 ml-0.5" />
                     </Button>
                   </div>
                 ) : (
