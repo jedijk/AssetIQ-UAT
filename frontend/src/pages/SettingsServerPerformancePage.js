@@ -14,7 +14,14 @@ import {
   Wifi,
   WifiOff,
   ShieldX,
-  Database
+  Database,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -186,12 +193,46 @@ const SettingsServerPerformancePage = () => {
   const [dbStorageLoading, setDbStorageLoading] = useState(true);
   const [dbStorageError, setDbStorageError] = useState(null);
   
+  // Security check state
+  const [security, setSecurity] = useState(null);
+  const [securityLoading, setSecurityLoading] = useState(true);
+  const [securityError, setSecurityError] = useState(null);
+  const [securityRefreshing, setSecurityRefreshing] = useState(false);
+  
   // History for sparklines (last 12 data points = ~1 minute at 5s intervals)
   const [cpuHistory, setCpuHistory] = useState([]);
   const [ramHistory, setRamHistory] = useState([]);
   
   // Check if user is owner
   const isOwner = user?.role === "owner";
+  
+  // Fetch security status
+  const fetchSecurity = useCallback(async (showRefreshing = false) => {
+    if (!isOwner) return;
+    
+    if (showRefreshing) setSecurityRefreshing(true);
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/api/system/security`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch security status");
+      }
+      
+      const data = await response.json();
+      setSecurity(data);
+      setSecurityError(null);
+    } catch (err) {
+      console.error("Failed to fetch security status:", err);
+      setSecurityError(err.message);
+    } finally {
+      setSecurityLoading(false);
+      setSecurityRefreshing(false);
+    }
+  }, [isOwner]);
   
   // Fetch database storage
   const fetchDbStorage = useCallback(async () => {
@@ -283,11 +324,13 @@ const SettingsServerPerformancePage = () => {
     if (!isOwner) {
       setLoading(false);
       setDbStorageLoading(false);
+      setSecurityLoading(false);
       return;
     }
     
     fetchMetrics();
     fetchDbStorage();
+    fetchSecurity();
     
     let interval;
     let dbInterval;
@@ -300,7 +343,7 @@ const SettingsServerPerformancePage = () => {
       if (interval) clearInterval(interval);
       if (dbInterval) clearInterval(dbInterval);
     };
-  }, [fetchMetrics, fetchDbStorage, autoRefresh, isOwner]);
+  }, [fetchMetrics, fetchDbStorage, fetchSecurity, autoRefresh, isOwner]);
   
   // Show access denied for non-owners
   if (!isOwner) {
@@ -672,6 +715,134 @@ const SettingsServerPerformancePage = () => {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* App Security Section */}
+        <div className="mt-4 sm:mt-6">
+          <Card>
+            <CardHeader className="py-2 sm:py-4 px-3 sm:px-6">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center justify-between">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-slate-600">
+                  <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>App Security</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Overall Status Badge */}
+                  {security && !securityLoading && !securityError && (
+                    <Badge className={`${
+                      security.status === "secure" 
+                        ? "bg-green-100 text-green-700" 
+                        : security.status === "warning" 
+                          ? "bg-orange-100 text-orange-700" 
+                          : "bg-red-100 text-red-700"
+                    } border-0 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5`}>
+                      {security.status === "secure" && <ShieldCheck className="w-3 h-3 mr-1" />}
+                      {security.status === "warning" && <ShieldAlert className="w-3 h-3 mr-1" />}
+                      {security.status === "critical" && <ShieldX className="w-3 h-3 mr-1" />}
+                      {security.status === "secure" ? "Secure" : security.status === "warning" ? "Warning" : "Critical"}
+                    </Badge>
+                  )}
+                  {/* Refresh Button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchSecurity(true)}
+                    disabled={securityRefreshing}
+                    className="h-6 w-6 sm:h-7 sm:w-7 p-0"
+                  >
+                    {securityRefreshing ? (
+                      <Loader2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6 pt-0">
+              {securityLoading ? (
+                <div className="flex items-center justify-center py-6 gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                  <span className="text-xs sm:text-sm text-slate-400">Running security checks...</span>
+                </div>
+              ) : securityError ? (
+                <div className="flex items-center justify-center py-6">
+                  <span className="text-xs sm:text-sm text-red-500">Unable to load security status</span>
+                </div>
+              ) : !security ? (
+                <div className="flex items-center justify-center py-6">
+                  <span className="text-xs sm:text-sm text-slate-400">No security data available</span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Security Checks List */}
+                  <div className="space-y-2">
+                    {security.checks?.map((check, index) => (
+                      <div 
+                        key={index}
+                        className={`flex items-start gap-2 p-2 sm:p-2.5 rounded-lg border ${
+                          check.status === "pass" 
+                            ? "bg-green-50/50 border-green-100" 
+                            : check.status === "warning" 
+                              ? "bg-orange-50/50 border-orange-100" 
+                              : "bg-red-50/50 border-red-100"
+                        }`}
+                      >
+                        {/* Status Icon */}
+                        <div className="mt-0.5 flex-shrink-0">
+                          {check.status === "pass" && (
+                            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" />
+                          )}
+                          {check.status === "warning" && (
+                            <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
+                          )}
+                          {check.status === "fail" && (
+                            <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
+                          )}
+                        </div>
+                        
+                        {/* Check Details */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs sm:text-sm font-medium text-slate-700">
+                              {check.name}
+                            </span>
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[9px] sm:text-[10px] px-1 py-0 ${
+                                check.status === "pass" 
+                                  ? "border-green-200 text-green-600" 
+                                  : check.status === "warning" 
+                                    ? "border-orange-200 text-orange-600" 
+                                    : "border-red-200 text-red-600"
+                              }`}
+                            >
+                              {check.status === "pass" ? "Pass" : check.status === "warning" ? "Warning" : "Fail"}
+                            </Badge>
+                          </div>
+                          <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
+                            {check.message}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Last Scan Timestamp */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-400">
+                      <span>Last checked</span>
+                      <span>
+                        {security.last_scan 
+                          ? new Date(security.last_scan).toLocaleTimeString() 
+                          : "-"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

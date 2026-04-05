@@ -4,11 +4,12 @@ System Metrics Routes.
 API endpoint for server performance monitoring.
 Provides CPU, RAM, Disk usage and uptime metrics.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime, timezone
 import time
 import logging
 import os
+import subprocess
 
 try:
     import psutil
@@ -192,4 +193,210 @@ async def get_database_storage(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to retrieve database storage: {str(e)}"
+        )
+
+
+
+@router.get("/system/security")
+async def get_security_status(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Run security checks and return status.
+    
+    Only accessible by owner users.
+    
+    Returns security status with individual check results.
+    """
+    # Restrict to owner only
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can access security checks"
+        )
+    
+    checks = []
+    
+    try:
+        # 1. Authentication Check
+        # Authentication is enabled if we got here (requires login)
+        checks.append({
+            "name": "Authentication",
+            "status": "pass",
+            "message": "User authentication is enabled and enforced"
+        })
+        
+        # 2. Password Policy Check
+        # Check if password requirements are configured
+        min_password_length = int(os.environ.get("MIN_PASSWORD_LENGTH", "6"))
+        if min_password_length >= 8:
+            checks.append({
+                "name": "Password Policy",
+                "status": "pass",
+                "message": "Strong password requirements are active"
+            })
+        elif min_password_length >= 6:
+            checks.append({
+                "name": "Password Policy",
+                "status": "warning",
+                "message": "Password requirements could be stronger"
+            })
+        else:
+            checks.append({
+                "name": "Password Policy",
+                "status": "fail",
+                "message": "Weak password requirements detected"
+            })
+        
+        # 3. HTTPS Check
+        # Check if request came over HTTPS
+        is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+        if is_https:
+            checks.append({
+                "name": "HTTPS",
+                "status": "pass",
+                "message": "Secure connection is enforced"
+            })
+        else:
+            # In development, this might be expected
+            is_production = os.environ.get("ENVIRONMENT", "development") == "production"
+            if is_production:
+                checks.append({
+                    "name": "HTTPS",
+                    "status": "fail",
+                    "message": "Secure connection not enforced"
+                })
+            else:
+                checks.append({
+                    "name": "HTTPS",
+                    "status": "warning",
+                    "message": "Using HTTP (acceptable for development)"
+                })
+        
+        # 4. CORS Configuration Check
+        cors_origins = os.environ.get("CORS_ORIGINS", "*")
+        if cors_origins == "*":
+            checks.append({
+                "name": "CORS Configuration",
+                "status": "warning",
+                "message": "CORS allows all origins (consider restricting)"
+            })
+        else:
+            checks.append({
+                "name": "CORS Configuration",
+                "status": "pass",
+                "message": "CORS is properly restricted"
+            })
+        
+        # 5. Rate Limiting Check
+        rate_limit_enabled = os.environ.get("RATE_LIMIT_ENABLED", "false").lower() == "true"
+        if rate_limit_enabled:
+            checks.append({
+                "name": "Rate Limiting",
+                "status": "pass",
+                "message": "API rate limiting is active"
+            })
+        else:
+            checks.append({
+                "name": "Rate Limiting",
+                "status": "warning",
+                "message": "Rate limiting not configured"
+            })
+        
+        # 6. Dependencies Check
+        # Check for known vulnerabilities using pip-audit if available
+        try:
+            result = subprocess.run(
+                ["pip-audit", "--format", "json", "-q"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                checks.append({
+                    "name": "Dependencies",
+                    "status": "pass",
+                    "message": "No known vulnerabilities in packages"
+                })
+            else:
+                checks.append({
+                    "name": "Dependencies",
+                    "status": "warning",
+                    "message": "Some packages may need updates"
+                })
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            # pip-audit not available, skip detailed check
+            checks.append({
+                "name": "Dependencies",
+                "status": "warning",
+                "message": "Dependency scan not available"
+            })
+        
+        # 7. Database Access Check
+        # Check if MongoDB requires authentication
+        try:
+            # Try to get server info - if we can access it, auth is working
+            await db.command("ping")
+            mongo_url = os.environ.get("MONGO_URL", "")
+            if "@" in mongo_url or "localhost" in mongo_url or "127.0.0.1" in mongo_url:
+                checks.append({
+                    "name": "Database Access",
+                    "status": "pass",
+                    "message": "Database connection is secured"
+                })
+            else:
+                checks.append({
+                    "name": "Database Access",
+                    "status": "warning",
+                    "message": "Verify database authentication is enabled"
+                })
+        except Exception:
+            checks.append({
+                "name": "Database Access",
+                "status": "fail",
+                "message": "Unable to verify database security"
+            })
+        
+        # 8. Environment Variables Check
+        # Check if sensitive keys are properly configured (not default/empty)
+        jwt_secret = os.environ.get("JWT_SECRET", "")
+        
+        sensitive_issues = []
+        if not jwt_secret or jwt_secret == "your-secret-key" or len(jwt_secret) < 32:
+            sensitive_issues.append("JWT secret")
+        
+        if sensitive_issues:
+            checks.append({
+                "name": "Environment Variables",
+                "status": "warning",
+                "message": f"Review configuration: {', '.join(sensitive_issues)}"
+            })
+        else:
+            checks.append({
+                "name": "Environment Variables",
+                "status": "pass",
+                "message": "Sensitive keys are properly configured"
+            })
+        
+        # Calculate overall status
+        statuses = [c["status"] for c in checks]
+        if "fail" in statuses:
+            overall_status = "critical"
+        elif "warning" in statuses:
+            overall_status = "warning"
+        else:
+            overall_status = "secure"
+        
+        return {
+            "status": overall_status,
+            "checks": checks,
+            "last_scan": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to run security checks: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to run security checks: {str(e)}"
         )

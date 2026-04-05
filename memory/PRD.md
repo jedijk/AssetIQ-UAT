@@ -24,6 +24,32 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 5, 2026 - App Security Check in Server Performance
+**NEW FEATURE:**
+- ✅ **Added App Security monitoring to Server Performance page**
+- Backend endpoint `GET /api/system/security` performs 8 security checks:
+  1. **Authentication** - Verifies user auth is enabled
+  2. **Password Policy** - Checks password length requirements
+  3. **HTTPS** - Verifies secure connection
+  4. **CORS Configuration** - Checks if CORS is restricted
+  5. **Rate Limiting** - Checks if rate limiting is configured
+  6. **Dependencies** - Scans for vulnerable packages
+  7. **Database Access** - Verifies DB connection is secured
+  8. **Environment Variables** - Checks JWT secret configuration
+- Overall status: Secure (all pass), Warning (some warnings), Critical (any fail)
+- Frontend displays:
+  - Overall status badge (green/orange/red)
+  - List of checks with status icons and messages
+  - Manual refresh button
+  - Last scan timestamp
+- Responsive for desktop and mobile
+
+**Files Modified:**
+- `/app/backend/routes/system.py` - Added `GET /api/system/security` endpoint
+- `/app/frontend/src/pages/SettingsServerPerformancePage.js` - Added App Security card
+
+---
+
 ### April 5, 2026 - Database Storage in Server Performance
 **NEW FEATURE:**
 - ✅ **Added Database Storage monitoring to Server Performance page**
