@@ -260,7 +260,7 @@ async def send_reset_email(email: str, reset_token: str, user_name: str):
                                 <!-- Logo -->
                                 <div style="text-align: center; margin-bottom: 32px;">
                                     <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #1e40af;">AssetIQ</h1>
-                                    <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Reliability Intelligence Platform</p>
+                                    <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Asset Management Intelligence Platform</p>
                                 </div>
                                 
                                 <!-- Content -->
@@ -343,7 +343,7 @@ async def send_approval_notification_email(admin_email: str, admin_name: str, ne
                             <td style="padding: 40px;">
                                 <div style="text-align: center; margin-bottom: 32px;">
                                     <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #1e40af;">AssetIQ</h1>
-                                    <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Reliability Intelligence Platform</p>
+                                    <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Asset Management Intelligence Platform</p>
                                 </div>
                                 
                                 <h2 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #1e293b;">New User Awaiting Approval</h2>
@@ -364,7 +364,7 @@ async def send_approval_notification_email(admin_email: str, admin_name: str, ne
                                 </div>
                                 
                                 <p style="margin: 0; font-size: 14px; color: #94a3b8; text-align: center;">
-                                    This is an automated notification from AssetIQ.
+                                    This is an automated notification from AssetIQ - Asset Management Intelligence Platform.
                                 </p>
                             </td>
                         </tr>
@@ -428,6 +428,7 @@ async def send_approval_result_email(user_email: str, user_name: str, approved: 
                             <td style="padding: 40px;">
                                 <div style="text-align: center; margin-bottom: 32px;">
                                     <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #1e40af;">AssetIQ</h1>
+                                    <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Asset Management Intelligence Platform</p>
                                 </div>
                                 
                                 <h2 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #1e293b;">Account Update</h2>

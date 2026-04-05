@@ -92,14 +92,14 @@ async def send_welcome_email(user_email: str, user_name: str, password: str, rol
                                 <!-- Logo -->
                                 <div style="text-align: center; margin-bottom: 32px;">
                                     <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #1e40af;">AssetIQ</h1>
-                                    <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Reliability Intelligence Platform</p>
+                                    <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Asset Management Intelligence Platform</p>
                                 </div>
                                 
                                 <!-- Welcome Message -->
                                 <h2 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #1e293b;">Welcome to AssetIQ, {user_name}!</h2>
                                 
                                 <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #475569;">
-                                    Your account has been created and you can now access the AssetIQ platform. Here are your login credentials:
+                                    Your account has been created and you can now access the Asset Management Intelligence Platform. Here are your login credentials:
                                 </p>
                                 
                                 <!-- Credentials Box -->
@@ -167,7 +167,8 @@ async def send_welcome_email(user_email: str, user_name: str, password: str, rol
                     
                     <!-- Footer -->
                     <p style="margin: 24px 0 0; font-size: 12px; color: #94a3b8; text-align: center;">
-                        This is an automated message from AssetIQ. If you did not expect this email, please contact your administrator.
+                        This is an automated message from AssetIQ - Asset Management Intelligence Platform.<br>
+                        If you did not expect this email, please contact your administrator.
                     </p>
                 </td>
             </tr>
@@ -180,7 +181,7 @@ async def send_welcome_email(user_email: str, user_name: str, password: str, rol
         resend.Emails.send({
             "from": SENDER_EMAIL,
             "to": user_email,
-            "subject": "Welcome to AssetIQ - Your Account is Ready",
+            "subject": "Welcome to AssetIQ - Asset Management Intelligence Platform",
             "html": html_content
         })
         logger.info(f"Welcome email sent to {user_email}")
