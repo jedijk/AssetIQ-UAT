@@ -31,13 +31,18 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - Backend endpoint: `POST /api/rbac/users/{user_id}/reset-intro`
 - Sets `has_seen_intro: false` in user record
 - Toast notification confirms "Intro tour will show on next login"
-- Also added `POST /api/users/mark-intro-seen` to persist tour completion to database
+- **Fixed sync between backend and frontend:**
+  - Login response now includes `has_seen_intro` flag
+  - Frontend syncs localStorage with backend on login
+  - If backend says `has_seen_intro: false`, clears localStorage to trigger intro
 
 **Files Modified:**
 - `/app/backend/routes/users.py` - Added reset-intro and mark-intro-seen endpoints
+- `/app/backend/routes/auth.py` - Added has_seen_intro to login and /auth/me responses
 - `/app/backend/models/api_models.py` - Added `has_seen_intro` field to UserResponse
 - `/app/frontend/src/pages/SettingsUserManagementPage.js` - Added Reset Intro Tour menu item
 - `/app/frontend/src/components/IntroOverlay.js` - Added API call on tour completion
+- `/app/frontend/src/contexts/AuthContext.js` - Syncs has_seen_intro with localStorage on login
 
 ---
 

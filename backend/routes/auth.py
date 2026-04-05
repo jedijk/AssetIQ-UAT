@@ -154,6 +154,7 @@ async def login(request: Request, credentials: UserLogin):
     
     token = create_token(user["id"])
     must_change_password = user.get("must_change_password", False)
+    has_seen_intro = user.get("has_seen_intro", True)  # Default to True for existing users
     return TokenResponse(
         token=token,
         must_change_password=must_change_password,
@@ -166,7 +167,8 @@ async def login(request: Request, credentials: UserLogin):
             position=user.get("position"),
             role=user.get("role"),
             phone=user.get("phone"),
-            must_change_password=must_change_password
+            must_change_password=must_change_password,
+            has_seen_intro=has_seen_intro
         )
     )
 
@@ -181,7 +183,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         position=current_user.get("position"),
         role=current_user.get("role"),
         phone=current_user.get("phone"),
-        must_change_password=current_user.get("must_change_password", False)
+        must_change_password=current_user.get("must_change_password", False),
+        has_seen_intro=current_user.get("has_seen_intro", True)
     )
 
 
