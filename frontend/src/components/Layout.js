@@ -262,7 +262,6 @@ const Layout = () => {
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "settings" },
-    { path: "/settings/feedback", label: t("nav.feedback") || "Feedback", icon: MessageCircleQuestion, feature: "feedback" },
   ];
   
   // Filter settings items based on device, role, and permissions
@@ -562,46 +561,6 @@ const Layout = () => {
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
                   <p>{language === "en" ? "Switch to Dutch" : "Wissel naar Engels"}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {/* Feedback Button - Mobile in Header */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/settings/feedback")}
-              className="sm:hidden h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-              data-testid="mobile-feedback-button"
-              aria-label="Send Feedback"
-            >
-              <MessageCircleQuestion className="w-4 h-4" />
-            </Button>
-
-            {/* Feedback Button - Desktop Prominent */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={springPresets.snappy}
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate("/settings/feedback")}
-                      className="hidden sm:flex h-7 sm:h-8 px-2 sm:px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300"
-                      data-testid="feedback-button"
-                      aria-label="Send Feedback"
-                    >
-                      <MessageCircleQuestion className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1.5" />
-                      <span className="hidden lg:inline text-xs sm:text-sm font-medium">{t("nav.feedback") || "Feedback"}</span>
-                    </Button>
-                  </motion.div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>{t("nav.feedback") || "Feedback"}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
