@@ -808,7 +808,10 @@ const Layout = () => {
       <div className="flex min-h-[calc(100vh-48px)]">
         {/* Equipment Hierarchy Sidebar - Desktop */}
         {hierarchyOpen && (
-          <div className="hidden lg:block w-72 flex-shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+          <div 
+            className="hidden lg:block w-72 flex-shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+            data-testid="hierarchy-sidebar"
+          >
             <div className="sticky top-12 h-[calc(100vh-48px)]">
               <EquipmentHierarchy 
                 isOpen={true} 

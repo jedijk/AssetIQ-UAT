@@ -65,7 +65,7 @@ const DESKTOP_STEPS = [
     title: "Equipment Hierarchy",
     description: "Browse your assets organized by location, system, and equipment type. Right-click for quick actions.",
     icon: GitBranch,
-    target: '[data-testid="hierarchy-panel"], .hierarchy-sidebar',
+    target: '[data-testid="hierarchy-sidebar"], [data-testid="hierarchy-toggle"]',
     position: "right"
   },
   {
