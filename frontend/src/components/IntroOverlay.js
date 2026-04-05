@@ -69,6 +69,14 @@ const DESKTOP_STEPS = [
     position: "right"
   },
   {
+    id: "quick-add",
+    title: "Quick Add",
+    description: "Tap the + button to quickly report a new observation from anywhere in the app. You can also use voice input.",
+    icon: Plus,
+    target: '[data-testid="fab-report-observation"]',
+    position: "left"
+  },
+  {
     id: "settings",
     title: "Settings",
     description: "Configure your profile, manage users, customize risk calculations, and access system settings.",

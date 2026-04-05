@@ -44,7 +44,7 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ### April 5, 2026 - Introduction Overlay / Onboarding Tour
 **NEW FEATURE:**
 - ✅ **Added step-by-step introduction overlay for new users**
-- **Desktop tour (8 steps):** Welcome → Dashboard → Observations → Causal Engine → My Tasks → Hierarchy → Settings → Complete
+- **Desktop tour (9 steps):** Welcome → Dashboard → Observations → Causal Engine → My Tasks → Hierarchy → Quick Add (+) → Settings → Complete
 - **Mobile tour (7 steps):** Welcome → Navigation Menu → Dashboard → Observations → Quick Add → AI Chat → Complete
 - Features:
   - Spotlight effect highlighting UI elements
