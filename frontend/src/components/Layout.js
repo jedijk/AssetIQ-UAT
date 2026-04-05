@@ -7,9 +7,10 @@ import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle } from "lucide-react";
 import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { springPresets } from "./animations/constants";
+import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
 const APP_VERSION = process.env.REACT_APP_VERSION || "2.5.1";
@@ -56,6 +57,9 @@ const Layout = () => {
   const [infoOpen, setInfoOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [dismissedNotifications, setDismissedNotifications] = useState(false);
+  
+  // Introduction overlay
+  const { showIntro, dismissIntro, resetIntro } = useIntroOverlay();
   
   // Pull-to-refresh state
   const [isPulling, setIsPulling] = useState(false);
@@ -602,6 +606,45 @@ const Layout = () => {
               </Tooltip>
             </TooltipProvider>
 
+            {/* Help Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <motion.div
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.92 }}
+                  transition={springPresets.snappy}
+                >
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900"
+                    data-testid="help-menu-button"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </Button>
+                </motion.div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel className="text-xs">Help</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={resetIntro}
+                  className="cursor-pointer text-sm"
+                  data-testid="replay-tour-menu-item"
+                >
+                  <Info className="w-3.5 h-3.5 mr-2" />
+                  Replay Tour
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => navigate("/settings/feedback")}
+                  className="cursor-pointer text-sm"
+                >
+                  <MessageCircleQuestion className="w-3.5 h-3.5 mr-2" />
+                  Send Feedback
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {/* Settings Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -971,6 +1014,14 @@ const Layout = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Introduction Overlay */}
+      {showIntro && (
+        <IntroOverlay 
+          onComplete={dismissIntro}
+          onSkip={dismissIntro}
+        />
+      )}
     </div>
   );
 };
