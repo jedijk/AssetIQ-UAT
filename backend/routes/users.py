@@ -681,3 +681,59 @@ async def delete_user(
 async def get_role_distribution(current_user: dict = Depends(get_current_user)):
     """Get count of users per role."""
     return await rbac_service.get_role_distribution()
+
+
+
+@router.post("/rbac/users/{user_id}/reset-intro")
+async def reset_user_intro(
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Reset the intro tour for a user.
+    Sets has_seen_intro to False so the tour will show again on next login.
+    """
+    # Check if current user has permission (owner or admin)
+    if current_user.get("role") not in ["owner", "admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only owners and admins can reset user intro"
+        )
+    
+    # Check if user exists
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "name": 1, "email": 1})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update the user's has_seen_intro flag
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"has_seen_intro": False}}
+    )
+    
+    if result.modified_count == 0 and result.matched_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to reset intro")
+    
+    logger.info(f"Intro tour reset for user {user_id} ({user.get('email')}) by {current_user['id']}")
+    
+    return {
+        "message": "Intro tour will show on next login",
+        "user_id": user_id,
+        "user_name": user.get("name")
+    }
+
+
+@router.post("/users/mark-intro-seen")
+async def mark_intro_seen(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Mark the intro tour as seen for the current user.
+    Called when user completes or skips the intro tour.
+    """
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"has_seen_intro": True}}
+    )
+    
+    return {"message": "Intro marked as seen"}

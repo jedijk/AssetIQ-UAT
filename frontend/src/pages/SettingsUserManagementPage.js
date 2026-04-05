@@ -41,6 +41,7 @@ import {
   Factory,
   Crown,
   KeyRound,
+  PlayCircle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -498,6 +499,29 @@ const SettingsUserManagementPage = () => {
     }
   });
 
+  // Reset intro tour mutation
+  const resetIntroMutation = useMutation({
+    mutationFn: async (userId) => {
+      const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}/reset-intro`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        }
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Failed to reset intro tour");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast.success(data.message || "Intro tour will show on next login");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to reset intro tour");
+    }
+  });
+
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData) => {
@@ -882,6 +906,12 @@ const SettingsUserManagementPage = () => {
                           disabled={resetPasswordMutation.isPending}
                         >
                           <KeyRound className="w-4 h-4 mr-2" /> Reset Password
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => resetIntroMutation.mutate(user.id)}
+                          disabled={resetIntroMutation.isPending}
+                        >
+                          <PlayCircle className="w-4 h-4 mr-2" /> Reset Intro Tour
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {user.is_active ? (
@@ -1547,6 +1577,12 @@ const SettingsUserManagementPage = () => {
                               disabled={resetPasswordMutation.isPending}
                             >
                               <KeyRound className="w-4 h-4 mr-2" /> Reset Password
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => resetIntroMutation.mutate(user.id)}
+                              disabled={resetIntroMutation.isPending}
+                            >
+                              <PlayCircle className="w-4 h-4 mr-2" /> Reset Intro Tour
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {user.is_active ? (

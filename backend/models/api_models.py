@@ -26,6 +26,7 @@ class UserResponse(BaseModel):
     role: Optional[str] = None
     phone: Optional[str] = None
     must_change_password: Optional[bool] = False
+    has_seen_intro: Optional[bool] = True
 
 
 class TokenResponse(BaseModel):

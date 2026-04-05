@@ -461,8 +461,9 @@ export const useIntroOverlay = () => {
   const [showIntro, setShowIntro] = useState(false);
 
   useEffect(() => {
-    const hasSeenIntro = localStorage.getItem("assetiq_intro_seen");
-    if (!hasSeenIntro) {
+    // Check localStorage first (for quick check)
+    const hasSeenIntroLocal = localStorage.getItem("assetiq_intro_seen");
+    if (!hasSeenIntroLocal) {
       // Small delay to let the app render first
       setTimeout(() => setShowIntro(true), 1000);
     }
@@ -472,8 +473,22 @@ export const useIntroOverlay = () => {
     setShowIntro(true);
   };
 
-  const dismissIntro = () => {
+  const dismissIntro = async () => {
     setShowIntro(false);
+    // Save to localStorage
+    localStorage.setItem("assetiq_intro_seen", "true");
+    // Also save to backend
+    try {
+      const token = localStorage.getItem("token");
+      if (token) {
+        await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/mark-intro-seen`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (err) {
+      console.error("Failed to mark intro as seen:", err);
+    }
   };
 
   const resetIntro = () => {

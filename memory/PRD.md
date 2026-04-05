@@ -24,6 +24,23 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ## Changelog
 
+### April 5, 2026 - User Management: Reset Intro Tour
+**NEW FEATURE:**
+- ✅ **Added "Reset Intro Tour" option in User Management**
+- Owners/Admins can reset the intro tour for any user from the user actions dropdown
+- Backend endpoint: `POST /api/rbac/users/{user_id}/reset-intro`
+- Sets `has_seen_intro: false` in user record
+- Toast notification confirms "Intro tour will show on next login"
+- Also added `POST /api/users/mark-intro-seen` to persist tour completion to database
+
+**Files Modified:**
+- `/app/backend/routes/users.py` - Added reset-intro and mark-intro-seen endpoints
+- `/app/backend/models/api_models.py` - Added `has_seen_intro` field to UserResponse
+- `/app/frontend/src/pages/SettingsUserManagementPage.js` - Added Reset Intro Tour menu item
+- `/app/frontend/src/components/IntroOverlay.js` - Added API call on tour completion
+
+---
+
 ### April 5, 2026 - Introduction Overlay / Onboarding Tour
 **NEW FEATURE:**
 - ✅ **Added step-by-step introduction overlay for new users**
@@ -33,7 +50,7 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
   - Spotlight effect highlighting UI elements
   - Progress bar and step dots
   - Skip/Back/Next navigation
-  - Stores completion in localStorage
+  - Stores completion in localStorage + database
   - Help menu with "Replay Tour" option
   - Auto-detects mobile vs desktop
   - Mobile-optimized compact card design
