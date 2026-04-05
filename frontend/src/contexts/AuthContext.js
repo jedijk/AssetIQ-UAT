@@ -64,8 +64,11 @@ export const AuthProvider = ({ children }) => {
     // Clear the must_change_password flag after successful change
     setMustChangePassword(false);
     if (user) {
-      setUser({ ...user, must_change_password: false });
+      setUser({ ...user, must_change_password: false, has_seen_intro: false });
     }
+    
+    // Clear intro flag so the tour shows after password change
+    localStorage.removeItem("assetiq_intro_seen");
     
     return response.data;
   };

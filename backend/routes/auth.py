@@ -213,13 +213,15 @@ async def change_password(
         raise HTTPException(status_code=400, detail="New password must be different from current password")
     
     # Update password and clear must_change_password flag
+    # Also reset has_seen_intro so the tour shows after password change
     await db.users.update_one(
         {"id": current_user["id"]},
         {
             "$set": {
                 "password_hash": hash_password(data.new_password),
                 "must_change_password": False,
-                "password_changed_at": datetime.now(timezone.utc).isoformat()
+                "password_changed_at": datetime.now(timezone.utc).isoformat(),
+                "has_seen_intro": False  # Trigger intro tour after password change
             }
         }
     )
