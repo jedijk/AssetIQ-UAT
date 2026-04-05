@@ -42,7 +42,7 @@ import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
 
 const Layout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, mustChangePassword } = useAuth();
   const { hasPermission, canSeeNavItem } = usePermissions();
   const { canUndo, undo, isUndoing, getLastAction, undoCount } = useUndo();
   const { language, toggleLanguage, t } = useLanguage();
@@ -1018,8 +1018,8 @@ const Layout = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Introduction Overlay */}
-      {showIntro && (
+      {/* Introduction Overlay - only show after password change is complete */}
+      {showIntro && !mustChangePassword && (
         <IntroOverlay 
           onComplete={dismissIntro}
           onSkip={dismissIntro}
