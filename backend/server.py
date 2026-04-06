@@ -50,8 +50,14 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-# Create app
-app = FastAPI(title="ThreatBase API")
+# Create app with explicit OpenAPI configuration
+app = FastAPI(
+    title="ThreatBase API",
+    version="2.5.2",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
+)
 
 # Add rate limiter to app state
 app.state.limiter = limiter

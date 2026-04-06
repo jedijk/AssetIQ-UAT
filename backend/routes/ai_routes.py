@@ -75,6 +75,66 @@ def check_injection_attempt(data: dict, endpoint: str) -> None:
                 )
 
 
+@router.post("/ai/chat-analyze")
+async def chat_analyze(data: dict):
+    """
+    Simple chat-based AI analysis endpoint.
+    Accepts a message and returns AI-generated analysis.
+    """
+    message = data.get("message", data.get("input", ""))
+    if not message:
+        return {
+            "success": False,
+            "error": "No message provided",
+            "message": "Please provide a message to analyze"
+        }
+    
+    try:
+        # Use the OpenAI client for chat
+        from openai import OpenAI
+        
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            return {
+                "success": False,
+                "error": "AI service not configured",
+                "message": "OpenAI API key not found"
+            }
+        
+        client = OpenAI(api_key=api_key)
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful AI assistant for industrial asset management and reliability engineering. Provide concise, actionable insights."
+                },
+                {"role": "user", "content": message}
+            ],
+            temperature=0.7,
+            max_tokens=1000
+        )
+        
+        ai_response = response.choices[0].message.content
+        
+        return {
+            "success": True,
+            "message": "Chat analyze working",
+            "input": message,
+            "response": ai_response,
+            "model": "gpt-4o"
+        }
+        
+    except Exception as e:
+        logger.error(f"Chat analyze error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "AI analysis failed"
+        }
+
+
 @router.post("/ai/analyze-risk/{threat_id}")
 @limiter.limit(AI_RATE_LIMIT)
 async def analyze_threat_risk(
