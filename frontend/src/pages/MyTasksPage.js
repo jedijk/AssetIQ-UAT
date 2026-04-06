@@ -1,5 +1,6 @@
 import { getBackendUrl } from '../lib/apiConfig';
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -213,6 +214,7 @@ const sourceBadges = {
 // Main My Tasks Page Component
 const MyTasksPage = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState("open");
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -220,6 +222,9 @@ const MyTasksPage = () => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [viewMode, setViewMode] = useState("list"); // "list" or "execution"
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
+  
+  // Closure suggestion dialog state
+  const [closureSuggestion, setClosureSuggestion] = useState(null);
   
   // Offline support
   const offlineStatus = useOfflineStatus();
@@ -323,6 +328,11 @@ const MyTasksPage = () => {
         });
       } else {
         toast.success("Task completed successfully!");
+        
+        // Check if all actions for the source are now completed
+        if (result?.completion_notification) {
+          setClosureSuggestion(result.completion_notification);
+        }
       }
       // Invalidate all my-tasks queries regardless of filters
       queryClient.invalidateQueries({ 
@@ -919,6 +929,52 @@ const MyTasksPage = () => {
                   Delete
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Closure Suggestion Dialog */}
+      <Dialog open={!!closureSuggestion} onOpenChange={() => setClosureSuggestion(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              All Actions Completed
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-3 mb-3 p-3 bg-green-50 rounded-lg">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-800">
+                  {closureSuggestion?.total_actions} action{closureSuggestion?.total_actions !== 1 ? 's' : ''} completed
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  {closureSuggestion?.source_name}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600">
+              {closureSuggestion?.message || `All corrective actions for this ${closureSuggestion?.source_type === 'threat' ? 'observation' : 'investigation'} have been completed.`}
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setClosureSuggestion(null)}>
+              Dismiss
+            </Button>
+            <Button
+              onClick={() => {
+                const sourceType = closureSuggestion?.source_type;
+                const sourceId = closureSuggestion?.source_id;
+                setClosureSuggestion(null);
+                if (sourceType === 'threat') {
+                  navigate(`/observations/${sourceId}`);
+                } else if (sourceType === 'investigation') {
+                  navigate(`/causal-engine?investigation=${sourceId}`);
+                }
+              }}
+            >
+              Go to {closureSuggestion?.source_type === 'threat' ? 'Observation' : 'Investigation'}
             </Button>
           </DialogFooter>
         </DialogContent>

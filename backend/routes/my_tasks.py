@@ -726,7 +726,57 @@ async def complete_my_action(
         await db.threats.insert_one(observation_doc)
         logger.info(f"Created observation from action: {observation_doc['id']}")
     
-    return {"success": True, "message": "Action completed successfully"}
+    # Check if all actions for the source are now completed
+    completion_notification = None
+    if action.get("source_type") and action.get("source_id"):
+        source_type = action["source_type"]
+        source_id = action["source_id"]
+        
+        # Count remaining open actions for this source
+        remaining_open = await db.central_actions.count_documents({
+            "source_type": source_type,
+            "source_id": source_id,
+            "status": {"$ne": "completed"}
+        })
+        
+        if remaining_open == 0:
+            # All actions completed - prepare notification
+            total_actions = await db.central_actions.count_documents({
+                "source_type": source_type,
+                "source_id": source_id
+            })
+            
+            # Get source details
+            source_name = None
+            source_status = None
+            if source_type == "threat":
+                threat = await db.threats.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
+                if threat:
+                    source_name = threat.get("title", "Observation")
+                    source_status = threat.get("status")
+            elif source_type == "investigation":
+                inv = await db.investigations.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
+                if inv:
+                    source_name = inv.get("title", "Investigation")
+                    source_status = inv.get("status")
+            
+            # Only suggest closure if source is not already closed
+            if source_status not in ["closed", "completed", "Mitigated"]:
+                completion_notification = {
+                    "type": "all_actions_completed",
+                    "source_type": source_type,
+                    "source_id": source_id,
+                    "source_name": source_name,
+                    "total_actions": total_actions,
+                    "message": f"All {total_actions} action(s) for '{source_name}' are now complete! Consider closing this {'observation' if source_type == 'threat' else 'investigation'}.",
+                    "suggest_closure": True
+                }
+    
+    response = {"success": True, "message": "Action completed successfully"}
+    if completion_notification:
+        response["completion_notification"] = completion_notification
+    
+    return response
 
 
 @router.post("/my-tasks/action/{action_id}/start")
