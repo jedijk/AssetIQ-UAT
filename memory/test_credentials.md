@@ -1,37 +1,25 @@
 # ThreatBase (AssetIQ) Test Credentials
 
-## User Accounts
+## Production Database Connection
+- **MongoDB Atlas:** mongodb+srv://assetiq_user:***@cluster0.kdaja2b.mongodb.net/assetiq
+- **Database Name:** assetiq
+
+## User Accounts (Production Database)
 
 ### Owner Account (Full Access)
 - **Email:** jedijk@gmail.com
-- **Password:** admin123
+- **Password:** (User's own password - NOT admin123)
 - **Role:** owner
 - **Installations:** Tyromer
 
-### Admin Account
-- **Email:** test@test.com
-- **Password:** test
-- **Role:** admin
-- **Installations:** Tyromer
-
-### Viewer Account (Restricted Access)
-- **Email:** viewer@test.com
-- **Password:** test
+### Viewer Account
+- **Email:** jaap.van-dijk@outlook.com
 - **Role:** viewer
-- **Installations:** Tyromer
-- **Restricted Features:** No access to Causal Engine, Forms, Equipment, Users, Settings
 
-### Test User (Created via Admin - Password Changed)
-- **Email:** emailtest@example.com
-- **Password:** NewPassword123!
-- **Role:** viewer
-- **Created By:** Admin user creation feature
-
-### Test User (Must Change Password)
-- **Email:** changepwd@test.com
-- **Password:** Welcome123! (temporary)
-- **Role:** viewer
-- **Note:** Will be prompted to change password on first login
+## Preview Environment Notes
+- Preview now uses the SAME production MongoDB Atlas database
+- Test credentials from local seed data no longer apply
+- Use your actual production credentials to log in
 
 ## Default Password for New Users
 When admins create new users via User Management, the default password is: `Welcome123!`
