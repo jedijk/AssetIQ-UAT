@@ -11,18 +11,21 @@ from motor.motor_asyncio import AsyncIOMotorClient
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection with proper connection pooling for production
+# MongoDB connection optimized for Atlas free/shared tier
+# Free tier (M0): 500 max connections shared
+# Shared tier (M2/M5): Limited connections
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(
     mongo_url,
-    maxPoolSize=50,  # Maximum connections in the pool
-    minPoolSize=10,  # Minimum connections to keep alive
-    maxIdleTimeMS=30000,  # Close idle connections after 30 seconds
-    serverSelectionTimeoutMS=10000,  # 10 second timeout for server selection
-    connectTimeoutMS=10000,  # 10 second connection timeout
-    socketTimeoutMS=30000,  # 30 second socket timeout
+    maxPoolSize=10,  # Reduced for free/shared tier (was 50)
+    minPoolSize=2,   # Reduced minimum connections (was 10)
+    maxIdleTimeMS=45000,  # Close idle connections after 45 seconds
+    serverSelectionTimeoutMS=15000,  # 15 second timeout for server selection
+    connectTimeoutMS=15000,  # 15 second connection timeout
+    socketTimeoutMS=45000,  # 45 second socket timeout
     retryWrites=True,  # Retry failed writes
     retryReads=True,  # Retry failed reads
+    waitQueueTimeoutMS=10000,  # Wait up to 10s for a connection from pool
 )
 db = client[os.environ['DB_NAME']]
 
