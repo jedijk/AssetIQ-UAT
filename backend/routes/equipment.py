@@ -26,7 +26,7 @@ import json
 import logging
 import base64
 import io
-from database import db, efm_service, EMERGENT_LLM_KEY, installation_filter
+from database import db, efm_service, installation_filter
 from auth import get_current_user
 from services.threat_score_service import recalculate_threat_scores_for_asset
 from iso14224_models import (
@@ -36,7 +36,7 @@ from iso14224_models import (
     UnstructuredItemCreate, ParseEquipmentListRequest, AssignToHierarchyRequest,
     detect_equipment_type, EquipmentTypeCreate, EquipmentTypeUpdate, ISO_LEVEL_LABELS
 )
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import OpenAI
 from bson import ObjectId
 
 logger = logging.getLogger(__name__)

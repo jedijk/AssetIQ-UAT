@@ -154,7 +154,7 @@ async def health_check():
     from dotenv import load_dotenv
     load_dotenv()
     
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY")
     
     return {
         "status": "healthy" if api_key else "unhealthy",

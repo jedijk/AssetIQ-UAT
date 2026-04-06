@@ -10,7 +10,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from database import db, EMERGENT_LLM_KEY, failure_modes_service
+from database import db, failure_modes_service
 from auth import get_current_user
 from maintenance_strategy_models import (
     MaintenanceStrategy, CriticalityLevel, MaintenanceFrequency,
@@ -112,7 +112,7 @@ async def generate_maintenance_strategy(
         )
     
     # Generate strategy using AI
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="AI API key not configured")
     
@@ -163,7 +163,7 @@ async def generate_all_maintenance_strategies(
     current_user: dict = Depends(get_current_user)
 ):
     """Generate maintenance strategies for ALL equipment types"""
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="AI API key not configured")
     

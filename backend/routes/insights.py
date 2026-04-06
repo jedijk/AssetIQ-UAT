@@ -604,23 +604,29 @@ Return as JSON array with fields: title, description, impact (high/medium/low)
 """
         
         # Call AI
-        from emergentintegrations.llm.chat import chat, ChatMessage
+        from openai import OpenAI
         
-        response = await chat(
-            api_key=os.environ.get("EMERGENT_API_KEY"),
-            model="gpt-5.2",
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="AI service not configured")
+            
+        client = OpenAI(api_key=api_key)
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",
             messages=[
-                ChatMessage(
-                    role="system",
-                    content="You are a reliability engineering expert. Provide specific, actionable recommendations based on the data. Return only valid JSON array."
-                ),
-                ChatMessage(role="user", content=context)
-            ]
+                {
+                    "role": "system",
+                    "content": "You are a reliability engineering expert. Provide specific, actionable recommendations based on the data. Return only valid JSON array."
+                },
+                {"role": "user", "content": context}
+            ],
+            temperature=0.5
         )
         
         # Parse response
         import json
-        response_text = response.message.strip()
+        response_text = response.choices[0].message.content.strip()
         
         # Extract JSON from response
         if "```json" in response_text:

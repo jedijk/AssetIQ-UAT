@@ -105,7 +105,7 @@ async def transcribe_audio(
     import os
     import logging
     import tempfile
-    from emergentintegrations.llm.openai import OpenAISpeechToText
+    from openai import OpenAI
     
     logger = logging.getLogger(__name__)
     
@@ -126,7 +126,7 @@ async def transcribe_audio(
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 25 MB.")
     
     # Get API key
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="Transcription service not configured")
     
@@ -137,14 +137,14 @@ async def transcribe_audio(
             temp_path = temp_file.name
         
         try:
-            # Initialize OpenAI STT
-            stt = OpenAISpeechToText(api_key=api_key)
+            # Initialize OpenAI client
+            client = OpenAI(api_key=api_key)
             
             # Transcribe audio
             with open(temp_path, "rb") as audio_file:
-                response = await stt.transcribe(
-                    file=audio_file,
+                response = client.audio.transcriptions.create(
                     model="whisper-1",
+                    file=audio_file,
                     response_format="json"
                 )
             
@@ -307,7 +307,7 @@ async def generate_ai_prompt(
     """Generate an AI prompt from selected feedback items."""
     import os
     import uuid
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from openai import OpenAI
     
     feedback_ids = data.get("feedback_ids", [])
     if not feedback_ids:
@@ -335,7 +335,7 @@ async def generate_ai_prompt(
     combined_feedback = "\n\n".join(feedback_context)
     
     # Get API key
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
@@ -360,16 +360,18 @@ Keep the prompt concise but complete. Do not include any preamble or explanation
 
 Generate a clear, actionable prompt that can be directly used with an AI development agent."""
 
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"feedback-prompt-{uuid.uuid4()}",
-            system_message=system_prompt
-        ).with_model("openai", "gpt-5.2")
+        client = OpenAI(api_key=api_key)
         
-        message = UserMessage(text=user_message)
-        response = await chat.send_message(message)
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.5
+        )
         
-        generated_prompt = response if isinstance(response, str) else str(response)
+        generated_prompt = response.choices[0].message.content
         
         return {
             "prompt": generated_prompt,

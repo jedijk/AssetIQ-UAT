@@ -953,3 +953,49 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - Frontend runs on port 3000
 - MongoDB connection via MONGO_URL environment variable
 - EMERGENT_LLM_KEY for AI features (GPT-5.2, Whisper)
+
+---
+
+### April 6, 2026 - OpenAI API Migration
+**COMPLETED: Migrated from Emergent LLM Key to User's Own OpenAI API Key**
+
+**What was changed:**
+- Replaced `emergentintegrations` library with direct `openai` SDK (v1.99.9)
+- Added `OPENAI_API_KEY` to backend `.env`
+- Updated all AI-powered features to use the official OpenAI SDK
+
+**Files Modified:**
+1. `/app/backend/.env` - Added OPENAI_API_KEY
+2. `/app/backend/ai_helpers.py` - Updated chat, vision, and whisper calls
+3. `/app/backend/ai_risk_engine.py` - Updated AI risk analysis engine
+4. `/app/backend/routes/ai_routes.py` - Updated AI route configurations
+5. `/app/backend/routes/feedback.py` - Updated transcription and prompt generation
+6. `/app/backend/routes/insights.py` - Updated AI recommendations
+7. `/app/backend/routes/forms.py` - Updated document search AI
+8. `/app/backend/routes/reports.py` - Updated report AI summaries
+9. `/app/backend/routes/maintenance.py` - Updated maintenance strategy generation
+10. `/app/backend/routes/equipment.py` - Removed unused imports
+11. `/app/backend/routes/image_analysis.py` - Updated health check
+12. `/app/backend/maintenance_strategy_generator.py` - Updated strategy generator
+13. `/app/backend/services/image_analysis_service.py` - Updated damage detection
+14. `/app/backend/services/openai_service.py` - NEW: Centralized OpenAI service helper
+
+**Model Mapping:**
+- `gpt-5.2` → `gpt-4o` (Latest GPT-4 model)
+- `gpt-4o-mini` → `gpt-4o-mini` (No change)
+- `whisper-1` → `whisper-1` (No change)
+
+**Features Using Your OpenAI Key:**
+- AI Risk Analysis (threat analysis, forecasting, recommendations)
+- Causal Intelligence (root cause analysis, bow-tie models, fault trees)
+- Voice Transcription (Whisper for voice-to-text)
+- AI Recommendations (insights generation)
+- AI Chat assistance
+- Maintenance Strategy Generation
+- Image Damage Detection
+- Report AI Summaries
+- Document Search AI
+
+**Verified Working:**
+- AI Risk Analysis endpoint returns valid results with forecasts and recommendations
+- OpenAI API calls logged as "HTTP/1.1 200 OK"

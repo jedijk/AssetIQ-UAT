@@ -1,11 +1,12 @@
 """
 Forms routes.
 """
+import os
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from datetime import datetime
-from database import db, form_service, EMERGENT_LLM_KEY
+from database import db, form_service
 from services.cache_service import cache
 from auth import get_current_user
 from models.form_models import (
@@ -423,7 +424,7 @@ async def search_form_documents(
     
     # Use AI to search documents
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from openai import OpenAI
         
         # Build context from documents
         doc_context = "\n\n".join([
@@ -441,19 +442,26 @@ Provide helpful, concise answers based on the document names, descriptions and t
 If a specific document would be most relevant, mention its name.
 If you cannot find relevant information, say so clearly and suggest which document type might help."""
         
-        # Create LLM chat with session ID
-        session_id = f"doc_search_{template_id}_{current_user['id']}"
-        llm = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=session_id,
-            system_message=system_prompt
-        ).with_model("openai", "gpt-4o-mini").with_params(temperature=0.3)
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise Exception("OpenAI API key not configured")
+            
+        client = OpenAI(api_key=api_key)
         
-        response = await llm.send_message(UserMessage(text=request.query))
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": request.query}
+            ],
+            temperature=0.3
+        )
+        
+        answer = response.choices[0].message.content
         
         return {
             "query": request.query,
-            "answer": response,
+            "answer": answer,
             "relevant_documents": [
                 {"id": d["id"], "name": d["name"], "url": d["url"], "type": d["type"]}
                 for d in documents

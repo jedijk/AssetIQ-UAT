@@ -2,17 +2,18 @@
 Report generation routes for Causal Investigations.
 Generates PowerPoint and PDF reports.
 """
+import os
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone
 import io
 import logging
-from database import db, EMERGENT_LLM_KEY
+from database import db
 from auth import get_current_user
 
 # AI Integration
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import OpenAI
 
 # PowerPoint imports
 from pptx import Presentation
@@ -875,17 +876,27 @@ Respond in JSON format:
     try:
         import uuid
         inv_id = inv.get('id', str(uuid.uuid4()))
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY, 
-            session_id=f"ai-summary-{inv_id}-{uuid.uuid4()}",
-            system_message="You are a senior reliability engineer and root cause analysis expert. Always respond with valid JSON only."
-        ).with_model("openai", "gpt-5.2")
-        response = await chat.send_message(UserMessage(text=prompt))
+        
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise Exception("OpenAI API key not configured")
+        
+        client = OpenAI(api_key=api_key)
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a senior reliability engineer and root cause analysis expert. Always respond with valid JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.5
+        )
+        
+        response_text = response.choices[0].message.content.strip()
         
         # Parse JSON response
         import json
         # Clean up response if needed
-        response_text = response.strip()
         if response_text.startswith("```json"):
             response_text = response_text[7:]
         if response_text.startswith("```"):

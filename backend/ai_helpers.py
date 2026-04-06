@@ -11,11 +11,18 @@ from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from openai import OpenAI
 
-from database import db, EMERGENT_LLM_KEY
+from database import db
 
 logger = logging.getLogger(__name__)
+
+def get_openai_client() -> OpenAI:
+    """Get OpenAI client with API key from environment."""
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not configured in environment")
+    return OpenAI(api_key=api_key)
 
 # ============= SYSTEM PROMPTS =============
 
@@ -140,16 +147,18 @@ async def classify_user_intent(message: str, session_id: str) -> dict:
 
     # Only use AI for ambiguous cases
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"{session_id}_classifier",
-            system_message=QUERY_CLASSIFIER_PROMPT
-        ).with_model("openai", "gpt-4o-mini")
+        client = get_openai_client()
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": QUERY_CLASSIFIER_PROMPT},
+                {"role": "user", "content": message}
+            ],
+            temperature=0.3
+        )
 
-        user_message = UserMessage(text=message)
-        response = await chat.send_message(user_message)
-
-        clean_response = response.strip()
+        clean_response = response.choices[0].message.content.strip()
         if clean_response.startswith("```"):
             clean_response = clean_response.split("```")[1]
             if clean_response.startswith("json"):
@@ -235,16 +244,18 @@ async def answer_data_query(message: str, session_id: str, data_context: str) ->
     try:
         prompt = DATA_QUERY_SYSTEM_PROMPT.format(data_context=data_context)
 
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"{session_id}_data",
-            system_message=prompt
-        ).with_model("openai", "gpt-4o-mini")
+        client = get_openai_client()
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": message}
+            ],
+            temperature=0.5
+        )
 
-        user_message = UserMessage(text=message)
-        response = await chat.send_message(user_message)
-
-        clean_response = response.strip()
+        clean_response = response.choices[0].message.content.strip()
         if clean_response.startswith("```"):
             clean_response = clean_response.split("```")[1]
             if clean_response.startswith("json"):
@@ -260,35 +271,45 @@ async def answer_data_query(message: str, session_id: str, data_context: str) ->
 async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Optional[str] = None) -> dict:
     """Analyze failure description using AI with fallback for AI unavailability."""
     try:
-        model_name = "gpt-5.2"
-
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=session_id,
-            system_message=THREAT_ANALYSIS_SYSTEM_PROMPT
-        ).with_model("openai", model_name)
+        client = get_openai_client()
 
         image_context = ""
         if image_base64:
-            image_chat = LlmChat(
-                api_key=EMERGENT_LLM_KEY,
-                session_id=f"{session_id}_image",
-                system_message=IMAGE_ANALYSIS_SYSTEM_PROMPT
-            ).with_model("openai", "gpt-4o-mini")
-
-            image_content = ImageContent(image_base64=image_base64)
-            image_message = UserMessage(
-                text="Analyze this image of equipment failure:",
-                file_contents=[image_content]
+            # Analyze image first using vision model
+            image_content = [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}
+                },
+                {
+                    "type": "text",
+                    "text": "Analyze this image of equipment failure:"
+                }
+            ]
+            
+            image_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": IMAGE_ANALYSIS_SYSTEM_PROMPT},
+                    {"role": "user", "content": image_content}
+                ],
+                temperature=0.5
             )
-            image_analysis = await image_chat.send_message(image_message)
+            image_analysis = image_response.choices[0].message.content
             image_context = f"\n\nImage Analysis: {image_analysis}"
 
         full_message = message + image_context
-        user_message = UserMessage(text=full_message)
-        response = await chat.send_message(user_message)
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": THREAT_ANALYSIS_SYSTEM_PROMPT},
+                {"role": "user", "content": full_message}
+            ],
+            temperature=0.5
+        )
 
-        clean_response = response.strip()
+        clean_response = response.choices[0].message.content.strip()
         if clean_response.startswith("```"):
             clean_response = clean_response.split("```")[1]
             if clean_response.startswith("json"):
@@ -338,10 +359,10 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
 
 
 async def transcribe_audio_with_ai(audio_base64: str) -> str:
-    """Transcribe audio using OpenAI Whisper via emergentintegrations."""
+    """Transcribe audio using OpenAI Whisper."""
     temp_path = None
     try:
-        from emergentintegrations.llm.openai import OpenAISpeechToText
+        client = get_openai_client()
 
         # Strip data URL prefix if present (e.g., "data:audio/webm;base64,...")
         if ',' in audio_base64:
@@ -381,12 +402,10 @@ async def transcribe_audio_with_ai(audio_base64: str) -> str:
             f.write(audio_data)
             temp_path = f.name
 
-        stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
-
         with open(temp_path, "rb") as audio_file:
-            response = await stt.transcribe(
-                file=audio_file,
+            response = client.audio.transcriptions.create(
                 model="whisper-1",
+                file=audio_file,
                 response_format="json"
                 # Language auto-detection enabled (supports Dutch, English, and 50+ languages)
             )

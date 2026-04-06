@@ -1,6 +1,7 @@
 """
 AI Risk Engine routes with rate limiting and security.
 """
+import os
 from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Optional
 from datetime import datetime, timezone
@@ -10,7 +11,7 @@ import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from database import db, EMERGENT_LLM_KEY, ai_usage_tracker
+from database import db, ai_usage_tracker
 from auth import get_current_user
 from ai_risk_engine import AIRiskEngine
 from ai_risk_models import (
@@ -25,7 +26,9 @@ router = APIRouter(tags=["AI Risk Engine"])
 # Rate limiter - uses same key_func as main app
 limiter = Limiter(key_func=get_remote_address)
 
-ai_engine = AIRiskEngine(api_key=EMERGENT_LLM_KEY)
+# Initialize AI engine with OpenAI API key
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+ai_engine = AIRiskEngine(api_key=OPENAI_API_KEY)
 
 # Rate limit configurations
 AI_RATE_LIMIT = "20/minute"  # 20 AI calls per minute per IP
@@ -35,7 +38,7 @@ AI_HEAVY_RATE_LIMIT = "10/minute"  # 10 heavy AI calls per minute (fault tree, b
 async def log_ai_usage(
     user_id: str,
     feature: str,
-    model: str = "gpt-5.2",
+    model: str = "gpt-4o",
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
     installation_name: str = "default",
@@ -178,7 +181,7 @@ async def analyze_threat_risk(
     await log_ai_usage(
         user_id=current_user["id"],
         feature="risk_analysis",
-        model="gpt-5.2",
+        model="gpt-4o",
         prompt_tokens=500,  # Estimated
         completion_tokens=1500,  # Estimated
         installation_name=installation_name,
@@ -344,7 +347,7 @@ async def generate_threat_causes(
     await log_ai_usage(
         user_id=current_user["id"],
         feature="causal_intelligence",
-        model="gpt-5.2",
+        model="gpt-4o",
         prompt_tokens=600,
         completion_tokens=1200,
         installation_name=installation_name,

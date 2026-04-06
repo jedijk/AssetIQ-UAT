@@ -3,13 +3,14 @@ Maintenance Strategy Generator - AI-powered generation from FMEA data
 Generates comprehensive strategies for ALL criticality levels per equipment type
 """
 
+import os
 import json
 import uuid
 import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import OpenAI
 
 from maintenance_strategy_models import (
     MaintenanceStrategy, CriticalityLevel, MaintenanceFrequency,
@@ -183,13 +184,23 @@ class MaintenanceStrategyGenerator:
     def __init__(self, api_key: str):
         self.api_key = api_key
     
-    def _create_chat(self, session_id: str) -> LlmChat:
-        """Create a new LLM chat instance"""
-        return LlmChat(
-            api_key=self.api_key,
-            session_id=session_id,
-            system_message=STRATEGY_GENERATION_PROMPT
-        ).with_model("openai", "gpt-5.2")
+    def _call_openai(self, user_message: str) -> str:
+        """Make a chat completion call to OpenAI"""
+        try:
+            client = OpenAI(api_key=self.api_key)
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": STRATEGY_GENERATION_PROMPT},
+                    {"role": "user", "content": user_message}
+                ],
+                max_tokens=4000,
+                temperature=0.5
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"OpenAI API error: {str(e)}")
+            raise
     
     def _parse_json_response(self, response: str) -> dict:
         """Parse JSON from LLM response, handling markdown code blocks"""
@@ -456,13 +467,9 @@ Address each failure mode appropriately for each criticality level.
     ) -> MaintenanceStrategy:
         """Generate a complete maintenance strategy for ALL criticality levels"""
         try:
-            session_id = f"strategy_gen_{equipment_type_id}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(session_id)
-            
             context = self._build_fmea_context(equipment_type_name, failure_modes)
-            message = UserMessage(text=context)
             
-            response = await chat.send_message(message)
+            response = self._call_openai(context)
             data = self._parse_json_response(response)
             
             # Parse strategies for each criticality level

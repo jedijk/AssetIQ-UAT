@@ -1,15 +1,16 @@
 """
 AI Risk Engine Service - ThreatBase v2
-Uses GPT-5.2 for intelligent risk analysis, cause generation, and recommendations
+Uses GPT-4o for intelligent risk analysis, cause generation, and recommendations
 """
 
+import os
 import json
 import uuid
 import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import OpenAI
 
 from ai_risk_models import (
     DynamicRiskScore, RiskTrend, ConfidenceLevel, RiskForecast, RiskInsight,
@@ -25,6 +26,13 @@ from services.ai_security_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+def get_openai_client() -> OpenAI:
+    """Get OpenAI client with API key from environment."""
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not configured in environment")
+    return OpenAI(api_key=api_key)
 
 
 # ============= System Prompts =============
@@ -285,14 +293,24 @@ class AIRiskEngine:
         'action_optimization': 2000
     }
     
-    def _create_chat(self, system_prompt: str, session_id: str, analysis_type: str = 'risk_analysis') -> LlmChat:
-        """Create a new LLM chat instance with token limits"""
+    def _call_openai(self, system_prompt: str, user_message: str, analysis_type: str = 'risk_analysis') -> str:
+        """Make a chat completion call to OpenAI"""
         max_tokens = self.TOKEN_LIMITS.get(analysis_type, 2000)
-        return LlmChat(
-            api_key=self.api_key,
-            session_id=session_id,
-            system_message=system_prompt
-        ).with_model("openai", "gpt-5.2").with_params(max_tokens=max_tokens)
+        try:
+            client = get_openai_client()
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                max_tokens=max_tokens,
+                temperature=0.5
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"OpenAI API error: {str(e)}")
+            raise
     
     def _parse_json_response(self, response: str) -> dict:
         """Parse JSON from LLM response, handling markdown code blocks"""
@@ -384,13 +402,9 @@ EQUIPMENT INFORMATION:
     ) -> RiskInsight:
         """Analyze threat and generate dynamic risk assessment"""
         try:
-            session_id = f"risk_analysis_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(RISK_ANALYSIS_PROMPT, session_id, 'risk_analysis')
-            
             context = self._build_threat_context(threat, equipment_data, historical_threats, equipment_history)
-            message = UserMessage(text=f"Analyze this threat:\n{context}")
             
-            response = await chat.send_message(message)
+            response = self._call_openai(RISK_ANALYSIS_PROMPT, f"Analyze this threat:\n{context}", 'risk_analysis')
             data = self._parse_json_response(response)
             
             # Use the threat's actual risk_score for consistency
@@ -500,13 +514,9 @@ EQUIPMENT INFORMATION:
     ) -> CausalExplanation:
         """Generate probable causes for a threat"""
         try:
-            session_id = f"cause_analysis_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(CAUSE_ANALYSIS_PROMPT, session_id, 'cause_analysis')
-            
             context = self._build_threat_context(threat, equipment_data, None, equipment_history)
-            message = UserMessage(text=f"Analyze causes for this threat (max {max_causes} causes):\n{context}")
             
-            response = await chat.send_message(message)
+            response = self._call_openai(CAUSE_ANALYSIS_PROMPT, f"Analyze causes for this threat (max {max_causes} causes):\n{context}", 'cause_analysis')
             data = self._parse_json_response(response)
             
             # Build probable causes with normalized probability levels
@@ -556,13 +566,9 @@ EQUIPMENT INFORMATION:
     ) -> FaultTree:
         """Generate a fault tree for the threat"""
         try:
-            session_id = f"fault_tree_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(FAULT_TREE_PROMPT, session_id, 'fault_tree')
-            
             context = self._build_threat_context(threat)
-            message = UserMessage(text=f"Generate a fault tree (max depth {max_depth}):\n{context}")
             
-            response = await chat.send_message(message)
+            response = self._call_openai(FAULT_TREE_PROMPT, f"Generate a fault tree (max depth {max_depth}):\n{context}", 'fault_tree')
             data = self._parse_json_response(response)
             
             def parse_node(node_data: dict) -> FaultTreeNode:
@@ -602,13 +608,9 @@ EQUIPMENT INFORMATION:
     async def generate_bow_tie(self, threat: dict) -> BowTieModel:
         """Generate a bow-tie risk model"""
         try:
-            session_id = f"bow_tie_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(BOW_TIE_PROMPT, session_id, 'bow_tie')
-            
             context = self._build_threat_context(threat)
-            message = UserMessage(text=f"Generate a bow-tie model:\n{context}")
             
-            response = await chat.send_message(message)
+            response = self._call_openai(BOW_TIE_PROMPT, f"Generate a bow-tie model:\n{context}", 'bow_tie')
             data = self._parse_json_response(response)
             
             preventive_barriers = [
@@ -649,9 +651,6 @@ EQUIPMENT INFORMATION:
     ) -> ActionOptimizationResult:
         """Optimize and recommend actions for risk reduction"""
         try:
-            session_id = f"action_opt_{threat.get('id', 'unknown')}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            chat = self._create_chat(ACTION_OPTIMIZATION_PROMPT, session_id, 'action_optimization')
-            
             context = self._build_threat_context(threat)
             
             if causes:
@@ -664,9 +663,7 @@ EQUIPMENT INFORMATION:
             
             context += f"\nPRIORITIZE BY: {prioritize_by}\n"
             
-            message = UserMessage(text=f"Recommend optimized actions:\n{context}")
-            
-            response = await chat.send_message(message)
+            response = self._call_openai(ACTION_OPTIMIZATION_PROMPT, f"Recommend optimized actions:\n{context}", 'action_optimization')
             data = self._parse_json_response(response)
             
             recommended_actions = [

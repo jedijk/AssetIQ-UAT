@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +78,9 @@ async def analyze_image_for_damage(
     Returns:
         Dictionary with analysis results
     """
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        logger.error("EMERGENT_LLM_KEY not found in environment")
+        logger.error("OPENAI_API_KEY not found in environment")
         return {
             "damage_detected": False,
             "confidence": "low",
@@ -119,33 +119,38 @@ async def analyze_image_for_damage(
         if equipment_type:
             analysis_prompt += f"\nEquipment type: {equipment_type}"
         
-        # Create image content
-        image_content = ImageContent(image_base64=image_base64)
-        
-        # Initialize LLM chat
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"damage-analysis-{id(image_base64)}",
-            system_message=DAMAGE_ANALYSIS_PROMPT
-        ).with_model("openai", "gpt-5.2")
+        # Initialize OpenAI client
+        client = OpenAI(api_key=api_key)
         
         # Create message with image
-        user_message = UserMessage(
-            text=analysis_prompt,
-            file_contents=[image_content]
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": DAMAGE_ANALYSIS_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}
+                        },
+                        {"type": "text", "text": analysis_prompt}
+                    ]
+                }
+            ],
+            temperature=0.3
         )
         
-        # Get response
-        response = await chat.send_message(user_message)
+        response_text = response.choices[0].message.content
         
         # Parse JSON response
         try:
             # Try to extract JSON from the response
-            json_match = re.search(r'\{[\s\S]*\}', response)
+            json_match = re.search(r'\{[\s\S]*\}', response_text)
             if json_match:
                 result = json.loads(json_match.group())
             else:
-                result = json.loads(response)
+                result = json.loads(response_text)
             
             # Ensure all required fields are present
             result.setdefault("damage_detected", False)
@@ -163,14 +168,14 @@ async def analyze_image_for_damage(
             logger.warning(f"Failed to parse JSON response: {e}")
             # Return a structured response based on text analysis
             return {
-                "damage_detected": "damage" in response.lower() or "defect" in response.lower(),
+                "damage_detected": "damage" in response_text.lower() or "defect" in response_text.lower(),
                 "confidence": "medium",
                 "severity": "unknown",
                 "findings": [],
-                "overall_assessment": response[:500] if len(response) > 500 else response,
+                "overall_assessment": response_text[:500] if len(response_text) > 500 else response_text,
                 "recommended_actions": [],
-                "requires_immediate_attention": "immediate" in response.lower() or "urgent" in response.lower(),
-                "raw_response": response
+                "requires_immediate_attention": "immediate" in response_text.lower() or "urgent" in response_text.lower(),
+                "raw_response": response_text
             }
             
     except Exception as e:
