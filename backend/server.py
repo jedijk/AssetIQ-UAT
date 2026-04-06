@@ -65,6 +65,53 @@ app.state.limiter = limiter
 # Add rate limit exceeded handler
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Import error logging function
+from routes.system import log_error
+
+# Global exception handler to log all unhandled errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Log all unhandled exceptions to the error log."""
+    error_details = {
+        "path": str(request.url.path),
+        "method": request.method,
+        "client": request.client.host if request.client else "unknown",
+        "exception_type": type(exc).__name__,
+    }
+    
+    # Determine error type based on exception
+    if "database" in str(exc).lower() or "mongo" in str(exc).lower():
+        error_type = "database"
+    elif "timeout" in str(exc).lower():
+        error_type = "timeout"
+    elif "auth" in str(exc).lower() or "token" in str(exc).lower():
+        error_type = "auth"
+    elif "openai" in str(exc).lower() or "ai" in str(exc).lower():
+        error_type = "ai"
+    else:
+        error_type = "server"
+    
+    log_error(
+        error_type=error_type,
+        message=str(exc)[:500],
+        details=error_details,
+        source="backend"
+    )
+    
+    logger.error(f"Unhandled exception on {request.url.path}: {exc}")
+    
+    # Return appropriate error response
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail}
+        )
+    
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
+
 # Create the /api prefix router and include all sub-routers
 api_router = APIRouter(prefix="/api")
 for router in all_routers:

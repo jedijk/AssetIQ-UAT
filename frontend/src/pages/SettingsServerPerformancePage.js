@@ -21,7 +21,12 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  FileWarning,
+  Trash2,
+  Check,
+  Bug,
+  Filter
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -199,6 +204,13 @@ const SettingsServerPerformancePage = () => {
   const [securityError, setSecurityError] = useState(null);
   const [securityRefreshing, setSecurityRefreshing] = useState(false);
   
+  // Error logs state
+  const [errorLogs, setErrorLogs] = useState(null);
+  const [errorLogsLoading, setErrorLogsLoading] = useState(true);
+  const [errorLogsError, setErrorLogsError] = useState(null);
+  const [errorLogsRefreshing, setErrorLogsRefreshing] = useState(false);
+  const [errorFilter, setErrorFilter] = useState("all"); // all, unresolved
+  
   // History for sparklines (last 12 data points = ~1 minute at 5s intervals)
   const [cpuHistory, setCpuHistory] = useState([]);
   const [ramHistory, setRamHistory] = useState([]);
@@ -258,6 +270,100 @@ const SettingsServerPerformancePage = () => {
       setDbStorageLoading(false);
     }
   }, [isOwner]);
+  
+  // Fetch error logs
+  const fetchErrorLogs = useCallback(async (showRefreshing = false) => {
+    if (!isOwner) return;
+    
+    if (showRefreshing) setErrorLogsRefreshing(true);
+    
+    try {
+      const token = localStorage.getItem("token");
+      const unresolved = errorFilter === "unresolved";
+      const response = await fetch(
+        `${API_URL}/api/system/errors?limit=50&unresolved_only=${unresolved}`, 
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch error logs");
+      }
+      
+      const data = await response.json();
+      setErrorLogs(data);
+      setErrorLogsError(null);
+    } catch (err) {
+      console.error("Failed to fetch error logs:", err);
+      setErrorLogsError(err.message);
+    } finally {
+      setErrorLogsLoading(false);
+      setErrorLogsRefreshing(false);
+    }
+  }, [isOwner, errorFilter]);
+  
+  // Resolve an error
+  const resolveError = async (errorId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/api/system/errors/${errorId}/resolve`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to resolve error");
+      }
+      
+      toast.success("Error marked as resolved");
+      fetchErrorLogs();
+    } catch (err) {
+      toast.error("Failed to resolve error");
+    }
+  };
+  
+  // Clear error logs
+  const clearErrorLogs = async () => {
+    if (!window.confirm("Are you sure you want to clear all error logs?")) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/api/system/errors`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to clear error logs");
+      }
+      
+      toast.success("Error logs cleared");
+      fetchErrorLogs();
+    } catch (err) {
+      toast.error("Failed to clear error logs");
+    }
+  };
+  
+  // Create test error (for debugging)
+  const createTestError = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/api/system/errors/test`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to create test error");
+      }
+      
+      toast.success("Test error created");
+      fetchErrorLogs(true);
+    } catch (err) {
+      toast.error("Failed to create test error");
+    }
+  };
   
   const fetchMetrics = useCallback(async (showRefreshIndicator = false) => {
     if (!isOwner) return;
@@ -325,25 +431,30 @@ const SettingsServerPerformancePage = () => {
       setLoading(false);
       setDbStorageLoading(false);
       setSecurityLoading(false);
+      setErrorLogsLoading(false);
       return;
     }
     
     fetchMetrics();
     fetchDbStorage();
     fetchSecurity();
+    fetchErrorLogs();
     
     let interval;
     let dbInterval;
+    let errorInterval;
     if (autoRefresh) {
       interval = setInterval(() => fetchMetrics(), 5000); // Refresh every 5 seconds
       dbInterval = setInterval(() => fetchDbStorage(), 30000); // Refresh DB storage every 30 seconds
+      errorInterval = setInterval(() => fetchErrorLogs(), 30000); // Refresh errors every 30 seconds
     }
     
     return () => {
       if (interval) clearInterval(interval);
       if (dbInterval) clearInterval(dbInterval);
+      if (errorInterval) clearInterval(errorInterval);
     };
-  }, [fetchMetrics, fetchDbStorage, fetchSecurity, autoRefresh, isOwner]);
+  }, [fetchMetrics, fetchDbStorage, fetchSecurity, fetchErrorLogs, autoRefresh, isOwner]);
   
   // Show access denied for non-owners
   if (!isOwner) {
@@ -842,6 +953,208 @@ const SettingsServerPerformancePage = () => {
                       <span>
                         {security.last_scan 
                           ? new Date(security.last_scan).toLocaleTimeString() 
+                          : "-"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Error Logs Section */}
+        <div className="mt-6">
+          <Card>
+            <CardHeader className="pb-2 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <FileWarning className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+                  <span>Error Logs</span>
+                  {errorLogs?.stats && (
+                    <Badge variant={errorLogs.stats.unresolved > 0 ? "destructive" : "secondary"} className="text-[10px] sm:text-xs">
+                      {errorLogs.stats.unresolved} unresolved
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Filter Toggle */}
+                  <div className="flex items-center gap-1 text-xs">
+                    <Button
+                      variant={errorFilter === "all" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setErrorFilter("all");
+                        setTimeout(() => fetchErrorLogs(true), 100);
+                      }}
+                      className="h-6 px-2 text-[10px] sm:text-xs"
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={errorFilter === "unresolved" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setErrorFilter("unresolved");
+                        setTimeout(() => fetchErrorLogs(true), 100);
+                      }}
+                      className="h-6 px-2 text-[10px] sm:text-xs"
+                    >
+                      <Filter className="w-3 h-3 mr-1" />
+                      Unresolved
+                    </Button>
+                  </div>
+                  {/* Test Error Button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={createTestError}
+                    className="h-6 px-2 text-[10px] sm:text-xs text-slate-500"
+                    title="Create test error"
+                  >
+                    <Bug className="w-3 h-3" />
+                  </Button>
+                  {/* Clear All Button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearErrorLogs}
+                    className="h-6 px-2 text-[10px] sm:text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
+                    title="Clear all errors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                  {/* Refresh Button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchErrorLogs(true)}
+                    disabled={errorLogsRefreshing}
+                    className="h-6 w-6 sm:h-7 sm:w-7 p-0"
+                  >
+                    {errorLogsRefreshing ? (
+                      <Loader2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6 pt-0">
+              {errorLogsLoading ? (
+                <div className="flex items-center justify-center py-6 gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                  <span className="text-xs sm:text-sm text-slate-400">Loading error logs...</span>
+                </div>
+              ) : errorLogsError ? (
+                <div className="flex items-center justify-center py-6">
+                  <span className="text-xs sm:text-sm text-red-500">Unable to load error logs</span>
+                </div>
+              ) : !errorLogs?.errors?.length ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <CheckCircle2 className="w-12 h-12 text-green-400 mb-3" />
+                  <span className="text-sm font-medium text-slate-600">No errors logged</span>
+                  <span className="text-xs text-slate-400 mt-1">Your application is running smoothly</span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Error Stats Summary */}
+                  {errorLogs.stats && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                      <div className="bg-slate-50 rounded-lg p-2 text-center">
+                        <div className="text-lg font-bold text-slate-700">{errorLogs.stats.total_errors}</div>
+                        <div className="text-[10px] text-slate-500">Total</div>
+                      </div>
+                      <div className="bg-red-50 rounded-lg p-2 text-center">
+                        <div className="text-lg font-bold text-red-600">{errorLogs.stats.unresolved}</div>
+                        <div className="text-[10px] text-red-500">Unresolved</div>
+                      </div>
+                      <div className="bg-orange-50 rounded-lg p-2 text-center">
+                        <div className="text-lg font-bold text-orange-600">{errorLogs.stats.errors_last_hour}</div>
+                        <div className="text-[10px] text-orange-500">Last Hour</div>
+                      </div>
+                      <div className="bg-blue-50 rounded-lg p-2 text-center">
+                        <div className="text-lg font-bold text-blue-600">{errorLogs.stats.errors_last_day}</div>
+                        <div className="text-[10px] text-blue-500">Last 24h</div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Error List */}
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                    {errorLogs.errors.map((error) => (
+                      <div 
+                        key={error.id}
+                        className={`p-3 rounded-lg border ${
+                          error.resolved 
+                            ? "bg-slate-50 border-slate-200 opacity-60" 
+                            : "bg-red-50/50 border-red-100"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <Badge 
+                                variant="outline"
+                                className={`text-[9px] px-1.5 py-0 ${
+                                  error.type === "database" ? "border-purple-200 text-purple-600 bg-purple-50" :
+                                  error.type === "auth" ? "border-yellow-200 text-yellow-700 bg-yellow-50" :
+                                  error.type === "ai" ? "border-blue-200 text-blue-600 bg-blue-50" :
+                                  error.type === "timeout" ? "border-orange-200 text-orange-600 bg-orange-50" :
+                                  error.type === "test" ? "border-slate-200 text-slate-600 bg-slate-50" :
+                                  "border-red-200 text-red-600 bg-red-50"
+                                }`}
+                              >
+                                {error.type}
+                              </Badge>
+                              <Badge 
+                                variant="outline"
+                                className="text-[9px] px-1.5 py-0 border-slate-200 text-slate-500"
+                              >
+                                {error.source}
+                              </Badge>
+                              {error.resolved && (
+                                <Badge className="text-[9px] px-1.5 py-0 bg-green-100 text-green-600 border-0">
+                                  Resolved
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs sm:text-sm text-slate-700 break-words">
+                              {error.message}
+                            </p>
+                            {error.details?.path && (
+                              <p className="text-[10px] text-slate-400 mt-1 font-mono">
+                                {error.details.method} {error.details.path}
+                              </p>
+                            )}
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              {new Date(error.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          {!error.resolved && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => resolveError(error.id)}
+                              className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 flex-shrink-0"
+                              title="Mark as resolved"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Logging Since */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-400">
+                      <span>Logging since</span>
+                      <span>
+                        {errorLogs.stats?.logging_since 
+                          ? new Date(errorLogs.stats.logging_since).toLocaleString() 
                           : "-"}
                       </span>
                     </div>

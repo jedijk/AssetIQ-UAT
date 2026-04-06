@@ -516,3 +516,233 @@ async def get_security_status(
             status_code=500,
             detail=f"Failed to run security checks: {str(e)}"
         )
+
+
+
+# ============= ERROR LOGGING =============
+
+# In-memory error log storage (persists until server restart)
+# For production, consider using MongoDB or a logging service
+ERROR_LOG_MAX_SIZE = 500  # Maximum number of errors to keep in memory
+
+class ErrorLogStorage:
+    """Simple in-memory storage for application errors."""
+    
+    def __init__(self):
+        self.errors = []
+        self.start_time = datetime.now(timezone.utc)
+    
+    def add_error(self, error_type: str, message: str, details: dict = None, source: str = "backend"):
+        """Add an error to the log."""
+        error_entry = {
+            "id": f"err_{int(time.time() * 1000)}_{len(self.errors)}",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "type": error_type,
+            "message": message[:500],  # Limit message length
+            "details": details or {},
+            "source": source,
+            "resolved": False
+        }
+        self.errors.insert(0, error_entry)  # Add to beginning (newest first)
+        
+        # Trim if exceeds max size
+        if len(self.errors) > ERROR_LOG_MAX_SIZE:
+            self.errors = self.errors[:ERROR_LOG_MAX_SIZE]
+        
+        return error_entry
+    
+    def get_errors(self, limit: int = 100, error_type: str = None, source: str = None, unresolved_only: bool = False):
+        """Get errors with optional filtering."""
+        filtered = self.errors
+        
+        if error_type:
+            filtered = [e for e in filtered if e["type"] == error_type]
+        if source:
+            filtered = [e for e in filtered if e["source"] == source]
+        if unresolved_only:
+            filtered = [e for e in filtered if not e["resolved"]]
+        
+        return filtered[:limit]
+    
+    def mark_resolved(self, error_id: str):
+        """Mark an error as resolved."""
+        for error in self.errors:
+            if error["id"] == error_id:
+                error["resolved"] = True
+                error["resolved_at"] = datetime.now(timezone.utc).isoformat()
+                return True
+        return False
+    
+    def clear_errors(self, older_than_hours: int = None):
+        """Clear errors, optionally only those older than specified hours."""
+        if older_than_hours:
+            cutoff = datetime.now(timezone.utc).timestamp() - (older_than_hours * 3600)
+            self.errors = [
+                e for e in self.errors 
+                if datetime.fromisoformat(e["timestamp"].replace("Z", "+00:00")).timestamp() > cutoff
+            ]
+        else:
+            self.errors = []
+    
+    def get_stats(self):
+        """Get error statistics."""
+        now = datetime.now(timezone.utc)
+        hour_ago = now.timestamp() - 3600
+        day_ago = now.timestamp() - 86400
+        
+        errors_last_hour = 0
+        errors_last_day = 0
+        by_type = {}
+        by_source = {}
+        unresolved = 0
+        
+        for e in self.errors:
+            ts = datetime.fromisoformat(e["timestamp"].replace("Z", "+00:00")).timestamp()
+            if ts > hour_ago:
+                errors_last_hour += 1
+            if ts > day_ago:
+                errors_last_day += 1
+            
+            by_type[e["type"]] = by_type.get(e["type"], 0) + 1
+            by_source[e["source"]] = by_source.get(e["source"], 0) + 1
+            
+            if not e["resolved"]:
+                unresolved += 1
+        
+        return {
+            "total_errors": len(self.errors),
+            "unresolved": unresolved,
+            "errors_last_hour": errors_last_hour,
+            "errors_last_day": errors_last_day,
+            "by_type": by_type,
+            "by_source": by_source,
+            "logging_since": self.start_time.isoformat()
+        }
+
+# Global error log instance
+error_log = ErrorLogStorage()
+
+
+def log_error(error_type: str, message: str, details: dict = None, source: str = "backend"):
+    """
+    Helper function to log errors from anywhere in the application.
+    
+    Usage:
+        from routes.system import log_error
+        log_error("database", "Connection timeout", {"collection": "users"})
+    """
+    return error_log.add_error(error_type, message, details, source)
+
+
+@router.get("/system/errors")
+async def get_error_logs(
+    limit: int = 100,
+    error_type: str = None,
+    source: str = None,
+    unresolved_only: bool = False,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get application error logs.
+    
+    Only accessible by owner users.
+    
+    Query Parameters:
+        - limit: Maximum number of errors to return (default 100)
+        - error_type: Filter by error type (database, api, auth, ai, validation, etc.)
+        - source: Filter by source (backend, frontend, external)
+        - unresolved_only: Only show unresolved errors
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can access error logs"
+        )
+    
+    errors = error_log.get_errors(limit, error_type, source, unresolved_only)
+    stats = error_log.get_stats()
+    
+    return {
+        "errors": errors,
+        "stats": stats,
+        "filters_applied": {
+            "limit": limit,
+            "error_type": error_type,
+            "source": source,
+            "unresolved_only": unresolved_only
+        }
+    }
+
+
+@router.get("/system/errors/stats")
+async def get_error_stats(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get error statistics summary."""
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can access error stats"
+        )
+    
+    return error_log.get_stats()
+
+
+@router.post("/system/errors/{error_id}/resolve")
+async def resolve_error(
+    error_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Mark an error as resolved."""
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can resolve errors"
+        )
+    
+    if error_log.mark_resolved(error_id):
+        return {"success": True, "message": "Error marked as resolved"}
+    else:
+        raise HTTPException(status_code=404, detail="Error not found")
+
+
+@router.delete("/system/errors")
+async def clear_error_logs(
+    older_than_hours: int = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Clear error logs.
+    
+    Query Parameters:
+        - older_than_hours: Only clear errors older than this many hours
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can clear error logs"
+        )
+    
+    error_log.clear_errors(older_than_hours)
+    return {"success": True, "message": "Error logs cleared"}
+
+
+@router.post("/system/errors/test")
+async def create_test_error(
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a test error for debugging purposes."""
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can create test errors"
+        )
+    
+    error = log_error(
+        error_type="test",
+        message="This is a test error created manually",
+        details={"created_by": current_user.get("email"), "purpose": "testing"},
+        source="backend"
+    )
+    
+    return {"success": True, "error": error}
