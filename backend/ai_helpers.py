@@ -358,6 +358,29 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
         raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
 
 
+def detect_audio_format(audio_data: bytes) -> str:
+    """Detect audio format from magic bytes and return appropriate file extension."""
+    if len(audio_data) < 4:
+        return ".webm"
+    
+    # Check magic bytes for common audio formats
+    if audio_data[:4] == b'\x1a\x45\xdf\xa3':
+        return ".webm"
+    elif audio_data[:4] == b'OggS':
+        return ".ogg"
+    elif audio_data[:4] == b'RIFF':
+        return ".wav"
+    elif audio_data[:3] == b'ID3' or (len(audio_data) >= 2 and audio_data[:2] == b'\xff\xfb'):
+        return ".mp3"
+    elif audio_data[:4] == b'fLaC':
+        return ".flac"
+    elif audio_data[:4] == b'ftyp' or audio_data[4:8] == b'ftyp':
+        return ".m4a"
+    else:
+        # Default to webm as that's what MediaRecorder typically produces
+        return ".webm"
+
+
 async def transcribe_audio_with_ai(audio_base64: str) -> str:
     """Transcribe audio using OpenAI Whisper."""
     temp_path = None
@@ -371,32 +394,10 @@ async def transcribe_audio_with_ai(audio_base64: str) -> str:
         # Decode the base64 audio data
         audio_data = base64.b64decode(audio_base64)
         
-        # Check if the audio data starts with common audio file headers
-        # WebM files start with 0x1A 0x45 0xDF 0xA3
-        # OGG files start with 'OggS'
-        # WAV files start with 'RIFF'
-        
         # Determine file extension based on magic bytes
-        if len(audio_data) >= 4:
-            if audio_data[:4] == b'\x1a\x45\xdf\xa3':
-                suffix = ".webm"
-            elif audio_data[:4] == b'OggS':
-                suffix = ".ogg"
-            elif audio_data[:4] == b'RIFF':
-                suffix = ".wav"
-            elif audio_data[:3] == b'ID3' or (len(audio_data) >= 2 and audio_data[:2] == b'\xff\xfb'):
-                suffix = ".mp3"
-            elif audio_data[:4] == b'fLaC':
-                suffix = ".flac"
-            elif audio_data[:4] == b'ftyp' or audio_data[4:8] == b'ftyp':
-                suffix = ".m4a"
-            else:
-                # Default to webm as that's what MediaRecorder typically produces
-                suffix = ".webm"
-        else:
-            suffix = ".webm"
+        suffix = detect_audio_format(audio_data)
         
-        logger.info(f"Detected audio format: {suffix}, data size: {len(audio_data)} bytes, first bytes: {audio_data[:8].hex() if len(audio_data) >= 8 else audio_data.hex()}")
+        logger.info(f"Detected audio format: {suffix}, data size: {len(audio_data)} bytes")
 
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
             f.write(audio_data)
@@ -407,7 +408,6 @@ async def transcribe_audio_with_ai(audio_base64: str) -> str:
                 model="whisper-1",
                 file=audio_file,
                 response_format="json"
-                # Language auto-detection enabled (supports Dutch, English, and 50+ languages)
             )
 
         return response.text

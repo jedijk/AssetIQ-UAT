@@ -1349,8 +1349,8 @@ const FailureModesPage = () => {
                             Changes from v{versions[0]?.version}:
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {changes.map((change, cIdx) => (
-                              <span key={cIdx} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                            {changes.map((change) => (
+                              <span key={`${change.field}-${change.from}-${change.to}`} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${
                                 change.isRPN ? (change.to > change.from ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')
                                 : change.isAction ? 'bg-purple-100 text-purple-700'
                                 : 'bg-slate-100 text-slate-700'
@@ -1467,9 +1467,9 @@ const FailureModesPage = () => {
                               Changed to v{versions[idx - 1]?.version}:
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              {changes.map((change, cIdx) => (
+                              {changes.map((change) => (
                                 <span 
-                                  key={cIdx} 
+                                  key={`${change.field}-${change.from}-${change.to}`} 
                                   className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${
                                     change.isRPN 
                                       ? change.to > change.from 

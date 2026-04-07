@@ -437,8 +437,8 @@ const InsightsPage = ({ embedded = false }) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {disciplinePerformance.disciplines.slice(0, 10).map((d, i) => (
-                          <tr key={i} className="border-b hover:bg-slate-50">
+                        {disciplinePerformance.disciplines.slice(0, 10).map((d) => (
+                          <tr key={d.discipline} className="border-b hover:bg-slate-50">
                             <td className="py-2 px-3 font-medium">{d.discipline}</td>
                             <td className="py-2 px-3 text-center">{d.total_tasks}</td>
                             <td className="py-2 px-3 text-center text-green-600">{d.completed}</td>
@@ -465,8 +465,8 @@ const InsightsPage = ({ embedded = false }) => {
                           Top Performers
                         </h4>
                         <ul className="space-y-2">
-                          {disciplinePerformance.top_performers.slice(0, 5).map((d, i) => (
-                            <li key={i} className="flex justify-between text-sm">
+                          {disciplinePerformance.top_performers.slice(0, 5).map((d) => (
+                            <li key={d.discipline} className="flex justify-between text-sm">
                               <span className="text-green-700">{d.discipline}</span>
                               <span className="text-green-600 font-medium">{d.completion_rate}% completion</span>
                             </li>
@@ -481,8 +481,8 @@ const InsightsPage = ({ embedded = false }) => {
                           Needs Improvement
                         </h4>
                         <ul className="space-y-2">
-                          {disciplinePerformance.bottom_performers.slice(0, 5).map((d, i) => (
-                            <li key={i} className="flex justify-between text-sm">
+                          {disciplinePerformance.bottom_performers.slice(0, 5).map((d) => (
+                            <li key={d.discipline} className="flex justify-between text-sm">
                               <span className="text-red-700">{d.discipline}</span>
                               <span className="text-red-600 font-medium">{d.failure_rate}% failure rate</span>
                             </li>
@@ -582,8 +582,8 @@ const InsightsPage = ({ embedded = false }) => {
             <CardContent>
               {gaps?.gaps?.length > 0 ? (
                 <div className="space-y-4">
-                  {gaps.gaps.map((gap, i) => (
-                    <div key={i} className={`p-4 rounded-xl border ${gap.severity === 'high' ? 'border-red-200 bg-red-50' : gap.severity === 'medium' ? 'border-amber-200 bg-amber-50' : 'border-blue-200 bg-blue-50'}`}>
+                  {gaps.gaps.map((gap) => (
+                    <div key={`gap-${gap.title}-${gap.severity}`} className={`p-4 rounded-xl border ${gap.severity === 'high' ? 'border-red-200 bg-red-50' : gap.severity === 'medium' ? 'border-amber-200 bg-amber-50' : 'border-blue-200 bg-blue-50'}`}>
                       <div className="flex items-start justify-between">
                         <div>
                           <h4 className={`font-semibold ${gap.severity === 'high' ? 'text-red-800' : gap.severity === 'medium' ? 'text-amber-800' : 'text-blue-800'}`}>
@@ -601,8 +601,8 @@ const InsightsPage = ({ embedded = false }) => {
                         <div className="mt-3 text-sm">
                           <p className="text-slate-500 mb-1">Examples:</p>
                           <ul className="list-disc list-inside space-y-1">
-                            {gap.items.slice(0, 3).map((item, j) => (
-                              <li key={j} className="text-slate-600">
+                          {gap.items.slice(0, 3).map((item) => (
+                              <li key={item.id || item.name || item.title} className="text-slate-600">
                                 {item.name || item.title || item.id}
                                 {item.failure_rate && ` (${item.failure_rate}% failure)`}
                               </li>

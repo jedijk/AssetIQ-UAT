@@ -265,16 +265,13 @@ export const DocumentViewer = ({
   
   // Construct proper URL - if it's a storage path (not full URL), proxy through API
   const url = useMemo(() => {
-    console.log("[DocumentViewer] rawUrl:", rawUrl);
     if (!rawUrl) return null;
     // If already a full URL, use as-is
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-      console.log("[DocumentViewer] Using rawUrl as full URL");
       return rawUrl;
     }
     // Otherwise, proxy through the form-documents endpoint
     const constructedUrl = `${API_BASE_URL}/api/form-documents/${rawUrl}`;
-    console.log("[DocumentViewer] Constructed URL:", constructedUrl);
     return constructedUrl;
   }, [rawUrl]);
   
@@ -293,7 +290,6 @@ export const DocumentViewer = ({
     
     try {
       const token = localStorage.getItem("token");
-      console.log("[DocumentViewer] Loading DOCX, token present:", !!token);
       
       const response = await fetch(url, { 
         headers: token ? { Authorization: `Bearer ${token}` } : {} 
@@ -325,7 +321,6 @@ export const DocumentViewer = ({
     
     try {
       const token = localStorage.getItem("token");
-      console.log("[DocumentViewer] Loading Excel, token present:", !!token);
       
       const response = await fetch(url, { 
         headers: token ? { Authorization: `Bearer ${token}` } : {} 
@@ -333,7 +328,6 @@ export const DocumentViewer = ({
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("[DocumentViewer] Excel fetch failed:", response.status, errorText);
         throw new Error(errorText || `Failed to fetch spreadsheet (${response.status})`);
       }
       
@@ -353,7 +347,6 @@ export const DocumentViewer = ({
       setExcelData(sheets);
       setActiveSheet(0);
     } catch (err) {
-      console.error("Error loading Excel:", err);
       setError(err.message || "Failed to load spreadsheet. Try downloading instead.");
     } finally {
       setLoading(false);
@@ -382,13 +375,11 @@ export const DocumentViewer = ({
       // Load PDF/Image as blob for authenticated access
       setLoading(true);
       const token = localStorage.getItem("token");
-      console.log("[DocumentViewer] Loading PDF/Image, token present:", !!token, "URL:", url);
       
       fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
         .then(async response => {
           if (!response.ok) {
             const errorText = await response.text();
-            console.error("[DocumentViewer] PDF/Image fetch failed:", response.status, errorText);
             throw new Error(errorText || `Failed to fetch file (${response.status})`);
           }
           return response.blob();
@@ -399,7 +390,6 @@ export const DocumentViewer = ({
           setBlobUrl(objectUrl);
         })
         .catch(err => {
-          console.error("Error loading file:", err);
           setError(err.message || "Failed to load file. Try downloading instead.");
         })
         .finally(() => setLoading(false));

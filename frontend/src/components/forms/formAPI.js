@@ -64,8 +64,6 @@ export const formAPI = {
     delete cleanedData.id; // Don't send ID in body
     delete cleanedData.pendingDocuments; // Don't send pending docs to backend
     
-    console.log('[formAPI] Updating template:', { templateId: id, payloadKeys: Object.keys(cleanedData) });
-    
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       method: "PATCH",
       headers: {
@@ -84,7 +82,6 @@ export const formAPI = {
     }
     
     const result = await response.json();
-    console.log('[formAPI] Template updated successfully:', { templateId: id, version: result.version });
     return result;
   },
 

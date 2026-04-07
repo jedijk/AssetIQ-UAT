@@ -651,7 +651,7 @@ export default function FormSubmissionsPage() {
                               ) : isArray ? (
                                 <div className="flex flex-wrap gap-1">
                                   {response.value.map((v, i) => (
-                                    <Badge key={i} variant="secondary" className="text-xs">
+                                    <Badge key={`${response.field_id}-${i}`} variant="secondary" className="text-xs">
                                       {String(v)}
                                     </Badge>
                                   ))}
@@ -714,7 +714,7 @@ export default function FormSubmissionsPage() {
                     Attachments ({selectedSubmission.attachments.length})
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {selectedSubmission.attachments.map((att, idx) => {
+                    {selectedSubmission.attachments.map((att) => {
                       const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name || att.filename || "");
                       const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name || att.filename || "");
                       const isDoc = /\.(doc|docx)$/i.test(att.name || att.filename || "");
@@ -723,7 +723,7 @@ export default function FormSubmissionsPage() {
                       
                       return (
                         <button
-                          key={idx}
+                          key={att.id || att.url || att.name}
                           onClick={() => {
                             if (isImage && previewUrl) {
                               setViewingImage({ url: previewUrl, name: fileName });

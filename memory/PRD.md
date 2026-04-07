@@ -5,6 +5,30 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 7, 2026 - Code Quality Fixes (Code Review)
+**FIXES APPLIED:**
+
+1. **Array Index as Key (React Anti-pattern) - Fixed 8 instances:**
+   - `/app/frontend/src/pages/InsightsPage.js` - Fixed discipline performance tables and recommendation lists
+   - `/app/frontend/src/pages/FormSubmissionsPage.js` - Fixed attachment keys and badge keys
+   - `/app/frontend/src/pages/FailureModesPage.js` - Fixed version change history keys
+
+2. **Console.log Removal - Removed 10 debug logs:**
+   - `/app/frontend/src/components/DocumentViewer.js` - Removed URL debugging logs
+   - `/app/frontend/src/components/Layout.js` - Removed avatar fetch debugging logs
+   - `/app/frontend/src/components/forms/formAPI.js` - Removed template update debugging logs
+
+3. **Python Function Complexity - Refactored:**
+   - `/app/backend/ai_helpers.py` - Extracted `detect_audio_format()` helper function from `transcribe_audio_with_ai()` to reduce complexity and improve readability
+
+**NOT APPLIED (Would require significant refactoring that could break functionality):**
+- Hook dependency warnings (143 instances) - Need careful analysis per-case
+- localStorage security changes - Would require session management overhaul
+- Component splitting (ChatSidebar, Layout, etc.) - Major refactoring risk
+- Full Python function decomposition - Needs thorough testing
+
+---
+
 ### April 7, 2026 - Ad-hoc Form Execution Bug Fix
 **BUG FIX:**
 - ✅ **Fixed datetime serialization issue** in ad-hoc plan execution (`/api/adhoc-plans/{plan_id}/execute`)

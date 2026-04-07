@@ -188,7 +188,6 @@ const Layout = () => {
         
         // Only fetch if we have a valid backend URL configured
         if (!backendUrl || !backendUrl.startsWith('http')) {
-          console.log("Avatar fetch skipped: backend URL not configured");
           setAvatarUrl(null);
           return;
         }
@@ -207,7 +206,6 @@ const Layout = () => {
         }
       } catch (err) {
         // Network error or avatar not available - use initials fallback
-        console.log("Avatar fetch failed, using initials fallback");
         setAvatarUrl(null);
       }
     };
