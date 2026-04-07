@@ -163,7 +163,9 @@ const en = {
     editDescription: "Update your profile information and photo",
     updateSuccess: "Profile updated successfully",
     changePhoto: "Change Photo",
+    editPhoto: "Edit Photo",
     uploading: "Uploading...",
+    photoUpdated: "Photo updated successfully",
   },
   
   // Common
@@ -1379,7 +1381,9 @@ const nl = {
     editDescription: "Werk je profielinformatie en foto bij",
     updateSuccess: "Profiel succesvol bijgewerkt",
     changePhoto: "Foto Wijzigen",
+    editPhoto: "Foto Bewerken",
     uploading: "Uploaden...",
+    photoUpdated: "Foto succesvol bijgewerkt",
   },
   
   // Common

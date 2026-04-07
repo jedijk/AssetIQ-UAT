@@ -316,7 +316,7 @@ async def update_own_profile(
             raise HTTPException(status_code=404, detail="User not found")
         
         # Invalidate cache
-        cache.delete(f"user:{user_id}")
+        cache.invalidate_user(user_id)
         
         # Fetch updated user
         updated_user = await db.users.find_one(

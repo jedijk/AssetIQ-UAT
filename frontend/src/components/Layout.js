@@ -42,6 +42,7 @@ import { Label } from "./ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 import { toast } from "sonner";
 import ChatSidebar from "./ChatSidebar";
+import ImageEditor from "./ImageEditor";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 import { actionsAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
@@ -75,6 +76,10 @@ const Layout = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const profileFileInputRef = useRef(null);
+  
+  // Image editor state for profile photo
+  const [imageEditorOpen, setImageEditorOpen] = useState(false);
+  const [selectedImageSrc, setSelectedImageSrc] = useState(null);
   
   // Introduction overlay
   const { showIntro, dismissIntro, resetIntro } = useIntroOverlay();
@@ -256,8 +261,8 @@ const Layout = () => {
     }
   };
 
-  // Handle avatar upload from profile dialog
-  const handleProfileAvatarUpload = async (event) => {
+  // Handle avatar file selection - opens image editor
+  const handleProfileAvatarSelect = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -273,13 +278,28 @@ const Layout = () => {
       return;
     }
 
+    // Create URL for the image and open editor
+    const imageUrl = URL.createObjectURL(file);
+    setSelectedImageSrc(imageUrl);
+    setImageEditorOpen(true);
+    
+    // Reset the file input
+    if (profileFileInputRef.current) {
+      profileFileInputRef.current.value = "";
+    }
+  };
+
+  // Handle edited image save from ImageEditor
+  const handleEditedImageSave = async (editedFile) => {
+    setImageEditorOpen(false);
     setIsUploadingAvatar(true);
+    
     try {
       const token = localStorage.getItem("token");
       const backendUrl = getBackendUrl();
       
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", editedFile);
 
       const response = await fetch(`${backendUrl}/api/users/me/avatar`, {
         method: "POST",
@@ -306,16 +326,26 @@ const Layout = () => {
         setAvatarUrl(URL.createObjectURL(blob));
       }
 
-      toast.success("Avatar updated successfully");
+      toast.success(t("profile.photoUpdated") || "Photo updated successfully");
     } catch (error) {
       console.error("Failed to upload avatar:", error);
       toast.error(error.message || "Failed to upload avatar");
     } finally {
       setIsUploadingAvatar(false);
-      // Reset the file input
-      if (profileFileInputRef.current) {
-        profileFileInputRef.current.value = "";
+      // Clean up the selected image URL
+      if (selectedImageSrc) {
+        URL.revokeObjectURL(selectedImageSrc);
+        setSelectedImageSrc(null);
       }
+    }
+  };
+
+  // Close image editor and cleanup
+  const handleImageEditorClose = () => {
+    setImageEditorOpen(false);
+    if (selectedImageSrc) {
+      URL.revokeObjectURL(selectedImageSrc);
+      setSelectedImageSrc(null);
     }
   };
 
@@ -1168,7 +1198,7 @@ const Layout = () => {
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={handleProfileAvatarUpload}
+                onChange={handleProfileAvatarSelect}
                 data-testid="profile-avatar-input"
               />
               <button
@@ -1269,6 +1299,16 @@ const Layout = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Image Editor for profile photo */}
+      <ImageEditor
+        open={imageEditorOpen}
+        onClose={handleImageEditorClose}
+        imageSrc={selectedImageSrc}
+        onSave={handleEditedImageSave}
+        aspectRatio={1}
+        title={t("profile.editPhoto") || "Edit Photo"}
+      />
 
       {/* Introduction Overlay - only show after password change is complete */}
       {showIntro && !mustChangePassword && (
