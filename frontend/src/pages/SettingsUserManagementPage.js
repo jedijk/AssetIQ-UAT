@@ -72,7 +72,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import SettingsPermissionsPage from "./SettingsPermissionsPage";
 
 // Get base URL without /api suffix
-const API_BASE_URL = getBackendUrl();
+// Get API base URL dynamically
+const getApiBaseUrl = () => getBackendUrl();
 
 // Role icons mapping
 const roleIcons = {
@@ -102,7 +103,7 @@ const rbacAPI = {
     if (params.role) queryParams.append("role", params.role);
     if (params.is_active !== undefined) queryParams.append("is_active", params.is_active);
     
-    const response = await fetch(`${API_BASE_URL}/api/rbac/users?${queryParams}`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users?${queryParams}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch users");
@@ -110,7 +111,7 @@ const rbacAPI = {
   },
   
   getPendingUsers: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/users/pending`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/pending`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch pending users");
@@ -118,7 +119,7 @@ const rbacAPI = {
   },
   
   approveUser: async ({ userId, action, role, rejectionReason, assignedInstallations }) => {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}/approve`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/approve`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -136,7 +137,7 @@ const rbacAPI = {
   },
   
   getRoles: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/roles`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/rbac/roles`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
     if (!response.ok) throw new Error("Failed to fetch roles");
@@ -144,7 +145,7 @@ const rbacAPI = {
   },
   
   updateUserRole: async ({ userId, role }) => {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}/role`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/role`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -157,7 +158,7 @@ const rbacAPI = {
   },
   
   updateUserStatus: async ({ userId, isActive }) => {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}/status`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/status`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -170,7 +171,7 @@ const rbacAPI = {
   },
   
   updateUserProfile: async ({ userId, data }) => {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}/profile`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/profile`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -186,7 +187,7 @@ const rbacAPI = {
     const formData = new FormData();
     formData.append("file", file);
     
-    const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}/avatar`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/avatar`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`
@@ -202,7 +203,7 @@ const rbacAPI = {
   
   getUserAvatar: async (userId) => {
     const token = localStorage.getItem("token");
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}/avatar?auth=${token}`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/users/${userId}/avatar?auth=${token}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!response.ok) return null;
@@ -211,7 +212,7 @@ const rbacAPI = {
   },
   
   deleteUser: async (userId) => {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`
@@ -231,7 +232,7 @@ const rbacAPI = {
         throw new Error("Not authenticated. Please log in again.");
       }
       
-      const response = await fetch(`${API_BASE_URL}/api/auth/admin-reset-password`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/auth/admin-reset-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -361,7 +362,7 @@ const SettingsUserManagementPage = () => {
   const { data: installationsData } = useQuery({
     queryKey: ["all-installations"],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/api/equipment-hierarchy/installations`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/equipment-hierarchy/installations`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
       });
       return response.json();
@@ -373,7 +374,7 @@ const SettingsUserManagementPage = () => {
   const { data: threatsData } = useQuery({
     queryKey: ["threats-for-locations"],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/api/threats`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/threats`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
       });
       return response.json();
@@ -502,7 +503,7 @@ const SettingsUserManagementPage = () => {
   // Reset intro tour mutation
   const resetIntroMutation = useMutation({
     mutationFn: async (userId) => {
-      const response = await fetch(`${API_BASE_URL}/api/rbac/users/${userId}/reset-intro`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/reset-intro`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${localStorage.getItem("token")}`
@@ -525,7 +526,7 @@ const SettingsUserManagementPage = () => {
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData) => {
-      const response = await fetch(`${API_BASE_URL}/api/users/create`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/users/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

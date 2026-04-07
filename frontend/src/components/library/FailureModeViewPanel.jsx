@@ -18,9 +18,6 @@ import {
 } from "../ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
 
-// API base URL for avatar fetching
-const API_BASE_URL = getBackendUrl();
-
 const categoryIcons = {
   Rotating: Cog,
   Static: Thermometer,
@@ -116,8 +113,11 @@ export function FailureModeViewPanel({
       if (!currentUser?.id) return;
       try {
         const token = localStorage.getItem("token");
+        const backendUrl = getBackendUrl();
+        if (!backendUrl || !backendUrl.startsWith('http')) return;
+        
         const response = await fetch(
-          `${API_BASE_URL}/api/users/${currentUser.id}/avatar?auth=${token}`,
+          `${backendUrl}/api/users/${currentUser.id}/avatar?auth=${token}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (response.ok) {
@@ -143,8 +143,11 @@ export function FailureModeViewPanel({
       }
       try {
         const token = localStorage.getItem("token");
+        const backendUrl = getBackendUrl();
+        if (!backendUrl || !backendUrl.startsWith('http')) return;
+        
         const response = await fetch(
-          `${API_BASE_URL}/api/users/${fm.validated_by_id}/avatar?auth=${token}`,
+          `${backendUrl}/api/users/${fm.validated_by_id}/avatar?auth=${token}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (response.ok) {
