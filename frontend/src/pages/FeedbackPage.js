@@ -609,7 +609,7 @@ const FeedbackPage = () => {
     };
     
     transcribeAudio();
-  }, [audioBlob]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [audioBlob]); // eslint-disable-line
   
   const clearRecording = () => {
     if (audioUrl) {
