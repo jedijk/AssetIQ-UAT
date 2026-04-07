@@ -89,10 +89,28 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
     return null;
   }, [node, allNodes]);
   
-  // Filter equipment types - show recommended first based on compatible_systems
+  // Filter equipment types - first by applicable_levels (hierarchy level), then by compatible_systems
   const { recommendedTypes, otherTypes } = useMemo(() => {
-    if (!equipmentTypes || !parentSystemName) {
-      return { recommendedTypes: [], otherTypes: equipmentTypes || [] };
+    if (!equipmentTypes) {
+      return { recommendedTypes: [], otherTypes: [] };
+    }
+    
+    // First filter by applicable_levels based on current node level
+    const nodeLevel = node?.level || "equipment_unit";
+    // Normalize legacy levels
+    const normalizedLevel = nodeLevel === "equipment" ? "equipment_unit" : 
+                           nodeLevel === "system" ? "section_system" : 
+                           nodeLevel === "unit" ? "plant_unit" : nodeLevel;
+    
+    // Filter types that are applicable to the current hierarchy level
+    const levelFilteredTypes = equipmentTypes.filter(eqt => {
+      const applicableLevels = eqt.applicable_levels || ["equipment_unit"];
+      return applicableLevels.includes(normalizedLevel);
+    });
+    
+    // If no parent system context, return level-filtered types without further recommendations
+    if (!parentSystemName) {
+      return { recommendedTypes: [], otherTypes: levelFilteredTypes };
     }
     
     const searchTerms = parentSystemName.toLowerCase();
@@ -101,7 +119,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
     const recommended = [];
     const others = [];
     
-    equipmentTypes.forEach(eqt => {
+    levelFilteredTypes.forEach(eqt => {
       const isCompatible = eqt.compatible_systems?.some(sys => {
         const sysLower = sys.toLowerCase();
         // Check if system name contains any word from compatible systems
@@ -119,7 +137,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
     });
     
     return { recommendedTypes: recommended, otherTypes: others };
-  }, [equipmentTypes, parentSystemName]);
+  }, [equipmentTypes, parentSystemName, node?.level]);
   
   if (!node) return (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">

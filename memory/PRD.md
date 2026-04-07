@@ -5,6 +5,40 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 7, 2026 - Equipment Types ISO 14224 Hierarchy Level Mapping
+**FEATURE COMPLETED:**
+- ✅ **Added `applicable_levels` field** to all equipment types defining which ISO hierarchy levels each type can be used at
+- ✅ **Expanded Equipment Types from 62 → 113 types** (+51 subunit/maintainable item component types)
+- ✅ **Level-based filtering** in Properties Panel - only shows equipment types appropriate for the current hierarchy level
+- ✅ **Smart dual-filtering**: First by applicable_levels (hierarchy), then by compatible_systems (recommendations)
+
+**New Component Types Added (51 types for Subunit/Maintainable Item levels):**
+- **Bearings:** Radial Bearing, Thrust Bearing, Journal Bearing
+- **Seals:** Mechanical Seal, Labyrinth Seal, Dry Gas Seal
+- **Rotating Components:** Coupling, Impeller, Rotor, Shaft, Gear Set
+- **Static Components:** Casing/Housing, Diaphragm, Piston, Cylinder/Liner, Packing, Gasket, O-Ring, Wear Ring
+- **Auxiliary Systems:** Lubrication System, Cooling Jacket
+- **Extrusion Components:** Screw Element, Barrel Section, Die/Die Head
+- **Heat Transfer:** Heating Element, Cooling Coil, Tube Bundle, Baffle Plate
+- **Vessel Components:** Vessel Internals, Tray/Column Packing
+- **Drive Components:** Belt/Drive Belt, Chain/Sprocket
+- **Electrical Components:** Stator, Winding, Brush/Commutator, Contactor/Relay, Circuit Breaker, Fuse, Capacitor, Resistor, Power Supply Unit
+- **Instrumentation Components:** I/O Module, Communication Module, HMI Panel, Solenoid Valve, Limit Switch, Thermocouple, RTD, Orifice Plate, Pressure Gauge, Sight Glass
+
+**ISO 14224 Level Mapping:**
+| Level | Types Available |
+|-------|-----------------|
+| equipment_unit | Full equipment (pumps, compressors, heat exchangers, etc.) |
+| subunit | Components (bearings, seals, motors, valves, sensors, etc.) |
+| maintainable_item | Replaceable parts (gaskets, o-rings, fuses, thermocouples, etc.) |
+
+**Files Modified:**
+- `/app/backend/iso14224_models.py` - Added applicable_levels field, 51 new component types
+- `/app/frontend/src/components/equipment/PropertiesPanel.js` - Added level-based filtering logic
+- `/app/backend/routes/equipment.py` - Updated create_equipment_type to include applicable_levels
+
+---
+
 ### December 2025 - FMEA Failure Modes Database Expansion (ISO 14224 Complete)
 **FEATURE COMPLETED:**
 - ✅ **Expanded Failure Modes Library from 215 → 531 modes** (+316 new failure modes)

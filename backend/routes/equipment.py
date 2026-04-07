@@ -87,6 +87,7 @@ async def create_equipment_type(
         "default_failure_modes": type_data.default_failure_modes or [],
         "compatible_systems": type_data.compatible_systems or [],
         "is_system_level": type_data.is_system_level or False,
+        "applicable_levels": type_data.applicable_levels or ["equipment_unit"],
         "is_custom": True,
         "created_by": current_user["id"],
         "created_at": datetime.now(timezone.utc).isoformat()
