@@ -1902,6 +1902,258 @@ class HierarchyImportRequest(BaseModel):
     replace_existing: bool = True  # If True, delete existing equipment first
 
 
+class ExcelHierarchyImportRequest(BaseModel):
+    """Request model for Excel-based hierarchy import."""
+    installation_id: str
+    excel_url: str  # URL to Excel file
+    replace_existing: bool = True
+
+
+# Level mapping from Excel to ISO 14224
+EXCEL_LEVEL_MAPPING = {
+    "Plant/Unit": "plant",
+    "Section/System": "section",
+    "Equipment Unit": "unit",
+    "Subunit": "subunit",
+    "Maintainable Item": "maintainable_item"
+}
+
+
+def calculate_criticality_from_excel(safety: int, production: int, environmental: int, reputation: int):
+    """Calculate criticality data including level, color, and risk score."""
+    max_impact = max(safety, production, environmental, reputation)
+    
+    # Determine level based on max dimension
+    if safety >= 4 or max_impact == 5:
+        level = "safety_critical"
+        color = "#EF4444"  # Red
+    elif production >= 4 or max_impact >= 4:
+        level = "production_critical"
+        color = "#F97316"  # Orange
+    elif max_impact >= 3:
+        level = "medium"
+        color = "#EAB308"  # Yellow
+    else:
+        level = "low"
+        color = "#22C55E"  # Green
+    
+    # Calculate risk score weighted by dimensions
+    risk_score = (
+        (safety * 25) +  # Safety has highest weight
+        (production * 20) +
+        (environmental * 15) +
+        (reputation * 10)
+    )
+    
+    return {
+        "safety_impact": safety,
+        "production_impact": production,
+        "environmental_impact": environmental,
+        "reputation_impact": reputation,
+        "level": level,
+        "color": color,
+        "max_impact": max_impact,
+        "risk_score": round(risk_score, 2)
+    }
+
+
+@router.post("/equipment/import-hierarchy-excel")
+async def import_hierarchy_from_excel(
+    request: ExcelHierarchyImportRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Import equipment hierarchy from an Excel file URL.
+    
+    The Excel file should have columns:
+    - Name: Equipment name
+    - Level: One of "Plant/Unit", "Section/System", "Equipment Unit", "Subunit", "Maintainable Item"
+    - Parent: Name of parent equipment
+    - Equipment Type: Type of equipment
+    - Discipline: Equipment discipline
+    - Description: Equipment description
+    - Safety: Safety criticality (0-5)
+    - Production: Production criticality (0-5)
+    - Environmental: Environmental criticality (0-5)
+    - Reputation: Reputation criticality (0-5)
+    
+    Requires admin or owner role.
+    """
+    import requests as req_lib
+    from openpyxl import load_workbook
+    
+    # Check permissions
+    if current_user.get("role") not in ["admin", "owner"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Verify installation exists (equipment_nodes with level="installation")
+    installation = await db.equipment_nodes.find_one({
+        "id": request.installation_id,
+        "level": "installation"
+    })
+    if not installation:
+        raise HTTPException(status_code=404, detail="Installation not found")
+    
+    installation_id = request.installation_id
+    installation_name = installation.get("name")
+    
+    # Download and parse Excel
+    try:
+        response = req_lib.get(request.excel_url, timeout=30)
+        response.raise_for_status()
+        wb = load_workbook(io.BytesIO(response.content))
+        ws = wb.active
+    except Exception as e:
+        logger.error(f"Failed to load Excel file: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to load Excel file: {str(e)}")
+    
+    headers = [cell.value for cell in ws[1]]
+    
+    # Level order for hierarchy
+    level_order = {"plant": 0, "section": 1, "unit": 2, "subunit": 3, "maintainable_item": 4}
+    
+    # Parse with FULL PATH tracking to uniquely identify items
+    # Items with same name but different parents are DIFFERENT items
+    current_path = []  # List of (level, name) tuples
+    all_items = []
+    
+    for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        data = dict(zip(headers, row))
+        name = data.get('Name')
+        level_raw = data.get('Level')
+        
+        if not name or not level_raw:
+            continue
+        
+        # Map level
+        level = EXCEL_LEVEL_MAPPING.get(level_raw)
+        if not level:
+            logger.warning(f"Unknown level '{level_raw}' for '{name}', skipping...")
+            continue
+        
+        name = name.strip() if isinstance(name, str) else name
+        level_num = level_order[level]
+        
+        # Get criticality values
+        safety = int(data.get('Safety') or 0)
+        production = int(data.get('Production') or 0)
+        environmental = int(data.get('Environmental') or 0)
+        reputation = int(data.get('Reputation') or 0)
+        
+        # Calculate criticality if any dimension > 0
+        criticality = None
+        if safety > 0 or production > 0 or environmental > 0 or reputation > 0:
+            criticality = calculate_criticality_from_excel(safety, production, environmental, reputation)
+        
+        # Trim path to correct level (clear deeper or same levels)
+        while current_path and level_order[current_path[-1][0]] >= level_num:
+            current_path.pop()
+        
+        # Get parent from path
+        parent_name = current_path[-1][1] if current_path else None
+        
+        # Add to path
+        current_path.append((level, name))
+        
+        # Create full path string for unique identification
+        full_path = ' > '.join([p[1] for p in current_path])
+        
+        all_items.append({
+            'name': name,
+            'level': level,
+            'parent_name': parent_name,
+            'full_path': full_path,
+            'equipment_type': data.get('Equipment Type'),
+            'discipline': data.get('Discipline'),
+            'description': data.get('Description'),
+            'criticality': criticality
+        })
+    
+    # Deduplicate by FULL PATH (preserves items with same name under different parents)
+    unique_items = {}
+    for item in all_items:
+        key = item['full_path']
+        if key not in unique_items:
+            unique_items[key] = item
+        elif item['criticality'] and not unique_items[key].get('criticality'):
+            unique_items[key]['criticality'] = item['criticality']
+    
+    items_list = list(unique_items.values())
+    logger.info(f"Parsed {len(items_list)} unique equipment items from Excel")
+    
+    # Delete existing equipment if requested
+    deleted_count = 0
+    if request.replace_existing:
+        result = await db.equipment_nodes.delete_many({"installation_id": installation_id})
+        deleted_count = result.deleted_count
+    
+    # Sort by level hierarchy for proper parent resolution
+    sorted_items = sorted(items_list, key=lambda x: level_order.get(x['level'], 5))
+    
+    # Create items with proper parent IDs using full path
+    path_to_id = {}  # Map full path to ID
+    equipment_list = []
+    sort_order = 0
+    
+    for item in sorted_items:
+        sort_order += 1
+        eq_id = str(uuid.uuid4())
+        
+        # Store ID by full path
+        path_to_id[item['full_path']] = eq_id
+        
+        # Find parent ID using full path
+        parent_id = installation_id  # Default to installation
+        if item.get('parent_name'):
+            # Find parent's full path by removing this item from the end
+            parent_path_parts = item['full_path'].rsplit(' > ', 1)
+            if len(parent_path_parts) > 1:
+                parent_path = parent_path_parts[0]
+                parent_id = path_to_id.get(parent_path, installation_id)
+        
+        eq = {
+            "id": eq_id,
+            "name": item['name'],
+            "parent_id": parent_id,
+            "installation_id": installation_id,
+            "level": item['level'],
+            "equipment_type": item.get('equipment_type'),
+            "discipline": item.get('discipline'),
+            "description": item.get('description'),
+            "criticality": item.get('criticality'),
+            "sort_order": sort_order,
+            "created_by": current_user["id"],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        equipment_list.append(eq)
+    
+    # Insert all equipment
+    inserted_count = 0
+    items_with_criticality = 0
+    if equipment_list:
+        result = await db.equipment_nodes.insert_many(equipment_list)
+        inserted_count = len(result.inserted_ids)
+        items_with_criticality = sum(1 for eq in equipment_list if eq.get('criticality'))
+    
+    # Count by level
+    from collections import Counter
+    level_counts = dict(Counter([eq['level'] for eq in equipment_list]))
+    
+    logger.info(f"Excel hierarchy import for installation {installation_id}: deleted={deleted_count}, inserted={inserted_count}, with_criticality={items_with_criticality}")
+    
+    return {
+        "success": True,
+        "installation_id": installation_id,
+        "installation_name": installation.get("name"),
+        "deleted_count": deleted_count,
+        "inserted_count": inserted_count,
+        "items_with_criticality": items_with_criticality,
+        "by_level": level_counts,
+        "message": f"Successfully imported {inserted_count} equipment items ({items_with_criticality} with criticality data)"
+    }
+
+
 @router.post("/equipment/import-hierarchy")
 async def import_equipment_hierarchy(
     request: HierarchyImportRequest,

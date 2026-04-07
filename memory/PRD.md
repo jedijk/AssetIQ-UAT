@@ -5,6 +5,37 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### December 7, 2026 - Tyromer Equipment Hierarchy Import with Criticality
+**FEATURE COMPLETED:**
+- ✅ **Equipment Hierarchy Import from Excel with Criticality Data**
+- ✅ **Full-path tracking for unique item identification** (handles duplicate names under different parents)
+- ✅ **Criticality data parsing** from Safety, Production, Environmental, Reputation columns
+- ✅ **Auto-calculation of criticality level** (safety_critical, production_critical, medium, low)
+- ✅ **Risk score calculation** with weighted dimensions
+
+**Import Summary:**
+- 135 unique equipment items imported
+- 21 items with criticality data
+- Hierarchy: 1 plant → 2 sections → 9 units → 26 subunits → 101 maintainable items
+
+**API Endpoint:**
+- `POST /api/equipment/import-hierarchy-excel` - Import from Excel URL with criticality
+
+**Request Format:**
+```json
+{
+  "installation_id": "5fb4f269-191f-47d1-b190-e865a6430c7e",
+  "excel_url": "https://...",
+  "replace_existing": true
+}
+```
+
+**Files Modified:**
+- `/app/backend/routes/equipment.py` - Added Excel import endpoint with criticality
+- `/app/backend/scripts/tyromer_hierarchy_import.py` - Standalone import script
+
+---
+
 ### April 7, 2026 - FastAPI Swagger Docs Fix
 **BUG FIX (P0 - Recurring Issue):**
 - ✅ **Fixed FastAPI Swagger UI `/docs` blank page issue**
