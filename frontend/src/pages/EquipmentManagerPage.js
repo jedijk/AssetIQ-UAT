@@ -12,7 +12,7 @@ import {
   ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
   Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, Move, ArrowRight, ArrowUp, ArrowDown,
-  Download, MoreVertical, Copy, Scissors,
+  Download, MoreVertical, Copy, Scissors, MapPin, GitBranch, Layers,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -36,19 +36,43 @@ const EQUIPMENT_ICONS = { droplets: Droplets, wind: Wind, cog: Cog, thermometer:
 const ICON_OPTIONS = ["droplets", "wind", "cog", "thermometer", "box", "circle-dot", "zap", "gauge", "cpu", "pipette", "flame"];
 // ISO 14224 Taxonomy Levels - aligned with standard terminology
 const LEVEL_CONFIG = { 
+  // ISO 14224 standard levels
   installation: { icon: Building2, label: "Installation", description: "Offshore platform, Onshore plant" }, 
   plant_unit: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" }, 
   section_system: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" }, 
   equipment_unit: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" }, 
   subunit: { icon: Box, label: "Subunit", description: "Driver, Driven unit, Control system" },
   maintainable_item: { icon: Wrench, label: "Maintainable Item", description: "Bearing, Seal, Impeller" },
-  // Legacy level support for backward compatibility
+  // Legacy/import level aliases
+  plant: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" },
   unit: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" },
+  section: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" },
   system: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" },
-  equipment: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" }
+  equipment: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" },
+  // Additional legacy levels for imported data
+  site: { icon: MapPin, label: "Site/Location", description: "Geographic location or site" },
+  location: { icon: MapPin, label: "Site/Location", description: "Geographic location or site" },
+  line: { icon: GitBranch, label: "Production Line", description: "Production line or process" },
+  production_line: { icon: GitBranch, label: "Production Line", description: "Production line or process" },
+  area: { icon: Layers, label: "Area", description: "Production area or zone" },
+  zone: { icon: Layers, label: "Zone", description: "Operational zone" },
+  auxiliary: { icon: Cog, label: "Auxiliary", description: "Auxiliary or support equipment" }
 };
-const LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
-const LEGACY_LEVEL_MAP = { "unit": "plant_unit", "system": "section_system", "equipment": "equipment_unit" };
+const LEVEL_ORDER = ["installation", "site", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
+const LEGACY_LEVEL_MAP = { 
+  "unit": "plant_unit", 
+  "plant": "plant_unit",
+  "system": "section_system", 
+  "section": "section_system",
+  "equipment": "equipment_unit",
+  "site": "site",
+  "location": "site",
+  "line": "section_system",
+  "production_line": "section_system",
+  "area": "section_system",
+  "zone": "section_system",
+  "auxiliary": "section_system"
+};
 const CRIT_COLORS = { safety_critical: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", dot: "bg-red-500" }, production_critical: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", dot: "bg-orange-500" }, medium: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", dot: "bg-yellow-500" }, low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } };
 const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process", "laboratory"];
 
@@ -93,7 +117,11 @@ function flattenTree(treeNodes, expandedIds, depth = 0) {
 
 // Tree Node Component with Drag-Drop for reorder, promote, demote, and unassigned items
 function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, allNodes, onDrop, onReorder, onChangeLevel, siblings, siblingIndex, isSearchMatch, onAddChild, onEdit, onDelete, onMoveUp, onMoveDown }) {
-  const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
+  // Get config, with smart fallback for unknown levels
+  const config = LEVEL_CONFIG[node.level] || LEVEL_CONFIG[normalizeLevel(node.level)] || { 
+    icon: Cog, 
+    label: node.level ? node.level.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Item"
+  };
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   
@@ -1186,7 +1214,11 @@ export default function EquipmentManagerPage() {
                   </div>
                 ) : (
                   getDemoteParentCandidates().map(parent => {
-                    const parentConfig = LEVEL_CONFIG[normalizeLevel(parent.level)] || { icon: Cog, label: "Unknown" };
+                    const normalizedLevel = normalizeLevel(parent.level);
+                    const parentConfig = LEVEL_CONFIG[normalizedLevel] || LEVEL_CONFIG[parent.level] || { 
+                      icon: Cog, 
+                      label: parent.level ? parent.level.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Item"
+                    };
                     const ParentIcon = parentConfig.icon;
                     return (
                       <button

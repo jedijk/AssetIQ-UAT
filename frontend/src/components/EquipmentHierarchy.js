@@ -36,9 +36,40 @@ const ISO_LEVEL_CONFIG = {
   maintainable_item: { icon: Wrench, label: "Maintainable Item", color: "text-slate-600" },
   // Legacy support
   unit: { icon: Factory, label: "Plant/Unit", color: "text-indigo-600" },
+  plant: { icon: Factory, label: "Plant/Unit", color: "text-indigo-600" },
+  section: { icon: Settings, label: "Section/System", color: "text-purple-600" },
   system: { icon: Settings, label: "Section/System", color: "text-purple-600" },
   equipment: { icon: Cog, label: "Equipment Unit", color: "text-orange-600" },
+  // Additional legacy levels from imports
+  site: { icon: Building2, label: "Site/Location", color: "text-cyan-600" },
+  location: { icon: Building2, label: "Site/Location", color: "text-cyan-600" },
+  line: { icon: Settings, label: "Production Line", color: "text-violet-600" },
+  production_line: { icon: Settings, label: "Production Line", color: "text-violet-600" },
+  area: { icon: Settings, label: "Area", color: "text-purple-600" },
+  zone: { icon: Settings, label: "Zone", color: "text-purple-600" },
+  auxiliary: { icon: Cog, label: "Auxiliary", color: "text-orange-600" }
 };
+
+// Legacy level mapping to ISO 14224
+const LEGACY_LEVEL_MAP = {
+  unit: "plant_unit",
+  plant: "plant_unit",
+  system: "section_system",
+  section: "section_system",
+  equipment: "equipment_unit",
+  site: "installation",
+  location: "installation",
+  line: "section_system",
+  production_line: "section_system",
+  area: "section_system",
+  zone: "section_system",
+  auxiliary: "section_system"
+};
+
+// Normalize level to handle legacy values
+function normalizeLevel(level) {
+  return LEGACY_LEVEL_MAP[level] || level;
+}
 
 const ISO_LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
 
@@ -87,7 +118,12 @@ function getCumulativeThreatCount(node, threatCountMap) {
 // Tree node component
 const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, onEditEquipment, t, equipmentTypes, isMobile = false }) => {
   const hasChildren = node.children && node.children.length > 0;
-  const config = ISO_LEVEL_CONFIG[node.level] || ISO_LEVEL_CONFIG.equipment_unit;
+  // Get config with smart fallback for unknown levels
+  const config = ISO_LEVEL_CONFIG[node.level] || ISO_LEVEL_CONFIG[normalizeLevel(node.level)] || { 
+    icon: Cog, 
+    label: node.level ? node.level.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Item",
+    color: "text-slate-600"
+  };
   const Icon = config.icon;
   const critColor = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0 });
@@ -438,7 +474,11 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
 
 // ISO Level Summary Item
 const LevelSummaryItem = ({ level, count, isActive, onClick }) => {
-  const config = ISO_LEVEL_CONFIG[level] || { icon: Cog, label: level, color: "text-slate-600" };
+  const config = ISO_LEVEL_CONFIG[level] || ISO_LEVEL_CONFIG[normalizeLevel(level)] || { 
+    icon: Cog, 
+    label: level ? level.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Item", 
+    color: "text-slate-600" 
+  };
   const Icon = config.icon;
   
   return (

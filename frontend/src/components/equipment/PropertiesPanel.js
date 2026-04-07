@@ -17,9 +17,20 @@ const LEVEL_CONFIG = {
   equipment_unit: { icon: Cog, label: "Equipment Unit" }, 
   subunit: { icon: Settings, label: "Subunit" },
   maintainable_item: { icon: Settings, label: "Maintainable Item" },
+  // Legacy support
   unit: { icon: Settings, label: "Plant/Unit" },
+  plant: { icon: Settings, label: "Plant/Unit" },
+  section: { icon: Settings, label: "Section/System" },
   system: { icon: Settings, label: "Section/System" },
-  equipment: { icon: Cog, label: "Equipment Unit" }
+  equipment: { icon: Cog, label: "Equipment Unit" },
+  // Additional legacy levels from imports
+  site: { icon: Settings, label: "Site/Location" },
+  location: { icon: Settings, label: "Site/Location" },
+  line: { icon: Settings, label: "Production Line" },
+  production_line: { icon: Settings, label: "Production Line" },
+  area: { icon: Settings, label: "Area" },
+  zone: { icon: Settings, label: "Zone" },
+  auxiliary: { icon: Cog, label: "Auxiliary" }
 };
 
 const CRIT_COLORS = { 
