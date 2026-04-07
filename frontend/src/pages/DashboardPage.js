@@ -985,8 +985,9 @@ export default function DashboardPage() {
                 item.status === "rejected" ? "bg-red-500" : "bg-blue-500"
               }`} />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-slate-700 truncate">{item.template_name || item.form_name || "Form"}</p>
+                <p className="text-xs font-medium text-slate-700 truncate">{item.form_template_name || item.template_name || item.form_name || "Form"}</p>
                 <p className="text-[10px] text-slate-400">
+                  {item.submitted_by_name && <span>{item.submitted_by_name} • </span>}
                   {new Date(item.submitted_at || item.created_at).toLocaleDateString()}
                 </p>
               </div>
@@ -1128,7 +1129,7 @@ export default function DashboardPage() {
           <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 border-b border-slate-100 flex-shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
-              <span className="truncate">{quickViewSubmission?.template_name || quickViewSubmission?.form_template_name || quickViewSubmission?.form_name || "Loading..."}</span>
+              <span className="truncate">{quickViewSubmission?.form_template_name || quickViewSubmission?.template_name || quickViewSubmission?.form_name || "Loading..."}</span>
             </DialogTitle>
             {quickViewSubmission && (
             <DialogDescription className="flex items-center gap-2 mt-2">
