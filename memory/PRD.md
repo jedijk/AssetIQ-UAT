@@ -12,6 +12,29 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - ✅ **Level-based filtering** in Properties Panel - only shows equipment types appropriate for the current hierarchy level
 - ✅ **Smart dual-filtering**: First by applicable_levels (hierarchy), then by compatible_systems (recommendations)
 - ✅ **Expanded Failure Modes from 531 → 627** (+96 component-specific failure modes for 50 new types)
+- ✅ **Enhanced ALL 627 failure modes with ISO 14224 data:**
+  - `mechanism`: ISO 14224 failure mechanism code (WEA, LKG, FAT, COR, CAV, VIB, STK, etc.)
+  - `mechanism_description`: Human-readable mechanism name
+  - `potential_effects`: Array of consequences when failure occurs
+  - `potential_causes`: Array of root causes for the failure
+
+**ISO 14224 Failure Mechanisms Added:**
+| Code | Description | Examples |
+|------|-------------|----------|
+| WEA | Wear - General | Bearing wear, Seal face wear |
+| LKG | Leakage | Seal failure, Gasket blowout |
+| FAT | Fatigue | Shaft fatigue, Bearing fatigue |
+| COR | Corrosion | Internal/External corrosion, CUI |
+| CAV | Cavitation | Pump cavitation |
+| VIB | Vibration | Imbalance, Rotor rub |
+| STK | Sticking | Valve stuck, Bearing seizure |
+| OVH | Overheating | Motor overheating, Dry running |
+| ERO | Erosion | Impeller erosion, Sand erosion |
+| CRK | Cracking | Stress corrosion cracking |
+| BRD | Breakdown | Actuator failure, General |
+| INS | Insulation failure | Winding failure |
+| DRF | Instrument drift | Sensor drift, Calibration |
+| And 15+ more mechanisms... |
 
 **New Component Types Added (51 types for Subunit/Maintainable Item levels):**
 - **Bearings:** Radial Bearing, Thrust Bearing, Journal Bearing
@@ -26,24 +49,12 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - **Electrical Components:** Stator, Winding, Brush/Commutator, Contactor/Relay, Circuit Breaker, Fuse, Capacitor, Resistor, Power Supply Unit
 - **Instrumentation Components:** I/O Module, Communication Module, HMI Panel, Solenoid Valve, Limit Switch, Thermocouple, RTD, Orifice Plate, Pressure Gauge, Sight Glass
 
-**New Component Failure Modes (96 modes covering 50 component types):**
-- Bearing failures: Seizure, Wear, Overheating, Fatigue, Thrust Pad Damage, Babbitt Damage
-- Seal failures: Face Wear, Spring Failure, O-Ring Degradation, Primary/Secondary Seal Failure
-- Rotating component failures: Impeller Erosion/Cracking, Rotor Bow/Rub, Shaft Fatigue, Gear Tooth Wear/Pitting
-- Sealing element failures: Gasket Blowout, O-Ring Extrusion, Packing Leak
-- Electrical component failures: Winding Insulation, Contact Wear, Coil Failure, Capacitor Failure
-- Instrumentation failures: TC/RTD Drift, Solenoid Coil Failure, Display Failure
-
-**ISO 14224 Level Mapping:**
-| Level | Types Available |
-|-------|-----------------|
-| equipment_unit | Full equipment (pumps, compressors, heat exchangers, etc.) |
-| subunit | Components (bearings, seals, motors, valves, sensors, etc.) |
-| maintainable_item | Replaceable parts (gaskets, o-rings, fuses, thermocouples, etc.) |
-
 **Files Modified:**
 - `/app/backend/iso14224_models.py` - Added applicable_levels field, 51 new component types
 - `/app/backend/failure_modes.py` - Added 96 component failure modes (IDs 532-627)
+- `/app/backend/scripts/enhance_failure_modes.py` - NEW: ISO 14224 enhancement mappings
+- `/app/backend/scripts/seed_failure_modes.py` - Updated to apply enhancements during seeding
+- `/app/backend/services/failure_modes_service.py` - Updated _serialize to include mechanism_description
 - `/app/frontend/src/components/equipment/PropertiesPanel.js` - Added level-based filtering logic
 - `/app/backend/routes/equipment.py` - Updated create_equipment_type to include applicable_levels
 - MongoDB `failure_modes` collection re-seeded via `scripts/seed_failure_modes.py --force`

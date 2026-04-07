@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 async def seed_failure_modes_library(db: AsyncIOMotorDatabase, force_reseed: bool = False) -> Dict[str, Any]:
     """
     Seed the failure_modes MongoDB collection from the static FAILURE_MODES_LIBRARY.
+    Applies ISO 14224 enhancements (mechanism, potential_effects, potential_causes).
     
     Args:
         db: MongoDB database instance
@@ -24,6 +25,7 @@ async def seed_failure_modes_library(db: AsyncIOMotorDatabase, force_reseed: boo
         Dict with seeding results (inserted count, skipped, errors)
     """
     from failure_modes import FAILURE_MODES_LIBRARY
+    from scripts.enhance_failure_modes import get_enhancement, ISO_MECHANISMS
     
     collection = db["failure_modes"]
     
@@ -48,6 +50,11 @@ async def seed_failure_modes_library(db: AsyncIOMotorDatabase, force_reseed: boo
     documents = []
     
     for fm in FAILURE_MODES_LIBRARY:
+        # Get ISO 14224 enhancements for this failure mode
+        enhancement = get_enhancement(fm.get("failure_mode", ""))
+        mechanism_code = enhancement.get("mechanism", "UNK")
+        mechanism_desc = ISO_MECHANISMS.get(mechanism_code, "Unknown")
+        
         doc = {
             "legacy_id": fm["id"],  # Keep original ID as legacy_id
             "category": fm.get("category", ""),
@@ -60,12 +67,11 @@ async def seed_failure_modes_library(db: AsyncIOMotorDatabase, force_reseed: boo
             "rpn": fm.get("rpn", 125),
             "recommended_actions": fm.get("recommended_actions", []),
             "equipment_type_ids": fm.get("equipment_type_ids", []),
-            "mechanism": fm.get("mechanism", "UNK - Unknown"),
-            # New enhanced fields
-            "process": fm.get("process"),
-            "potential_effects": fm.get("potential_effects"),
-            "potential_causes": fm.get("potential_causes"),
-            "iso14224_mechanism": fm.get("iso14224_mechanism"),
+            # ISO 14224 enhanced fields
+            "mechanism": mechanism_code,
+            "mechanism_description": mechanism_desc,
+            "potential_effects": enhancement.get("potential_effects", []),
+            "potential_causes": enhancement.get("potential_causes", []),
             # Versioning
             "version": 1,
             "is_validated": False,

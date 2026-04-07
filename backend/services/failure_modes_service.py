@@ -540,11 +540,13 @@ class FailureModesService:
             "rpn": doc["rpn"],
             "recommended_actions": doc.get("recommended_actions", []),
             "equipment_type_ids": doc.get("equipment_type_ids", []),
-            "mechanism": doc.get("mechanism", "UNK - Unknown"),
-            # New fields for failure mode enhancements
+            # ISO 14224 enhanced fields
+            "mechanism": doc.get("mechanism", "UNK"),
+            "mechanism_description": doc.get("mechanism_description", "Unknown"),
+            "potential_effects": doc.get("potential_effects", []),
+            "potential_causes": doc.get("potential_causes", []),
+            # Legacy fields
             "process": doc.get("process"),
-            "potential_effects": doc.get("potential_effects"),
-            "potential_causes": doc.get("potential_causes"),
             "iso14224_mechanism": doc.get("iso14224_mechanism"),
             "is_validated": doc.get("is_validated", False),
             "validated_by_name": doc.get("validated_by_name"),
