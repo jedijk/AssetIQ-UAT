@@ -617,11 +617,11 @@ class FormService:
                 return {}
             users = await self.db.users.find(
                 {"id": {"$in": list(user_ids)}}, 
-                {"_id": 0, "id": 1, "name": 1, "email": 1, "avatar_path": 1}
+                {"_id": 0, "id": 1, "name": 1, "email": 1, "avatar_path": 1, "avatar_data": 1}
             ).to_list(length=100)
             return {u["id"]: {
                 "name": u.get("name", u.get("email", "Unknown")),
-                "avatar_path": u.get("avatar_path")
+                "has_avatar": bool(u.get("avatar_path") or u.get("avatar_data"))
             } for u in users}
         
         async def fetch_equipment():
@@ -684,7 +684,7 @@ class FormService:
                 if user_data:
                     if not serialized.get("submitted_by_name"):
                         serialized["submitted_by_name"] = user_data.get("name", "Unknown")
-                    if user_data.get("avatar_path"):
+                    if user_data.get("has_avatar"):
                         serialized["submitted_by_photo"] = f"/api/users/{serialized['submitted_by']}/avatar"
             
             # Get equipment info from map

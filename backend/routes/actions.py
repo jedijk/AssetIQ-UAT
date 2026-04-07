@@ -34,7 +34,7 @@ async def enrich_with_creator_info(items: list) -> list:
     if uncached_ids:
         creators = await db.users.find(
             {"id": {"$in": uncached_ids}},
-            {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "position": 1, "role": 1}
+            {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "avatar_data": 1, "position": 1, "role": 1}
         ).to_list(100)
         
         # Cache the fetched users
@@ -53,11 +53,11 @@ async def enrich_with_creator_info(items: list) -> list:
             creator = creator_map[creator_id]
             item["creator_name"] = creator.get("name") or creator.get("email", "").split("@")[0]
             item["creator_position"] = creator.get("position") or creator.get("role") or "Team Member"
-            # Check both photo_url and avatar_path - convert avatar_path to API URL
+            # Check photo_url, avatar_path, or avatar_data (MongoDB fallback)
             if creator.get("photo_url"):
                 item["creator_photo"] = creator.get("photo_url")
-            elif creator.get("avatar_path"):
-                # Generate API URL for avatar
+            elif creator.get("avatar_path") or creator.get("avatar_data"):
+                # Generate API URL for avatar (works for both storage methods)
                 item["creator_photo"] = f"/api/users/{creator_id}/avatar"
             else:
                 item["creator_photo"] = None

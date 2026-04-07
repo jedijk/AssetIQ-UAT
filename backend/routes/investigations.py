@@ -89,12 +89,12 @@ async def get_investigations(
         if inv.get("investigation_leader"):
             user = await db.users.find_one(
                 {"name": inv["investigation_leader"]},
-                {"_id": 0, "id": 1, "photo_url": 1, "avatar_path": 1, "name": 1, "position": 1, "role": 1}
+                {"_id": 0, "id": 1, "photo_url": 1, "avatar_path": 1, "avatar_data": 1, "name": 1, "position": 1, "role": 1}
             )
             if user:
                 if user.get("photo_url"):
                     lead_picture = user.get("photo_url")
-                elif user.get("avatar_path"):
+                elif user.get("avatar_path") or user.get("avatar_data"):
                     lead_picture = f"/api/users/{user['id']}/avatar"
                 lead_name = user.get("name", lead_name)
                 lead_position = user.get("position") or user.get("role") or "Investigation Lead"
@@ -103,12 +103,12 @@ async def get_investigations(
         if not lead_picture and inv.get("created_by"):
             user = await db.users.find_one(
                 {"id": inv["created_by"]},
-                {"_id": 0, "photo_url": 1, "avatar_path": 1, "name": 1, "position": 1, "role": 1}
+                {"_id": 0, "photo_url": 1, "avatar_path": 1, "avatar_data": 1, "name": 1, "position": 1, "role": 1}
             )
             if user:
                 if user.get("photo_url"):
                     lead_picture = user.get("photo_url")
-                elif user.get("avatar_path"):
+                elif user.get("avatar_path") or user.get("avatar_data"):
                     lead_picture = f"/api/users/{inv['created_by']}/avatar"
                 if not lead_name:
                     lead_name = user.get("name")
