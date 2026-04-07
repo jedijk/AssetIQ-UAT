@@ -1081,6 +1081,7 @@ export default function EquipmentManagerPage() {
           equipmentTypes={equipmentTypes} 
           criticalityProfiles={criticalityProfiles} 
           disciplines={disciplines} 
+          allNodes={hierarchyData || []}
           onUpdate={(id, data) => updateMutation.mutate({ nodeId: id, data })} 
           onAssignCriticality={(id, a) => criticalityMutation.mutate({ nodeId: id, assignment: a })} 
           onAssignDiscipline={(id, d) => disciplineMutation.mutate({ nodeId: id, discipline: d })}

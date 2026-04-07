@@ -117,81 +117,101 @@ class EquipmentCategory(str, Enum):
     SAFETY = "safety"
     ELECTRICAL = "electrical"
 
+# Standard system categories for compatibility mapping
+SYSTEM_CATEGORIES = [
+    "Pumping System",
+    "Compression System",
+    "Power Generation",
+    "Power Distribution",
+    "Cooling System",
+    "Heating System",
+    "Process Control",
+    "Separation System",
+    "Storage System",
+    "Material Handling",
+    "Safety System",
+    "Fire Protection",
+    "Utility System",
+    "Extrusion System",
+    "Mixing System",
+]
+
 # Equipment types with ISO classification - Expanded and standardized per ISO 14224
+# Each type includes compatible_systems for smart filtering when creating equipment
 EQUIPMENT_TYPES = [
     # ========== MECHANICAL - Rotating Equipment ==========
-    {"id": "pump_centrifugal", "name": "Centrifugal Pump", "iso_class": "1.1.1", "discipline": "Mechanical", "category": "rotating", "icon": "droplets", "default_failure_modes": []},
-    {"id": "pump_reciprocating", "name": "Reciprocating Pump", "iso_class": "1.1.2", "discipline": "Mechanical", "category": "rotating", "icon": "droplets", "default_failure_modes": []},
-    {"id": "pump_package", "name": "Pump Package / Skid", "iso_class": "1.1.3", "discipline": "Mechanical", "category": "rotating", "icon": "droplets", "default_failure_modes": []},
-    {"id": "compressor_centrifugal", "name": "Centrifugal Compressor", "iso_class": "1.2.1", "discipline": "Mechanical", "category": "rotating", "icon": "wind", "default_failure_modes": []},
-    {"id": "compressor_reciprocating", "name": "Reciprocating Compressor", "iso_class": "1.2.2", "discipline": "Mechanical", "category": "rotating", "icon": "wind", "default_failure_modes": []},
-    {"id": "compressor_screw", "name": "Screw Compressor", "iso_class": "1.2.3", "discipline": "Mechanical", "category": "rotating", "icon": "wind", "default_failure_modes": []},
-    {"id": "turbine_gas", "name": "Gas Turbine", "iso_class": "1.3.1", "discipline": "Mechanical", "category": "rotating", "icon": "cog", "default_failure_modes": []},
-    {"id": "turbine_steam", "name": "Steam Turbine", "iso_class": "1.3.2", "discipline": "Mechanical", "category": "rotating", "icon": "cog", "default_failure_modes": []},
-    {"id": "gearbox", "name": "Gearbox", "iso_class": "1.4.1", "discipline": "Mechanical", "category": "rotating", "icon": "cog", "default_failure_modes": []},
-    {"id": "blower_fan", "name": "Blower / Fan", "iso_class": "1.5.1", "discipline": "Mechanical", "category": "rotating", "icon": "wind", "default_failure_modes": []},
-    {"id": "mixer_agitator", "name": "Mixer / Agitator", "iso_class": "1.6.1", "discipline": "Mechanical", "category": "rotating", "icon": "settings", "default_failure_modes": []},
-    {"id": "extruder", "name": "Extruder", "iso_class": "1.7.1", "discipline": "Mechanical", "category": "rotating", "icon": "cylinder", "default_failure_modes": []},
-    {"id": "grinder", "name": "Grinder", "iso_class": "1.8.1", "discipline": "Mechanical", "category": "rotating", "icon": "settings", "default_failure_modes": []},
-    {"id": "conveyor", "name": "Conveyor", "iso_class": "1.9.1", "discipline": "Mechanical", "category": "rotating", "icon": "move-horizontal", "default_failure_modes": []},
-    {"id": "crane_hoist", "name": "Crane / Hoist", "iso_class": "1.10.1", "discipline": "Mechanical", "category": "rotating", "icon": "arrow-up-down", "default_failure_modes": []},
+    {"id": "pump_centrifugal", "name": "Centrifugal Pump", "iso_class": "1.1.1", "discipline": "Mechanical", "category": "rotating", "icon": "droplets", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Cooling System", "Utility System"], "is_system_level": False},
+    {"id": "pump_reciprocating", "name": "Reciprocating Pump", "iso_class": "1.1.2", "discipline": "Mechanical", "category": "rotating", "icon": "droplets", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Process Control"], "is_system_level": False},
+    {"id": "pump_package", "name": "Pump Package / Skid", "iso_class": "1.1.3", "discipline": "Mechanical", "category": "rotating", "icon": "droplets", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Utility System"], "is_system_level": False},
+    {"id": "compressor_centrifugal", "name": "Centrifugal Compressor", "iso_class": "1.2.1", "discipline": "Mechanical", "category": "rotating", "icon": "wind", "default_failure_modes": [], "compatible_systems": ["Compression System", "Utility System"], "is_system_level": False},
+    {"id": "compressor_reciprocating", "name": "Reciprocating Compressor", "iso_class": "1.2.2", "discipline": "Mechanical", "category": "rotating", "icon": "wind", "default_failure_modes": [], "compatible_systems": ["Compression System"], "is_system_level": False},
+    {"id": "compressor_screw", "name": "Screw Compressor", "iso_class": "1.2.3", "discipline": "Mechanical", "category": "rotating", "icon": "wind", "default_failure_modes": [], "compatible_systems": ["Compression System", "Utility System"], "is_system_level": False},
+    {"id": "turbine_gas", "name": "Gas Turbine", "iso_class": "1.3.1", "discipline": "Mechanical", "category": "rotating", "icon": "cog", "default_failure_modes": [], "compatible_systems": ["Power Generation", "Compression System"], "is_system_level": False},
+    {"id": "turbine_steam", "name": "Steam Turbine", "iso_class": "1.3.2", "discipline": "Mechanical", "category": "rotating", "icon": "cog", "default_failure_modes": [], "compatible_systems": ["Power Generation"], "is_system_level": False},
+    {"id": "gearbox", "name": "Gearbox", "iso_class": "1.4.1", "discipline": "Mechanical", "category": "rotating", "icon": "cog", "default_failure_modes": [], "compatible_systems": ["Compression System", "Pumping System", "Power Generation", "Mixing System"], "is_system_level": False},
+    {"id": "blower_fan", "name": "Blower / Fan", "iso_class": "1.5.1", "discipline": "Mechanical", "category": "rotating", "icon": "wind", "default_failure_modes": [], "compatible_systems": ["Cooling System", "Utility System", "Heating System"], "is_system_level": False},
+    {"id": "mixer_agitator", "name": "Mixer / Agitator", "iso_class": "1.6.1", "discipline": "Mechanical", "category": "rotating", "icon": "settings", "default_failure_modes": [], "compatible_systems": ["Mixing System", "Process Control"], "is_system_level": False},
+    {"id": "extruder", "name": "Extruder", "iso_class": "1.7.1", "discipline": "Mechanical", "category": "rotating", "icon": "cylinder", "default_failure_modes": [], "compatible_systems": ["Extrusion System"], "is_system_level": False},
+    {"id": "grinder", "name": "Grinder", "iso_class": "1.8.1", "discipline": "Mechanical", "category": "rotating", "icon": "settings", "default_failure_modes": [], "compatible_systems": ["Material Handling", "Process Control"], "is_system_level": False},
+    {"id": "conveyor", "name": "Conveyor", "iso_class": "1.9.1", "discipline": "Mechanical", "category": "rotating", "icon": "move-horizontal", "default_failure_modes": [], "compatible_systems": ["Material Handling", "Extrusion System"], "is_system_level": False},
+    {"id": "crane_hoist", "name": "Crane / Hoist", "iso_class": "1.10.1", "discipline": "Mechanical", "category": "rotating", "icon": "arrow-up-down", "default_failure_modes": [], "compatible_systems": ["Material Handling", "Utility System"], "is_system_level": False},
     
     # ========== MECHANICAL - Valves ==========
-    {"id": "valve_manual", "name": "Manual Valve", "iso_class": "3.1.1", "discipline": "Mechanical", "category": "static", "icon": "circle-dot", "default_failure_modes": []},
-    {"id": "valve_check", "name": "Check Valve", "iso_class": "3.1.2", "discipline": "Mechanical", "category": "static", "icon": "circle-dot", "default_failure_modes": []},
-    {"id": "valve_ball", "name": "Ball Valve", "iso_class": "3.1.3", "discipline": "Mechanical", "category": "static", "icon": "circle-dot", "default_failure_modes": []},
-    {"id": "valve_gate", "name": "Gate Valve", "iso_class": "3.1.4", "discipline": "Mechanical", "category": "static", "icon": "circle-dot", "default_failure_modes": []},
-    {"id": "valve_butterfly", "name": "Butterfly Valve", "iso_class": "3.1.5", "discipline": "Mechanical", "category": "static", "icon": "circle-dot", "default_failure_modes": []},
+    {"id": "valve_manual", "name": "Manual Valve", "iso_class": "3.1.1", "discipline": "Mechanical", "category": "static", "icon": "circle-dot", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Compression System", "Cooling System", "Heating System", "Process Control", "Storage System"], "is_system_level": False},
+    {"id": "valve_check", "name": "Check Valve", "iso_class": "3.1.2", "discipline": "Mechanical", "category": "static", "icon": "circle-dot", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Compression System", "Cooling System"], "is_system_level": False},
+    {"id": "valve_ball", "name": "Ball Valve", "iso_class": "3.1.3", "discipline": "Mechanical", "category": "static", "icon": "circle-dot", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Compression System", "Process Control", "Storage System"], "is_system_level": False},
+    {"id": "valve_gate", "name": "Gate Valve", "iso_class": "3.1.4", "discipline": "Mechanical", "category": "static", "icon": "circle-dot", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Storage System", "Utility System"], "is_system_level": False},
+    {"id": "valve_butterfly", "name": "Butterfly Valve", "iso_class": "3.1.5", "discipline": "Mechanical", "category": "static", "icon": "circle-dot", "default_failure_modes": [], "compatible_systems": ["Cooling System", "Utility System"], "is_system_level": False},
     
     # ========== ELECTRICAL ==========
-    {"id": "motor_electric", "name": "Electric Motor", "iso_class": "4.1.1", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": []},
-    {"id": "motor_dc", "name": "DC Motor", "iso_class": "4.1.2", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": []},
-    {"id": "transformer", "name": "Transformer", "iso_class": "4.2.1", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": []},
-    {"id": "switchgear", "name": "Switchgear", "iso_class": "4.3.1", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": []},
-    {"id": "mcc", "name": "Motor Control Center (MCC)", "iso_class": "4.3.2", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": []},
-    {"id": "vfd", "name": "Variable Frequency Drive (VFD)", "iso_class": "4.4.1", "discipline": "Electrical", "category": "electrical", "icon": "activity", "default_failure_modes": []},
-    {"id": "ups", "name": "UPS (Uninterruptible Power Supply)", "iso_class": "4.5.1", "discipline": "Electrical", "category": "electrical", "icon": "battery", "default_failure_modes": []},
-    {"id": "battery_system", "name": "Battery System", "iso_class": "4.5.2", "discipline": "Electrical", "category": "electrical", "icon": "battery", "default_failure_modes": []},
-    {"id": "generator", "name": "Generator", "iso_class": "4.6.1", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": []},
-    {"id": "cable_termination", "name": "Cable / Termination", "iso_class": "4.7.1", "discipline": "Electrical", "category": "electrical", "icon": "cable", "default_failure_modes": []},
+    {"id": "motor_electric", "name": "Electric Motor", "iso_class": "4.1.1", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Compression System", "Cooling System", "Material Handling", "Mixing System", "Extrusion System"], "is_system_level": False},
+    {"id": "motor_dc", "name": "DC Motor", "iso_class": "4.1.2", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": [], "compatible_systems": ["Material Handling", "Process Control"], "is_system_level": False},
+    {"id": "transformer", "name": "Transformer", "iso_class": "4.2.1", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": [], "compatible_systems": ["Power Distribution"], "is_system_level": False},
+    {"id": "switchgear", "name": "Switchgear", "iso_class": "4.3.1", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": [], "compatible_systems": ["Power Distribution"], "is_system_level": False},
+    {"id": "mcc", "name": "Motor Control Center (MCC)", "iso_class": "4.3.2", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": [], "compatible_systems": ["Power Distribution"], "is_system_level": False},
+    {"id": "vfd", "name": "Variable Frequency Drive (VFD)", "iso_class": "4.4.1", "discipline": "Electrical", "category": "electrical", "icon": "activity", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Compression System", "Cooling System", "Process Control"], "is_system_level": False},
+    {"id": "ups", "name": "UPS (Uninterruptible Power Supply)", "iso_class": "4.5.1", "discipline": "Electrical", "category": "electrical", "icon": "battery", "default_failure_modes": [], "compatible_systems": ["Power Distribution", "Safety System", "Process Control"], "is_system_level": False},
+    {"id": "battery_system", "name": "Battery System", "iso_class": "4.5.2", "discipline": "Electrical", "category": "electrical", "icon": "battery", "default_failure_modes": [], "compatible_systems": ["Power Distribution", "Safety System"], "is_system_level": False},
+    {"id": "generator", "name": "Generator", "iso_class": "4.6.1", "discipline": "Electrical", "category": "electrical", "icon": "zap", "default_failure_modes": [], "compatible_systems": ["Power Generation", "Power Distribution"], "is_system_level": False},
+    {"id": "cable_termination", "name": "Cable / Termination", "iso_class": "4.7.1", "discipline": "Electrical", "category": "electrical", "icon": "cable", "default_failure_modes": [], "compatible_systems": ["Power Distribution"], "is_system_level": False},
     
     # ========== INSTRUMENTATION ==========
-    {"id": "sensor_pressure", "name": "Pressure Sensor / Transmitter", "iso_class": "5.1.1", "discipline": "Instrumentation", "category": "control", "icon": "gauge", "default_failure_modes": []},
-    {"id": "sensor_temperature", "name": "Temperature Sensor / Transmitter", "iso_class": "5.1.2", "discipline": "Instrumentation", "category": "control", "icon": "thermometer", "default_failure_modes": []},
-    {"id": "sensor_flow", "name": "Flow Sensor / Transmitter", "iso_class": "5.1.3", "discipline": "Instrumentation", "category": "control", "icon": "gauge", "default_failure_modes": []},
-    {"id": "sensor_level", "name": "Level Sensor / Transmitter", "iso_class": "5.1.4", "discipline": "Instrumentation", "category": "control", "icon": "gauge", "default_failure_modes": []},
-    {"id": "valve_control", "name": "Control Valve", "iso_class": "5.2.1", "discipline": "Instrumentation", "category": "control", "icon": "circle-dot", "default_failure_modes": []},
-    {"id": "valve_positioner", "name": "Valve Positioner", "iso_class": "5.2.2", "discipline": "Instrumentation", "category": "control", "icon": "sliders", "default_failure_modes": []},
-    {"id": "plc", "name": "PLC Controller", "iso_class": "5.3.1", "discipline": "Instrumentation", "category": "control", "icon": "cpu", "default_failure_modes": []},
-    {"id": "dcs", "name": "Distributed Control System (DCS)", "iso_class": "5.3.2", "discipline": "Instrumentation", "category": "control", "icon": "cpu", "default_failure_modes": []},
-    {"id": "analyzer_gas", "name": "Gas Analyzer", "iso_class": "5.4.1", "discipline": "Instrumentation", "category": "control", "icon": "flask-conical", "default_failure_modes": []},
-    {"id": "analyzer_chemical", "name": "Chemical Analyzer", "iso_class": "5.4.2", "discipline": "Instrumentation", "category": "control", "icon": "flask-conical", "default_failure_modes": []},
-    {"id": "actuator_electric", "name": "Electric Actuator", "iso_class": "5.5.1", "discipline": "Instrumentation", "category": "control", "icon": "move", "default_failure_modes": []},
-    {"id": "actuator_pneumatic", "name": "Pneumatic Actuator", "iso_class": "5.5.2", "discipline": "Instrumentation", "category": "control", "icon": "move", "default_failure_modes": []},
+    {"id": "sensor_pressure", "name": "Pressure Sensor / Transmitter", "iso_class": "5.1.1", "discipline": "Instrumentation", "category": "control", "icon": "gauge", "default_failure_modes": [], "compatible_systems": ["Process Control", "Pumping System", "Compression System", "Safety System"], "is_system_level": False},
+    {"id": "sensor_temperature", "name": "Temperature Sensor / Transmitter", "iso_class": "5.1.2", "discipline": "Instrumentation", "category": "control", "icon": "thermometer", "default_failure_modes": [], "compatible_systems": ["Process Control", "Cooling System", "Heating System", "Safety System"], "is_system_level": False},
+    {"id": "sensor_flow", "name": "Flow Sensor / Transmitter", "iso_class": "5.1.3", "discipline": "Instrumentation", "category": "control", "icon": "gauge", "default_failure_modes": [], "compatible_systems": ["Process Control", "Pumping System", "Utility System"], "is_system_level": False},
+    {"id": "sensor_level", "name": "Level Sensor / Transmitter", "iso_class": "5.1.4", "discipline": "Instrumentation", "category": "control", "icon": "gauge", "default_failure_modes": [], "compatible_systems": ["Process Control", "Storage System", "Separation System"], "is_system_level": False},
+    {"id": "valve_control", "name": "Control Valve", "iso_class": "5.2.1", "discipline": "Instrumentation", "category": "control", "icon": "circle-dot", "default_failure_modes": [], "compatible_systems": ["Process Control", "Pumping System", "Cooling System", "Heating System"], "is_system_level": False},
+    {"id": "valve_positioner", "name": "Valve Positioner", "iso_class": "5.2.2", "discipline": "Instrumentation", "category": "control", "icon": "sliders", "default_failure_modes": [], "compatible_systems": ["Process Control"], "is_system_level": False},
+    {"id": "plc", "name": "PLC Controller", "iso_class": "5.3.1", "discipline": "Instrumentation", "category": "control", "icon": "cpu", "default_failure_modes": [], "compatible_systems": ["Process Control", "Safety System", "Material Handling"], "is_system_level": False},
+    {"id": "dcs", "name": "Distributed Control System (DCS)", "iso_class": "5.3.2", "discipline": "Instrumentation", "category": "control", "icon": "cpu", "default_failure_modes": [], "compatible_systems": ["Process Control"], "is_system_level": True},
+    {"id": "analyzer_gas", "name": "Gas Analyzer", "iso_class": "5.4.1", "discipline": "Instrumentation", "category": "control", "icon": "flask-conical", "default_failure_modes": [], "compatible_systems": ["Process Control", "Safety System"], "is_system_level": False},
+    {"id": "analyzer_chemical", "name": "Chemical Analyzer", "iso_class": "5.4.2", "discipline": "Instrumentation", "category": "control", "icon": "flask-conical", "default_failure_modes": [], "compatible_systems": ["Process Control"], "is_system_level": False},
+    {"id": "actuator_electric", "name": "Electric Actuator", "iso_class": "5.5.1", "discipline": "Instrumentation", "category": "control", "icon": "move", "default_failure_modes": [], "compatible_systems": ["Process Control"], "is_system_level": False},
+    {"id": "actuator_pneumatic", "name": "Pneumatic Actuator", "iso_class": "5.5.2", "discipline": "Instrumentation", "category": "control", "icon": "move", "default_failure_modes": [], "compatible_systems": ["Process Control"], "is_system_level": False},
     
     # ========== STATIC EQUIPMENT ==========
-    {"id": "heat_exchanger", "name": "Heat Exchanger", "iso_class": "2.1.1", "discipline": "Static Equipment", "category": "static", "icon": "thermometer", "default_failure_modes": []},
-    {"id": "air_cooler", "name": "Air Cooler (Fin Fan)", "iso_class": "2.1.2", "discipline": "Static Equipment", "category": "static", "icon": "wind", "default_failure_modes": []},
-    {"id": "vessel_pressure", "name": "Pressure Vessel", "iso_class": "2.2.1", "discipline": "Static Equipment", "category": "static", "icon": "box", "default_failure_modes": []},
-    {"id": "vessel_storage", "name": "Storage Tank", "iso_class": "2.2.2", "discipline": "Static Equipment", "category": "static", "icon": "box", "default_failure_modes": []},
-    {"id": "column_tower", "name": "Column / Tower", "iso_class": "2.3.1", "discipline": "Static Equipment", "category": "static", "icon": "cylinder", "default_failure_modes": []},
-    {"id": "reactor", "name": "Reactor", "iso_class": "2.4.1", "discipline": "Static Equipment", "category": "static", "icon": "flask-conical", "default_failure_modes": []},
-    {"id": "filter_separator", "name": "Filter / Separator", "iso_class": "2.5.1", "discipline": "Static Equipment", "category": "static", "icon": "filter", "default_failure_modes": []},
-    {"id": "pipe", "name": "Piping", "iso_class": "6.1.1", "discipline": "Static Equipment", "category": "static", "icon": "pipette", "default_failure_modes": []},
-    {"id": "flange_fitting", "name": "Flange / Fitting", "iso_class": "6.1.2", "discipline": "Static Equipment", "category": "static", "icon": "circle", "default_failure_modes": []},
-    {"id": "boiler", "name": "Boiler", "iso_class": "2.6.1", "discipline": "Static Equipment", "category": "static", "icon": "flame", "default_failure_modes": []},
-    {"id": "furnace_heater", "name": "Furnace / Heater", "iso_class": "2.6.2", "discipline": "Static Equipment", "category": "static", "icon": "flame", "default_failure_modes": []},
+    {"id": "heat_exchanger", "name": "Heat Exchanger", "iso_class": "2.1.1", "discipline": "Static Equipment", "category": "static", "icon": "thermometer", "default_failure_modes": [], "compatible_systems": ["Cooling System", "Heating System", "Process Control"], "is_system_level": False},
+    {"id": "air_cooler", "name": "Air Cooler (Fin Fan)", "iso_class": "2.1.2", "discipline": "Static Equipment", "category": "static", "icon": "wind", "default_failure_modes": [], "compatible_systems": ["Cooling System"], "is_system_level": False},
+    {"id": "vessel_pressure", "name": "Pressure Vessel", "iso_class": "2.2.1", "discipline": "Static Equipment", "category": "static", "icon": "box", "default_failure_modes": [], "compatible_systems": ["Separation System", "Process Control", "Storage System"], "is_system_level": False},
+    {"id": "vessel_storage", "name": "Storage Tank", "iso_class": "2.2.2", "discipline": "Static Equipment", "category": "static", "icon": "box", "default_failure_modes": [], "compatible_systems": ["Storage System"], "is_system_level": False},
+    {"id": "column_tower", "name": "Column / Tower", "iso_class": "2.3.1", "discipline": "Static Equipment", "category": "static", "icon": "cylinder", "default_failure_modes": [], "compatible_systems": ["Separation System", "Process Control"], "is_system_level": False},
+    {"id": "reactor", "name": "Reactor", "iso_class": "2.4.1", "discipline": "Static Equipment", "category": "static", "icon": "flask-conical", "default_failure_modes": [], "compatible_systems": ["Process Control"], "is_system_level": False},
+    {"id": "filter_separator", "name": "Filter / Separator", "iso_class": "2.5.1", "discipline": "Static Equipment", "category": "static", "icon": "filter", "default_failure_modes": [], "compatible_systems": ["Separation System", "Utility System", "Pumping System"], "is_system_level": False},
+    {"id": "pipe", "name": "Piping", "iso_class": "6.1.1", "discipline": "Static Equipment", "category": "static", "icon": "pipette", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Compression System", "Cooling System", "Heating System", "Process Control", "Storage System", "Utility System"], "is_system_level": False},
+    {"id": "flange_fitting", "name": "Flange / Fitting", "iso_class": "6.1.2", "discipline": "Static Equipment", "category": "static", "icon": "circle", "default_failure_modes": [], "compatible_systems": ["Pumping System", "Compression System", "Process Control", "Storage System"], "is_system_level": False},
+    {"id": "boiler", "name": "Boiler", "iso_class": "2.6.1", "discipline": "Static Equipment", "category": "static", "icon": "flame", "default_failure_modes": [], "compatible_systems": ["Heating System", "Power Generation", "Utility System"], "is_system_level": False},
+    {"id": "furnace_heater", "name": "Furnace / Heater", "iso_class": "2.6.2", "discipline": "Static Equipment", "category": "static", "icon": "flame", "default_failure_modes": [], "compatible_systems": ["Heating System", "Process Control"], "is_system_level": False},
     
-    # ========== SAFETY ==========
-    {"id": "valve_safety", "name": "Safety Valve / PSV", "iso_class": "7.1.1", "discipline": "Safety", "category": "safety", "icon": "shield", "default_failure_modes": []},
-    {"id": "rupture_disc", "name": "Rupture Disc", "iso_class": "7.1.2", "discipline": "Safety", "category": "safety", "icon": "shield", "default_failure_modes": []},
-    {"id": "esd", "name": "Emergency Shutdown System (ESD)", "iso_class": "7.2.1", "discipline": "Safety", "category": "safety", "icon": "shield-alert", "default_failure_modes": []},
-    {"id": "sis", "name": "Safety Instrumented System (SIS)", "iso_class": "7.2.2", "discipline": "Safety", "category": "safety", "icon": "shield-alert", "default_failure_modes": []},
-    {"id": "fire_gas", "name": "Fire & Gas System (F&G)", "iso_class": "7.3.1", "discipline": "Safety", "category": "safety", "icon": "flame", "default_failure_modes": []},
-    {"id": "fire_protection", "name": "Fire Protection / Deluge System", "iso_class": "7.3.2", "discipline": "Safety", "category": "safety", "icon": "droplets", "default_failure_modes": []},
-    {"id": "flare_system", "name": "Flare System", "iso_class": "7.4.1", "discipline": "Safety", "category": "safety", "icon": "flame", "default_failure_modes": []},
-    {"id": "gas_detector", "name": "Gas Detector", "iso_class": "7.5.1", "discipline": "Safety", "category": "safety", "icon": "alert-triangle", "default_failure_modes": []},
-    {"id": "flame_detector", "name": "Flame / Fire Detector", "iso_class": "7.5.2", "discipline": "Safety", "category": "safety", "icon": "alert-triangle", "default_failure_modes": []},
+    # ========== SAFETY (System-level equipment) ==========
+    {"id": "valve_safety", "name": "Safety Valve / PSV", "iso_class": "7.1.1", "discipline": "Safety", "category": "safety", "icon": "shield", "default_failure_modes": [], "compatible_systems": ["Safety System", "Pumping System", "Compression System", "Storage System"], "is_system_level": False},
+    {"id": "rupture_disc", "name": "Rupture Disc", "iso_class": "7.1.2", "discipline": "Safety", "category": "safety", "icon": "shield", "default_failure_modes": [], "compatible_systems": ["Safety System", "Storage System"], "is_system_level": False},
+    {"id": "esd", "name": "Emergency Shutdown System (ESD)", "iso_class": "7.2.1", "discipline": "Safety", "category": "safety", "icon": "shield-alert", "default_failure_modes": [], "compatible_systems": ["Safety System"], "is_system_level": True},
+    {"id": "sis", "name": "Safety Instrumented System (SIS)", "iso_class": "7.2.2", "discipline": "Safety", "category": "safety", "icon": "shield-alert", "default_failure_modes": [], "compatible_systems": ["Safety System"], "is_system_level": True},
+    {"id": "fire_gas", "name": "Fire & Gas System (F&G)", "iso_class": "7.3.1", "discipline": "Safety", "category": "safety", "icon": "flame", "default_failure_modes": [], "compatible_systems": ["Safety System", "Fire Protection"], "is_system_level": True},
+    {"id": "fire_protection", "name": "Fire Protection / Deluge System", "iso_class": "7.3.2", "discipline": "Safety", "category": "safety", "icon": "droplets", "default_failure_modes": [], "compatible_systems": ["Fire Protection", "Safety System"], "is_system_level": True},
+    {"id": "flare_system", "name": "Flare System", "iso_class": "7.4.1", "discipline": "Safety", "category": "safety", "icon": "flame", "default_failure_modes": [], "compatible_systems": ["Safety System"], "is_system_level": True},
+    {"id": "gas_detector", "name": "Gas Detector", "iso_class": "7.5.1", "discipline": "Safety", "category": "safety", "icon": "alert-triangle", "default_failure_modes": [], "compatible_systems": ["Safety System", "Fire Protection"], "is_system_level": False},
+    {"id": "flame_detector", "name": "Flame / Fire Detector", "iso_class": "7.5.2", "discipline": "Safety", "category": "safety", "icon": "alert-triangle", "default_failure_modes": [], "compatible_systems": ["Safety System", "Fire Protection"], "is_system_level": False},
 ]
 
 # Default criticality profiles
@@ -303,6 +323,8 @@ class EquipmentTypeCreate(BaseModel):
     icon: str = "cog"
     category: Optional[str] = "rotating"  # rotating, static, control, safety, electrical
     default_failure_modes: Optional[List[str]] = []  # List of failure mode IDs
+    compatible_systems: Optional[List[str]] = []  # List of compatible system categories
+    is_system_level: Optional[bool] = False  # True for DCS, ESD, SIS, F&G, etc.
 
 class EquipmentTypeUpdate(BaseModel):
     name: Optional[str] = None
@@ -311,6 +333,8 @@ class EquipmentTypeUpdate(BaseModel):
     icon: Optional[str] = None
     category: Optional[str] = None
     default_failure_modes: Optional[List[str]] = None
+    compatible_systems: Optional[List[str]] = None
+    is_system_level: Optional[bool] = None
 
 # Equipment type detection keywords - Expanded for ISO 14224 coverage
 EQUIPMENT_TYPE_KEYWORDS = {

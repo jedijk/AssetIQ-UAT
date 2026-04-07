@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLanguage } from "../../contexts/LanguageContext";
 import {
-  Settings, Cog, Check, Edit, GripVertical, Trash2,
+  Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { ScrollArea } from "../ui/scroll-area";
+import { Switch } from "../ui/switch";
 
 const LEVEL_CONFIG = { 
   installation: { icon: Settings, label: "Installation" }, 
@@ -51,11 +52,63 @@ const CriticalityDimension = ({ label, color, value, onClick }) => (
   </div>
 );
 
-export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCriticality, onDelete }) {
+export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCriticality, onDelete, allNodes }) {
   const { t } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [showAllTypes, setShowAllTypes] = useState(false);
+  
+  // Determine parent system name for smart filtering
+  const parentSystemName = useMemo(() => {
+    if (!node || !allNodes) return null;
+    
+    // Find parent nodes and check for system-level name
+    let currentParentId = node.parent_id;
+    while (currentParentId) {
+      const parent = allNodes.find(n => n.id === currentParentId);
+      if (!parent) break;
+      
+      // Check if parent level is a system (section_system, system)
+      if (parent.level === "section_system" || parent.level === "system" || parent.level === "equipment_unit") {
+        return parent.name;
+      }
+      currentParentId = parent.parent_id;
+    }
+    return null;
+  }, [node, allNodes]);
+  
+  // Filter equipment types - show recommended first based on compatible_systems
+  const { recommendedTypes, otherTypes } = useMemo(() => {
+    if (!equipmentTypes || !parentSystemName) {
+      return { recommendedTypes: [], otherTypes: equipmentTypes || [] };
+    }
+    
+    const searchTerms = parentSystemName.toLowerCase();
+    
+    // Find types that have compatible systems matching parent name
+    const recommended = [];
+    const others = [];
+    
+    equipmentTypes.forEach(eqt => {
+      const isCompatible = eqt.compatible_systems?.some(sys => {
+        const sysLower = sys.toLowerCase();
+        // Check if system name contains any word from compatible systems
+        return searchTerms.includes(sysLower.split(" ")[0]) || 
+               sysLower.includes(searchTerms.split(" ")[0]) ||
+               searchTerms.includes(sysLower) ||
+               sysLower.includes(searchTerms);
+      });
+      
+      if (isCompatible) {
+        recommended.push(eqt);
+      } else {
+        others.push(eqt);
+      }
+    });
+    
+    return { recommendedTypes: recommended, otherTypes: others };
+  }, [equipmentTypes, parentSystemName]);
   
   if (!node) return (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
@@ -113,7 +166,20 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
           {(node.level === "equipment_unit" || node.level === "equipment" || node.level === "subunit" || node.level === "maintainable_item") && (
             <>
               <div>
-                <Label className="text-xs text-slate-500 mb-1">{t("equipment.equipmentType") || "Equipment Type"}</Label>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-xs text-slate-500">{t("equipment.equipmentType") || "Equipment Type"}</Label>
+                  {recommendedTypes.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-3 h-3 text-slate-400" />
+                      <span className="text-xs text-slate-400">Show all</span>
+                      <Switch 
+                        checked={showAllTypes} 
+                        onCheckedChange={setShowAllTypes}
+                        className="h-4 w-7"
+                      />
+                    </div>
+                  )}
+                </div>
                 <Select 
                   value={node.equipment_type_id || "__none__"} 
                   onValueChange={v => {
@@ -126,13 +192,59 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                   }}
                 >
                   <SelectTrigger className="h-9"><SelectValue placeholder="Select type" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-80">
                     <SelectItem value="__none__">
                       <span className="text-slate-400">None</span>
                     </SelectItem>
-                    {equipmentTypes?.map(eqt => <SelectItem key={eqt.id} value={eqt.id}>{eqt.name}</SelectItem>)}
+                    
+                    {/* Recommended types based on parent system */}
+                    {recommendedTypes.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 bg-blue-50 border-y border-blue-100">
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles className="w-3 h-3 text-blue-500" />
+                            <span className="text-xs font-medium text-blue-700">Recommended for this system</span>
+                          </div>
+                        </div>
+                        {recommendedTypes.map(eqt => (
+                          <SelectItem key={eqt.id} value={eqt.id} className="pl-4">
+                            <div className="flex items-center gap-2">
+                              <span>{eqt.name}</span>
+                              <span className="text-xs text-slate-400">({eqt.discipline})</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* Other types - shown if showAllTypes is true or no recommendations */}
+                    {(showAllTypes || recommendedTypes.length === 0) && otherTypes.length > 0 && (
+                      <>
+                        {recommendedTypes.length > 0 && (
+                          <div className="px-2 py-1.5 bg-slate-50 border-y border-slate-100">
+                            <span className="text-xs font-medium text-slate-500">All Equipment Types</span>
+                          </div>
+                        )}
+                        {otherTypes.map(eqt => (
+                          <SelectItem key={eqt.id} value={eqt.id} className="pl-4">
+                            <div className="flex items-center gap-2">
+                              <span>{eqt.name}</span>
+                              <span className="text-xs text-slate-400">({eqt.discipline})</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
+                
+                {/* System context hint */}
+                {parentSystemName && recommendedTypes.length > 0 && !showAllTypes && (
+                  <p className="text-xs text-blue-500 mt-1 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    Filtered for "{parentSystemName}"
+                  </p>
+                )}
               </div>
               
               {node.equipment_type_id && (

@@ -5,6 +5,33 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 7, 2026 - Equipment Types Intelligent Hierarchy Mapping
+**FEATURE COMPLETED:**
+- ✅ **Added `compatible_systems` field** to all 62 equipment types for smart filtering
+- ✅ **Added `is_system_level` flag** for system-level equipment (DCS, ESD, SIS, F&G, Fire Protection, Flare)
+- ✅ **15 Standard System Categories** defined for compatibility mapping
+- ✅ **Smart Equipment Type filtering** in Properties Panel based on parent system name
+- ✅ **"Recommended for this system"** section with highlighted equipment types
+- ✅ **"Show all types" toggle** to override filtering when needed
+
+**System Categories:**
+Pumping, Compression, Power Generation, Power Distribution, Cooling, Heating, Process Control, Separation, Storage, Material Handling, Safety, Fire Protection, Utility, Extrusion, Mixing
+
+**System-Level Equipment Types (6):**
+- Distributed Control System (DCS)
+- Emergency Shutdown System (ESD)
+- Safety Instrumented System (SIS)
+- Fire & Gas System (F&G)
+- Fire Protection / Deluge System
+- Flare System
+
+**Files Modified:**
+- `/app/backend/iso14224_models.py` - Added compatible_systems, is_system_level, SYSTEM_CATEGORIES
+- `/app/frontend/src/components/equipment/PropertiesPanel.js` - Smart filtering UI
+- `/app/frontend/src/components/library/EquipmentTypeItem.jsx` - Display compatible systems
+
+---
+
 ### April 7, 2026 - Equipment Types Module ISO 14224 Expansion
 **FEATURE COMPLETED:**
 - ✅ **Expanded Equipment Types from 22 → 62 types** covering all major industrial categories
