@@ -55,7 +55,7 @@ limiter = Limiter(key_func=get_remote_address)
 # Also add fallback routes at root level for direct Railway access
 app = FastAPI(
     title="ThreatBase API",
-    version="2.6.0",
+    version="2.7.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json"
@@ -180,7 +180,7 @@ async def api_health_check():
         "database": db_status,
         "database_latency_ms": db_latency,
         "uptime_seconds": uptime,
-        "version": "2.6.5"
+        "version": "2.7.0"
     }
 
 

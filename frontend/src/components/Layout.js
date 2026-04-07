@@ -13,7 +13,7 @@ import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "2.6.5";
+const APP_VERSION = process.env.REACT_APP_VERSION || "2.7.0";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -407,6 +407,7 @@ const Layout = () => {
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true, feature: "investigations" },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList, feature: "actions" },
     { path: "/my-tasks", label: t("nav.myTasks") || "My Tasks", icon: ClipboardCheck, feature: "tasks" },
+    { path: "/forms", label: t("nav.forms") || "Forms", icon: FileText, desktopOnly: true, feature: "forms" },
     { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true, feature: "library" },
   ];
   
@@ -423,7 +424,6 @@ const Layout = () => {
   const allSettingsMenuItems = [
     { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2, desktopOnly: true, feature: "equipment" },
     { path: "/tasks", label: t("taskScheduler.execution"), icon: Calendar, desktopOnly: true, feature: "tasks" },
-    { path: "/form-submissions", label: "Form Submissions", icon: ClipboardCheck, desktopOnly: true, feature: "forms" },
     { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, feature: "users" },
     { path: "/settings/risk-calculation", label: "Risk Calculation", icon: Sliders, adminOnly: true, desktopOnly: true },
