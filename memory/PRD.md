@@ -5,6 +5,45 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### December 2025 - FMEA Failure Modes Database Expansion (ISO 14224 Complete)
+**FEATURE COMPLETED:**
+- ✅ **Expanded Failure Modes Library from 215 → 531 modes** (+316 new failure modes)
+- ✅ **Full coverage of all 62 Equipment Types** (40 previously missing types now covered)
+- ✅ **7-8 failure modes per equipment type** following ISO 14224 standards
+- ✅ **Complete field structure**: failure_mode, keywords, severity, occurrence, detectability, RPN, recommended_actions, equipment_type_ids
+
+**Equipment Types Now Covered (40 newly added):**
+- **Mechanical Rotating:** Pump Package, Screw Compressor, Gearbox, Blower/Fan, Mixer/Agitator, Conveyor, Crane/Hoist
+- **Mechanical Valves:** Check Valve, Ball Valve, Gate Valve, Butterfly Valve
+- **Electrical:** DC Motor, MCC, VFD, UPS, Battery System, Generator, Cable/Termination
+- **Instrumentation:** Level Sensor, Valve Positioner, DCS, Gas Analyzer, Chemical Analyzer, Electric Actuator, Pneumatic Actuator
+- **Static Equipment:** Air Cooler, Column/Tower, Reactor, Filter/Separator, Flange/Fitting, Boiler, Furnace/Heater
+- **Safety Systems:** Rupture Disc, ESD, SIS, Fire & Gas (F&G), Fire Protection/Deluge, Flare System, Gas Detector, Flame Detector
+
+**Failure Mode Fields (ISO 14224 Compliant):**
+- `failure_mode`: Standard failure description (e.g., "IGBT Failure")
+- `keywords`: Search terms for matching
+- `severity`: Impact rating (1-10)
+- `occurrence`: Frequency rating (1-10)
+- `detectability`: Detection difficulty (1-10)
+- `rpn`: Risk Priority Number (severity × occurrence × detectability)
+- `recommended_actions`: Maintenance tasks with action_type (PM, PDM, CM) and discipline
+- `equipment_type_ids`: Linked equipment types for smart filtering
+
+**Files Modified:**
+- `/app/backend/failure_modes.py` - Added 316 new failure modes
+- Database seeded via `/app/backend/scripts/seed_failure_modes.py --force`
+
+**API Testing:**
+```bash
+# Get failure modes by equipment type
+GET /api/failure-modes?equipment_type_id=vfd&limit=10
+GET /api/failure-modes?equipment_type_id=gas_detector&limit=10
+GET /api/failure-modes?equipment_type_id=boiler&limit=10
+```
+
+---
+
 ### April 7, 2026 - Equipment Types Intelligent Hierarchy Mapping
 **FEATURE COMPLETED:**
 - ✅ **Added `compatible_systems` field** to all 62 equipment types for smart filtering
