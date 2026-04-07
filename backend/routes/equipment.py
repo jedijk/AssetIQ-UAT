@@ -351,15 +351,40 @@ async def export_equipment_hierarchy_excel(
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
     
-    # Fetch all nodes
+    # Use the same installation-based filtering as get_equipment_nodes
+    installation_ids = await installation_filter.get_user_installation_ids(current_user)
+    
+    if not installation_ids:
+        # Return empty Excel if no installations assigned
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Equipment Hierarchy"
+        ws['A1'] = "No equipment found"
+        
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=equipment_hierarchy_empty.xlsx"}
+        )
+    
+    # Get all equipment IDs under assigned installations
+    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+        installation_ids, current_user["id"]
+    )
+    
+    # Fetch nodes using installation filter (same as hierarchy view)
     nodes = await db.equipment_nodes.find(
-        {"created_by": current_user["id"]},
+        {"id": {"$in": list(equipment_ids)}} if equipment_ids else {},
         {"_id": 0}
     ).sort("sort_order", 1).to_list(5000)
     
-    # Fetch equipment types for lookup
+    # Fetch equipment types for lookup (both user's custom and defaults)
     equipment_types = await db.custom_equipment_types.find(
-        {"created_by": current_user["id"]},
+        {},
         {"_id": 0}
     ).to_list(100)
     
@@ -392,11 +417,12 @@ async def export_equipment_hierarchy_excel(
         crit = node.get("criticality")
         if not isinstance(crit, dict):
             return 0
+        # Support both formats: safety_impact (new) and safety (legacy)
         return sum([
-            crit.get("safety", 0) or 0,
-            crit.get("production", 0) or 0,
-            crit.get("environmental", 0) or 0,
-            crit.get("reputation", 0) or 0
+            crit.get("safety_impact", crit.get("safety", 0)) or 0,
+            crit.get("production_impact", crit.get("production", 0)) or 0,
+            crit.get("environmental_impact", crit.get("environmental", 0)) or 0,
+            crit.get("reputation_impact", crit.get("reputation", 0)) or 0
         ])
     
     # Create workbook
@@ -479,14 +505,15 @@ async def export_equipment_hierarchy_excel(
             level_label,
             parent_name,
             get_path(node),
-            equipment_type_name,
+            equipment_type_name or node.get("equipment_type", ""),
             (node.get("discipline") or "").replace("_", " ").title(),
             node.get("process_step", ""),
             node.get("description", ""),
-            criticality.get("safety", 0),
-            criticality.get("production", 0),
-            criticality.get("environmental", 0),
-            criticality.get("reputation", 0),
+            # Support both formats: safety_impact (new) and safety (legacy)
+            criticality.get("safety_impact", criticality.get("safety", 0)) or 0,
+            criticality.get("production_impact", criticality.get("production", 0)) or 0,
+            criticality.get("environmental_impact", criticality.get("environmental", 0)) or 0,
+            criticality.get("reputation_impact", criticality.get("reputation", 0)) or 0,
             get_criticality_score(node),
             node.get("created_at", "")[:10] if node.get("created_at") else ""
         ]
