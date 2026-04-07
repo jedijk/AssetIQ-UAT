@@ -1,9 +1,13 @@
 """
 Object Storage Service using Emergent Object Storage.
 Handles file uploads for user avatars, attachments, etc.
+
+For Railway/production deployments without Emergent storage,
+falls back to storing images in MongoDB as base64.
 """
 import os
 import uuid
+import base64
 import logging
 import requests
 from typing import Tuple, Optional
@@ -16,6 +20,28 @@ APP_NAME = "assetiq"
 
 # Module-level storage key - initialized once and reused
 _storage_key: Optional[str] = None
+_storage_available: Optional[bool] = None
+
+
+def is_storage_available() -> bool:
+    """Check if Emergent object storage is available."""
+    global _storage_available
+    if _storage_available is not None:
+        return _storage_available
+    
+    if not EMERGENT_KEY:
+        logger.warning("EMERGENT_LLM_KEY not configured - using MongoDB fallback for file storage")
+        _storage_available = False
+        return False
+    
+    try:
+        init_storage()
+        _storage_available = True
+        return True
+    except Exception as e:
+        logger.warning(f"Emergent storage not available ({e}) - using MongoDB fallback")
+        _storage_available = False
+        return False
 
 
 def init_storage() -> str:

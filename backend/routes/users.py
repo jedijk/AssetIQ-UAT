@@ -1,16 +1,17 @@
 """
 User profile and avatar routes.
-Handles user profile photos using object storage.
+Handles user profile photos using object storage or MongoDB fallback.
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Header, Response
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timezone
 import logging
 import uuid
+import base64
 import os
 from database import db, rbac_service
 from auth import get_current_user, hash_password
-from services.storage_service import upload_avatar, get_object, get_mime_type
+from services.storage_service import upload_avatar, get_object, get_mime_type, is_storage_available
 
 # Try to import resend for email
 try:
@@ -273,6 +274,7 @@ async def upload_user_avatar(
     """
     Upload a profile photo for the current user.
     Supports JPEG, PNG, GIF, and WebP images up to 5MB.
+    Uses object storage if available, otherwise stores in MongoDB.
     """
     # Validate file type
     content_type = file.content_type or get_mime_type(file.filename)
@@ -293,33 +295,51 @@ async def upload_user_avatar(
         )
     
     try:
-        # Upload to object storage
-        storage_path = upload_avatar(
-            user_id=current_user["id"],
-            file_data=content,
-            filename=file.filename,
-            content_type=content_type
-        )
-        
-        # Update user document with avatar path
-        await db.users.update_one(
-            {"id": current_user["id"]},
-            {"$set": {
-                "avatar_path": storage_path,
-                "avatar_updated_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        
-        logger.info(f"Avatar uploaded for user {current_user['id']}: {storage_path}")
+        if is_storage_available():
+            # Upload to object storage (Emergent)
+            storage_path = upload_avatar(
+                user_id=current_user["id"],
+                file_data=content,
+                filename=file.filename,
+                content_type=content_type
+            )
+            
+            # Update user document with avatar path
+            await db.users.update_one(
+                {"id": current_user["id"]},
+                {"$set": {
+                    "avatar_path": storage_path,
+                    "avatar_storage": "object",
+                    "avatar_updated_at": datetime.now(timezone.utc).isoformat()
+                },
+                "$unset": {"avatar_data": ""}}  # Remove any old MongoDB data
+            )
+            
+            logger.info(f"Avatar uploaded to object storage for user {current_user['id']}: {storage_path}")
+        else:
+            # Fallback: Store in MongoDB as base64
+            avatar_data = base64.b64encode(content).decode('utf-8')
+            
+            await db.users.update_one(
+                {"id": current_user["id"]},
+                {"$set": {
+                    "avatar_data": avatar_data,
+                    "avatar_content_type": content_type,
+                    "avatar_storage": "mongodb",
+                    "avatar_updated_at": datetime.now(timezone.utc).isoformat()
+                },
+                "$unset": {"avatar_path": ""}}  # Remove any old object storage path
+            )
+            
+            logger.info(f"Avatar stored in MongoDB for user {current_user['id']}")
         
         return {
-            "message": "Avatar uploaded successfully",
-            "avatar_path": storage_path
+            "message": "Avatar uploaded successfully"
         }
     
     except Exception as e:
         logger.error(f"Failed to upload avatar: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload avatar")
+        raise HTTPException(status_code=500, detail=f"Failed to upload avatar: {str(e)}")
 
 
 @router.get("/users/me/avatar")
@@ -369,28 +389,45 @@ async def get_user_avatar(
     """
     Get a user's avatar image.
     Supports both header-based and query param auth for img src compatibility.
+    Handles both object storage and MongoDB-stored avatars.
     """
     # Simple auth check - accept either header or query param
     auth_header = authorization or (f"Bearer {auth}" if auth else None)
     if not auth_header:
         raise HTTPException(status_code=401, detail="Authentication required")
     
-    # Get user
+    # Get user with all avatar fields
     user = await db.users.find_one(
         {"id": user_id},
-        {"_id": 0, "avatar_path": 1}
+        {"_id": 0, "avatar_path": 1, "avatar_data": 1, "avatar_content_type": 1, "avatar_storage": 1}
     )
     
-    if not user or not user.get("avatar_path"):
-        raise HTTPException(status_code=404, detail="Avatar not found")
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     
-    try:
-        # Fetch from object storage
-        content, content_type = get_object(user["avatar_path"])
-        return Response(content=content, media_type=content_type)
-    except Exception as e:
-        logger.error(f"Failed to get avatar: {e}")
-        raise HTTPException(status_code=404, detail="Avatar not found")
+    # Check storage type
+    storage_type = user.get("avatar_storage", "object")
+    
+    if storage_type == "mongodb" and user.get("avatar_data"):
+        # Return from MongoDB
+        try:
+            content = base64.b64decode(user["avatar_data"])
+            content_type = user.get("avatar_content_type", "image/png")
+            return Response(content=content, media_type=content_type)
+        except Exception as e:
+            logger.error(f"Failed to decode MongoDB avatar: {e}")
+            raise HTTPException(status_code=404, detail="Avatar not found")
+    
+    elif user.get("avatar_path"):
+        # Return from object storage
+        try:
+            content, content_type = get_object(user["avatar_path"])
+            return Response(content=content, media_type=content_type)
+        except Exception as e:
+            logger.error(f"Failed to get avatar from storage: {e}")
+            raise HTTPException(status_code=404, detail="Avatar not found")
+    
+    raise HTTPException(status_code=404, detail="Avatar not found")
 
 
 # ============= RBAC USER MANAGEMENT WITH AVATAR =============
@@ -590,8 +627,11 @@ async def upload_user_avatar_admin(
 ):
     """
     Admin endpoint to upload avatar for any user.
+    Uses object storage if available, otherwise stores in MongoDB.
     """
-    # TODO: Add admin permission check
+    # Admin/Owner permission check
+    if current_user.get("role") not in ["admin", "owner"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
     
     # Validate file type
     content_type = file.content_type or get_mime_type(file.filename)
@@ -612,33 +652,51 @@ async def upload_user_avatar_admin(
         )
     
     try:
-        # Upload to object storage
-        storage_path = upload_avatar(
-            user_id=user_id,
-            file_data=content,
-            filename=file.filename,
-            content_type=content_type
-        )
-        
-        # Update user document with avatar path
-        await db.users.update_one(
-            {"id": user_id},
-            {"$set": {
-                "avatar_path": storage_path,
-                "avatar_updated_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        
-        logger.info(f"Avatar uploaded for user {user_id} by admin {current_user['id']}")
+        if is_storage_available():
+            # Upload to object storage (Emergent)
+            storage_path = upload_avatar(
+                user_id=user_id,
+                file_data=content,
+                filename=file.filename,
+                content_type=content_type
+            )
+            
+            # Update user document with avatar path
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {
+                    "avatar_path": storage_path,
+                    "avatar_storage": "object",
+                    "avatar_updated_at": datetime.now(timezone.utc).isoformat()
+                },
+                "$unset": {"avatar_data": ""}}
+            )
+            
+            logger.info(f"Avatar uploaded to object storage for user {user_id} by admin {current_user['id']}")
+        else:
+            # Fallback: Store in MongoDB as base64
+            avatar_data = base64.b64encode(content).decode('utf-8')
+            
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {
+                    "avatar_data": avatar_data,
+                    "avatar_content_type": content_type,
+                    "avatar_storage": "mongodb",
+                    "avatar_updated_at": datetime.now(timezone.utc).isoformat()
+                },
+                "$unset": {"avatar_path": ""}}
+            )
+            
+            logger.info(f"Avatar stored in MongoDB for user {user_id} by admin {current_user['id']}")
         
         return {
-            "message": "Avatar uploaded successfully",
-            "avatar_path": storage_path
+            "message": "Avatar uploaded successfully"
         }
     
     except Exception as e:
         logger.error(f"Failed to upload avatar: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload avatar")
+        raise HTTPException(status_code=500, detail=f"Failed to upload avatar: {str(e)}")
 
 
 
