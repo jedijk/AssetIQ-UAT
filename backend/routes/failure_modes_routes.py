@@ -239,14 +239,28 @@ async def export_failure_modes_excel(
         else:
             actions_str = str(actions or "")
         
+        # Format potential_effects (could be list or string)
+        potential_effects = fm.get("potential_effects", "")
+        if isinstance(potential_effects, list):
+            potential_effects_str = ", ".join(potential_effects)
+        else:
+            potential_effects_str = str(potential_effects or "")
+        
+        # Format potential_causes (could be list or string)
+        potential_causes = fm.get("potential_causes", "")
+        if isinstance(potential_causes, list):
+            potential_causes_str = ", ".join(potential_causes)
+        else:
+            potential_causes_str = str(potential_causes or "")
+        
         row_data = [
             str(fm.get("id", "")),
             fm.get("category", ""),
             fm.get("equipment", ""),
             fm.get("failure_mode", ""),
             fm.get("process", ""),
-            fm.get("potential_effects", ""),
-            fm.get("potential_causes", ""),
+            potential_effects_str,
+            potential_causes_str,
             fm.get("iso14224_mechanism", ""),
             fm.get("severity", 0),
             fm.get("occurrence", 0),
