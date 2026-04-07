@@ -69,7 +69,7 @@ from fastapi.responses import JSONResponse
 async def swagger_ui_html():
     """Swagger UI at /docs for direct backend access (Railway)."""
     return get_swagger_ui_html(
-        openapi_url="/api/openapi.json",
+        openapi_url="/openapi.json",
         title=app.title + " - Swagger UI",
         swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-bundle.js",
         swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css",
@@ -79,7 +79,7 @@ async def swagger_ui_html():
 async def redoc_html():
     """ReDoc at /redoc for direct backend access (Railway)."""
     return get_redoc_html(
-        openapi_url="/api/openapi.json",
+        openapi_url="/openapi.json",
         title=app.title + " - ReDoc",
         redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js",
     )
