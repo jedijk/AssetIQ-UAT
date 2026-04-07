@@ -46,6 +46,7 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -273,11 +274,39 @@ const rbacAPI = {
   }
 };
 
+// Helper component for user avatars with proper fallback
+const UserAvatar = ({ user, avatarUrl, size = "md", className = "" }) => {
+  const sizeClasses = {
+    sm: "h-8 w-8 text-xs",
+    md: "h-10 w-10 text-sm",
+    lg: "h-12 w-12 text-lg",
+    xl: "h-16 w-16 text-xl"
+  };
+  
+  const initials = user?.name?.charAt(0)?.toUpperCase() || "U";
+  
+  return (
+    <Avatar className={`${sizeClasses[size]} border-2 border-white shadow-sm ${className}`}>
+      {avatarUrl && (
+        <AvatarImage 
+          src={avatarUrl} 
+          alt={user?.name || "User"} 
+          className="object-cover"
+        />
+      )}
+      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-semibold">
+        {initials}
+      </AvatarFallback>
+    </Avatar>
+  );
+};
+
 const SettingsUserManagementPage = () => {
   const { t } = useLanguage();
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
+  const loadedAvatarIdsRef = useRef(new Set());
   
   // Check if current user is owner
   const isOwner = currentUser?.role === "owner";
@@ -570,8 +599,9 @@ const SettingsUserManagementPage = () => {
   useEffect(() => {
     const loadAvatars = async () => {
       for (const user of users) {
-        // Load avatar for users that have an avatar_path and we haven't loaded yet
-        if (user.avatar_path && !avatarUrls[user.id]) {
+        // Load avatar for users that have an avatar_path and we haven't attempted yet
+        if (user.avatar_path && !loadedAvatarIdsRef.current.has(user.id)) {
+          loadedAvatarIdsRef.current.add(user.id); // Mark as attempted
           try {
             const url = await rbacAPI.getUserAvatar(user.id);
             if (url) {
@@ -579,6 +609,7 @@ const SettingsUserManagementPage = () => {
             }
           } catch (err) {
             // Silently fail - user just won't have an avatar
+            console.warn(`Failed to load avatar for user ${user.id}:`, err);
           }
         }
       }
@@ -592,12 +623,16 @@ const SettingsUserManagementPage = () => {
   // Function to reload a specific user's avatar (called after upload)
   const loadAvatar = async (userId) => {
     try {
+      // Allow re-fetching by removing from the loaded set
+      loadedAvatarIdsRef.current.delete(userId);
       const url = await rbacAPI.getUserAvatar(userId);
       if (url) {
         setAvatarUrls(prev => ({ ...prev, [userId]: url }));
+        loadedAvatarIdsRef.current.add(userId);
       }
     } catch (err) {
       // Silently fail
+      console.warn(`Failed to reload avatar for user ${userId}:`, err);
     }
   };
 
@@ -833,17 +868,7 @@ const SettingsUserManagementPage = () => {
                       className="relative cursor-pointer"
                       onClick={() => handleAvatarUpload(user.id)}
                     >
-                      {avatarUrl ? (
-                        <img
-                          src={avatarUrl}
-                          alt={user.name}
-                          className="h-12 w-12 rounded-full object-cover border-2 border-white shadow"
-                        />
-                      ) : (
-                        <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-lg border-2 border-white shadow">
-                          {user.name?.charAt(0)?.toUpperCase() || "U"}
-                        </div>
-                      )}
+                      <UserAvatar user={user} avatarUrl={avatarUrl} size="lg" />
                       <div className="absolute -bottom-1 -right-1 h-5 w-5 bg-white rounded-full flex items-center justify-center shadow border">
                         <Camera className="w-3 h-3 text-slate-500" />
                       </div>
@@ -1462,17 +1487,7 @@ const SettingsUserManagementPage = () => {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="relative group">
-                            {avatarUrl ? (
-                              <img
-                                src={avatarUrl}
-                                alt={user.name}
-                                className="h-10 w-10 rounded-full object-cover border-2 border-white shadow-sm"
-                              />
-                            ) : (
-                              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm border-2 border-white shadow-sm">
-                                {user.name?.charAt(0)?.toUpperCase() || "U"}
-                              </div>
-                            )}
+                            <UserAvatar user={user} avatarUrl={avatarUrl} size="md" />
                             {/* Upload overlay on hover */}
                             <button
                               onClick={() => handleAvatarUpload(user.id)}
