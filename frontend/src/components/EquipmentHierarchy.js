@@ -286,7 +286,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
       {contextMenu.show && (
         <div 
           ref={contextMenuRef}
-          className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50 min-w-[180px]"
+          className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-[100] min-w-[180px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           <button
@@ -322,7 +322,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
       {showDetails && (
         <div 
           ref={detailsRef}
-          className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-50 w-72"
+          className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-[100] w-72"
           style={{ 
             left: Math.min(contextMenu.x, window.innerWidth - 300), 
             top: Math.min(contextMenu.y, window.innerHeight - 350) 
