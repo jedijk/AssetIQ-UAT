@@ -17,6 +17,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { getBackendUrl } from "../lib/apiConfig";
 
 // Desktop steps - highlights sidebar navigation
 const DESKTOP_STEPS = [
@@ -693,7 +694,7 @@ export const useIntroOverlay = () => {
     try {
       const token = localStorage.getItem("token");
       if (token) {
-        await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/mark-intro-seen`, {
+        await fetch(`${getBackendUrl()}/api/users/mark-intro-seen`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` }
         });

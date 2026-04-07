@@ -34,8 +34,9 @@ import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
+import { getBackendUrl } from "../lib/apiConfig";
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = getBackendUrl();
 
 // Helper to format uptime
 const formatUptime = (seconds) => {

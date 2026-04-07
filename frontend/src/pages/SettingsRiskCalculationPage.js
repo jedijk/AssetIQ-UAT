@@ -21,8 +21,9 @@ import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { getBackendUrl } from "../lib/apiConfig";
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = getBackendUrl();
 
 const SettingsRiskCalculationPage = () => {
   const navigate = useNavigate();

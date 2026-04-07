@@ -1,18 +1,24 @@
 /**
  * Runtime API URL Configuration
  * 
- * IMPORTANT: React environment variables are baked in at BUILD time.
- * This means REACT_APP_BACKEND_URL will contain whatever value was set
- * when the app was built, NOT the current deployment domain.
+ * For deployments where frontend (Vercel) and backend (Railway) are on different domains,
+ * we MUST use REACT_APP_BACKEND_URL environment variable.
  * 
- * Solution: ALWAYS use window.location.origin for API calls.
- * This ensures the app works on ANY domain it's deployed to.
+ * Set in Vercel: REACT_APP_BACKEND_URL=https://your-backend.railway.app
  */
 
-// Get the backend URL - ALWAYS uses current origin for maximum compatibility
+// Get the backend URL from environment variable (required for Vercel + Railway)
 export const getBackendUrl = () => {
-  // Always use current window origin - this works on ANY deployment domain
-  // (assetiq.tech, *.emergent.host, localhost, etc.)
+  // Use environment variable if set (for Vercel + Railway deployment)
+  // Fall back to window.location.origin for same-domain deployments
+  const envUrl = process.env.REACT_APP_BACKEND_URL;
+  
+  if (envUrl && envUrl !== 'undefined') {
+    // Remove trailing slash if present
+    return envUrl.replace(/\/$/, '');
+  }
+  
+  // Fallback for same-domain deployments (e.g., Emergent preview)
   return window.location.origin;
 };
 

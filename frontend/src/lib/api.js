@@ -1,8 +1,8 @@
 import axios from "axios";
+import { getApiUrl } from "./apiConfig";
 
-// ALWAYS use current origin for API calls - this ensures the app works on ANY domain
-// React env variables are baked at build time, so we can't rely on them for production
-const API_URL = `${window.location.origin}/api`;
+// Use centralized API URL config (supports Vercel + Railway deployment)
+const API_URL = getApiUrl();
 
 // Create axios instance with timeout
 const api = axios.create({

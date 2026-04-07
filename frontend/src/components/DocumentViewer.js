@@ -26,7 +26,8 @@ import * as pdfjsLib from "pdfjs-dist";
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs`;
 
 // Get the API base URL for document proxying
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+import { getBackendUrl } from '../lib/apiConfig';
+const API_BASE_URL = getBackendUrl();
 
 /**
  * Mobile-friendly PDF viewer using canvas rendering

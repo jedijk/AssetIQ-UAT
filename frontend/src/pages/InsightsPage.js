@@ -5,6 +5,7 @@ import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import { Skeleton } from "../components/ui/skeleton";
+import { getBackendUrl } from "../lib/apiConfig";
 import { 
   Activity, 
   CheckCircle2, 
@@ -29,7 +30,7 @@ import {
 import axios from "axios";
 import { toast } from "sonner";
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = getBackendUrl();
 
 const InsightsPage = ({ embedded = false }) => {
   const { t } = useLanguage();
