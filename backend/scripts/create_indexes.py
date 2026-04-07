@@ -128,9 +128,16 @@ INDEX_DEFINITIONS = {
     # Form submissions
     "form_submissions": [
         {"keys": [("id", 1)], "unique": True},
-        {"keys": [("template_id", 1)]},
+        {"keys": [("form_template_id", 1)]},
+        {"keys": [("template_id", 1)]},  # Legacy field name
         {"keys": [("submitted_by", 1)]},
         {"keys": [("submitted_at", -1)]},
+        {"keys": [("task_instance_id", 1)]},
+        {"keys": [("equipment_id", 1)]},
+        {"keys": [("has_warnings", 1)]},
+        {"keys": [("has_critical", 1)]},
+        # Compound index for common query pattern
+        {"keys": [("submitted_at", -1), ("form_template_id", 1)]},
     ],
     
     # Chat messages

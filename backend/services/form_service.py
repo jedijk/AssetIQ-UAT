@@ -584,11 +584,20 @@ class FormService:
         
         import asyncio
         
-        # Run count and fetch in parallel
-        count_task = self.submissions.count_documents(query)
+        # Use estimated count for unfiltered queries (much faster)
+        # Only use exact count when filters are applied
+        if query:
+            count_task = self.submissions.count_documents(query)
+        else:
+            count_task = self.submissions.estimated_document_count()
+        
         fetch_task = self.submissions.find(query).sort("submitted_at", -1).skip(skip).limit(limit).to_list(length=limit)
         
         total, raw_submissions = await asyncio.gather(count_task, fetch_task)
+        
+        # Early return if no submissions - skip unnecessary lookups
+        if not raw_submissions:
+            return {"total": total, "submissions": []}
         
         # ============================================
         # BATCH LOOKUP: Extract all unique IDs upfront

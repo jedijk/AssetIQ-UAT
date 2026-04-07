@@ -167,6 +167,8 @@ export default function FormSubmissionsPage() {
       hasCritical: statusFilter === "critical",
     }),
     enabled: !isMobile, // Don't fetch on mobile
+    staleTime: 30000, // Cache for 30 seconds to prevent excessive refetching
+    gcTime: 60000, // Keep in cache for 1 minute
   });
 
   // Delete mutation - must be before any early returns
