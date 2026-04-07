@@ -48,6 +48,7 @@ async def search_equipment_hierarchy(
     Search equipment hierarchy for matching equipment.
     Only searches subunit level and below (not sites, plants, units).
     Matches by name, tag, description, or equipment_type.
+    For maintainable items, includes the parent subunit name for context.
     """
     keywords = extract_keywords(search_text)
     if not keywords:
@@ -78,8 +79,23 @@ async def search_equipment_hierarchy(
         query,
         {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1, 
          "equipment_type": 1, "equipment_type_name": 1, "description": 1, 
-         "level": 1, "criticality": 1}
+         "level": 1, "criticality": 1, "parent_id": 1, "installation_id": 1}
     ).limit(20).to_list(20)
+    
+    # Collect parent IDs for maintainable items to fetch parent names
+    parent_ids = set()
+    for eq in equipment_list:
+        if eq.get("level") == "maintainable_item" and eq.get("parent_id"):
+            parent_ids.add(eq["parent_id"])
+    
+    # Fetch parent equipment (subunits) in a single batch query
+    parent_map = {}
+    if parent_ids:
+        parents = await db.equipment_nodes.find(
+            {"id": {"$in": list(parent_ids)}},
+            {"_id": 0, "id": 1, "name": 1, "level": 1}
+        ).to_list(100)
+        parent_map = {p["id"]: p for p in parents}
     
     # Score and rank results
     scored = []
@@ -105,6 +121,13 @@ async def search_equipment_hierarchy(
                 score += 3
         
         if score > 0:
+            # Get parent subunit name for maintainable items
+            parent_name = None
+            if eq.get("level") == "maintainable_item" and eq.get("parent_id"):
+                parent = parent_map.get(eq["parent_id"])
+                if parent:
+                    parent_name = parent.get("name")
+            
             scored.append({
                 "id": eq.get("id"),
                 "name": eq.get("name"),
@@ -113,6 +136,7 @@ async def search_equipment_hierarchy(
                 "description": eq.get("description"),
                 "level": eq.get("level"),
                 "criticality": eq.get("criticality"),
+                "parent_name": parent_name,  # Parent subunit name for context
                 "score": score
             })
     

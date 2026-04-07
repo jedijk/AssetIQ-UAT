@@ -213,12 +213,19 @@ const ChatPage = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => handleSuggestionClick(eq.tag ? `${eq.name} (${eq.tag})` : eq.name)}
-                  className="text-left justify-start text-blue-600 hover:bg-blue-50 border-blue-200"
+                  className="text-left justify-start text-blue-600 hover:bg-blue-50 border-blue-200 h-auto py-1.5"
                   data-testid={`equipment-suggestion-${idx}`}
                 >
-                  <Settings className="w-3 h-3 mr-1" />
-                  {eq.name}
-                  {eq.tag && <span className="ml-1 text-slate-400">({eq.tag})</span>}
+                  <div className="flex flex-col items-start">
+                    <div className="flex items-center">
+                      <Settings className="w-3 h-3 mr-1 flex-shrink-0" />
+                      <span>{eq.name}</span>
+                      {eq.tag && <span className="ml-1 text-slate-400">({eq.tag})</span>}
+                    </div>
+                    {eq.parent_name && (
+                      <span className="text-xs text-slate-400 ml-4">in {eq.parent_name}</span>
+                    )}
+                  </div>
                 </Button>
               ))}
             </div>

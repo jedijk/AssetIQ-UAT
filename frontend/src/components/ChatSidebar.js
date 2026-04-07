@@ -397,16 +397,24 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                 className="w-full text-left p-2.5 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-medium text-blue-900 text-sm">{eq.name}</span>
-                    {eq.tag && (
-                      <span className="ml-2 text-blue-600 text-xs">({eq.tag})</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-blue-900 text-sm">{eq.name}</span>
+                      {eq.tag && (
+                        <span className="text-blue-600 text-xs">({eq.tag})</span>
+                      )}
+                    </div>
+                    {/* Show parent subunit for maintainable items */}
+                    {eq.parent_name && (
+                      <div className="text-xs text-slate-500 mt-0.5 truncate">
+                        <span className="text-slate-400">in</span> {eq.parent_name}
+                      </div>
                     )}
                   </div>
                   {isSending ? (
-                    <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                    <Loader2 className="w-4 h-4 text-blue-400 animate-spin flex-shrink-0" />
                   ) : (
-                    <ArrowRight className="w-4 h-4 text-blue-400 group-hover:text-blue-600 transition-colors" />
+                    <ArrowRight className="w-4 h-4 text-blue-400 group-hover:text-blue-600 transition-colors flex-shrink-0" />
                   )}
                 </div>
                 {eq.equipment_type && (

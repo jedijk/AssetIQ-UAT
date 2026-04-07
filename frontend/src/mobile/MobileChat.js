@@ -114,7 +114,10 @@ const MobileChat = ({ onClose }) => {
                   onClick={() => setMessage(eq.name)}
                   className="suggestion-btn"
                 >
-                  {eq.name}
+                  <span>{eq.name}</span>
+                  {eq.parent_name && (
+                    <span className="text-xs text-slate-400 block">in {eq.parent_name}</span>
+                  )}
                 </button>
               ))}
             </div>
