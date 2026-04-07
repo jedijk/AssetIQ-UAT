@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = 'reliabilityos-v1';
+const CACHE_NAME = 'reliabilityos-v2';  // Incremented to force cache refresh
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache on install
