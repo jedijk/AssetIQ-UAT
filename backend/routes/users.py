@@ -12,6 +12,7 @@ import os
 from database import db, rbac_service
 from auth import get_current_user, hash_password
 from services.storage_service import upload_avatar, get_object, get_mime_type, is_storage_available
+from services.cache_service import CacheService as cache
 
 # Try to import resend for email
 try:
@@ -315,6 +316,9 @@ async def upload_user_avatar(
                 "$unset": {"avatar_data": ""}}  # Remove any old MongoDB data
             )
             
+            # Invalidate user cache so new avatar is reflected immediately
+            cache.invalidate_user(current_user["id"])
+            
             logger.info(f"Avatar uploaded to object storage for user {current_user['id']}: {storage_path}")
         else:
             # Fallback: Store in MongoDB as base64
@@ -332,6 +336,9 @@ async def upload_user_avatar(
             )
             
             logger.info(f"Avatar stored in MongoDB for user {current_user['id']}")
+        
+        # Invalidate user cache so new avatar is reflected immediately
+        cache.invalidate_user(current_user["id"])
         
         return {
             "message": "Avatar uploaded successfully"
@@ -672,6 +679,9 @@ async def upload_user_avatar_admin(
                 "$unset": {"avatar_data": ""}}
             )
             
+            # Invalidate user cache so new avatar is reflected immediately
+            cache.invalidate_user(user_id)
+            
             logger.info(f"Avatar uploaded to object storage for user {user_id} by admin {current_user['id']}")
         else:
             # Fallback: Store in MongoDB as base64
@@ -689,6 +699,9 @@ async def upload_user_avatar_admin(
             )
             
             logger.info(f"Avatar stored in MongoDB for user {user_id} by admin {current_user['id']}")
+        
+        # Invalidate user cache so new avatar is reflected immediately
+        cache.invalidate_user(user_id)
         
         return {
             "message": "Avatar uploaded successfully"

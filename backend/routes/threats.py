@@ -67,7 +67,7 @@ async def enrich_with_creator_info(items: list) -> list:
     if uncached_ids:
         creators = await db.users.find(
             {"id": {"$in": uncached_ids}},
-            {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "position": 1, "role": 1}
+            {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "avatar_data": 1, "position": 1, "role": 1}
         ).to_list(100)
         
         # Cache the fetched users
