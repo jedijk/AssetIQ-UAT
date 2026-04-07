@@ -74,7 +74,10 @@ function canBeChildOf(childLevel, parentLevel) {
 
 function buildTreeData(nodes, parentId = null, depth = 0) {
   if (depth > 10) return [];
-  return nodes.filter(n => n.parent_id === parentId).map(node => ({ ...node, children: buildTreeData(nodes, node.id, depth + 1) }));
+  return nodes
+    .filter(n => n.parent_id === parentId)
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name))
+    .map(node => ({ ...node, children: buildTreeData(nodes, node.id, depth + 1) }));
 }
 
 function flattenTree(treeNodes, expandedIds, depth = 0) {

@@ -50,10 +50,11 @@ const CRIT_COLORS = {
   low: "text-green-500"
 };
 
-// Build tree from flat nodes
+// Build tree from flat nodes (sorted by sort_order, then name)
 function buildTreeData(nodes, parentId = null) {
   return nodes
     .filter(n => n.parent_id === parentId)
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name))
     .map(node => ({
       ...node,
       children: buildTreeData(nodes, node.id)
