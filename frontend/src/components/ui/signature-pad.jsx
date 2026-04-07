@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useRef, useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 import { Button } from "./button";
 import { Eraser, Check, X } from "lucide-react";
 

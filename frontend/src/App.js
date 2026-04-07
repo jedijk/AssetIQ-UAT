@@ -36,7 +36,7 @@ import UserStatisticsPage from "./pages/UserStatisticsPage";
 import FeedbackPage from "./pages/FeedbackPage";
 import DefinitionsPage from "./pages/DefinitionsPage";
 import MobileApp from "./mobile/MobileApp";
-import "@/App.css";
+import "./App.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
