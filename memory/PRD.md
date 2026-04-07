@@ -5,6 +5,35 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 7, 2026 - Form Submission Bug Fix (P0)
+**BUG FIX - Forms submitted via task execution not appearing in Form Submissions list:**
+
+**Root Cause:**
+1. `_serialize_submission()` in `form_service.py` was using `str(doc["_id"])` to get the ID, but:
+   - Task service creates submissions with custom `id` field (UUID string)
+   - The `get_submissions()` projection excluded `_id` (for performance), causing KeyError
+2. `submit_form()` wasn't adding a custom `id` field, causing inconsistency
+3. `get_submission_by_id()` only queried by MongoDB `_id`, not by custom `id`
+4. Batch lookup queries in `get_submissions()` lacked timeouts, causing 5-second request timeouts
+
+**Fixes Applied:**
+- ✅ `_serialize_submission()` now uses `doc.get("id") or str(doc["_id"])` to handle both ID types
+- ✅ `submit_form()` now adds a UUID `id` field for consistency with task service
+- ✅ `get_submission_by_id()` now queries by custom `id` first, then falls back to `_id`
+- ✅ All batch lookup queries now have 2-second timeouts to prevent cascading failures
+- ✅ Fixed `UserResponse` datetime serialization (login/auth/me endpoints) - `created_at` was passing datetime object instead of ISO string
+
+**Files Modified:**
+- `/app/backend/services/form_service.py` - Fixed ID handling and added timeouts
+- `/app/backend/routes/auth.py` - Fixed datetime-to-string conversion for UserResponse
+
+**Testing:**
+- API curl test confirmed 16 form submissions now visible
+- UI dashboard shows "Recent Form Submissions" including task-created submissions
+- Task completion with form_data successfully creates visible form submission record
+
+---
+
 ### April 7, 2026 - Code Quality Fixes (Code Review)
 **FIXES APPLIED:**
 

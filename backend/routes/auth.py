@@ -261,11 +261,18 @@ async def login(request: Request, credentials: UserLogin):
     
     try:
         user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
+        logger.info(f"Login attempt for {credentials.email}: user_found={user is not None}")
     except Exception as e:
         logger.error(f"Database error during login: {e}")
         raise HTTPException(status_code=503, detail="Database connection error. Please try again.")
     
-    if not user or not verify_password(credentials.password, user["password_hash"]):
+    if not user:
+        logger.warning(f"Login failed: user not found for {credentials.email}")
+        await record_login_attempt(credentials.email, success=False, ip_address=ip_address)
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    if not verify_password(credentials.password, user["password_hash"]):
+        logger.warning(f"Login failed: invalid password for {credentials.email}")
         # Record failed attempt
         await record_login_attempt(credentials.email, success=False, ip_address=ip_address)
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -296,6 +303,14 @@ async def login(request: Request, credentials: UserLogin):
     token = create_token(user["id"])
     must_change_password = user.get("must_change_password", False)
     has_seen_intro = user.get("has_seen_intro", True)  # Default to True for existing users
+    
+    # Convert datetime to string for Pydantic model
+    created_at = user.get("created_at")
+    if hasattr(created_at, 'isoformat'):
+        created_at = created_at.isoformat()
+    elif not isinstance(created_at, str):
+        created_at = str(created_at) if created_at else None
+    
     return TokenResponse(
         token=token,
         must_change_password=must_change_password,
@@ -303,7 +318,7 @@ async def login(request: Request, credentials: UserLogin):
             id=user["id"],
             email=user["email"],
             name=user["name"],
-            created_at=user["created_at"],
+            created_at=created_at,
             department=user.get("department"),
             position=user.get("position"),
             role=user.get("role"),
@@ -321,11 +336,18 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         # Use the backend proxy endpoint so frontend can access it without storage auth
         avatar_url = f"/api/users/{current_user['id']}/avatar"
     
+    # Convert datetime to string for Pydantic model
+    created_at = current_user.get("created_at")
+    if hasattr(created_at, 'isoformat'):
+        created_at = created_at.isoformat()
+    elif not isinstance(created_at, str):
+        created_at = str(created_at) if created_at else None
+    
     return UserResponse(
         id=current_user["id"],
         email=current_user["email"],
         name=current_user["name"],
-        created_at=current_user["created_at"],
+        created_at=created_at,
         department=current_user.get("department"),
         position=current_user.get("position"),
         role=current_user.get("role"),

@@ -499,6 +499,7 @@ class FormService:
         
         # Create submission document
         doc = {
+            "id": str(uuid.uuid4()),  # Custom string ID for consistency
             "form_template_id": data["form_template_id"],
             "form_template_name": template["name"],
             "form_template_version": template.get("version", 1),
@@ -658,56 +659,88 @@ class FormService:
             if doc.get("form_template_id"):
                 form_template_ids.add(doc["form_template_id"])
         
-        # Run all batch lookups in parallel
+        # Run all batch lookups in parallel with timeout
         async def fetch_users():
             if not user_ids:
                 return {}
-            users = await self.db.users.find(
-                {"id": {"$in": list(user_ids)}}, 
-                {"_id": 0, "id": 1, "name": 1, "email": 1, "avatar_path": 1, "avatar_data": 1}
-            ).to_list(length=100)
-            return {u["id"]: {
-                "name": u.get("name", u.get("email", "Unknown")),
-                "has_avatar": bool(u.get("avatar_path") or u.get("avatar_data"))
-            } for u in users}
+            try:
+                users = await asyncio.wait_for(
+                    self.db.users.find(
+                        {"id": {"$in": list(user_ids)}}, 
+                        {"_id": 0, "id": 1, "name": 1, "email": 1, "avatar_path": 1, "avatar_data": 1}
+                    ).to_list(length=100),
+                    timeout=2.0
+                )
+                return {u["id"]: {
+                    "name": u.get("name", u.get("email", "Unknown")),
+                    "has_avatar": bool(u.get("avatar_path") or u.get("avatar_data"))
+                } for u in users}
+            except asyncio.TimeoutError:
+                logger.warning("[FormService] fetch_users timeout")
+                return {}
         
         async def fetch_equipment():
             if not equipment_ids:
                 return {}
-            equipment = await self.db.equipment_nodes.find(
-                {"id": {"$in": list(equipment_ids)}}, 
-                {"_id": 0, "id": 1, "name": 1, "path": 1}
-            ).to_list(length=100)
-            return {eq["id"]: {"name": eq.get("name", "Unknown Equipment"), "path": eq.get("path", "")} for eq in equipment}
+            try:
+                equipment = await asyncio.wait_for(
+                    self.db.equipment_nodes.find(
+                        {"id": {"$in": list(equipment_ids)}}, 
+                        {"_id": 0, "id": 1, "name": 1, "path": 1}
+                    ).to_list(length=100),
+                    timeout=2.0
+                )
+                return {eq["id"]: {"name": eq.get("name", "Unknown Equipment"), "path": eq.get("path", "")} for eq in equipment}
+            except asyncio.TimeoutError:
+                logger.warning("[FormService] fetch_equipment timeout")
+                return {}
         
         async def fetch_tasks():
             result = {}
-            if task_ids_str:
-                tasks = await self.db.task_instances.find({"id": {"$in": list(task_ids_str)}}).to_list(length=100)
-                for task in tasks:
-                    result[task.get("id")] = task
-            if task_ids_oid:
-                tasks = await self.db.task_instances.find({"_id": {"$in": list(task_ids_oid)}}).to_list(length=100)
-                for task in tasks:
-                    result[str(task["_id"])] = task
+            try:
+                if task_ids_str:
+                    tasks = await asyncio.wait_for(
+                        self.db.task_instances.find({"id": {"$in": list(task_ids_str)}}).to_list(length=100),
+                        timeout=2.0
+                    )
+                    for task in tasks:
+                        result[task.get("id")] = task
+                if task_ids_oid:
+                    tasks = await asyncio.wait_for(
+                        self.db.task_instances.find({"_id": {"$in": list(task_ids_oid)}}).to_list(length=100),
+                        timeout=2.0
+                    )
+                    for task in tasks:
+                        result[str(task["_id"])] = task
+            except asyncio.TimeoutError:
+                logger.warning("[FormService] fetch_tasks timeout")
             return result
         
         async def fetch_templates():
             result = {}
             if not form_template_ids:
                 return result
-            # Try by string id
-            templates = await self.templates.find({"id": {"$in": list(form_template_ids)}}).to_list(length=100)
-            for tmpl in templates:
-                result[tmpl.get("id")] = tmpl
-            # Also try by ObjectId for any missing
-            missing_ids = form_template_ids - set(result.keys())
-            if missing_ids:
-                oid_list = [ObjectId(fid) for fid in missing_ids if ObjectId.is_valid(fid)]
-                if oid_list:
-                    templates = await self.templates.find({"_id": {"$in": oid_list}}).to_list(length=100)
-                    for tmpl in templates:
-                        result[str(tmpl["_id"])] = tmpl
+            try:
+                # Try by string id
+                templates = await asyncio.wait_for(
+                    self.templates.find({"id": {"$in": list(form_template_ids)}}).to_list(length=100),
+                    timeout=2.0
+                )
+                for tmpl in templates:
+                    result[tmpl.get("id")] = tmpl
+                # Also try by ObjectId for any missing
+                missing_ids = form_template_ids - set(result.keys())
+                if missing_ids:
+                    oid_list = [ObjectId(fid) for fid in missing_ids if ObjectId.is_valid(fid)]
+                    if oid_list:
+                        templates = await asyncio.wait_for(
+                            self.templates.find({"_id": {"$in": oid_list}}).to_list(length=100),
+                            timeout=2.0
+                        )
+                        for tmpl in templates:
+                            result[str(tmpl["_id"])] = tmpl
+            except asyncio.TimeoutError:
+                logger.warning("[FormService] fetch_templates timeout")
             return result
         
         # Execute all lookups in parallel
@@ -759,13 +792,18 @@ class FormService:
         return {"total": total, "submissions": submissions}
     
     async def get_submission_by_id(self, submission_id: str) -> Optional[Dict[str, Any]]:
-        """Get a specific submission."""
-        if not ObjectId.is_valid(submission_id):
-            return None
-        
-        doc = await self.submissions.find_one({"_id": ObjectId(submission_id)})
+        """Get a specific submission by custom ID or MongoDB ObjectId."""
+        # First try by custom 'id' field (UUID string)
+        doc = await self.submissions.find_one({"id": submission_id})
         if doc:
             return self._serialize_submission(doc)
+        
+        # Fallback: try by MongoDB ObjectId
+        if ObjectId.is_valid(submission_id):
+            doc = await self.submissions.find_one({"_id": ObjectId(submission_id)})
+            if doc:
+                return self._serialize_submission(doc)
+        
         return None
     
     # ==================== THRESHOLD EVALUATION ====================
@@ -975,8 +1013,11 @@ class FormService:
         """Serialize submission document."""
         values = doc.get("values", [])
         
+        # Handle both custom 'id' field (from task_service) and MongoDB '_id'
+        doc_id = doc.get("id") or (str(doc["_id"]) if doc.get("_id") else None)
+        
         return {
-            "id": str(doc["_id"]),
+            "id": doc_id,
             "form_template_id": doc["form_template_id"],
             "form_template_name": doc.get("form_template_name"),
             "template_name": doc.get("form_template_name"),  # Alias for frontend
