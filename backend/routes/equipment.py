@@ -1888,3 +1888,116 @@ async def get_equipment_history(
             "tasks": len([i for i in timeline_items if i["type"] == "task"])
         }
     }
+
+
+
+# ============================================================================
+# HIERARCHY IMPORT
+# ============================================================================
+
+class HierarchyImportRequest(BaseModel):
+    """Request model for hierarchy import."""
+    installation_id: str
+    hierarchy: dict  # Nested hierarchy structure
+    replace_existing: bool = True  # If True, delete existing equipment first
+
+
+@router.post("/equipment/import-hierarchy")
+async def import_equipment_hierarchy(
+    request: HierarchyImportRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Import a complete equipment hierarchy for an installation.
+    
+    This endpoint allows importing a nested hierarchy structure like:
+    {
+        "Line-90": {
+            "type": "section",
+            "children": {
+                "Feedstock Prep Unit": {
+                    "type": "unit",
+                    "children": {
+                        "Crane Subunit": {
+                            "type": "subunit",
+                            "children": ["Crane Motor", "Crane Chain"]
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Requires admin or owner role.
+    """
+    # Check permissions
+    if current_user.get("role") not in ["admin", "owner"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Verify installation exists and user has access
+    installation = await db.installations.find_one({"id": request.installation_id})
+    if not installation:
+        raise HTTPException(status_code=404, detail="Installation not found")
+    
+    installation_id = request.installation_id
+    
+    # Delete existing equipment if requested
+    deleted_count = 0
+    if request.replace_existing:
+        result = await db.equipment.delete_many({"installation_id": installation_id})
+        deleted_count = result.deleted_count
+    
+    # Process hierarchy and create equipment items
+    equipment_list = []
+    sort_order = 0
+    
+    def create_equipment(name, parent_id, eq_type, level):
+        nonlocal sort_order
+        sort_order += 1
+        return {
+            "id": str(uuid.uuid4()),
+            "name": name,
+            "parent_id": parent_id,
+            "installation_id": installation_id,
+            "type": eq_type,
+            "level": level,
+            "sort_order": sort_order,
+            "created_by": current_user["id"],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+    
+    def process_hierarchy(data, parent_id=None, level=0):
+        items = []
+        for name, info in data.items():
+            if isinstance(info, dict):
+                eq_type = info.get("type", "equipment")
+                eq = create_equipment(name, parent_id, eq_type, level)
+                items.append(eq)
+                
+                children = info.get("children", {})
+                if isinstance(children, dict):
+                    items.extend(process_hierarchy(children, eq["id"], level + 1))
+                elif isinstance(children, list):
+                    for child_name in children:
+                        child_eq = create_equipment(child_name, eq["id"], "maintainable_item", level + 1)
+                        items.append(child_eq)
+        return items
+    
+    equipment_list = process_hierarchy(request.hierarchy)
+    
+    # Insert all equipment
+    inserted_count = 0
+    if equipment_list:
+        result = await db.equipment.insert_many(equipment_list)
+        inserted_count = len(result.inserted_ids)
+    
+    logger.info(f"Hierarchy import for installation {installation_id}: deleted={deleted_count}, inserted={inserted_count}")
+    
+    return {
+        "success": True,
+        "installation_id": installation_id,
+        "deleted_count": deleted_count,
+        "inserted_count": inserted_count,
+        "message": f"Successfully imported {inserted_count} equipment items"
+    }
