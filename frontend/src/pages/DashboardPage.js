@@ -309,7 +309,8 @@ export default function DashboardPage() {
   const handleQuickViewClick = async (submission) => {
     setLoadingQuickView(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/form-submissions/${submission.id}`, {
+      const apiUrl = getBackendUrl();
+      const response = await fetch(`${apiUrl}/api/form-submissions/${submission.id}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
