@@ -5,6 +5,19 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 7, 2026 - Ad-hoc Form Execution Bug Fix
+**BUG FIX:**
+- ✅ **Fixed datetime serialization issue** in ad-hoc plan execution (`/api/adhoc-plans/{plan_id}/execute`)
+  - When returning an existing in-progress task, datetime fields weren't being serialized properly
+  - Now uses `serialize_task()` for proper JSON serialization
+- ✅ **Improved error messages** in frontend API call to show backend error details
+
+**Files Modified:**
+- `/app/backend/routes/my_tasks.py` - Fixed `execute_adhoc_plan` to use `serialize_task()` for existing tasks
+- `/app/frontend/src/pages/MyTasksPage.js` - Added error detail parsing in `executeAdhocPlan` API call
+
+---
+
 ### April 7, 2026 - Backend Equipment Module Refactoring (P3)
 **REFACTORING COMPLETED:**
 - ✅ **Split equipment.py (2288 lines) into modular package** - Created `/app/backend/routes/equipment/` directory with 7 focused modules:

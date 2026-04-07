@@ -977,9 +977,8 @@ async def execute_adhoc_plan(
     
     if existing_task:
         # Return the existing task instead of creating a new one
-        existing_task["id"] = existing_task.get("id") or str(existing_task["_id"])
-        del existing_task["_id"]
-        return existing_task
+        # Use serialize_task for proper datetime handling
+        return serialize_task(existing_task)
     
     # Get template details - try by string id first, then ObjectId
     template = None

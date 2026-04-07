@@ -134,7 +134,10 @@ const myTasksAPI = {
       method: "POST",
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
-    if (!response.ok) throw new Error("Failed to execute ad-hoc plan");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Failed to execute ad-hoc plan");
+    }
     return response.json();
   },
   
