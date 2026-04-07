@@ -1163,41 +1163,69 @@ export default function DashboardPage() {
           <>
           <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             <div className="space-y-4">
-            {/* Status Badge */}
-            <div className="flex items-center gap-2">
-              <Label className="text-slate-500 text-xs sm:text-sm">{t("common.status")}:</Label>
-              <span className={`px-2 py-0.5 sm:py-1 rounded text-xs sm:text-sm font-medium capitalize ${
-                quickViewSubmission?.status === "completed" || quickViewSubmission?.status === "approved" 
-                  ? "bg-green-100 text-green-700" 
-                  : quickViewSubmission?.status === "pending" 
-                    ? "bg-amber-100 text-amber-700"
-                    : quickViewSubmission?.status === "rejected"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-blue-100 text-blue-700"
-              }`}>
-                {quickViewSubmission?.status || "submitted"}
-              </span>
+            {/* Submission Info - Grid layout like FormSubmissionsPage */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 rounded-lg">
+              <div>
+                <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Submitted At</p>
+                <p className="text-xs sm:text-sm font-medium">
+                  {quickViewSubmission?.submitted_at 
+                    ? new Date(quickViewSubmission.submitted_at).toLocaleString() 
+                    : "Unknown"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Submitted By</p>
+                <p className="text-xs sm:text-sm font-medium">{quickViewSubmission?.submitted_by_name || "Unknown"}</p>
+              </div>
+              {quickViewSubmission?.discipline && (
+                <div>
+                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Discipline</p>
+                  <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${
+                      quickViewSubmission.discipline === "Electrical" ? "bg-yellow-500" :
+                      quickViewSubmission.discipline === "Mechanical" ? "bg-blue-500" :
+                      quickViewSubmission.discipline === "Instrumentation" ? "bg-purple-500" :
+                      quickViewSubmission.discipline === "Process" ? "bg-green-500" : "bg-slate-500"
+                    }`} />
+                    {quickViewSubmission.discipline}
+                  </p>
+                </div>
+              )}
+              {quickViewSubmission?.equipment_name && (
+                <div>
+                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Equipment</p>
+                  <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                    <Building2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400" />
+                    <span className="truncate">{quickViewSubmission.equipment_name}</span>
+                  </p>
+                </div>
+              )}
+              {quickViewSubmission?.task_template_name && (
+                <div className="sm:col-span-2">
+                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Originating Task</p>
+                  <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                    <ClipboardList className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400" />
+                    {quickViewSubmission.task_template_name}
+                  </p>
+                </div>
+              )}
+              <div>
+                <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Status</p>
+                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${
+                  quickViewSubmission?.status === "completed" || quickViewSubmission?.status === "approved" 
+                    ? "bg-green-100 text-green-700" 
+                    : quickViewSubmission?.status === "pending" 
+                      ? "bg-amber-100 text-amber-700"
+                      : quickViewSubmission?.status === "rejected"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-blue-100 text-blue-700"
+                }`}>
+                  {quickViewSubmission?.status || "submitted"}
+                </span>
+              </div>
             </div>
             
-            {/* Equipment & Task Info */}
-            {(quickViewSubmission?.equipment_name || quickViewSubmission?.task_template_name) && (
-              <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
-                {quickViewSubmission?.equipment_name && (
-                  <div className="flex items-center gap-1">
-                    <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
-                    <span className="text-slate-600 truncate max-w-[150px] sm:max-w-none">{quickViewSubmission.equipment_name}</span>
-                  </div>
-                )}
-                {quickViewSubmission?.task_template_name && (
-                  <div className="flex items-center gap-1">
-                    <ClipboardList className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
-                    <span className="text-slate-600 truncate max-w-[150px] sm:max-w-none">{quickViewSubmission.task_template_name}</span>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {/* Form Responses - Support both values/responses and form_data formats */}
+            {/* Form Responses - Matching FormSubmissionsPage style */}
             {(() => {
               const responses = quickViewSubmission?.values || quickViewSubmission?.responses || [];
               const formData = quickViewSubmission?.form_data || {};
@@ -1206,10 +1234,10 @@ export default function DashboardPage() {
               
               if (hasResponses) {
                 return (
-                  <div className="border rounded-lg p-3 sm:p-4 bg-slate-50">
-                    <h4 className="font-medium text-slate-700 mb-2 sm:mb-3 flex items-center gap-2 text-sm">
-                      <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
-                      {t("dashboard.formResponses") || "Form Responses"} ({responses.length})
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                      <ClipboardList className="w-4 h-4 text-blue-500" />
+                      Form Responses ({responses.length})
                     </h4>
                     <div className="space-y-2">
                       {responses.map((response, idx) => {
@@ -1217,6 +1245,9 @@ export default function DashboardPage() {
                         const isCritical = response.threshold_status === "critical";
                         const isBoolean = typeof response.value === "boolean";
                         const isArray = Array.isArray(response.value);
+                        const isNumeric = typeof response.value === "number";
+                        const hasAttachment = response.attachment_url || response.file_url;
+                        const isImage = hasAttachment && /\.(jpg|jpeg|png|gif|webp)$/i.test(response.attachment_url || response.file_url || "");
                         
                         // Check if this is a signature field (base64 data URL)
                         const isSignature = response.field_type === "signature" || 
@@ -1225,7 +1256,7 @@ export default function DashboardPage() {
                         return (
                           <div 
                             key={response.field_id || `response-${idx}`}
-                            className={`p-2 sm:p-3 rounded-lg border ${
+                            className={`p-3 rounded-lg border ${
                               isCritical 
                                 ? "bg-red-50 border-red-200" 
                                 : isWarning 
@@ -1233,37 +1264,87 @@ export default function DashboardPage() {
                                   : "bg-white border-slate-200"
                             }`}
                           >
-                            <p className={`text-[10px] sm:text-xs font-medium mb-0.5 sm:mb-1 ${
-                              isCritical ? "text-red-600" : isWarning ? "text-amber-600" : "text-slate-500"
-                            }`}>
-                              {response.field_label || response.field_id}
-                            </p>
-                            <div className={`text-xs sm:text-sm font-medium ${
-                              isCritical ? "text-red-800" : isWarning ? "text-amber-800" : "text-slate-800"
-                            }`}>
-                              {isSignature && response.value ? (
-                                <div className="bg-white border border-slate-200 rounded-lg p-2 inline-block">
-                                  <img 
-                                    src={response.value} 
-                                    alt="Signature" 
-                                    className="max-h-12 sm:max-h-16 w-auto object-contain"
-                                  />
-                                </div>
-                              ) : isBoolean ? (
-                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ${
-                                  response.value 
-                                    ? "bg-green-100 text-green-700" 
-                                    : "bg-slate-100 text-slate-600"
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs font-medium mb-1 ${
+                                  isCritical ? "text-red-600" : isWarning ? "text-amber-600" : "text-slate-500"
                                 }`}>
-                                  {response.value ? "Yes" : "No"}
-                                </span>
-                              ) : isArray ? (
-                                response.value.join(", ")
-                              ) : (
-                                <>
-                                  {String(response.value || "—")}
-                                  {response.unit && <span className="text-slate-500 ml-1">{response.unit}</span>}
-                                </>
+                                  {response.field_label || response.field_id}
+                                  {response.required && <span className="text-red-400 ml-0.5">*</span>}
+                                </p>
+                                
+                                {/* Value display based on type */}
+                                <div className={`text-sm font-medium ${
+                                  isCritical ? "text-red-800" : isWarning ? "text-amber-800" : "text-slate-800"
+                                }`}>
+                                  {isSignature && response.value ? (
+                                    <button
+                                      onClick={() => setViewingImage({ url: response.value, name: response.field_label || "Signature" })}
+                                      className="block bg-slate-50 border border-slate-200 rounded-lg p-2 hover:border-blue-300 hover:shadow-sm transition-all"
+                                    >
+                                      <img 
+                                        src={response.value} 
+                                        alt="Signature" 
+                                        className="max-h-16 sm:max-h-20 w-auto object-contain"
+                                      />
+                                      <span className="text-[10px] text-slate-500 mt-1 block">Tap to enlarge</span>
+                                    </button>
+                                  ) : isBoolean ? (
+                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ${
+                                      response.value 
+                                        ? "bg-green-100 text-green-700" 
+                                        : "bg-slate-100 text-slate-600"
+                                    }`}>
+                                      {response.value ? (
+                                        <><CheckCircle2 className="w-3 h-3" /> Yes</>
+                                      ) : (
+                                        <><X className="w-3 h-3" /> No</>
+                                      )}
+                                    </span>
+                                  ) : isArray ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {response.value.map((v, i) => (
+                                        <Badge key={`${response.field_id}-${i}`} variant="secondary" className="text-xs">
+                                          {String(v)}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  ) : isNumeric ? (
+                                    <span className="font-mono text-base">
+                                      {response.value}
+                                      {response.unit && <span className="text-slate-500 ml-1 text-sm">{response.unit}</span>}
+                                    </span>
+                                  ) : hasAttachment ? (
+                                    <button
+                                      onClick={() => {
+                                        const url = response.attachment_url || response.file_url;
+                                        if (isImage) {
+                                          setViewingImage({ url, name: response.field_label || "Image" });
+                                        } else {
+                                          window.open(url, '_blank');
+                                        }
+                                      }}
+                                      className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800"
+                                    >
+                                      <Paperclip className="w-4 h-4" />
+                                      View Attachment
+                                    </button>
+                                  ) : (
+                                    <>
+                                      {String(response.value || "—")}
+                                      {response.unit && <span className="text-slate-500 ml-1">{response.unit}</span>}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Threshold indicator */}
+                              {(isWarning || isCritical) && (
+                                <div className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${
+                                  isCritical ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                                }`}>
+                                  {isCritical ? "Critical" : "Warning"}
+                                </div>
                               )}
                             </div>
                           </div>
