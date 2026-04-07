@@ -34,8 +34,8 @@ const ISO_LEVEL_CONFIG = {
   equipment_unit: { icon: Cog, label: "Equipment Unit", color: "text-orange-600" },
   subunit: { icon: Box, label: "Subunit", color: "text-teal-600" },
   maintainable_item: { icon: Wrench, label: "Maintainable Item", color: "text-slate-600" },
-  // Legacy support
-  unit: { icon: Factory, label: "Plant/Unit", color: "text-indigo-600" },
+  // Legacy support - "unit" maps to Equipment Unit
+  unit: { icon: Cog, label: "Equipment Unit", color: "text-orange-600" },
   plant: { icon: Factory, label: "Plant/Unit", color: "text-indigo-600" },
   section: { icon: Settings, label: "Section/System", color: "text-purple-600" },
   system: { icon: Settings, label: "Section/System", color: "text-purple-600" },
@@ -52,7 +52,7 @@ const ISO_LEVEL_CONFIG = {
 
 // Legacy level mapping to ISO 14224
 const LEGACY_LEVEL_MAP = {
-  unit: "plant_unit",
+  unit: "equipment_unit",
   plant: "plant_unit",
   system: "section_system",
   section: "section_system",

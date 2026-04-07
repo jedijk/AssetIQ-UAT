@@ -45,7 +45,7 @@ const LEVEL_CONFIG = {
   maintainable_item: { icon: Wrench, label: "Maintainable Item", description: "Bearing, Seal, Impeller" },
   // Legacy/import level aliases
   plant: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" },
-  unit: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" },
+  unit: { icon: Cog, label: "Equipment Unit", description: "Equipment unit" },
   section: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" },
   system: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" },
   equipment: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" },
@@ -60,8 +60,8 @@ const LEVEL_CONFIG = {
 };
 const LEVEL_ORDER = ["installation", "site", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
 const LEGACY_LEVEL_MAP = { 
-  "unit": "plant_unit", 
   "plant": "plant_unit",
+  "unit": "equipment_unit",
   "system": "section_system", 
   "section": "section_system",
   "equipment": "equipment_unit",

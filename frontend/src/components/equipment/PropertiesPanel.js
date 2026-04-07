@@ -17,8 +17,8 @@ const LEVEL_CONFIG = {
   equipment_unit: { icon: Cog, label: "Equipment Unit" }, 
   subunit: { icon: Settings, label: "Subunit" },
   maintainable_item: { icon: Settings, label: "Maintainable Item" },
-  // Legacy support
-  unit: { icon: Settings, label: "Plant/Unit" },
+  // Legacy support - "unit" maps to Equipment Unit
+  unit: { icon: Cog, label: "Equipment Unit" },
   plant: { icon: Settings, label: "Plant/Unit" },
   section: { icon: Settings, label: "Section/System" },
   system: { icon: Settings, label: "Section/System" },
