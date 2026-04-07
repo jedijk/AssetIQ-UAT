@@ -38,14 +38,16 @@ export const AuthProvider = ({ children }) => {
     
     // Validate API URL is configured
     if (!API_URL || API_URL === '/api') {
-      console.error("[Auth] Backend API URL not configured. Set REACT_APP_API_URL in environment variables.");
+      console.error("[Auth] Backend API URL not configured. Set REACT_APP_BACKEND_URL in environment variables.");
       throw new Error("Backend not configured. Please contact administrator.");
     }
     
-    console.log("[Auth] Login request to:", `${API_URL}/auth/login`);
+    const loginUrl = `${API_URL}/auth/login`;
+    console.log("[Auth] Login request to:", loginUrl);
+    console.log("[Auth] API_URL resolved to:", API_URL);
     
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, { email, password });
+      const response = await axios.post(loginUrl, { email, password });
       const { token: newToken, user: userData, must_change_password } = response.data;
     
     localStorage.setItem("token", newToken);
