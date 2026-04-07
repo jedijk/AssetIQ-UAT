@@ -14,6 +14,7 @@ import {
   DropdownMenuLabel,
 } from "../ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { getApiUrl } from "../../lib/apiConfig";
 
 export const UserMenu = ({ 
   user, 
@@ -35,12 +36,24 @@ export const UserMenu = ({
     viewer: "bg-slate-100 text-slate-500",
   };
 
+  // Build authenticated avatar URL
+  const getAvatarUrl = () => {
+    if (!user?.avatar_url) return null;
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    // avatar_url is like "/api/users/{id}/avatar", we need full URL with auth
+    const baseUrl = getApiUrl().replace("/api", "");
+    return `${baseUrl}${user.avatar_url}?auth=${token}`;
+  };
+
+  const avatarUrl = getAvatarUrl();
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="flex items-center gap-2 h-auto py-1.5 px-2" data-testid="user-menu-trigger">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user?.avatar_url} alt={user?.name} />
+            <AvatarImage src={avatarUrl} alt={user?.name} />
             <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs">
               {initials}
             </AvatarFallback>

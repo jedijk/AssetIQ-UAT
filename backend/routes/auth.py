@@ -315,6 +315,12 @@ async def login(request: Request, credentials: UserLogin):
 
 @router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
+    # Build avatar URL if user has an avatar
+    avatar_url = None
+    if current_user.get("avatar_path") or current_user.get("avatar_data"):
+        # Use the backend proxy endpoint so frontend can access it without storage auth
+        avatar_url = f"/api/users/{current_user['id']}/avatar"
+    
     return UserResponse(
         id=current_user["id"],
         email=current_user["email"],
@@ -325,7 +331,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         role=current_user.get("role"),
         phone=current_user.get("phone"),
         must_change_password=current_user.get("must_change_password", False),
-        has_seen_intro=current_user.get("has_seen_intro", True)
+        has_seen_intro=current_user.get("has_seen_intro", True),
+        avatar_url=avatar_url
     )
 
 
@@ -467,7 +474,7 @@ async def send_reset_email(email: str, reset_token: str, user_name: str):
     }
     
     try:
-        email_response = await asyncio.to_thread(resend.Emails.send, params)
+        await asyncio.to_thread(resend.Emails.send, params)
         logger.info(f"Password reset email sent to {email}")
         return True
     except Exception as e:
@@ -533,7 +540,7 @@ async def send_approval_notification_email(admin_email: str, admin_name: str, ne
     """
     
     try:
-        result = resend.Emails.send({
+        resend.Emails.send({
             "from": SENDER_EMAIL,
             "to": admin_email,
             "subject": f"New User Awaiting Approval: {new_user_name}",
@@ -609,7 +616,7 @@ async def send_approval_result_email(user_email: str, user_name: str, approved: 
     """
     
     try:
-        result = resend.Emails.send({
+        resend.Emails.send({
             "from": SENDER_EMAIL,
             "to": user_email,
             "subject": subject,

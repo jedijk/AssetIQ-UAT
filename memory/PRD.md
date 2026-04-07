@@ -5,6 +5,22 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 7, 2026 - Version 2.6.5 Production Fixes
+**BUG FIXES:**
+- ✅ **Excel Export Fix** - Fixed failure modes export (`/api/failure-modes/export`) crashing when `potential_effects` and `potential_causes` fields are arrays. Now properly converts list fields to comma-separated strings before Excel generation.
+- ✅ **Avatar URL Support for Production** - Added `avatar_url` field to UserResponse model and `/auth/me` endpoint. Frontend UserMenu now constructs authenticated URLs for avatar images using query param auth tokens, enabling avatars to work in Vercel/Railway production deployments.
+- ✅ **Code Cleanup** - Removed unused variables in auth.py email functions to satisfy linter.
+
+**Files Modified:**
+- `/app/backend/routes/failure_modes_routes.py` - Fixed list-to-string conversion for potential_effects/causes in Excel export
+- `/app/backend/models/api_models.py` - Added avatar_url field to UserResponse
+- `/app/backend/routes/auth.py` - Updated /auth/me to return avatar_url, cleaned up unused variables
+- `/app/frontend/src/components/layout/UserMenu.jsx` - Build authenticated avatar URL using token query param
+- `/app/frontend/src/components/Layout.js` - Updated version to 2.6.5
+- `/app/frontend/package.json` - Updated version to 2.6.5
+
+---
+
 ### April 7, 2026 - Equipment Type Searchable Selector with Failure Mode Counts
 **FEATURE COMPLETED:**
 - ✅ **Searchable Equipment Type Selector** - Replaced dropdown with Command/Combobox pattern for searching equipment types by name, discipline, or ID
