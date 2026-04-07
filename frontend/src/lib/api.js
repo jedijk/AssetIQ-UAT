@@ -274,6 +274,11 @@ export const failureModesAPI = {
     });
     return response.data;
   },
+  
+  getCountsByEquipmentType: async () => {
+    const response = await api.get("/failure-modes/counts-by-equipment-type");
+    return response.data;
+  },
 };
 
 // Equipment Hierarchy API (ISO 14224)

@@ -5,6 +5,25 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 7, 2026 - Equipment Type Searchable Selector with Failure Mode Counts
+**FEATURE COMPLETED:**
+- ✅ **Searchable Equipment Type Selector** - Replaced dropdown with Command/Combobox pattern for searching equipment types by name, discipline, or ID
+- ✅ **Failure Mode Counts per Equipment Type** - Shows "X FM" badge next to each equipment type indicating how many failure modes exist in library
+- ✅ **New API endpoint** - `GET /api/failure-modes/counts-by-equipment-type` returns failure mode counts per equipment type ID
+
+**UI Changes:**
+- PropertiesPanel now uses Popover+Command for equipment type selection
+- Search input filters equipment types in real-time
+- Each type shows failure mode count badge (e.g., "8 FM" for pump_centrifugal)
+- Selected type shows failure mode count hint below the selector
+
+**Files Modified:**
+- `/app/backend/routes/failure_modes_routes.py` - Added counts-by-equipment-type endpoint
+- `/app/frontend/src/lib/api.js` - Added getCountsByEquipmentType method
+- `/app/frontend/src/components/equipment/PropertiesPanel.js` - Complete rewrite of equipment type selector with search and FM counts
+
+---
+
 ### April 7, 2026 - Equipment Types ISO 14224 Hierarchy Level Mapping
 **FEATURE COMPLETED:**
 - ✅ **Added `applicable_levels` field** to all equipment types defining which ISO hierarchy levels each type can be used at

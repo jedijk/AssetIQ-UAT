@@ -133,6 +133,41 @@ async def get_mechanisms():
         return {"mechanisms": []}
 
 
+@router.get("/failure-modes/counts-by-equipment-type")
+async def get_failure_mode_counts_by_equipment_type(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get failure mode counts grouped by equipment_type_id.
+    Returns a dict mapping equipment_type_id to count of failure modes.
+    """
+    try:
+        # Aggregate to count failure modes per equipment type
+        pipeline = [
+            {"$unwind": "$equipment_type_ids"},
+            {"$group": {
+                "_id": "$equipment_type_ids",
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"count": -1}}
+        ]
+        
+        results = await db.failure_modes.aggregate(pipeline).to_list(500)
+        
+        counts = {item["_id"]: item["count"] for item in results if item["_id"]}
+        
+        # Also get total count
+        total = await db.failure_modes.count_documents({})
+        
+        return {
+            "counts_by_type": counts,
+            "total_failure_modes": total
+        }
+    except Exception as e:
+        logger.error(f"Error fetching failure mode counts: {e}")
+        return {"counts_by_type": {}, "total_failure_modes": 0}
+
+
 @router.get("/failure-modes/export")
 async def export_failure_modes_excel(
     current_user: dict = Depends(get_current_user)

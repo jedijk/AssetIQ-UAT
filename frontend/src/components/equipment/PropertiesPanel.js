@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { failureModesAPI } from "../../lib/api";
 import {
-  Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye,
+  Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -9,6 +11,8 @@ import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "../ui/command";
 
 const LEVEL_CONFIG = { 
   installation: { icon: Settings, label: "Installation" }, 
@@ -69,6 +73,16 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [showAllTypes, setShowAllTypes] = useState(false);
+  const [typeSearchOpen, setTypeSearchOpen] = useState(false);
+  const [typeSearchQuery, setTypeSearchQuery] = useState("");
+  
+  // Fetch failure mode counts by equipment type
+  const { data: fmCountsData } = useQuery({
+    queryKey: ["failure-mode-counts"],
+    queryFn: failureModesAPI.getCountsByEquipmentType,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+  const fmCounts = fmCountsData?.counts_by_type || {};
   
   // Determine parent system name for smart filtering
   const parentSystemName = useMemo(() => {
@@ -138,6 +152,30 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
     
     return { recommendedTypes: recommended, otherTypes: others };
   }, [equipmentTypes, parentSystemName, node?.level]);
+  
+  // Filter types by search query
+  const filteredRecommendedTypes = useMemo(() => {
+    if (!typeSearchQuery) return recommendedTypes;
+    const q = typeSearchQuery.toLowerCase();
+    return recommendedTypes.filter(eqt => 
+      eqt.name.toLowerCase().includes(q) || 
+      eqt.discipline?.toLowerCase().includes(q) ||
+      eqt.id.toLowerCase().includes(q)
+    );
+  }, [recommendedTypes, typeSearchQuery]);
+  
+  const filteredOtherTypes = useMemo(() => {
+    if (!typeSearchQuery) return otherTypes;
+    const q = typeSearchQuery.toLowerCase();
+    return otherTypes.filter(eqt => 
+      eqt.name.toLowerCase().includes(q) || 
+      eqt.discipline?.toLowerCase().includes(q) ||
+      eqt.id.toLowerCase().includes(q)
+    );
+  }, [otherTypes, typeSearchQuery]);
+  
+  // Get selected equipment type
+  const selectedType = equipmentTypes?.find(t => t.id === node?.equipment_type_id);
   
   if (!node) return (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
@@ -209,69 +247,150 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                     </div>
                   )}
                 </div>
-                <Select 
-                  value={node.equipment_type_id || "__none__"} 
-                  onValueChange={v => {
-                    const actualValue = v === "__none__" ? null : v;
-                    const eqType = actualValue ? equipmentTypes?.find(t => t.id === actualValue) : null;
-                    onUpdate(node.id, { 
-                      equipment_type_id: actualValue,
-                      discipline: eqType?.discipline || null
-                    });
-                  }}
-                >
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select type" /></SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    <SelectItem value="__none__">
-                      <span className="text-slate-400">None</span>
-                    </SelectItem>
-                    
-                    {/* Recommended types based on parent system */}
-                    {recommendedTypes.length > 0 && (
-                      <>
-                        <div className="px-2 py-1.5 bg-blue-50 border-y border-blue-100">
-                          <div className="flex items-center gap-1.5">
-                            <Sparkles className="w-3 h-3 text-blue-500" />
-                            <span className="text-xs font-medium text-blue-700">Recommended for this system</span>
-                          </div>
+                
+                {/* Searchable Equipment Type Selector */}
+                <Popover open={typeSearchOpen} onOpenChange={setTypeSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={typeSearchOpen}
+                      className="w-full h-9 justify-between font-normal"
+                    >
+                      {selectedType ? (
+                        <div className="flex items-center gap-2 truncate">
+                          <span className="truncate">{selectedType.name}</span>
+                          {fmCounts[selectedType.id] && (
+                            <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" />
+                              {fmCounts[selectedType.id]} FM
+                            </span>
+                          )}
                         </div>
-                        {recommendedTypes.map(eqt => (
-                          <SelectItem key={eqt.id} value={eqt.id} className="pl-4">
-                            <div className="flex items-center gap-2">
-                              <span>{eqt.name}</span>
-                              <span className="text-xs text-slate-400">({eqt.discipline})</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                    
-                    {/* Other types - shown if showAllTypes is true or no recommendations */}
-                    {(showAllTypes || recommendedTypes.length === 0) && otherTypes.length > 0 && (
-                      <>
-                        {recommendedTypes.length > 0 && (
-                          <div className="px-2 py-1.5 bg-slate-50 border-y border-slate-100">
-                            <span className="text-xs font-medium text-slate-500">All Equipment Types</span>
-                          </div>
+                      ) : (
+                        <span className="text-slate-400">Select equipment type...</span>
+                      )}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[340px] p-0" align="start">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Search equipment types..." 
+                        value={typeSearchQuery}
+                        onValueChange={setTypeSearchQuery}
+                      />
+                      <CommandList className="max-h-72">
+                        <CommandEmpty>No equipment type found.</CommandEmpty>
+                        
+                        {/* Clear selection option */}
+                        <CommandGroup>
+                          <CommandItem
+                            value="__none__"
+                            onSelect={() => {
+                              onUpdate(node.id, { equipment_type_id: null, discipline: null });
+                              setTypeSearchOpen(false);
+                              setTypeSearchQuery("");
+                            }}
+                          >
+                            <span className="text-slate-400">None (clear selection)</span>
+                          </CommandItem>
+                        </CommandGroup>
+                        
+                        {/* Recommended types */}
+                        {filteredRecommendedTypes.length > 0 && (
+                          <>
+                            <CommandSeparator />
+                            <CommandGroup heading={
+                              <div className="flex items-center gap-1.5 text-blue-600">
+                                <Sparkles className="w-3 h-3" />
+                                <span>Recommended for this system</span>
+                              </div>
+                            }>
+                              {filteredRecommendedTypes.map(eqt => (
+                                <CommandItem
+                                  key={eqt.id}
+                                  value={`recommended-${eqt.id}-${eqt.name}`}
+                                  onSelect={() => {
+                                    onUpdate(node.id, { 
+                                      equipment_type_id: eqt.id,
+                                      discipline: eqt.discipline || null
+                                    });
+                                    setTypeSearchOpen(false);
+                                    setTypeSearchQuery("");
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-2">
+                                      {node.equipment_type_id === eqt.id && <Check className="w-4 h-4 text-blue-500" />}
+                                      <span>{eqt.name}</span>
+                                      <span className="text-xs text-slate-400">({eqt.discipline})</span>
+                                    </div>
+                                    {fmCounts[eqt.id] > 0 && (
+                                      <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                        {fmCounts[eqt.id]} FM
+                                      </span>
+                                    )}
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </>
                         )}
-                        {otherTypes.map(eqt => (
-                          <SelectItem key={eqt.id} value={eqt.id} className="pl-4">
-                            <div className="flex items-center gap-2">
-                              <span>{eqt.name}</span>
-                              <span className="text-xs text-slate-400">({eqt.discipline})</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
+                        
+                        {/* Other types - shown if showAllTypes or no recommendations */}
+                        {(showAllTypes || recommendedTypes.length === 0) && filteredOtherTypes.length > 0 && (
+                          <>
+                            <CommandSeparator />
+                            <CommandGroup heading="All Equipment Types">
+                              {filteredOtherTypes.map(eqt => (
+                                <CommandItem
+                                  key={eqt.id}
+                                  value={`other-${eqt.id}-${eqt.name}`}
+                                  onSelect={() => {
+                                    onUpdate(node.id, { 
+                                      equipment_type_id: eqt.id,
+                                      discipline: eqt.discipline || null
+                                    });
+                                    setTypeSearchOpen(false);
+                                    setTypeSearchQuery("");
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-2">
+                                      {node.equipment_type_id === eqt.id && <Check className="w-4 h-4 text-blue-500" />}
+                                      <span>{eqt.name}</span>
+                                      <span className="text-xs text-slate-400">({eqt.discipline})</span>
+                                    </div>
+                                    {fmCounts[eqt.id] > 0 && (
+                                      <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                        {fmCounts[eqt.id]} FM
+                                      </span>
+                                    )}
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 
                 {/* System context hint */}
                 {parentSystemName && recommendedTypes.length > 0 && !showAllTypes && (
                   <p className="text-xs text-blue-500 mt-1 flex items-center gap-1">
                     <Sparkles className="w-3 h-3" />
                     Filtered for "{parentSystemName}"
+                  </p>
+                )}
+                
+                {/* Show failure mode count for selected type */}
+                {selectedType && fmCounts[selectedType.id] > 0 && (
+                  <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    {fmCounts[selectedType.id]} failure modes in library for {selectedType.name}
                   </p>
                 )}
               </div>
