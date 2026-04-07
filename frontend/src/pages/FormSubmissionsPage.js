@@ -126,9 +126,25 @@ export default function FormSubmissionsPage() {
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [loadingSubmission, setLoadingSubmission] = useState(false);
   const [viewingDocument, setViewingDocument] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // Function to handle clicking on a submission - fetches full details
+  const handleSubmissionClick = async (submission) => {
+    setLoadingSubmission(true);
+    try {
+      const fullSubmission = await fetchSubmission(submission.id);
+      setSelectedSubmission(fullSubmission);
+    } catch (error) {
+      console.error("Failed to fetch submission details:", error);
+      // Fallback to the lightweight version if fetch fails
+      setSelectedSubmission(submission);
+    } finally {
+      setLoadingSubmission(false);
+    }
+  };
 
   // Close image lightbox with Escape key
   const closeImageLightbox = useCallback(() => {
@@ -403,7 +419,7 @@ export default function FormSubmissionsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.03 }}
                     className="p-3 sm:p-4 hover:bg-slate-50 cursor-pointer transition-colors"
-                    onClick={() => setSelectedSubmission(submission)}
+                    onClick={() => handleSubmissionClick(submission)}
                     data-testid={`submission-row-${submission.id}`}
                   >
                     <div className="flex items-start justify-between gap-2 sm:gap-4">
@@ -485,7 +501,7 @@ export default function FormSubmissionsPage() {
                           className="hidden sm:flex"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedSubmission(submission);
+                            handleSubmissionClick(submission);
                           }}
                         >
                           <Eye className="w-4 h-4 mr-1" />
@@ -507,7 +523,7 @@ export default function FormSubmissionsPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedSubmission(submission);
+                              handleSubmissionClick(submission);
                             }}>
                               <Eye className="w-4 h-4 mr-2" /> View Details
                             </DropdownMenuItem>
@@ -533,14 +549,20 @@ export default function FormSubmissionsPage() {
       </div>
 
       {/* Submission Detail Dialog */}
-      <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
+      <Dialog open={!!selectedSubmission || loadingSubmission} onOpenChange={() => { setSelectedSubmission(null); setLoadingSubmission(false); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-              {selectedSubmission?.form_template_name || "Form Submission"}
+              {selectedSubmission?.form_template_name || "Loading..."}
             </DialogTitle>
           </DialogHeader>
+          
+          {loadingSubmission && !selectedSubmission && (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          )}
           
           {selectedSubmission && (
             <div className="space-y-4 mt-2 sm:mt-4">

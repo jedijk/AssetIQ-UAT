@@ -302,7 +302,32 @@ export default function DashboardPage() {
   
   // Quick View states
   const [quickViewSubmission, setQuickViewSubmission] = useState(null);
+  const [loadingQuickView, setLoadingQuickView] = useState(false);
   const [viewingImage, setViewingImage] = useState(null);
+
+  // Function to handle clicking on a submission - fetches full details
+  const handleQuickViewClick = async (submission) => {
+    setLoadingQuickView(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/form-submissions/${submission.id}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      if (response.ok) {
+        const fullSubmission = await response.json();
+        setQuickViewSubmission(fullSubmission);
+      } else {
+        // Fallback to lightweight version
+        setQuickViewSubmission(submission);
+      }
+    } catch (error) {
+      console.error("Failed to fetch submission details:", error);
+      setQuickViewSubmission(submission);
+    } finally {
+      setLoadingQuickView(false);
+    }
+  };
 
   // Close image lightbox with Escape key
   const closeImageLightbox = useCallback(() => {
@@ -944,7 +969,7 @@ export default function DashboardPage() {
             <div 
               key={item.id || `submission-${idx}`} 
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
-              onClick={(e) => { e.stopPropagation(); setQuickViewSubmission(item); }}
+              onClick={(e) => { e.stopPropagation(); handleQuickViewClick(item); }}
               data-testid={`form-submission-item-${item.id}`}
             >
               <UserAvatar 
@@ -1098,13 +1123,14 @@ export default function DashboardPage() {
       </div>
       
       {/* Quick View Modal for Form Submissions */}
-      <Dialog open={!!quickViewSubmission} onOpenChange={() => setQuickViewSubmission(null)}>
+      <Dialog open={!!quickViewSubmission || loadingQuickView} onOpenChange={() => { setQuickViewSubmission(null); setLoadingQuickView(false); }}>
         <DialogContent className="w-[95vw] max-w-2xl h-[85vh] sm:h-auto sm:max-h-[80vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 border-b border-slate-100 flex-shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
-              <span className="truncate">{quickViewSubmission?.template_name || quickViewSubmission?.form_name || "Form Submission"}</span>
+              <span className="truncate">{quickViewSubmission?.template_name || quickViewSubmission?.form_template_name || quickViewSubmission?.form_name || "Loading..."}</span>
             </DialogTitle>
+            {quickViewSubmission && (
             <DialogDescription className="flex items-center gap-2 mt-2">
               <UserAvatar 
                 name={quickViewSubmission?.submitted_by_name || "User"}
@@ -1119,9 +1145,19 @@ export default function DashboardPage() {
                 <span className="text-slate-500">{quickViewSubmission?.submitted_at ? new Date(quickViewSubmission.submitted_at).toLocaleDateString() : "Unknown"}</span>
               </div>
             </DialogDescription>
+            )}
           </DialogHeader>
           
+          {/* Loading state */}
+          {loadingQuickView && !quickViewSubmission && (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            </div>
+          )}
+          
           {/* Scrollable content */}
+          {quickViewSubmission && (
+          <>
           <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             <div className="space-y-4">
             {/* Status Badge */}
@@ -1336,6 +1372,8 @@ export default function DashboardPage() {
               <span className="sm:hidden">View All</span>
             </Button>
           </div>
+          </>
+          )}
         </DialogContent>
       </Dialog>
 
