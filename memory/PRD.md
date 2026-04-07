@@ -5,6 +5,39 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 7, 2026 - Backend Equipment Module Refactoring (P3)
+**REFACTORING COMPLETED:**
+- ✅ **Split equipment.py (2288 lines) into modular package** - Created `/app/backend/routes/equipment/` directory with 7 focused modules:
+  - `equipment_types.py` - Equipment type CRUD (create, read, update, delete custom types)
+  - `equipment_nodes.py` - Node CRUD operations (get, create, update, delete, export)
+  - `equipment_operations.py` - Move, reorder, change level operations
+  - `equipment_criticality.py` - Criticality and discipline assignment, stats
+  - `equipment_utils.py` - Search, disciplines, ISO levels utilities
+  - `equipment_history.py` - Equipment history timeline
+  - `equipment_import.py` - Hierarchy import (Excel, JSON), unstructured items
+  - `__init__.py` - Package init that combines all sub-routers
+
+**Benefits:**
+- Improved code maintainability and readability
+- Easier navigation for developers working on specific features
+- Better separation of concerns
+- No functionality changes - all 33 routes preserved
+
+**Files Created:**
+- `/app/backend/routes/equipment/__init__.py`
+- `/app/backend/routes/equipment/equipment_types.py`
+- `/app/backend/routes/equipment/equipment_nodes.py`
+- `/app/backend/routes/equipment/equipment_operations.py`
+- `/app/backend/routes/equipment/equipment_criticality.py`
+- `/app/backend/routes/equipment/equipment_utils.py`
+- `/app/backend/routes/equipment/equipment_history.py`
+- `/app/backend/routes/equipment/equipment_import.py`
+
+**Files Deleted:**
+- `/app/backend/routes/equipment.py` (replaced by package)
+
+---
+
 ### April 7, 2026 - Version 2.6.5 Production Fixes
 **BUG FIXES:**
 - ✅ **Excel Export Fix** - Fixed failure modes export (`/api/failure-modes/export`) crashing when `potential_effects` and `potential_causes` fields are arrays. Now properly converts list fields to comma-separated strings before Excel generation.
