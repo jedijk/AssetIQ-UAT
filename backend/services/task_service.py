@@ -635,9 +635,30 @@ class TaskService:
             if to_date:
                 query["scheduled_date"]["$lte"] = to_date
         
+        # Projection to limit fields returned (for performance)
+        projection = {
+            "_id": 1,
+            "id": 1,
+            "task_plan_id": 1,
+            "task_template_name": 1,
+            "task_type": 1,
+            "equipment_id": 1,
+            "equipment_name": 1,
+            "installation_name": 1,
+            "scheduled_date": 1,
+            "due_date": 1,
+            "status": 1,
+            "priority": 1,
+            "assigned_user_id": 1,
+            "assigned_user_name": 1,
+            "completed_at": 1,
+            "created_at": 1,
+            "description": 1
+        }
+        
         # Run count and fetch in parallel for better performance
         async def fetch_instances():
-            cursor = self.instances.find(query).sort("scheduled_date", 1).skip(skip).limit(limit)
+            cursor = self.instances.find(query, projection).sort("scheduled_date", 1).skip(skip).limit(limit)
             instances = []
             async for doc in cursor:
                 instances.append(self._serialize_instance(doc))

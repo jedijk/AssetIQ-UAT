@@ -187,27 +187,70 @@ async def get_form_submissions(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 50,  # Reduced default for better performance
     current_user: dict = Depends(get_current_user)
 ):
-    """Get form submissions with filters."""
-    from_dt = datetime.fromisoformat(from_date) if from_date else None
-    to_dt = datetime.fromisoformat(to_date) if to_date else None
+    """Get form submissions with filters, timeout protection, and fallback."""
+    import time
+    import asyncio
+    import logging
     
-    result = await form_service.get_submissions(
-        form_template_id=form_template_id,
-        task_instance_id=task_instance_id,
-        equipment_id=equipment_id,
-        has_warnings=has_warnings,
-        has_critical=has_critical,
-        from_date=from_dt,
-        to_date=to_dt,
-        skip=skip,
-        limit=limit
-    )
+    logger = logging.getLogger(__name__)
+    start_time = time.time()
+    request_id = f"forms-{int(start_time * 1000) % 100000}"
     
-    # User photos are now fetched directly in form_service.get_submissions
-    return result
+    logger.info(f"[{request_id}] GET /api/form-submissions started - filters: template={form_template_id}, limit={limit}")
+    
+    try:
+        from_dt = datetime.fromisoformat(from_date) if from_date else None
+        to_dt = datetime.fromisoformat(to_date) if to_date else None
+        
+        # Execute query with 5 second timeout
+        async def fetch_submissions():
+            return await form_service.get_submissions(
+                form_template_id=form_template_id,
+                task_instance_id=task_instance_id,
+                equipment_id=equipment_id,
+                has_warnings=has_warnings,
+                has_critical=has_critical,
+                from_date=from_dt,
+                to_date=to_dt,
+                skip=skip,
+                limit=min(limit, 100)  # Cap at 100 max
+            )
+        
+        try:
+            result = await asyncio.wait_for(fetch_submissions(), timeout=5.0)
+            
+            duration = time.time() - start_time
+            logger.info(f"[{request_id}] Completed in {duration:.2f}s - returned {result.get('total', 0)} items")
+            
+            if duration > 2.0:
+                logger.warning(f"[{request_id}] Slow query detected: {duration:.2f}s")
+            
+            return result
+            
+        except asyncio.TimeoutError:
+            duration = time.time() - start_time
+            logger.error(f"[{request_id}] TIMEOUT after {duration:.2f}s - database query too slow")
+            return {
+                "total": 0,
+                "submissions": [],
+                "error": "timeout",
+                "message": "Database query exceeded time limit. Please try again or narrow your search."
+            }
+            
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(f"[{request_id}] ERROR after {duration:.2f}s: {str(e)}", exc_info=True)
+        
+        # Return fallback response instead of hanging
+        return {
+            "total": 0,
+            "submissions": [],
+            "warning": "Database unavailable",
+            "error": str(e)
+        }
 
 @router.get("/form-submissions/{submission_id}")
 async def get_form_submission(

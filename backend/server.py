@@ -215,6 +215,34 @@ app.add_middleware(
 app.add_middleware(TimeoutMiddleware, timeout=25.0)
 
 
+# Global Request Logging Middleware
+@app.middleware("http")
+async def log_requests(request, call_next):
+    """Log all incoming requests with timing."""
+    import time
+    start_time = time.time()
+    request_id = f"req-{int(start_time * 1000) % 100000}"
+    
+    # Log request start
+    logger.info(f"[{request_id}] {request.method} {request.url.path} started")
+    
+    try:
+        response = await call_next(request)
+        
+        # Log request completion
+        duration = time.time() - start_time
+        logger.info(f"[{request_id}] {request.method} {request.url.path} completed in {duration:.2f}s - status {response.status_code}")
+        
+        if duration > 2.0:
+            logger.warning(f"[{request_id}] SLOW REQUEST: {request.url.path} took {duration:.2f}s")
+        
+        return response
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(f"[{request_id}] {request.method} {request.url.path} FAILED after {duration:.2f}s: {str(e)}")
+        raise
+
+
 # Security Headers Middleware
 @app.middleware("http")
 async def add_security_headers(request, call_next):

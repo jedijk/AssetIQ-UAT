@@ -584,6 +584,25 @@ class FormService:
         
         import asyncio
         
+        # Projection to limit fields returned (for performance)
+        projection = {
+            "_id": 0,
+            "id": 1,
+            "form_template_id": 1,
+            "form_template_name": 1,
+            "task_instance_id": 1,
+            "equipment_id": 1,
+            "equipment_name": 1,
+            "submitted_by": 1,
+            "submitted_by_name": 1,
+            "submitted_at": 1,
+            "responses": 1,
+            "has_warnings": 1,
+            "has_critical": 1,
+            "attachments": 1,
+            "notes": 1
+        }
+        
         # Use estimated count for unfiltered queries (much faster)
         # Only use exact count when filters are applied
         if query:
@@ -591,7 +610,7 @@ class FormService:
         else:
             count_task = self.submissions.estimated_document_count()
         
-        fetch_task = self.submissions.find(query).sort("submitted_at", -1).skip(skip).limit(limit).to_list(length=limit)
+        fetch_task = self.submissions.find(query, projection).sort("submitted_at", -1).skip(skip).limit(limit).to_list(length=limit)
         
         total, raw_submissions = await asyncio.gather(count_task, fetch_task)
         
