@@ -9,8 +9,8 @@ import { Label } from "../components/ui/label";
 import { Loader2, Shield, Activity, BarChart3, RefreshCw, Server, WifiOff } from "lucide-react";
 import { getBackendUrl } from "../lib/apiConfig";
 
-// Background video for login/register - use runtime URL detection
-const BACKGROUND_VIDEO = `${getBackendUrl()}/api/assets/video/background.mp4`;
+// Background video helper - get URL dynamically
+const getBackgroundVideoUrl = () => `${getBackendUrl()}/api/assets/video/background.mp4`;
 
 // Max retry attempts for server connection
 const MAX_RETRY_ATTEMPTS = 5;
@@ -180,7 +180,7 @@ const LoginPage = () => {
     <div className="login-page-container">
       {/* Mobile Video Background - positioned at container level */}
       <video 
-        src={BACKGROUND_VIDEO}
+        src={getBackgroundVideoUrl()}
         autoPlay
         loop
         muted
@@ -193,7 +193,7 @@ const LoginPage = () => {
       {/* Left side - Background Video with Overlay */}
       <div className="login-image-section">
         <video 
-          src={BACKGROUND_VIDEO}
+          src={getBackgroundVideoUrl()}
           autoPlay
           loop
           muted

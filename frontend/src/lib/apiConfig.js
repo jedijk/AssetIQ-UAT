@@ -17,17 +17,12 @@ export const getBackendUrl = () => {
   
   const envUrl = apiUrl || backendUrl;
   
-  // Debug logging - remove in production
-  console.log("[API Config] REACT_APP_API_URL:", apiUrl);
-  console.log("[API Config] REACT_APP_BACKEND_URL:", backendUrl);
-  console.log("[API Config] Using URL:", envUrl);
-  
   if (envUrl && envUrl !== 'undefined' && envUrl.startsWith('http')) {
     // Remove trailing slash if present
     return envUrl.replace(/\/$/, '');
   }
   
-  // CRITICAL: If no env var is set, throw error in production to catch misconfig early
+  // CRITICAL: If no env var is set, log error in production to catch misconfig early
   if (process.env.NODE_ENV === 'production') {
     console.error("[API Config] ERROR: No backend URL configured! Set REACT_APP_API_URL in Vercel.");
   }

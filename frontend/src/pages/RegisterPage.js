@@ -9,8 +9,8 @@ import { Label } from "../components/ui/label";
 import { Loader2, Shield, Activity, BarChart3, CheckCircle2, Clock } from "lucide-react";
 import { getBackendUrl } from "../lib/apiConfig";
 
-// Background video for login/register (same as login)
-const BACKGROUND_VIDEO = `${getBackendUrl()}/api/assets/video/background.mp4`;
+// Background video helper - get URL dynamically
+const getBackgroundVideoUrl = () => `${getBackendUrl()}/api/assets/video/background.mp4`;
 
 // Styles for register page (shared between form and success states)
 const REGISTER_STYLES = `
@@ -235,7 +235,7 @@ const RegisterPage = () => {
       <div className="register-page-container">
         {/* Mobile Video Background - positioned at container level */}
         <video 
-          src={BACKGROUND_VIDEO}
+          src={getBackgroundVideoUrl()}
           autoPlay
           loop
           muted
@@ -246,7 +246,7 @@ const RegisterPage = () => {
         {/* Left side - Background Video with Overlay */}
         <div className="register-image-section">
           <video 
-            src={BACKGROUND_VIDEO}
+            src={getBackgroundVideoUrl()}
             autoPlay
             loop
             muted
@@ -325,7 +325,7 @@ const RegisterPage = () => {
     <div className="register-page-container">
       {/* Mobile Video Background - positioned at container level */}
       <video 
-        src={BACKGROUND_VIDEO}
+        src={getBackgroundVideoUrl()}
         autoPlay
         loop
         muted
@@ -336,7 +336,7 @@ const RegisterPage = () => {
       {/* Left side - Background Video with Overlay */}
       <div className="register-image-section">
         <video 
-          src={BACKGROUND_VIDEO}
+          src={getBackgroundVideoUrl()}
           autoPlay
           loop
           muted
