@@ -461,6 +461,7 @@ const LevelSummaryItem = ({ level, count, isActive, onClick }) => {
 const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const scrollContainerRef = useRef(null);
   
   // Load expanded nodes from localStorage on initial render
   const [expandedNodes, setExpandedNodes] = useState(() => {
@@ -534,6 +535,9 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   }, [nodes]);
 
   const toggleNode = (nodeId) => {
+    // Preserve scroll position during toggle
+    const scrollTop = scrollContainerRef.current?.scrollTop || 0;
+    
     setExpandedNodes((prev) => {
       const next = new Set(prev);
       if (next.has(nodeId)) {
@@ -542,6 +546,13 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
         next.add(nodeId);
       }
       return next;
+    });
+    
+    // Restore scroll position after React re-renders
+    requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = scrollTop;
+      }
     });
   };
 
@@ -649,7 +660,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
 
       {/* Content */}
       {!nodesLoading && (
-        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-2 custom-scrollbar">
           {viewMode === "levels" ? (
             // ISO Levels View
             <div className="space-y-1">

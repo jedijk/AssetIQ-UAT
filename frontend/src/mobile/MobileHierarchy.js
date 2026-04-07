@@ -25,6 +25,7 @@ const MobileHierarchy = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, node: null });
   const contextMenuRef = useRef(null);
+  const scrollContainerRef = useRef(null);
 
   const { data: nodesData = {}, isLoading } = useQuery({
     queryKey: ["equipmentNodes"],
@@ -52,6 +53,10 @@ const MobileHierarchy = () => {
 
   const toggleExpand = (nodeId, e) => {
     e.stopPropagation();
+    
+    // Preserve scroll position during toggle
+    const scrollTop = scrollContainerRef.current?.scrollTop || 0;
+    
     const newExpanded = new Set(expandedNodes);
     if (newExpanded.has(nodeId)) {
       newExpanded.delete(nodeId);
@@ -59,6 +64,13 @@ const MobileHierarchy = () => {
       newExpanded.add(nodeId);
     }
     setExpandedNodes(newExpanded);
+    
+    // Restore scroll position after React re-renders
+    requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = scrollTop;
+      }
+    });
   };
 
   // Handle tap on equipment item - show context menu
@@ -204,7 +216,7 @@ const MobileHierarchy = () => {
       </div>
 
       {/* Hierarchy Tree */}
-      <div className="hierarchy-container">
+      <div className="hierarchy-container" ref={scrollContainerRef}>
         {isLoading ? (
           <div className="loading-state">
             <div className="loading-spinner" />
