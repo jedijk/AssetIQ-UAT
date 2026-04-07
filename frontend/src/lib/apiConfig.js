@@ -6,7 +6,8 @@
  *   - REACT_APP_API_URL=https://your-backend.railway.app (preferred)
  *   - REACT_APP_BACKEND_URL=https://your-backend.railway.app (legacy)
  * 
- * IMPORTANT: The environment variable MUST be set - no fallbacks!
+ * IMPORTANT: Environment variables are baked in at BUILD TIME in React.
+ * You must rebuild after changing env vars in Vercel.
  */
 
 // Get the backend URL from environment variable
@@ -22,13 +23,20 @@ export const getBackendUrl = () => {
     return envUrl.replace(/\/$/, '');
   }
   
-  // CRITICAL: If no env var is set, log error in production to catch misconfig early
-  if (process.env.NODE_ENV === 'production') {
-    console.error("[API Config] ERROR: No backend URL configured! Set REACT_APP_API_URL in Vercel.");
+  // Check if we're on Vercel (production) without env var configured
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const isVercel = currentOrigin.includes('vercel.app');
+  
+  if (isVercel) {
+    // Log error - user needs to set REACT_APP_API_URL in Vercel and rebuild
+    console.error("[API Config] ERROR: Running on Vercel but REACT_APP_API_URL not set!");
+    console.error("[API Config] Set REACT_APP_API_URL in Vercel Environment Variables and REBUILD the app.");
+    // Return empty to prevent requests to wrong domain
+    return '';
   }
   
-  // Fallback for local development only
-  return window.location.origin;
+  // Fallback for local/preview development (same-origin)
+  return currentOrigin;
 };
 
 // Get the full API URL (with /api prefix)
