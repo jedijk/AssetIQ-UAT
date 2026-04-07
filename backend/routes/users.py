@@ -464,6 +464,7 @@ async def get_user_avatar(
     Get a user's avatar image.
     Supports both header-based and query param auth for img src compatibility.
     Handles both object storage and MongoDB-stored avatars.
+    Returns 204 No Content (instead of 404) when avatar unavailable to prevent frontend errors.
     """
     # Simple auth check - accept either header or query param
     auth_header = authorization or (f"Bearer {auth}" if auth else None)
@@ -477,7 +478,8 @@ async def get_user_avatar(
     )
     
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        # Return 204 instead of 404 to prevent frontend errors
+        return Response(status_code=204)
     
     # Check storage type
     storage_type = user.get("avatar_storage", "object")
@@ -490,7 +492,7 @@ async def get_user_avatar(
             return Response(content=content, media_type=content_type)
         except Exception as e:
             logger.error(f"Failed to decode MongoDB avatar: {e}")
-            raise HTTPException(status_code=404, detail="Avatar not found")
+            return Response(status_code=204)  # Graceful fallback
     
     elif user.get("avatar_path"):
         # Return from object storage
@@ -499,9 +501,11 @@ async def get_user_avatar(
             return Response(content=content, media_type=content_type)
         except Exception as e:
             logger.error(f"Failed to get avatar from storage: {e}")
-            raise HTTPException(status_code=404, detail="Avatar not found")
+            # Return 204 No Content instead of 404 to let frontend use fallback
+            return Response(status_code=204)
     
-    raise HTTPException(status_code=404, detail="Avatar not found")
+    # No avatar configured - return 204 to use fallback
+    return Response(status_code=204)
 
 
 # ============= RBAC USER MANAGEMENT WITH AVATAR =============
