@@ -157,6 +157,15 @@ const en = {
     viewAllSubmissions: "View All Submissions",
   },
   
+  // Profile
+  profile: {
+    editProfile: "Edit Profile",
+    editDescription: "Update your profile information and photo",
+    updateSuccess: "Profile updated successfully",
+    changePhoto: "Change Photo",
+    uploading: "Uploading...",
+  },
+  
   // Common
   common: {
     search: "Search",
@@ -1356,6 +1365,15 @@ const nl = {
     noFormData: "Geen formuliergegevens beschikbaar",
     viewInFormDesigner: "Bekijken in Formulierontwerper",
     viewAllSubmissions: "Alle Inzendingen Bekijken",
+  },
+  
+  // Profiel
+  profile: {
+    editProfile: "Profiel Bewerken",
+    editDescription: "Werk je profielinformatie en foto bij",
+    updateSuccess: "Profiel succesvol bijgewerkt",
+    changePhoto: "Foto Wijzigen",
+    uploading: "Uploaden...",
   },
   
   // Common

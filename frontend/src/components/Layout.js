@@ -7,7 +7,7 @@ import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Phone, MapPin, Save } from "lucide-react";
 import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
@@ -34,7 +34,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
+import { toast } from "sonner";
 import ChatSidebar from "./ChatSidebar";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 import { actionsAPI } from "../lib/api";
@@ -57,6 +63,18 @@ const Layout = () => {
   const [infoOpen, setInfoOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [dismissedNotifications, setDismissedNotifications] = useState(false);
+  
+  // Profile edit dialog state
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    position: "",
+    phone: "",
+    location: "",
+  });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const profileFileInputRef = useRef(null);
   
   // Introduction overlay
   const { showIntro, dismissIntro, resetIntro } = useIntroOverlay();
@@ -193,6 +211,113 @@ const Layout = () => {
       if (avatarUrl) URL.revokeObjectURL(avatarUrl);
     };
   }, [user?.id]);
+
+  // Open profile dialog and populate form
+  const openProfileDialog = useCallback(() => {
+    setProfileForm({
+      name: user?.name || "",
+      position: user?.position || "",
+      phone: user?.phone || "",
+      location: user?.location || "",
+    });
+    setProfileDialogOpen(true);
+  }, [user]);
+
+  // Save profile changes
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      const token = localStorage.getItem("token");
+      const backendUrl = getBackendUrl();
+      
+      const response = await fetch(`${backendUrl}/api/users/me/profile`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileForm),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Failed to update profile");
+      }
+
+      // Refresh user data
+      queryClient.invalidateQueries(["user"]);
+      toast.success(t("profile.updateSuccess") || "Profile updated successfully");
+      setProfileDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to save profile:", error);
+      toast.error(error.message || "Failed to update profile");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  // Handle avatar upload from profile dialog
+  const handleProfileAvatarUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be less than 5MB");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const token = localStorage.getItem("token");
+      const backendUrl = getBackendUrl();
+      
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(`${backendUrl}/api/users/me/avatar`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Failed to upload avatar");
+      }
+
+      // Refresh avatar
+      const avatarResponse = await fetch(
+        `${backendUrl}/api/users/${user.id}/avatar?auth=${token}&t=${Date.now()}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (avatarResponse.ok) {
+        const blob = await avatarResponse.blob();
+        if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+        setAvatarUrl(URL.createObjectURL(blob));
+      }
+
+      toast.success("Avatar updated successfully");
+    } catch (error) {
+      console.error("Failed to upload avatar:", error);
+      toast.error(error.message || "Failed to upload avatar");
+    } finally {
+      setIsUploadingAvatar(false);
+      // Reset the file input
+      if (profileFileInputRef.current) {
+        profileFileInputRef.current.value = "";
+      }
+    }
+  };
 
   // Query overdue actions for notification bell
   const { data: overdueData } = useQuery({
@@ -704,7 +829,7 @@ const Layout = () => {
                         {user?.name || "User"}
                       </p>
                       <p className="text-xs text-slate-500 truncate">
-                        {user?.department || t("userManagement.department")}
+                        {user?.email}
                       </p>
                       <p className="text-xs text-blue-600 font-medium mt-1 truncate" title={user?.position || t("userManagement.position")}>
                         {user?.position || t("userManagement.position")}
@@ -713,6 +838,15 @@ const Layout = () => {
                   </div>
                 </div>
                 <div className="py-1">
+                  <DropdownMenuItem 
+                    onClick={openProfileDialog}
+                    className="cursor-pointer"
+                    data-testid="edit-profile-menu-item"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    {t("profile.editProfile") || "Edit Profile"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={logout}
                     className="cursor-pointer text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -990,6 +1124,149 @@ const Layout = () => {
               </ul>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Profile Edit Dialog */}
+      <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              {t("profile.editProfile") || "Edit Profile"}
+            </DialogTitle>
+            <DialogDescription>
+              {t("profile.editDescription") || "Update your profile information and photo"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Avatar Section */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative group">
+                <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
+                  {avatarUrl && <AvatarImage src={avatarUrl} alt={user?.name} className="object-cover" />}
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-2xl font-bold">
+                    {user?.name?.charAt(0)?.toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <button
+                  onClick={() => profileFileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-not-allowed"
+                  title={t("profile.changePhoto") || "Change Photo"}
+                >
+                  {isUploadingAvatar ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-6 h-6 text-white" />
+                  )}
+                </button>
+              </div>
+              <input
+                ref={profileFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleProfileAvatarUpload}
+                data-testid="profile-avatar-input"
+              />
+              <button
+                onClick={() => profileFileInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium disabled:text-slate-400"
+              >
+                {isUploadingAvatar ? (t("profile.uploading") || "Uploading...") : (t("profile.changePhoto") || "Change Photo")}
+              </button>
+            </div>
+
+            {/* Profile Form */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="profile-name" className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-slate-400" />
+                  {t("userManagement.name") || "Name"}
+                </Label>
+                <Input
+                  id="profile-name"
+                  value={profileForm.name}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder={t("userManagement.enterName") || "Enter your name"}
+                  data-testid="profile-name-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="profile-position" className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-slate-400" />
+                  {t("userManagement.position") || "Position"}
+                </Label>
+                <Input
+                  id="profile-position"
+                  value={profileForm.position}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, position: e.target.value }))}
+                  placeholder={t("userManagement.enterPosition") || "Enter your position"}
+                  data-testid="profile-position-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="profile-phone" className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-slate-400" />
+                  {t("userManagement.phone") || "Phone"}
+                </Label>
+                <Input
+                  id="profile-phone"
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder={t("userManagement.enterPhone") || "Enter your phone number"}
+                  data-testid="profile-phone-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="profile-location" className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-slate-400" />
+                  {t("userManagement.location") || "Location"}
+                </Label>
+                <Input
+                  id="profile-location"
+                  value={profileForm.location}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, location: e.target.value }))}
+                  placeholder={t("userManagement.enterLocation") || "Enter your location"}
+                  data-testid="profile-location-input"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setProfileDialogOpen(false)}
+              disabled={isSavingProfile}
+            >
+              {t("common.cancel") || "Cancel"}
+            </Button>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={isSavingProfile}
+              className="gap-2"
+              data-testid="save-profile-button"
+            >
+              {isSavingProfile ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t("common.saving") || "Saving..."}
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  {t("common.save") || "Save Changes"}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

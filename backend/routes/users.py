@@ -67,6 +67,14 @@ class AdminCreateUser(BaseModel):
     installations: list = []
 
 
+class UserProfileUpdate(BaseModel):
+    """Schema for user updating their own profile."""
+    name: str = None
+    position: str = None
+    phone: str = None
+    location: str = None
+
+
 async def send_welcome_email(user_email: str, user_name: str, password: str, role: str):
     """Send welcome email to newly created user with login credentials."""
     if not RESEND_AVAILABLE or not RESEND_API_KEY:
@@ -265,6 +273,65 @@ async def admin_create_user(
             "assigned_installations": user_data.installations,
         }
     }
+
+
+@router.patch("/users/me/profile")
+async def update_own_profile(
+    profile_data: UserProfileUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update the current user's own profile information.
+    Users can update their name, position, phone, and location.
+    """
+    user_id = current_user.get("id") or current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User ID not found")
+    
+    # Build update document with only provided fields
+    update_fields = {}
+    if profile_data.name is not None:
+        update_fields["name"] = profile_data.name
+    if profile_data.position is not None:
+        update_fields["position"] = profile_data.position
+    if profile_data.phone is not None:
+        update_fields["phone"] = profile_data.phone
+    if profile_data.location is not None:
+        update_fields["location"] = profile_data.location
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    # Add updated timestamp
+    update_fields["updated_at"] = datetime.now(timezone.utc)
+    
+    try:
+        # Update user in database
+        result = await db.users.update_one(
+            {"id": user_id},
+            {"$set": update_fields}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Invalidate cache
+        cache.delete(f"user:{user_id}")
+        
+        # Fetch updated user
+        updated_user = await db.users.find_one(
+            {"id": user_id},
+            {"_id": 0, "password_hash": 0}
+        )
+        
+        return {
+            "success": True,
+            "message": "Profile updated successfully",
+            "user": updated_user
+        }
+    except Exception as e:
+        logger.error(f"Failed to update profile for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update profile: {str(e)}")
 
 
 @router.post("/users/me/avatar")
