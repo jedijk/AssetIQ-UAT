@@ -49,6 +49,7 @@ import { DISCIPLINES } from "../constants/disciplines";
 
 // User avatar component with optional hover card
 const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showPopover = false }) => {
+  const [imageError, setImageError] = useState(false);
   const sizeClasses = {
     sm: "w-6 h-6 text-[9px]",
     md: "w-8 h-8 text-xs",
@@ -68,30 +69,27 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
 
   // Build photo URL with auth token if needed
   const getPhotoUrl = () => {
-    if (!photo) return null;
-    // If it's an API path, add auth token
+    if (!photo || imageError) return null;
+    // If it's an API path, add auth token and backend URL
     if (photo.startsWith("/api/")) {
       const token = localStorage.getItem("token");
-      if (token) {
-        return `${getBackendUrl()}${photo}?auth=${token}`;
+      const backendUrl = getBackendUrl();
+      if (token && backendUrl) {
+        return `${backendUrl}${photo}?auth=${token}`;
       }
+      return null;
     }
     // If it's already a full URL, use as-is
-    return photo;
+    if (photo.startsWith("http")) {
+      return photo;
+    }
+    return null;
   };
 
   const photoUrl = getPhotoUrl();
 
-  const avatarElement = photoUrl ? (
-    <img
-      src={photoUrl}
-      alt={name || "User"}
-      className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0 cursor-pointer`}
-      onError={(e) => {
-        e.target.style.display = 'none';
-      }}
-    />
-  ) : (
+  // Initials fallback element
+  const initialsElement = (
     <div 
       className={`${sizeClasses[size]} ${getAvatarColor(name)} rounded-full flex items-center justify-center text-white font-medium ring-2 ring-white flex-shrink-0 cursor-pointer`}
       title={!showPopover ? (name || "Unknown user") : undefined}
@@ -99,6 +97,18 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
       {initials || (name ? name.charAt(0).toUpperCase() : "?")}
     </div>
   );
+
+  const avatarElement = photoUrl ? (
+    <img
+      src={photoUrl}
+      alt={name || "User"}
+      className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0 cursor-pointer`}
+      onError={(e) => {
+        setImageError(true);
+        e.target.style.display = 'none';
+      }}
+    />
+  ) : initialsElement;
 
   if (showPopover && name) {
     return (

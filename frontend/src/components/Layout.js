@@ -160,16 +160,22 @@ const Layout = () => {
       if (!user?.id) return;
       try {
         const token = localStorage.getItem("token");
+        const backendUrl = getBackendUrl();
         const response = await fetch(
-          `${getBackendUrl()}/api/users/${user.id}/avatar?auth=${token}`,
+          `${backendUrl}/api/users/${user.id}/avatar?auth=${token}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (response.ok) {
           const blob = await response.blob();
           setAvatarUrl(URL.createObjectURL(blob));
+        } else {
+          // Avatar not found - will use initials fallback
+          setAvatarUrl(null);
         }
       } catch (err) {
-        // No avatar available
+        // Network error or avatar not available - use initials fallback
+        console.log("Avatar fetch failed, using initials fallback");
+        setAvatarUrl(null);
       }
     };
     fetchAvatar();
