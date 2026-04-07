@@ -207,7 +207,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
         {/* Arrow button - expand/collapse only, larger tap area on mobile */}
         {hasChildren ? (
           <button 
-            className={`flex items-center justify-center hover:bg-slate-200 rounded transition-colors ${isMobile ? 'p-2 -m-1' : 'p-0.5'}`}
+            className={`flex items-center justify-center hover:bg-slate-200 rounded transition-colors flex-shrink-0 ${isMobile ? 'w-7 h-7' : 'w-5 h-5'}`}
             onClick={handleArrowClick}
             data-testid={`hierarchy-expand-${node.id}`}
           >
@@ -218,7 +218,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
             )}
           </button>
         ) : (
-          <span className={isMobile ? 'w-7' : 'w-4.5'} />
+          <span className={`flex-shrink-0 ${isMobile ? 'w-7' : 'w-5'}`} />
         )}
         
         {/* Equipment info - clickable area for context menu on mobile */}
