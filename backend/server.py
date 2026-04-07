@@ -63,7 +63,6 @@ app = FastAPI(
 
 # Add duplicate docs endpoints at root level for Railway direct access
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
-from fastapi.responses import JSONResponse
 
 @app.get("/docs", include_in_schema=False)
 async def swagger_ui_html():
@@ -155,6 +154,35 @@ async def health_check():
     """Health check endpoint for deployment."""
     return {"status": "healthy"}
 
+
+# Enhanced health check endpoint with database status
+@app.get("/api/health")
+async def api_health_check():
+    """Comprehensive health check with database status."""
+    import time
+    start_time = time.time()
+    
+    try:
+        # Test database connection
+        from database import db
+        await db.command('ping')
+        db_status = "connected"
+        db_latency = round((time.time() - start_time) * 1000, 2)
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+        db_latency = None
+    
+    # Get uptime (approximate - time since module loaded)
+    uptime = round(time.time() - app.state.start_time, 2) if hasattr(app.state, 'start_time') else 0
+    
+    return {
+        "status": "ok" if db_status == "connected" else "degraded",
+        "database": db_status,
+        "database_latency_ms": db_latency,
+        "uptime_seconds": uptime,
+        "version": "2.6.5"
+    }
+
 # CORS - Allow production domains and Vercel deployments
 ALLOWED_ORIGINS = [
     "https://assetiq.tech",
@@ -237,6 +265,9 @@ async def add_security_headers(request, call_next):
 @app.on_event("startup")
 async def startup_event():
     """Initialize database indexes and seed data on startup."""
+    import time
+    app.state.start_time = time.time()  # Track server start time for health check
+    
     from database import db
     
     # Create indexes

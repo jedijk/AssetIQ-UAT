@@ -113,9 +113,14 @@ INDEX_DEFINITIONS = {
         {"keys": [("due_date", 1)]},
         {"keys": [("assigned_user_id", 1)]},
         {"keys": [("installation_name", 1)]},
+        {"keys": [("equipment_id", 1)]},
+        {"keys": [("priority", 1)]},
         # For calendar queries
         {"keys": [("scheduled_date", 1), ("status", 1)]},
         {"keys": [("installation_name", 1), ("scheduled_date", 1)]},
+        # Compound index for common filtered queries
+        {"keys": [("status", 1), ("scheduled_date", 1)]},
+        {"keys": [("equipment_id", 1), ("status", 1)]},
     ],
     
     # Form templates

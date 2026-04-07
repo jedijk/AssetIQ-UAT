@@ -14,6 +14,9 @@ from models.task_models import (
 )
 import uuid
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Object storage - import if available
 try:
@@ -215,23 +218,36 @@ async def get_task_instances(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 50,  # Reduced default limit for faster response
     current_user: dict = Depends(get_current_user)
 ):
     """Get task instances with optional filters."""
-    from_dt = datetime.fromisoformat(from_date) if from_date else None
-    to_dt = datetime.fromisoformat(to_date) if to_date else None
+    import time
+    start_time = time.time()
     
-    return await task_service.get_instances(
-        equipment_id=equipment_id,
-        plan_id=plan_id,
-        status=status,
-        priority=priority,
-        from_date=from_dt,
-        to_date=to_dt,
-        skip=skip,
-        limit=limit
-    )
+    try:
+        from_dt = datetime.fromisoformat(from_date) if from_date else None
+        to_dt = datetime.fromisoformat(to_date) if to_date else None
+        
+        result = await task_service.get_instances(
+            equipment_id=equipment_id,
+            plan_id=plan_id,
+            status=status,
+            priority=priority,
+            from_date=from_dt,
+            to_date=to_dt,
+            skip=skip,
+            limit=min(limit, 100)  # Cap at 100 max
+        )
+        
+        duration = time.time() - start_time
+        if duration > 2.0:
+            logger.warning(f"Slow task-instances query: {duration:.2f}s, filters: equipment={equipment_id}, status={status}")
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error in get_task_instances: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch task instances: {str(e)}")
 
 @router.get("/task-instances/calendar")
 async def get_task_calendar(

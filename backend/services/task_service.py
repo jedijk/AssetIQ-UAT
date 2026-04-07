@@ -609,6 +609,7 @@ class TaskService:
         limit: int = 100
     ) -> Dict[str, Any]:
         """Get task instances with filters."""
+        import asyncio
         
         query = {}
         
@@ -634,13 +635,23 @@ class TaskService:
             if to_date:
                 query["scheduled_date"]["$lte"] = to_date
         
-        cursor = self.instances.find(query).sort("scheduled_date", 1).skip(skip).limit(limit)
+        # Run count and fetch in parallel for better performance
+        async def fetch_instances():
+            cursor = self.instances.find(query).sort("scheduled_date", 1).skip(skip).limit(limit)
+            instances = []
+            async for doc in cursor:
+                instances.append(self._serialize_instance(doc))
+            return instances
         
-        instances = []
-        async for doc in cursor:
-            instances.append(self._serialize_instance(doc))
+        # Use estimated count for unfiltered queries (much faster)
+        if query:
+            count_task = self.instances.count_documents(query)
+        else:
+            count_task = self.instances.estimated_document_count()
         
-        total = await self.instances.count_documents(query)
+        fetch_task = fetch_instances()
+        
+        total, instances = await asyncio.gather(count_task, fetch_task)
         
         return {"total": total, "instances": instances}
     
