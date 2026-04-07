@@ -34,8 +34,8 @@ const ISO_LEVEL_CONFIG = {
   equipment_unit: { icon: Cog, label: "Equipment Unit", color: "text-orange-600" },
   subunit: { icon: Box, label: "Subunit", color: "text-teal-600" },
   maintainable_item: { icon: Wrench, label: "Maintainable Item", color: "text-slate-600" },
-  // Legacy support - "unit" maps to Equipment Unit
-  unit: { icon: Cog, label: "Equipment Unit", color: "text-orange-600" },
+  // Legacy support - "unit" maps to Section/System (Process Units like Feedstock Prep Unit)
+  unit: { icon: Settings, label: "Section/System", color: "text-purple-600" },
   plant: { icon: Factory, label: "Plant/Unit", color: "text-indigo-600" },
   section: { icon: Settings, label: "Section/System", color: "text-purple-600" },
   system: { icon: Settings, label: "Section/System", color: "text-purple-600" },
@@ -52,7 +52,8 @@ const ISO_LEVEL_CONFIG = {
 
 // Legacy level mapping to ISO 14224
 const LEGACY_LEVEL_MAP = {
-  unit: "equipment_unit",
+  // "unit" in this database context refers to Process Units (Section/System level)
+  unit: "section_system",
   plant: "plant_unit",
   system: "section_system",
   section: "section_system",
@@ -553,19 +554,12 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   // Build tree structure
   const treeData = useMemo(() => buildTreeData(nodes), [nodes]);
   
-  // Legacy level mapping
-  const LEGACY_LEVEL_MAP = {
-    "unit": "plant_unit",
-    "system": "section_system",
-    "equipment": "equipment_unit"
-  };
-  
-  // Count by ISO level (including legacy levels mapped to their ISO equivalents)
+  // Count by ISO level (using the module-level LEGACY_LEVEL_MAP for consistency)
   const levelCounts = useMemo(() => {
     const counts = {};
     ISO_LEVEL_ORDER.forEach(level => { counts[level] = 0; });
     nodes.forEach(node => {
-      // Normalize legacy levels to ISO 14224
+      // Normalize legacy levels to ISO 14224 using the module-level map
       const normalizedLevel = LEGACY_LEVEL_MAP[node.level] || node.level;
       if (counts[normalizedLevel] !== undefined) {
         counts[normalizedLevel]++;

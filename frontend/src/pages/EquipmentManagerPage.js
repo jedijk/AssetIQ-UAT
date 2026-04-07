@@ -39,14 +39,14 @@ const LEVEL_CONFIG = {
   // ISO 14224 standard levels
   installation: { icon: Building2, label: "Installation", description: "Offshore platform, Onshore plant" }, 
   plant_unit: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" }, 
-  section_system: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" }, 
+  section_system: { icon: Settings, label: "Section/System", description: "Process unit, Feedstock prep" }, 
   equipment_unit: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" }, 
   subunit: { icon: Box, label: "Subunit", description: "Driver, Driven unit, Control system" },
   maintainable_item: { icon: Wrench, label: "Maintainable Item", description: "Bearing, Seal, Impeller" },
   // Legacy/import level aliases
   plant: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" },
-  unit: { icon: Cog, label: "Equipment Unit", description: "Equipment unit" },
-  section: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" },
+  unit: { icon: Settings, label: "Section/System", description: "Process unit, Feedstock prep" },  // unit = process units like Feedstock Prep Unit
+  section: { icon: Settings, label: "Section/System", description: "Production line section" },
   system: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" },
   equipment: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" },
   // Additional legacy levels for imported data
@@ -61,7 +61,7 @@ const LEVEL_CONFIG = {
 const LEVEL_ORDER = ["installation", "site", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
 const LEGACY_LEVEL_MAP = { 
   "plant": "plant_unit",
-  "unit": "equipment_unit",
+  "unit": "section_system",  // "unit" in this data means Process Units (Feedstock Prep Unit, etc.)
   "system": "section_system", 
   "section": "section_system",
   "equipment": "equipment_unit",
