@@ -1132,18 +1132,20 @@ export default function DashboardPage() {
               <span className="truncate">{quickViewSubmission?.form_template_name || quickViewSubmission?.template_name || quickViewSubmission?.form_name || "Loading..."}</span>
             </DialogTitle>
             {quickViewSubmission && (
-            <DialogDescription className="flex items-center gap-2 mt-2">
-              <UserAvatar 
-                name={quickViewSubmission?.submitted_by_name || "User"}
-                photo={quickViewSubmission?.submitted_by_photo}
-                initials={(quickViewSubmission?.submitted_by_name || "U").charAt(0)}
-                size="sm"
-                showPopover={false}
-              />
-              <div className="text-xs sm:text-sm">
-                <span className="font-medium text-slate-700">{quickViewSubmission?.submitted_by_name || "Unknown"}</span>
-                <span className="text-slate-400 mx-1">•</span>
-                <span className="text-slate-500">{quickViewSubmission?.submitted_at ? new Date(quickViewSubmission.submitted_at).toLocaleDateString() : "Unknown"}</span>
+            <DialogDescription asChild>
+              <div className="flex items-center gap-2 mt-2">
+                <UserAvatar 
+                  name={quickViewSubmission?.submitted_by_name || "User"}
+                  photo={quickViewSubmission?.submitted_by_photo}
+                  initials={(quickViewSubmission?.submitted_by_name || "U").charAt(0)}
+                  size="sm"
+                  showPopover={false}
+                />
+                <span className="text-xs sm:text-sm">
+                  <span className="font-medium text-slate-700">{quickViewSubmission?.submitted_by_name || "Unknown"}</span>
+                  <span className="text-slate-400 mx-1">•</span>
+                  <span className="text-slate-500">{quickViewSubmission?.submitted_at ? new Date(quickViewSubmission.submitted_at).toLocaleDateString() : "Unknown"}</span>
+                </span>
               </div>
             </DialogDescription>
             )}
