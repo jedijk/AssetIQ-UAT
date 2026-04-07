@@ -36,7 +36,8 @@ import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "../lib/apiConfig";
 
-const API_URL = getBackendUrl();
+// Get API URL dynamically (supports Vercel + Railway deployment)
+const getApiUrl = () => getBackendUrl();
 
 // Helper to format uptime
 const formatUptime = (seconds) => {
@@ -227,7 +228,7 @@ const SettingsServerPerformancePage = () => {
     
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/api/system/security`, {
+      const response = await fetch(`${getApiUrl()}/api/system/security`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -253,7 +254,7 @@ const SettingsServerPerformancePage = () => {
     
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/api/system/database`, {
+      const response = await fetch(`${getApiUrl()}/api/system/database`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -282,7 +283,7 @@ const SettingsServerPerformancePage = () => {
       const token = localStorage.getItem("token");
       const unresolved = errorFilter === "unresolved";
       const response = await fetch(
-        `${API_URL}/api/system/errors?limit=50&unresolved_only=${unresolved}`, 
+        `${getApiUrl()}/api/system/errors?limit=50&unresolved_only=${unresolved}`, 
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -308,7 +309,7 @@ const SettingsServerPerformancePage = () => {
   const resolveError = async (errorId) => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/api/system/errors/${errorId}/resolve`, {
+      const response = await fetch(`${getApiUrl()}/api/system/errors/${errorId}/resolve`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -330,7 +331,7 @@ const SettingsServerPerformancePage = () => {
     
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/api/system/errors`, {
+      const response = await fetch(`${getApiUrl()}/api/system/errors`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -350,7 +351,7 @@ const SettingsServerPerformancePage = () => {
   const createTestError = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/api/system/errors/test`, {
+      const response = await fetch(`${getApiUrl()}/api/system/errors/test`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -373,7 +374,7 @@ const SettingsServerPerformancePage = () => {
     
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/api/system/metrics`, {
+      const response = await fetch(`${getApiUrl()}/api/system/metrics`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
