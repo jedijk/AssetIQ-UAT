@@ -180,6 +180,7 @@ const taskAPI = {
   // Instances
   getInstances: async (params = {}) => {
     const queryParams = new URLSearchParams();
+    queryParams.append("limit", "30");  // Optimized limit for fast loading
     if (params.status) queryParams.append("status", params.status);
     if (params.plan_id) queryParams.append("plan_id", params.plan_id);
     const response = await fetch(`${API_BASE_URL}/api/task-instances?${queryParams}`, {

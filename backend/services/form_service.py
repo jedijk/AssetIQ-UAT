@@ -554,9 +554,19 @@ class FormService:
         from_date: Optional[datetime] = None,
         to_date: Optional[datetime] = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 10,  # REDUCED default limit for performance
+        include_details: bool = False  # NEW: Only include full details if requested
     ) -> Dict[str, Any]:
-        """Get form submissions with filters."""
+        """Get form submissions with filters - optimized for fast response."""
+        import asyncio
+        import time
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        start_time = time.time()
+        
+        # STRICT PAGINATION - cap at 50 max
+        limit = min(limit, 50)
         
         query = {}
         
@@ -582,9 +592,7 @@ class FormService:
             if to_date:
                 query["submitted_at"]["$lte"] = to_date
         
-        import asyncio
-        
-        # Projection to limit fields returned (for performance)
+        # LIGHTWEIGHT PROJECTION - exclude large fields for list view
         projection = {
             "_id": 0,
             "id": 1,
@@ -596,23 +604,34 @@ class FormService:
             "submitted_by": 1,
             "submitted_by_name": 1,
             "submitted_at": 1,
-            "responses": 1,
             "has_warnings": 1,
             "has_critical": 1,
-            "attachments": 1,
-            "notes": 1
+            "notes": 1,
+            # Summary fields only - NOT full responses/attachments
+            "response_count": 1,
+            "attachment_count": 1
         }
         
+        # Only include heavy fields if explicitly requested
+        if include_details:
+            projection["responses"] = 1
+            projection["attachments"] = 1
+        
+        logger.info(f"[FormService] Starting query: filters={bool(query)}, limit={limit}, include_details={include_details}")
+        
         # Use estimated count for unfiltered queries (much faster)
-        # Only use exact count when filters are applied
         if query:
             count_task = self.submissions.count_documents(query)
         else:
             count_task = self.submissions.estimated_document_count()
         
+        # Sort by submitted_at DESC using index
         fetch_task = self.submissions.find(query, projection).sort("submitted_at", -1).skip(skip).limit(limit).to_list(length=limit)
         
         total, raw_submissions = await asyncio.gather(count_task, fetch_task)
+        
+        query_time = time.time() - start_time
+        logger.info(f"[FormService] Query completed in {query_time:.3f}s - returned {len(raw_submissions)} of {total} total")
         
         # Early return if no submissions - skip unnecessary lookups
         if not raw_submissions:

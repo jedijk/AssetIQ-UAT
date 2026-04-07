@@ -93,6 +93,7 @@ const useIsMobile = () => {
 // Fetch form submissions
 const fetchSubmissions = async (filters) => {
   const params = new URLSearchParams();
+  params.append("limit", "20");  // Optimized limit for fast loading
   if (filters.hasWarnings) params.append("has_warnings", "true");
   if (filters.hasCritical) params.append("has_critical", "true");
   

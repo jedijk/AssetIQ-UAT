@@ -187,10 +187,14 @@ async def get_form_submissions(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     skip: int = 0,
-    limit: int = 50,  # Reduced default for better performance
+    limit: int = 10,  # REDUCED default for fast response
+    include_details: bool = False,  # NEW: Only include full details if requested
     current_user: dict = Depends(get_current_user)
 ):
-    """Get form submissions with filters, timeout protection, and fallback."""
+    """Get form submissions list - optimized lightweight endpoint.
+    
+    For full submission details, use GET /api/form-submissions/{id}
+    """
     import time
     import asyncio
     import logging
@@ -199,7 +203,10 @@ async def get_form_submissions(
     start_time = time.time()
     request_id = f"forms-{int(start_time * 1000) % 100000}"
     
-    logger.info(f"[{request_id}] GET /api/form-submissions started - filters: template={form_template_id}, limit={limit}")
+    # STRICT limit enforcement
+    limit = min(limit, 50)
+    
+    logger.info(f"[{request_id}] GET /api/form-submissions started - limit={limit}, skip={skip}, include_details={include_details}")
     
     try:
         from_dt = datetime.fromisoformat(from_date) if from_date else None
@@ -216,39 +223,38 @@ async def get_form_submissions(
                 from_date=from_dt,
                 to_date=to_dt,
                 skip=skip,
-                limit=min(limit, 100)  # Cap at 100 max
+                limit=limit,
+                include_details=include_details
             )
         
         try:
             result = await asyncio.wait_for(fetch_submissions(), timeout=5.0)
             
             duration = time.time() - start_time
-            logger.info(f"[{request_id}] Completed in {duration:.2f}s - returned {result.get('total', 0)} items")
+            logger.info(f"[{request_id}] Completed in {duration:.3f}s - returned {len(result.get('submissions', []))} of {result.get('total', 0)} total")
             
-            if duration > 2.0:
-                logger.warning(f"[{request_id}] Slow query detected: {duration:.2f}s")
+            if duration > 1.0:
+                logger.warning(f"[{request_id}] Slow query: {duration:.2f}s")
             
             return result
             
         except asyncio.TimeoutError:
             duration = time.time() - start_time
-            logger.error(f"[{request_id}] TIMEOUT after {duration:.2f}s - database query too slow")
+            logger.error(f"[{request_id}] TIMEOUT after {duration:.2f}s")
             return {
                 "total": 0,
                 "submissions": [],
-                "error": "timeout",
-                "message": "Database query exceeded time limit. Please try again or narrow your search."
+                "error": "Query timeout",
+                "message": "Database query exceeded 5 second limit. Try reducing limit or adding filters."
             }
             
     except Exception as e:
         duration = time.time() - start_time
         logger.error(f"[{request_id}] ERROR after {duration:.2f}s: {str(e)}", exc_info=True)
         
-        # Return fallback response instead of hanging
         return {
             "total": 0,
             "submissions": [],
-            "warning": "Database unavailable",
             "error": str(e)
         }
 
