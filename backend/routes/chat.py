@@ -20,15 +20,20 @@ router = APIRouter(tags=["Chat"])
 
 
 async def get_failure_modes_from_db():
-    """Fetch failure modes from MongoDB, fallback to static library if empty."""
+    """Fetch ALL failure modes from MongoDB, fallback to static library if empty."""
     try:
-        result = await failure_modes_service.get_all(limit=1000)
+        # Fetch all failure modes (no limit) to ensure we always have the latest complete set
+        result = await failure_modes_service.get_all(limit=2000)
         failure_modes = result.get("failure_modes", [])
+        total = result.get("total", 0)
+        
         if failure_modes and len(failure_modes) > 0:
-            logger.info(f"Using {len(failure_modes)} failure modes from database")
+            logger.info(f"Chat using {len(failure_modes)}/{total} failure modes from database")
             return failure_modes
+        else:
+            logger.warning("No failure modes found in database, using static library")
     except Exception as e:
-        logger.warning(f"Failed to fetch failure modes from DB: {e}")
+        logger.error(f"Failed to fetch failure modes from DB: {e}")
     
     # Fallback to static library
     logger.info(f"Using static FAILURE_MODES_LIBRARY with {len(FAILURE_MODES_LIBRARY)} entries")
