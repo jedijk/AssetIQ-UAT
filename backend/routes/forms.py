@@ -237,11 +237,28 @@ async def get_form_submissions(
     try:
         # 3 second hard timeout
         async def execute_query():
-            # Query with projection, sort by submitted_at DESC (fallback to created_at), skip/limit
+            # Query with projection, sort by submitted_at DESC, skip/limit
             cursor = db.form_submissions.find(query, projection).sort("submitted_at", -1).skip(skip).limit(limit)
             return await cursor.to_list(length=limit)
         
-        raw_submissions = await asyncio.wait_for(execute_query(), timeout=3.0)
+        raw_submissions = await asyncio.wait_for(execute_query(), timeout=2.0)
+        
+        # Collect user IDs for avatar lookup (fast batch query)
+        user_ids = list(set(doc.get("submitted_by") for doc in raw_submissions if doc.get("submitted_by")))
+        
+        # Quick user avatar lookup (1 second timeout)
+        user_avatars = {}
+        if user_ids:
+            try:
+                async def fetch_avatars():
+                    users = await db.users.find(
+                        {"id": {"$in": user_ids}},
+                        {"_id": 0, "id": 1, "avatar_path": 1, "avatar_data": 1}
+                    ).to_list(length=50)
+                    return {u["id"]: bool(u.get("avatar_path") or u.get("avatar_data")) for u in users}
+                user_avatars = await asyncio.wait_for(fetch_avatars(), timeout=1.0)
+            except asyncio.TimeoutError:
+                pass  # Skip avatars on timeout
         
         # Transform to response format matching frontend expectations
         submissions = []
@@ -255,6 +272,12 @@ async def get_form_submissions(
             if hasattr(created_at, 'isoformat'):
                 created_at = created_at.isoformat()
             
+            # Build avatar URL if user has avatar
+            submitted_by = doc.get("submitted_by")
+            submitted_by_photo = None
+            if submitted_by and user_avatars.get(submitted_by):
+                submitted_by_photo = f"/api/users/{submitted_by}/avatar"
+            
             submissions.append({
                 "id": doc.get("id"),
                 "form_template_id": doc.get("form_template_id"),
@@ -263,8 +286,9 @@ async def get_form_submissions(
                 "task_template_name": doc.get("task_template_name"),
                 "equipment_id": doc.get("equipment_id"),
                 "equipment_name": doc.get("equipment_name"),
-                "submitted_by": doc.get("submitted_by"),
+                "submitted_by": submitted_by,
                 "submitted_by_name": doc.get("submitted_by_name"),
+                "submitted_by_photo": submitted_by_photo,
                 "submitted_at": submitted_at,
                 "created_at": created_at,
                 "status": doc.get("status", "completed"),
