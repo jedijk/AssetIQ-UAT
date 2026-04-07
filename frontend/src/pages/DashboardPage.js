@@ -70,19 +70,26 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
   // Build photo URL with auth token if needed
   const getPhotoUrl = () => {
     if (!photo || imageError) return null;
+    
     // If it's an API path, add auth token and backend URL
     if (photo.startsWith("/api/")) {
       const token = localStorage.getItem("token");
       const backendUrl = getBackendUrl();
-      if (token && backendUrl) {
+      
+      // Only build URL if we have all required parts
+      if (token && backendUrl && backendUrl.startsWith('http')) {
         return `${backendUrl}${photo}?auth=${token}`;
       }
+      // If backend URL is not configured, skip the image
       return null;
     }
-    // If it's already a full URL, use as-is
+    
+    // If it's already a full URL (https://...), use as-is
     if (photo.startsWith("http")) {
       return photo;
     }
+    
+    // For any other path format, skip (prevents 404s from relative paths)
     return null;
   };
 

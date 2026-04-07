@@ -158,13 +158,23 @@ const Layout = () => {
   useEffect(() => {
     const fetchAvatar = async () => {
       if (!user?.id) return;
+      
       try {
         const token = localStorage.getItem("token");
         const backendUrl = getBackendUrl();
+        
+        // Only fetch if we have a valid backend URL configured
+        if (!backendUrl || !backendUrl.startsWith('http')) {
+          console.log("Avatar fetch skipped: backend URL not configured");
+          setAvatarUrl(null);
+          return;
+        }
+        
         const response = await fetch(
           `${backendUrl}/api/users/${user.id}/avatar?auth=${token}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        
         if (response.ok) {
           const blob = await response.blob();
           setAvatarUrl(URL.createObjectURL(blob));
