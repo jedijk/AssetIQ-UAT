@@ -63,7 +63,7 @@ import MaintenanceStrategiesPanel from "../components/MaintenanceStrategiesPanel
 import BackButton from "../components/BackButton";
 
 // Extracted components
-import { EquipmentTypeItem, EQUIPMENT_ICONS, ICON_OPTIONS, DISCIPLINES } from "../components/library";
+import { EquipmentTypeItem, EQUIPMENT_ICONS, ICON_OPTIONS, DISCIPLINES, EQUIPMENT_CATEGORIES, DISCIPLINE_COLORS } from "../components/library";
 import { FailureModeViewPanel } from "../components/library";
 
 const categoryIcons = {
@@ -128,7 +128,8 @@ const FailureModesPage = () => {
   // Equipment type dialog state
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);
-  const [newType, setNewType] = useState({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
+  const [newType, setNewType] = useState({ id: "", name: "", discipline: "Mechanical", icon: "cog", iso_class: "", category: "rotating" });
+  const [typeFilterDiscipline, setTypeFilterDiscipline] = useState("all"); // Filter for Equipment Types tab
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -183,7 +184,7 @@ const FailureModesPage = () => {
     { value: "PDM", label: "PDM (Predictive)", color: "bg-purple-100 text-purple-700" },
   ];
   
-  const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "mechanical", icon: "cog", iso_class: "" });
+  const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "Mechanical", icon: "cog", iso_class: "", category: "rotating" });
   const resetFmForm = () => {
     setNewFm({
       category: "Rotating",
@@ -434,13 +435,13 @@ const FailureModesPage = () => {
 
   const handleEditType = (type) => { 
     setEditingType(type); 
-    setNewType({ id: type.id, name: type.name, discipline: type.discipline || "mechanical", icon: type.icon || "cog", iso_class: type.iso_class || "" }); 
+    setNewType({ id: type.id, name: type.name, discipline: type.discipline || "Mechanical", icon: type.icon || "cog", iso_class: type.iso_class || "", category: type.category || "rotating" }); 
     setIsTypeDialogOpen(true); 
   };
   
   const handleSaveType = () => { 
     if (editingType) { 
-      updateTypeMutation.mutate({ typeId: editingType.id, data: { name: newType.name, discipline: newType.discipline, icon: newType.icon, iso_class: newType.iso_class } }); 
+      updateTypeMutation.mutate({ typeId: editingType.id, data: { name: newType.name, discipline: newType.discipline, icon: newType.icon, iso_class: newType.iso_class, category: newType.category } }); 
     } else { 
       createTypeMutation.mutate(newType); 
     } 
@@ -856,24 +857,55 @@ const FailureModesPage = () => {
         {/* Equipment Types Tab */}
         <TabsContent value="libraries" className="space-y-6">
           <div className="card">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-slate-800">{t("library.equipmentTypes")}</h3>
                 <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} {t("library.typesDefined")}</p>
               </div>
-              <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
-                <Plus className="w-4 h-4 mr-1" /> {t("library.addEquipmentType")}
-              </Button>
+              <div className="flex items-center gap-2">
+                {/* Discipline Filter */}
+                <Select value={typeFilterDiscipline} onValueChange={setTypeFilterDiscipline}>
+                  <SelectTrigger className="w-[160px] h-9">
+                    <SelectValue placeholder="All Disciplines" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Disciplines</SelectItem>
+                    {DISCIPLINES.map(d => (
+                      <SelectItem key={d} value={d}>{d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
+                  <Plus className="w-4 h-4 mr-1" /> {t("library.addEquipmentType")}
+                </Button>
+              </div>
             </div>
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[calc(100vh-320px)] overflow-y-auto">
-              {equipmentTypes.map(t => (
-                <EquipmentTypeItem 
-                  key={t.id} 
-                  item={t} 
-                  onEdit={handleEditType} 
-                  onDelete={(id) => deleteTypeMutation.mutate(id)} 
-                />
-              ))}
+            <div className="p-4 max-h-[calc(100vh-320px)] overflow-y-auto">
+              {/* Group equipment types by discipline */}
+              {DISCIPLINES.filter(d => typeFilterDiscipline === "all" || d === typeFilterDiscipline).map(discipline => {
+                const disciplineTypes = equipmentTypes.filter(t => t.discipline === discipline);
+                if (disciplineTypes.length === 0) return null;
+                const colors = DISCIPLINE_COLORS[discipline] || DISCIPLINE_COLORS["Mechanical"];
+                
+                return (
+                  <div key={discipline} className="mb-6 last:mb-0">
+                    <div className={`flex items-center gap-2 mb-3 px-2 py-1.5 rounded-lg ${colors.bg}`}>
+                      <span className={`text-sm font-semibold ${colors.text}`}>{discipline}</span>
+                      <span className="text-xs text-slate-400">({disciplineTypes.length})</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {disciplineTypes.map(t => (
+                        <EquipmentTypeItem 
+                          key={t.id} 
+                          item={t} 
+                          onEdit={handleEditType} 
+                          onDelete={(id) => deleteTypeMutation.mutate(id)} 
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </TabsContent>
@@ -926,7 +958,16 @@ const FailureModesPage = () => {
               <Select value={newType.discipline} onValueChange={v => setNewType({ ...newType, discipline: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {DISCIPLINES.map(d => <SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>)}
+                  {DISCIPLINES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Category</Label>
+              <Select value={newType.category} onValueChange={v => setNewType({ ...newType, category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EQUIPMENT_CATEGORIES.map(c => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

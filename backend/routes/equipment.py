@@ -83,6 +83,8 @@ async def create_equipment_type(
         "iso_class": type_data.iso_class,
         "discipline": type_data.discipline,
         "icon": type_data.icon,
+        "category": type_data.category,
+        "default_failure_modes": type_data.default_failure_modes or [],
         "is_custom": True,
         "created_by": current_user["id"],
         "created_at": datetime.now(timezone.utc).isoformat()

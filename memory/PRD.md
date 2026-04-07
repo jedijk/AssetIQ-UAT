@@ -5,6 +5,29 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 7, 2026 - Equipment Types Module ISO 14224 Expansion
+**FEATURE COMPLETED:**
+- ✅ **Expanded Equipment Types from 22 → 62 types** covering all major industrial categories
+- ✅ **5 Standardized Disciplines**: Mechanical, Electrical, Instrumentation, Static Equipment, Safety
+- ✅ **5 Equipment Categories**: rotating, static, control, safety, electrical
+- ✅ **Discipline-based UI grouping** with color-coded sections
+- ✅ **Filter by discipline** in Equipment Types tab
+- ✅ **Prepared for future FMEA integration** with `default_failure_modes` field
+
+**Equipment Types by Discipline:**
+- Mechanical: 20 types (pumps, compressors, turbines, gearbox, blower/fan, mixer, conveyor, valves)
+- Electrical: 10 types (motors, transformers, switchgear, MCC, VFD, UPS, battery, generator)
+- Instrumentation: 12 types (sensors, transmitters, control valves, positioners, PLC, DCS, analyzers, actuators)
+- Static Equipment: 11 types (heat exchangers, vessels, tanks, columns, reactors, filters, piping, boilers)
+- Safety: 9 types (PSV, ESD, SIS, F&G, fire protection, flare systems, detectors)
+
+**Files Modified:**
+- `/app/backend/iso14224_models.py` - Expanded EQUIPMENT_TYPES list, added category field
+- `/app/frontend/src/components/library/EquipmentTypeItem.jsx` - Added DISCIPLINE_COLORS, EQUIPMENT_CATEGORIES
+- `/app/frontend/src/pages/FailureModesPage.js` - Added discipline grouping and filtering UI
+
+---
+
 ### December 7, 2026 - Tyromer Equipment Hierarchy Import with Criticality
 **FEATURE COMPLETED:**
 - ✅ **Equipment Hierarchy Import from Excel with Criticality Data**
