@@ -51,9 +51,8 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 limiter = Limiter(key_func=get_remote_address)
 
 # Create app with explicit OpenAPI configuration
-# IMPORTANT: docs_url and openapi_url MUST be under /api/ prefix 
-# because Kubernetes ingress only routes /api/* to the backend.
-# Without /api prefix, requests go to frontend and return React HTML.
+# Primary docs at /api/* for proxy environments (Emergent, Vercel+Railway)
+# Also add fallback routes at root level for direct Railway access
 app = FastAPI(
     title="ThreatBase API",
     version="2.5.2",
@@ -61,6 +60,34 @@ app = FastAPI(
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json"
 )
+
+# Add duplicate docs endpoints at root level for Railway direct access
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.responses import JSONResponse
+
+@app.get("/docs", include_in_schema=False)
+async def swagger_ui_html():
+    """Swagger UI at /docs for direct backend access (Railway)."""
+    return get_swagger_ui_html(
+        openapi_url="/api/openapi.json",
+        title=app.title + " - Swagger UI",
+        swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-bundle.js",
+        swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css",
+    )
+
+@app.get("/redoc", include_in_schema=False)
+async def redoc_html():
+    """ReDoc at /redoc for direct backend access (Railway)."""
+    return get_redoc_html(
+        openapi_url="/api/openapi.json",
+        title=app.title + " - ReDoc",
+        redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js",
+    )
+
+@app.get("/openapi.json", include_in_schema=False)
+async def openapi_json():
+    """OpenAPI schema at /openapi.json for direct backend access."""
+    return JSONResponse(app.openapi())
 
 # Add rate limiter to app state
 app.state.limiter = limiter
@@ -178,7 +205,9 @@ async def add_security_headers(request, call_next):
     
     # Content Security Policy
     # Skip CSP for Swagger docs pages (they need CDN resources)
-    if request.url.path in ["/api/docs", "/api/redoc", "/api/openapi.json"]:
+    # Support both /api/* paths (proxy) and root paths (direct Railway)
+    docs_paths = ["/api/docs", "/api/redoc", "/api/openapi.json", "/docs", "/redoc", "/openapi.json"]
+    if request.url.path in docs_paths:
         # No CSP for docs - Swagger UI needs external CDN
         # Add CORP header to allow ReDoc script loading
         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
