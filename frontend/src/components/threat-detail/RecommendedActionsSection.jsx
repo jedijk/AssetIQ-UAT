@@ -89,6 +89,18 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     discipline: "",
   });
   
+  // Edit action plan item state
+  const [showEditActionDialog, setShowEditActionDialog] = useState(false);
+  const [editingAction, setEditingAction] = useState(null);
+  const [editActionForm, setEditActionForm] = useState({
+    title: "",
+    description: "",
+    action_type: "",
+    discipline: "",
+    priority: "",
+    status: "",
+  });
+  
   // RPN Scoring state for new failure mode
   const [fmData, setFmData] = useState({
     severity: 5,
@@ -249,6 +261,52 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     },
   });
 
+  // Edit action plan item mutation
+  const editActionMutation = useMutation({
+    mutationFn: async ({ actionId, updates }) => {
+      return actionsAPI.update(actionId, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["linked-actions", threatId] });
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action updated!");
+      setShowEditActionDialog(false);
+      setEditingAction(null);
+    },
+    onError: () => {
+      toast.error("Failed to update action");
+    },
+  });
+
+  // Delete action plan item mutation
+  const deleteActionMutation = useMutation({
+    mutationFn: async (actionId) => {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${getBackendUrl()}/api/actions/${actionId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to delete action");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["linked-actions", threatId] });
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action deleted!");
+    },
+    onError: () => {
+      toast.error("Failed to delete action");
+    },
+  });
+
   // Create failure mode mutation
   const createFailureModeMutation = useMutation({
     mutationFn: async () => {
@@ -356,6 +414,39 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   const handleDeleteAction = (index) => {
     if (window.confirm("Are you sure you want to delete this recommended action?")) {
       deleteRecommendedActionMutation.mutate(index);
+    }
+  };
+
+  // Open edit dialog for action plan item
+  const handleEditActionPlanItem = (action) => {
+    setEditingAction(action);
+    setEditActionForm({
+      title: action.title || "",
+      description: action.description || "",
+      action_type: action.action_type || "",
+      discipline: action.discipline || "",
+      priority: action.priority || "medium",
+      status: action.status || "open",
+    });
+    setShowEditActionDialog(true);
+  };
+
+  // Save edited action plan item
+  const handleSaveActionPlanItem = () => {
+    if (!editActionForm.title.trim()) {
+      toast.error("Please enter an action title");
+      return;
+    }
+    editActionMutation.mutate({
+      actionId: editingAction.id,
+      updates: editActionForm,
+    });
+  };
+
+  // Delete action plan item with confirmation
+  const handleDeleteActionPlanItem = (actionId) => {
+    if (window.confirm("Are you sure you want to delete this action? This cannot be undone.")) {
+      deleteActionMutation.mutate(actionId);
     }
   };
 
@@ -586,7 +677,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               return (
                 <div
                   key={action.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
+                  className={`group flex items-start gap-3 p-3 rounded-lg border transition-all ${
                     action.is_validated 
                       ? "bg-green-50 border-green-200" 
                       : `${statusCfg.bg} border-slate-200 hover:shadow-sm`
@@ -665,6 +756,38 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                         {action.priority}
                       </Badge>
                     )}
+                    
+                    {/* Edit & Delete Buttons */}
+                    <div className="flex items-center gap-1 mt-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditActionPlanItem(action);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-all h-6 w-6 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                        title="Edit action"
+                        data-testid={`edit-action-plan-${action.id}`}
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteActionPlanItem(action.id);
+                        }}
+                        disabled={deleteActionMutation.isPending}
+                        className="opacity-0 group-hover:opacity-100 transition-all h-6 w-6 p-0 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                        title="Delete action"
+                        data-testid={`delete-action-plan-${action.id}`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    
                     {/* Validate Button */}
                     {!action.is_validated ? (
                       <Button
@@ -1174,6 +1297,167 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                 <ShieldCheck className="w-4 h-4 mr-2" />
               )}
               Confirm Validation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Action Plan Item Dialog */}
+      <Dialog open={showEditActionDialog} onOpenChange={setShowEditActionDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-blue-600" />
+              Edit Action
+            </DialogTitle>
+            <DialogDescription>
+              Update the action details. Changes will be saved to the action plan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-action-title">Action Title *</Label>
+              <Input
+                id="edit-action-title"
+                value={editActionForm.title}
+                onChange={(e) => setEditActionForm({ ...editActionForm, title: e.target.value })}
+                placeholder="e.g., Replace worn seals"
+                data-testid="edit-action-title-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-action-description">Description</Label>
+              <Textarea
+                id="edit-action-description"
+                value={editActionForm.description}
+                onChange={(e) => setEditActionForm({ ...editActionForm, description: e.target.value })}
+                placeholder="Additional details about the action..."
+                rows={3}
+                data-testid="edit-action-description-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-action-type">Action Type</Label>
+                <Select
+                  value={editActionForm.action_type}
+                  onValueChange={(v) => setEditActionForm({ ...editActionForm, action_type: v })}
+                >
+                  <SelectTrigger data-testid="edit-action-type-select">
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACTION_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${type.color}`} />
+                          {type.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-action-discipline">Discipline</Label>
+                <SearchableSelect
+                  options={DISCIPLINES.map((disc) => ({ value: disc, label: disc }))}
+                  value={editActionForm.discipline}
+                  onValueChange={(v) => setEditActionForm({ ...editActionForm, discipline: v })}
+                  placeholder="Select discipline..."
+                  searchPlaceholder="Search disciplines..."
+                  data-testid="edit-action-discipline-select"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-action-priority">Priority</Label>
+                <Select
+                  value={editActionForm.priority}
+                  onValueChange={(v) => setEditActionForm({ ...editActionForm, priority: v })}
+                >
+                  <SelectTrigger data-testid="edit-action-priority-select">
+                    <SelectValue placeholder="Select priority..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-400" />
+                        Low
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="medium">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                        Medium
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="high">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        High
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-action-status">Status</Label>
+                <Select
+                  value={editActionForm.status}
+                  onValueChange={(v) => setEditActionForm({ ...editActionForm, status: v })}
+                >
+                  <SelectTrigger data-testid="edit-action-status-select">
+                    <SelectValue placeholder="Select status..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3 h-3 text-blue-500" />
+                        Open
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="in_progress">
+                      <div className="flex items-center gap-2">
+                        <Settings className="w-3 h-3 text-amber-500" />
+                        In Progress
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="completed">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-3 h-3 text-green-500" />
+                        Completed
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEditActionDialog(false);
+                setEditingAction(null);
+              }}
+              data-testid="cancel-edit-action-button"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveActionPlanItem}
+              disabled={editActionMutation.isPending || !editActionForm.title.trim()}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="save-edit-action-button"
+            >
+              {editActionMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Pencil className="w-4 h-4 mr-2" />
+              )}
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>

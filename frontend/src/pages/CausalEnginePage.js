@@ -91,6 +91,18 @@ export default function CausalEnginePage() {
   const [validatorName, setValidatorName] = useState("");
   const [validatorPosition, setValidatorPosition] = useState("");
   
+  // Edit action dialog state
+  const [showEditActionDialog, setShowEditActionDialog] = useState(false);
+  const [editingAction, setEditingAction] = useState(null);
+  const [editActionForm, setEditActionForm] = useState({
+    title: "",
+    description: "",
+    action_type: "",
+    discipline: "",
+    priority: "",
+    status: "",
+  });
+  
   const [newInvForm, setNewInvForm] = useState({ title: "", description: "", asset_name: "", location: "", incident_date: "", investigation_leader: "" });
   const [editInvForm, setEditInvForm] = useState({ title: "", description: "", asset_name: "", location: "", incident_date: "", investigation_leader: "", status: "draft" });
   const [eventForm, setEventForm] = useState({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" });
@@ -616,6 +628,36 @@ export default function CausalEnginePage() {
     },
   });
 
+  // Edit action mutation
+  const editActionMutation = useMutation({
+    mutationFn: ({ actionId, updates }) => actionsAPI.update(actionId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: ["central-actions", "investigation", selectedInvId] });
+      toast.success("Action updated!");
+      setShowEditActionDialog(false);
+      setEditingAction(null);
+    },
+    onError: (error) => {
+      console.error("Failed to update action:", error);
+      toast.error("Failed to update action");
+    },
+  });
+
+  // Delete central action mutation
+  const deleteCentralActionMutation = useMutation({
+    mutationFn: (actionId) => actionsAPI.delete(actionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: ["central-actions", "investigation", selectedInvId] });
+      toast.success("Action deleted!");
+    },
+    onError: (error) => {
+      console.error("Failed to delete action:", error);
+      toast.error("Failed to delete action");
+    },
+  });
+
   const handleOpenValidateDialog = (action) => {
     setActionToValidate(action);
     setValidatorName(user?.name || "");
@@ -633,6 +675,39 @@ export default function CausalEnginePage() {
       validatorName: validatorName.trim(),
       validatorPosition: validatorPosition.trim(),
     });
+  };
+
+  // Open edit action dialog
+  const handleEditActionPlanItem = (action) => {
+    setEditingAction(action);
+    setEditActionForm({
+      title: action.title || "",
+      description: action.description || "",
+      action_type: action.action_type || "",
+      discipline: action.discipline || "",
+      priority: action.priority || "medium",
+      status: action.status || "open",
+    });
+    setShowEditActionDialog(true);
+  };
+
+  // Save edited action
+  const handleSaveEditedAction = () => {
+    if (!editActionForm.title.trim()) {
+      toast.error("Please enter an action title");
+      return;
+    }
+    editActionMutation.mutate({
+      actionId: editingAction.id,
+      updates: editActionForm,
+    });
+  };
+
+  // Delete action with confirmation
+  const handleDeleteActionPlanItem = (actionId) => {
+    if (window.confirm("Are you sure you want to delete this action? This cannot be undone.")) {
+      deleteCentralActionMutation.mutate(actionId);
+    }
   };
 
   // Check if an investigation action is already in the central action plan
@@ -1674,6 +1749,38 @@ export default function CausalEnginePage() {
                                   {action.priority}
                                 </Badge>
                               )}
+                              
+                              {/* Edit & Delete Buttons */}
+                              <div className="flex items-center gap-1 mt-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditActionPlanItem(action);
+                                  }}
+                                  className="h-6 w-6 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                  title="Edit action"
+                                  data-testid={`inv-edit-action-${action.id}`}
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteActionPlanItem(action.id);
+                                  }}
+                                  disabled={deleteCentralActionMutation.isPending}
+                                  className="h-6 w-6 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                  title="Delete action"
+                                  data-testid={`inv-delete-action-${action.id}`}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              
                               {!action.is_validated ? (
                                 <Button
                                   variant="outline"
@@ -2026,6 +2133,182 @@ export default function CausalEnginePage() {
             >
               <CheckCircle className="w-4 h-4 mr-2" />
               Complete Investigation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Action Dialog */}
+      <Dialog open={showEditActionDialog} onOpenChange={setShowEditActionDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5 text-blue-600" />
+              Edit Action
+            </DialogTitle>
+            <DialogDescription>
+              Update the action details. Changes will be saved to the action plan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="inv-edit-action-title">Action Title *</Label>
+              <Input
+                id="inv-edit-action-title"
+                value={editActionForm.title}
+                onChange={(e) => setEditActionForm({ ...editActionForm, title: e.target.value })}
+                placeholder="e.g., Replace worn seals"
+                data-testid="inv-edit-action-title-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="inv-edit-action-description">Description</Label>
+              <Textarea
+                id="inv-edit-action-description"
+                value={editActionForm.description}
+                onChange={(e) => setEditActionForm({ ...editActionForm, description: e.target.value })}
+                placeholder="Additional details about the action..."
+                rows={3}
+                data-testid="inv-edit-action-description-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="inv-edit-action-type">Action Type</Label>
+                <Select
+                  value={editActionForm.action_type}
+                  onValueChange={(v) => setEditActionForm({ ...editActionForm, action_type: v })}
+                >
+                  <SelectTrigger data-testid="inv-edit-action-type-select">
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CM">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        Corrective (CM)
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="PM">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        Preventive (PM)
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="PDM">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-500" />
+                        Predictive (PDM)
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="inv-edit-action-discipline">Discipline</Label>
+                <Select
+                  value={editActionForm.discipline}
+                  onValueChange={(v) => setEditActionForm({ ...editActionForm, discipline: v })}
+                >
+                  <SelectTrigger data-testid="inv-edit-action-discipline-select">
+                    <SelectValue placeholder="Select discipline..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["Mechanical", "Electrical", "Instrumentation", "Process", "Operations", "Safety", "Civil", "Rotating Equipment", "HVAC", "IT/OT", "General"].map((disc) => (
+                      <SelectItem key={disc} value={disc}>{disc}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="inv-edit-action-priority">Priority</Label>
+                <Select
+                  value={editActionForm.priority}
+                  onValueChange={(v) => setEditActionForm({ ...editActionForm, priority: v })}
+                >
+                  <SelectTrigger data-testid="inv-edit-action-priority-select">
+                    <SelectValue placeholder="Select priority..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-400" />
+                        Low
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="medium">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                        Medium
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="high">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        High
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="inv-edit-action-status">Status</Label>
+                <Select
+                  value={editActionForm.status}
+                  onValueChange={(v) => setEditActionForm({ ...editActionForm, status: v })}
+                >
+                  <SelectTrigger data-testid="inv-edit-action-status-select">
+                    <SelectValue placeholder="Select status..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3 h-3 text-blue-500" />
+                        Open
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="in_progress">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3 h-3 text-amber-500" />
+                        In Progress
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="completed">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-3 h-3 text-green-500" />
+                        Completed
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEditActionDialog(false);
+                setEditingAction(null);
+              }}
+              data-testid="cancel-inv-edit-action-button"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEditedAction}
+              disabled={editActionMutation.isPending || !editActionForm.title.trim()}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="save-inv-edit-action-button"
+            >
+              {editActionMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Edit className="w-4 h-4 mr-2" />
+              )}
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
