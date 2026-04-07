@@ -180,83 +180,75 @@ async def reorder_form_fields(
 @router.get("/form-submissions")
 async def get_form_submissions(
     form_template_id: Optional[str] = None,
-    task_instance_id: Optional[str] = None,
-    equipment_id: Optional[str] = None,
-    has_warnings: Optional[bool] = None,
-    has_critical: Optional[bool] = None,
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
     skip: int = 0,
-    limit: int = 10,  # REDUCED default for fast response
-    include_details: bool = False,  # NEW: Only include full details if requested
+    limit: int = 10,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get form submissions list - optimized lightweight endpoint.
+    """
+    Get form submissions list - ULTRA-LIGHTWEIGHT endpoint.
     
+    Returns ONLY: id, formId, status, createdAt
     For full submission details, use GET /api/form-submissions/{id}
+    
+    Performance target: < 500ms response time
     """
     import time
     import asyncio
-    import logging
     
-    logger = logging.getLogger(__name__)
     start_time = time.time()
-    request_id = f"forms-{int(start_time * 1000) % 100000}"
     
-    # STRICT limit enforcement
-    limit = min(limit, 50)
+    # STRICT limits: default 10, max 50
+    limit = min(max(limit, 1), 50)
+    skip = max(skip, 0)
     
-    logger.info(f"[{request_id}] GET /api/form-submissions started - limit={limit}, skip={skip}, include_details={include_details}")
+    # MINIMAL projection - ONLY required fields
+    projection = {
+        "_id": 0,
+        "id": 1,
+        "form_template_id": 1,  # formId
+        "status": 1,
+        "created_at": 1  # createdAt
+    }
+    
+    # Build query
+    query = {}
+    if form_template_id:
+        query["form_template_id"] = form_template_id
     
     try:
-        from_dt = datetime.fromisoformat(from_date) if from_date else None
-        to_dt = datetime.fromisoformat(to_date) if to_date else None
+        # 3 second hard timeout
+        async def execute_query():
+            # Single query with projection, sort by created_at DESC, skip/limit
+            cursor = db.form_submissions.find(query, projection).sort("created_at", -1).skip(skip).limit(limit)
+            return await cursor.to_list(length=limit)
         
-        # Execute query with 5 second timeout
-        async def fetch_submissions():
-            return await form_service.get_submissions(
-                form_template_id=form_template_id,
-                task_instance_id=task_instance_id,
-                equipment_id=equipment_id,
-                has_warnings=has_warnings,
-                has_critical=has_critical,
-                from_date=from_dt,
-                to_date=to_dt,
-                skip=skip,
-                limit=limit,
-                include_details=include_details
-            )
+        submissions = await asyncio.wait_for(execute_query(), timeout=3.0)
         
-        try:
-            result = await asyncio.wait_for(fetch_submissions(), timeout=5.0)
+        # Transform to response format
+        data = []
+        for doc in submissions:
+            created_at = doc.get("created_at")
+            if hasattr(created_at, 'isoformat'):
+                created_at = created_at.isoformat()
             
-            duration = time.time() - start_time
-            logger.info(f"[{request_id}] Completed in {duration:.3f}s - returned {len(result.get('submissions', []))} of {result.get('total', 0)} total")
-            
-            if duration > 1.0:
-                logger.warning(f"[{request_id}] Slow query: {duration:.2f}s")
-            
-            return result
-            
-        except asyncio.TimeoutError:
-            duration = time.time() - start_time
-            logger.error(f"[{request_id}] TIMEOUT after {duration:.2f}s")
-            return {
-                "total": 0,
-                "submissions": [],
-                "error": "Query timeout",
-                "message": "Database query exceeded 5 second limit. Try reducing limit or adding filters."
-            }
-            
-    except Exception as e:
+            data.append({
+                "id": doc.get("id"),
+                "formId": doc.get("form_template_id"),
+                "status": doc.get("status", "completed"),
+                "createdAt": created_at
+            })
+        
         duration = time.time() - start_time
-        logger.error(f"[{request_id}] ERROR after {duration:.2f}s: {str(e)}", exc_info=True)
+        logger.info(f"GET /api/form-submissions completed in {duration:.3f}s - returned {len(data)} items")
         
-        return {
-            "total": 0,
-            "submissions": [],
-            "error": str(e)
-        }
+        return {"data": data}
+        
+    except asyncio.TimeoutError:
+        logger.error("GET /api/form-submissions TIMEOUT after 3s")
+        return {"data": [], "error": "timeout"}
+    except Exception as e:
+        logger.error(f"GET /api/form-submissions ERROR: {e}")
+        return {"data": [], "error": "timeout"}
 
 @router.get("/form-submissions/{submission_id}")
 async def get_form_submission(

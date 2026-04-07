@@ -137,12 +137,15 @@ INDEX_DEFINITIONS = {
         {"keys": [("template_id", 1)]},  # Legacy field name
         {"keys": [("submitted_by", 1)]},
         {"keys": [("submitted_at", -1)]},
+        {"keys": [("created_at", -1)]},  # Performance index for listing
         {"keys": [("task_instance_id", 1)]},
         {"keys": [("equipment_id", 1)]},
         {"keys": [("has_warnings", 1)]},
         {"keys": [("has_critical", 1)]},
+        {"keys": [("status", 1)]},  # Filter by status
         # Compound index for common query pattern
         {"keys": [("submitted_at", -1), ("form_template_id", 1)]},
+        {"keys": [("created_at", -1), ("form_template_id", 1)]},  # Optimized listing
     ],
     
     # Chat messages
