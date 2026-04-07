@@ -4,7 +4,12 @@ import { getApiUrl } from "../lib/apiConfig";
 
 const AuthContext = createContext(null);
 
-const API_URL = getApiUrl();
+// Get API URL dynamically to ensure env vars are loaded
+const getAuthApiUrl = () => {
+  const url = getApiUrl();
+  console.log("[AuthContext] API URL:", url);
+  return url;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -23,6 +28,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
+      const API_URL = getAuthApiUrl();
       const response = await axios.get(`${API_URL}/auth/me`);
       setUser(response.data);
       setMustChangePassword(response.data.must_change_password || false);
@@ -35,6 +41,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password) => {
+    const API_URL = getAuthApiUrl();
+    console.log("[AuthContext] Login request to:", `${API_URL}/auth/login`);
     const response = await axios.post(`${API_URL}/auth/login`, { email, password });
     const { token: newToken, user: userData, must_change_password } = response.data;
     
@@ -60,6 +68,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const changePassword = async (currentPassword, newPassword) => {
+    const API_URL = getAuthApiUrl();
     const response = await axios.post(`${API_URL}/auth/change-password`, {
       current_password: currentPassword,
       new_password: newPassword,
@@ -78,6 +87,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (name, email, password) => {
+    const API_URL = getAuthApiUrl();
     const response = await axios.post(`${API_URL}/auth/register`, { name, email, password });
     
     // Check if registration requires approval (new workflow)
