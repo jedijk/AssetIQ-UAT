@@ -51,12 +51,15 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 limiter = Limiter(key_func=get_remote_address)
 
 # Create app with explicit OpenAPI configuration
+# IMPORTANT: docs_url and openapi_url MUST be under /api/ prefix 
+# because Kubernetes ingress only routes /api/* to the backend.
+# Without /api prefix, requests go to frontend and return React HTML.
 app = FastAPI(
     title="ThreatBase API",
     version="2.5.2",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json"
 )
 
 # Add rate limiter to app state
@@ -173,17 +176,24 @@ async def add_security_headers(request, call_next):
     # Permissions Policy (restrict browser features)
     response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
     
-    # Content Security Policy (allow same origin and specific trusted sources)
-    # Note: This is permissive for development. Tighten for production.
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: https: blob:; "
-        "font-src 'self' data:; "
-        "connect-src 'self' https:; "
-        "frame-ancestors 'none';"
-    )
+    # Content Security Policy
+    # Skip CSP for Swagger docs pages (they need CDN resources)
+    if request.url.path in ["/api/docs", "/api/redoc", "/api/openapi.json"]:
+        # No CSP for docs - Swagger UI needs external CDN
+        # Add CORP header to allow ReDoc script loading
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        response.headers["Cross-Origin-Embedder-Policy"] = "unsafe-none"
+    else:
+        # Standard CSP for all other routes
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https: blob:; "
+            "font-src 'self' data:; "
+            "connect-src 'self' https:; "
+            "frame-ancestors 'none';"
+        )
     
     return response
 

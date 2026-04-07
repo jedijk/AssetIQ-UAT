@@ -3,6 +3,30 @@
 ## Original Problem Statement
 Full-stack platform for AI-powered reliability intelligence featuring causal analysis, FMEA libraries, task scheduling, and user management.
 
+---
+
+### April 7, 2026 - FastAPI Swagger Docs Fix
+**BUG FIX (P0 - Recurring Issue):**
+- ✅ **Fixed FastAPI Swagger UI `/docs` blank page issue**
+- **Root Causes:**
+  1. Routes without `/api` prefix get served by frontend (React) instead of backend
+  2. Content Security Policy (CSP) was blocking external CDN resources (cdn.jsdelivr.net)
+- **Solution:**
+  - Moved docs URL from `/docs` → `/api/docs`
+  - Moved redoc URL from `/redoc` → `/api/redoc`  
+  - Moved openapi.json from `/openapi.json` → `/api/openapi.json`
+  - Exempted docs routes from CSP headers
+
+**Files Modified:**
+- `/app/backend/server.py` - Updated FastAPI docs_url, redoc_url, openapi_url and CSP middleware
+
+**Access:**
+- Swagger UI: `https://[domain]/api/docs`
+- ReDoc: `https://[domain]/api/redoc` (note: may have ORB blocking issues in some browsers)
+- OpenAPI JSON: `https://[domain]/api/openapi.json`
+
+---
+
 ## Core Requirements
 - Authentication with JWT
 - Role-based access control (Owner, Admin, User, Custom roles)
