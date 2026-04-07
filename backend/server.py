@@ -183,10 +183,30 @@ async def api_health_check():
         "version": "2.6.5"
     }
 
+
+# Debug endpoint to list all available routes
+@app.get("/api/routes")
+async def list_routes():
+    """List all registered API routes (useful for debugging 404 issues)."""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            methods = list(route.methods - {'HEAD', 'OPTIONS'}) if route.methods else ['GET']
+            if route.path.startswith('/api'):
+                routes.append({
+                    "path": route.path,
+                    "methods": methods
+                })
+    return {
+        "total": len(routes),
+        "routes": sorted(routes, key=lambda x: x['path'])
+    }
+
 # CORS - Allow production domains and Vercel deployments
 ALLOWED_ORIGINS = [
     "https://assetiq.tech",
     "https://www.assetiq.tech",
+    "https://asset-iq-rho.vercel.app",  # NEW: Vercel production
     "https://asset-iq-preview.preview.emergentagent.com",  # Preview environment
     "https://assetiq-rmhd.vercel.app",  # Vercel production
     "https://assetiq.vercel.app",  # Vercel alias
@@ -296,6 +316,11 @@ async def startup_event():
     import time
     app.state.start_time = time.time()  # Track server start time for health check
     
+    # Log server startup
+    port = os.environ.get('PORT', '8001')
+    logger.info(f"=== SERVER STARTING on port {port} ===")
+    logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
+    
     from database import db, verify_database_connection
     
     # Verify database connection with retry
@@ -322,6 +347,21 @@ async def startup_event():
             logger.info("Failure modes library ready")
     except Exception as e:
         logger.warning(f"Failure modes seeding skipped: {e}")
+    
+    # Log all registered routes
+    logger.info("=== REGISTERED API ROUTES ===")
+    api_routes = []
+    for route in app.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            methods = ','.join(route.methods - {'HEAD', 'OPTIONS'}) if route.methods else 'GET'
+            if methods and route.path.startswith('/api'):
+                api_routes.append(f"  {methods:10} {route.path}")
+    
+    # Sort and log
+    for route_info in sorted(api_routes)[:50]:  # Log first 50 routes
+        logger.info(route_info)
+    logger.info(f"Total API routes: {len(api_routes)}")
+    logger.info("=== SERVER READY ===")
 
 
 @app.on_event("shutdown")
