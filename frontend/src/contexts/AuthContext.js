@@ -35,8 +35,18 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const API_URL = getApiUrl();
-    const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-    const { token: newToken, user: userData, must_change_password } = response.data;
+    
+    // Validate API URL is configured
+    if (!API_URL || API_URL === '/api') {
+      console.error("[Auth] Backend API URL not configured. Set REACT_APP_API_URL in environment variables.");
+      throw new Error("Backend not configured. Please contact administrator.");
+    }
+    
+    console.log("[Auth] Login request to:", `${API_URL}/auth/login`);
+    
+    try {
+      const response = await axios.post(`${API_URL}/auth/login`, { email, password });
+      const { token: newToken, user: userData, must_change_password } = response.data;
     
     localStorage.setItem("token", newToken);
     axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
@@ -57,6 +67,22 @@ export const AuthProvider = ({ children }) => {
     }
     
     return { ...userData, must_change_password: must_change_password || userData.must_change_password };
+    } catch (error) {
+      // Log detailed error for debugging
+      console.error("[Auth] Login failed:", error.response?.status, error.response?.data || error.message);
+      
+      if (error.response?.status === 401) {
+        throw new Error("Invalid email or password");
+      } else if (error.response?.status === 429) {
+        throw new Error("Too many login attempts. Please try again later.");
+      } else if (!error.response) {
+        // Network error - likely CORS or backend unreachable
+        console.error("[Auth] Network error - check if backend is reachable and CORS is configured");
+        throw new Error("Cannot connect to server. Please try again later.");
+      }
+      
+      throw error;
+    }
   };
 
   const changePassword = async (currentPassword, newPassword) => {
