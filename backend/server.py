@@ -178,7 +178,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.(vercel\.app|emergentagent\.com)",  # Match Vercel and Emergent deployments
+    allow_origin_regex=r"https://.*\.(vercel\.app|emergentagent\.com|emergent\.host)",  # Match Vercel and Emergent deployments
     allow_methods=["*"],
     allow_headers=["*"],
 )

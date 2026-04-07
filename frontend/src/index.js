@@ -60,6 +60,8 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js')
       .then((registration) => {
         console.log('ServiceWorker registered: ', registration.scope);
+        // Force update check on every page load
+        registration.update();
       })
       .catch((error) => {
         console.log('ServiceWorker registration failed: ', error);
