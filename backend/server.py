@@ -155,23 +155,30 @@ async def health_check():
     """Health check endpoint for deployment."""
     return {"status": "healthy"}
 
-# CORS - Restrict to production domain
+# CORS - Allow production domains and Vercel deployments
 ALLOWED_ORIGINS = [
     "https://assetiq.tech",
     "https://www.assetiq.tech",
     "https://asset-iq-preview.preview.emergentagent.com",  # Preview environment
+    "https://assetiq-rmhd.vercel.app",  # Vercel production
+    "https://assetiq.vercel.app",  # Vercel alias
     "http://localhost:3000",  # Local development
 ]
+
+# Also allow any Vercel preview deployments
+VERCEL_PATTERN = ".vercel.app"
 
 # Override with environment variable if set
 env_origins = os.environ.get('CORS_ORIGINS', '')
 if env_origins and env_origins != '*':
     ALLOWED_ORIGINS = [origin.strip() for origin in env_origins.split(',')]
 
+# Use allow_origin_regex to match all Vercel preview deployments
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Match all Vercel deployments
     allow_methods=["*"],
     allow_headers=["*"],
 )
