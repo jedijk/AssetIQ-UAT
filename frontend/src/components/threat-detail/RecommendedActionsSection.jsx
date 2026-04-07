@@ -4,7 +4,7 @@ import { threatsAPI, actionsAPI } from "../../lib/api";
 import { getBackendUrl } from "../../lib/apiConfig";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Plus, ClipboardList, Loader2, Sparkles, AlertTriangle, Settings, CheckCircle, Clock, XCircle, ExternalLink, ShieldCheck, UserCheck } from "lucide-react";
+import { Plus, ClipboardList, Loader2, Sparkles, AlertTriangle, Settings, CheckCircle, Clock, XCircle, ExternalLink, ShieldCheck, UserCheck, Pencil, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
@@ -75,6 +75,15 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   const [validatorName, setValidatorName] = useState("");
   const [validatorPosition, setValidatorPosition] = useState("");
   const [newRecommendedAction, setNewRecommendedAction] = useState({
+    action: "",
+    action_type: "",
+    discipline: "",
+  });
+  
+  // Edit recommended action state
+  const [showEditRecommendedDialog, setShowEditRecommendedDialog] = useState(false);
+  const [editingActionIndex, setEditingActionIndex] = useState(null);
+  const [editRecommendedAction, setEditRecommendedAction] = useState({
     action: "",
     action_type: "",
     discipline: "",
@@ -203,6 +212,43 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     },
   });
 
+  // Edit recommended action mutation
+  const editRecommendedActionMutation = useMutation({
+    mutationFn: ({ index, updatedAction }) => {
+      const currentActions = [...(threat?.recommended_actions || [])];
+      currentActions[index] = updatedAction;
+      return threatsAPI.update(threatId, { recommended_actions: currentActions });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      toast.success("Recommended action updated!");
+      setShowEditRecommendedDialog(false);
+      setEditingActionIndex(null);
+      setEditRecommendedAction({ action: "", action_type: "", discipline: "" });
+    },
+    onError: () => {
+      toast.error("Failed to update recommended action");
+    },
+  });
+
+  // Delete recommended action mutation
+  const deleteRecommendedActionMutation = useMutation({
+    mutationFn: (index) => {
+      const currentActions = [...(threat?.recommended_actions || [])];
+      currentActions.splice(index, 1);
+      return threatsAPI.update(threatId, { recommended_actions: currentActions });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      toast.success("Recommended action deleted!");
+    },
+    onError: () => {
+      toast.error("Failed to delete recommended action");
+    },
+  });
+
   // Create failure mode mutation
   const createFailureModeMutation = useMutation({
     mutationFn: async () => {
@@ -280,6 +326,37 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       return;
     }
     addRecommendedActionMutation.mutate(newRecommendedAction);
+  };
+
+  // Open edit dialog with current action data
+  const handleEditAction = (index, action) => {
+    const isObj = typeof action === "object";
+    setEditingActionIndex(index);
+    setEditRecommendedAction({
+      action: isObj ? (action.action || action.description || "") : action,
+      action_type: isObj ? (action.action_type || "") : "",
+      discipline: isObj ? (action.discipline || "") : "",
+    });
+    setShowEditRecommendedDialog(true);
+  };
+
+  // Save edited action
+  const handleSaveEditedAction = () => {
+    if (!editRecommendedAction.action.trim()) {
+      toast.error("Please enter an action description");
+      return;
+    }
+    editRecommendedActionMutation.mutate({
+      index: editingActionIndex,
+      updatedAction: editRecommendedAction,
+    });
+  };
+
+  // Delete action with confirmation
+  const handleDeleteAction = (index) => {
+    if (window.confirm("Are you sure you want to delete this recommended action?")) {
+      deleteRecommendedActionMutation.mutate(index);
+    }
   };
 
   return (
@@ -405,35 +482,61 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                   )}
                 </div>
 
-                {/* Act Button - Show only if not already acted */}
-                {isAlreadyActed ? (
-                  <div className="flex-shrink-0">
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* Edit Button - Always visible on hover */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditAction(idx, action)}
+                    className="opacity-0 group-hover:opacity-100 transition-all text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md p-1 h-7 w-7"
+                    title="Edit action"
+                    data-testid={`edit-action-${idx}`}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  
+                  {/* Delete Button - Always visible on hover */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteAction(idx)}
+                    disabled={deleteRecommendedActionMutation.isPending}
+                    className="opacity-0 group-hover:opacity-100 transition-all text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-md p-1 h-7 w-7"
+                    title="Delete action"
+                    data-testid={`delete-action-${idx}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                  
+                  {/* Act Button - Show only if not already acted */}
+                  {isAlreadyActed ? (
                     <Badge 
                       variant="outline" 
-                      className="bg-green-100 text-green-700 border-green-300 text-[10px] px-2 py-1"
+                      className="bg-green-100 text-green-700 border-green-300 text-[10px] px-2 py-1 ml-1"
                     >
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Added
                     </Badge>
-                  </div>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => promoteToActionMutation.mutate({
-                      text: actionText,
-                      action_type: actionType,
-                      discipline: discipline,
-                    })}
-                    disabled={promoteToActionMutation.isPending}
-                    className="opacity-0 group-hover:opacity-100 transition-all text-blue-600 hover:text-white hover:bg-blue-600 rounded-md px-2 py-1 h-7 text-xs"
-                    title="Add to action plan"
-                    data-testid={`promote-action-${idx}`}
-                  >
-                    <ClipboardList className="w-3 h-3 mr-1" />
-                    Act
-                  </Button>
-                )}
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => promoteToActionMutation.mutate({
+                        text: actionText,
+                        action_type: actionType,
+                        discipline: discipline,
+                      })}
+                      disabled={promoteToActionMutation.isPending}
+                      className="opacity-0 group-hover:opacity-100 transition-all text-blue-600 hover:text-white hover:bg-blue-600 rounded-md px-2 py-1 h-7 text-xs"
+                      title="Add to action plan"
+                      data-testid={`promote-action-${idx}`}
+                    >
+                      <ClipboardList className="w-3 h-3 mr-1" />
+                      Act
+                    </Button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -712,6 +815,122 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                 <Plus className="w-4 h-4 mr-2" />
               )}
               Add Recommendation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Recommended Action Dialog */}
+      <Dialog open={showEditRecommendedDialog} onOpenChange={setShowEditRecommendedDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-blue-600" />
+              Edit Recommended Action
+            </DialogTitle>
+            <DialogDescription>
+              Update the maintenance recommendation. Changes will be saved automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-rec-action-text">Action Description *</Label>
+              <Textarea
+                id="edit-rec-action-text"
+                value={editRecommendedAction.action}
+                onChange={(e) => setEditRecommendedAction({ ...editRecommendedAction, action: e.target.value })}
+                placeholder="e.g., Replace worn seals and inspect shaft alignment"
+                rows={3}
+                data-testid="edit-rec-action-text-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-rec-action-type">Action Type *</Label>
+                <Select
+                  value={editRecommendedAction.action_type}
+                  onValueChange={(v) => setEditRecommendedAction({ ...editRecommendedAction, action_type: v })}
+                >
+                  <SelectTrigger data-testid="edit-rec-action-type-select">
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACTION_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${type.color}`} />
+                          {type.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-rec-action-discipline">Discipline *</Label>
+                <SearchableSelect
+                  options={DISCIPLINES.map((disc) => ({ value: disc, label: disc }))}
+                  value={editRecommendedAction.discipline}
+                  onValueChange={(v) => setEditRecommendedAction({ ...editRecommendedAction, discipline: v })}
+                  placeholder="Select discipline..."
+                  searchPlaceholder="Search disciplines..."
+                  data-testid="edit-rec-action-discipline-select"
+                />
+              </div>
+            </div>
+            {/* Preview */}
+            {editRecommendedAction.action && (
+              <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="text-xs text-slate-500 mb-2">Preview:</div>
+                <div className="flex items-start gap-3">
+                  {editRecommendedAction.action_type && (
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold ${
+                      editRecommendedAction.action_type === "CM" ? "bg-amber-500" :
+                      editRecommendedAction.action_type === "PM" ? "bg-blue-500" :
+                      editRecommendedAction.action_type === "PDM" ? "bg-purple-500" : "bg-slate-500"
+                    }`}>
+                      {editRecommendedAction.action_type}
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    {editRecommendedAction.discipline && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium mb-1">
+                        {editRecommendedAction.discipline}
+                      </span>
+                    )}
+                    <p className="text-sm text-slate-700">{editRecommendedAction.action}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEditRecommendedDialog(false);
+                setEditingActionIndex(null);
+                setEditRecommendedAction({ action: "", action_type: "", discipline: "" });
+              }}
+              data-testid="cancel-edit-rec-action-button"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEditedAction}
+              disabled={
+                editRecommendedActionMutation.isPending ||
+                !editRecommendedAction.action.trim()
+              }
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="save-edit-rec-action-button"
+            >
+              {editRecommendedActionMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Pencil className="w-4 h-4 mr-2" />
+              )}
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
