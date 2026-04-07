@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
@@ -282,12 +283,12 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
         </div>
       </div>
       
-      {/* Context Menu */}
-      {contextMenu.show && (
+      {/* Context Menu - rendered via Portal to ensure it's on top of everything */}
+      {contextMenu.show && createPortal(
         <div 
           ref={contextMenuRef}
-          className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-[9999] min-w-[180px]"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[180px]"
+          style={{ left: contextMenu.x, top: contextMenu.y, zIndex: 99999 }}
         >
           <button
             onClick={handleFilterOn}
@@ -315,17 +316,19 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
             <Plus className="w-4 h-4" />
             {t?.("hierarchy.addThreat") || "Add Observation"}
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Details Popup */}
-      {showDetails && (
+      {/* Details Popup - rendered via Portal to ensure it's on top of everything */}
+      {showDetails && createPortal(
         <div 
           ref={detailsRef}
-          className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-[9999] w-72"
+          className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 p-4 w-72"
           style={{ 
             left: Math.min(contextMenu.x, window.innerWidth - 300), 
-            top: Math.min(contextMenu.y, window.innerHeight - 350) 
+            top: Math.min(contextMenu.y, window.innerHeight - 350),
+            zIndex: 99999
           }}
         >
           {/* Header */}
@@ -461,7 +464,8 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
               {t ? t("hierarchy.editInManager") : "Edit in Equipment Manager"}
             </Button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       
       {hasChildren && isOpen && (
