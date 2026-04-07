@@ -13,7 +13,7 @@ import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "2.5.3.1";
+const APP_VERSION = process.env.REACT_APP_VERSION || "2.6.0";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
