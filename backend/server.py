@@ -268,7 +268,15 @@ async def startup_event():
     import time
     app.state.start_time = time.time()  # Track server start time for health check
     
-    from database import db
+    from database import db, verify_database_connection
+    
+    # Verify database connection with retry
+    logger.info("Verifying database connection...")
+    connected = await verify_database_connection(max_retries=3, timeout=5.0)
+    if not connected:
+        logger.error("WARNING: Database connection failed on startup - some features may not work")
+    else:
+        logger.info("MongoDB connected successfully")
     
     # Create indexes
     try:

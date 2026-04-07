@@ -218,36 +218,68 @@ async def get_task_instances(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     skip: int = 0,
-    limit: int = 50,  # Reduced default limit for faster response
+    limit: int = 50,  # Default pagination limit
     current_user: dict = Depends(get_current_user)
 ):
-    """Get task instances with optional filters."""
+    """Get task instances with optional filters, timeout protection, and fallback."""
     import time
+    import asyncio
+    
     start_time = time.time()
+    request_id = f"tasks-{int(start_time * 1000) % 100000}"
+    
+    logger.info(f"[{request_id}] GET /api/task-instances started - filters: equipment={equipment_id}, status={status}, limit={limit}")
     
     try:
+        # Parse dates
         from_dt = datetime.fromisoformat(from_date) if from_date else None
         to_dt = datetime.fromisoformat(to_date) if to_date else None
         
-        result = await task_service.get_instances(
-            equipment_id=equipment_id,
-            plan_id=plan_id,
-            status=status,
-            priority=priority,
-            from_date=from_dt,
-            to_date=to_dt,
-            skip=skip,
-            limit=min(limit, 100)  # Cap at 100 max
-        )
+        # Execute query with 5 second timeout
+        async def fetch_tasks():
+            return await task_service.get_instances(
+                equipment_id=equipment_id,
+                plan_id=plan_id,
+                status=status,
+                priority=priority,
+                from_date=from_dt,
+                to_date=to_dt,
+                skip=skip,
+                limit=min(limit, 100)  # Cap at 100 max
+            )
         
-        duration = time.time() - start_time
-        if duration > 2.0:
-            logger.warning(f"Slow task-instances query: {duration:.2f}s, filters: equipment={equipment_id}, status={status}")
-        
-        return result
+        try:
+            result = await asyncio.wait_for(fetch_tasks(), timeout=5.0)
+            
+            duration = time.time() - start_time
+            logger.info(f"[{request_id}] Completed in {duration:.2f}s - returned {result.get('total', 0)} items")
+            
+            if duration > 2.0:
+                logger.warning(f"[{request_id}] Slow query detected: {duration:.2f}s")
+            
+            return result
+            
+        except asyncio.TimeoutError:
+            duration = time.time() - start_time
+            logger.error(f"[{request_id}] TIMEOUT after {duration:.2f}s - database query too slow")
+            return {
+                "total": 0,
+                "instances": [],
+                "error": "Request timeout",
+                "details": "Database query took too long. Please try again or narrow your search."
+            }
+            
     except Exception as e:
-        logger.error(f"Error in get_task_instances: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch task instances: {str(e)}")
+        duration = time.time() - start_time
+        logger.error(f"[{request_id}] ERROR after {duration:.2f}s: {str(e)}", exc_info=True)
+        
+        # Return fallback response instead of hanging
+        return {
+            "total": 0,
+            "instances": [],
+            "warning": "Database unavailable",
+            "error": str(e)
+        }
 
 @router.get("/task-instances/calendar")
 async def get_task_calendar(
