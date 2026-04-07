@@ -173,12 +173,12 @@ env_origins = os.environ.get('CORS_ORIGINS', '')
 if env_origins and env_origins != '*':
     ALLOWED_ORIGINS = [origin.strip() for origin in env_origins.split(',')]
 
-# Use allow_origin_regex to match all Vercel preview deployments
+# Use allow_origin_regex to match all Vercel and Emergent preview deployments
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.vercel\.app",  # Match all Vercel deployments
+    allow_origin_regex=r"https://.*\.(vercel\.app|emergentagent\.com)",  # Match Vercel and Emergent deployments
     allow_methods=["*"],
     allow_headers=["*"],
 )
