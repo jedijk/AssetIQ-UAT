@@ -180,6 +180,9 @@ async def reorder_form_fields(
 @router.get("/form-submissions")
 async def get_form_submissions(
     form_template_id: Optional[str] = None,
+    template_id: Optional[str] = None,  # Legacy parameter name
+    has_warnings: Optional[bool] = None,
+    has_critical: Optional[bool] = None,
     skip: int = 0,
     limit: int = 10,
     current_user: dict = Depends(get_current_user)
@@ -187,7 +190,7 @@ async def get_form_submissions(
     """
     Get form submissions list - ULTRA-LIGHTWEIGHT endpoint.
     
-    Returns ONLY: id, formId, status, createdAt
+    Returns lightweight submission objects for list view.
     For full submission details, use GET /api/form-submissions/{id}
     
     Performance target: < 500ms response time
@@ -201,54 +204,87 @@ async def get_form_submissions(
     limit = min(max(limit, 1), 50)
     skip = max(skip, 0)
     
-    # MINIMAL projection - ONLY required fields
+    # MINIMAL projection - lightweight fields only
     projection = {
         "_id": 0,
         "id": 1,
-        "form_template_id": 1,  # formId
+        "form_template_id": 1,
+        "form_template_name": 1,
+        "task_instance_id": 1,
+        "equipment_id": 1,
+        "equipment_name": 1,
+        "submitted_by": 1,
+        "submitted_by_name": 1,
+        "submitted_at": 1,
+        "created_at": 1,
         "status": 1,
-        "created_at": 1  # createdAt
+        "has_warnings": 1,
+        "has_critical": 1,
+        "discipline": 1,
+        "task_template_name": 1
     }
     
     # Build query
     query = {}
-    if form_template_id:
-        query["form_template_id"] = form_template_id
+    effective_template_id = form_template_id or template_id
+    if effective_template_id:
+        query["form_template_id"] = effective_template_id
+    if has_warnings is not None:
+        query["has_warnings"] = has_warnings
+    if has_critical is not None:
+        query["has_critical"] = has_critical
     
     try:
         # 3 second hard timeout
         async def execute_query():
-            # Single query with projection, sort by created_at DESC, skip/limit
-            cursor = db.form_submissions.find(query, projection).sort("created_at", -1).skip(skip).limit(limit)
+            # Query with projection, sort by submitted_at DESC (fallback to created_at), skip/limit
+            cursor = db.form_submissions.find(query, projection).sort("submitted_at", -1).skip(skip).limit(limit)
             return await cursor.to_list(length=limit)
         
-        submissions = await asyncio.wait_for(execute_query(), timeout=3.0)
+        raw_submissions = await asyncio.wait_for(execute_query(), timeout=3.0)
         
-        # Transform to response format
-        data = []
-        for doc in submissions:
+        # Transform to response format matching frontend expectations
+        submissions = []
+        for doc in raw_submissions:
+            # Handle datetime serialization
+            submitted_at = doc.get("submitted_at") or doc.get("created_at")
+            if hasattr(submitted_at, 'isoformat'):
+                submitted_at = submitted_at.isoformat()
+            
             created_at = doc.get("created_at")
             if hasattr(created_at, 'isoformat'):
                 created_at = created_at.isoformat()
             
-            data.append({
+            submissions.append({
                 "id": doc.get("id"),
-                "formId": doc.get("form_template_id"),
+                "form_template_id": doc.get("form_template_id"),
+                "form_template_name": doc.get("form_template_name"),
+                "task_instance_id": doc.get("task_instance_id"),
+                "task_template_name": doc.get("task_template_name"),
+                "equipment_id": doc.get("equipment_id"),
+                "equipment_name": doc.get("equipment_name"),
+                "submitted_by": doc.get("submitted_by"),
+                "submitted_by_name": doc.get("submitted_by_name"),
+                "submitted_at": submitted_at,
+                "created_at": created_at,
                 "status": doc.get("status", "completed"),
-                "createdAt": created_at
+                "has_warnings": doc.get("has_warnings", False),
+                "has_critical": doc.get("has_critical", False),
+                "discipline": doc.get("discipline")
             })
         
         duration = time.time() - start_time
-        logger.info(f"GET /api/form-submissions completed in {duration:.3f}s - returned {len(data)} items")
+        logger.info(f"GET /api/form-submissions completed in {duration:.3f}s - returned {len(submissions)} items")
         
-        return {"data": data}
+        # Return format expected by frontend
+        return {"total": len(submissions), "submissions": submissions}
         
     except asyncio.TimeoutError:
         logger.error("GET /api/form-submissions TIMEOUT after 3s")
-        return {"data": [], "error": "timeout"}
+        return {"total": 0, "submissions": [], "error": "timeout"}
     except Exception as e:
         logger.error(f"GET /api/form-submissions ERROR: {e}")
-        return {"data": [], "error": "timeout"}
+        return {"total": 0, "submissions": [], "error": "timeout"}
 
 @router.get("/form-submissions/{submission_id}")
 async def get_form_submission(
