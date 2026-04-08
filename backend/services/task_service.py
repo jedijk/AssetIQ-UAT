@@ -945,7 +945,7 @@ class TaskService:
             data = att.get("data", "")
             if data and len(data) > 100000:  # > 100KB
                 try:
-                    from services.storage_service import is_storage_available, upload_object
+                    from services.storage_service import is_storage_available, put_object
                     if is_storage_available():
                         # Extract base64 content
                         if "," in data:
@@ -962,18 +962,21 @@ class TaskService:
                         
                         # Upload with timeout
                         try:
-                            url = await asyncio.wait_for(
+                            result = await asyncio.wait_for(
                                 asyncio.get_event_loop().run_in_executor(
-                                    None, upload_object, storage_path, file_bytes, att.get("type", "application/octet-stream")
+                                    None, put_object, storage_path, file_bytes, att.get("type", "application/octet-stream")
                                 ),
-                                timeout=10.0
+                                timeout=30.0  # Increased timeout for large files
                             )
+                            # put_object returns dict with 'path' key
+                            url = result.get("path", storage_path)
                             processed_attachments.append({
                                 "name": att.get("name"),
                                 "type": att.get("type"),
-                                "size": att.get("size"),
+                                "size": len(file_bytes),
                                 "url": url,
                             })
+                            logger.info(f"Uploaded attachment {att.get('name')} to {url}")
                             continue
                         except asyncio.TimeoutError:
                             logger.warning(f"Attachment upload timeout for {att.get('name')}")

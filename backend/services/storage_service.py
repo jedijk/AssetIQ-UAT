@@ -11,16 +11,24 @@ import base64
 import logging
 import requests
 from typing import Tuple, Optional
+from dotenv import load_dotenv
+
+# Ensure env vars are loaded
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
-EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 APP_NAME = "assetiq"
 
 # Module-level storage key - initialized once and reused
 _storage_key: Optional[str] = None
 _storage_available: Optional[bool] = None
+
+
+def _get_emergent_key() -> str:
+    """Get the Emergent LLM key from environment."""
+    return os.environ.get("EMERGENT_LLM_KEY", "")
 
 
 def is_storage_available() -> bool:
@@ -29,7 +37,8 @@ def is_storage_available() -> bool:
     if _storage_available is not None:
         return _storage_available
     
-    if not EMERGENT_KEY:
+    emergent_key = _get_emergent_key()
+    if not emergent_key:
         logger.warning("EMERGENT_LLM_KEY not configured - using MongoDB fallback for file storage")
         _storage_available = False
         return False
@@ -50,13 +59,14 @@ def init_storage() -> str:
     if _storage_key:
         return _storage_key
     
-    if not EMERGENT_KEY:
+    emergent_key = _get_emergent_key()
+    if not emergent_key:
         raise ValueError("EMERGENT_LLM_KEY not configured")
     
     try:
         resp = requests.post(
             f"{STORAGE_URL}/init",
-            json={"emergent_key": EMERGENT_KEY},
+            json={"emergent_key": emergent_key},
             timeout=30
         )
         resp.raise_for_status()

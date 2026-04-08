@@ -3,8 +3,10 @@ My Tasks routes - User-centric task execution endpoints.
 """
 import logging
 import uuid
+import base64
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from database import db
 from auth import get_current_user
@@ -13,6 +15,69 @@ from bson import ObjectId
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["My Tasks"])
+
+
+async def _process_attachments(raw_attachments: List[dict]) -> List[dict]:
+    """Process attachments - upload to object storage if large, otherwise keep base64."""
+    processed = []
+    
+    for att in raw_attachments:
+        data = att.get("data", "")
+        
+        # If attachment has large base64 data (> 100KB), try to upload to storage
+        if data and len(data) > 100000:
+            try:
+                from services.storage_service import is_storage_available, put_object
+                
+                if is_storage_available():
+                    # Extract base64 content (remove data URI prefix)
+                    if "," in data:
+                        base64_data = data.split(",", 1)[1]
+                    else:
+                        base64_data = data
+                    
+                    file_bytes = base64.b64decode(base64_data)
+                    
+                    # Generate storage path
+                    file_ext = att.get("name", "file").split(".")[-1] if "." in att.get("name", "") else "bin"
+                    storage_path = f"attachments/{uuid.uuid4()}.{file_ext}"
+                    
+                    # Upload with timeout
+                    result = await asyncio.wait_for(
+                        asyncio.get_event_loop().run_in_executor(
+                            None, put_object, storage_path, file_bytes, att.get("type", "application/octet-stream")
+                        ),
+                        timeout=30.0
+                    )
+                    
+                    # put_object returns dict with 'path' key
+                    url = result.get("path", storage_path)
+                    processed.append({
+                        "name": att.get("name"),
+                        "type": att.get("type"),
+                        "size": len(file_bytes),
+                        "url": url,
+                    })
+                    logger.info(f"Uploaded attachment {att.get('name')} to {url}")
+                    continue
+                    
+            except asyncio.TimeoutError:
+                logger.warning(f"Attachment upload timeout for {att.get('name')}")
+            except Exception as e:
+                logger.warning(f"Failed to upload attachment to storage: {e}")
+        
+        # Fallback: keep attachment as-is (but truncate large data for MongoDB)
+        if data and len(data) > 500000:  # > 500KB - too large for MongoDB
+            processed.append({
+                "name": att.get("name"),
+                "type": att.get("type"),
+                "size": att.get("size"),
+                "error": "File too large to store",
+            })
+        else:
+            processed.append(att)
+    
+    return processed
 
 
 def safe_isoformat(value):
@@ -678,9 +743,10 @@ async def complete_my_action(
         # Store form data if provided
         if data.get("form_data"):
             update_data["form_data"] = data["form_data"]
-        # Store attachments if provided
+        # Process and store attachments if provided
         if data.get("attachments"):
-            update_data["attachments"] = data["attachments"]
+            processed_attachments = await _process_attachments(data["attachments"])
+            update_data["attachments"] = processed_attachments
     
     await db.central_actions.update_one(
         {"id": action_id},
