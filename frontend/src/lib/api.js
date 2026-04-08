@@ -1,17 +1,32 @@
 import axios from "axios";
-import { getApiUrl } from "./apiConfig";
+import { getApiUrl, getBackendUrl } from "./apiConfig";
 
-// Use centralized API URL config (supports Vercel + Railway deployment)
+// Get API URL at initialization for static uses
 const API_URL = getApiUrl();
 
-// Create axios instance with timeout
+// Log API configuration at startup
+console.log("[API] Initializing API client...");
+console.log("[API] Backend URL:", getBackendUrl());
+console.log("[API] Full API URL:", API_URL);
+
+// Create axios instance with dynamic baseURL getter
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: API_URL, // Set initial baseURL
   timeout: 30000, // 30 second timeout
 });
 
-// Add auth interceptor
+// Add request interceptor to validate URL and add auth
 api.interceptors.request.use((config) => {
+  // Log request URL for debugging
+  console.log("[API] Request:", config.method?.toUpperCase(), `${config.baseURL}${config.url}`);
+  
+  // Validate the URL includes /api
+  if (!config.baseURL?.includes('/api')) {
+    console.error("[API] WARNING: API URL does not include /api prefix:", config.baseURL);
+    console.error("[API] This will cause 404 errors. Check REACT_APP_BACKEND_URL configuration.");
+  }
+  
+  // Add auth token
   const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

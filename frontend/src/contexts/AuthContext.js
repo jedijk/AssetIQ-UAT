@@ -55,15 +55,18 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const API_URL = getApiUrl();
     
-    // Validate API URL is configured - warn but don't block
-    if (!API_URL || API_URL === '/api') {
-      console.warn("[Auth] API URL appears incomplete:", API_URL);
-      console.warn("[Auth] If on Vercel, ensure REACT_APP_BACKEND_URL is set and rebuild.");
+    // Validate API URL includes /api prefix
+    if (!API_URL || !API_URL.includes('/api')) {
+      console.error("[Auth] ERROR: API URL is invalid or missing /api prefix:", API_URL);
+      console.error("[Auth] Expected format: https://your-backend.domain/api");
+      console.error("[Auth] Check REACT_APP_BACKEND_URL environment variable.");
     }
     
     const loginUrl = `${API_URL}/auth/login`;
-    console.log("[Auth] Login request to:", loginUrl);
-    console.log("[Auth] API_URL resolved to:", API_URL);
+    console.log("[Auth] ===== LOGIN ATTEMPT =====");
+    console.log("[Auth] API_URL:", API_URL);
+    console.log("[Auth] Login URL:", loginUrl);
+    console.log("[Auth] ========================");
     
     try {
       const response = await axios.post(loginUrl, { email, password });
