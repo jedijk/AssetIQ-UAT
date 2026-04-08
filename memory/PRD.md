@@ -5,6 +5,31 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 8, 2026 - Equipment Hierarchy Move/Add Child Fix (P0)
+**BUG FIX - "Invalid parent-child relationship" error when adding children to equipment nodes:**
+
+**Root Cause:**
+1. Frontend `LEVEL_ORDER` array included "site" level which doesn't exist in backend ISO 14224 hierarchy
+2. Frontend `LEGACY_LEVEL_MAP` incorrectly mapped "unit" → "section_system", but backend maps "unit" → "plant_unit"
+3. This mismatch caused the frontend to compute the wrong next level when adding children, resulting in backend validation rejecting the request
+
+**Example of the bug:**
+- User has a node with level `unit` (legacy level)
+- Backend normalizes `unit` → `plant_unit`, so valid children are `section_system`
+- But old frontend mapped `unit` → `section_system`, so when adding child it would try to add at wrong level
+- Backend rejected with: "Invalid parent-child relationship. unit can only have ['section_system'] as children"
+
+**Fixes Applied:**
+- ✅ Removed "site" from `LEVEL_ORDER` - now matches backend: `["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"]`
+- ✅ Fixed `LEGACY_LEVEL_MAP` to match backend: `unit` → `plant_unit`, `site` → `installation`, `auxiliary` → `equipment_unit`
+- ✅ Updated `LEVEL_CONFIG` icons and descriptions to reflect correct mappings
+- ✅ Removed unused icon imports (MapPin, GitBranch, Layers)
+
+**Files Modified:**
+- `/app/frontend/src/pages/EquipmentManagerPage.js` - Fixed LEVEL_ORDER, LEGACY_LEVEL_MAP, LEVEL_CONFIG
+
+---
+
 ### April 8, 2026 - Attachment Viewing Fix (P0)
 **BUG FIX - Attachments not viewable in Dashboard Quick View and Form Submissions:**
 

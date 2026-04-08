@@ -12,7 +12,7 @@ import {
   ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
   Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, Move, ArrowRight, ArrowUp, ArrowDown,
-  Download, MoreVertical, Copy, Scissors, MapPin, GitBranch, Layers,
+  Download, MoreVertical, Copy, Scissors,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -43,35 +43,38 @@ const LEVEL_CONFIG = {
   equipment_unit: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" }, 
   subunit: { icon: Box, label: "Subunit", description: "Driver, Driven unit, Control system" },
   maintainable_item: { icon: Wrench, label: "Maintainable Item", description: "Bearing, Seal, Impeller" },
-  // Legacy/import level aliases
+  // Legacy/import level aliases - mapped to ISO 14224 equivalents
   plant: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" },
-  unit: { icon: Settings, label: "Section/System", description: "Process unit, Feedstock prep" },  // unit = process units like Feedstock Prep Unit
+  unit: { icon: Factory, label: "Plant/Unit", description: "Plant unit (mapped from legacy 'unit')" },  // Backend maps unit → plant_unit
   section: { icon: Settings, label: "Section/System", description: "Production line section" },
   system: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" },
   equipment: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" },
   // Additional legacy levels for imported data
-  site: { icon: MapPin, label: "Site/Location", description: "Geographic location or site" },
-  location: { icon: MapPin, label: "Site/Location", description: "Geographic location or site" },
-  line: { icon: GitBranch, label: "Production Line", description: "Production line or process" },
-  production_line: { icon: GitBranch, label: "Production Line", description: "Production line or process" },
-  area: { icon: Layers, label: "Area", description: "Production area or zone" },
-  zone: { icon: Layers, label: "Zone", description: "Operational zone" },
-  auxiliary: { icon: Cog, label: "Auxiliary", description: "Auxiliary or support equipment" }
+  site: { icon: Building2, label: "Installation", description: "Site (mapped to installation)" },
+  location: { icon: Building2, label: "Installation", description: "Location (mapped to installation)" },
+  line: { icon: Settings, label: "Section/System", description: "Production line or process" },
+  production_line: { icon: Settings, label: "Section/System", description: "Production line or process" },
+  area: { icon: Settings, label: "Section/System", description: "Production area or zone" },
+  zone: { icon: Settings, label: "Section/System", description: "Operational zone" },
+  auxiliary: { icon: Cog, label: "Equipment Unit", description: "Auxiliary or support equipment" }
 };
-const LEVEL_ORDER = ["installation", "site", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
+// ISO 14224 Level hierarchy - must match backend iso14224_models.py
+const LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
+
+// Legacy level mapping to ISO 14224 standard - must match backend LEGACY_LEVEL_MAP
 const LEGACY_LEVEL_MAP = { 
   "plant": "plant_unit",
-  "unit": "section_system",  // "unit" in this data means Process Units (Feedstock Prep Unit, etc.)
+  "unit": "plant_unit",        // Backend maps "unit" to "plant_unit" (ISO 14224)
   "system": "section_system", 
   "section": "section_system",
   "equipment": "equipment_unit",
-  "site": "site",
-  "location": "site",
+  "site": "installation",       // Map site to installation (ISO 14224 doesn't have separate site level)
+  "location": "installation",
   "line": "section_system",
   "production_line": "section_system",
   "area": "section_system",
   "zone": "section_system",
-  "auxiliary": "section_system"
+  "auxiliary": "equipment_unit"
 };
 const CRIT_COLORS = { safety_critical: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", dot: "bg-red-500" }, production_critical: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", dot: "bg-orange-500" }, medium: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", dot: "bg-yellow-500" }, low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } };
 const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process", "laboratory"];
