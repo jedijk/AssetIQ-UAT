@@ -78,6 +78,12 @@ const ImageWithFallback = ({ src, alt, fallback }) => {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Reset state when src changes
+  useEffect(() => {
+    setHasError(false);
+    setIsLoading(true);
+  }, [src]);
+
   if (hasError) {
     return fallback;
   }
@@ -649,7 +655,13 @@ export default function FormSubmissionsPage() {
                     const isArray = Array.isArray(response.value);
                     const isNumeric = typeof response.value === "number";
                     const hasAttachment = response.attachment_url || response.file_url;
-                    const isImage = hasAttachment && /\.(jpg|jpeg|png|gif|webp)$/i.test(response.attachment_url || response.file_url || "");
+                    const attachmentRawUrl = response.attachment_url || response.file_url || "";
+                    const isImage = hasAttachment && /\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentRawUrl);
+                    // Construct full URL for inline attachments
+                    const authToken = localStorage.getItem('token');
+                    const attachmentFullUrl = attachmentRawUrl && !attachmentRawUrl.startsWith('data:') && !attachmentRawUrl.startsWith('http')
+                      ? `${getBackendUrl()}/api/storage/${attachmentRawUrl}${authToken ? `?token=${authToken}` : ''}`
+                      : attachmentRawUrl;
                     
                     // Check if this is a signature field (base64 data URL or field_type is signature)
                     const isSignature = response.field_type === "signature" || 
@@ -719,11 +731,10 @@ export default function FormSubmissionsPage() {
                               ) : hasAttachment ? (
                                 <button
                                   onClick={() => {
-                                    const url = response.attachment_url || response.file_url;
                                     if (isImage) {
-                                      setViewingImage({ url, name: response.field_label || "Image" });
+                                      setViewingImage({ url: attachmentFullUrl, name: response.field_label || "Image" });
                                     } else {
-                                      window.open(url, '_blank');
+                                      window.open(attachmentFullUrl, '_blank');
                                     }
                                   }}
                                   className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800"
