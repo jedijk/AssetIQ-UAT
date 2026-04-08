@@ -157,10 +157,16 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       if (draft) {
         setFormData(draft.formData || {});
         setCompletionNotes(draft.completionNotes || "");
-        // Restore attachments (without actual file data for images - those need re-upload)
-        setAttachments(draft.attachments || []);
+        // Restore attachments - filter out ones that need re-upload (no data/preview)
+        const restoredAttachments = (draft.attachments || []).filter(att => att.url);
+        const needsReupload = (draft.attachments || []).filter(att => att.needsReupload || !att.url);
+        setAttachments(restoredAttachments);
         setHasDraft(true);
-        toast.info("Restored your previous draft", { duration: 3000 });
+        if (needsReupload.length > 0) {
+          toast.info(`Restored draft. ${needsReupload.length} attachment(s) need to be re-added.`, { duration: 4000 });
+        } else {
+          toast.info("Restored your previous draft", { duration: 3000 });
+        }
       } else {
         setFormData({});
         setCompletionNotes("");
@@ -189,13 +195,15 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
     if (!hasData) return;
     
     const timeout = setTimeout(() => {
-      // Filter out file objects from attachments (can't serialize)
+      // Filter out large base64 data from attachments (localStorage has size limits)
+      // Only keep metadata - files will need to be re-attached after draft restore
       const serializableAttachments = attachments.map(att => ({
         name: att.name,
         type: att.type,
-        preview: att.preview, // Keep preview URL if available
-        data: att.data, // Keep base64 data if available
-        url: att.url, // Keep URL if available
+        size: att.size,
+        url: att.url, // Keep URL if it was uploaded to server
+        // Don't store base64 data/preview - too large for localStorage
+        needsReupload: !att.url, // Mark as needing re-upload if no server URL
       }));
       
       saveDraft(task.id, {
@@ -963,26 +971,43 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             {attachments.map((att, idx) => {
               const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
               const previewUrl = att.preview || att.data || att.url;
+              const hasValidPreview = previewUrl && !att.needsReupload;
               
               return (
                 <div 
                   key={idx} 
                   className="relative group bg-slate-100 rounded-lg border border-slate-200 overflow-hidden"
                 >
-                  {isImage && previewUrl ? (
+                  {isImage && hasValidPreview ? (
                     <div className="aspect-square">
                       <img 
                         src={previewUrl} 
                         alt={att.name}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Hide broken image and show fallback
+                          e.target.style.display = 'none';
+                          e.target.nextSibling && (e.target.nextSibling.style.display = 'flex');
+                        }}
                       />
+                      <div className="hidden aspect-square flex-col items-center justify-center p-2 bg-slate-50">
+                        <ImageIcon className="w-8 h-8 text-slate-400 mb-1" />
+                        <span className="text-[10px] text-amber-600 font-medium">Preview unavailable</span>
+                      </div>
                     </div>
                   ) : (
                     <div className="aspect-square flex flex-col items-center justify-center p-2 bg-slate-50">
-                      <File className="w-8 h-8 text-slate-400 mb-1" />
+                      {isImage ? (
+                        <ImageIcon className="w-8 h-8 text-slate-400 mb-1" />
+                      ) : (
+                        <File className="w-8 h-8 text-slate-400 mb-1" />
+                      )}
                       <span className="text-[10px] text-slate-500 uppercase font-medium">
                         {att.name?.split('.').pop() || 'File'}
                       </span>
+                      {att.needsReupload && (
+                        <span className="text-[9px] text-amber-600 mt-1">Needs re-upload</span>
+                      )}
                     </div>
                   )}
                   
