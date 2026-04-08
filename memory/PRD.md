@@ -5,6 +5,32 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 8, 2026 - Failure Mode Auto-Create Actions Feature (COMPLETED)
+**NEW FEATURE - Enable actions to auto-create with observations:**
+
+**Implemented:**
+- ✅ Added `auto_create` checkbox to each recommended action in Failure Modes library
+- ✅ Green visual indicator when action is enabled for auto-create
+- ✅ When an observation is created using a failure mode, all actions with `auto_create: true` are automatically created
+- ✅ Auto-created actions are linked to the observation with `auto_created_from_failure_mode: true` flag
+- ✅ Context prompt after observation shows how many actions were auto-created
+
+**UI Changes:**
+- Failure Mode Edit view shows checkbox for each recommended action
+- Enabled actions show green background and "Auto-create" badge
+- View mode shows which actions will auto-create
+
+**Backend Logic:**
+- When observation is created via chat, system checks failure mode's `recommended_actions`
+- For each action with `auto_create: true`, creates a linked action in the Actions collection
+- Updates observation with `auto_created_action_ids` array
+
+**Files Modified:**
+- `/app/frontend/src/components/library/FailureModeViewPanel.jsx` - Added checkboxes and toggle function
+- `/app/backend/routes/chat.py` - Added auto-action creation logic
+
+---
+
 ### April 8, 2026 - Chat Context Prompt Feature (COMPLETED)
 **NEW FEATURE - Ask for additional context after observation is recorded:**
 

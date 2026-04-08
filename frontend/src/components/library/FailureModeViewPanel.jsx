@@ -185,7 +185,8 @@ export function FailureModeViewPanel({
       const newAction = {
         description: actionInput.trim(),
         discipline: actionDiscipline,
-        action_type: actionType
+        action_type: actionType,
+        auto_create: false  // Default to false, user can enable it
       };
       setFormData({ ...formData, recommended_actions: [...(formData.recommended_actions || []), newAction] });
       setActionInput("");
@@ -195,6 +196,23 @@ export function FailureModeViewPanel({
   const removeAction = (idx) => {
     if (formData) {
       setFormData({ ...formData, recommended_actions: formData.recommended_actions.filter((_, i) => i !== idx) });
+    }
+  };
+
+  const toggleActionAutoCreate = (idx) => {
+    if (formData && formData.recommended_actions) {
+      const updatedActions = formData.recommended_actions.map((action, i) => {
+        if (i === idx) {
+          const isObject = typeof action === 'object';
+          if (isObject) {
+            return { ...action, auto_create: !action.auto_create };
+          }
+          // Convert string action to object with auto_create
+          return { description: action, auto_create: true };
+        }
+        return action;
+      });
+      setFormData({ ...formData, recommended_actions: updatedActions });
     }
   };
 
@@ -593,13 +611,22 @@ export function FailureModeViewPanel({
 
         {/* Recommended Actions */}
         <div>
-          <Label className="text-xs text-slate-500 mb-2 block">{t("library.recommendedActions")}</Label>
+          <div className="flex items-center justify-between mb-2">
+            <Label className="text-xs text-slate-500">{t("library.recommendedActions")}</Label>
+            {!isEditing && fm.recommended_actions?.some(a => a.auto_create) && (
+              <span className="text-xs text-green-600 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" />
+                Auto-create enabled
+              </span>
+            )}
+          </div>
           <div className="space-y-2">
             {(isEditing ? formData?.recommended_actions : fm.recommended_actions)?.map((action, idx) => {
               const isObject = typeof action === 'object';
               const description = isObject ? (action.action || action.description) : action;
               const discipline = isObject ? action.discipline : null;
               const actType = isObject ? action.action_type : null;
+              const autoCreate = isObject ? action.auto_create : false;
               
               const typeColors = {
                 PM: "bg-blue-100 text-blue-700",
@@ -608,8 +635,32 @@ export function FailureModeViewPanel({
               };
               
               return (
-                <div key={idx} className="flex items-start gap-2 p-3 bg-slate-50 rounded-lg group border border-slate-100">
-                  <ShieldCheck className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <div key={idx} className={`flex items-start gap-2 p-3 rounded-lg group border ${autoCreate ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-100'}`}>
+                  {/* Auto-create checkbox */}
+                  {isEditing ? (
+                    <button
+                      onClick={() => toggleActionAutoCreate(idx)}
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                        autoCreate 
+                          ? 'bg-green-600 border-green-600 text-white' 
+                          : 'border-slate-300 hover:border-green-400'
+                      }`}
+                      title={autoCreate ? "Auto-create enabled" : "Click to auto-create with observation"}
+                      data-testid={`action-auto-create-${idx}`}
+                    >
+                      {autoCreate && <CheckCircle className="w-3 h-3" />}
+                    </button>
+                  ) : (
+                    <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      autoCreate ? 'bg-green-600 text-white' : ''
+                    }`}>
+                      {autoCreate ? (
+                        <CheckCircle className="w-3 h-3" />
+                      ) : (
+                        <ShieldCheck className="w-4 h-4 text-green-600" />
+                      )}
+                    </div>
+                  )}
                   <div className="flex-1">
                     {(actType || discipline) && (
                       <div className="flex items-center gap-2 mb-1">
@@ -620,6 +671,9 @@ export function FailureModeViewPanel({
                         )}
                         {discipline && (
                           <span className="text-xs text-slate-500 capitalize">{discipline}</span>
+                        )}
+                        {autoCreate && (
+                          <span className="text-xs text-green-600 font-medium">Auto-create</span>
                         )}
                       </div>
                     )}

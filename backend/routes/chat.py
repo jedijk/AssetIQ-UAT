@@ -301,6 +301,55 @@ async def send_chat_message(
         
         await db.threats.insert_one(threat_doc)
         
+        # Auto-create actions from failure mode's recommended actions with auto_create flag
+        auto_created_actions = []
+        recommended_actions = obs_data.get("recommended_actions", [])
+        if not recommended_actions and fmea_data:
+            recommended_actions = fmea_data.get("recommended_actions", [])
+        
+        for rec_action in recommended_actions:
+            # Check if auto_create is enabled for this action
+            auto_create = False
+            if isinstance(rec_action, dict):
+                auto_create = rec_action.get("auto_create", False)
+            
+            if auto_create:
+                action_id = str(uuid.uuid4())
+                action_description = rec_action.get("action") or rec_action.get("description") if isinstance(rec_action, dict) else str(rec_action)
+                action_type = rec_action.get("action_type", "CM") if isinstance(rec_action, dict) else "CM"
+                discipline = rec_action.get("discipline", "Mechanical") if isinstance(rec_action, dict) else "Mechanical"
+                
+                action_doc = {
+                    "id": action_id,
+                    "title": action_description[:200],  # Limit title length
+                    "description": action_description,
+                    "status": "Open",
+                    "priority": "Medium",
+                    "type": action_type,
+                    "discipline": discipline,
+                    "threat_id": threat_id,
+                    "threat_title": threat_doc["title"],
+                    "auto_created_from_failure_mode": True,
+                    "failure_mode_id": obs_data.get("failure_mode_id"),
+                    "failure_mode_name": failure_mode_name,
+                    "created_by": user_id,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "installation_id": installation_id
+                }
+                await db.actions.insert_one(action_doc)
+                auto_created_actions.append({
+                    "id": action_id,
+                    "title": action_description[:100],
+                    "type": action_type
+                })
+        
+        # Update threat with auto-created action IDs
+        if auto_created_actions:
+            await db.threats.update_one(
+                {"id": threat_id},
+                {"$set": {"auto_created_action_ids": [a["id"] for a in auto_created_actions]}}
+            )
+        
         # Update all ranks
         await update_all_ranks(user_id)
         
@@ -326,8 +375,16 @@ async def send_chat_message(
         )
         
         # After creating observation, ask for additional context
+        actions_info = ""
+        if auto_created_actions:
+            actions_info = f"\n\n🎯 **{len(auto_created_actions)} action(s) auto-created:**\n"
+            for act in auto_created_actions[:3]:  # Show max 3
+                actions_info += f"• {act['title'][:50]}{'...' if len(act['title']) > 50 else ''}\n"
+            if len(auto_created_actions) > 3:
+                actions_info += f"• ...and {len(auto_created_actions) - 3} more\n"
+        
         context_prompt = (
-            f"✅ Observation recorded: **{updated_threat['title']}**\n\n"
+            f"✅ Observation recorded: **{updated_threat['title']}**{actions_info}\n"
             f"Would you like to add any additional context? You can:\n"
             f"• Add comments about what you observed\n"
             f"• Provide temperature or measurement readings\n"
