@@ -205,7 +205,6 @@ async def send_chat_message(
         "original_message": result.get("original_message"),
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.chat_messages.insert_one(ai_response)
     
     # If we need to create an observation
     if result.get("create_observation") and result.get("observation_data"):
@@ -358,23 +357,7 @@ async def send_chat_message(
         if isinstance(updated_threat.get("risk_score"), float):
             updated_threat["risk_score"] = int(updated_threat["risk_score"])
         
-        # Update assistant message with threat info
-        await db.chat_messages.update_one(
-            {"id": ai_response["id"]},
-            {"$set": {
-                "threat_id": threat_id,
-                "threat_title": updated_threat["title"],
-                "threat_asset": updated_threat["asset"],
-                "threat_equipment_type": updated_threat["equipment_type"],
-                "threat_failure_mode": updated_threat["failure_mode"],
-                "threat_risk_level": updated_threat["risk_level"],
-                "threat_risk_score": updated_threat["risk_score"],
-                "threat_rank": updated_threat["rank"],
-                "threat_summary": True
-            }}
-        )
-        
-        # After creating observation, ask for additional context
+        # Build context prompt message (this is the ONLY message we store for observations)
         actions_info = ""
         if auto_created_actions:
             actions_info = f"\n\n🎯 **{len(auto_created_actions)} action(s) auto-created:**\n"
@@ -384,7 +367,7 @@ async def send_chat_message(
                 actions_info += f"• ...and {len(auto_created_actions) - 3} more\n"
         
         context_prompt = (
-            f"✅ Observation recorded: **{updated_threat['title']}**{actions_info}\n"
+            f"✅ Observation recorded: **{updated_threat['title']}**{actions_info}\n\n"
             f"Would you like to add any additional context? You can:\n"
             f"• Add comments about what you observed\n"
             f"• Provide temperature or measurement readings\n"
@@ -393,18 +376,22 @@ async def send_chat_message(
             f"Type your observations or say 'skip' to continue."
         )
         
-        # Store the context prompt message
-        context_response = {
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "role": "assistant",
-            "content": context_prompt,
-            "chat_state": ChatState.AWAITING_CONTEXT,
-            "threat_id": threat_id,
-            "awaiting_context_for_threat": threat_id,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.chat_messages.insert_one(context_response)
+        # Update the ai_response content to be the context prompt (single message)
+        ai_response["content"] = context_prompt
+        ai_response["chat_state"] = ChatState.AWAITING_CONTEXT
+        ai_response["threat_id"] = threat_id
+        ai_response["threat_title"] = updated_threat["title"]
+        ai_response["threat_asset"] = updated_threat["asset"]
+        ai_response["threat_equipment_type"] = updated_threat["equipment_type"]
+        ai_response["threat_failure_mode"] = updated_threat["failure_mode"]
+        ai_response["threat_risk_level"] = updated_threat["risk_level"]
+        ai_response["threat_risk_score"] = updated_threat["risk_score"]
+        ai_response["threat_rank"] = updated_threat["rank"]
+        ai_response["threat_summary"] = True
+        ai_response["awaiting_context_for_threat"] = threat_id
+        
+        # Store this single combined message
+        await db.chat_messages.insert_one(ai_response)
         
         # Update conversation state
         await db.chat_conversations.update_one(
@@ -420,12 +407,15 @@ async def send_chat_message(
         )
         
         return ChatResponse(
-            message=result["response_text"],
+            message=context_prompt,
             threat=ThreatResponse(**updated_threat),
             follow_up_question=context_prompt,
             question_type="context",
             awaiting_context_for_threat=threat_id
         )
+    
+    # No observation created - store the regular response
+    await db.chat_messages.insert_one(ai_response)
     
     # Return follow-up question response
     return ChatResponse(
