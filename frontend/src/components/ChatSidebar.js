@@ -378,8 +378,38 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           </div>
         )}
         
-        {!msg.threat_id && (
+        {/* Show content for non-threat messages OR context prompts */}
+        {(!msg.threat_id || msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
           <p className="whitespace-pre-wrap">{msg.content}</p>
+        )}
+        
+        {/* Context Prompt Quick Actions - Show Add Photo and Skip buttons */}
+        {(msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
+          <div className="mt-3 pt-3 border-t border-green-200 bg-green-50/50 rounded-lg p-3 -mx-1">
+            <p className="text-sm font-medium text-green-700 mb-2">Quick options:</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSending}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors text-sm font-medium disabled:opacity-50"
+                data-testid="add-photo-btn"
+              >
+                <ImageIcon className="w-4 h-4" />
+                Add Photo
+              </button>
+              <button
+                onClick={() => sendMutation.mutate({ content: "skip", image: null })}
+                disabled={isSending}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
+                data-testid="skip-context-btn"
+              >
+                Skip
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              Or type your observations (temperature, conditions, notes...)
+            </p>
+          </div>
         )}
         
         {/* Equipment Suggestions */}

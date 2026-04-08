@@ -85,6 +85,9 @@ class ThreatResponse(BaseModel):
     creator_photo: Optional[str] = None
     creator_initials: Optional[str] = None
     creator_position: Optional[str] = None
+    # User context from chat
+    user_context: Optional[str] = None
+    context_added_at: Optional[str] = None
 
 
 class ThreatUpdate(BaseModel):
