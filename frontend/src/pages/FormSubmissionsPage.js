@@ -69,7 +69,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../com
 import BackButton from "../components/BackButton";
 import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 import { DocumentViewer } from "../components/DocumentViewer";
-import { format, parseISO } from "date-fns";
+import { formatDate as formatDateUtil, formatDateTime as formatDateTimeUtil } from "../lib/dateUtils";
 
 const API_BASE_URL = getBackendUrl();
 

@@ -6,6 +6,7 @@ import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsA
 import { formAPI } from "../components/forms";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
+import { formatDate, formatDateTime } from "../lib/dateUtils";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -1019,7 +1020,7 @@ export default function DashboardPage() {
                 <p className="text-xs font-medium text-slate-700 truncate">{item.form_template_name || item.template_name || item.form_name || "Form"}</p>
                 <p className="text-[10px] text-slate-400">
                   {item.submitted_by_name && <span>{item.submitted_by_name} • </span>}
-                  {new Date(item.submitted_at || item.created_at).toLocaleDateString()}
+                  {formatDate(item.submitted_at || item.created_at)}
                 </p>
               </div>
               <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize ${
@@ -1175,7 +1176,7 @@ export default function DashboardPage() {
                 <span className="text-xs sm:text-sm">
                   <span className="font-medium text-slate-700">{quickViewSubmission?.submitted_by_name || "Unknown"}</span>
                   <span className="text-slate-400 mx-1">•</span>
-                  <span className="text-slate-500">{quickViewSubmission?.submitted_at ? new Date(quickViewSubmission.submitted_at).toLocaleDateString() : "Unknown"}</span>
+                  <span className="text-slate-500">{quickViewSubmission?.submitted_at ? formatDate(quickViewSubmission.submitted_at) : "Unknown"}</span>
                 </span>
               </div>
             </DialogDescription>
@@ -1200,7 +1201,7 @@ export default function DashboardPage() {
                 <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Submitted At</p>
                 <p className="text-xs sm:text-sm font-medium">
                   {quickViewSubmission?.submitted_at 
-                    ? new Date(quickViewSubmission.submitted_at).toLocaleString() 
+                    ? formatDateTime(quickViewSubmission.submitted_at) 
                     : "Unknown"}
                 </p>
               </div>

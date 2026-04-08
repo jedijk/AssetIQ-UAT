@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getBackendUrl } from "../lib/apiConfig";
+import { updateCachedPreferences } from "../lib/dateUtils";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -106,6 +107,10 @@ export default function SettingsPreferencesPage() {
   const { data: preferences, isLoading: prefsLoading } = useQuery({
     queryKey: ["user-preferences"],
     queryFn: preferencesAPI.getPreferences,
+    onSuccess: (data) => {
+      // Cache preferences for date formatting across the app
+      updateCachedPreferences(data);
+    },
   });
 
   // Fetch available timezones
@@ -119,8 +124,10 @@ export default function SettingsPreferencesPage() {
   // Update preferences mutation
   const updateMutation = useMutation({
     mutationFn: preferencesAPI.updatePreferences,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries(["user-preferences"]);
+      // Update cached preferences for date formatting across the app
+      updateCachedPreferences(data);
       toast.success("Preferences saved successfully");
     },
     onError: () => {
