@@ -881,3 +881,135 @@ async def mark_intro_seen(
     )
     
     return {"message": "Intro marked as seen"}
+
+
+
+class UserPreferencesUpdate(BaseModel):
+    """Schema for updating user preferences."""
+    timezone: str = None
+    timezone_auto_detect: bool = None
+    date_format: str = None
+    time_format: str = None  # "12h" or "24h"
+    language: str = None
+
+
+@router.get("/users/me/preferences")
+async def get_user_preferences(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get current user's preferences including timezone settings."""
+    user = await db.users.find_one(
+        {"id": current_user["id"]},
+        {"_id": 0, "preferences": 1}
+    )
+    
+    # Return defaults if no preferences set
+    defaults = {
+        "timezone": "UTC",
+        "timezone_auto_detect": True,
+        "date_format": "YYYY-MM-DD",
+        "time_format": "24h",
+        "language": "en"
+    }
+    
+    preferences = user.get("preferences", {}) if user else {}
+    return {**defaults, **preferences}
+
+
+@router.put("/users/me/preferences")
+async def update_user_preferences(
+    preferences: UserPreferencesUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update current user's preferences including timezone settings."""
+    update_data = {}
+    
+    if preferences.timezone is not None:
+        update_data["preferences.timezone"] = preferences.timezone
+    if preferences.timezone_auto_detect is not None:
+        update_data["preferences.timezone_auto_detect"] = preferences.timezone_auto_detect
+    if preferences.date_format is not None:
+        update_data["preferences.date_format"] = preferences.date_format
+    if preferences.time_format is not None:
+        update_data["preferences.time_format"] = preferences.time_format
+    if preferences.language is not None:
+        update_data["preferences.language"] = preferences.language
+    
+    if update_data:
+        await db.users.update_one(
+            {"id": current_user["id"]},
+            {"$set": update_data}
+        )
+    
+    # Return updated preferences
+    user = await db.users.find_one(
+        {"id": current_user["id"]},
+        {"_id": 0, "preferences": 1}
+    )
+    
+    defaults = {
+        "timezone": "UTC",
+        "timezone_auto_detect": True,
+        "date_format": "YYYY-MM-DD",
+        "time_format": "24h",
+        "language": "en"
+    }
+    
+    preferences_result = user.get("preferences", {}) if user else {}
+    return {**defaults, **preferences_result}
+
+
+@router.get("/timezones")
+async def get_available_timezones():
+    """Get list of available timezones for selection."""
+    # Common timezones organized by region
+    timezones = [
+        # UTC
+        {"value": "UTC", "label": "UTC (Coordinated Universal Time)", "offset": "+00:00"},
+        # Europe
+        {"value": "Europe/London", "label": "London (GMT/BST)", "offset": "+00:00"},
+        {"value": "Europe/Amsterdam", "label": "Amsterdam (CET/CEST)", "offset": "+01:00"},
+        {"value": "Europe/Paris", "label": "Paris (CET/CEST)", "offset": "+01:00"},
+        {"value": "Europe/Berlin", "label": "Berlin (CET/CEST)", "offset": "+01:00"},
+        {"value": "Europe/Brussels", "label": "Brussels (CET/CEST)", "offset": "+01:00"},
+        {"value": "Europe/Madrid", "label": "Madrid (CET/CEST)", "offset": "+01:00"},
+        {"value": "Europe/Rome", "label": "Rome (CET/CEST)", "offset": "+01:00"},
+        {"value": "Europe/Zurich", "label": "Zurich (CET/CEST)", "offset": "+01:00"},
+        {"value": "Europe/Stockholm", "label": "Stockholm (CET/CEST)", "offset": "+01:00"},
+        {"value": "Europe/Oslo", "label": "Oslo (CET/CEST)", "offset": "+01:00"},
+        {"value": "Europe/Copenhagen", "label": "Copenhagen (CET/CEST)", "offset": "+01:00"},
+        {"value": "Europe/Helsinki", "label": "Helsinki (EET/EEST)", "offset": "+02:00"},
+        {"value": "Europe/Athens", "label": "Athens (EET/EEST)", "offset": "+02:00"},
+        {"value": "Europe/Istanbul", "label": "Istanbul (TRT)", "offset": "+03:00"},
+        {"value": "Europe/Moscow", "label": "Moscow (MSK)", "offset": "+03:00"},
+        # Americas
+        {"value": "America/New_York", "label": "New York (EST/EDT)", "offset": "-05:00"},
+        {"value": "America/Chicago", "label": "Chicago (CST/CDT)", "offset": "-06:00"},
+        {"value": "America/Denver", "label": "Denver (MST/MDT)", "offset": "-07:00"},
+        {"value": "America/Los_Angeles", "label": "Los Angeles (PST/PDT)", "offset": "-08:00"},
+        {"value": "America/Toronto", "label": "Toronto (EST/EDT)", "offset": "-05:00"},
+        {"value": "America/Vancouver", "label": "Vancouver (PST/PDT)", "offset": "-08:00"},
+        {"value": "America/Mexico_City", "label": "Mexico City (CST/CDT)", "offset": "-06:00"},
+        {"value": "America/Sao_Paulo", "label": "São Paulo (BRT)", "offset": "-03:00"},
+        {"value": "America/Buenos_Aires", "label": "Buenos Aires (ART)", "offset": "-03:00"},
+        # Asia/Pacific
+        {"value": "Asia/Dubai", "label": "Dubai (GST)", "offset": "+04:00"},
+        {"value": "Asia/Kolkata", "label": "Mumbai/Delhi (IST)", "offset": "+05:30"},
+        {"value": "Asia/Singapore", "label": "Singapore (SGT)", "offset": "+08:00"},
+        {"value": "Asia/Hong_Kong", "label": "Hong Kong (HKT)", "offset": "+08:00"},
+        {"value": "Asia/Shanghai", "label": "Shanghai (CST)", "offset": "+08:00"},
+        {"value": "Asia/Tokyo", "label": "Tokyo (JST)", "offset": "+09:00"},
+        {"value": "Asia/Seoul", "label": "Seoul (KST)", "offset": "+09:00"},
+        {"value": "Australia/Sydney", "label": "Sydney (AEST/AEDT)", "offset": "+10:00"},
+        {"value": "Australia/Melbourne", "label": "Melbourne (AEST/AEDT)", "offset": "+10:00"},
+        {"value": "Australia/Perth", "label": "Perth (AWST)", "offset": "+08:00"},
+        {"value": "Pacific/Auckland", "label": "Auckland (NZST/NZDT)", "offset": "+12:00"},
+        # Middle East / Africa
+        {"value": "Africa/Johannesburg", "label": "Johannesburg (SAST)", "offset": "+02:00"},
+        {"value": "Africa/Cairo", "label": "Cairo (EET)", "offset": "+02:00"},
+        {"value": "Africa/Lagos", "label": "Lagos (WAT)", "offset": "+01:00"},
+        {"value": "Asia/Riyadh", "label": "Riyadh (AST)", "offset": "+03:00"},
+        {"value": "Asia/Tehran", "label": "Tehran (IRST)", "offset": "+03:30"},
+    ]
+    
+    return {"timezones": timezones}

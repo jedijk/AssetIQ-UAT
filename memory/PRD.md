@@ -5,6 +5,28 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 8, 2026 - Timezone Settings Feature (NEW)
+**NEW FEATURE - Timezone settings with auto-detection and manual override:**
+
+**Implemented:**
+- ✅ Created `/settings/preferences` page with timezone configuration
+- ✅ Auto-detection of browser timezone using `Intl.DateTimeFormat().resolvedOptions().timeZone`
+- ✅ Toggle to enable/disable auto-detection
+- ✅ Manual timezone selector with 41 common timezones (searchable dropdown)
+- ✅ Date format selector (YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY, etc.)
+- ✅ Time format selector (12h/24h)
+- ✅ Real-time clock display showing current time in selected timezone
+- ✅ Backend endpoints: `GET/PUT /api/users/me/preferences`, `GET /api/timezones`
+- ✅ Preferences stored in user document in MongoDB
+
+**Files Created/Modified:**
+- `/app/frontend/src/pages/SettingsPreferencesPage.js` - NEW preferences page
+- `/app/backend/routes/users.py` - Added preferences endpoints
+- `/app/frontend/src/App.js` - Added route
+- `/app/frontend/src/components/Layout.js` - Added menu item
+
+---
+
 ### April 8, 2026 - Attachment Viewing Complete Fix (P0)
 **BUG FIX - Attachments not viewable in Dashboard Quick View and Form Submissions:**
 
