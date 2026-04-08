@@ -779,6 +779,19 @@ class TaskService:
             delta = now - started
             actual_duration = int(delta.total_seconds() / 60)
         
+        # Process attachments - strip large base64 data before storing in task instance
+        # (Full attachments will be stored in form_submissions)
+        raw_attachments = data.get("attachments", [])
+        lightweight_attachments = []
+        for att in raw_attachments:
+            # Only store metadata in task instance, not full data
+            lightweight_attachments.append({
+                "name": att.get("name"),
+                "type": att.get("type"),
+                "size": att.get("size"),
+                "url": att.get("url"),  # Keep URL if present
+            })
+        
         update = {
             "status": "completed",
             "completed_at": now,
@@ -790,7 +803,7 @@ class TaskService:
             "follow_up_required": data.get("follow_up_required", False),
             "follow_up_notes": data.get("follow_up_notes"),
             "form_data": data.get("form_data"),
-            "attachments": data.get("attachments", []),  # Completion attachments
+            "attachments": lightweight_attachments,  # Lightweight metadata only
             "updated_at": now,
         }
         
@@ -907,6 +920,7 @@ class TaskService:
     ) -> Optional[str]:
         """Create a form submission record when a task with form is completed."""
         import uuid
+        import asyncio
         
         form_data = completion_data.get("form_data", {})
         
@@ -922,6 +936,61 @@ class TaskService:
         elif isinstance(form_data, list):
             values = form_data
         
+        # Process attachments - upload to storage if large, otherwise keep base64
+        raw_attachments = completion_data.get("attachments", [])
+        processed_attachments = []
+        
+        for att in raw_attachments:
+            # If attachment has base64 data and is large (> 100KB), try to upload to storage
+            data = att.get("data", "")
+            if data and len(data) > 100000:  # > 100KB
+                try:
+                    from services.storage_service import is_storage_available, upload_object
+                    if is_storage_available():
+                        # Extract base64 content
+                        if "," in data:
+                            base64_data = data.split(",", 1)[1]
+                        else:
+                            base64_data = data
+                        
+                        import base64
+                        file_bytes = base64.b64decode(base64_data)
+                        
+                        # Generate storage path
+                        file_ext = att.get("name", "file").split(".")[-1] if "." in att.get("name", "") else "bin"
+                        storage_path = f"attachments/{uuid.uuid4()}.{file_ext}"
+                        
+                        # Upload with timeout
+                        try:
+                            url = await asyncio.wait_for(
+                                asyncio.get_event_loop().run_in_executor(
+                                    None, upload_object, storage_path, file_bytes, att.get("type", "application/octet-stream")
+                                ),
+                                timeout=10.0
+                            )
+                            processed_attachments.append({
+                                "name": att.get("name"),
+                                "type": att.get("type"),
+                                "size": att.get("size"),
+                                "url": url,
+                            })
+                            continue
+                        except asyncio.TimeoutError:
+                            logger.warning(f"Attachment upload timeout for {att.get('name')}")
+                except Exception as e:
+                    logger.warning(f"Failed to upload attachment to storage: {e}")
+            
+            # Fallback: keep attachment as-is (but truncate large data for MongoDB)
+            if data and len(data) > 500000:  # > 500KB - too large for MongoDB
+                processed_attachments.append({
+                    "name": att.get("name"),
+                    "type": att.get("type"),
+                    "size": att.get("size"),
+                    "error": "File too large to store",
+                })
+            else:
+                processed_attachments.append(att)
+        
         submission_doc = {
             "id": str(uuid.uuid4()),
             "form_template_id": task_instance.get("form_template_id"),
@@ -932,7 +1001,7 @@ class TaskService:
             "equipment_name": task_instance.get("equipment_name"),
             "discipline": task_instance.get("discipline"),
             "values": values,
-            "attachments": completion_data.get("attachments", []),
+            "attachments": processed_attachments,
             "notes": completion_data.get("completion_notes"),
             "submitted_by": submitted_by_id,
             "submitted_by_name": submitted_by_name,
