@@ -51,6 +51,7 @@ import { Label } from "../ui/label";
 import { Checkbox } from "../ui/checkbox";
 import { cn } from "../../lib/utils";
 import { SignaturePad } from "../ui/signature-pad";
+import { VoiceInput } from "../ui/voice-input";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { imageAnalysisAPI } from "../../lib/api";
 import { DocumentViewer } from "../DocumentViewer";
@@ -477,14 +478,27 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       case "textarea":
         return (
           <div key={field.id} className="space-y-1.5">
-            <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
-              {field.label} {field.required && <span className="text-red-500">*</span>}
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
+                {field.label} {field.required && <span className="text-red-500">*</span>}
+              </Label>
+              <VoiceInput 
+                size="sm"
+                onTranscribe={(text, append) => {
+                  const currentValue = value || "";
+                  if (append && currentValue) {
+                    handleFieldChange(field.id, currentValue + (currentValue.endsWith(' ') ? '' : ' ') + text);
+                  } else {
+                    handleFieldChange(field.id, text);
+                  }
+                }}
+              />
+            </div>
             <LinkedEquipmentBadge />
             <Textarea
               value={value || ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+              placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}... (or use microphone)`}
               rows={3}
               className="text-sm"
             />
@@ -977,11 +991,23 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       
       {/* Completion Notes */}
       <div className="space-y-2 pt-4 border-t">
-        <Label className={isMobile ? "text-sm" : ""}>Completion Notes</Label>
+        <div className="flex items-center justify-between">
+          <Label className={isMobile ? "text-sm" : ""}>Completion Notes</Label>
+          <VoiceInput 
+            size="sm"
+            onTranscribe={(text, append) => {
+              if (append && completionNotes) {
+                setCompletionNotes(completionNotes + (completionNotes.endsWith(' ') ? '' : ' ') + text);
+              } else {
+                setCompletionNotes(text);
+              }
+            }}
+          />
+        </div>
         <Textarea
           value={completionNotes}
           onChange={(e) => setCompletionNotes(e.target.value)}
-          placeholder="Add any notes about task completion..."
+          placeholder="Add any notes about task completion... (or use microphone to dictate)"
           rows={3}
           className="text-sm"
         />
