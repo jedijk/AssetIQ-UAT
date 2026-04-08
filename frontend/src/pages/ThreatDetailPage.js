@@ -1294,6 +1294,30 @@ const ThreatDetailPage = () => {
         </motion.div>
       )}
 
+      {/* User Context / Field Notes - from chat context prompt */}
+      {threat.user_context && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.27 }}
+          className="card p-6 mb-6"
+          data-testid="threat-context-section"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <MessageSquare className="w-5 h-5 text-green-600" />
+            <h3 className="font-semibold text-slate-900">Field Notes</h3>
+            {threat.context_added_at && (
+              <span className="text-xs text-slate-400">
+                Added {formatDateTime(threat.context_added_at)}
+              </span>
+            )}
+          </div>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-slate-700 whitespace-pre-wrap">{threat.user_context}</p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Cause */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
