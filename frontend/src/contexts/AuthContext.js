@@ -55,10 +55,10 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const API_URL = getApiUrl();
     
-    // Validate API URL is configured
+    // Validate API URL is configured - warn but don't block
     if (!API_URL || API_URL === '/api') {
-      console.error("[Auth] Backend API URL not configured. Set REACT_APP_BACKEND_URL in environment variables.");
-      throw new Error("Backend not configured. Please contact administrator.");
+      console.warn("[Auth] API URL appears incomplete:", API_URL);
+      console.warn("[Auth] If on Vercel, ensure REACT_APP_BACKEND_URL is set and rebuild.");
     }
     
     const loginUrl = `${API_URL}/auth/login`;

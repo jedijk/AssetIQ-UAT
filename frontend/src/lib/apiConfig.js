@@ -16,6 +16,10 @@
 // Debug flag - set to true to enable console logging
 const DEBUG_API_CONFIG = true;
 
+// Fallback backend URL for Railway production deployment
+// Used when REACT_APP_BACKEND_URL is not set on Vercel
+const FALLBACK_BACKEND_URL = "https://assetiq-production.up.railway.app";
+
 const logDebug = (message, ...args) => {
   if (DEBUG_API_CONFIG) {
     console.log(`[API Config] ${message}`, ...args);
@@ -29,6 +33,7 @@ export const getBackendUrl = () => {
   
   logDebug("REACT_APP_BACKEND_URL:", backendUrl);
   
+  // Priority 1: Use configured environment variable
   if (backendUrl && backendUrl !== 'undefined' && backendUrl.startsWith('http')) {
     // Remove trailing slash and /api suffix if present
     let url = backendUrl.replace(/\/$/, '');
@@ -40,27 +45,37 @@ export const getBackendUrl = () => {
     return url;
   }
   
-  // Check if we're on Vercel (production) without env var configured
+  // Detect current environment
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const isVercel = currentOrigin.includes('vercel.app');
   const isEmergent = currentOrigin.includes('emergentagent.com') || currentOrigin.includes('emergent.host');
+  const isLocalhost = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1');
   
   logDebug("Current origin:", currentOrigin);
-  logDebug("Is Vercel:", isVercel);
-  logDebug("Is Emergent:", isEmergent);
+  logDebug("Environment - Vercel:", isVercel, "Emergent:", isEmergent, "Local:", isLocalhost);
   
-  if (isVercel && !backendUrl) {
-    // Log error - user needs to set REACT_APP_BACKEND_URL in Vercel and rebuild
-    console.error("[API Config] ERROR: Running on Vercel but REACT_APP_BACKEND_URL not set!");
-    console.error("[API Config] Set REACT_APP_BACKEND_URL in Vercel Environment Variables and REBUILD the app.");
-    console.error("[API Config] Example: REACT_APP_BACKEND_URL=https://your-backend.railway.app");
-    // Return empty to prevent requests to wrong domain
-    return '';
+  // Priority 2: Vercel without env var - use Railway fallback (non-blocking warning)
+  if (isVercel) {
+    console.warn("[API Config] REACT_APP_BACKEND_URL not set on Vercel, using fallback:", FALLBACK_BACKEND_URL);
+    console.warn("[API Config] For production, set REACT_APP_BACKEND_URL in Vercel Environment Variables and rebuild.");
+    return FALLBACK_BACKEND_URL;
   }
   
-  // Fallback for local/preview development (same-origin)
-  logDebug("Using same-origin fallback:", currentOrigin);
-  return currentOrigin;
+  // Priority 3: Emergent preview - use same-origin (proxied)
+  if (isEmergent) {
+    logDebug("Using Emergent same-origin:", currentOrigin);
+    return currentOrigin;
+  }
+  
+  // Priority 4: Local development - use same-origin
+  if (isLocalhost) {
+    logDebug("Using localhost same-origin:", currentOrigin);
+    return currentOrigin;
+  }
+  
+  // Priority 5: Unknown environment - use fallback with warning
+  console.warn("[API Config] Unknown environment, using fallback:", FALLBACK_BACKEND_URL);
+  return FALLBACK_BACKEND_URL;
 };
 
 // Get the full API URL (with /api prefix)
@@ -78,7 +93,7 @@ export const getApiUrl = () => {
   // Otherwise, build from backend URL
   const baseUrl = getBackendUrl();
   const fullApiUrl = `${baseUrl}/api`;
-  logDebug("Built API URL from base:", fullApiUrl);
+  logDebug("Resolved API URL:", fullApiUrl);
   return fullApiUrl;
 };
 
