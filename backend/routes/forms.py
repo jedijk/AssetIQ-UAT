@@ -486,6 +486,46 @@ async def serve_form_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
 
+
+@router.get("/storage/{path:path}")
+async def serve_attachment(
+    path: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Serve a file from object storage.
+    
+    This endpoint serves files stored in object storage, typically
+    images and documents attached to form submissions.
+    
+    The path should match the storage path exactly (e.g., attachments/xxx.jpg)
+    
+    Authentication can be provided via:
+    - Authorization: Bearer <token> header
+    - ?token=<token> query parameter (for browser image loading)
+    """
+    from fastapi.responses import Response
+    
+    try:
+        # Get the file from storage
+        content, content_type = get_object(path)
+        
+        # Determine filename from path
+        filename = path.split('/')[-1] if '/' in path else path
+        
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f"inline; filename=\"{filename}\"",
+                "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to serve attachment {path}: {e}")
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+
+
 @router.get("/form-templates/{template_id}/documents")
 async def get_form_documents(
     template_id: str,

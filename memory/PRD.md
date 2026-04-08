@@ -5,6 +5,26 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 8, 2026 - Attachment Viewing Complete Fix (P0)
+**BUG FIX - Attachments not viewable in Dashboard Quick View and Form Submissions:**
+
+**Issues Identified:**
+1. Attachment URLs in database were relative paths (`attachments/xxx.jpg`) not full URLs
+2. No backend endpoint existed to serve attachment files from object storage
+3. Browser `<img>` tags cannot send Authorization headers, so token-based auth failed
+
+**Fixes Applied:**
+- ✅ **Created `/api/storage/{path}` endpoint** in `/app/backend/routes/forms.py` to serve files from object storage
+- ✅ **Enhanced auth system** in `/app/backend/auth.py` to accept token via query parameter (`?token=xxx`) in addition to Authorization header - this allows browsers to load images with authentication
+- ✅ **Updated frontend** (`DashboardPage.js`, `FormSubmissionsPage.js`) to construct full URLs with auth token: `${backendUrl}/api/storage/${att.url}?token=${localStorage.token}`
+
+**Technical Details:**
+- Object storage files are accessed via the Emergent storage API
+- The `/api/storage/{path}` endpoint proxies requests to object storage with proper authentication
+- Token in query parameter is validated the same way as Authorization header tokens
+
+---
+
 ### April 8, 2026 - Equipment Hierarchy Move/Add Child Fix (P0)
 **BUG FIX - "Invalid parent-child relationship" error when adding children to equipment nodes:**
 

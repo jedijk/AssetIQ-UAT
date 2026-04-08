@@ -4,12 +4,13 @@ Authentication helpers: password hashing, JWT tokens, current user dependency.
 import jwt
 import bcrypt
 from datetime import datetime, timezone, timedelta
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional
 
 from database import db, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 def hash_password(password: str) -> str:
@@ -28,9 +29,10 @@ def create_token(user_id: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def _validate_token(token: str) -> dict:
+    """Internal helper to validate a JWT token and return the user."""
     try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id")
         user = await db.users.find_one({"id": user_id}, {"_id": 0})
         if not user:
@@ -40,3 +42,26 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    token: Optional[str] = Query(None, description="Auth token (alternative to header)")
+):
+    """Get current user from Authorization header or query parameter token.
+    
+    This supports both:
+    - Authorization: Bearer <token> header (standard)
+    - ?token=<token> query parameter (for image loading in browsers)
+    """
+    # Try header first
+    if credentials and credentials.credentials:
+        return await _validate_token(credentials.credentials)
+    
+    # Fall back to query parameter
+    if token:
+        return await _validate_token(token)
+    
+    # No auth provided
+    raise HTTPException(status_code=401, detail="Not authenticated")
+

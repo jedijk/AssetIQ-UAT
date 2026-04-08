@@ -743,7 +743,13 @@ export default function FormSubmissionsPage() {
                       const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name || att.filename || "");
                       const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name || att.filename || "");
                       const isDoc = /\.(doc|docx)$/i.test(att.name || att.filename || "");
-                      const previewUrl = att.url || att.data;
+                      // Construct full URL for attachments stored in object storage
+                      // Include token in URL for browser image loading (can't send auth headers with <img>)
+                      const rawUrl = att.url || att.data;
+                      const authToken = localStorage.getItem('token');
+                      const previewUrl = rawUrl && !rawUrl.startsWith('data:') && !rawUrl.startsWith('http') 
+                        ? `${getBackendUrl()}/api/storage/${rawUrl}${authToken ? `?token=${authToken}` : ''}` 
+                        : rawUrl;
                       const fileName = att.name || att.filename || "Attachment";
                       const hasError = att.error || att.needs_migration;
                       
