@@ -290,10 +290,51 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
     
     setIsSubmitting(true);
     try {
+      // Convert file objects to base64 for upload
+      const processedAttachments = await Promise.all(
+        attachments.map(async (att) => {
+          // If already has data (base64), use it
+          if (att.data) {
+            return {
+              name: att.name,
+              data: att.data,
+              type: att.type,
+              size: att.size,
+            };
+          }
+          // If has file object, convert to base64
+          if (att.file) {
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                resolve({
+                  name: att.name,
+                  data: reader.result,
+                  type: att.type,
+                  size: att.size,
+                });
+              };
+              reader.onerror = () => {
+                // On error, return without data
+                resolve({
+                  name: att.name,
+                  type: att.type,
+                  size: att.size,
+                  error: 'Failed to read file',
+                });
+              };
+              reader.readAsDataURL(att.file);
+            });
+          }
+          // Return as-is if no file or data
+          return att;
+        })
+      );
+      
       await onComplete({
         form_data: formData,
         completion_notes: completionNotes,
-        attachments: attachments,
+        attachments: processedAttachments.filter(a => a.data), // Only include attachments with data
       });
       // Clear draft on successful submission
       if (task?.id) {
@@ -970,7 +1011,8 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {attachments.map((att, idx) => {
               const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
-              const previewUrl = att.preview || att.data || att.url;
+              // Use blob URL first (for newly added files), then fall back to data/url
+              const previewUrl = att.blobUrl || att.preview || att.data || att.url;
               const hasValidPreview = previewUrl && !att.needsReupload;
               
               return (
@@ -987,7 +1029,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                         onError={(e) => {
                           // Hide broken image and show fallback
                           e.target.style.display = 'none';
-                          e.target.nextSibling && (e.target.nextSibling.style.display = 'flex');
+                          if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
                         }}
                       />
                       <div className="hidden aspect-square flex-col items-center justify-center p-2 bg-slate-50">
@@ -1020,8 +1062,14 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                   <Button
                     variant="destructive"
                     size="icon"
-                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity"
+                    onClick={() => {
+                      // Revoke blob URL to free memory
+                      if (att.blobUrl) {
+                        URL.revokeObjectURL(att.blobUrl);
+                      }
+                      setAttachments(prev => prev.filter((_, i) => i !== idx));
+                    }}
                   >
                     <Trash2 className="w-3 h-3" />
                   </Button>
@@ -1069,18 +1117,19 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
                     }
                   }
                   
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const isImage = processedFile.type.startsWith('image/');
-                    setAttachments(prev => [...prev, { 
-                      name: processedFile.name, 
-                      data: reader.result, 
-                      type: processedFile.type,
-                      preview: isImage ? reader.result : null,
-                      size: processedFile.size
-                    }]);
-                  };
-                  reader.readAsDataURL(processedFile);
+                  // Use blob URL for preview (more memory efficient than base64)
+                  const isImage = processedFile.type.startsWith('image/');
+                  const blobUrl = URL.createObjectURL(processedFile);
+                  
+                  // Store the file object for later upload, use blob URL for preview
+                  setAttachments(prev => [...prev, { 
+                    name: processedFile.name, 
+                    file: processedFile, // Keep file object for upload
+                    type: processedFile.type,
+                    preview: isImage ? blobUrl : null,
+                    blobUrl: blobUrl, // Track for cleanup
+                    size: processedFile.size
+                  }]);
                 }
                 toast.success(`${files.length} file(s) attached`);
               } finally {
