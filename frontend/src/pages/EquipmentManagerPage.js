@@ -494,6 +494,7 @@ export default function EquipmentManagerPage() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const fileInputRef = useRef(null);
+  const searchInputRef = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
   
   // Check if user is owner (can create installations)
@@ -539,6 +540,24 @@ export default function EquipmentManagerPage() {
   const [movingNode, setMovingNode] = useState(null);
   // State for delete confirmation with impact analysis
   const [deleteConfirmation, setDeleteConfirmation] = useState({ open: false, node: null, impact: null, loading: false });
+
+  // Keyboard shortcut to focus search (press /)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Focus search on '/' key, unless user is typing in an input
+      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Clear search on Escape
+      if (e.key === 'Escape' && searchQuery) {
+        setSearchQuery('');
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchQuery]);
 
   const { data: nodesData, isLoading } = useQuery({ queryKey: ["equipment-nodes"], queryFn: equipmentHierarchyAPI.getNodes });
   const { data: typesData } = useQuery({ queryKey: ["equipment-types"], queryFn: equipmentHierarchyAPI.getEquipmentTypes });
@@ -990,30 +1009,48 @@ export default function EquipmentManagerPage() {
       <div className="flex flex-1 overflow-hidden">
       {/* Main Panel - Hierarchy */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="p-4 border-b border-slate-200 bg-white flex items-center gap-3">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        {/* Search Section - Prominent at Top */}
+        <div className="p-4 bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200">
+          <div className="relative max-w-2xl">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500" />
             <Input 
-              placeholder={t("equipment.searchPlaceholder")} 
+              ref={searchInputRef}
+              placeholder={t("equipment.searchPlaceholder") || "Search equipment by name, tag, or description..."} 
               value={searchQuery} 
               onChange={e => setSearchQuery(e.target.value)} 
-              className="pl-9 pr-8 h-9" 
+              className="pl-12 pr-12 h-12 text-base bg-white border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 rounded-lg" 
               data-testid="hierarchy-search-input" 
             />
-            {searchQuery && (
+            {searchQuery ? (
               <button 
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full hover:bg-slate-200"
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 transition-colors"
+                data-testid="clear-search-btn"
               >
-                <X className="w-3.5 h-3.5 text-slate-400" />
+                <X className="w-4 h-4 text-slate-600" />
               </button>
+            ) : (
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400 hidden sm:block">
+                Press / to search
+              </span>
             )}
           </div>
           {searchQuery && (
-            <span className="text-sm text-slate-500">
-              {matchingIds.size} {t("equipment.matches")}
-            </span>
+            <div className="mt-2 flex items-center gap-3">
+              <span className="text-sm font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                {matchingIds.size} {matchingIds.size === 1 ? "match" : "matches"} found
+              </span>
+              {matchingIds.size > 0 && (
+                <span className="text-xs text-slate-500">
+                  Matching items are highlighted in yellow
+                </span>
+              )}
+            </div>
           )}
+        </div>
+        
+        {/* Toolbar */}
+        <div className="px-4 py-2 border-b border-slate-200 bg-white flex items-center gap-2 flex-wrap">
           <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
           <Button onClick={handleExportExcel} size="sm" variant="outline" disabled={isExporting || nodes.length === 0} data-testid="export-excel-btn">
             <Download className="w-4 h-4 mr-1" />{isExporting ? (t("common.exporting") || "Exporting...") : (t("equipment.exportExcel") || "Export Excel")}
