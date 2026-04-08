@@ -9,21 +9,30 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 **FEATURE - Enhanced search function prominently displayed at top of hierarchy:**
 
 **Implemented:**
-- ✅ Prominent search bar with gradient background (from-slate-50 to-blue-50)
-- ✅ Larger search input (h-12) for better visibility
-- ✅ Blue search icon and placeholder "Search name, description, tag..."
-- ✅ Keyboard shortcut "/" to focus search, Escape to clear
-- ✅ "Press / to search" hint displayed on right side
-- ✅ Match count badge with blue background showing "X matches found"
-- ✅ Yellow highlighting on matching items with "Match" badge
-- ✅ Auto-expand hierarchy to reveal matching nested items
-- ✅ Clear button (X) restores original expanded state when search cleared
-- ✅ Toolbar buttons (Import, Export, Add Installation) remain visible below search
+- ✅ **Equipment Manager Page** - Prominent search bar with gradient background (from-slate-50 to-blue-50)
+  - Large search input (h-12) for better visibility
+  - Blue search icon and placeholder "Search name, description, tag..."
+  - Keyboard shortcut "/" to focus search, Escape to clear
+  - "Press / to search" hint displayed on right side
+  - Match count badge with blue background showing "X matches found"
+  - Yellow highlighting on matching items with "Match" badge
+  - Auto-expand hierarchy to reveal matching nested items
+  - Clear button (X) restores original expanded state when search cleared
+  - Toolbar buttons (Import, Export, Add Installation) remain visible below search
+  
+- ✅ **Sidebar Hierarchy** - Compact search bar in the side pane
+  - Search input below Tree/Levels toggle
+  - Placeholder "Search equipment..."
+  - Match count displayed below input
+  - Yellow highlighting with "Match" badge on matching items
+  - Auto-expand tree to show matching nested items
+  - Clear button to reset search
 
 **Files Modified:**
 - `/app/frontend/src/pages/EquipmentManagerPage.js` - Search UI enhancement and keyboard shortcuts
+- `/app/frontend/src/components/EquipmentHierarchy.js` - Added search bar to sidebar
 
-**Testing:** 12/12 tests passed (100% success rate)
+**Testing:** 12/12 tests passed for Equipment Manager (100% success rate)
 
 ---
 

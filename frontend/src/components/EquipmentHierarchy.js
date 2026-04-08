@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -22,10 +22,12 @@ import {
   Zap,
   Leaf,
   Star,
-  Filter
+  Filter,
+  Search
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { Input } from "./ui/input";
 
 // ISO 14224 Level Configuration
 const ISO_LEVEL_CONFIG = {
@@ -118,7 +120,7 @@ function getCumulativeThreatCount(node, threatCountMap) {
 }
 
 // Tree node component
-const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, onEditEquipment, t, equipmentTypes, isMobile = false }) => {
+const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, onEditEquipment, t, equipmentTypes, isMobile = false, isSearchMatch = false }) => {
   const hasChildren = node.children && node.children.length > 0;
   // Get config with smart fallback for unknown levels
   const config = ISO_LEVEL_CONFIG[node.level] || ISO_LEVEL_CONFIG[normalizeLevel(node.level)] || { 
@@ -236,7 +238,9 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     <div>
       <div
         className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors ${
-          isActive ? "bg-blue-50 text-blue-700" : "hover:bg-slate-100 text-slate-700"
+          isActive ? "bg-blue-50 text-blue-700" : 
+          isSearchMatch ? "bg-yellow-50 border border-yellow-200" :
+          "hover:bg-slate-100 text-slate-700"
         }`}
         style={{ paddingLeft: `${8 + level * 16}px` }}
         onContextMenu={handleContextMenu}
@@ -266,7 +270,10 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           data-testid={`hierarchy-item-${node.id}`}
         >
           <Icon className={`w-4 h-4 ${critColor || config.color} flex-shrink-0`} />
-          <span className="text-sm font-medium truncate flex-1">{node.name}</span>
+          <span className={`text-sm font-medium truncate flex-1 ${isSearchMatch ? 'text-yellow-800' : ''}`}>{node.name}</span>
+          {isSearchMatch && (
+            <span className="text-[10px] bg-yellow-200 text-yellow-800 px-1 py-0.5 rounded">Match</span>
+          )}
           {threatCount > 0 && (
             <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" />
@@ -507,6 +514,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   const navigate = useNavigate();
   const { t } = useLanguage();
   const scrollContainerRef = useRef(null);
+  const searchInputRef = useRef(null);
   
   // Load expanded nodes from localStorage on initial render
   const [expandedNodes, setExpandedNodes] = useState(() => {
@@ -530,6 +538,8 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [viewMode, setViewMode] = useState("tree"); // "tree" or "levels"
   const [filterLevel, setFilterLevel] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [preSearchExpandedNodes, setPreSearchExpandedNodes] = useState(null);
 
   // Fetch equipment hierarchy nodes
   const { data: nodesData, isLoading: nodesLoading } = useQuery({
@@ -557,6 +567,60 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   
   // Build tree structure
   const treeData = useMemo(() => buildTreeData(nodes), [nodes]);
+  
+  // Search matching function
+  const nodeMatchesSearch = useCallback((node, query) => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    const nameMatch = node.name?.toLowerCase().includes(q);
+    const descMatch = node.description?.toLowerCase().includes(q);
+    const tagMatch = node.tag?.toLowerCase().includes(q);
+    const eqType = equipmentTypes.find(et => et.id === node.equipment_type_id);
+    const typeMatch = eqType?.name?.toLowerCase().includes(q);
+    return nameMatch || descMatch || tagMatch || typeMatch;
+  }, [equipmentTypes]);
+  
+  // Get parent chain for a node
+  const getParentChain = useCallback((nodeId, nodeList) => {
+    const parents = [];
+    let current = nodeList.find(n => n.id === nodeId);
+    while (current?.parent_id) {
+      parents.push(current.parent_id);
+      current = nodeList.find(n => n.id === current.parent_id);
+    }
+    return parents;
+  }, []);
+  
+  // Get matching node IDs and their parents for auto-expand
+  const { matchingIds, expandForSearch } = useMemo(() => {
+    if (!searchQuery) return { matchingIds: new Set(), expandForSearch: new Set() };
+    const matching = new Set();
+    const toExpand = new Set();
+    nodes.forEach(node => {
+      if (nodeMatchesSearch(node, searchQuery)) {
+        matching.add(node.id);
+        getParentChain(node.id, nodes).forEach(pid => toExpand.add(pid));
+      }
+    });
+    return { matchingIds: matching, expandForSearch: toExpand };
+  }, [nodes, searchQuery, nodeMatchesSearch, getParentChain]);
+  
+  // Auto-expand parents when searching
+  useEffect(() => {
+    if (searchQuery && expandForSearch.size > 0) {
+      if (preSearchExpandedNodes === null) {
+        setPreSearchExpandedNodes(new Set(expandedNodes));
+      }
+      setExpandedNodes(prev => {
+        const newSet = new Set(prev);
+        expandForSearch.forEach(id => newSet.add(id));
+        return newSet;
+      });
+    } else if (!searchQuery && preSearchExpandedNodes !== null) {
+      setExpandedNodes(preSearchExpandedNodes);
+      setPreSearchExpandedNodes(null);
+    }
+  }, [searchQuery, expandForSearch, preSearchExpandedNodes]);
   
   // Count by ISO level (using the module-level LEGACY_LEVEL_MAP for consistency)
   const levelCounts = useMemo(() => {
@@ -623,10 +687,19 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   // Render tree recursively
   const renderTree = (treeNodes, level = 0) => {
     return treeNodes
-      .filter(node => !filterLevel || node.level === filterLevel)
+      .filter(node => {
+        // If searching, only show nodes that match OR have matching descendants
+        if (searchQuery) {
+          const isMatch = matchingIds.has(node.id);
+          const isParentOfMatch = expandForSearch.has(node.id);
+          return isMatch || isParentOfMatch;
+        }
+        return !filterLevel || node.level === filterLevel;
+      })
       .map(node => {
         // Only show direct threat count for this specific node
         const threatCount = threatCountByAsset.get(node.name) || 0;
+        const isSearchMatch = searchQuery && matchingIds.has(node.id);
         return (
           <TreeNode
             key={node.id}
@@ -642,6 +715,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
             t={t}
             equipmentTypes={equipmentTypes}
             isMobile={isMobile}
+            isSearchMatch={isSearchMatch}
           >
             {node.children && node.children.length > 0 && renderTree(node.children, level + 1)}
           </TreeNode>
@@ -664,7 +738,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
             variant={viewMode === "tree" ? "secondary" : "ghost"}
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={() => { setViewMode("tree"); setFilterLevel(null); }}
+            onClick={() => { setViewMode("tree"); setFilterLevel(null); setSearchQuery(""); }}
           >
             Tree
           </Button>
@@ -672,7 +746,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
             variant={viewMode === "levels" ? "secondary" : "ghost"}
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={() => setViewMode("levels")}
+            onClick={() => { setViewMode("levels"); setSearchQuery(""); }}
           >
             Levels
           </Button>
@@ -688,6 +762,37 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
           )}
         </div>
       </div>
+
+      {/* Search Bar */}
+      {viewMode === "tree" && (
+        <div className="p-2 border-b border-slate-200 bg-slate-50">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              ref={searchInputRef}
+              placeholder="Search equipment..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 pr-8 h-8 text-sm bg-white"
+              data-testid="sidebar-hierarchy-search"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300"
+                data-testid="sidebar-clear-search"
+              >
+                <X className="w-3 h-3 text-slate-500" />
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <div className="mt-1.5 text-xs text-slate-500">
+              {matchingIds.size} {matchingIds.size === 1 ? 'match' : 'matches'}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Loading state */}
       {nodesLoading && (
