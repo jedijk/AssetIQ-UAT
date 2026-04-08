@@ -113,6 +113,23 @@ export default function SettingsPreferencesPage() {
     },
   });
 
+  // Auto-save detected timezone if auto-detect is enabled and timezone differs
+  useEffect(() => {
+    if (!prefsLoading && preferences) {
+      const autoDetectEnabled = preferences.timezone_auto_detect !== false; // default to true
+      const currentSavedTimezone = preferences.timezone;
+      
+      // If auto-detect is enabled and detected timezone differs from saved, update it
+      if (autoDetectEnabled && detectedTimezone && detectedTimezone !== currentSavedTimezone) {
+        console.log(`Auto-updating timezone from ${currentSavedTimezone} to ${detectedTimezone}`);
+        updateMutation.mutate({
+          timezone: detectedTimezone,
+          timezone_auto_detect: true,
+        });
+      }
+    }
+  }, [prefsLoading, preferences?.timezone, preferences?.timezone_auto_detect, detectedTimezone]);
+
   // Fetch available timezones
   const { data: timezonesData } = useQuery({
     queryKey: ["timezones"],

@@ -1,8 +1,24 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 import { getApiUrl } from "../lib/apiConfig";
+import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtils";
 
 const AuthContext = createContext(null);
+
+// Fetch user preferences and cache them for date formatting
+const fetchAndCachePreferences = async (API_URL) => {
+  try {
+    const response = await axios.get(`${API_URL}/users/me/preferences`);
+    if (response.data) {
+      updateCachedPreferences(response.data);
+    }
+  } catch (error) {
+    console.warn("Failed to fetch user preferences:", error);
+    // On error, use browser's detected timezone as fallback
+    const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    updateCachedPreferences({ timezone: detectedTimezone });
+  }
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -25,6 +41,9 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.get(`${API_URL}/auth/me`);
       setUser(response.data);
       setMustChangePassword(response.data.must_change_password || false);
+      
+      // Fetch and cache user preferences for date/time formatting
+      await fetchAndCachePreferences(API_URL);
     } catch (error) {
       console.error("Failed to fetch user:", error);
       logout();
@@ -55,6 +74,9 @@ export const AuthProvider = ({ children }) => {
     setToken(newToken);
     setUser(userData);
     setMustChangePassword(must_change_password || userData.must_change_password || false);
+    
+    // Fetch and cache user preferences for date/time formatting
+    await fetchAndCachePreferences(API_URL);
     
     // Sync intro seen status with localStorage
     // If user must change password, don't show intro yet (will show after password change)
@@ -133,6 +155,8 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     setMustChangePassword(false);
+    // Clear cached preferences on logout
+    clearCachedPreferences();
   };
 
   return (
