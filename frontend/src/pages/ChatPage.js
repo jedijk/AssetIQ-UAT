@@ -197,10 +197,42 @@ const ChatPage = () => {
     const hasEquipmentSuggestions = msg.equipment_suggestions && msg.equipment_suggestions.length > 0;
     const hasFailureModeSuggestions = msg.failure_mode_suggestions && msg.failure_mode_suggestions.length > 0;
     const showNewFailureModeOption = msg.failure_mode_suggestions !== undefined || msg.chat_state === "awaiting_failure_mode";
+    const isContextPrompt = msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat;
     
     return (
-      <div className={`chat-bubble-ai ${isFollowUp ? "border-l-4 border-l-blue-400" : ""}`}>
+      <div className={`chat-bubble-ai ${isFollowUp ? "border-l-4 border-l-blue-400" : ""} ${isContextPrompt ? "border-l-4 border-l-green-400 bg-green-50/50" : ""}`}>
         <p className="whitespace-pre-wrap">{msg.content}</p>
+        
+        {/* Context Prompt Quick Actions */}
+        {isContextPrompt && (
+          <div className="mt-3 pt-3 border-t border-green-200">
+            <p className="text-sm text-slate-500 mb-2">Quick options:</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-green-600 hover:bg-green-50 border-green-200"
+                data-testid="add-photo-btn"
+              >
+                <ImageIcon className="w-3 h-3 mr-1" />
+                Add Photo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSuggestionClick("skip")}
+                className="text-slate-500 hover:bg-slate-50 border-slate-200"
+                data-testid="skip-context-btn"
+              >
+                Skip
+              </Button>
+            </div>
+            <p className="text-xs text-slate-400 mt-2">
+              Or type your observations (temperature, conditions, notes...)
+            </p>
+          </div>
+        )}
         
         {/* Equipment Suggestions */}
         {hasEquipmentSuggestions && (

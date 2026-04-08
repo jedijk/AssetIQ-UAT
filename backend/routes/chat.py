@@ -48,6 +48,7 @@ async def send_chat_message(
     Clean 2-step chat flow:
     1. Match equipment from hierarchy (subunit level and below)
     2. Match failure mode from FMEA library
+    3. After observation creation, ask for additional context
     Auto-creates observation if confident (1 match each)
     """
     session_id = f"user_{current_user['id']}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
@@ -68,6 +69,90 @@ async def send_chat_message(
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.chat_messages.insert_one(chat_msg)
+    
+    # Check if user is in AWAITING_CONTEXT state (after observation was created)
+    conversation_state = await db.chat_conversations.find_one({"user_id": user_id})
+    if conversation_state and conversation_state.get("state") == ChatState.AWAITING_CONTEXT:
+        threat_id = conversation_state.get("awaiting_context_for_threat")
+        
+        # Check if user wants to skip
+        skip_phrases = ["skip", "no", "done", "next", "nee", "klaar", "volgende"]
+        user_wants_skip = message.content.strip().lower() in skip_phrases
+        
+        if user_wants_skip:
+            # Clear the awaiting context state
+            await db.chat_conversations.update_one(
+                {"user_id": user_id},
+                {"$set": {"state": ChatState.INITIAL, "awaiting_context_for_threat": None}}
+            )
+            
+            skip_response = {
+                "id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "role": "assistant",
+                "content": "Got it! Your observation has been saved. What else would you like to report?",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.chat_messages.insert_one(skip_response)
+            
+            return ChatResponse(
+                message="Got it! Your observation has been saved. What else would you like to report?"
+            )
+        
+        # User is providing context - update the threat with the additional info
+        if threat_id:
+            # Build context update
+            context_update = {
+                "user_context": message.content,
+                "context_added_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # If user uploaded an image with the context, add it as attachment
+            if message.image_base64:
+                attachment = {
+                    "type": "image",
+                    "data": image_thumbnail,
+                    "description": message.content,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.threats.update_one(
+                    {"id": threat_id},
+                    {
+                        "$set": context_update,
+                        "$push": {"attachments": attachment}
+                    }
+                )
+            else:
+                await db.threats.update_one(
+                    {"id": threat_id},
+                    {"$set": context_update}
+                )
+            
+            # Clear the awaiting context state
+            await db.chat_conversations.update_one(
+                {"user_id": user_id},
+                {"$set": {"state": ChatState.INITIAL, "awaiting_context_for_threat": None}}
+            )
+            
+            # Build confirmation message
+            confirmation = "Thanks! I've added your context to the observation"
+            if message.image_base64:
+                confirmation += " along with the photo"
+            confirmation += ". What else would you like to report?"
+            
+            context_added_response = {
+                "id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "role": "assistant",
+                "content": confirmation,
+                "context_added_to_threat": threat_id,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.chat_messages.insert_one(context_added_response)
+            
+            return ChatResponse(
+                message=confirmation
+            )
     
     # Check for data queries (skip if image provided)
     if not message.image_base64:
@@ -240,9 +325,49 @@ async def send_chat_message(
             }}
         )
         
+        # After creating observation, ask for additional context
+        context_prompt = (
+            f"✅ Observation recorded: **{updated_threat['title']}**\n\n"
+            f"Would you like to add any additional context? You can:\n"
+            f"• Add comments about what you observed\n"
+            f"• Provide temperature or measurement readings\n"
+            f"• Describe the conditions (weather, operating state)\n"
+            f"• Upload a photo of the issue\n\n"
+            f"Type your observations or say 'skip' to continue."
+        )
+        
+        # Store the context prompt message
+        context_response = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "role": "assistant",
+            "content": context_prompt,
+            "chat_state": ChatState.AWAITING_CONTEXT,
+            "threat_id": threat_id,
+            "awaiting_context_for_threat": threat_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.chat_messages.insert_one(context_response)
+        
+        # Update conversation state
+        await db.chat_conversations.update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "state": ChatState.AWAITING_CONTEXT,
+                    "awaiting_context_for_threat": threat_id,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            },
+            upsert=True
+        )
+        
         return ChatResponse(
             message=result["response_text"],
-            threat=ThreatResponse(**updated_threat)
+            threat=ThreatResponse(**updated_threat),
+            follow_up_question=context_prompt,
+            question_type="context",
+            awaiting_context_for_threat=threat_id
         )
     
     # Return follow-up question response

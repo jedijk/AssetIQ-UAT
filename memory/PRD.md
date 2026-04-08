@@ -5,6 +5,35 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 8, 2026 - Chat Context Prompt Feature (COMPLETED)
+**NEW FEATURE - Ask for additional context after observation is recorded:**
+
+**Implemented:**
+- ✅ Added `AWAITING_CONTEXT` state to chat flow in `/app/backend/chat_handler_v2.py`
+- ✅ After observation creation, chat prompts user for additional context:
+  - Comments about what was observed
+  - Temperature or measurement readings
+  - Environmental conditions (weather, operating state)
+  - Photo uploads
+- ✅ User can provide context (text and/or image) which gets saved to the observation
+- ✅ User can skip by typing "skip", "done", "no", etc.
+- ✅ Updated `ChatResponse` model with `awaiting_context_for_threat` field
+- ✅ Frontend shows context prompt with quick action buttons (Add Photo, Skip)
+
+**Files Modified:**
+- `/app/backend/routes/chat.py` - Added context state handling
+- `/app/backend/chat_handler_v2.py` - Added `AWAITING_CONTEXT` state
+- `/app/backend/models/api_models.py` - Updated `ChatResponse` model
+- `/app/frontend/src/pages/ChatPage.js` - Added context prompt UI
+
+**Flow:**
+1. User reports issue → Equipment selection → Failure mode selection
+2. Observation created → **Context prompt appears**
+3. User provides context (temperature, conditions, photo) OR skips
+4. Context saved to observation → Ready for next report
+
+---
+
 ### April 8, 2026 - DateTime Formatting Propagation (P1 - COMPLETED)
 **TASK - Propagate timezone-aware date/time formatting throughout the application:**
 

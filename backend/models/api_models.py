@@ -119,6 +119,7 @@ class ChatResponse(BaseModel):
     equipment_suggestions: Optional[List[dict]] = None
     failure_mode_suggestions: Optional[List[dict]] = None
     show_new_failure_mode_option: Optional[bool] = None
+    awaiting_context_for_threat: Optional[str] = None  # Threat ID when awaiting additional context
 
 
 class VoiceTranscriptionResponse(BaseModel):

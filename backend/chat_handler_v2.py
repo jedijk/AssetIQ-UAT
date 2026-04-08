@@ -22,6 +22,7 @@ class ChatState:
     AWAITING_EQUIPMENT = "awaiting_equipment"  # User needs to select equipment
     AWAITING_FAILURE_MODE = "awaiting_failure_mode"  # User needs to select failure mode
     AWAITING_NEW_FAILURE_MODE = "awaiting_new_failure_mode"  # User is specifying a new failure mode
+    AWAITING_CONTEXT = "awaiting_context"  # Ask for additional context after observation created
     COMPLETE = "complete"  # Ready to create observation
 
 
