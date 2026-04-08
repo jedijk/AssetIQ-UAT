@@ -307,7 +307,7 @@ export default function FormSubmissionsPage() {
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A";
     try {
-      return format(parseISO(dateStr), "MMM d, yyyy 'at' h:mm a");
+      return formatDateTimeUtil(dateStr);
     } catch {
       return dateStr;
     }
@@ -480,7 +480,7 @@ export default function FormSubmissionsPage() {
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             <span className="hidden sm:inline">{formatDate(submission.submitted_at)}</span>
-                            <span className="sm:hidden">{submission.submitted_at ? format(parseISO(submission.submitted_at), "MMM d") : "N/A"}</span>
+                            <span className="sm:hidden">{submission.submitted_at ? formatDateUtil(submission.submitted_at, { format: 'short' }) : "N/A"}</span>
                           </div>
                           
                           {/* Submitted By - Hide name on mobile */}
