@@ -12,6 +12,12 @@
 - **Role:** owner
 - **Installations:** Tyromer
 
+### Test Account
+- **Email:** test@test.com
+- **Password:** admin123
+- **Role:** (default user role)
+- **Note:** `must_change_password` set to false for testing
+
 ### Viewer Account
 - **Email:** jaap.van-dijk@outlook.com
 - **Role:** viewer

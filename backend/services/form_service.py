@@ -811,32 +811,47 @@ class FormService:
                         "as": "att",
                         "in": {
                             "$cond": {
-                                "if": {"$ifNull": ["$$att.url", False]},
-                                # Has URL - return without data
+                                # Case 1: Has URL - return with URL (migrated attachment)
+                                "if": {"$and": [
+                                    {"$ifNull": ["$$att.url", False]},
+                                    {"$ne": ["$$att.url", ""]}
+                                ]},
                                 "then": {
                                     "name": "$$att.name",
                                     "type": "$$att.type", 
                                     "size": "$$att.size",
                                     "url": "$$att.url"
                                 },
-                                # No URL - check data size
                                 "else": {
                                     "$cond": {
-                                        "if": {"$gt": [{"$strLenCP": {"$ifNull": ["$$att.data", ""]}}, 50000]},
-                                        # Large data - mark as needs migration
+                                        # Case 2: Has error field - pass through the error
+                                        "if": {"$ifNull": ["$$att.error", False]},
                                         "then": {
                                             "name": "$$att.name",
                                             "type": "$$att.type",
                                             "size": "$$att.size",
-                                            "error": "Legacy attachment - file too large to display inline",
+                                            "error": "$$att.error",
                                             "needs_migration": True
                                         },
-                                        # Small data - keep it
                                         "else": {
-                                            "name": "$$att.name",
-                                            "type": "$$att.type",
-                                            "size": "$$att.size",
-                                            "data": "$$att.data"
+                                            "$cond": {
+                                                # Case 3: Has large data - mark as needs migration
+                                                "if": {"$gt": [{"$strLenCP": {"$ifNull": ["$$att.data", ""]}}, 50000]},
+                                                "then": {
+                                                    "name": "$$att.name",
+                                                    "type": "$$att.type",
+                                                    "size": "$$att.size",
+                                                    "error": "Legacy attachment - file too large to display inline",
+                                                    "needs_migration": True
+                                                },
+                                                # Case 4: Has small data - keep it inline
+                                                "else": {
+                                                    "name": "$$att.name",
+                                                    "type": "$$att.type",
+                                                    "size": "$$att.size",
+                                                    "data": {"$ifNull": ["$$att.data", ""]}
+                                                }
+                                            }
                                         }
                                     }
                                 }
