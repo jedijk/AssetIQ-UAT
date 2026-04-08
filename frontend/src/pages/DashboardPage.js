@@ -47,6 +47,36 @@ import { Label } from "../components/ui/label";
 import InsightsPage from "./InsightsPage";
 import { DISCIPLINES } from "../constants/disciplines";
 
+// Image component with fallback for failed loads
+const ImageWithFallback = ({ src, alt, fallback, className = "" }) => {
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  if (hasError) {
+    return fallback;
+  }
+
+  return (
+    <>
+      {isLoading && (
+        <div className={`flex items-center justify-center bg-slate-100 ${className}`}>
+          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+      <img
+        src={src}
+        alt={alt}
+        className={`${className} ${isLoading ? 'hidden' : ''}`}
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setIsLoading(false);
+          setHasError(true);
+        }}
+      />
+    </>
+  );
+};
+
 // User avatar component with optional hover card
 const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showPopover = false }) => {
   const [imageError, setImageError] = useState(false);
@@ -1428,7 +1458,19 @@ export default function DashboardPage() {
                             </span>
                           </div>
                         ) : isImage && previewUrl ? (
-                          <img src={previewUrl} alt={fileName} className="w-full h-full object-cover" />
+                          <ImageWithFallback 
+                            src={previewUrl} 
+                            alt={fileName}
+                            className="w-full h-full object-cover"
+                            fallback={
+                              <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                                <FileText className="w-6 h-6 text-slate-400" />
+                                <span className="text-[10px] text-slate-500 uppercase mt-1">
+                                  {fileName.split('.').pop()}
+                                </span>
+                              </div>
+                            }
+                          />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center p-2">
                             <FileText className="w-6 h-6 text-slate-400" />

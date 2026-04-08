@@ -73,6 +73,36 @@ import { format, parseISO } from "date-fns";
 
 const API_BASE_URL = getBackendUrl();
 
+// Image component with fallback for failed loads
+const ImageWithFallback = ({ src, alt, fallback }) => {
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  if (hasError) {
+    return fallback;
+  }
+
+  return (
+    <>
+      {isLoading && (
+        <div className="w-full h-full flex items-center justify-center bg-slate-100">
+          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+      <img
+        src={src}
+        alt={alt}
+        className={`w-full h-full object-cover ${isLoading ? 'hidden' : ''}`}
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setIsLoading(false);
+          setHasError(true);
+        }}
+      />
+    </>
+  );
+};
+
 // Hook to detect mobile
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -739,7 +769,7 @@ export default function FormSubmissionsPage() {
                     Attachments ({selectedSubmission.attachments.length})
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {selectedSubmission.attachments.map((att) => {
+                    {selectedSubmission.attachments.map((att, attIdx) => {
                       const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name || att.filename || "");
                       const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name || att.filename || "");
                       const isDoc = /\.(doc|docx)$/i.test(att.name || att.filename || "");
@@ -784,7 +814,18 @@ export default function FormSubmissionsPage() {
                               </span>
                             </div>
                           ) : isImage && previewUrl ? (
-                            <img src={previewUrl} alt={fileName} className="w-full h-full object-cover" />
+                            <ImageWithFallback 
+                              src={previewUrl} 
+                              alt={fileName}
+                              fallback={
+                                <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                                  <File className="w-8 h-8 text-slate-400 mb-1" />
+                                  <span className="text-[10px] text-slate-500 uppercase font-medium">
+                                    {fileName.split('.').pop()}
+                                  </span>
+                                </div>
+                              }
+                            />
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center p-2">
                               {isPdf ? (
