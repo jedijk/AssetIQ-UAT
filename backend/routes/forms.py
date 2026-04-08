@@ -338,13 +338,16 @@ async def delete_form_submission(
     submission_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete a form submission."""
+    """Delete a form submission by custom ID or MongoDB ObjectId."""
     from bson import ObjectId
     
-    if not ObjectId.is_valid(submission_id):
-        raise HTTPException(status_code=400, detail="Invalid submission ID")
+    # First try by custom 'id' field (UUID string)
+    result = await db.form_submissions.delete_one({"id": submission_id})
     
-    result = await db.form_submissions.delete_one({"_id": ObjectId(submission_id)})
+    if result.deleted_count == 0:
+        # Fallback: try by MongoDB ObjectId
+        if ObjectId.is_valid(submission_id):
+            result = await db.form_submissions.delete_one({"_id": ObjectId(submission_id)})
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Form submission not found")
