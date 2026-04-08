@@ -723,8 +723,8 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
       });
   };
 
-  // Content component
-  const Content = () => (
+  // Shared content JSX
+  const contentJSX = (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className={`flex items-center justify-between p-3 border-b border-slate-200 flex-shrink-0 ${isMobile ? 'bg-white sticky top-0 z-10' : ''}`}>
@@ -893,7 +893,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
     if (!isOpen) return null;
     return (
       <div className="fixed inset-0 z-50 bg-white flex flex-col" style={{ height: '100dvh' }}>
-        <Content />
+        {contentJSX}
       </div>
     );
   }
@@ -901,7 +901,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   // Desktop: render inline
   return (
     <div className="h-full flex flex-col">
-      <Content />
+      {contentJSX}
     </div>
   );
 };
