@@ -315,101 +315,95 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     
     return (
       <div className={`bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm p-3 max-w-[90%] shadow-sm text-sm ${isFollowUp ? "border-l-4 border-l-blue-400" : ""}`}>
-        {/* Show success message for threat creation */}
+        {/* Combined Observation Card with Context Prompt */}
         {msg.threat_id && (
-          <div className="flex items-center gap-2 text-green-600 mb-2">
-            <CheckCircle2 className="w-4 h-4" />
-            <span className="font-medium">Observation Recorded</span>
+          <div className="bg-gradient-to-b from-green-50 to-white rounded-lg border border-green-200 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center gap-2 text-green-700 px-3 py-2 bg-green-100/50 border-b border-green-200">
+              <CheckCircle2 className="w-4 h-4" />
+              <span className="font-semibold text-sm">Observation Recorded</span>
+            </div>
+            
+            {/* Threat Details */}
+            <div className="p-3">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h4 className="font-semibold text-slate-900 text-sm leading-tight">
+                  {msg.threat_title || "Threat Logged"}
+                </h4>
+                <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  msg.threat_risk_level === "Critical" ? "bg-red-100 text-red-700" :
+                  msg.threat_risk_level === "High" ? "bg-orange-100 text-orange-700" :
+                  msg.threat_risk_level === "Medium" ? "bg-yellow-100 text-yellow-700" :
+                  "bg-green-100 text-green-700"
+                }`}>
+                  {msg.threat_risk_level || "Medium"}
+                </span>
+              </div>
+              
+              <div className="space-y-1 text-xs text-slate-600 mb-3">
+                {msg.threat_asset && (
+                  <div className="flex items-center gap-1.5">
+                    <Wrench className="w-3 h-3 text-slate-400" />
+                    <span><strong>Equipment:</strong> {msg.threat_asset}</span>
+                  </div>
+                )}
+                {msg.threat_failure_mode && (
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-3 h-3 text-slate-400" />
+                    <span><strong>Issue:</strong> {msg.threat_failure_mode}</span>
+                  </div>
+                )}
+                {msg.threat_risk_score && (
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="w-3 h-3 text-slate-400" />
+                    <span><strong>Risk Score:</strong> {msg.threat_risk_score} • <strong>Rank:</strong> #{msg.threat_rank}</span>
+                  </div>
+                )}
+              </div>
+              
+              <a 
+                href={`/threats/${msg.threat_id}`}
+                onClick={onClose}
+                className="inline-flex items-center gap-1 text-blue-600 text-xs font-medium hover:underline"
+              >
+                View full details
+                <ArrowRight className="w-3 h-3" />
+              </a>
+            </div>
+            
+            {/* Context Prompt - Inside the same card */}
+            {(msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
+              <div className="px-3 pb-3 pt-2 border-t border-slate-200 bg-slate-50/50">
+                <p className="text-xs text-slate-600 mb-2">
+                  Would you like to add more details? (temperature, conditions, photos)
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isSending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors text-xs font-medium disabled:opacity-50"
+                    data-testid="add-photo-btn"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    Add Photo
+                  </button>
+                  <button
+                    onClick={() => sendMutation.mutate({ content: "skip", image: null })}
+                    disabled={isSending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-500 rounded-lg hover:bg-slate-100 transition-colors text-xs font-medium disabled:opacity-50"
+                    data-testid="skip-context-btn"
+                  >
+                    Skip
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         
-        {/* Threat Summary Card */}
-        {msg.threat_id && (
-          <div className="bg-slate-50 rounded-lg p-3 mb-2 border border-slate-200">
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <h4 className="font-semibold text-slate-900 text-sm leading-tight">
-                {msg.threat_title || "Threat Logged"}
-              </h4>
-              <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                msg.threat_risk_level === "Critical" ? "bg-red-100 text-red-700" :
-                msg.threat_risk_level === "High" ? "bg-orange-100 text-orange-700" :
-                msg.threat_risk_level === "Medium" ? "bg-yellow-100 text-yellow-700" :
-                "bg-green-100 text-green-700"
-              }`}>
-                {msg.threat_risk_level || "Medium"}
-              </span>
-            </div>
-            
-            <div className="space-y-1 text-xs text-slate-600">
-              {msg.threat_asset && (
-                <div className="flex items-center gap-1.5">
-                  <Wrench className="w-3 h-3 text-slate-400" />
-                  <span><strong>Equipment:</strong> {msg.threat_asset}</span>
-                </div>
-              )}
-              {msg.threat_failure_mode && (
-                <div className="flex items-center gap-1.5">
-                  <AlertTriangle className="w-3 h-3 text-slate-400" />
-                  <span><strong>Issue:</strong> {msg.threat_failure_mode}</span>
-                </div>
-              )}
-              {msg.threat_location && (
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="w-3 h-3 text-slate-400" />
-                  <span><strong>Location:</strong> {msg.threat_location}</span>
-                </div>
-              )}
-              {msg.threat_risk_score && (
-                <div className="flex items-center gap-1.5">
-                  <Activity className="w-3 h-3 text-slate-400" />
-                  <span><strong>Risk Score:</strong> {msg.threat_risk_score} • <strong>Rank:</strong> #{msg.threat_rank}</span>
-                </div>
-              )}
-            </div>
-            
-            <a 
-              href={`/threats/${msg.threat_id}`}
-              onClick={onClose}
-              className="mt-2 inline-flex items-center gap-1 text-blue-600 text-xs font-medium hover:underline"
-            >
-              View full details
-              <ArrowRight className="w-3 h-3" />
-            </a>
-          </div>
-        )}
-        
-        {/* Show content for non-threat messages OR context prompts */}
-        {(!msg.threat_id || msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
+        {/* Show content for non-threat messages */}
+        {!msg.threat_id && (
           <p className="whitespace-pre-wrap">{msg.content}</p>
-        )}
-        
-        {/* Context Prompt Quick Actions - Show Add Photo and Skip buttons */}
-        {(msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
-          <div className="mt-3 pt-3 border-t border-green-200 bg-green-50/50 rounded-lg p-3 -mx-1">
-            <p className="text-sm font-medium text-green-700 mb-2">Quick options:</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isSending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors text-sm font-medium disabled:opacity-50"
-                data-testid="add-photo-btn"
-              >
-                <ImageIcon className="w-4 h-4" />
-                Add Photo
-              </button>
-              <button
-                onClick={() => sendMutation.mutate({ content: "skip", image: null })}
-                disabled={isSending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
-                data-testid="skip-context-btn"
-              >
-                Skip
-              </button>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">
-              Or type your observations (temperature, conditions, notes...)
-            </p>
-          </div>
         )}
         
         {/* Equipment Suggestions */}
