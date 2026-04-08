@@ -206,11 +206,13 @@ async def list_routes():
 ALLOWED_ORIGINS = [
     "https://assetiq.tech",
     "https://www.assetiq.tech",
-    "https://asset-iq-rho.vercel.app",  # NEW: Vercel production
+    "https://assetiq-rho.vercel.app",  # Vercel production
+    "https://asset-iq-rho.vercel.app",  # Vercel production (alternate)
     "https://asset-iq-preview.preview.emergentagent.com",  # Preview environment
-    "https://assetiq-rmhd.vercel.app",  # Vercel production
+    "https://assetiq-rmhd.vercel.app",  # Vercel production (legacy)
     "https://assetiq.vercel.app",  # Vercel alias
     "http://localhost:3000",  # Local development
+    "http://localhost:5000",  # Local backend direct
 ]
 
 # Also allow any Vercel preview deployments
