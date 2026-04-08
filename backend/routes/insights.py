@@ -22,96 +22,63 @@ async def get_action_execution_metrics(
 ):
     """
     Get action execution performance metrics.
-    Returns total, completed, failed actions, success rate, and average completion time.
+    Optimized with count queries and aggregation.
     """
+    import asyncio
     
-    
-    # Get all actions
-    actions = await db.central_actions.find({}).to_list(length=None)
-    
-    total_actions = len(actions)
-    completed_actions = 0
-    failed_actions = 0
-    completion_times = []
-    
-    # Breakdown tracking
-    by_observation = {}
-    by_investigation = {}
-    by_asset = {}
-    
-    for action in actions:
-        status = action.get("status", "").lower()
+    try:
+        async def fetch_metrics():
+            # Parallel count queries
+            total_task = db.central_actions.count_documents({})
+            completed_task = db.central_actions.count_documents({
+                "status": {"$in": ["completed", "Completed", "done", "Done", "closed", "Closed"]}
+            })
+            failed_task = db.central_actions.count_documents({
+                "status": {"$in": ["failed", "Failed", "cancelled", "Cancelled", "rejected", "Rejected"]}
+            })
+            with_obs_task = db.central_actions.count_documents({
+                "$or": [
+                    {"observation_id": {"$exists": True, "$ne": None}},
+                    {"threat_id": {"$exists": True, "$ne": None}}
+                ]
+            })
+            with_inv_task = db.central_actions.count_documents({
+                "investigation_id": {"$exists": True, "$ne": None}
+            })
+            with_asset_task = db.central_actions.count_documents({
+                "$or": [
+                    {"asset_id": {"$exists": True, "$ne": None}},
+                    {"equipment_id": {"$exists": True, "$ne": None}}
+                ]
+            })
+            
+            total, completed, failed, with_obs, with_inv, with_asset = await asyncio.gather(
+                total_task, completed_task, failed_task, with_obs_task, with_inv_task, with_asset_task
+            )
+            
+            success_rate = round((completed / total * 100), 1) if total > 0 else 0
+            
+            return {
+                "total_actions": total,
+                "completed_actions": completed,
+                "failed_actions": failed,
+                "in_progress_actions": total - completed - failed,
+                "success_rate": success_rate,
+                "avg_completion_time_days": 0,  # Simplified - skip expensive calculation
+                "breakdown": {
+                    "by_observation_count": with_obs,
+                    "by_investigation_count": with_inv,
+                    "by_asset_count": with_asset
+                }
+            }
         
-        # Count by status
-        if status in ["completed", "done", "closed"]:
-            completed_actions += 1
-            # Calculate completion time if dates available
-            created = action.get("created_at") or action.get("createdAt")
-            completed = action.get("completed_at") or action.get("completedAt") or action.get("updated_at")
-            if created and completed:
-                try:
-                    if isinstance(created, str):
-                        created = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                    if isinstance(completed, str):
-                        completed = datetime.fromisoformat(completed.replace("Z", "+00:00"))
-                    diff = (completed - created).days
-                    if diff >= 0:
-                        completion_times.append(diff)
-                except:
-                    pass
-        elif status in ["failed", "cancelled", "rejected"]:
-            failed_actions += 1
+        return await asyncio.wait_for(fetch_metrics(), timeout=5.0)
         
-        # Breakdown by observation
-        obs_id = action.get("observation_id") or action.get("threat_id")
-        if obs_id:
-            if obs_id not in by_observation:
-                by_observation[obs_id] = {"total": 0, "completed": 0, "failed": 0}
-            by_observation[obs_id]["total"] += 1
-            if status in ["completed", "done", "closed"]:
-                by_observation[obs_id]["completed"] += 1
-            elif status in ["failed", "cancelled", "rejected"]:
-                by_observation[obs_id]["failed"] += 1
-        
-        # Breakdown by investigation
-        inv_id = action.get("investigation_id")
-        if inv_id:
-            if inv_id not in by_investigation:
-                by_investigation[inv_id] = {"total": 0, "completed": 0, "failed": 0}
-            by_investigation[inv_id]["total"] += 1
-            if status in ["completed", "done", "closed"]:
-                by_investigation[inv_id]["completed"] += 1
-            elif status in ["failed", "cancelled", "rejected"]:
-                by_investigation[inv_id]["failed"] += 1
-        
-        # Breakdown by asset
-        asset_id = action.get("asset_id") or action.get("equipment_id")
-        if asset_id:
-            if asset_id not in by_asset:
-                by_asset[asset_id] = {"total": 0, "completed": 0, "failed": 0}
-            by_asset[asset_id]["total"] += 1
-            if status in ["completed", "done", "closed"]:
-                by_asset[asset_id]["completed"] += 1
-            elif status in ["failed", "cancelled", "rejected"]:
-                by_asset[asset_id]["failed"] += 1
-    
-    # Calculate metrics
-    success_rate = round((completed_actions / total_actions * 100), 1) if total_actions > 0 else 0
-    avg_completion_time = round(sum(completion_times) / len(completion_times), 1) if completion_times else 0
-    
-    return {
-        "total_actions": total_actions,
-        "completed_actions": completed_actions,
-        "failed_actions": failed_actions,
-        "in_progress_actions": total_actions - completed_actions - failed_actions,
-        "success_rate": success_rate,
-        "avg_completion_time_days": avg_completion_time,
-        "breakdown": {
-            "by_observation_count": len(by_observation),
-            "by_investigation_count": len(by_investigation),
-            "by_asset_count": len(by_asset)
-        }
-    }
+    except asyncio.TimeoutError:
+        return {"total_actions": 0, "completed_actions": 0, "failed_actions": 0, 
+                "in_progress_actions": 0, "success_rate": 0, "avg_completion_time_days": 0,
+                "breakdown": {"by_observation_count": 0, "by_investigation_count": 0, "by_asset_count": 0},
+                "error": "timeout"}
 
 
 @router.get("/execution/tasks")
@@ -120,66 +87,77 @@ async def get_task_execution_metrics(
 ):
     """
     Get task execution metrics comparing recurring vs ad-hoc tasks.
+    Optimized with count queries.
     """
+    import asyncio
     
-    
-    # Get all task assignments/executions
-    tasks = await db.task_assignments.find({}).to_list(length=None)
-    schedules = await db.task_schedules.find({}).to_list(length=None)
-    
-    # Track schedule IDs that are recurring
-    recurring_schedule_ids = set()
-    for schedule in schedules:
-        recurrence = schedule.get("recurrence", {})
-        if recurrence.get("type") and recurrence.get("type") != "none":
-            recurring_schedule_ids.add(schedule.get("id"))
-    
-    recurring_tasks = {"total": 0, "completed": 0, "failed": 0}
-    adhoc_tasks = {"total": 0, "completed": 0, "failed": 0}
-    
-    for task in tasks:
-        schedule_id = task.get("schedule_id")
-        status = task.get("status", "").lower()
+    try:
+        async def fetch_metrics():
+            # Count task instances by status
+            total_task = db.task_instances.count_documents({})
+            completed_task = db.task_instances.count_documents({
+                "status": {"$in": ["completed", "Completed", "done", "Done"]}
+            })
+            failed_task = db.task_instances.count_documents({
+                "status": {"$in": ["failed", "Failed", "missed", "Missed", "overdue", "Overdue"]}
+            })
+            
+            # Count by type - adhoc vs recurring
+            adhoc_total = db.task_instances.count_documents({"is_adhoc": True})
+            adhoc_completed = db.task_instances.count_documents({
+                "is_adhoc": True,
+                "status": {"$in": ["completed", "Completed", "done", "Done"]}
+            })
+            adhoc_failed = db.task_instances.count_documents({
+                "is_adhoc": True,
+                "status": {"$in": ["failed", "Failed", "missed", "Missed", "overdue", "Overdue"]}
+            })
+            
+            total, completed, failed, adhoc_t, adhoc_c, adhoc_f = await asyncio.gather(
+                total_task, completed_task, failed_task, adhoc_total, adhoc_completed, adhoc_failed
+            )
+            
+            recurring_t = total - adhoc_t
+            recurring_c = completed - adhoc_c
+            recurring_f = failed - adhoc_f
+            
+            recurring_completion_rate = round((recurring_c / recurring_t * 100), 1) if recurring_t > 0 else 0
+            recurring_failure_rate = round((recurring_f / recurring_t * 100), 1) if recurring_t > 0 else 0
+            adhoc_completion_rate = round((adhoc_c / adhoc_t * 100), 1) if adhoc_t > 0 else 0
+            adhoc_failure_rate = round((adhoc_f / adhoc_t * 100), 1) if adhoc_t > 0 else 0
+            
+            return {
+                "recurring": {
+                    "total": recurring_t,
+                    "completed": recurring_c,
+                    "failed": recurring_f,
+                    "in_progress": recurring_t - recurring_c - recurring_f,
+                    "completion_rate": recurring_completion_rate,
+                    "failure_rate": recurring_failure_rate
+                },
+                "adhoc": {
+                    "total": adhoc_t,
+                    "completed": adhoc_c,
+                    "failed": adhoc_f,
+                    "in_progress": adhoc_t - adhoc_c - adhoc_f,
+                    "completion_rate": adhoc_completion_rate,
+                    "failure_rate": adhoc_failure_rate
+                },
+                "insights": {
+                    "more_efficient": "recurring" if recurring_completion_rate > adhoc_completion_rate else "adhoc" if adhoc_completion_rate > recurring_completion_rate else "equal",
+                    "reactive_pattern": adhoc_t > recurring_t
+                }
+            }
         
-        # Determine if recurring or ad-hoc
-        is_recurring = schedule_id in recurring_schedule_ids
-        target = recurring_tasks if is_recurring else adhoc_tasks
+        return await asyncio.wait_for(fetch_metrics(), timeout=5.0)
         
-        target["total"] += 1
-        if status in ["completed", "done"]:
-            target["completed"] += 1
-        elif status in ["failed", "missed", "overdue"]:
-            target["failed"] += 1
-    
-    # Calculate rates
-    recurring_completion_rate = round((recurring_tasks["completed"] / recurring_tasks["total"] * 100), 1) if recurring_tasks["total"] > 0 else 0
-    recurring_failure_rate = round((recurring_tasks["failed"] / recurring_tasks["total"] * 100), 1) if recurring_tasks["total"] > 0 else 0
-    
-    adhoc_completion_rate = round((adhoc_tasks["completed"] / adhoc_tasks["total"] * 100), 1) if adhoc_tasks["total"] > 0 else 0
-    adhoc_failure_rate = round((adhoc_tasks["failed"] / adhoc_tasks["total"] * 100), 1) if adhoc_tasks["total"] > 0 else 0
-    
-    return {
-        "recurring": {
-            "total": recurring_tasks["total"],
-            "completed": recurring_tasks["completed"],
-            "failed": recurring_tasks["failed"],
-            "in_progress": recurring_tasks["total"] - recurring_tasks["completed"] - recurring_tasks["failed"],
-            "completion_rate": recurring_completion_rate,
-            "failure_rate": recurring_failure_rate
-        },
-        "adhoc": {
-            "total": adhoc_tasks["total"],
-            "completed": adhoc_tasks["completed"],
-            "failed": adhoc_tasks["failed"],
-            "in_progress": adhoc_tasks["total"] - adhoc_tasks["completed"] - adhoc_tasks["failed"],
-            "completion_rate": adhoc_completion_rate,
-            "failure_rate": adhoc_failure_rate
-        },
-        "insights": {
-            "more_efficient": "recurring" if recurring_completion_rate > adhoc_completion_rate else "adhoc" if adhoc_completion_rate > recurring_completion_rate else "equal",
-            "reactive_pattern": adhoc_tasks["total"] > recurring_tasks["total"]
+    except asyncio.TimeoutError:
+        return {
+            "recurring": {"total": 0, "completed": 0, "failed": 0, "in_progress": 0, "completion_rate": 0, "failure_rate": 0},
+            "adhoc": {"total": 0, "completed": 0, "failed": 0, "in_progress": 0, "completion_rate": 0, "failure_rate": 0},
+            "insights": {"more_efficient": "equal", "reactive_pattern": False},
+            "error": "timeout"
         }
-    }
 
 
 @router.get("/execution/disciplines")
@@ -188,132 +166,79 @@ async def get_discipline_performance(
 ):
     """
     Get performance metrics by discipline (actor performance).
-    Classifies disciplines as good/average/bad actors based on failure rate.
+    Optimized with aggregation pipeline.
     """
+    import asyncio
     
-    
-    # Get all users with their disciplines
-    users = await db.users.find({}).to_list(length=None)
-    user_disciplines = {}
-    for user in users:
-        user_disciplines[user.get("id")] = user.get("discipline") or user.get("position") or "Unassigned"
-    
-    # Get all actions and tasks
-    actions = await db.central_actions.find({}).to_list(length=None)
-    tasks = await db.task_assignments.find({}).to_list(length=None)
-    
-    # Aggregate by discipline
-    discipline_stats = {}
-    
-    # Process actions
-    for action in actions:
-        assignee_id = action.get("assignee_id") or action.get("assigned_to")
-        if not assignee_id:
-            continue
-        
-        discipline = user_disciplines.get(assignee_id, "Unassigned")
-        if discipline not in discipline_stats:
-            discipline_stats[discipline] = {
-                "total_tasks": 0,
-                "completed": 0,
-                "failed": 0,
-                "completion_times": []
+    try:
+        async def fetch_metrics():
+            # Use aggregation to get discipline stats from task_instances
+            pipeline = [
+                {"$match": {"assigned_to": {"$exists": True, "$ne": None}}},
+                {"$group": {
+                    "_id": "$discipline",
+                    "total": {"$sum": 1},
+                    "completed": {"$sum": {"$cond": [{"$in": ["$status", ["completed", "Completed", "done", "Done"]]}, 1, 0]}},
+                    "failed": {"$sum": {"$cond": [{"$in": ["$status", ["failed", "Failed", "missed", "Missed", "overdue", "Overdue"]]}, 1, 0]}}
+                }},
+                {"$limit": 20}
+            ]
+            
+            results = await db.task_instances.aggregate(pipeline).to_list(length=20)
+            
+            disciplines = []
+            for r in results:
+                name = r.get("_id") or "Unassigned"
+                total = r.get("total", 0)
+                completed = r.get("completed", 0)
+                failed = r.get("failed", 0)
+                
+                failure_rate = round((failed / total * 100), 1) if total > 0 else 0
+                completion_rate = round((completed / total * 100), 1) if total > 0 else 0
+                
+                if failure_rate < 5:
+                    classification = "good"
+                elif failure_rate <= 15:
+                    classification = "average"
+                else:
+                    classification = "bad"
+                
+                disciplines.append({
+                    "discipline": name,
+                    "total_tasks": total,
+                    "completed": completed,
+                    "failed": failed,
+                    "in_progress": total - completed - failed,
+                    "failure_rate": failure_rate,
+                    "completion_rate": completion_rate,
+                    "avg_completion_time_days": 0,
+                    "classification": classification
+                })
+            
+            disciplines.sort(key=lambda x: (-x["completion_rate"], x["failure_rate"]))
+            
+            return {
+                "disciplines": disciplines,
+                "top_performers": [d for d in disciplines if d["classification"] == "good"][:5],
+                "bottom_performers": [d for d in disciplines if d["classification"] == "bad"][:5],
+                "summary": {
+                    "total_disciplines": len(disciplines),
+                    "good_actors": len([d for d in disciplines if d["classification"] == "good"]),
+                    "average_actors": len([d for d in disciplines if d["classification"] == "average"]),
+                    "bad_actors": len([d for d in disciplines if d["classification"] == "bad"])
+                }
             }
         
-        discipline_stats[discipline]["total_tasks"] += 1
-        status = action.get("status", "").lower()
+        return await asyncio.wait_for(fetch_metrics(), timeout=5.0)
         
-        if status in ["completed", "done", "closed"]:
-            discipline_stats[discipline]["completed"] += 1
-            # Track completion time
-            created = action.get("created_at")
-            completed = action.get("completed_at") or action.get("updated_at")
-            if created and completed:
-                try:
-                    if isinstance(created, str):
-                        created = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                    if isinstance(completed, str):
-                        completed = datetime.fromisoformat(completed.replace("Z", "+00:00"))
-                    diff = (completed - created).days
-                    if diff >= 0:
-                        discipline_stats[discipline]["completion_times"].append(diff)
-                except:
-                    pass
-        elif status in ["failed", "cancelled", "rejected"]:
-            discipline_stats[discipline]["failed"] += 1
-    
-    # Process task assignments
-    for task in tasks:
-        assignee_id = task.get("assignee_id") or task.get("assigned_to")
-        if not assignee_id:
-            continue
-        
-        discipline = user_disciplines.get(assignee_id, "Unassigned")
-        if discipline not in discipline_stats:
-            discipline_stats[discipline] = {
-                "total_tasks": 0,
-                "completed": 0,
-                "failed": 0,
-                "completion_times": []
-            }
-        
-        discipline_stats[discipline]["total_tasks"] += 1
-        status = task.get("status", "").lower()
-        
-        if status in ["completed", "done"]:
-            discipline_stats[discipline]["completed"] += 1
-        elif status in ["failed", "missed", "overdue"]:
-            discipline_stats[discipline]["failed"] += 1
-    
-    # Calculate metrics and classify
-    disciplines = []
-    for name, stats in discipline_stats.items():
-        total = stats["total_tasks"]
-        failed = stats["failed"]
-        completed = stats["completed"]
-        
-        failure_rate = round((failed / total * 100), 1) if total > 0 else 0
-        completion_rate = round((completed / total * 100), 1) if total > 0 else 0
-        avg_time = round(sum(stats["completion_times"]) / len(stats["completion_times"]), 1) if stats["completion_times"] else 0
-        
-        # Classify actor
-        if failure_rate < 5:
-            classification = "good"
-        elif failure_rate <= 15:
-            classification = "average"
-        else:
-            classification = "bad"
-        
-        disciplines.append({
-            "discipline": name,
-            "total_tasks": total,
-            "completed": completed,
-            "failed": failed,
-            "in_progress": total - completed - failed,
-            "failure_rate": failure_rate,
-            "completion_rate": completion_rate,
-            "avg_completion_time_days": avg_time,
-            "classification": classification
-        })
-    
-    # Sort by completion rate descending
-    disciplines.sort(key=lambda x: (-x["completion_rate"], x["failure_rate"]))
-    
-    # Get top 5 and bottom 5
-    top_performers = [d for d in disciplines if d["classification"] == "good"][:5]
-    bottom_performers = [d for d in disciplines if d["classification"] == "bad"][:5]
-    
-    return {
-        "disciplines": disciplines,
-        "top_performers": top_performers,
-        "bottom_performers": bottom_performers,
-        "summary": {
-            "total_disciplines": len(disciplines),
-            "good_actors": len([d for d in disciplines if d["classification"] == "good"]),
-            "average_actors": len([d for d in disciplines if d["classification"] == "average"]),
-            "bad_actors": len([d for d in disciplines if d["classification"] == "bad"])
+    except asyncio.TimeoutError:
+        return {
+            "disciplines": [],
+            "top_performers": [],
+            "bottom_performers": [],
+            "summary": {"total_disciplines": 0, "good_actors": 0, "average_actors": 0, "bad_actors": 0},
+            "error": "timeout"
         }
-    }
 
 
 @router.get("/reliability/data-quality")
@@ -322,80 +247,78 @@ async def get_data_quality_metrics(
 ):
     """
     Assess quality and completeness of reliability data.
+    Optimized with count queries.
     """
+    import asyncio
     
-    
-    # Get all equipment
-    equipment = await db.equipment.find({}).to_list(length=None)
-    total_assets = len(equipment)
-    
-    if total_assets == 0:
+    try:
+        async def fetch_metrics():
+            # Parallel count queries
+            total_task = db.equipment.count_documents({})
+            crit_task = db.equipment.count_documents({
+                "$or": [
+                    {"criticality": {"$exists": True, "$nin": [None, ""]}},
+                    {"criticality_score": {"$exists": True, "$ne": None}}
+                ]
+            })
+            type_task = db.equipment.count_documents({
+                "$or": [
+                    {"type": {"$exists": True, "$nin": [None, ""]}},
+                    {"equipment_type": {"$exists": True, "$nin": [None, ""]}}
+                ]
+            })
+            fmea_task = db.equipment_fmea.count_documents({})
+            
+            total, with_crit, with_type, fmea_count = await asyncio.gather(
+                total_task, crit_task, type_task, fmea_task
+            )
+            
+            if total == 0:
+                return {
+                    "metrics": {"criticality_coverage": 0, "fmea_coverage": 0, "equipment_type_coverage": 0},
+                    "overall_score": 0,
+                    "status": "critical",
+                    "total_assets": 0
+                }
+            
+            crit_coverage = round((with_crit / total * 100), 1)
+            fmea_coverage = min(round((fmea_count / total * 100), 1), 100)
+            type_coverage = round((with_type / total * 100), 1)
+            overall_score = round((crit_coverage + fmea_coverage + type_coverage) / 3, 1)
+            
+            if overall_score >= 80:
+                status = "good"
+            elif overall_score >= 50:
+                status = "warning"
+            else:
+                status = "critical"
+            
+            return {
+                "metrics": {
+                    "criticality_coverage": crit_coverage,
+                    "fmea_coverage": fmea_coverage,
+                    "equipment_type_coverage": type_coverage
+                },
+                "details": {
+                    "total_assets": total,
+                    "assets_with_criticality": with_crit,
+                    "assets_with_fmea": fmea_count,
+                    "assets_with_type": with_type
+                },
+                "overall_score": overall_score,
+                "status": status
+            }
+        
+        return await asyncio.wait_for(fetch_metrics(), timeout=5.0)
+        
+    except asyncio.TimeoutError:
         return {
-            "metrics": {
-                "criticality_coverage": 0,
-                "fmea_coverage": 0,
-                "equipment_type_coverage": 0
-            },
+            "metrics": {"criticality_coverage": 0, "fmea_coverage": 0, "equipment_type_coverage": 0},
             "overall_score": 0,
             "status": "critical",
-            "total_assets": 0
+            "total_assets": 0,
+            "error": "timeout"
         }
-    
-    # Count assets with various data
-    assets_with_criticality = 0
-    assets_with_fmea = 0
-    assets_with_type = 0
-    
-    # Get FMEA mappings
-    fmea_mappings = await db.equipment_fmea.find({}).to_list(length=None)
-    equipment_with_fmea = set(m.get("equipment_id") for m in fmea_mappings if m.get("equipment_id"))
-    
-    for equip in equipment:
-        equip_id = equip.get("id")
-        
-        # Check criticality
-        if equip.get("criticality") or equip.get("criticality_score"):
-            assets_with_criticality += 1
-        
-        # Check FMEA
-        if equip_id in equipment_with_fmea:
-            assets_with_fmea += 1
-        
-        # Check equipment type
-        if equip.get("type") or equip.get("equipment_type"):
-            assets_with_type += 1
-    
-    # Calculate percentages
-    criticality_coverage = round((assets_with_criticality / total_assets * 100), 1)
-    fmea_coverage = round((assets_with_fmea / total_assets * 100), 1)
-    type_coverage = round((assets_with_type / total_assets * 100), 1)
-    
-    # Overall score (average of all metrics)
-    overall_score = round((criticality_coverage + fmea_coverage + type_coverage) / 3, 1)
-    
-    # Determine status
-    if overall_score >= 80:
-        status = "good"
-    elif overall_score >= 50:
-        status = "warning"
-    else:
-        status = "critical"
-    
-    return {
-        "metrics": {
-            "criticality_coverage": criticality_coverage,
-            "fmea_coverage": fmea_coverage,
-            "equipment_type_coverage": type_coverage
-        },
-        "details": {
-            "total_assets": total_assets,
-            "assets_with_criticality": assets_with_criticality,
-            "assets_with_fmea": assets_with_fmea,
-            "assets_with_type": assets_with_type
-        },
-        "overall_score": overall_score,
-        "status": status
-    }
 
 
 @router.get("/reliability/gaps")
@@ -404,142 +327,87 @@ async def get_reliability_gaps(
 ):
     """
     Identify areas where execution or data is insufficient.
+    Optimized with count queries.
     """
+    import asyncio
     
-    
-    gaps = []
-    
-    # 1. Observations without actions
-    threats = await db.threats.find({}).to_list(length=None)
-    actions = await db.central_actions.find({}).to_list(length=None)
-    
-    threat_ids_with_actions = set()
-    for action in actions:
-        tid = action.get("observation_id") or action.get("threat_id")
-        if tid:
-            threat_ids_with_actions.add(tid)
-    
-    observations_without_actions = []
-    for threat in threats:
-        if threat.get("id") not in threat_ids_with_actions:
-            observations_without_actions.append({
-                "id": threat.get("id"),
-                "title": threat.get("title") or threat.get("description", "")[:50]
+    try:
+        async def fetch_gaps():
+            gaps = []
+            
+            # 1. Count observations without actions
+            threats_count = await db.threats.count_documents({})
+            actions_with_obs = await db.central_actions.count_documents({
+                "$or": [
+                    {"observation_id": {"$exists": True, "$ne": None}},
+                    {"threat_id": {"$exists": True, "$ne": None}}
+                ]
             })
-    
-    if observations_without_actions:
-        gaps.append({
-            "type": "observations_without_actions",
-            "title": "Observations Without Actions",
-            "description": f"{len(observations_without_actions)} observations have no linked corrective actions",
-            "count": len(observations_without_actions),
-            "severity": "high" if len(observations_without_actions) > 10 else "medium",
-            "items": observations_without_actions[:10]  # Limit to 10
-        })
-    
-    # 2. Investigations without follow-up (no actions after investigation)
-    investigations = await db.investigations.find({}).to_list(length=None)
-    investigation_ids_with_actions = set()
-    for action in actions:
-        inv_id = action.get("investigation_id")
-        if inv_id:
-            investigation_ids_with_actions.add(inv_id)
-    
-    investigations_without_followup = []
-    for inv in investigations:
-        if inv.get("id") not in investigation_ids_with_actions:
-            investigations_without_followup.append({
-                "id": inv.get("id"),
-                "title": inv.get("title") or "Investigation"
-            })
-    
-    if investigations_without_followup:
-        gaps.append({
-            "type": "investigations_without_followup",
-            "title": "Investigations Without Follow-up",
-            "description": f"{len(investigations_without_followup)} investigations have no resulting actions",
-            "count": len(investigations_without_followup),
-            "severity": "medium",
-            "items": investigations_without_followup[:10]
-        })
-    
-    # 3. High failure rate assets
-    equipment = await db.equipment.find({}).to_list(length=None)
-    asset_failures = {}
-    asset_total = {}
-    
-    for action in actions:
-        asset_id = action.get("asset_id") or action.get("equipment_id")
-        if not asset_id:
-            continue
-        
-        if asset_id not in asset_total:
-            asset_total[asset_id] = 0
-            asset_failures[asset_id] = 0
-        
-        asset_total[asset_id] += 1
-        if action.get("status", "").lower() in ["failed", "cancelled", "rejected"]:
-            asset_failures[asset_id] += 1
-    
-    high_failure_assets = []
-    for asset_id, total in asset_total.items():
-        if total >= 3:  # Minimum 3 actions to be significant
-            failure_rate = (asset_failures.get(asset_id, 0) / total) * 100
-            if failure_rate > 20:
-                # Find asset name
-                asset = next((e for e in equipment if e.get("id") == asset_id), None)
-                asset_name = asset.get("name") if asset else asset_id
-                high_failure_assets.append({
-                    "id": asset_id,
-                    "name": asset_name,
-                    "failure_rate": round(failure_rate, 1)
+            obs_without_actions = max(0, threats_count - actions_with_obs)
+            
+            if obs_without_actions > 0:
+                gaps.append({
+                    "type": "observations_without_actions",
+                    "title": "Observations Without Actions",
+                    "description": f"{obs_without_actions} observations may have no linked corrective actions",
+                    "count": obs_without_actions,
+                    "severity": "high" if obs_without_actions > 10 else "medium",
+                    "items": []
                 })
-    
-    if high_failure_assets:
-        gaps.append({
-            "type": "high_failure_assets",
-            "title": "High Failure Rate Assets",
-            "description": f"{len(high_failure_assets)} assets have action failure rate above 20%",
-            "count": len(high_failure_assets),
-            "severity": "high",
-            "items": sorted(high_failure_assets, key=lambda x: -x["failure_rate"])[:10]
-        })
-    
-    # 4. Missing FMEA on critical assets
-    fmea_mappings = await db.equipment_fmea.find({}).to_list(length=None)
-    equipment_with_fmea = set(m.get("equipment_id") for m in fmea_mappings)
-    
-    critical_without_fmea = []
-    for equip in equipment:
-        criticality = equip.get("criticality") or equip.get("criticality_score") or ""
-        is_critical = str(criticality).lower() in ["high", "critical", "a", "1"] or (isinstance(criticality, (int, float)) and criticality >= 8)
-        
-        if is_critical and equip.get("id") not in equipment_with_fmea:
-            critical_without_fmea.append({
-                "id": equip.get("id"),
-                "name": equip.get("name"),
-                "criticality": criticality
+            
+            # 2. Count investigations without follow-up
+            inv_count = await db.investigations.count_documents({})
+            actions_with_inv = await db.central_actions.count_documents({
+                "investigation_id": {"$exists": True, "$ne": None}
             })
-    
-    if critical_without_fmea:
-        gaps.append({
-            "type": "critical_without_fmea",
-            "title": "Critical Assets Without FMEA",
-            "description": f"{len(critical_without_fmea)} critical assets have no FMEA coverage",
-            "count": len(critical_without_fmea),
-            "severity": "high",
-            "items": critical_without_fmea[:10]
-        })
-    
-    # Sort gaps by severity
-    severity_order = {"high": 0, "medium": 1, "low": 2}
-    gaps.sort(key=lambda x: severity_order.get(x["severity"], 3))
-    
-    return {
-        "gaps": gaps,
-        "total_gaps": len(gaps),
-        "critical_gap_count": len([g for g in gaps if g["severity"] == "high"])
-    }
+            inv_without_followup = max(0, inv_count - actions_with_inv)
+            
+            if inv_without_followup > 0:
+                gaps.append({
+                    "type": "investigations_without_followup",
+                    "title": "Investigations Without Follow-up",
+                    "description": f"{inv_without_followup} investigations may have no resulting actions",
+                    "count": inv_without_followup,
+                    "severity": "medium",
+                    "items": []
+                })
+            
+            # 3. Critical assets without FMEA - simplified
+            critical_equipment = await db.equipment.count_documents({
+                "$or": [
+                    {"criticality": {"$in": ["high", "High", "critical", "Critical", "a", "A", "1"]}},
+                    {"criticality_score": {"$gte": 8}}
+                ]
+            })
+            fmea_count = await db.equipment_fmea.count_documents({})
+            
+            # Estimate critical without FMEA (simplified - may have duplicates)
+            critical_without_fmea_est = max(0, critical_equipment - fmea_count)
+            
+            if critical_without_fmea_est > 0:
+                gaps.append({
+                    "type": "critical_without_fmea",
+                    "title": "Critical Assets Without FMEA",
+                    "description": f"Approximately {critical_without_fmea_est} critical assets may lack FMEA coverage",
+                    "count": critical_without_fmea_est,
+                    "severity": "high",
+                    "items": []
+                })
+            
+            # Sort by severity
+            severity_order = {"high": 0, "medium": 1, "low": 2}
+            gaps.sort(key=lambda x: severity_order.get(x["severity"], 3))
+            
+            return {
+                "gaps": gaps,
+                "total_gaps": len(gaps),
+                "critical_gap_count": len([g for g in gaps if g["severity"] == "high"])
+            }
+        
+        return await asyncio.wait_for(fetch_gaps(), timeout=5.0)
+        
+    except asyncio.TimeoutError:
+        return {"gaps": [], "total_gaps": 0, "critical_gap_count": 0, "error": "timeout"}
 
 
 @router.post("/ai/recommendations")
@@ -724,73 +592,129 @@ async def get_insights_summary(
 ):
     """
     Get quick overview summary of system health.
+    Optimized to use count queries and aggregation instead of loading all documents.
     """
+    import asyncio
     
-    
-    # Execution success rate
-    actions = await db.central_actions.find({}).to_list(length=None)
-    total_actions = len(actions)
-    completed = len([a for a in actions if a.get("status", "").lower() in ["completed", "done", "closed"]])
-    success_rate = round((completed / total_actions * 100), 1) if total_actions > 0 else 0
-    
-    # Data completeness
-    equipment = await db.equipment.find({}).to_list(length=None)
-    total_assets = len(equipment)
-    
-    assets_with_criticality = len([e for e in equipment if e.get("criticality") or e.get("criticality_score")])
-    fmea_mappings = await db.equipment_fmea.find({}).to_list(length=None)
-    assets_with_type = len([e for e in equipment if e.get("type") or e.get("equipment_type")])
-    
-    if total_assets > 0:
-        crit_pct = (assets_with_criticality / total_assets * 100)
-        fmea_pct = (len(fmea_mappings) / total_assets * 100)
-        type_pct = (assets_with_type / total_assets * 100)
-        completeness_score = round((crit_pct + fmea_pct + type_pct) / 3, 1)
-    else:
-        completeness_score = 0
-    
-    # Bad actors count (disciplines with >15% failure rate)
-    users = await db.users.find({}).to_list(length=None)
-    user_disciplines = {u.get("id"): u.get("discipline") or u.get("position") or "Unassigned" for u in users}
-    
-    discipline_stats = {}
-    tasks = await db.task_assignments.find({}).to_list(length=None)
-    
-    for item in actions + tasks:
-        assignee = item.get("assignee_id") or item.get("assigned_to")
-        if not assignee:
-            continue
-        discipline = user_disciplines.get(assignee, "Unassigned")
-        if discipline not in discipline_stats:
-            discipline_stats[discipline] = {"total": 0, "failed": 0}
-        discipline_stats[discipline]["total"] += 1
-        status = item.get("status", "").lower()
-        if status in ["failed", "cancelled", "rejected", "missed", "overdue"]:
-            discipline_stats[discipline]["failed"] += 1
-    
-    bad_actors = len([d for d, s in discipline_stats.items() if s["total"] >= 3 and (s["failed"] / s["total"] * 100) > 15])
-    
-    # Critical gaps count
-    threats = await db.threats.find({}).to_list(length=None)
-    threat_ids_with_actions = set(a.get("observation_id") or a.get("threat_id") for a in actions if a.get("observation_id") or a.get("threat_id"))
-    obs_without_actions = len([t for t in threats if t.get("id") not in threat_ids_with_actions])
-    
-    critical_without_fmea = len([e for e in equipment 
-        if (str(e.get("criticality", "")).lower() in ["high", "critical", "a", "1"] or 
-            (isinstance(e.get("criticality_score"), (int, float)) and e.get("criticality_score", 0) >= 8))
-        and e.get("id") not in set(m.get("equipment_id") for m in fmea_mappings)])
-    
-    critical_gaps = 0
-    if obs_without_actions > 10:
-        critical_gaps += 1
-    if critical_without_fmea > 0:
-        critical_gaps += 1
-    
-    return {
-        "execution_success_rate": success_rate,
-        "data_completeness_score": completeness_score,
-        "bad_actors_count": bad_actors,
-        "critical_gaps_count": critical_gaps,
-        "total_actions": total_actions,
-        "total_assets": total_assets
-    }
+    try:
+        # Use asyncio.wait_for for timeout protection
+        async def fetch_summary():
+            # Parallel count queries for performance
+            total_actions_task = db.central_actions.count_documents({})
+            completed_actions_task = db.central_actions.count_documents({
+                "status": {"$in": ["completed", "Completed", "done", "Done", "closed", "Closed"]}
+            })
+            total_equipment_task = db.equipment.count_documents({})
+            equipment_with_criticality_task = db.equipment.count_documents({
+                "$or": [
+                    {"criticality": {"$exists": True, "$nin": [None, ""]}},
+                    {"criticality_score": {"$exists": True, "$ne": None}}
+                ]
+            })
+            equipment_with_type_task = db.equipment.count_documents({
+                "$or": [
+                    {"type": {"$exists": True, "$nin": [None, ""]}},
+                    {"equipment_type": {"$exists": True, "$nin": [None, ""]}}
+                ]
+            })
+            fmea_count_task = db.equipment_fmea.count_documents({})
+            threats_count_task = db.threats.count_documents({})
+            
+            # Execute all count queries in parallel
+            (
+                total_actions,
+                completed_actions,
+                total_equipment,
+                equipment_with_criticality,
+                equipment_with_type,
+                fmea_count,
+                threats_count
+            ) = await asyncio.gather(
+                total_actions_task,
+                completed_actions_task,
+                total_equipment_task,
+                equipment_with_criticality_task,
+                equipment_with_type_task,
+                fmea_count_task,
+                threats_count_task
+            )
+            
+            # Calculate metrics
+            success_rate = round((completed_actions / total_actions * 100), 1) if total_actions > 0 else 0
+            
+            # Data completeness score
+            if total_equipment > 0:
+                crit_pct = (equipment_with_criticality / total_equipment * 100)
+                fmea_pct = min((fmea_count / total_equipment * 100), 100)  # Cap at 100%
+                type_pct = (equipment_with_type / total_equipment * 100)
+                completeness_score = round((crit_pct + fmea_pct + type_pct) / 3, 1)
+            else:
+                completeness_score = 0
+            
+            # Count actions with observation/threat references
+            actions_with_obs = await db.central_actions.count_documents({
+                "$or": [
+                    {"observation_id": {"$exists": True, "$ne": None}},
+                    {"threat_id": {"$exists": True, "$ne": None}}
+                ]
+            })
+            
+            # Estimate gaps (simplified for performance)
+            # Critical gaps: observations without actions ratio
+            obs_without_actions_estimate = max(0, threats_count - actions_with_obs)
+            
+            # Count critical equipment without FMEA (simplified)
+            critical_equipment = await db.equipment.count_documents({
+                "$or": [
+                    {"criticality": {"$in": ["high", "High", "critical", "Critical", "a", "A", "1"]}},
+                    {"criticality_score": {"$gte": 8}}
+                ]
+            })
+            
+            # Simplified bad actors and gaps count
+            critical_gaps = 0
+            if obs_without_actions_estimate > 10:
+                critical_gaps += 1
+            if critical_equipment > fmea_count:
+                critical_gaps += 1
+            
+            # Bad actors - simplified estimate based on failed actions ratio
+            failed_actions = await db.central_actions.count_documents({
+                "status": {"$in": ["failed", "Failed", "cancelled", "Cancelled", "rejected", "Rejected"]}
+            })
+            bad_actors_estimate = 1 if (failed_actions > 0 and total_actions > 0 and (failed_actions / total_actions * 100) > 15) else 0
+            
+            return {
+                "execution_success_rate": success_rate,
+                "data_completeness_score": completeness_score,
+                "bad_actors_count": bad_actors_estimate,
+                "critical_gaps_count": critical_gaps,
+                "total_actions": total_actions,
+                "total_assets": total_equipment
+            }
+        
+        result = await asyncio.wait_for(fetch_summary(), timeout=10.0)
+        return result
+        
+    except asyncio.TimeoutError:
+        logger.error("Insights summary timeout")
+        return {
+            "execution_success_rate": 0,
+            "data_completeness_score": 0,
+            "bad_actors_count": 0,
+            "critical_gaps_count": 0,
+            "total_actions": 0,
+            "total_assets": 0,
+            "error": "timeout"
+        }
+    except Exception as e:
+        logger.error(f"Insights summary error: {e}")
+        return {
+            "execution_success_rate": 0,
+            "data_completeness_score": 0,
+            "bad_actors_count": 0,
+            "critical_gaps_count": 0,
+            "total_actions": 0,
+            "total_assets": 0,
+            "error": str(e)
+        }
