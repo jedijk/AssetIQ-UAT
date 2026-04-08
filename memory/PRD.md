@@ -5,6 +5,28 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 8, 2026 - Equipment Hierarchy Search Enhancement (COMPLETED)
+**FEATURE - Enhanced search function prominently displayed at top of hierarchy:**
+
+**Implemented:**
+- ✅ Prominent search bar with gradient background (from-slate-50 to-blue-50)
+- ✅ Larger search input (h-12) for better visibility
+- ✅ Blue search icon and placeholder "Search name, description, tag..."
+- ✅ Keyboard shortcut "/" to focus search, Escape to clear
+- ✅ "Press / to search" hint displayed on right side
+- ✅ Match count badge with blue background showing "X matches found"
+- ✅ Yellow highlighting on matching items with "Match" badge
+- ✅ Auto-expand hierarchy to reveal matching nested items
+- ✅ Clear button (X) restores original expanded state when search cleared
+- ✅ Toolbar buttons (Import, Export, Add Installation) remain visible below search
+
+**Files Modified:**
+- `/app/frontend/src/pages/EquipmentManagerPage.js` - Search UI enhancement and keyboard shortcuts
+
+**Testing:** 12/12 tests passed (100% success rate)
+
+---
+
 ### April 8, 2026 - Failure Mode Auto-Create Actions Feature (COMPLETED)
 **NEW FEATURE - Enable actions to auto-create with observations:**
 
