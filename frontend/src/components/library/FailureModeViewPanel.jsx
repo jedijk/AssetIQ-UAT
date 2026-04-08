@@ -1,5 +1,6 @@
 import { getBackendUrl } from '../../lib/apiConfig';
 import { useState, useEffect } from "react";
+import { formatDate } from "../../lib/dateUtils";
 import { 
   AlertTriangle, Edit, Trash2, X, Plus, Link, CheckCircle, 
   User, Briefcase, Calendar, History, RotateCcw, Clock, ShieldCheck,
@@ -374,7 +375,7 @@ export function FailureModeViewPanel({
                 <span className="text-xs text-green-500">•</span>
                 <div className="flex items-center gap-1 text-xs text-green-500">
                   <Calendar className="w-3 h-3" />
-                  <span>{new Date(fm.validated_at).toLocaleDateString()}</span>
+                  <span>{formatDate(fm.validated_at)}</span>
                 </div>
               </div>
               {/* Row 2: Name + Position */}

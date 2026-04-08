@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { formatDate, formatDateTime } from '../lib/dateUtils';
 import { 
   ArrowLeft, Save, Trash2, ExternalLink, Calendar, User,
   FileText, Brain, Search, AlertTriangle, Loader2, Check,
@@ -624,8 +625,8 @@ export default function ActionDetailPage() {
 
               {/* Timestamps - Compact */}
               <div className="text-[10px] text-slate-400 flex gap-3 px-1">
-                {action.created_at && <span>Created: {new Date(action.created_at).toLocaleDateString()}</span>}
-                {action.updated_at && <span>Updated: {new Date(action.updated_at).toLocaleDateString()}</span>}
+                {action.created_at && <span>Created: {formatDate(action.created_at)}</span>}
+                {action.updated_at && <span>Updated: {formatDate(action.updated_at)}</span>}
               </div>
 
               {/* Action Buttons */}

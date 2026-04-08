@@ -6,6 +6,7 @@ import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import { Skeleton } from "../components/ui/skeleton";
 import { getBackendUrl } from "../lib/apiConfig";
+import { formatDateTime } from "../lib/dateUtils";
 import { 
   Activity, 
   CheckCircle2, 
@@ -674,7 +675,7 @@ const InsightsPage = ({ embedded = false }) => {
                   ))}
                   {recommendations.generated_at && (
                     <p className="text-xs text-slate-400 text-right mt-4">
-                      Generated: {new Date(recommendations.generated_at).toLocaleString()}
+                      Generated: {formatDateTime(recommendations.generated_at)}
                     </p>
                   )}
                 </div>

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
+import { formatDate as formatDateUtil } from "../lib/dateUtils";
 import ImageEditor from "../components/ImageEditor";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { usersAPI, equipmentHierarchyAPI } from "../lib/api";
@@ -724,11 +725,7 @@ const SettingsUserManagementPage = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric"
-    });
+    return formatDateUtil(dateStr);
   };
 
   // Mobile Layout

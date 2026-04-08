@@ -6,6 +6,7 @@ import { compressImage, formatFileSize, getCompressionPercent } from "../lib/ima
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { usePermissions } from "../contexts/PermissionsContext";
+import { formatDate as formatDateUtil, formatDateTime } from "../lib/dateUtils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -409,11 +410,10 @@ export default function ActionsPage() {
     return new Date(action.due_date) < new Date();
   };
 
-  // Format date for display
+  // Format date for display using user preferences
   const formatDate = (dateStr) => {
     if (!dateStr) return "No due date";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return formatDateUtil(dateStr);
   };
 
   // Stats cards matching ThreatsPage style
@@ -1368,8 +1368,8 @@ export default function ActionsPage() {
                       </div>
                     )}
                     <div className="text-xs text-slate-400 flex items-center gap-4 pt-2 border-t border-slate-100">
-                      {ea.created_at && <span>Created: {new Date(ea.created_at).toLocaleString()}</span>}
-                      {ea.updated_at && <span>Updated: {new Date(ea.updated_at).toLocaleString()}</span>}
+                      {ea.created_at && <span>Created: {formatDateTime(ea.created_at)}</span>}
+                      {ea.updated_at && <span>Updated: {formatDateTime(ea.updated_at)}</span>}
                     </div>
                   </div>
                   <DialogFooter className="gap-2 sm:justify-between flex-wrap">

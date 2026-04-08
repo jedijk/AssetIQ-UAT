@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatTime, formatDateTime } from "../lib/dateUtils";
 import {
   ArrowLeft,
   Server,
@@ -829,7 +830,7 @@ const SettingsServerPerformancePage = () => {
                 <div className="pt-2 border-t border-slate-100">
                   <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-400">
                     <span>Updated</span>
-                    <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "-"}</span>
+                    <span>{lastUpdated ? formatTime(lastUpdated) : "-"}</span>
                   </div>
                 </div>
               </div>
@@ -954,7 +955,7 @@ const SettingsServerPerformancePage = () => {
                       <span>Last checked</span>
                       <span>
                         {security.last_scan 
-                          ? new Date(security.last_scan).toLocaleTimeString() 
+                          ? formatTime(security.last_scan) 
                           : "-"}
                       </span>
                     </div>
@@ -1131,7 +1132,7 @@ const SettingsServerPerformancePage = () => {
                               </p>
                             )}
                             <p className="text-[10px] text-slate-400 mt-1">
-                              {new Date(error.timestamp).toLocaleString()}
+                              {formatDateTime(error.timestamp)}
                             </p>
                           </div>
                           {!error.resolved && (
@@ -1156,7 +1157,7 @@ const SettingsServerPerformancePage = () => {
                       <span>Logging since</span>
                       <span>
                         {errorLogs.stats?.logging_since 
-                          ? new Date(errorLogs.stats.logging_since).toLocaleString() 
+                          ? formatDateTime(errorLogs.stats.logging_since) 
                           : "-"}
                       </span>
                     </div>

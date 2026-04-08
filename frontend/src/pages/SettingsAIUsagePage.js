@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "../lib/apiConfig";
+import { formatDate } from "../lib/dateUtils";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import BackButton from "../components/BackButton";
@@ -328,7 +329,7 @@ export default function SettingsAIUsagePage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-slate-500 text-sm">
-                        {inst.last_used ? new Date(inst.last_used).toLocaleDateString() : "-"}
+                        {inst.last_used ? formatDate(inst.last_used) : "-"}
                       </TableCell>
                     </TableRow>
                   ))}

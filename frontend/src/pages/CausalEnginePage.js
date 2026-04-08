@@ -6,6 +6,7 @@ import { compressImage, formatFileSize, getCompressionPercent } from "../lib/ima
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
+import { formatDate, formatDateTime } from "../lib/dateUtils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -884,7 +885,7 @@ export default function CausalEnginePage() {
                       {inv.incident_date && (
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{new Date(inv.incident_date).toLocaleDateString()}</span>
+                          <span>{formatDate(inv.incident_date)}</span>
                         </div>
                       )}
                     </div>
@@ -1200,7 +1201,7 @@ export default function CausalEnginePage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {investigation.asset_name && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Target className="w-3 h-3" />Equipment</div><p className="font-medium text-sm">{investigation.asset_name}</p></div>}
                       {investigation.location && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><MapPin className="w-3 h-3" />Location</div><p className="font-medium text-sm">{investigation.location}</p></div>}
-                      {investigation.incident_date && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Calendar className="w-3 h-3" />Date</div><p className="font-medium text-sm">{new Date(investigation.incident_date).toLocaleDateString()}</p></div>}
+                      {investigation.incident_date && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Calendar className="w-3 h-3" />Date</div><p className="font-medium text-sm">{formatDate(investigation.incident_date)}</p></div>}
                       {investigation.investigation_leader && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><User className="w-3 h-3" />Lead</div><p className="font-medium text-sm">{investigation.investigation_leader}</p></div>}
                     </div>
                   </>
@@ -1347,13 +1348,11 @@ export default function CausalEnginePage() {
                   <div className="priority-list">
                     {sortedTimelineEvents.map((event, idx) => {
                       const category = EVENT_CATEGORIES.find(c => c.value === event.category);
-                      // Format the timestamp to be more readable
-                      const formatTime = (timeStr) => {
+                      // Format the timestamp to be more readable using user preferences
+                      const formatEventTime = (timeStr) => {
                         if (!timeStr) return `#${idx + 1}`;
                         try {
-                          const date = new Date(timeStr);
-                          return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + 
-                            ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                          return formatDateTime(timeStr);
                         } catch {
                           return timeStr.substring(0, 16).replace('T', ' ');
                         }
@@ -1365,7 +1364,7 @@ export default function CausalEnginePage() {
                           </div>
                           <div className="flex-1 min-w-0 ml-3">
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="text-xs font-medium text-slate-500">{formatTime(event.event_time)}</span>
+                              <span className="text-xs font-medium text-slate-500">{formatEventTime(event.event_time)}</span>
                               <span className={`text-xs px-2 py-0.5 rounded-full ${category?.bgClass || "bg-slate-100 text-slate-700"}`}>{category?.label || event.category}</span>
                               <span className={`text-xs px-2 py-0.5 rounded-full ${event.confidence === "high" ? "bg-green-100 text-green-700" : event.confidence === "low" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>{event.confidence}</span>
                               {event.comment && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1"><MessageSquare className="w-3 h-3" />Has comment</span>}
@@ -1555,7 +1554,7 @@ export default function CausalEnginePage() {
                                 {action.due_date && (
                                   <span className={`flex items-center gap-1.5 ${isOverdue ? 'text-red-600' : ''}`}>
                                     <Calendar className="w-3.5 h-3.5" />
-                                    <span className={isOverdue ? 'font-medium' : ''}>{new Date(action.due_date).toLocaleDateString()}</span>
+                                    <span className={isOverdue ? 'font-medium' : ''}>{formatDate(action.due_date)}</span>
                                   </span>
                                 )}
                                 {action.comment && (
@@ -1734,7 +1733,7 @@ export default function CausalEnginePage() {
                             <div className="flex-shrink-0 flex flex-col items-end gap-1">
                               {action.due_date && (
                                 <p className="text-[10px] text-slate-500">
-                                  Due: {new Date(action.due_date).toLocaleDateString()}
+                                  Due: {formatDate(action.due_date)}
                                 </p>
                               )}
                               {action.priority && (

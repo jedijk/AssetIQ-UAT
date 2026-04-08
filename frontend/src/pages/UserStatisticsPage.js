@@ -2,6 +2,7 @@ import { getBackendUrl } from '../lib/apiConfig';
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
+import { formatDateTime } from "../lib/dateUtils";
 import {
   BarChart3,
   Users,
@@ -810,12 +811,7 @@ const UserStatisticsPage = () => {
                         </TableCell>
                         <TableCell className="text-[11px] text-slate-500">
                           {user.last_active 
-                            ? new Date(user.last_active).toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })
+                            ? formatDateTime(user.last_active)
                             : '—'
                           }
                         </TableCell>

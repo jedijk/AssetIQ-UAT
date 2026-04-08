@@ -5,7 +5,45 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
-### April 8, 2026 - Timezone Settings Feature (NEW)
+### April 8, 2026 - DateTime Formatting Propagation (P1 - COMPLETED)
+**TASK - Propagate timezone-aware date/time formatting throughout the application:**
+
+**Implemented:**
+- ✅ Created centralized date formatting utilities in `/app/frontend/src/lib/dateUtils.js`
+  - `formatDate()` - Date formatting respecting user timezone/format preferences
+  - `formatTime()` - Time formatting respecting user timezone/format preferences
+  - `formatDateTime()` - Combined date/time formatting
+  - `formatDateRelative()` - Relative time (e.g., "2h ago")
+  - `formatDateCompact()` - Short format for lists
+  - User preferences caching via localStorage
+- ✅ Updated 15+ pages/components to use centralized formatters:
+  - `ActionsPage.js` - Action due dates and timestamps
+  - `ActionDetailPage.js` - Created/updated timestamps
+  - `CausalEnginePage.js` - Investigation dates, timeline events, action due dates
+  - `ThreatDetailPage.js` - Observation metadata and attachment dates
+  - `FormSubmissionsPage.js` - Submission timestamps (already done)
+  - `DashboardPage.js` - Recent form submission dates (already done)
+  - `InsightsPage.js` - Recommendations generated timestamp
+  - `FeedbackPage.js` - Relative time for feedback items
+  - `FailureModesPage.js` - Version history timestamps
+  - `SettingsUserManagementPage.js` - User dates
+  - `SettingsAIUsagePage.js` - AI usage dates
+  - `SettingsServerPerformancePage.js` - Error logs and scan timestamps
+  - `UserStatisticsPage.js` - User last active timestamps
+  - `TaskSchedulerPage.js` - Task dates
+  - `AIInsightsPanel.jsx` - Last analyzed timestamp
+  - `SubmissionRow.jsx` - Submission details
+  - `CausalNodeCard.jsx` - Node timestamps
+  - `RecommendedActionsSection.jsx` - Action due dates
+  - `FailureModeViewPanel.jsx` - Validation dates
+
+**Files Modified:**
+- `/app/frontend/src/lib/dateUtils.js` - NEW centralized date utilities
+- Multiple page and component files (see list above)
+
+---
+
+### April 8, 2026 - Timezone Settings Feature (COMPLETED)
 **NEW FEATURE - Timezone settings with auto-detection and manual override:**
 
 **Implemented:**

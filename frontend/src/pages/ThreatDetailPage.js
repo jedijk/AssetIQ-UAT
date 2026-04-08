@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { threatsAPI, actionsAPI, equipmentHierarchyAPI, failureModesAPI, usersAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { formatDate, formatTime, formatDateTime } from "../lib/dateUtils";
 import SearchableCombobox from "../components/SearchableCombobox";
 import EquipmentTimeline from "../components/EquipmentTimeline";
 import { DISCIPLINES } from "../constants/disciplines";
@@ -1277,7 +1278,7 @@ const ThreatDetailPage = () => {
                     {attachment.created_at && (
                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1">
                         <span className="text-[10px] text-white/80">
-                          {new Date(attachment.created_at).toLocaleDateString()}
+                          {formatDate(attachment.created_at)}
                         </span>
                       </div>
                     )}
@@ -1370,8 +1371,7 @@ const ThreatDetailPage = () => {
         className="mt-6 text-center text-sm text-slate-400"
         data-testid="threat-metadata"
       >
-        Created {new Date(threat.created_at).toLocaleDateString()} at{" "}
-        {new Date(threat.created_at).toLocaleTimeString()}
+        Created {formatDateTime(threat.created_at)}
       </motion.div>
       </div>
 

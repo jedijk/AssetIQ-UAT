@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { formatDate } from "../../lib/dateUtils";
 
 const nodeTypeConfig = {
   event: {
@@ -78,7 +79,7 @@ export const CausalNodeCard = ({
             {node.timestamp && (
               <Badge variant="outline" className="text-xs">
                 <Calendar className="w-3 h-3 mr-1" />
-                {new Date(node.timestamp).toLocaleDateString()}
+                {formatDate(node.timestamp)}
               </Badge>
             )}
             {node.category && (

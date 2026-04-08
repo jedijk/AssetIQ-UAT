@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { threatsAPI, actionsAPI } from "../../lib/api";
 import { getBackendUrl } from "../../lib/apiConfig";
+import { formatDate } from "../../lib/dateUtils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Plus, ClipboardList, Loader2, Sparkles, AlertTriangle, Settings, CheckCircle, Clock, XCircle, ExternalLink, ShieldCheck, UserCheck, Pencil, Trash2 } from "lucide-react";
@@ -741,7 +742,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                   <div className="flex-shrink-0 flex flex-col items-end gap-1">
                     {action.due_date && (
                       <p className="text-[10px] text-slate-500">
-                        Due: {new Date(action.due_date).toLocaleDateString()}
+                        Due: {formatDate(action.due_date)}
                       </p>
                     )}
                     {action.priority && (

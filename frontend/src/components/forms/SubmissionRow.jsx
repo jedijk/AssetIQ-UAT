@@ -6,13 +6,14 @@ import { useState } from "react";
 import { ChevronRight, ChevronDown, Clock, CheckCircle2 } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { ThresholdBadge } from "./FieldPreview";
+import { formatDateTime } from "../../lib/dateUtils";
 
 export const SubmissionRow = ({ submission }) => {
   const [expanded, setExpanded] = useState(false);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A";
-    return new Date(dateStr).toLocaleString();
+    return formatDateTime(dateStr);
   };
 
   return (

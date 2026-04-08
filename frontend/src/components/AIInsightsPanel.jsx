@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { aiRiskAPI, threatsAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
+import { formatDateTime } from "../lib/dateUtils";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -638,7 +639,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
               
               {/* Last Updated */}
               <div className="text-xs text-slate-400 text-right">
-                {t("ai.lastAnalyzed")}: {new Date(displayData.last_updated || insights?.updated_at).toLocaleString()}
+                {t("ai.lastAnalyzed")}: {formatDateTime(displayData.last_updated || insights?.updated_at)}
               </div>
             </div>
           </motion.div>

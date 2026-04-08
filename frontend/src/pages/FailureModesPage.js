@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
+import { formatDateTime } from "../lib/dateUtils";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { 
   Search, 
@@ -1455,7 +1456,7 @@ const FailureModesPage = () => {
                           <Badge variant="outline">v{version.version}</Badge>
                           <span className="text-xs text-slate-500 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {new Date(version.created_at).toLocaleString()}
+                            {formatDateTime(version.created_at)}
                           </span>
                         </div>
                         
