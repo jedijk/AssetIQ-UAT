@@ -792,19 +792,94 @@ class FormService:
         return {"total": total, "submissions": submissions}
     
     async def get_submission_by_id(self, submission_id: str) -> Optional[Dict[str, Any]]:
-        """Get a specific submission by custom ID or MongoDB ObjectId."""
-        # First try by custom 'id' field (UUID string)
-        doc = await self.submissions.find_one({"id": submission_id})
-        if doc:
-            return self._serialize_submission(doc)
+        """Get a specific submission by custom ID or MongoDB ObjectId.
         
-        # Fallback: try by MongoDB ObjectId
-        if ObjectId.is_valid(submission_id):
-            doc = await self.submissions.find_one({"_id": ObjectId(submission_id)})
+        Uses aggregation pipeline to handle large base64 attachments efficiently.
+        """
+        import asyncio
+        
+        # Build the pipeline to process attachments without loading huge data fields
+        # MongoDB 4.2+ supports $map and $cond in aggregation
+        pipeline = [
+            # Match the submission
+            {"$match": {"id": submission_id}},
+            # Process attachments to exclude large base64 data
+            {"$addFields": {
+                "attachments": {
+                    "$map": {
+                        "input": {"$ifNull": ["$attachments", []]},
+                        "as": "att",
+                        "in": {
+                            "$cond": {
+                                "if": {"$ifNull": ["$$att.url", False]},
+                                # Has URL - return without data
+                                "then": {
+                                    "name": "$$att.name",
+                                    "type": "$$att.type", 
+                                    "size": "$$att.size",
+                                    "url": "$$att.url"
+                                },
+                                # No URL - check data size
+                                "else": {
+                                    "$cond": {
+                                        "if": {"$gt": [{"$strLenCP": {"$ifNull": ["$$att.data", ""]}}, 50000]},
+                                        # Large data - mark as needs migration
+                                        "then": {
+                                            "name": "$$att.name",
+                                            "type": "$$att.type",
+                                            "size": "$$att.size",
+                                            "error": "Legacy attachment - file too large to display inline",
+                                            "needs_migration": True
+                                        },
+                                        # Small data - keep it
+                                        "else": {
+                                            "name": "$$att.name",
+                                            "type": "$$att.type",
+                                            "size": "$$att.size",
+                                            "data": "$$att.data"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }}
+        ]
+        
+        try:
+            # Try by custom 'id' field first with timeout
+            result = await asyncio.wait_for(
+                self.submissions.aggregate(pipeline).to_list(length=1),
+                timeout=5.0
+            )
+            if result:
+                return self._serialize_submission(result[0])
+            
+            # Fallback: try by MongoDB ObjectId
+            if ObjectId.is_valid(submission_id):
+                pipeline[0]["$match"] = {"_id": ObjectId(submission_id)}
+                result = await asyncio.wait_for(
+                    self.submissions.aggregate(pipeline).to_list(length=1),
+                    timeout=5.0
+                )
+                if result:
+                    return self._serialize_submission(result[0])
+            
+            return None
+            
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout fetching submission {submission_id} - falling back to projection")
+            # Fallback: use simple projection excluding attachments entirely
+            projection = {"attachments.data": 0}  # Exclude just the data field
+            
+            doc = await self.submissions.find_one({"id": submission_id}, projection)
+            if not doc and ObjectId.is_valid(submission_id):
+                doc = await self.submissions.find_one({"_id": ObjectId(submission_id)}, projection)
+            
             if doc:
                 return self._serialize_submission(doc)
-        
-        return None
+            return None
     
     # ==================== THRESHOLD EVALUATION ====================
     
@@ -1016,6 +1091,34 @@ class FormService:
         # Handle both custom 'id' field (from task_service) and MongoDB '_id'
         doc_id = doc.get("id") or (str(doc["_id"]) if doc.get("_id") else None)
         
+        # Process attachments - strip large base64 data to prevent timeouts
+        raw_attachments = doc.get("attachments", [])
+        processed_attachments = []
+        for att in raw_attachments:
+            processed = {
+                "name": att.get("name"),
+                "type": att.get("type"),
+                "size": att.get("size"),
+            }
+            
+            # Prefer URL if available (properly stored in object storage)
+            if att.get("url"):
+                processed["url"] = att["url"]
+            elif att.get("data"):
+                # Legacy attachment with base64 data but no URL
+                # Check if data is small enough to include (< 50KB)
+                data = att.get("data", "")
+                if len(data) < 50000:  # 50KB threshold
+                    processed["data"] = data
+                else:
+                    # Too large - mark as needing migration
+                    processed["error"] = "Legacy attachment - file too large to display inline"
+                    processed["needs_migration"] = True
+            elif att.get("error"):
+                processed["error"] = att["error"]
+            
+            processed_attachments.append(processed)
+        
         return {
             "id": doc_id,
             "form_template_id": doc["form_template_id"],
@@ -1029,7 +1132,7 @@ class FormService:
             "efm_id": doc.get("efm_id"),
             "values": values,
             "responses": values,  # Alias for frontend compatibility
-            "attachments": doc.get("attachments", []),
+            "attachments": processed_attachments,
             "threshold_breaches": doc.get("threshold_breaches", []),
             "failure_indicators": doc.get("failure_indicators", []),
             "has_warnings": doc.get("has_warnings", False),

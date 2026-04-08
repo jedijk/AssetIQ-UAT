@@ -745,11 +745,13 @@ export default function FormSubmissionsPage() {
                       const isDoc = /\.(doc|docx)$/i.test(att.name || att.filename || "");
                       const previewUrl = att.url || att.data;
                       const fileName = att.name || att.filename || "Attachment";
+                      const hasError = att.error || att.needs_migration;
                       
                       return (
                         <button
                           key={att.id || att.url || att.name}
                           onClick={() => {
+                            if (hasError) return; // Don't allow interaction for unavailable attachments
                             if (isImage && previewUrl) {
                               setViewingImage({ url: previewUrl, name: fileName });
                             } else if ((isPdf || isDoc) && previewUrl) {
@@ -761,9 +763,21 @@ export default function FormSubmissionsPage() {
                               link.click();
                             }
                           }}
-                          className="relative group bg-slate-100 rounded-lg border border-slate-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0"
+                          className={`relative group rounded-lg border overflow-hidden transition-all w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 ${
+                            hasError 
+                              ? 'bg-amber-50 border-amber-300 cursor-not-allowed opacity-75' 
+                              : 'bg-slate-100 border-slate-200 hover:border-blue-300 hover:shadow-md'
+                          }`}
+                          disabled={hasError}
                         >
-                          {isImage && previewUrl ? (
+                          {hasError ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                              <AlertTriangle className="w-8 h-8 text-amber-500 mb-1" />
+                              <span className="text-[10px] text-amber-600 text-center px-1">
+                                Unavailable
+                              </span>
+                            </div>
+                          ) : isImage && previewUrl ? (
                             <img src={previewUrl} alt={fileName} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center p-2">
@@ -782,11 +796,13 @@ export default function FormSubmissionsPage() {
                           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">
                             <p className="text-[10px] text-white truncate font-medium">{fileName}</p>
                           </div>
-                          <div className="absolute inset-0 bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <div className="bg-white/90 rounded-full p-1.5 shadow-lg">
-                              {isImage ? <ZoomIn className="w-4 h-4 text-blue-600" /> : <Eye className="w-4 h-4 text-blue-600" />}
+                          {!hasError && (
+                            <div className="absolute inset-0 bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <div className="bg-white/90 rounded-full p-1.5 shadow-lg">
+                                {isImage ? <ZoomIn className="w-4 h-4 text-blue-600" /> : <Eye className="w-4 h-4 text-blue-600" />}
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </button>
                       );
                     })}

@@ -1391,11 +1391,16 @@ export default function DashboardPage() {
                     const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name || att.filename || "");
                     const previewUrl = att.url || att.data;
                     const fileName = att.name || att.filename || "Attachment";
+                    const hasError = att.error || att.needs_migration;
                     
                     return (
                       <button
                         key={att.url || att.id || `attachment-${idx}`}
                         onClick={() => {
+                          if (hasError) {
+                            // Show error message for unavailable attachments
+                            return;
+                          }
                           if (previewUrl) {
                             if (isImage) {
                               setViewingImage({ url: previewUrl, name: fileName });
@@ -1404,9 +1409,19 @@ export default function DashboardPage() {
                             }
                           }
                         }}
-                        className="relative group bg-slate-100 rounded-lg border border-slate-200 overflow-hidden aspect-square hover:border-blue-300"
+                        className={`relative group bg-slate-100 rounded-lg border overflow-hidden aspect-square ${
+                          hasError ? 'border-amber-300 cursor-not-allowed opacity-75' : 'border-slate-200 hover:border-blue-300'
+                        }`}
+                        disabled={hasError}
                       >
-                        {isImage && previewUrl ? (
+                        {hasError ? (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-2 bg-amber-50">
+                            <AlertTriangle className="w-6 h-6 text-amber-500" />
+                            <span className="text-[9px] text-amber-600 mt-1 text-center px-1">
+                              Unavailable
+                            </span>
+                          </div>
+                        ) : isImage && previewUrl ? (
                           <img src={previewUrl} alt={fileName} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center p-2">
