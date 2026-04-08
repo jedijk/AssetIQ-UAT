@@ -46,6 +46,7 @@ async def get_failure_modes(
     equipment_type_id: Optional[str] = None,
     mechanism: Optional[str] = None,
     is_validated: Optional[bool] = None,
+    failure_mode_type: Optional[str] = None,  # "generic" or "customer_specific"
     skip: int = 0,
     limit: int = 500
 ):
@@ -60,6 +61,7 @@ async def get_failure_modes(
             equipment_type_id=equipment_type_id,
             mechanism=mechanism,
             is_validated=is_validated,
+            failure_mode_type=failure_mode_type,
             skip=skip,
             limit=limit
         )

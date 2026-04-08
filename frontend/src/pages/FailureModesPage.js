@@ -41,7 +41,9 @@ import {
   User,
   RotateCcw,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Globe,
+  Building
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -111,8 +113,16 @@ const FailureModesPage = () => {
   // Initialize state from URL params (for FMEA linkage from Maintenance Strategies)
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all"); // generic, customer_specific, all
   const [mainTab, setMainTab] = useState(() => searchParams.get("tab") || "failure-modes");
   const [libraryTab, setLibraryTab] = useState("equipment");
+  
+  // Failure mode type options
+  const FAILURE_MODE_TYPE_OPTIONS = [
+    { value: "all", label: "All Types" },
+    { value: "generic", label: "Generic (Industry Standard)", color: "bg-blue-100 text-blue-700", icon: "globe" },
+    { value: "customer_specific", label: "Customer Specific", color: "bg-purple-100 text-purple-700", icon: "building" },
+  ];
   
   // Handle URL parameter changes (e.g., from Maintenance Strategy FMEA links)
   useEffect(() => {
@@ -162,7 +172,8 @@ const FailureModesPage = () => {
     process: "",
     potential_effects: "",
     potential_causes: "",
-    iso14224_mechanism: ""
+    iso14224_mechanism: "",
+    failure_mode_type: "generic"  // "generic" or "customer_specific"
   });
   const [keywordInput, setKeywordInput] = useState("");
   const [actionInput, setActionInput] = useState("");
@@ -200,7 +211,8 @@ const FailureModesPage = () => {
       process: "",
       potential_effects: "",
       potential_causes: "",
-      iso14224_mechanism: ""
+      iso14224_mechanism: "",
+      failure_mode_type: "generic"
     });
     setKeywordInput("");
     setActionInput("");
@@ -217,7 +229,7 @@ const FailureModesPage = () => {
 
   // Fetch failure modes
   const { data: modesData, isLoading } = useQuery({
-    queryKey: ["failureModes", categoryFilter, searchQuery],
+    queryKey: ["failureModes", categoryFilter, searchQuery, typeFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (categoryFilter && categoryFilter !== "all") {
@@ -225,6 +237,9 @@ const FailureModesPage = () => {
       }
       if (searchQuery) {
         params.append("search", searchQuery);
+      }
+      if (typeFilter && typeFilter !== "all") {
+        params.append("failure_mode_type", typeFilter);
       }
       const response = await api.get(`/failure-modes?${params.toString()}`);
       return response.data;
@@ -692,6 +707,28 @@ const FailureModesPage = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full sm:w-52 h-11" data-testid="type-filter">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  <span className="flex items-center gap-2">All Types</span>
+                </SelectItem>
+                <SelectItem value="generic">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    Generic (Industry)
+                  </span>
+                </SelectItem>
+                <SelectItem value="customer_specific">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                    Customer Specific
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
             <Button 
               onClick={handleExportExcel} 
               variant="outline" 
@@ -757,6 +794,11 @@ const FailureModesPage = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <Badge className={`${colors} text-xs px-1.5 py-0`}>{fm.category}</Badge>
+                            {fm.failure_mode_type === "customer_specific" && (
+                              <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0">
+                                Customer
+                              </Badge>
+                            )}
                           </div>
                           <h3 className="font-medium text-slate-900 text-sm line-clamp-1">
                             {fm.failure_mode}
@@ -1041,6 +1083,66 @@ const FailureModesPage = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* Failure Mode Type Selection */}
+            <div>
+              <Label className="flex items-center gap-2">
+                Failure Mode Type *
+                <span className="text-xs text-slate-400 font-normal">(Generic = industry standard, Customer = specific to your organization)</span>
+              </Label>
+              <div className="flex gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setNewFm({ ...newFm, failure_mode_type: "generic" })}
+                  className={`flex-1 p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${
+                    newFm.failure_mode_type === "generic"
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                  data-testid="fm-type-generic"
+                >
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    newFm.failure_mode_type === "generic" ? "bg-blue-100" : "bg-slate-100"
+                  }`}>
+                    <Globe className={`w-5 h-5 ${newFm.failure_mode_type === "generic" ? "text-blue-600" : "text-slate-400"}`} />
+                  </div>
+                  <div className="text-left">
+                    <p className={`font-medium ${newFm.failure_mode_type === "generic" ? "text-blue-700" : "text-slate-700"}`}>
+                      Generic
+                    </p>
+                    <p className="text-xs text-slate-500">Industry standard failure modes</p>
+                  </div>
+                  {newFm.failure_mode_type === "generic" && (
+                    <CheckCircle className="w-5 h-5 text-blue-600 ml-auto" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewFm({ ...newFm, failure_mode_type: "customer_specific" })}
+                  className={`flex-1 p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${
+                    newFm.failure_mode_type === "customer_specific"
+                      ? "border-purple-500 bg-purple-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                  data-testid="fm-type-customer"
+                >
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    newFm.failure_mode_type === "customer_specific" ? "bg-purple-100" : "bg-slate-100"
+                  }`}>
+                    <Building className={`w-5 h-5 ${newFm.failure_mode_type === "customer_specific" ? "text-purple-600" : "text-slate-400"}`} />
+                  </div>
+                  <div className="text-left">
+                    <p className={`font-medium ${newFm.failure_mode_type === "customer_specific" ? "text-purple-700" : "text-slate-700"}`}>
+                      Customer Specific
+                    </p>
+                    <p className="text-xs text-slate-500">Unique to your organization</p>
+                  </div>
+                  {newFm.failure_mode_type === "customer_specific" && (
+                    <CheckCircle className="w-5 h-5 text-purple-600 ml-auto" />
+                  )}
+                </button>
               </div>
             </div>
 

@@ -361,6 +361,53 @@ export function FailureModeViewPanel({
           </div>
         </div>
 
+        {/* Failure Mode Type Indicator */}
+        <div className="flex items-center gap-3">
+          {isEditing ? (
+            <div className="flex gap-2 flex-1">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, failure_mode_type: "generic" })}
+                className={`flex-1 p-2 rounded-lg border transition-all flex items-center justify-center gap-2 ${
+                  (formData?.failure_mode_type || "generic") === "generic"
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                <span className={`text-sm font-medium ${(formData?.failure_mode_type || "generic") === "generic" ? "text-blue-700" : "text-slate-600"}`}>
+                  Generic (Industry)
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, failure_mode_type: "customer_specific" })}
+                className={`flex-1 p-2 rounded-lg border transition-all flex items-center justify-center gap-2 ${
+                  formData?.failure_mode_type === "customer_specific"
+                    ? "border-purple-500 bg-purple-50"
+                    : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                <span className={`text-sm font-medium ${formData?.failure_mode_type === "customer_specific" ? "text-purple-700" : "text-slate-600"}`}>
+                  Customer Specific
+                </span>
+              </button>
+            </div>
+          ) : (
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${
+              fm.failure_mode_type === "customer_specific" 
+                ? "bg-purple-100 text-purple-700" 
+                : "bg-blue-100 text-blue-700"
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${fm.failure_mode_type === "customer_specific" ? "bg-purple-500" : "bg-blue-500"}`}></div>
+              <span className="text-sm font-medium">
+                {fm.failure_mode_type === "customer_specific" ? "Customer Specific" : "Generic (Industry)"}
+              </span>
+            </div>
+          )}
+        </div>
+
         {/* Validation Status */}
         {fm.is_validated ? (
           <div className="flex items-center gap-4 px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">

@@ -33,6 +33,7 @@ class FailureModesService:
         equipment_type_id: Optional[str] = None,
         mechanism: Optional[str] = None,
         is_validated: Optional[bool] = None,
+        failure_mode_type: Optional[str] = None,
         skip: int = 0,
         limit: int = 500
     ) -> Dict[str, Any]:
@@ -58,6 +59,10 @@ class FailureModesService:
         
         if is_validated is not None:
             query["is_validated"] = is_validated
+        
+        # Filter by failure mode type (generic vs customer_specific)
+        if failure_mode_type and failure_mode_type.lower() != "all":
+            query["failure_mode_type"] = failure_mode_type.lower()
         
         # Text search across multiple fields
         if search:
