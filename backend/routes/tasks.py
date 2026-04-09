@@ -12,18 +12,12 @@ from models.task_models import (
     TaskInstanceCreate, TaskInstanceUpdate, TaskExecutionSubmit,
     AdhocTaskCreate
 )
+from services.storage_service import put_object_async, is_storage_available
 import uuid
 import os
 import logging
 
 logger = logging.getLogger(__name__)
-
-# Object storage - import if available
-try:
-    from emergentintegrations.llm.objectstorage import upload_file_to_storage
-    HAS_OBJECT_STORAGE = True
-except ImportError:
-    HAS_OBJECT_STORAGE = False
 
 router = APIRouter(tags=["Tasks"])
 
@@ -35,31 +29,32 @@ async def upload_task_attachment(
     current_user: dict = Depends(get_current_user)
 ):
     """Upload an attachment file for task completion."""
-    if not HAS_OBJECT_STORAGE:
-        raise HTTPException(status_code=501, detail="Object storage not configured")
+    if not is_storage_available():
+        raise HTTPException(status_code=501, detail="Storage service not available")
     
     try:
         # Read file content
         content = await file.read()
         file_ext = os.path.splitext(file.filename)[1] if file.filename else ".bin"
         unique_id = str(uuid.uuid4())
-        storage_path = f"assetiq/task-attachments/{current_user['id']}/{unique_id}{file_ext}"
+        storage_path = f"task-attachments/{current_user['id']}/{unique_id}{file_ext}"
         
-        # Upload to object storage
-        file_url = upload_file_to_storage(
-            file_path=storage_path,
-            file_content=content,
+        # Upload to MongoDB storage
+        result = await put_object_async(
+            path=storage_path,
+            data=content,
             content_type=file.content_type or "application/octet-stream"
         )
         
         return {
-            "url": file_url,
+            "url": result.get("path", storage_path),
             "name": file.filename,
             "type": file.content_type,
             "size": len(content),
             "uploaded_at": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
+        logger.error(f"Failed to upload attachment: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
 
 # ============= TASK MANAGEMENT ENDPOINTS =============

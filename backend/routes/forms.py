@@ -382,6 +382,10 @@ async def upload_form_document(
 ):
     """Upload a reference document to a form template."""
     from bson import ObjectId
+    from services.storage_service import put_object_async, is_storage_available
+    
+    if not is_storage_available():
+        raise HTTPException(status_code=501, detail="Storage service not available")
     
     # Verify template exists
     template = await form_service.get_template_by_id(template_id)
@@ -407,10 +411,10 @@ async def upload_form_document(
     storage_path = f"forms/{template_id}/documents/{doc_id}.{ext}"
     content_type = MIME_TYPES.get(ext, "application/octet-stream")
     
-    # Upload to object storage
+    # Upload to MongoDB storage
     try:
-        result = put_object(storage_path, file_data, content_type)
-        doc_url = result.get("url", storage_path)
+        result = await put_object_async(storage_path, file_data, content_type)
+        doc_url = result.get("path", storage_path)
     except Exception as e:
         logger.error(f"Failed to upload document: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload document")
@@ -468,12 +472,13 @@ async def serve_form_document(
     document_path: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Serve a form document file from object storage."""
+    """Serve a form document file from MongoDB storage."""
     from fastapi.responses import Response
+    from services.storage_service import get_object_async
     
     try:
         # Get the document from storage
-        content, content_type = get_object(document_path)
+        content, content_type = await get_object_async(document_path)
         return Response(
             content=content,
             media_type=content_type,
@@ -481,6 +486,8 @@ async def serve_form_document(
                 "Content-Disposition": f"inline; filename=\"{document_path.split('/')[-1]}\""
             }
         )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Document not found")
     except Exception as e:
         logger.error(f"Failed to serve document {document_path}: {e}")
         raise HTTPException(status_code=404, detail="Document not found")

@@ -245,27 +245,34 @@ app.add_middleware(
 # =============================================================================
 
 class TimeoutMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, timeout: float = 25.0):
+    def __init__(self, app, timeout: float = 25.0, long_timeout: float = 120.0):
         super().__init__(app)
         self.timeout = timeout
+        self.long_timeout = long_timeout  # For file downloads
 
     async def dispatch(self, request: Request, call_next):
         # Skip timeout for health endpoints
         if request.url.path in ["/health", "/", "/api/health"]:
             return await call_next(request)
         
+        # Use longer timeout for file storage/download endpoints
+        if "/storage/" in request.url.path or "/avatar" in request.url.path:
+            request_timeout = self.long_timeout
+        else:
+            request_timeout = self.timeout
+        
         start_time = time.time()
         try:
-            response = await asyncio.wait_for(call_next(request), timeout=self.timeout)
+            response = await asyncio.wait_for(call_next(request), timeout=request_timeout)
             duration = time.time() - start_time
             if duration > 5.0:
                 logger.warning(f"Slow request: {request.method} {request.url.path} took {duration:.2f}s")
             return response
         except asyncio.TimeoutError:
-            logger.error(f"Request timeout: {request.method} {request.url.path} exceeded {self.timeout}s")
+            logger.error(f"Request timeout: {request.method} {request.url.path} exceeded {request_timeout}s")
             return JSONResponse(status_code=504, content={"detail": "Request timeout - please try again"})
 
-app.add_middleware(TimeoutMiddleware, timeout=25.0)
+app.add_middleware(TimeoutMiddleware, timeout=25.0, long_timeout=120.0)
 
 
 # =============================================================================

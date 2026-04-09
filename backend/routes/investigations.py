@@ -9,7 +9,7 @@ import uuid
 import logging
 from database import db
 from auth import get_current_user
-from services.storage_service import put_object, get_object, MIME_TYPES, APP_NAME
+from services.storage_service import put_object_async, get_object_async, MIME_TYPES, APP_NAME
 from investigation_models import (
     InvestigationCreate, InvestigationUpdate, InvestigationStatus,
     TimelineEventCreate, TimelineEventUpdate, EventCategory, ConfidenceLevel,
@@ -674,8 +674,8 @@ async def upload_investigation_file(
     storage_path = f"{APP_NAME}/investigations/{inv_id}/{file_id}.{ext}"
     
     try:
-        # Upload to object storage
-        result = put_object(storage_path, file_data, content_type)
+        # Upload to MongoDB storage
+        result = await put_object_async(storage_path, file_data, content_type)
         
         # Create evidence record
         evidence_doc = {
@@ -709,14 +709,14 @@ async def download_file(
     auth: str = Query(None),
     current_user: dict = Depends(get_current_user)
 ):
-    """Download a file from storage."""
+    """Download a file from MongoDB storage."""
     # Find file record
     record = await db.evidence_items.find_one({"storage_path": path, "is_deleted": {"$ne": True}})
     if not record:
         raise HTTPException(status_code=404, detail="File not found")
     
     try:
-        data, content_type = get_object(path)
+        data, content_type = await get_object_async(path)
         return Response(
             content=data, 
             media_type=record.get("content_type", content_type),
@@ -724,6 +724,8 @@ async def download_file(
                 "Content-Disposition": f'inline; filename="{record.get("original_filename", "download")}"'
             }
         )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found in storage")
     except Exception as e:
         logger.error(f"File download failed: {e}")
         raise HTTPException(status_code=500, detail="File download failed")

@@ -6,6 +6,62 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ---
 
 
+### April 9, 2026 - MongoDB File Storage Migration (COMPLETED)
+**FEATURE - Migrated file storage from Emergent Object Storage to MongoDB:**
+
+**Problem:**
+- The app was dependent on Emergent Object Storage for file attachments
+- On Railway/Vercel deployments, the `EMERGENT_LLM_KEY` was required for file access
+- Users wanted to be independent of external storage dependencies
+
+**Solution:**
+1. **Implemented MongoDB-based file storage** (`/app/backend/services/storage_service.py`)
+   - Files stored directly in MongoDB's `file_storage` collection as base64
+   - No external dependencies - works on any deployment
+   - Dedicated MongoDB connection with extended timeouts (120s) for large files
+   - Async-first API with sync wrappers for backward compatibility
+
+2. **Updated all storage endpoints to use MongoDB:**
+   - `/api/storage/{path}` - Main file serving endpoint
+   - `/api/tasks/upload-attachment` - Task attachments
+   - `/api/form-templates/{id}/documents` - Form document uploads
+   - `/api/form-documents/{path}` - Form document retrieval
+   - `/api/investigations/{id}/files` - Investigation evidence
+   - `/api/users/{id}/avatar` - User avatars
+
+3. **Extended server timeout middleware** for file downloads:
+   - Default timeout: 25 seconds
+   - Storage/avatar endpoints: 120 seconds
+
+4. **Added `file_storage` collection indexes**:
+   - `path` (unique)
+   - `created_at`
+   - `content_type`
+
+5. **Created migration script** (`/app/backend/scripts/migrate_to_mongodb_storage.py`)
+   - Migrates existing files from Emergent storage to MongoDB
+   - Run once on deployment to move existing files
+
+**Files Modified:**
+- `/app/backend/services/storage_service.py` - Complete rewrite for MongoDB storage
+- `/app/backend/routes/assets.py` - Updated to use async MongoDB operations
+- `/app/backend/routes/tasks.py` - Updated attachment upload
+- `/app/backend/routes/forms.py` - Updated document upload/download
+- `/app/backend/routes/investigations.py` - Updated evidence file handling
+- `/app/backend/routes/users.py` - Updated avatar upload/retrieval
+- `/app/backend/server.py` - Extended timeout for storage endpoints
+
+**Performance:**
+- Small files (<500KB): ~5-6 seconds
+- Medium files (500KB-1MB): ~10-15 seconds
+- Large files (>2MB): ~30-40 seconds
+
+**Note:** Large file retrieval time is due to MongoDB network latency for base64 decoding. For production with high file volumes, consider GridFS or dedicated object storage.
+
+---
+
+
+
 ### April 9, 2026 - Database Performance Optimization (COMPLETED)
 **OPTIMIZATION - Speed optimization via database indexing and query caching:**
 

@@ -11,7 +11,7 @@ import base64
 import os
 from database import db, rbac_service
 from auth import get_current_user, hash_password
-from services.storage_service import upload_avatar, get_object, get_mime_type, is_storage_available
+from services.storage_service import upload_avatar_async, get_object_async, get_mime_type, is_storage_available
 from services.cache_service import CacheService as cache
 
 # Try to import resend for email
@@ -365,8 +365,8 @@ async def upload_user_avatar(
     
     try:
         if is_storage_available():
-            # Upload to object storage (Emergent)
-            storage_path = upload_avatar(
+            # Upload to MongoDB storage
+            storage_path = await upload_avatar_async(
                 user_id=current_user["id"],
                 file_data=content,
                 filename=file.filename,
@@ -505,9 +505,9 @@ async def get_user_avatar(
             return Response(status_code=204)  # Graceful fallback
     
     elif user.get("avatar_path"):
-        # Return from object storage
+        # Return from MongoDB storage
         try:
-            content, content_type = get_object(user["avatar_path"])
+            content, content_type = await get_object_async(user["avatar_path"])
             return Response(
                 content=content, 
                 media_type=content_type,
@@ -516,6 +516,9 @@ async def get_user_avatar(
                     "Cache-Control": "public, max-age=3600"
                 }
             )
+        except FileNotFoundError:
+            logger.warning(f"Avatar not found in storage: {user['avatar_path']}")
+            return Response(status_code=204)
         except Exception as e:
             logger.error(f"Failed to get avatar from storage: {e}")
             # Return 204 No Content instead of 404 to let frontend use fallback
@@ -748,8 +751,8 @@ async def upload_user_avatar_admin(
     
     try:
         if is_storage_available():
-            # Upload to object storage (Emergent)
-            storage_path = upload_avatar(
+            # Upload to MongoDB storage
+            storage_path = await upload_avatar_async(
                 user_id=user_id,
                 file_data=content,
                 filename=file.filename,

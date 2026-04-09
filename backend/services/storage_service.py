@@ -19,15 +19,50 @@ import base64
 import logging
 from datetime import datetime, timezone
 from typing import Tuple, Optional, Dict, Any
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from motor.motor_asyncio import AsyncIOMotorClient
 
 logger = logging.getLogger(__name__)
 
-# Global database reference - set by init_mongo_storage()
-_db: Optional[AsyncIOMotorDatabase] = None
-
 # App name for storage paths (kept for backward compatibility)
 APP_NAME = "assetiq"
+
+# Dedicated client for file storage with longer timeouts
+_storage_client: Optional[AsyncIOMotorClient] = None
+_storage_db = None
+
+
+async def _get_storage_db():
+    """Get database with extended timeouts for large file operations."""
+    global _storage_client, _storage_db
+    
+    if _storage_db is not None:
+        return _storage_db
+    
+    mongo_url = os.environ.get('MONGO_URL')
+    db_name = os.environ.get('DB_NAME', 'test_database').strip('"')
+    
+    if not mongo_url:
+        raise RuntimeError("MONGO_URL not configured")
+    
+    # Create client with extended timeouts for large file transfers
+    _storage_client = AsyncIOMotorClient(
+        mongo_url,
+        serverSelectionTimeoutMS=30000,  # 30 seconds
+        connectTimeoutMS=30000,
+        socketTimeoutMS=120000,  # 2 minutes for large file reads
+        maxPoolSize=5,
+        retryReads=True,
+        retryWrites=True,
+    )
+    _storage_db = _storage_client[db_name]
+    logger.info("File storage DB connection initialized with extended timeouts")
+    return _storage_db
+
+
+def _get_db():
+    """Get database reference from the database module (for backward compatibility)."""
+    from database import db
+    return db
 
 # MIME type helpers
 MIME_TYPES = {
@@ -51,10 +86,8 @@ MIME_TYPES = {
 }
 
 
-def init_mongo_storage(db: AsyncIOMotorDatabase):
-    """Initialize the MongoDB storage with database reference."""
-    global _db
-    _db = db
+def init_mongo_storage(db=None):
+    """Initialize the MongoDB storage - kept for backward compatibility."""
     logger.info("MongoDB file storage initialized")
 
 
@@ -65,8 +98,12 @@ def get_mime_type(filename: str) -> str:
 
 
 def is_storage_available() -> bool:
-    """Check if storage is available - always True for MongoDB storage."""
-    return _db is not None
+    """Check if storage is available - True if database is connected."""
+    try:
+        db = _get_db()
+        return db is not None
+    except Exception:
+        return False
 
 
 # ==================== ASYNC FUNCTIONS (Primary API) ====================
@@ -83,10 +120,9 @@ async def put_object_async(path: str, data: bytes, content_type: str) -> Dict[st
     Returns:
         dict with path, size, created_at
     """
-    if _db is None:
-        raise RuntimeError("Storage not initialized - call init_mongo_storage first")
+    db = await _get_storage_db()
     
-    collection = _db["file_storage"]
+    collection = db["file_storage"]
     
     # Encode to base64 for storage
     base64_data = base64.b64encode(data).decode('utf-8')
@@ -130,10 +166,9 @@ async def get_object_async(path: str) -> Tuple[bytes, str]:
     Raises:
         FileNotFoundError if file doesn't exist
     """
-    if _db is None:
-        raise RuntimeError("Storage not initialized - call init_mongo_storage first")
+    db = await _get_storage_db()
     
-    collection = _db["file_storage"]
+    collection = db["file_storage"]
     
     doc = await collection.find_one({"path": path})
     
@@ -158,10 +193,9 @@ async def delete_object_async(path: str) -> bool:
     Returns:
         True if deleted, False if not found
     """
-    if _db is None:
-        raise RuntimeError("Storage not initialized - call init_mongo_storage first")
+    db = await _get_storage_db()
     
-    collection = _db["file_storage"]
+    collection = db["file_storage"]
     result = await collection.delete_one({"path": path})
     
     if result.deleted_count > 0:
@@ -181,10 +215,9 @@ async def list_objects_async(prefix: str = "", limit: int = 100) -> list:
     Returns:
         List of file metadata dicts
     """
-    if _db is None:
-        raise RuntimeError("Storage not initialized - call init_mongo_storage first")
+    db = await _get_storage_db()
     
-    collection = _db["file_storage"]
+    collection = db["file_storage"]
     
     query = {}
     if prefix:
@@ -216,9 +249,6 @@ def put_object(path: str, data: bytes, content_type: str) -> Dict[str, Any]:
     """
     import asyncio
     
-    if _db is None:
-        raise RuntimeError("Storage not initialized - call init_mongo_storage first")
-    
     async def _put():
         return await put_object_async(path, data, content_type)
     
@@ -229,7 +259,7 @@ def put_object(path: str, data: bytes, content_type: str) -> Dict[str, Any]:
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(asyncio.run, _put())
-            return future.result(timeout=60)
+            return future.result(timeout=120)
     except RuntimeError:
         # No running loop - we can use asyncio.run directly
         return asyncio.run(_put())
@@ -242,9 +272,6 @@ def get_object(path: str) -> Tuple[bytes, str]:
     """
     import asyncio
     
-    if _db is None:
-        raise RuntimeError("Storage not initialized - call init_mongo_storage first")
-    
     async def _get():
         return await get_object_async(path)
     
@@ -254,7 +281,7 @@ def get_object(path: str) -> Tuple[bytes, str]:
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(asyncio.run, _get())
-            return future.result(timeout=60)
+            return future.result(timeout=120)
     except RuntimeError:
         # No running loop
         return asyncio.run(_get())
@@ -320,10 +347,12 @@ def upload_avatar(user_id: str, file_data: bytes, filename: str, content_type: s
 
 async def get_storage_stats() -> Dict[str, Any]:
     """Get storage statistics."""
-    if _db is None:
-        return {"error": "Storage not initialized"}
+    try:
+        db = await _get_storage_db()
+    except Exception as e:
+        return {"error": f"Storage not initialized: {e}"}
     
-    collection = _db["file_storage"]
+    collection = db["file_storage"]
     
     # Count files
     total_files = await collection.count_documents({})
