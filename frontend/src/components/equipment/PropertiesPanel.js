@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
-import { failureModesAPI } from "../../lib/api";
+import { failureModesAPI, qrCodeAPI } from "../../lib/api";
 import {
-  Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle,
+  Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle, QrCode,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -13,6 +13,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "../ui/command";
+import { QRCodeDialog } from "./QRCodeDialog";
 
 const LEVEL_CONFIG = { 
   installation: { icon: Settings, label: "Installation" }, 
@@ -75,6 +76,15 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const [showAllTypes, setShowAllTypes] = useState(false);
   const [typeSearchOpen, setTypeSearchOpen] = useState(false);
   const [typeSearchQuery, setTypeSearchQuery] = useState("");
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  
+  // Fetch QR code for this equipment
+  const { data: qrData } = useQuery({
+    queryKey: ["qr-code", node?.id],
+    queryFn: () => qrCodeAPI.getForEquipment(node.id),
+    enabled: !!node?.id,
+    staleTime: 30000,
+  });
   
   // Fetch failure mode counts by equipment type
   const { data: fmCountsData } = useQuery({
@@ -470,6 +480,27 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
             </div>
           </div>
           
+          {/* QR Code Section */}
+          <div className="pt-4 border-t border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-sm font-medium">QR Code</Label>
+              {qrData?.qr_code && (
+                <span className="text-xs text-green-600 flex items-center gap-1">
+                  <Check className="w-3 h-3" />
+                  Active
+                </span>
+              )}
+            </div>
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => setShowQRDialog(true)}
+            >
+              <QrCode className="w-4 h-4 mr-2" />
+              {qrData?.qr_code ? "View/Edit QR Code" : "Generate QR Code"}
+            </Button>
+          </div>
+          
           {node.level !== "installation" && (
             <div className="pt-4 border-t border-slate-200">
               <Button 
@@ -484,6 +515,14 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
           )}
         </div>
       </ScrollArea>
+      
+      {/* QR Code Dialog */}
+      <QRCodeDialog 
+        open={showQRDialog}
+        onOpenChange={setShowQRDialog}
+        equipment={node}
+        existingQR={qrData?.qr_code}
+      />
     </div>
   );
 }

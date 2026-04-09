@@ -30,6 +30,7 @@ from routes.admin import router as admin_router
 from routes.risk_settings import router as risk_settings_router
 from routes.system import router as system_router
 from routes.insights import router as insights_router
+from routes.qr_codes import router as qr_codes_router
 
 all_routers = [
     auth_router,
@@ -61,4 +62,5 @@ all_routers = [
     risk_settings_router,
     system_router,
     insights_router,
+    qr_codes_router,
 ]

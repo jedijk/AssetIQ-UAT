@@ -5,6 +5,54 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 9, 2026 - QR Code Management Module (COMPLETED)
+**FEATURE - Complete QR Code generation, assignment, and print/export system:**
+
+**Backend Implementation:**
+- ✅ `/api/qr/generate` - Generate single QR code with optional hierarchy linking
+- ✅ `/api/qr/generate-bulk` - Bulk QR generation for multiple equipment items
+- ✅ `/api/qr/list` - List all QR codes with filtering
+- ✅ `/api/qr/{qr_id}` - Get QR code details with image
+- ✅ `/api/qr/{qr_id}/image` - Direct QR image endpoint (PNG/SVG)
+- ✅ `/api/qr/resolve/{qr_id}` - Scan resolution with action menu
+- ✅ `/api/qr/print` - PDF generation with templates (single, A4 2x2, 3x3, 4x5)
+- ✅ `/api/qr/export` - Export as PNG, SVG, PDF, ZIP, CSV
+- ✅ `/api/qr/equipment/{id}` - Get/Generate QR for specific equipment
+
+**Frontend Implementation:**
+- ✅ `QRCodeDialog.js` - Full QR management dialog with:
+  - QR code generation and display
+  - Label editing
+  - Action configuration (View Asset, Report Observation)
+  - Default action selection
+  - Print with template selection (size, layout)
+  - Export dropdown (PNG, SVG, PDF)
+  - Copy URL and open in new tab
+- ✅ `BulkQRDialog.js` - Bulk generation for multiple selected items
+- ✅ `QRScanPage.js` - Landing page when QR is scanned:
+  - Login required for access
+  - Action menu for multiple actions
+  - Direct redirect for single default action
+- ✅ Equipment Manager integration - "Generate/View QR Code" button in properties panel
+- ✅ QR Code API in `api.js`
+
+**Files Created:**
+- `/app/backend/routes/qr_codes.py`
+- `/app/frontend/src/components/equipment/QRCodeDialog.js`
+- `/app/frontend/src/pages/QRScanPage.js`
+
+**Files Modified:**
+- `/app/backend/routes/__init__.py`
+- `/app/frontend/src/lib/api.js`
+- `/app/frontend/src/components/equipment/PropertiesPanel.js`
+- `/app/frontend/src/App.js`
+
+**Dependencies Added:**
+- `qrcode[pil]` - QR code generation
+- `reportlab` - PDF generation
+
+---
+
 ### April 8, 2026 - Equipment Hierarchy Search Enhancement (COMPLETED)
 **FEATURE - Enhanced search function prominently displayed at top of hierarchy:**
 

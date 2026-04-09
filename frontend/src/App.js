@@ -37,6 +37,7 @@ import UserStatisticsPage from "./pages/UserStatisticsPage";
 import FeedbackPage from "./pages/FeedbackPage";
 import DefinitionsPage from "./pages/DefinitionsPage";
 import MobileApp from "./mobile/MobileApp";
+import QRScanPage from "./pages/QRScanPage";
 import "./App.css";
 
 const queryClient = new QueryClient({
@@ -173,6 +174,8 @@ function App() {
                   <ResetPasswordPage />
                 </PublicRoute>
               } />
+              {/* QR Code Scan Landing Page */}
+              <Route path="/qr/:qrId" element={<QRScanPage />} />
               <Route path="/" element={
                 <ProtectedRoute>
                   <ChangePasswordDialog />
