@@ -195,7 +195,7 @@ const Layout = () => {
         }
         
         const response = await fetch(
-          `${backendUrl}/api/users/${user.id}/avatar?auth=${token}`,
+          `${backendUrl}/api/users/${user.id}/avatar?token=${token}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         
@@ -316,7 +316,7 @@ const Layout = () => {
 
       // Refresh avatar
       const avatarResponse = await fetch(
-        `${backendUrl}/api/users/${user.id}/avatar?auth=${token}&t=${Date.now()}`,
+        `${backendUrl}/api/users/${user.id}/avatar?token=${token}&t=${Date.now()}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       

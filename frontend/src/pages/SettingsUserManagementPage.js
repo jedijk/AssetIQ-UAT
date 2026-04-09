@@ -205,7 +205,7 @@ const rbacAPI = {
   
   getUserAvatar: async (userId) => {
     const token = localStorage.getItem("token");
-    const response = await fetch(`${getApiBaseUrl()}/api/users/${userId}/avatar?auth=${token}`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/users/${userId}/avatar?token=${token}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!response.ok) return null;

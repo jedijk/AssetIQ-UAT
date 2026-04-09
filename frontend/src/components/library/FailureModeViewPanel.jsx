@@ -118,7 +118,7 @@ export function FailureModeViewPanel({
         if (!backendUrl || !backendUrl.startsWith('http')) return;
         
         const response = await fetch(
-          `${backendUrl}/api/users/${currentUser.id}/avatar?auth=${token}`,
+          `${backendUrl}/api/users/${currentUser.id}/avatar?token=${token}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (response.ok) {
@@ -148,7 +148,7 @@ export function FailureModeViewPanel({
         if (!backendUrl || !backendUrl.startsWith('http')) return;
         
         const response = await fetch(
-          `${backendUrl}/api/users/${fm.validated_by_id}/avatar?auth=${token}`,
+          `${backendUrl}/api/users/${fm.validated_by_id}/avatar?token=${token}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (response.ok) {

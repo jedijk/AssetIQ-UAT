@@ -109,7 +109,7 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
       
       // Only build URL if we have all required parts
       if (token && backendUrl && backendUrl.startsWith('http')) {
-        return `${backendUrl}${photo}?auth=${token}`;
+        return `${backendUrl}${photo}?token=${token}`;
       }
       // If backend URL is not configured, skip the image
       return null;

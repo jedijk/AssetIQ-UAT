@@ -43,7 +43,7 @@ export const UserMenu = ({
     if (!token) return null;
     // avatar_url is like "/api/users/{id}/avatar", we need full URL with auth
     const baseUrl = getApiUrl().replace("/api", "");
-    return `${baseUrl}${user.avatar_url}?auth=${token}`;
+    return `${baseUrl}${user.avatar_url}?token=${token}`;
   };
 
   const avatarUrl = getAvatarUrl();
