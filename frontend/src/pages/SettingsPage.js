@@ -4,7 +4,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import {
   Settings,
-  Building2,
   Users,
   QrCode,
   Bell,
@@ -12,10 +11,7 @@ import {
   Sliders,
   Brain,
   Server,
-  Clock,
   BarChart3,
-  Database,
-  Link2,
   ChevronRight,
   ArrowLeft
 } from "lucide-react";
@@ -32,14 +28,6 @@ const SETTINGS_SECTIONS = [
     icon: Settings,
     path: "/settings/preferences",
     roles: ["owner", "admin", "engineer", "technician"]
-  },
-  {
-    id: "organization",
-    label: "Organization",
-    description: "Company and installation settings",
-    icon: Building2,
-    path: "/settings/organization",
-    roles: ["owner", "admin"]
   },
   {
     id: "users",
@@ -73,22 +61,6 @@ const SETTINGS_SECTIONS = [
     icon: Bell,
     path: "/settings/notifications",
     roles: ["owner", "admin", "engineer", "technician"]
-  },
-  {
-    id: "integrations",
-    label: "Integrations",
-    description: "Connect external services",
-    icon: Link2,
-    path: "/settings/integrations",
-    roles: ["owner", "admin"]
-  },
-  {
-    id: "data",
-    label: "Data & Imports",
-    description: "Import/export and data management",
-    icon: Database,
-    path: "/settings/data",
-    roles: ["owner", "admin"]
   },
   {
     id: "ai",
