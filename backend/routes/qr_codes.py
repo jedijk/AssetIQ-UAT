@@ -299,22 +299,6 @@ async def list_qr_codes(
         "skip": skip
     }
 
-@router.get("/{qr_id}")
-async def get_qr_code(qr_id: str, user: dict = Depends(get_current_user)):
-    """Get QR code details"""
-    qr = await db.qr_codes.find_one({"id": qr_id}, {"_id": 0})
-    if not qr:
-        raise HTTPException(status_code=404, detail="QR code not found")
-    
-    # Generate QR image
-    qr_image = generate_qr_with_label(qr_id, qr.get("label", ""))
-    qr_base64 = image_to_base64(qr_image)
-    
-    return {
-        **qr,
-        "qr_image": f"data:image/png;base64,{qr_base64}"
-    }
-
 @router.get("/{qr_id}/image")
 async def get_qr_image(
     qr_id: str,
@@ -349,6 +333,22 @@ async def get_qr_image(
     
     buffer.seek(0)
     return StreamingResponse(buffer, media_type=media_type)
+
+@router.get("/{qr_id}")
+async def get_qr_code(qr_id: str, user: dict = Depends(get_current_user)):
+    """Get QR code details"""
+    qr = await db.qr_codes.find_one({"id": qr_id}, {"_id": 0})
+    if not qr:
+        raise HTTPException(status_code=404, detail="QR code not found")
+    
+    # Generate QR image
+    qr_image = generate_qr_with_label(qr_id, qr.get("label", ""))
+    qr_base64 = image_to_base64(qr_image)
+    
+    return {
+        **qr,
+        "qr_image": f"data:image/png;base64,{qr_base64}"
+    }
 
 @router.put("/{qr_id}")
 async def update_qr_code(qr_id: str, request: QRUpdateRequest, user: dict = Depends(get_current_user)):

@@ -522,11 +522,21 @@ export default function SettingsQRPage() {
           </DialogHeader>
           {viewQR && (
             <div className="space-y-4">
-              <div className="flex justify-center p-4 bg-slate-50 rounded-lg">
+              <div className="flex justify-center p-4 bg-slate-50 rounded-lg min-h-[200px] items-center">
                 <img 
-                  src={qrCodeAPI.getImageUrl(viewQR.id, "large")}
+                  src={`${process.env.REACT_APP_BACKEND_URL}/api/qr/${viewQR.id}/image?size=large&show_label=true`}
                   alt={viewQR.label}
                   className="w-48 h-48"
+                  onLoad={(e) => e.target.style.opacity = 1}
+                  onError={(e) => {
+                    console.error("Failed to load QR image:", e.target.src);
+                    // Try alternative URL format
+                    if (!e.target.dataset.retried) {
+                      e.target.dataset.retried = 'true';
+                      e.target.src = qrCodeAPI.getImageUrl(viewQR.id, "large");
+                    }
+                  }}
+                  style={{ opacity: 0, transition: 'opacity 0.3s' }}
                 />
               </div>
               <div className="space-y-2 text-sm">
