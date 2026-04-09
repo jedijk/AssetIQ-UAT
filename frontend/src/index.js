@@ -60,12 +60,42 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js')
       .then((registration) => {
         console.log('ServiceWorker registered: ', registration.scope);
+        
         // Force update check on every page load
         registration.update();
+        
+        // Listen for new service worker installing
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New version available - show refresh prompt or auto-reload
+              console.log('New version available! Refreshing...');
+              
+              // Option 1: Auto-reload (uncomment to enable)
+              // window.location.reload();
+              
+              // Option 2: Show a toast/banner (current behavior)
+              if (window.confirm('A new version is available. Reload to update?')) {
+                window.location.reload();
+              }
+            }
+          });
+        });
       })
       .catch((error) => {
         console.log('ServiceWorker registration failed: ', error);
       });
+  });
+  
+  // Also check for updates when the page becomes visible again
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      navigator.serviceWorker.ready.then((registration) => {
+        registration.update();
+      });
+    }
   });
 }
 

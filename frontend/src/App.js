@@ -42,7 +42,55 @@ import FeedbackPage from "./pages/FeedbackPage";
 import DefinitionsPage from "./pages/DefinitionsPage";
 import MobileApp from "./mobile/MobileApp";
 import QRScanPage from "./pages/QRScanPage";
+import { useEffect } from "react";
 import "./App.css";
+
+// Current frontend version - update with each release
+const APP_VERSION = "2.7.5";
+
+// Version check hook - compares frontend version with backend
+const useVersionCheck = () => {
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/health`);
+        const data = await response.json();
+        const backendVersion = data.version;
+        
+        // Store the last known version
+        const storedVersion = localStorage.getItem('app_version');
+        
+        if (storedVersion && storedVersion !== APP_VERSION) {
+          // Version changed - clear caches and reload
+          console.log(`Version changed: ${storedVersion} → ${APP_VERSION}`);
+          
+          // Clear service worker caches
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(name => caches.delete(name)));
+          }
+          
+          // Update stored version
+          localStorage.setItem('app_version', APP_VERSION);
+          
+          // Force reload to get fresh assets
+          window.location.reload(true);
+          return;
+        }
+        
+        // Store current version
+        localStorage.setItem('app_version', APP_VERSION);
+        
+        // Log version info
+        console.log(`App Version: ${APP_VERSION}, API Version: ${backendVersion}`);
+      } catch (error) {
+        console.log('Version check failed:', error);
+      }
+    };
+    
+    checkVersion();
+  }, []);
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -137,6 +185,9 @@ const MobileLayout = () => {
 };
 
 function App() {
+  // Check for version updates on app load
+  useVersionCheck();
+  
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

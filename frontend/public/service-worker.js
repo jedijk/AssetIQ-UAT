@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = 'reliabilityos-v3';  // Incremented to force cache refresh - v3 for CORS fix
+const CACHE_NAME = 'reliabilityos-v2.7.5';  // Update with each release
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache on install
