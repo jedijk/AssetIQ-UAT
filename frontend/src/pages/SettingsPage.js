@@ -192,8 +192,13 @@ export default function SettingsPage() {
 
         {/* Sidebar Footer */}
         <div className="p-3 border-t border-slate-200 bg-slate-50">
-          <div className="text-xs text-slate-500 text-center">
-            <span className="font-medium">{user?.role}</span> access level
+          <div className="text-xs text-slate-500 text-center space-y-1">
+            <div>
+              <span className="font-medium">{user?.role}</span> access level
+            </div>
+            <div className="text-slate-400">
+              Version 2.7.0
+            </div>
           </div>
         </div>
       </aside>
