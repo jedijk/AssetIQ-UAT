@@ -216,6 +216,101 @@ INDEX_DEFINITIONS = {
     "ai_causal_analysis": [
         {"keys": [("investigation_id", 1)]},
     ],
+    
+    # QR Codes - frequently queried by equipment_id and scanned
+    "qr_codes": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("equipment_id", 1)]},
+        {"keys": [("status", 1)]},
+        {"keys": [("created_at", -1)]},
+        {"keys": [("installation_name", 1)]},
+        {"keys": [("total_scans", -1)]},
+        # Compound for listing
+        {"keys": [("status", 1), ("created_at", -1)]},
+        {"keys": [("installation_name", 1), ("status", 1)]},
+    ],
+    
+    # Decision rules - used in decision engine
+    "decision_rules": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("rule_type", 1)]},
+        {"keys": [("is_active", 1)]},
+        {"keys": [("priority", -1)]},
+        {"keys": [("created_at", -1)]},
+    ],
+    
+    # Decision suggestions
+    "decision_suggestions": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("rule_id", 1)]},
+        {"keys": [("threat_id", 1)]},
+        {"keys": [("status", 1)]},
+        {"keys": [("created_at", -1)]},
+    ],
+    
+    # Failure identifications - linked to observations
+    "failure_identifications": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("observation_id", 1)]},
+        {"keys": [("failure_mode_id", 1)]},
+        {"keys": [("equipment_id", 1)]},
+        {"keys": [("created_at", -1)]},
+    ],
+    
+    # Failure mode versions - version history
+    "failure_mode_versions": [
+        {"keys": [("failure_mode_id", 1)]},
+        {"keys": [("version", -1)]},
+        {"keys": [("created_at", -1)]},
+        # Compound for fetching latest version
+        {"keys": [("failure_mode_id", 1), ("version", -1)]},
+    ],
+    
+    # Maintenance strategies
+    "maintenance_strategies": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("equipment_type_id", 1)]},
+        {"keys": [("failure_mode_id", 1)]},
+        {"keys": [("strategy_type", 1)]},
+    ],
+    
+    # Security audit log - important for compliance
+    "security_audit_log": [
+        {"keys": [("timestamp", -1)]},
+        {"keys": [("user_id", 1)]},
+        {"keys": [("action", 1)]},
+        {"keys": [("resource_type", 1)]},
+        # Compound for audit queries
+        {"keys": [("user_id", 1), ("timestamp", -1)]},
+        {"keys": [("resource_type", 1), ("timestamp", -1)]},
+    ],
+    
+    # Custom equipment types
+    "custom_equipment_types": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("discipline", 1)]},
+        {"keys": [("installation_name", 1)]},
+    ],
+    
+    # Ad-hoc plans - frequently queried
+    "adhoc_plans": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("task_template_id", 1)]},
+        {"keys": [("equipment_id", 1)]},
+        {"keys": [("installation_name", 1)]},
+        {"keys": [("is_active", 1)]},
+        {"keys": [("created_at", -1)]},
+    ],
+    
+    # AI usage tracking
+    "ai_usage": [
+        {"keys": [("user_id", 1)]},
+        {"keys": [("timestamp", -1)]},
+        {"keys": [("model", 1)]},
+        {"keys": [("feature", 1)]},
+        # Compound for analytics
+        {"keys": [("user_id", 1), ("timestamp", -1)]},
+    ],
 }
 
 

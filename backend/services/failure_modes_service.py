@@ -10,8 +10,22 @@ from typing import Optional, List, Dict, Any
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
+import time
 
 logger = logging.getLogger(__name__)
+
+# Simple in-memory cache for failure modes (invalidated on write)
+_cache = {
+    "all_modes": None,
+    "all_modes_timestamp": 0,
+    "cache_ttl": 300,  # 5 minutes
+}
+
+
+def _invalidate_cache():
+    """Invalidate the failure modes cache."""
+    _cache["all_modes"] = None
+    _cache["all_modes_timestamp"] = 0
 
 
 class FailureModesService:
@@ -38,6 +52,21 @@ class FailureModesService:
         limit: int = 500
     ) -> Dict[str, Any]:
         """Get failure modes with optional filters."""
+        import asyncio
+        
+        # Check if this is a default query (no filters, first page, default limit)
+        is_default_query = (
+            not category or category.lower() == "all"
+        ) and not equipment and not search and not min_rpn and not equipment_type_id and not mechanism and is_validated is None and (
+            not failure_mode_type or failure_mode_type.lower() == "all"
+        ) and skip == 0 and limit >= 500
+        
+        # Use cache for default unfiltered query
+        if is_default_query:
+            now = time.time()
+            if _cache["all_modes"] is not None and (now - _cache["all_modes_timestamp"]) < _cache["cache_ttl"]:
+                logger.debug("[FailureModesService] Returning cached failure modes")
+                return _cache["all_modes"]
         
         # Build query
         query = {}
@@ -76,19 +105,26 @@ class FailureModesService:
                 {"mechanism": search_regex},
             ]
         
-        # Execute query
-        cursor = self.collection.find(query).sort("rpn", -1).skip(skip).limit(limit)
+        # Execute count and fetch in PARALLEL for performance
+        count_task = self.collection.count_documents(query) if query else self.collection.estimated_document_count()
+        fetch_task = self.collection.find(query).sort("rpn", -1).skip(skip).limit(limit).to_list(length=limit)
         
-        failure_modes = []
-        async for doc in cursor:
-            failure_modes.append(self._serialize(doc))
+        total, raw_docs = await asyncio.gather(count_task, fetch_task)
         
-        total = await self.collection.count_documents(query)
+        failure_modes = [self._serialize(doc) for doc in raw_docs]
         
-        return {
+        result = {
             "total": total,
             "failure_modes": failure_modes
         }
+        
+        # Cache default query result
+        if is_default_query:
+            _cache["all_modes"] = result
+            _cache["all_modes_timestamp"] = time.time()
+            logger.info(f"[FailureModesService] Cached {total} failure modes")
+        
+        return result
     
     async def get_by_id(self, mode_id: str) -> Optional[Dict[str, Any]]:
         """Get a failure mode by MongoDB _id or legacy_id."""
@@ -236,6 +272,9 @@ class FailureModesService:
         result = await self.collection.insert_one(doc)
         doc["_id"] = result.inserted_id
         
+        # Invalidate cache after creation
+        _invalidate_cache()
+        
         return self._serialize(doc)
     
     async def update(self, mode_id: str, data: Dict[str, Any], updated_by: Optional[str] = None, change_reason: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -294,6 +333,8 @@ class FailureModesService:
         )
         
         if result:
+            # Invalidate cache after update
+            _invalidate_cache()
             serialized = self._serialize(result)
             serialized["fmea_changed"] = fmea_changed
             serialized["old_failure_mode_name"] = existing["failure_mode"]
@@ -425,6 +466,8 @@ class FailureModesService:
         )
         
         if result:
+            # Invalidate cache after rollback
+            _invalidate_cache()
             return self._serialize(result)
         
         return None
@@ -458,6 +501,8 @@ class FailureModesService:
         )
         
         if result:
+            # Invalidate cache after validation
+            _invalidate_cache()
             return self._serialize(result)
         return None
     
@@ -483,6 +528,8 @@ class FailureModesService:
         )
         
         if result:
+            # Invalidate cache after unvalidation
+            _invalidate_cache()
             return self._serialize(result)
         return None
     
@@ -502,6 +549,11 @@ class FailureModesService:
         await self._save_version(existing, updated_by="System", change_reason="Deleted")
         
         result = await self.collection.delete_one(query)
+        
+        # Invalidate cache after deletion
+        if result.deleted_count > 0:
+            _invalidate_cache()
+        
         return result.deleted_count > 0
     
     # ============== HELPER METHODS ==============
