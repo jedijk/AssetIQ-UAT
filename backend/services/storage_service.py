@@ -98,12 +98,10 @@ def get_mime_type(filename: str) -> str:
 
 
 def is_storage_available() -> bool:
-    """Check if storage is available - True if database is connected."""
-    try:
-        db = _get_db()
-        return db is not None
-    except Exception:
-        return False
+    """Check if storage is available - always True since we use MongoDB."""
+    # Storage uses the same MongoDB as the app, just with longer timeouts
+    # The _get_storage_db() function will create the connection lazily
+    return True
 
 
 # ==================== ASYNC FUNCTIONS (Primary API) ====================

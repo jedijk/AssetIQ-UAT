@@ -4,7 +4,7 @@ Forms routes.
 import os
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Header
 from datetime import datetime
 from database import db, form_service
 from services.cache_service import cache
@@ -491,9 +491,16 @@ async def delete_form_document(
 @router.get("/form-documents/{document_path:path}")
 async def serve_form_document(
     document_path: str,
+    token: str = Query(None),
+    authorization: str = Header(None),
     current_user: dict = Depends(get_current_user)
 ):
-    """Serve a form document file from MongoDB storage."""
+    """Serve a form document file from MongoDB storage.
+    
+    Authentication can be provided via:
+    - Authorization: Bearer <token> header
+    - ?token=<token> query parameter (for browser image loading)
+    """
     from fastapi.responses import Response
     from services.storage_service import get_object_async
     
@@ -504,7 +511,9 @@ async def serve_form_document(
             content=content,
             media_type=content_type,
             headers={
-                "Content-Disposition": f"inline; filename=\"{document_path.split('/')[-1]}\""
+                "Content-Disposition": f"inline; filename=\"{document_path.split('/')[-1]}\"",
+                "Cache-Control": "public, max-age=3600",
+                "Access-Control-Allow-Origin": "*"
             }
         )
     except FileNotFoundError:

@@ -1157,7 +1157,7 @@ export default function DashboardPage() {
       
       {/* Quick View Modal for Form Submissions */}
       <Dialog open={!!quickViewSubmission || loadingQuickView} onOpenChange={() => { setQuickViewSubmission(null); setLoadingQuickView(false); }}>
-        <DialogContent className="w-[95vw] max-w-2xl h-[85vh] sm:h-auto sm:max-h-[80vh] flex flex-col p-0 gap-0">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
           <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 border-b border-slate-100 flex-shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
