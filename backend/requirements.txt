@@ -135,3 +135,4 @@ zipp==3.23.0
 slowapi==0.1.9
 cachetools==7.0.5
 pip-audit
+qrcode==8.2

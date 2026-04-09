@@ -163,6 +163,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # Load all API routes (wrapped for safety)
+route_load_error = None
 try:
     from routes import all_routers
     
@@ -173,7 +174,14 @@ try:
     app.include_router(api_router)
     logger.info(f"Loaded {len(all_routers)} route modules")
 except Exception as e:
+    import traceback
+    route_load_error = {
+        "error": str(e),
+        "type": type(e).__name__,
+        "traceback": traceback.format_exc()
+    }
     logger.error(f"Failed to load routes: {e}")
+    logger.error(traceback.format_exc())
     # App will still run with health endpoints
 
 
@@ -188,6 +196,18 @@ async def list_routes():
             if route.path.startswith('/api'):
                 routes.append({"path": route.path, "methods": methods})
     return {"total": len(routes), "routes": sorted(routes, key=lambda x: x['path'])}
+
+
+# Diagnostic endpoint to check route loading status
+@app.get("/api/debug/routes-status")
+async def routes_status():
+    """Check if routes loaded correctly - for debugging deployment issues."""
+    return {
+        "routes_loaded": route_load_error is None,
+        "error": route_load_error,
+        "total_routes": len([r for r in app.routes if hasattr(r, 'path')]),
+        "api_routes": len([r for r in app.routes if hasattr(r, 'path') and r.path.startswith('/api')])
+    }
 
 
 # =============================================================================
