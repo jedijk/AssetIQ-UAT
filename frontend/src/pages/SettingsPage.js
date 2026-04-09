@@ -93,6 +93,7 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [activeSection, setActiveSection] = useState("general");
+  const [showMobileNav, setShowMobileNav] = useState(true);
 
   // Filter sections based on user role
   const visibleSections = SETTINGS_SECTIONS.filter(section => {
@@ -106,23 +107,36 @@ export default function SettingsPage() {
     const matchedSection = SETTINGS_SECTIONS.find(s => currentPath.startsWith(s.path));
     if (matchedSection) {
       setActiveSection(matchedSection.id);
+      // On mobile, hide nav when a section is selected
+      setShowMobileNav(false);
     } else if (currentPath === "/settings" || currentPath === "/settings/") {
       // Redirect to first available section
       if (visibleSections.length > 0) {
         navigate(visibleSections[0].path, { replace: true });
       }
+      setShowMobileNav(true);
     }
   }, [location.pathname, navigate, visibleSections]);
 
   const handleSectionClick = (section) => {
     setActiveSection(section.id);
+    setShowMobileNav(false);
     navigate(section.path);
+  };
+
+  const handleBackToNav = () => {
+    setShowMobileNav(true);
   };
 
   return (
     <div className="h-[calc(100vh-48px)] flex bg-slate-50">
-      {/* Left Sidebar */}
-      <aside className="w-72 xl:w-80 bg-white border-r border-slate-200 flex flex-col flex-shrink-0">
+      {/* Left Sidebar - Hidden on mobile when content is shown */}
+      <aside className={cn(
+        "bg-white border-r border-slate-200 flex flex-col flex-shrink-0",
+        "w-full md:w-72 xl:w-80",
+        "md:flex",
+        showMobileNav ? "flex" : "hidden md:flex"
+      )}>
         {/* Sidebar Header */}
         <div className="p-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
@@ -203,10 +217,28 @@ export default function SettingsPage() {
         </div>
       </aside>
 
-      {/* Right Content Panel - Full Width */}
-      <main className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="p-6 xl:p-8">
+      {/* Right Content Panel - Full width on mobile */}
+      <main className={cn(
+        "flex-1 overflow-hidden",
+        showMobileNav ? "hidden md:block" : "block"
+      )}>
+        {/* Mobile back button */}
+        <div className="md:hidden p-4 border-b border-slate-200 bg-white flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={handleBackToNav}
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <span className="font-medium text-slate-900">
+            {visibleSections.find(s => s.id === activeSection)?.label || "Settings"}
+          </span>
+        </div>
+        
+        <ScrollArea className="h-full md:h-full" style={{ height: 'calc(100% - 56px)' }}>
+          <div className="p-4 md:p-6 xl:p-8">
             <Outlet />
           </div>
         </ScrollArea>
