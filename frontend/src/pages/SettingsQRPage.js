@@ -128,11 +128,12 @@ export default function SettingsQRPage() {
 
   // Export mutation
   const exportMutation = useMutation({
-    mutationFn: (format) => qrCodeAPI.export(
-      selectedQRs.size > 0 ? Array.from(selectedQRs) : qrCodes.map(q => q.id),
-      format,
-      true
-    ),
+    mutationFn: (format) => {
+      const idsToExport = selectedQRs.size > 0 
+        ? Array.from(selectedQRs) 
+        : filteredQRs.map(q => q.id);
+      return qrCodeAPI.export(idsToExport, format, true);
+    },
     onSuccess: (blob, format) => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -144,7 +145,8 @@ export default function SettingsQRPage() {
       URL.revokeObjectURL(url);
       toast.success(`Export downloaded!`);
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Export error:", error);
       toast.error("Failed to export QR codes");
     }
   });
@@ -555,6 +557,82 @@ export default function SettingsQRPage() {
               </div>
               <div className="p-2 bg-slate-100 rounded text-xs font-mono text-slate-600 break-all">
                 {viewQR.url}
+              </div>
+              
+              {/* Download Actions */}
+              <div className="flex gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={async () => {
+                    try {
+                      const blob = await qrCodeAPI.export([viewQR.id], "png");
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `${viewQR.label.replace(/\s+/g, '_')}.png`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(url);
+                      toast.success("PNG downloaded!");
+                    } catch {
+                      toast.error("Failed to download PNG");
+                    }
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  PNG
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={async () => {
+                    try {
+                      const blob = await qrCodeAPI.export([viewQR.id], "svg");
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `${viewQR.label.replace(/\s+/g, '_')}.svg`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(url);
+                      toast.success("SVG downloaded!");
+                    } catch {
+                      toast.error("Failed to download SVG");
+                    }
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  SVG
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={async () => {
+                    try {
+                      const blob = await qrCodeAPI.print([viewQR.id], { template: "single" });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `${viewQR.label.replace(/\s+/g, '_')}.pdf`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(url);
+                      toast.success("PDF downloaded!");
+                    } catch {
+                      toast.error("Failed to download PDF");
+                    }
+                  }}
+                >
+                  <Printer className="w-4 h-4 mr-1" />
+                  PDF
+                </Button>
               </div>
             </div>
           )}

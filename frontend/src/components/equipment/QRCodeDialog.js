@@ -123,7 +123,8 @@ export function QRCodeDialog({ open, onOpenChange, equipment, existingQR = null 
       toast.success("PDF downloaded!");
       setShowPrintOptions(false);
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Print error:", error);
       toast.error("Failed to generate PDF");
     }
   });
@@ -142,7 +143,8 @@ export function QRCodeDialog({ open, onOpenChange, equipment, existingQR = null 
       URL.revokeObjectURL(url);
       toast.success(`${format.toUpperCase()} downloaded!`);
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Export error:", error);
       toast.error("Failed to export QR code");
     }
   });
