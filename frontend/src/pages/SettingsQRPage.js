@@ -15,7 +15,8 @@ import {
   FileDown,
   Loader2,
   CheckCircle2,
-  XCircle
+  XCircle,
+  AlertTriangle
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -61,6 +62,15 @@ export default function SettingsQRPage() {
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printTemplate, setPrintTemplate] = useState("a4_3x3");
   const [viewQR, setViewQR] = useState(null);
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    description: "",
+    variant: "default", // "default" | "destructive"
+    onConfirm: () => {},
+  });
 
   // Fetch QR codes
   const { data, isLoading, refetch } = useQuery({
@@ -155,6 +165,20 @@ export default function SettingsQRPage() {
       newSelected.add(qrId);
     }
     setSelectedQRs(newSelected);
+  };
+
+  // Helper to show confirmation dialog
+  const showConfirm = (title, description, variant, onConfirm) => {
+    setConfirmDialog({
+      open: true,
+      title,
+      description,
+      variant,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+      },
+    });
   };
 
   return (
@@ -265,12 +289,15 @@ export default function SettingsQRPage() {
               variant="outline"
               size="sm"
               className="text-amber-600 hover:text-amber-700"
-              onClick={() => {
-                if (confirm(`Deactivate ${selectedQRs.size} QR codes?`)) {
+              onClick={() => showConfirm(
+                "Deactivate QR Codes",
+                `Are you sure you want to deactivate ${selectedQRs.size} QR code(s)? They can be reactivated later.`,
+                "default",
+                () => {
                   selectedQRs.forEach(id => deleteMutation.mutate({ qrId: id, permanent: false }));
                   setSelectedQRs(new Set());
                 }
-              }}
+              )}
             >
               <Trash2 className="w-4 h-4 mr-1" />
               Deactivate
@@ -279,12 +306,15 @@ export default function SettingsQRPage() {
               variant="outline"
               size="sm"
               className="text-red-600 hover:text-red-700"
-              onClick={() => {
-                if (confirm(`PERMANENTLY delete ${selectedQRs.size} QR codes? This cannot be undone!`)) {
+              onClick={() => showConfirm(
+                "Permanently Delete QR Codes",
+                `Are you sure you want to permanently delete ${selectedQRs.size} QR code(s)? This action cannot be undone.`,
+                "destructive",
+                () => {
                   selectedQRs.forEach(id => deleteMutation.mutate({ qrId: id, permanent: true }));
                   setSelectedQRs(new Set());
                 }
-              }}
+              )}
             >
               <Trash2 className="w-4 h-4 mr-1" />
               Delete
@@ -399,22 +429,24 @@ export default function SettingsQRPage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             className="text-amber-600"
-                            onClick={() => {
-                              if (confirm("Deactivate this QR code? It can be reactivated later.")) {
-                                deleteMutation.mutate({ qrId: qr.id, permanent: false });
-                              }
-                            }}
+                            onClick={() => showConfirm(
+                              "Deactivate QR Code",
+                              `Are you sure you want to deactivate "${qr.label}"? It can be reactivated later.`,
+                              "default",
+                              () => deleteMutation.mutate({ qrId: qr.id, permanent: false })
+                            )}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Deactivate
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             className="text-red-600"
-                            onClick={() => {
-                              if (confirm("PERMANENTLY delete this QR code? This cannot be undone!")) {
-                                deleteMutation.mutate({ qrId: qr.id, permanent: true });
-                              }
-                            }}
+                            onClick={() => showConfirm(
+                              "Delete Permanently",
+                              `Are you sure you want to permanently delete "${qr.label}"? This action cannot be undone.`,
+                              "destructive",
+                              () => deleteMutation.mutate({ qrId: qr.id, permanent: true })
+                            )}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Delete Permanently
@@ -529,6 +561,39 @@ export default function SettingsQRPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setViewQR(null)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {confirmDialog.variant === "destructive" ? (
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              )}
+              {confirmDialog.title}
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              {confirmDialog.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant={confirmDialog.variant === "destructive" ? "destructive" : "default"}
+              onClick={confirmDialog.onConfirm}
+            >
+              Confirm
             </Button>
           </DialogFooter>
         </DialogContent>

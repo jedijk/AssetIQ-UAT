@@ -7,7 +7,6 @@ import {
   Users,
   QrCode,
   Bell,
-  Shield,
   Sliders,
   Brain,
   Server,
@@ -85,14 +84,6 @@ const SETTINGS_SECTIONS = [
     icon: BarChart3,
     path: "/settings/statistics",
     roles: ["owner", "admin", "engineer", "technician"]
-  },
-  {
-    id: "security",
-    label: "Security",
-    description: "Authentication and access control",
-    icon: Shield,
-    path: "/settings/security",
-    roles: ["owner", "admin"]
   }
 ];
 
