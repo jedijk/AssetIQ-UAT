@@ -987,16 +987,14 @@ const Layout = () => {
       </header>
 
       {/* Main Layout with Sidebar */}
-      <div className={`flex min-h-[calc(100vh-48px)] ${isResizing ? 'select-none' : ''}`}>
+      <div className={`flex min-h-[calc(100vh-48px)] ${isResizing ? 'select-none cursor-col-resize' : ''}`}>
         {/* Equipment Hierarchy Sidebar - Desktop */}
         {hierarchyOpen && (
-          <div 
-            className="hidden lg:flex flex-shrink-0 relative"
-            data-testid="hierarchy-sidebar"
-            style={{ width: `${hierarchyWidth}px` }}
-          >
+          <>
             <div 
-              className="flex-1 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+              className="hidden lg:block flex-shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+              data-testid="hierarchy-sidebar"
+              style={{ width: `${hierarchyWidth}px` }}
             >
               <div className="sticky top-12 h-[calc(100vh-48px)]">
                 <EquipmentHierarchy 
@@ -1007,17 +1005,15 @@ const Layout = () => {
                 />
               </div>
             </div>
-            {/* Resize Handle */}
+            {/* Resize Handle - Separate element */}
             <div
-              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-10 group"
+              className="hidden lg:flex w-1.5 flex-shrink-0 cursor-col-resize items-center justify-center hover:bg-blue-100 active:bg-blue-200 transition-colors group"
               onMouseDown={handleResizeMouseDown}
               title="Drag to resize"
             >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 -mr-1.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="w-1 h-6 bg-slate-300 rounded-full" />
-              </div>
+              <div className="w-0.5 h-8 bg-slate-300 group-hover:bg-blue-400 group-active:bg-blue-500 rounded-full transition-colors" />
             </div>
-          </div>
+          </>
         )}
 
         {/* Mobile Hierarchy Sidebar (overlay) */}
