@@ -83,7 +83,8 @@ async def send_welcome_email(user_email: str, user_name: str, password: str, rol
     
     login_link = f"{EMAIL_FRONTEND_URL}/login"
     role_name = ROLE_NAMES.get(role, role.title())
-    mobile_guide_image = "https://customer-assets.emergentagent.com/job_6a729e6c-f1da-4ef5-9bc4-3f27b6dedd78/artifacts/lzzxzaqo_AssetIQ%20-%20Mobile%20.png"
+    # Mobile guide image - use environment variable or fallback to hosted asset
+    mobile_guide_image = os.environ.get("MOBILE_GUIDE_IMAGE_URL", "https://customer-assets.emergentagent.com/job_6a729e6c-f1da-4ef5-9bc4-3f27b6dedd78/artifacts/lzzxzaqo_AssetIQ%20-%20Mobile%20.png")
     
     html_content = f"""
     <!DOCTYPE html>

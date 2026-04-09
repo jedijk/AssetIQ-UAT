@@ -74,9 +74,11 @@ class QRExportRequest(BaseModel):
 # ==================== HELPERS ====================
 
 def get_frontend_url():
-    """Get the frontend URL for QR code links"""
+    """Get the frontend URL for QR code links - domain agnostic"""
     import os
-    return os.environ.get("REACT_APP_BACKEND_URL", "https://asset-iq-preview.preview.emergentagent.com")
+    # Priority: FRONTEND_URL > REACT_APP_BACKEND_URL > fallback
+    # FRONTEND_URL should be set to the production frontend domain
+    return os.environ.get("FRONTEND_URL", os.environ.get("REACT_APP_BACKEND_URL", ""))
 
 def generate_qr_image(qr_id: str, size: int = 200):
     """Generate a QR code image"""
