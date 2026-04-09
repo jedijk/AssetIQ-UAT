@@ -85,9 +85,9 @@ export default function SettingsQRPage() {
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (qrId) => qrCodeAPI.delete(qrId),
-    onSuccess: () => {
-      toast.success("QR code deactivated");
+    mutationFn: ({ qrId, permanent }) => qrCodeAPI.delete(qrId, permanent),
+    onSuccess: (data, variables) => {
+      toast.success(variables.permanent ? "QR code permanently deleted" : "QR code deactivated");
       queryClient.invalidateQueries(["qr-codes-list"]);
     },
     onError: () => {
@@ -264,16 +264,30 @@ export default function SettingsQRPage() {
             <Button
               variant="outline"
               size="sm"
-              className="text-red-600 hover:text-red-700"
+              className="text-amber-600 hover:text-amber-700"
               onClick={() => {
                 if (confirm(`Deactivate ${selectedQRs.size} QR codes?`)) {
-                  selectedQRs.forEach(id => deleteMutation.mutate(id));
+                  selectedQRs.forEach(id => deleteMutation.mutate({ qrId: id, permanent: false }));
                   setSelectedQRs(new Set());
                 }
               }}
             >
               <Trash2 className="w-4 h-4 mr-1" />
               Deactivate
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-red-600 hover:text-red-700"
+              onClick={() => {
+                if (confirm(`PERMANENTLY delete ${selectedQRs.size} QR codes? This cannot be undone!`)) {
+                  selectedQRs.forEach(id => deleteMutation.mutate({ qrId: id, permanent: true }));
+                  setSelectedQRs(new Set());
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Delete
             </Button>
           </div>
         )}
@@ -384,15 +398,26 @@ export default function SettingsQRPage() {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            className="text-red-600"
+                            className="text-amber-600"
                             onClick={() => {
-                              if (confirm("Deactivate this QR code?")) {
-                                deleteMutation.mutate(qr.id);
+                              if (confirm("Deactivate this QR code? It can be reactivated later.")) {
+                                deleteMutation.mutate({ qrId: qr.id, permanent: false });
                               }
                             }}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Deactivate
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => {
+                              if (confirm("PERMANENTLY delete this QR code? This cannot be undone!")) {
+                                deleteMutation.mutate({ qrId: qr.id, permanent: true });
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Permanently
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

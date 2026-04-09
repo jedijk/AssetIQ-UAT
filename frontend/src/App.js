@@ -32,6 +32,7 @@ import SettingsPreferencesPage from "./pages/SettingsPreferencesPage";
 import SettingsPage from "./pages/SettingsPage";
 import SettingsGeneralPage from "./pages/SettingsGeneralPage";
 import SettingsQRPage from "./pages/SettingsQRPage";
+import SettingsNotificationsPage from "./pages/SettingsNotificationsPage";
 import InsightsPage from "./pages/InsightsPage";
 import FormsPage from "./pages/FormsPage";
 import FormSubmissionsPage from "./pages/FormSubmissionsPage";
@@ -209,6 +210,7 @@ function App() {
                   <Route path="user-management" element={<SettingsUserManagementPage />} />
                   <Route path="permissions" element={<SettingsPermissionsPage />} />
                   <Route path="qr" element={<SettingsQRPage />} />
+                  <Route path="notifications" element={<SettingsNotificationsPage />} />
                   <Route path="risk-calculation" element={<SettingsRiskCalculationPage />} />
                   <Route path="ai-usage" element={<SettingsAIUsagePage />} />
                   <Route path="server-performance" element={<SettingsServerPerformancePage />} />

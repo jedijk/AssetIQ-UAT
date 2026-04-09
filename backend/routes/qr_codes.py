@@ -383,15 +383,25 @@ async def update_qr_code(qr_id: str, request: QRUpdateRequest, user: dict = Depe
     return updated
 
 @router.delete("/{qr_id}")
-async def delete_qr_code(qr_id: str, user: dict = Depends(get_current_user)):
-    """Delete (deactivate) a QR code"""
-    result = await db.qr_codes.update_one(
-        {"id": qr_id},
-        {"$set": {"status": "inactive", "deleted_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="QR code not found")
-    return {"success": True, "message": "QR code deactivated"}
+async def delete_qr_code(
+    qr_id: str, 
+    permanent: bool = Query(default=False, description="Permanently delete instead of deactivating"),
+    user: dict = Depends(get_current_user)
+):
+    """Delete a QR code (deactivate or permanently remove)"""
+    if permanent:
+        result = await db.qr_codes.delete_one({"id": qr_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="QR code not found")
+        return {"success": True, "message": "QR code permanently deleted"}
+    else:
+        result = await db.qr_codes.update_one(
+            {"id": qr_id},
+            {"$set": {"status": "inactive", "deleted_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="QR code not found")
+        return {"success": True, "message": "QR code deactivated"}
 
 # ==================== SCAN RESOLUTION ====================
 

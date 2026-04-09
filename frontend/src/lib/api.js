@@ -1124,8 +1124,8 @@ export const qrCodeAPI = {
   },
   
   // Delete (deactivate) QR code
-  delete: async (qrId) => {
-    const response = await api.delete(`/qr/${qrId}`);
+  delete: async (qrId, permanent = false) => {
+    const response = await api.delete(`/qr/${qrId}?permanent=${permanent}`);
     return response.data;
   },
   

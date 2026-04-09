@@ -190,7 +190,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <ChevronRight className={cn(
-                    "w-4 h-4 flex-shrink-0 transition-transform",
+                    "w-4 h-4 flex-shrink-0 transition-transform ml-3",
                     isActive ? "text-blue-500" : "text-slate-400 group-hover:translate-x-0.5"
                   )} />
                 </button>
