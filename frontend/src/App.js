@@ -29,6 +29,9 @@ import SettingsAIUsagePage from "./pages/SettingsAIUsagePage";
 import SettingsRiskCalculationPage from "./pages/SettingsRiskCalculationPage";
 import SettingsServerPerformancePage from "./pages/SettingsServerPerformancePage";
 import SettingsPreferencesPage from "./pages/SettingsPreferencesPage";
+import SettingsPage from "./pages/SettingsPage";
+import SettingsGeneralPage from "./pages/SettingsGeneralPage";
+import SettingsQRPage from "./pages/SettingsQRPage";
 import InsightsPage from "./pages/InsightsPage";
 import FormsPage from "./pages/FormsPage";
 import FormSubmissionsPage from "./pages/FormSubmissionsPage";
@@ -197,17 +200,25 @@ function App() {
                 <Route path="forms" element={<Navigate to="/tasks?tab=forms" replace />} />
                 <Route path="form-submissions" element={<FormSubmissionsPage />} />
                 <Route path="decision-engine" element={<UnderDevelopmentPage />} />
-                <Route path="settings/user-management" element={<SettingsUserManagementPage />} />
-                <Route path="settings/permissions" element={<SettingsPermissionsPage />} />
-                <Route path="settings/ai-usage" element={<SettingsAIUsagePage />} />
-                <Route path="settings/risk-calculation" element={<SettingsRiskCalculationPage />} />
-                <Route path="settings/server-performance" element={<SettingsServerPerformancePage />} />
-                <Route path="settings/preferences" element={<SettingsPreferencesPage />} />
-                <Route path="settings/insights" element={<InsightsPage />} />
-                <Route path="settings/statistics" element={<UserStatisticsPage />} />
+                
+                {/* Settings Layout with nested routes */}
+                <Route path="settings" element={<SettingsPage />}>
+                  <Route index element={<Navigate to="/settings/preferences" replace />} />
+                  <Route path="preferences" element={<SettingsPreferencesPage />} />
+                  <Route path="general" element={<SettingsGeneralPage />} />
+                  <Route path="user-management" element={<SettingsUserManagementPage />} />
+                  <Route path="permissions" element={<SettingsPermissionsPage />} />
+                  <Route path="qr" element={<SettingsQRPage />} />
+                  <Route path="risk-calculation" element={<SettingsRiskCalculationPage />} />
+                  <Route path="ai-usage" element={<SettingsAIUsagePage />} />
+                  <Route path="server-performance" element={<SettingsServerPerformancePage />} />
+                  <Route path="insights" element={<InsightsPage />} />
+                  <Route path="statistics" element={<UserStatisticsPage />} />
+                  <Route path="criticality-definitions" element={<DefinitionsPage />} />
+                  <Route path="feedback" element={<FeedbackPage />} />
+                </Route>
+                
                 <Route path="user-statistics" element={<UserStatisticsPage />} />
-                <Route path="settings/criticality-definitions" element={<DefinitionsPage />} />
-                <Route path="settings/feedback" element={<FeedbackPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -5,6 +5,48 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 9, 2026 - Desktop Settings Page (COMPLETED)
+**FEATURE - Full-page Settings interface replacing dropdown menu:**
+
+**Implemented:**
+- ✅ **SettingsPage.js** - Main settings layout with sidebar + content panel
+  - Left sidebar with 12 navigation sections
+  - Icons and descriptions for each section
+  - Active section highlighting
+  - Back button to dashboard
+  - Role-based section visibility (owner/admin/engineer/technician)
+  - "owner access level" footer indicator
+  
+- ✅ **SettingsGeneralPage.js** - General preferences section
+  - Language selection
+  - Timezone configuration
+  - Date/Time format options
+  - Theme settings (light/dark/system)
+  - Notification preferences
+  
+- ✅ **SettingsQRPage.js** - QR Code management dashboard
+  - Stats cards (total, active, inactive, scans)
+  - QR codes table with search and filter
+  - Bulk selection and actions
+  - Print with template selection
+  - Export as ZIP/CSV
+  - View details dialog
+
+**Behavior:**
+- Desktop (>1024px): Gear icon navigates to /settings (full page)
+- Mobile (<1024px): Gear icon shows dropdown menu (existing behavior)
+
+**Files Created:**
+- `/app/frontend/src/pages/SettingsPage.js`
+- `/app/frontend/src/pages/SettingsGeneralPage.js`
+- `/app/frontend/src/pages/SettingsQRPage.js`
+
+**Files Modified:**
+- `/app/frontend/src/App.js` - Added nested settings routes
+- `/app/frontend/src/components/Layout.js` - Desktop navigation to /settings
+
+---
+
 ### April 9, 2026 - QR Code Management Module (COMPLETED)
 **FEATURE - Complete QR Code generation, assignment, and print/export system:**
 

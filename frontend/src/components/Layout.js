@@ -774,45 +774,63 @@ const Layout = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Settings Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <motion.div
-                  whileHover={{ scale: 1.08, rotate: 15 }}
-                  whileTap={{ scale: 0.92 }}
-                  transition={springPresets.snappy}
+            {/* Settings - Navigate to /settings on desktop, dropdown on mobile */}
+            {isMobileView ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <motion.div
+                    whileHover={{ scale: 1.08, rotate: 15 }}
+                    whileTap={{ scale: 0.92 }}
+                    transition={springPresets.snappy}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900"
+                      data-testid="settings-menu-button"
+                    >
+                      <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </Button>
+                  </motion.div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel className="text-xs">{t("nav.settings")}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {settingsMenuItems.map((item) => (
+                    <DropdownMenuItem 
+                      key={item.path}
+                      onClick={() => navigate(item.path)}
+                      className="cursor-pointer text-sm"
+                      data-testid={`settings-${item.path.replace(/\//g, '-').replace(/^-/, '')}-menu-item`}
+                    >
+                      <item.icon className="w-3.5 h-3.5 mr-2" />
+                      {item.label}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 text-[10px] text-slate-400 flex items-center gap-1">
+                    <Tag className="w-3 h-3" />
+                    Version {APP_VERSION}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <motion.div
+                whileHover={{ scale: 1.08, rotate: 15 }}
+                whileTap={{ scale: 0.92 }}
+                transition={springPresets.snappy}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900"
+                  onClick={() => navigate("/settings")}
+                  data-testid="settings-menu-button"
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900"
-                    data-testid="settings-menu-button"
-                  >
-                    <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </Button>
-                </motion.div>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuLabel className="text-xs">{t("nav.settings")}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {settingsMenuItems.map((item) => (
-                  <DropdownMenuItem 
-                    key={item.path}
-                    onClick={() => navigate(item.path)}
-                    className="cursor-pointer text-sm"
-                    data-testid={`settings-${item.path.replace(/\//g, '-').replace(/^-/, '')}-menu-item`}
-                  >
-                    <item.icon className="w-3.5 h-3.5 mr-2" />
-                    {item.label}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1.5 text-[10px] text-slate-400 flex items-center gap-1">
-                  <Tag className="w-3 h-3" />
-                  Version {APP_VERSION}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </Button>
+              </motion.div>
+            )}
 
             {/* User Avatar with Profile Dropdown */}
             <DropdownMenu>
