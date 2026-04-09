@@ -31,6 +31,16 @@ async def serve_storage_file(
     - Authorization: Bearer <token> header
     - ?token=<token> query parameter (for browser image loading)
     """
+    from services.storage_service import is_storage_available
+    
+    # Check if storage is available first
+    if not is_storage_available():
+        logger.error("Object storage not available - EMERGENT_LLM_KEY not configured")
+        raise HTTPException(
+            status_code=503, 
+            detail="File storage not available. Please configure EMERGENT_LLM_KEY in environment."
+        )
+    
     # Validate auth
     auth_header = authorization or (f"Bearer {token}" if token else None)
     if not auth_header:
@@ -58,7 +68,7 @@ async def serve_storage_file(
         raise
     except Exception as e:
         logger.error(f"Failed to serve file {path}: {e}")
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail=f"File not found: {path}")
 
 
 @router.get("/assets/video/background.mp4")
