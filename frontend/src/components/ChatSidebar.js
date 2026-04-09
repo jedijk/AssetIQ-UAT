@@ -375,7 +375,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             {(msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
               <div className="px-3 pb-3 pt-2 border-t border-slate-200 bg-slate-50/50">
                 <p className="text-xs text-slate-600 mb-2">
-                  Would you like to add more details? (temperature, conditions, photos)
+                  Would you like to add more details? (temperature, conditions, photos) — add your comments in the chat below ↓
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
