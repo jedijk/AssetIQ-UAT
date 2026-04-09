@@ -10,6 +10,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 import os
 import logging
 import asyncio
@@ -273,6 +274,9 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             return JSONResponse(status_code=504, content={"detail": "Request timeout - please try again"})
 
 app.add_middleware(TimeoutMiddleware, timeout=25.0, long_timeout=120.0)
+
+# Add GZip compression for responses > 500 bytes
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 
 # =============================================================================

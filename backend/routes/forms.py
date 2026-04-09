@@ -34,7 +34,22 @@ async def get_form_templates(
     current_user: dict = Depends(get_current_user)
 ):
     """Get form templates with optional filters."""
-    return await form_service.get_templates(
+    from services.query_cache import query_cache
+    import time
+    
+    start = time.time()
+    
+    # Cache only for default unfiltered queries
+    is_default = not discipline and not equipment_type_id and not failure_mode_id and not search and active_only and skip == 0
+    cache_key = f"form_templates:default:{limit}" if is_default else None
+    
+    if cache_key:
+        cached = query_cache.get(cache_key)
+        if cached is not None:
+            logger.info(f"CACHE HIT: form_templates in {(time.time()-start)*1000:.0f}ms")
+            return cached
+    
+    result = await form_service.get_templates(
         discipline=discipline,
         equipment_type_id=equipment_type_id,
         failure_mode_id=failure_mode_id,
@@ -43,6 +58,12 @@ async def get_form_templates(
         skip=skip,
         limit=limit
     )
+    
+    if cache_key:
+        query_cache.set(cache_key, result, ttl=300)  # 5 minutes
+        logger.info(f"CACHE MISS: form_templates fetched from DB in {(time.time()-start)*1000:.0f}ms")
+    
+    return result
 
 @router.get("/form-templates/{template_id}")
 async def get_form_template(

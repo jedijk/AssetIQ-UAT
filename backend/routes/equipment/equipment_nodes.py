@@ -23,12 +23,23 @@ async def get_equipment_nodes(
     current_user: dict = Depends(get_current_user)
 ):
     """Get equipment hierarchy nodes filtered by user's assigned installations."""
+    from services.query_cache import query_cache
+    import time
+    
+    # Check cache first (keyed by user ID since results are user-specific)
+    cache_key = f"equipment_nodes:{current_user['id']}"
+    cached = query_cache.get(cache_key)
+    if cached is not None:
+        return cached
+    
     # Get user's installation filter data
     installation_ids = await installation_filter.get_user_installation_ids(current_user)
     
     # If no installations assigned, return empty list
     if not installation_ids:
-        return {"nodes": []}
+        result = {"nodes": []}
+        query_cache.set(cache_key, result, ttl=60)
+        return result
     
     # Get all equipment IDs under assigned installations (shared equipment - no created_by filter)
     equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
@@ -36,14 +47,20 @@ async def get_equipment_nodes(
     )
     
     if not equipment_ids:
-        return {"nodes": []}
+        result = {"nodes": []}
+        query_cache.set(cache_key, result, ttl=60)
+        return result
     
     # Get all nodes that belong to assigned installations (no created_by filter)
     nodes = await db.equipment_nodes.find(
         {"id": {"$in": list(equipment_ids)}},
         {"_id": 0}
     ).sort("sort_order", 1).to_list(5000)
-    return {"nodes": nodes}
+    
+    result = {"nodes": nodes}
+    # Cache for 2 minutes
+    query_cache.set(cache_key, result, ttl=120)
+    return result
 
 
 @router.get("/equipment-hierarchy/installations")

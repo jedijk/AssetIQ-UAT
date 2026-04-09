@@ -129,6 +129,29 @@ async def get_system_health():
     }
 
 
+@router.get("/system/cache-stats")
+async def get_cache_stats(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get query cache statistics.
+    Only accessible by owner users.
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can access cache stats"
+        )
+    
+    try:
+        from services.query_cache import get_cache_stats
+        return get_cache_stats()
+    except ImportError:
+        return {"error": "Cache service not available"}
+
+
+
+
 @router.get("/system/database")
 async def get_database_storage(
     current_user: dict = Depends(get_current_user)

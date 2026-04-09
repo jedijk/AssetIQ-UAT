@@ -4,6 +4,7 @@ Filters all data based on user's assigned installations.
 Owner role bypasses all installation filtering.
 """
 import logging
+import time
 from typing import List, Optional, Set
 from functools import lru_cache
 import asyncio
@@ -13,6 +14,15 @@ logger = logging.getLogger(__name__)
 # Simple in-memory cache for installation equipment mappings
 _equipment_cache = {}
 _cache_ttl = 300  # 5 minutes
+
+# User-specific cache for equipment IDs
+_user_equipment_cache = {}
+_user_cache_ttl = 120  # 2 minutes
+
+
+def _get_cache_key(installation_ids: List[str]) -> str:
+    """Generate cache key from installation IDs."""
+    return ":".join(sorted(installation_ids))
 
 
 class InstallationFilterService:
@@ -84,41 +94,88 @@ class InstallationFilterService:
         if not installation_ids:
             return set()
         
+        # Check cache first
+        cache_key = _get_cache_key(installation_ids)
+        cache_entry = _user_equipment_cache.get(cache_key)
+        if cache_entry and time.time() < cache_entry["expires_at"]:
+            logger.debug(f"Cache HIT: equipment_ids for {len(installation_ids)} installations")
+            return cache_entry["value"]
+        
         try:
-            all_ids = set(installation_ids)
+            # Use aggregation pipeline for single query instead of recursive calls
+            pipeline = [
+                # Start with the installation nodes
+                {"$match": {"id": {"$in": installation_ids}}},
+                # Use $graphLookup to get all descendants in one query
+                {"$graphLookup": {
+                    "from": "equipment_nodes",
+                    "startWith": "$id",
+                    "connectFromField": "id",
+                    "connectToField": "parent_id",
+                    "as": "descendants",
+                    "maxDepth": 10,  # Max hierarchy depth
+                    "depthField": "depth"
+                }},
+                # Unwind to get individual documents
+                {"$unwind": {"path": "$descendants", "preserveNullAndEmptyArrays": True}},
+                # Project just the IDs
+                {"$group": {
+                    "_id": None,
+                    "all_ids": {"$addToSet": "$id"},
+                    "descendant_ids": {"$addToSet": "$descendants.id"}
+                }}
+            ]
             
-            # Recursively get all children (without created_by filter - equipment is shared)
-            # Use iteration instead of recursion to prevent stack overflow
-            parents_to_process = list(installation_ids)
-            processed = set()
+            result = await self.db.equipment_nodes.aggregate(pipeline).to_list(1)
             
-            while parents_to_process:
-                # Process in batches to avoid memory issues
-                batch = parents_to_process[:100]
-                parents_to_process = parents_to_process[100:]
-                
-                # Skip already processed
-                batch = [p for p in batch if p not in processed]
-                if not batch:
-                    continue
-                
-                processed.update(batch)
-                
-                children = await self.db.equipment_nodes.find(
-                    {"parent_id": {"$in": batch}},
-                    {"_id": 0, "id": 1}
-                ).to_list(5000)
-                
-                for c in children:
-                    child_id = c["id"]
-                    if child_id not in all_ids:
-                        all_ids.add(child_id)
-                        parents_to_process.append(child_id)
+            if result:
+                all_ids = set(result[0].get("all_ids", []))
+                descendant_ids = set(result[0].get("descendant_ids", []))
+                all_ids.update(descendant_ids)
+                all_ids.discard(None)  # Remove any None values
+            else:
+                all_ids = set(installation_ids)
+            
+            # Cache the result
+            _user_equipment_cache[cache_key] = {
+                "value": all_ids,
+                "expires_at": time.time() + _user_cache_ttl
+            }
+            logger.debug(f"Cached equipment_ids: {len(all_ids)} nodes for {len(installation_ids)} installations")
             
             return all_ids
         except Exception as e:
             logger.error(f"Error getting equipment IDs for installations: {e}")
-            return set(installation_ids)  # Return at least the installation IDs
+            # Fallback to recursive approach if aggregation fails
+            return await self._get_equipment_ids_recursive(installation_ids)
+
+    async def _get_equipment_ids_recursive(self, installation_ids: List[str]) -> Set[str]:
+        """Fallback recursive method for getting equipment IDs."""
+        all_ids = set(installation_ids)
+        parents_to_process = list(installation_ids)
+        processed = set()
+        
+        while parents_to_process:
+            batch = parents_to_process[:100]
+            parents_to_process = parents_to_process[100:]
+            batch = [p for p in batch if p not in processed]
+            if not batch:
+                continue
+            processed.update(batch)
+            
+            children = await self.db.equipment_nodes.find(
+                {"parent_id": {"$in": batch}},
+                {"_id": 0, "id": 1}
+            ).to_list(5000)
+            
+            for c in children:
+                child_id = c["id"]
+                if child_id not in all_ids:
+                    all_ids.add(child_id)
+                    parents_to_process.append(child_id)
+        
+        return all_ids
+
     
     async def get_equipment_names_for_installations(
         self,

@@ -73,7 +73,18 @@ async def get_task_templates(
     current_user: dict = Depends(get_current_user)
 ):
     """Get task templates with optional filters."""
-    return await task_service.get_templates(
+    from services.query_cache import query_cache
+    
+    # Cache only for default unfiltered queries
+    is_default = not discipline and not mitigation_strategy and not equipment_type_id and not search and active_only and skip == 0
+    cache_key = f"task_templates:default:{limit}" if is_default else None
+    
+    if cache_key:
+        cached = query_cache.get(cache_key)
+        if cached is not None:
+            return cached
+    
+    result = await task_service.get_templates(
         discipline=discipline,
         mitigation_strategy=mitigation_strategy,
         equipment_type_id=equipment_type_id,
@@ -82,6 +93,11 @@ async def get_task_templates(
         skip=skip,
         limit=limit
     )
+    
+    if cache_key:
+        query_cache.set(cache_key, result, ttl=300)  # 5 minutes
+    
+    return result
 
 @router.get("/task-templates/{template_id}")
 async def get_task_template(
