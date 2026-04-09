@@ -1,11 +1,11 @@
 """
-Static assets route - serves assets from object storage.
+Static assets route - serves assets from MongoDB storage.
 """
 from fastapi import APIRouter, HTTPException, Query, Header
 from fastapi.responses import Response
 import logging
 
-from services.storage_service import get_object
+from services.storage_service import get_object_async, is_storage_available
 
 logger = logging.getLogger(__name__)
 
@@ -19,26 +19,24 @@ async def serve_storage_file(
     authorization: str = Header(None)
 ):
     """
-    Serve a file from object storage.
+    Serve a file from MongoDB storage.
     
-    This endpoint serves files stored in object storage, including:
+    This endpoint serves files stored in MongoDB, including:
     - Form submission attachments
     - Task execution attachments
-    - User avatars (when stored in object storage)
+    - User avatars
     - Any other uploaded files
     
     Authentication can be provided via:
     - Authorization: Bearer <token> header
     - ?token=<token> query parameter (for browser image loading)
     """
-    from services.storage_service import is_storage_available
-    
-    # Check if storage is available first
+    # Check if storage is available
     if not is_storage_available():
-        logger.error("Object storage not available - EMERGENT_LLM_KEY not configured")
+        logger.error("MongoDB storage not initialized")
         raise HTTPException(
             status_code=503, 
-            detail="File storage not available. Please configure EMERGENT_LLM_KEY in environment."
+            detail="Storage service not available"
         )
     
     # Validate auth
@@ -47,8 +45,8 @@ async def serve_storage_file(
         raise HTTPException(status_code=401, detail="Authentication required")
     
     try:
-        # Get the file from storage
-        content, content_type = get_object(path)
+        # Get the file from MongoDB storage
+        content, content_type = await get_object_async(path)
         
         # Determine filename from path
         filename = path.split('/')[-1] if '/' in path else path
@@ -64,21 +62,21 @@ async def serve_storage_file(
                 "Access-Control-Allow-Headers": "Authorization, Content-Type"
             }
         )
-    except HTTPException:
-        raise
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"File not found: {path}")
     except Exception as e:
         logger.error(f"Failed to serve file {path}: {e}")
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve file")
 
 
 @router.get("/assets/video/background.mp4")
 async def get_background_video():
     """
-    Serve the background video from object storage.
+    Serve the background video from storage.
     This is a public endpoint - no auth required.
     """
     try:
-        content, content_type = get_object("assetiq/videos/background.mp4")
+        content, content_type = await get_object_async("assetiq/videos/background.mp4")
         return Response(
             content=content,
             media_type="video/mp4",
@@ -87,6 +85,8 @@ async def get_background_video():
                 "Accept-Ranges": "bytes"
             }
         )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Video not found")
     except Exception as e:
         logger.error(f"Failed to get background video: {e}")
         raise HTTPException(status_code=404, detail="Video not found")

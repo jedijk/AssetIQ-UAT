@@ -945,7 +945,7 @@ class TaskService:
             data = att.get("data", "")
             if data and len(data) > 100000:  # > 100KB
                 try:
-                    from services.storage_service import is_storage_available, put_object
+                    from services.storage_service import is_storage_available, put_object_async
                     if is_storage_available():
                         # Extract base64 content
                         if "," in data:
@@ -960,15 +960,13 @@ class TaskService:
                         file_ext = att.get("name", "file").split(".")[-1] if "." in att.get("name", "") else "bin"
                         storage_path = f"attachments/{uuid.uuid4()}.{file_ext}"
                         
-                        # Upload with timeout
+                        # Upload with timeout - now using async directly
                         try:
                             result = await asyncio.wait_for(
-                                asyncio.get_event_loop().run_in_executor(
-                                    None, put_object, storage_path, file_bytes, att.get("type", "application/octet-stream")
-                                ),
-                                timeout=30.0  # Increased timeout for large files
+                                put_object_async(storage_path, file_bytes, att.get("type", "application/octet-stream")),
+                                timeout=30.0
                             )
-                            # put_object returns dict with 'path' key
+                            # put_object_async returns dict with 'path' key
                             url = result.get("path", storage_path)
                             processed_attachments.append({
                                 "name": att.get("name"),

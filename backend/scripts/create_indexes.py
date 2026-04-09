@@ -311,6 +311,13 @@ INDEX_DEFINITIONS = {
         # Compound for analytics
         {"keys": [("user_id", 1), ("timestamp", -1)]},
     ],
+    
+    # File storage - MongoDB-based file storage
+    "file_storage": [
+        {"keys": [("path", 1)], "unique": True},
+        {"keys": [("created_at", -1)]},
+        {"keys": [("content_type", 1)]},
+    ],
 }
 
 

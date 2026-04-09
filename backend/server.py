@@ -363,6 +363,14 @@ async def background_startup():
         if connected:
             logger.info("MongoDB connected successfully")
             
+            # Initialize MongoDB file storage
+            try:
+                from services.storage_service import init_mongo_storage
+                init_mongo_storage(db)
+                logger.info("MongoDB file storage initialized")
+            except Exception as e:
+                logger.warning(f"File storage init failed: {e}")
+            
             # Create indexes
             try:
                 from scripts.create_indexes import create_indexes
