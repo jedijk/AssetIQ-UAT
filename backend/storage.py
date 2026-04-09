@@ -58,10 +58,15 @@ def put_object(path: str, data: bytes, content_type: str) -> dict:
 def get_object(path: str) -> tuple:
     key = init_storage()
     if not key:
-        raise HTTPException(status_code=503, detail="Storage service unavailable")
-    resp = requests.get(
-        f"{STORAGE_URL}/objects/{path}",
-        headers={"X-Storage-Key": key}, timeout=60
-    )
-    resp.raise_for_status()
-    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+        logger.error(f"Storage unavailable when trying to get: {path}. Check EMERGENT_LLM_KEY environment variable.")
+        raise HTTPException(status_code=503, detail="Storage service unavailable - EMERGENT_LLM_KEY not configured")
+    try:
+        resp = requests.get(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key}, timeout=60
+        )
+        resp.raise_for_status()
+        return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to get object {path}: {e}")
+        raise HTTPException(status_code=404, detail="File not found in storage")
