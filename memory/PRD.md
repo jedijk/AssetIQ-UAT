@@ -24,6 +24,24 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 9, 2026 - Settings Page Viewability Fix (COMPLETED)
+**BUG FIX - Settings page not using full viewport and incorrect height calculation:**
+
+**Issue:**
+- Settings page height calculation used wrong header height (64px instead of 48px)
+- Content area was constrained by `max-w-5xl` limiting use of full screen
+- Sidebar was narrower than optimal
+
+**Fix Applied:**
+- Fixed height from `h-[calc(100vh-64px)]` to `h-[calc(100vh-48px)]` (header is 48px/h-12)
+- Increased sidebar width from `w-64 xl:w-72` to `w-72 xl:w-80` for better readability
+- Removed `max-w-5xl` constraint on content panel - now uses full available width
+
+**File Modified:**
+- `/app/frontend/src/pages/SettingsPage.js`
+
+---
+
 ### April 9, 2026 - Desktop Settings Page (COMPLETED)
 **FEATURE - Full-page Settings interface replacing dropdown menu:**
 

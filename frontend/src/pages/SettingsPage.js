@@ -157,9 +157,9 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] flex bg-slate-50">
+    <div className="h-[calc(100vh-48px)] flex bg-slate-50">
       {/* Left Sidebar */}
-      <aside className="w-64 xl:w-72 bg-white border-r border-slate-200 flex flex-col flex-shrink-0">
+      <aside className="w-72 xl:w-80 bg-white border-r border-slate-200 flex flex-col flex-shrink-0">
         {/* Sidebar Header */}
         <div className="p-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
@@ -235,10 +235,10 @@ export default function SettingsPage() {
         </div>
       </aside>
 
-      {/* Right Content Panel */}
+      {/* Right Content Panel - Full Width */}
       <main className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
-          <div className="p-6 xl:p-8 max-w-5xl">
+          <div className="p-6 xl:p-8">
             <Outlet />
           </div>
         </ScrollArea>
