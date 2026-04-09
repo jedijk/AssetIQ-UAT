@@ -379,6 +379,11 @@ const LoginPage = () => {
             </Link>
           </p>
         </div>
+        
+        {/* Version Number - Bottom Right */}
+        <div className="login-version">
+          Version 2.7.5
+        </div>
       </div>
 
       <style>{`
@@ -638,6 +643,22 @@ const LoginPage = () => {
 
         .login-form-wrapper {
           position: relative;
+        }
+
+        /* Version display - bottom right */
+        .login-version {
+          position: absolute;
+          bottom: 16px;
+          right: 24px;
+          font-size: 11px;
+          color: #94a3b8;
+          font-weight: 500;
+        }
+
+        @media (max-width: 1023px) {
+          .login-version {
+            color: rgba(255, 255, 255, 0.6);
+          }
         }
       `}</style>
     </div>
