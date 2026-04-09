@@ -148,11 +148,17 @@ for router in all_routers:
 
 app.include_router(api_router)
 
-# Health check endpoint (required for Emergent deployment)
+# Root endpoint for basic verification
+@app.get("/")
+async def root():
+    """Root endpoint for basic verification."""
+    return {"message": "AssetIQ API", "status": "running", "version": "2.7.0"}
+
+# Health check endpoint (required for Railway/Emergent deployment)
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for deployment."""
-    return {"status": "healthy"}
+    """Health check endpoint for deployment - must return quickly."""
+    return {"status": "ok"}
 
 
 # Enhanced health check endpoint with database status
