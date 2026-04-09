@@ -517,7 +517,10 @@ async def serve_attachment(
             media_type=content_type,
             headers={
                 "Content-Disposition": f"inline; filename=\"{filename}\"",
-                "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
+                "Cache-Control": "public, max-age=3600",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "Authorization, Content-Type"
             }
         )
     except Exception as e:

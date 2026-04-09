@@ -459,7 +459,8 @@ async def delete_my_avatar(
 async def get_user_avatar(
     user_id: str,
     authorization: str = Header(None),
-    auth: str = Query(None)
+    token: str = Query(None),  # Changed from 'auth' to 'token' to match frontend
+    auth: str = Query(None)    # Keep 'auth' for backwards compatibility
 ):
     """
     Get a user's avatar image.
@@ -467,8 +468,9 @@ async def get_user_avatar(
     Handles both object storage and MongoDB-stored avatars.
     Returns 204 No Content (instead of 404) when avatar unavailable to prevent frontend errors.
     """
-    # Simple auth check - accept either header or query param
-    auth_header = authorization or (f"Bearer {auth}" if auth else None)
+    # Simple auth check - accept header, token query param, or auth query param
+    auth_token = token or auth  # Prefer 'token' but accept 'auth' for backwards compat
+    auth_header = authorization or (f"Bearer {auth_token}" if auth_token else None)
     if not auth_header:
         raise HTTPException(status_code=401, detail="Authentication required")
     
@@ -490,7 +492,14 @@ async def get_user_avatar(
         try:
             content = base64.b64decode(user["avatar_data"])
             content_type = user.get("avatar_content_type", "image/png")
-            return Response(content=content, media_type=content_type)
+            return Response(
+                content=content, 
+                media_type=content_type,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=3600"
+                }
+            )
         except Exception as e:
             logger.error(f"Failed to decode MongoDB avatar: {e}")
             return Response(status_code=204)  # Graceful fallback
@@ -499,7 +508,14 @@ async def get_user_avatar(
         # Return from object storage
         try:
             content, content_type = get_object(user["avatar_path"])
-            return Response(content=content, media_type=content_type)
+            return Response(
+                content=content, 
+                media_type=content_type,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=3600"
+                }
+            )
         except Exception as e:
             logger.error(f"Failed to get avatar from storage: {e}")
             # Return 204 No Content instead of 404 to let frontend use fallback
