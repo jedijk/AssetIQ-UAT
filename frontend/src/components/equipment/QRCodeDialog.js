@@ -172,8 +172,8 @@ export function QRCodeDialog({ open, onOpenChange, equipment, existingQR = null 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <QrCode className="w-5 h-5 text-blue-600" />
             QR Code for {equipment?.name}
@@ -183,7 +183,7 @@ export function QRCodeDialog({ open, onOpenChange, equipment, existingQR = null 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 pr-1">
           {/* QR Code Display or Generate Button */}
           {qrData ? (
             <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg border">
@@ -364,7 +364,7 @@ export function QRCodeDialog({ open, onOpenChange, equipment, existingQR = null 
           )}
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="flex-col sm:flex-row gap-2 flex-shrink-0 pt-4 border-t">
           {qrData && (
             <>
               <div className="flex gap-2 flex-1">

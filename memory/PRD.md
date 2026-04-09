@@ -5,6 +5,25 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+
+### April 9, 2026 - QR Code Dialog Viewability Fix (COMPLETED)
+**BUG FIX - QR Code dialog fields overflowing outside window on desktop:**
+
+**Issue:**
+- QR Code configuration dialog content exceeded viewport height when QR was generated
+- Form fields (label, actions, print options) were cut off and inaccessible
+
+**Fix Applied:**
+- Added `max-h-[85vh] flex flex-col` to `DialogContent` - limits height to 85% viewport
+- Added `flex-shrink-0` to `DialogHeader` and `DialogFooter` - keeps header/footer fixed
+- Added `overflow-y-auto flex-1 pr-1` to main content div - enables scrolling for content
+- Added `pt-4 border-t` to `DialogFooter` - visual separation when content scrolls
+
+**File Modified:**
+- `/app/frontend/src/components/equipment/QRCodeDialog.js`
+
+---
+
 ### April 9, 2026 - Desktop Settings Page (COMPLETED)
 **FEATURE - Full-page Settings interface replacing dropdown menu:**
 
