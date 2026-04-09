@@ -24,7 +24,7 @@ from services.feedback_service import (
     delete_user_feedback,
     bulk_update_status,
 )
-from storage import put_object, MIME_TYPES
+from services.storage_service import put_object, MIME_TYPES
 
 router = APIRouter(prefix="/feedback", tags=["Feedback"])
 

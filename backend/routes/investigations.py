@@ -9,7 +9,7 @@ import uuid
 import logging
 from database import db
 from auth import get_current_user
-from storage import put_object, get_object, MIME_TYPES, APP_NAME
+from services.storage_service import put_object, get_object, MIME_TYPES, APP_NAME
 from investigation_models import (
     InvestigationCreate, InvestigationUpdate, InvestigationStatus,
     TimelineEventCreate, TimelineEventUpdate, EventCategory, ConfidenceLevel,

@@ -1,12 +1,11 @@
 """
 Static assets route - serves assets from object storage.
 """
-from fastapi import APIRouter, HTTPException, Depends, Query, Header
+from fastapi import APIRouter, HTTPException, Query, Header
 from fastapi.responses import Response
 import logging
 
-from storage import get_object
-from auth import get_current_user
+from services.storage_service import get_object
 
 logger = logging.getLogger(__name__)
 

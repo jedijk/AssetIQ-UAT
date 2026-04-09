@@ -14,7 +14,7 @@ from models.form_models import (
     FormFieldDefinition, FormFieldUpdate,
     FormSubmission
 )
-from storage import put_object, get_object, MIME_TYPES
+from services.storage_service import put_object, get_object, MIME_TYPES
 import logging
 import uuid
 

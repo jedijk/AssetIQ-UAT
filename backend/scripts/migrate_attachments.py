@@ -39,7 +39,7 @@ async def migrate_attachments(dry_run: bool = True):
     
     # Check if storage is available
     try:
-        from storage import put_object, init_storage
+        from services.storage_service import put_object, init_storage
         storage_key = init_storage()
         storage_available = storage_key is not None
     except ImportError:
