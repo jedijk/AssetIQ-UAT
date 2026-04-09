@@ -61,6 +61,8 @@ const Layout = () => {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
   const [hierarchyOpen, setHierarchyOpen] = useState(true);
+  const [hierarchyWidth, setHierarchyWidth] = useState(288); // 288px = w-72 default
+  const [isResizing, setIsResizing] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [dismissedNotifications, setDismissedNotifications] = useState(false);
@@ -397,6 +399,30 @@ const Layout = () => {
       setHierarchyOpen(false);
     }
   }, [location.pathname, isMobileView]);
+
+  // Handle hierarchy panel resize
+  const handleResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    
+    const startX = e.clientX;
+    const startWidth = hierarchyWidth;
+    
+    const handleMouseMove = (moveEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 200), 500); // Min 200px, Max 500px
+      setHierarchyWidth(newWidth);
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [hierarchyWidth]);
 
   const lastAction = getLastAction();
 
@@ -961,20 +987,35 @@ const Layout = () => {
       </header>
 
       {/* Main Layout with Sidebar */}
-      <div className="flex min-h-[calc(100vh-48px)]">
+      <div className={`flex min-h-[calc(100vh-48px)] ${isResizing ? 'select-none' : ''}`}>
         {/* Equipment Hierarchy Sidebar - Desktop */}
         {hierarchyOpen && (
           <div 
-            className="hidden lg:block w-72 flex-shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+            className="hidden lg:flex flex-shrink-0 relative"
             data-testid="hierarchy-sidebar"
+            style={{ width: `${hierarchyWidth}px` }}
           >
-            <div className="sticky top-12 h-[calc(100vh-48px)]">
-              <EquipmentHierarchy 
-                isOpen={true} 
-                onClose={() => setHierarchyOpen(false)}
-                isMobile={false}
-                onAddThreat={handleAddObservationFromHierarchy}
-              />
+            <div 
+              className="flex-1 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+            >
+              <div className="sticky top-12 h-[calc(100vh-48px)]">
+                <EquipmentHierarchy 
+                  isOpen={true} 
+                  onClose={() => setHierarchyOpen(false)}
+                  isMobile={false}
+                  onAddThreat={handleAddObservationFromHierarchy}
+                />
+              </div>
+            </div>
+            {/* Resize Handle */}
+            <div
+              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-10 group"
+              onMouseDown={handleResizeMouseDown}
+              title="Drag to resize"
+            >
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 -mr-1.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="w-1 h-6 bg-slate-300 rounded-full" />
+              </div>
             </div>
           </div>
         )}
