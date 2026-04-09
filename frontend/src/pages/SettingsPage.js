@@ -250,14 +250,14 @@ export default function SettingsPage() {
 // Settings Section Wrapper Component for consistent styling
 export function SettingsSection({ title, description, children }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-slate-900">{title}</h2>
         {description && (
-          <p className="text-slate-500 mt-1">{description}</p>
+          <p className="text-sm md:text-base text-slate-500 mt-1">{description}</p>
         )}
       </div>
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         {children}
       </div>
     </div>
@@ -269,15 +269,15 @@ export function SettingsCard({ title, description, children, actions }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       {(title || description) && (
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            {title && <h3 className="font-semibold text-slate-900">{title}</h3>}
-            {description && <p className="text-sm text-slate-500 mt-0.5">{description}</p>}
+            {title && <h3 className="font-semibold text-slate-900 text-sm md:text-base">{title}</h3>}
+            {description && <p className="text-xs md:text-sm text-slate-500 mt-0.5">{description}</p>}
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
       )}
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {children}
       </div>
     </div>
@@ -287,14 +287,14 @@ export function SettingsCard({ title, description, children, actions }) {
 // Settings Row Component
 export function SettingsRow({ label, description, children }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-      <div className="flex-1 min-w-0 pr-4">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-slate-100 last:border-0 gap-2 sm:gap-4">
+      <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-slate-900">{label}</p>
         {description && (
           <p className="text-xs text-slate-500 mt-0.5">{description}</p>
         )}
       </div>
-      <div className="flex-shrink-0">
+      <div className="flex-shrink-0 w-full sm:w-auto">
         {children}
       </div>
     </div>

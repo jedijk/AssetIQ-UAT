@@ -117,8 +117,12 @@ const Layout = () => {
       startScrollY = window.scrollY;
       touchStartY.current = e.touches[0].clientY;
       
-      // Only enable pull-to-refresh when truly at the top (scrollY === 0)
-      if (startScrollY === 0) {
+      // Only enable pull-to-refresh when:
+      // 1. Truly at the top (scrollY === 0)
+      // 2. Touch starts in the top 150px of the viewport (near header)
+      const touchStartInTopArea = e.touches[0].clientY < 150;
+      
+      if (startScrollY === 0 && touchStartInTopArea) {
         setIsPulling(true);
       } else {
         setIsPulling(false);
@@ -942,6 +946,11 @@ const Layout = () => {
           width="280px"
           showCloseButton={false}
           className="pt-safe"
+          footer={
+            <div className="text-xs text-slate-400 text-center">
+              Version 2.7.5
+            </div>
+          }
         >
           <nav className="p-4 space-y-1" data-testid="mobile-nav">
             {/* Hierarchy toggle for mobile */}
@@ -982,6 +991,55 @@ const Layout = () => {
                 </NavLink>
               </motion.div>
             ))}
+            
+            {/* Divider */}
+            <div className="my-3 border-t border-slate-200" />
+            
+            {/* Definitions Link */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: navItems.length * 0.05, ...springPresets.snappy }}
+            >
+              <NavLink
+                to="/definitions"
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                    isActive
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`
+                }
+                data-testid="mobile-nav-definitions"
+              >
+                <Sliders className="w-5 h-5" />
+                {t("nav.criticalityDefinitions")}
+              </NavLink>
+            </motion.div>
+            
+            {/* Settings Link */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: (navItems.length + 1) * 0.05, ...springPresets.snappy }}
+            >
+              <NavLink
+                to="/settings"
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                    isActive
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`
+                }
+                data-testid="mobile-nav-settings"
+              >
+                <Settings className="w-5 h-5" />
+                {t("nav.settings")}
+              </NavLink>
+            </motion.div>
           </nav>
         </AnimatedDrawer>
       </header>
