@@ -46,34 +46,37 @@ The threat already has a Risk Score calculated using FMEA methodology:
 - Scale: 10-250 (Low < 50, Medium 50-99, High 100-149, Critical >= 150)
 - Current threat risk score is provided in the context
 
-IMPORTANT: Use the EQUIPMENT HISTORY to inform your analysis:
-- Past observations indicate recurring issues or patterns
-- Completed actions show maintenance efforts already taken
-- Completed tasks indicate preventive work done
+IMPORTANT: Use ALL available information to inform your analysis:
+- FIELD NOTES: Observer's additional context and on-site observations - these are firsthand accounts from personnel who witnessed the issue
+- ATTACHMENTS: Photos and documents that provide visual evidence of the condition
+- EQUIPMENT HISTORY: Past observations, maintenance actions, and completed tasks
 - Consider the timeline and frequency of past issues
 
-Given the threat details and equipment history, provide:
+Given the threat details, field notes, and equipment history, provide:
 1. DO NOT recalculate risk_score - use the provided threat's current risk score
 2. Failure Probability (0-100%):
    - Based on failure mode patterns
-   - Equipment condition indicators
+   - Equipment condition indicators from field notes and photos
    - Historical data patterns from equipment history
    - Account for recent maintenance actions completed
 
 3. Time-to-Failure Estimate:
    - Based on degradation patterns
    - Consider past similar failures on this equipment
+   - Use field observations to assess current condition severity
    - Provide in hours (null if uncertain)
 
 4. Risk Trend:
    - "increasing", "stable", or "decreasing" based on current conditions
-   - Factor in recent maintenance actions and their effectiveness
+   - Factor in field notes observations and their severity
+   - Consider recent maintenance actions and their effectiveness
 
 5. Trend Delta:
    - Expected change in risk score over time (positive = worsening, negative = improving)
 
 6. Key Risk Factors (3-5 factors)
    - Include factors from equipment history
+   - Include relevant details from field notes
 
 7. Forecasts for next 7/14/30 days using the SAME FMEA scale (10-250)
    - Start from the current risk score and project changes
@@ -112,8 +115,10 @@ CAUSE_ANALYSIS_PROMPT = """You are an AI Causal Analysis Expert for industrial e
 
 IMPORTANT: Respond ONLY with valid JSON. No markdown, no explanations outside the JSON.
 
-IMPORTANT: Use the EQUIPMENT HISTORY to inform your analysis:
-- Past observations on this equipment may reveal recurring issues or patterns
+IMPORTANT: Use ALL available information to inform your analysis:
+- FIELD NOTES: Observer's firsthand account with additional context - these often contain crucial details about the condition observed
+- ATTACHMENTS: Photos and documents that provide visual evidence of the failure or condition
+- EQUIPMENT HISTORY: Past observations on this equipment may reveal recurring issues or patterns
 - Previously identified causes on the same equipment are highly relevant
 - Completed maintenance actions indicate what has been tried before
 - Consider if past causes have been properly addressed or may recur
@@ -122,7 +127,7 @@ For the given threat, identify:
 1. Top 3-5 probable causes ranked by likelihood
 2. Category for each cause: technical_cause, human_factor, maintenance_issue, design_issue, organizational_factor, external_condition
 3. Probability percentage for each cause (total can exceed 100% as causes may combine)
-4. Supporting evidence indicators (include evidence from equipment history)
+4. Supporting evidence indicators (include evidence from field notes, attachments, and equipment history)
 5. Recommended mitigation actions for each cause - IMPORTANT: Each action must be a structured object with:
    - action: The recommended action description
    - action_type: One of "CM" (Corrective Maintenance), "PM" (Preventive Maintenance), or "PDM" (Predictive Maintenance)
@@ -343,6 +348,41 @@ THREAT DETAILS:
 - Equipment Criticality: {safe_threat.get('equipment_criticality', 'Not specified')}
 - Created: {safe_threat.get('created_at', 'Unknown')}
 """
+        
+        # Add field notes/user context if available
+        user_context = threat.get('user_context')
+        if user_context:
+            safe_context = sanitize_for_ai_prompt(str(user_context), max_length=2000)
+            context += f"""
+FIELD NOTES (Observer's Additional Context):
+{safe_context}
+"""
+        
+        # Add attachment descriptions if available (pictures, documents)
+        attachments = threat.get('attachments', [])
+        if attachments:
+            context += "\nATTACHMENTS/EVIDENCE:"
+            for i, attachment in enumerate(attachments[:10], 1):  # Limit to 10 attachments
+                att_type = attachment.get('type', 'unknown')
+                att_name = sanitize_for_ai_prompt(str(attachment.get('name', 'Unnamed')), max_length=100)
+                att_description = attachment.get('description', '')
+                if att_description:
+                    att_description = sanitize_for_ai_prompt(str(att_description), max_length=200)
+                
+                if att_type == 'image':
+                    context += f"\n{i}. [IMAGE] {att_name}"
+                    if att_description:
+                        context += f" - {att_description}"
+                    # Note: We indicate that visual evidence exists, even if we can't analyze the image directly
+                    context += " (Visual evidence provided by observer)"
+                elif att_type == 'document':
+                    context += f"\n{i}. [DOCUMENT] {att_name}"
+                    if att_description:
+                        context += f" - {att_description}"
+                else:
+                    context += f"\n{i}. [{att_type.upper()}] {att_name}"
+                    if att_description:
+                        context += f" - {att_description}"
         
         if equipment_data:
             # Sanitize equipment data
