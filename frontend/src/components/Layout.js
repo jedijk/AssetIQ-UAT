@@ -391,9 +391,9 @@ const Layout = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Auto-collapse hierarchy on mobile and on Equipment Manager page
+  // Auto-collapse hierarchy on mobile, Equipment Manager page, and Settings pages
   useEffect(() => {
-    if (location.pathname === "/equipment-manager" || isMobileView) {
+    if (location.pathname === "/equipment-manager" || location.pathname.startsWith("/settings") || isMobileView) {
       setHierarchyOpen(false);
     }
   }, [location.pathname, isMobileView]);
