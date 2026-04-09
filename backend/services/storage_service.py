@@ -44,18 +44,18 @@ async def _get_storage_db():
     if not mongo_url:
         raise RuntimeError("MONGO_URL not configured")
     
-    # Create client with extended timeouts for large file transfers
+    # Create client with reasonable timeouts
     _storage_client = AsyncIOMotorClient(
         mongo_url,
-        serverSelectionTimeoutMS=30000,  # 30 seconds
-        connectTimeoutMS=30000,
-        socketTimeoutMS=120000,  # 2 minutes for large file reads
+        serverSelectionTimeoutMS=10000,  # 10 seconds
+        connectTimeoutMS=10000,
+        socketTimeoutMS=30000,  # 30 seconds for file reads
         maxPoolSize=5,
         retryReads=True,
         retryWrites=True,
     )
     _storage_db = _storage_client[db_name]
-    logger.info("File storage DB connection initialized with extended timeouts")
+    logger.info("File storage DB connection initialized")
     return _storage_db
 
 
@@ -164,11 +164,24 @@ async def get_object_async(path: str) -> Tuple[bytes, str]:
     Raises:
         FileNotFoundError if file doesn't exist
     """
-    db = await _get_storage_db()
+    import asyncio
     
-    collection = db["file_storage"]
-    
-    doc = await collection.find_one({"path": path})
+    try:
+        # Add timeout for slow queries
+        db = await asyncio.wait_for(_get_storage_db(), timeout=10.0)
+        collection = db["file_storage"]
+        
+        # Timeout for the actual query
+        doc = await asyncio.wait_for(
+            collection.find_one({"path": path}),
+            timeout=15.0
+        )
+    except asyncio.TimeoutError:
+        logger.error(f"Timeout fetching file: {path}")
+        raise FileNotFoundError(f"Timeout fetching file: {path}")
+    except Exception as e:
+        logger.error(f"Error fetching file {path}: {e}")
+        raise FileNotFoundError(f"Error fetching file: {path}")
     
     if not doc:
         logger.warning(f"File not found: {path}")

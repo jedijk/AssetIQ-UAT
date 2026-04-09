@@ -6,6 +6,41 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ---
 
 
+### April 9, 2026 - Form Designer Document Viewer Fix (COMPLETED)
+**BUG FIX - Fixed Form Designer document viewing with MongoDB storage:**
+
+**Problem:**
+- DocumentViewer was timing out when loading documents (~25s+ hang)
+- Old documents uploaded before MongoDB migration were not migrated
+- Storage service had overly long timeouts (120s socket timeout)
+
+**Solution:**
+1. **Reduced storage service timeouts** (`/app/backend/services/storage_service.py`)
+   - Socket timeout: 120s → 30s
+   - Server selection timeout: 30s → 10s
+   - Connect timeout: 30s → 10s
+
+2. **Added explicit timeout handling in `get_object_async()`**:
+   - 10 second timeout for DB connection
+   - 15 second timeout for the actual query
+   - Returns 404 quickly for missing files instead of hanging
+
+3. **Updated migration script** to include `form_templates.documents`:
+   - Script now scans `form_templates` collection for document references
+   - Migrates form designer documents alongside other attachments
+
+**Current State:**
+- ✅ Newly uploaded documents work correctly (~1s fetch time)
+- ✅ Missing documents show proper error ("Document not found") in ~15s
+- ⚠️ Old documents from before migration need to be re-uploaded
+
+**Files Modified:**
+- `/app/backend/services/storage_service.py` - Timeout improvements
+- `/app/backend/scripts/migrate_to_mongodb_storage.py` - Added form_templates.documents
+
+---
+
+
 ### April 9, 2026 - MongoDB File Storage Migration (COMPLETED)
 **FEATURE - Migrated file storage from Emergent Object Storage to MongoDB:**
 

@@ -123,6 +123,15 @@ async def find_all_storage_paths(db):
             if att.get("url"):
                 paths.add(att["url"])
     
+    # Check form_templates for attached documents (Form Designer documents)
+    async for doc in db["form_templates"].find({"documents": {"$exists": True, "$ne": []}}):
+        for form_doc in doc.get("documents", []):
+            # Check both url and storage_path fields
+            if form_doc.get("url"):
+                paths.add(form_doc["url"])
+            if form_doc.get("storage_path") and form_doc["storage_path"] != form_doc.get("url"):
+                paths.add(form_doc["storage_path"])
+    
     return paths
 
 
