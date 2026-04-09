@@ -314,7 +314,7 @@ async def add_security_headers(request, call_next):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database indexes and seed data on startup."""
+    """Initialize server - starts background tasks for DB initialization."""
     import time
     app.state.start_time = time.time()  # Track server start time for health check
     
@@ -323,47 +323,62 @@ async def startup_event():
     logger.info(f"=== SERVER STARTING on port {port} ===")
     logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
     
+    # Start background initialization (non-blocking for fast healthcheck response)
+    asyncio.create_task(background_startup())
+    
+    logger.info("=== SERVER READY (background tasks running) ===")
+
+
+async def background_startup():
+    """Run heavy initialization tasks in background to not block healthcheck."""
+    logger.info("Background startup tasks running...")
+    
     from database import db, verify_database_connection
     
-    # Verify database connection with retry
-    logger.info("Verifying database connection...")
-    connected = await verify_database_connection(max_retries=3, timeout=5.0)
-    if not connected:
-        logger.error("WARNING: Database connection failed on startup - some features may not work")
-    else:
-        logger.info("MongoDB connected successfully")
-    
-    # Create indexes
     try:
-        from scripts.create_indexes import create_indexes
-        created, skipped = await create_indexes()
-        logger.info(f"Database indexes: {created} created, {skipped} already existed")
+        # Verify database connection with retry
+        logger.info("Verifying database connection...")
+        connected = await verify_database_connection(max_retries=3, timeout=5.0)
+        
+        if connected:
+            logger.info("MongoDB connected successfully")
+            
+            # Create indexes
+            try:
+                from scripts.create_indexes import create_indexes
+                created, skipped = await create_indexes()
+                logger.info(f"Database indexes: {created} created, {skipped} already existed")
+            except Exception as e:
+                logger.warning(f"Index creation skipped: {e}")
+            
+            # Seed failure modes library if empty
+            try:
+                from scripts.seed_failure_modes import ensure_failure_modes_seeded
+                seeded = await ensure_failure_modes_seeded(db)
+                if seeded:
+                    logger.info("Failure modes library ready")
+            except Exception as e:
+                logger.warning(f"Failure modes seeding skipped: {e}")
+        else:
+            logger.warning("Database not connected - running in degraded mode")
+        
+        # Log all registered routes
+        logger.info("=== REGISTERED API ROUTES ===")
+        api_routes = []
+        for route in app.routes:
+            if hasattr(route, 'path') and hasattr(route, 'methods'):
+                methods = ','.join(route.methods - {'HEAD', 'OPTIONS'}) if route.methods else 'GET'
+                if methods and route.path.startswith('/api'):
+                    api_routes.append(f"  {methods:10} {route.path}")
+        
+        # Sort and log
+        for route_info in sorted(api_routes)[:50]:  # Log first 50 routes
+            logger.info(route_info)
+        logger.info(f"Total API routes: {len(api_routes)}")
+        logger.info("=== BACKGROUND STARTUP COMPLETE ===")
+        
     except Exception as e:
-        logger.warning(f"Index creation skipped: {e}")
-    
-    # Seed failure modes library if empty
-    try:
-        from scripts.seed_failure_modes import ensure_failure_modes_seeded
-        seeded = await ensure_failure_modes_seeded(db)
-        if seeded:
-            logger.info("Failure modes library ready")
-    except Exception as e:
-        logger.warning(f"Failure modes seeding skipped: {e}")
-    
-    # Log all registered routes
-    logger.info("=== REGISTERED API ROUTES ===")
-    api_routes = []
-    for route in app.routes:
-        if hasattr(route, 'path') and hasattr(route, 'methods'):
-            methods = ','.join(route.methods - {'HEAD', 'OPTIONS'}) if route.methods else 'GET'
-            if methods and route.path.startswith('/api'):
-                api_routes.append(f"  {methods:10} {route.path}")
-    
-    # Sort and log
-    for route_info in sorted(api_routes)[:50]:  # Log first 50 routes
-        logger.info(route_info)
-    logger.info(f"Total API routes: {len(api_routes)}")
-    logger.info("=== SERVER READY ===")
+        logger.error(f"Background startup failed: {e}")
 
 
 @app.on_event("shutdown")
