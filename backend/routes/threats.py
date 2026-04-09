@@ -612,6 +612,9 @@ async def update_threat(
         # Recalculate ranks if status changed
         if "status" in update_data:
             await update_all_ranks(current_user["id"])
+        
+        # Invalidate stats cache
+        cache.invalidate_stats(f"stats:{current_user['id']}")
     
     updated = await db.threats.find_one({"id": threat_id}, {"_id": 0})
     # Ensure risk_score is int
@@ -677,6 +680,10 @@ async def delete_threat(
         raise HTTPException(status_code=404, detail="Threat not found or you don't have permission to delete it")
     
     await update_all_ranks(current_user["id"])
+    
+    # Invalidate stats cache
+    cache.invalidate_stats(f"stats:{current_user['id']}")
+    
     return {
         "message": "Threat deleted",
         "deleted_actions": deleted_actions_count,

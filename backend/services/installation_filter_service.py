@@ -158,22 +158,29 @@ class InstallationFilterService:
         Build a MongoDB query filter for threats based on assigned installations.
         Threats are filtered by:
         - linked_equipment_id in equipment_ids, OR
-        - asset name in equipment_names
+        - asset name in equipment_names, OR
+        - installation matches user's assigned installations, OR
+        - created by this user (fallback for orphan threats)
         Note: Threats are shared - anyone with installation access can see them.
         """
-        if not equipment_ids and not equipment_names:
-            # No installations assigned - return impossible filter (no results)
-            return {"_impossible": True}
-        
         base_filter = {
             "$or": []
         }
         
+        # Match by linked equipment ID
         if equipment_ids:
             base_filter["$or"].append({"linked_equipment_id": {"$in": list(equipment_ids)}})
         
+        # Match by asset name (exact match)
         if equipment_names:
             base_filter["$or"].append({"asset": {"$in": list(equipment_names)}})
+        
+        # Match by location (often set to equipment name)
+        if equipment_names:
+            base_filter["$or"].append({"location": {"$in": list(equipment_names)}})
+        
+        # Fallback: include threats created by the user that may not be linked yet
+        base_filter["$or"].append({"created_by": user_id})
         
         # If no $or conditions, return impossible filter
         if not base_filter["$or"]:

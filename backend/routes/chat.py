@@ -12,6 +12,7 @@ from ai_helpers import classify_user_intent, get_data_context, answer_data_query
 from chat_handler_v2 import process_chat_message, ChatState
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.threat_score_service import calculate_rank, update_all_ranks
+from services.cache_service import cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -392,6 +393,9 @@ async def send_chat_message(
         
         # Store this single combined message
         await db.chat_messages.insert_one(ai_response)
+        
+        # Invalidate stats cache since a new threat was created
+        cache.invalidate_stats(f"stats:{user_id}")
         
         # Update conversation state
         await db.chat_conversations.update_one(

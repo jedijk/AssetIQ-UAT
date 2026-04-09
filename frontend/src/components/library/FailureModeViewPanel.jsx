@@ -539,12 +539,14 @@ export function FailureModeViewPanel({
           <Label className="text-xs text-slate-500 mb-2 block">{t("library.potentialEffects")}</Label>
           {isEditing ? (
             <Input
-              value={formData?.potential_effects || ""}
+              value={Array.isArray(formData?.potential_effects) ? formData.potential_effects.join(", ") : (formData?.potential_effects || "")}
               onChange={(e) => setFormData({ ...formData, potential_effects: e.target.value })}
               placeholder={t("library.potentialEffectsPlaceholder")}
             />
           ) : (
-            <span className="text-sm text-slate-700">{fm.potential_effects || "—"}</span>
+            <span className="text-sm text-slate-700">
+              {Array.isArray(fm.potential_effects) ? fm.potential_effects.join(", ") : (fm.potential_effects || "—")}
+            </span>
           )}
         </div>
 
@@ -553,12 +555,14 @@ export function FailureModeViewPanel({
           <Label className="text-xs text-slate-500 mb-2 block">{t("library.potentialCauses")}</Label>
           {isEditing ? (
             <Input
-              value={formData?.potential_causes || ""}
+              value={Array.isArray(formData?.potential_causes) ? formData.potential_causes.join(", ") : (formData?.potential_causes || "")}
               onChange={(e) => setFormData({ ...formData, potential_causes: e.target.value })}
               placeholder={t("library.potentialCausesPlaceholder")}
             />
           ) : (
-            <span className="text-sm text-slate-700">{fm.potential_causes || "—"}</span>
+            <span className="text-sm text-slate-700">
+              {Array.isArray(fm.potential_causes) ? fm.potential_causes.join(", ") : (fm.potential_causes || "—")}
+            </span>
           )}
         </div>
 
