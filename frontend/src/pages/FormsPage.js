@@ -652,7 +652,7 @@ const FormsPage = ({ embedded = false }) => {
                   rows={2}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{t("forms.discipline")}</Label>
                   <Select
@@ -670,19 +670,21 @@ const FormsPage = ({ embedded = false }) => {
                   </Select>
                 </div>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>{t("forms.requireSignature")}</Label>
+                  <div className="flex items-center gap-3">
                     <Switch
+                      id="require-signature"
                       checked={newTemplate.require_signature}
                       onCheckedChange={(v) => setNewTemplate(prev => ({ ...prev, require_signature: v }))}
                     />
+                    <Label htmlFor="require-signature" className="cursor-pointer">{t("forms.requireSignature")}</Label>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <Label>{t("forms.allowPartialSubmit")}</Label>
+                  <div className="flex items-center gap-3">
                     <Switch
+                      id="allow-partial"
                       checked={newTemplate.allow_partial_submission}
                       onCheckedChange={(v) => setNewTemplate(prev => ({ ...prev, allow_partial_submission: v }))}
                     />
+                    <Label htmlFor="allow-partial" className="cursor-pointer">{t("forms.allowPartialSubmit")}</Label>
                   </div>
                 </div>
               </div>
