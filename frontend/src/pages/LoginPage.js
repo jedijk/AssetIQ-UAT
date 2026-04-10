@@ -382,7 +382,7 @@ const LoginPage = () => {
         
         {/* Version Number - Bottom Right */}
         <div className="login-version">
-          Version 2.7.8
+          Version 2.7.9
         </div>
       </div>
 
