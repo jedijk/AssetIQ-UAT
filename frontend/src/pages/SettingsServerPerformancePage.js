@@ -391,36 +391,34 @@ const SettingsServerPerformancePage = () => {
       setLastUpdated(new Date());
       setError(null);
       
-      // Update history for sparklines
-      setCpuHistory(prev => [...prev.slice(-11), data.cpu_percent]);
-      setRamHistory(prev => [...prev.slice(-11), data.ram_percent]);
-      
-      // Show warning toast if any metric is critical
-      if (data.cpu_percent >= 90 || data.ram_percent >= 90 || data.disk_percent >= 90) {
-        const criticalMetrics = [];
-        if (data.cpu_percent >= 90) criticalMetrics.push("CPU");
-        if (data.ram_percent >= 90) criticalMetrics.push("RAM");
-        if (data.disk_percent >= 90) criticalMetrics.push("Disk");
-        toast.warning(`High usage detected: ${criticalMetrics.join(", ")}`);
+      // Only update history if we have real metrics (not serverless)
+      if (!data.serverless && data.cpu_percent !== null) {
+        setCpuHistory(prev => [...prev.slice(-11), data.cpu_percent]);
+        setRamHistory(prev => [...prev.slice(-11), data.ram_percent]);
+        
+        // Show warning toast if any metric is critical
+        if (data.cpu_percent >= 90 || data.ram_percent >= 90 || data.disk_percent >= 90) {
+          const criticalMetrics = [];
+          if (data.cpu_percent >= 90) criticalMetrics.push("CPU");
+          if (data.ram_percent >= 90) criticalMetrics.push("RAM");
+          if (data.disk_percent >= 90) criticalMetrics.push("Disk");
+          toast.warning(`High usage detected: ${criticalMetrics.join(", ")}`);
+        }
       }
       
     } catch (err) {
       console.error("Failed to fetch metrics:", err);
       setError(err.message);
       
-      // Use mock data as fallback
+      // Set serverless-like fallback when fetch fails
       setMetrics({
-        cpu_percent: 35.5,
-        cpu_count: 4,
-        cpu_count_logical: 8,
-        ram_used: 4.2,
-        ram_total: 8.0,
-        ram_percent: 52.5,
-        disk_used: 45.0,
-        disk_total: 100.0,
-        disk_percent: 45.0,
-        uptime: 86400,
-        mock: true
+        cpu_percent: null,
+        ram_percent: null,
+        disk_percent: null,
+        uptime: null,
+        serverless: true,
+        environment: "unknown",
+        message: "Unable to connect to server metrics. This may indicate a serverless environment or network issue."
       });
     } finally {
       setLoading(false);
@@ -615,7 +613,57 @@ const SettingsServerPerformancePage = () => {
           </div>
         )}
 
-        {/* Main Metrics Grid - 2x2 on mobile, 4 columns on desktop */}
+        {/* Serverless Environment Notice */}
+        {metrics?.serverless && (
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <Server className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-indigo-800 text-sm sm:text-base">
+                  Serverless Environment Detected
+                  {metrics.environment && (
+                    <span className="ml-2 text-xs font-normal px-2 py-0.5 bg-indigo-100 rounded-full">
+                      {metrics.environment === 'vercel' ? 'Vercel' : 
+                       metrics.environment === 'railway' ? 'Railway' : 
+                       metrics.environment === 'aws_lambda' ? 'AWS Lambda' : 
+                       metrics.environment}
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs sm:text-sm text-indigo-600 mt-1">
+                  {metrics.message || "System metrics (CPU, RAM, Disk) are not available in serverless deployments. Database health and error monitoring are still functional below."}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Metrics Grid - Show placeholder for serverless */}
+        {metrics?.serverless ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+            {/* Serverless placeholder cards */}
+            {[
+              { title: "CPU", icon: Cpu },
+              { title: "RAM", icon: MemoryStick },
+              { title: "Disk", icon: HardDrive },
+              { title: "Uptime", icon: Clock }
+            ].map(({ title, icon: Icon }) => (
+              <Card key={title} className="border-slate-200 bg-slate-50/50">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs sm:text-sm font-medium text-slate-400">{title}</span>
+                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300" />
+                  </div>
+                  <div className="flex flex-col items-center justify-center h-20 sm:h-24">
+                    <Server className="w-6 h-6 sm:w-8 sm:h-8 text-slate-300 mb-2" />
+                    <p className="text-xs text-slate-400 text-center">N/A in serverless</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+        /* Main Metrics Grid - 2x2 on mobile, 4 columns on desktop */
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           {/* CPU */}
           <MetricCard title="CPU" icon={Cpu} percent={metrics?.cpu_percent} compact>
@@ -693,6 +741,7 @@ const SettingsServerPerformancePage = () => {
             </div>
           </MetricCard>
         </div>
+        )}
 
         {/* Database Storage Card - Separate Section */}
         <div className="mb-4 sm:mb-6">

@@ -3,6 +3,8 @@ System Metrics Routes.
 
 API endpoint for server performance monitoring.
 Provides CPU, RAM, Disk usage and uptime metrics.
+
+Note: Some metrics may not be available in serverless environments (Vercel, Railway).
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime, timezone
@@ -24,6 +26,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["System"])
 
+# Detect deployment environment
+def get_deployment_environment():
+    """Detect the deployment environment."""
+    if os.environ.get("VERCEL"):
+        return "vercel"
+    if os.environ.get("RAILWAY_ENVIRONMENT"):
+        return "railway"
+    if os.environ.get("KUBERNETES_SERVICE_HOST"):
+        return "kubernetes"
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        return "aws_lambda"
+    if os.environ.get("EMERGENT_PREVIEW"):
+        return "emergent"
+    return "standard"
+
 
 @router.get("/system/metrics")
 async def get_system_metrics(
@@ -36,6 +53,7 @@ async def get_system_metrics(
     
     Returns:
         CPU usage, RAM usage, Disk usage, and server uptime.
+        Note: In serverless environments (Vercel/Railway), some metrics may be estimated.
     """
     # Restrict to owner only
     if current_user.get("role") != "owner":
@@ -44,19 +62,24 @@ async def get_system_metrics(
             detail="Only owners can access server metrics"
         )
     
-    if not PSUTIL_AVAILABLE:
-        # Return mock data if psutil is not available
+    environment = get_deployment_environment()
+    is_serverless = environment in ["vercel", "railway", "aws_lambda"]
+    
+    if not PSUTIL_AVAILABLE or is_serverless:
+        # Return appropriate data for serverless environments
         return {
-            "cpu_percent": 35.5,
-            "ram_used": 4.2,
-            "ram_total": 8.0,
-            "ram_percent": 52.5,
-            "disk_used": 45.0,
-            "disk_total": 100.0,
-            "disk_percent": 45.0,
-            "uptime": 86400,
+            "cpu_percent": None,
+            "ram_used": None,
+            "ram_total": None,
+            "ram_percent": None,
+            "disk_used": None,
+            "disk_total": None,
+            "disk_percent": None,
+            "uptime": None,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "mock": True
+            "environment": environment,
+            "serverless": is_serverless,
+            "message": "System metrics are not available in serverless environments. Database and application health monitoring is still available below." if is_serverless else "psutil not installed - limited metrics available"
         }
     
     try:
@@ -106,7 +129,8 @@ async def get_system_metrics(
             "uptime": uptime,
             "network": network,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "mock": False
+            "environment": environment,
+            "serverless": False
         }
         
     except Exception as e:
