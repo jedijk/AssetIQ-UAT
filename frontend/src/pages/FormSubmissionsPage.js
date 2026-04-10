@@ -30,6 +30,13 @@ import {
   ZoomIn,
   Trash2,
   MoreVertical,
+  ArrowLeft,
+  Check,
+  CheckSquare,
+  Lightbulb,
+  Settings,
+  Sparkles,
+  Users,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -585,320 +592,415 @@ export default function FormSubmissionsPage() {
       </div>
 
       {/* Submission Detail Dialog */}
+      {/* Quick View Modal - Matching Dashboard Design */}
       <Dialog open={!!selectedSubmission || loadingSubmission} onOpenChange={() => { setSelectedSubmission(null); setLoadingSubmission(false); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-              {selectedSubmission?.form_template_name || "Loading..."}
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
+          {/* Header */}
+          <div className="flex items-center px-4 py-3 border-b border-slate-100 flex-shrink-0">
+            <button 
+              onClick={() => setSelectedSubmission(null)}
+              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+            </button>
+          </div>
           
+          {/* Loading state */}
           {loadingSubmission && !selectedSubmission && (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="flex-1 flex items-center justify-center py-12">
+              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
             </div>
           )}
           
           {selectedSubmission && (
-            <div className="space-y-4 mt-2 sm:mt-4">
-              {/* Submission Info - Responsive grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 rounded-lg">
-                <div>
-                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Submitted At</p>
-                  <p className="text-xs sm:text-sm font-medium">{formatDate(selectedSubmission.submitted_at)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Submitted By</p>
-                  <p className="text-xs sm:text-sm font-medium">{selectedSubmission.submitted_by_name || "Unknown"}</p>
-                </div>
-                {selectedSubmission.discipline && (
-                  <div>
-                    <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Discipline</p>
-                    <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${getDisciplineInfo(selectedSubmission.discipline).color}`} />
-                      {getDisciplineInfo(selectedSubmission.discipline).label}
-                    </p>
-                  </div>
-                )}
-                {selectedSubmission.equipment_name && (
-                  <div>
-                    <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Equipment</p>
-                    <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
-                      <Building2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400" />
-                      <span className="truncate">{selectedSubmission.equipment_name}</span>
-                    </p>
-                  </div>
-                )}
-                {selectedSubmission.task_template_name && (
-                  <div className="sm:col-span-2">
-                    <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Originating Task</p>
-                    <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
-                      <ClipboardList className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400" />
-                      {selectedSubmission.task_template_name}
-                    </p>
-                  </div>
-                )}
-              </div>
-              
-              {/* Form Responses */}
-              <div>
-                <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <ClipboardList className="w-4 h-4 text-blue-500" />
-                  Form Responses ({(selectedSubmission.responses || selectedSubmission.values || []).length})
-                </h4>
-                <div className="space-y-2">
-                  {(selectedSubmission.responses || selectedSubmission.values || []).map((response, idx) => {
-                    const isWarning = response.threshold_status === "warning";
-                    const isCritical = response.threshold_status === "critical";
-                    const isBoolean = typeof response.value === "boolean";
-                    const isArray = Array.isArray(response.value);
-                    const isNumeric = typeof response.value === "number";
-                    const hasAttachment = response.attachment_url || response.file_url;
-                    const attachmentRawUrl = response.attachment_url || response.file_url || "";
-                    const isImage = hasAttachment && /\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentRawUrl);
-                    // Construct full URL for inline attachments
-                    const authToken = localStorage.getItem('token');
-                    const attachmentFullUrl = attachmentRawUrl && !attachmentRawUrl.startsWith('data:') && !attachmentRawUrl.startsWith('http')
-                      ? `${getBackendUrl()}/api/storage/${attachmentRawUrl}${authToken ? `?token=${authToken}` : ''}`
-                      : attachmentRawUrl;
-                    
-                    // Check if this is a signature field (base64 data URL or field_type is signature)
-                    const isSignature = response.field_type === "signature" || 
-                      (typeof response.value === "string" && response.value?.startsWith("data:image/png;base64,"));
-                    
-                    return (
-                      <div 
-                        key={idx}
-                        className={`p-3 rounded-lg border ${
-                          isCritical 
-                            ? "bg-red-50 border-red-200" 
-                            : isWarning 
-                              ? "bg-amber-50 border-amber-200" 
-                              : "bg-white border-slate-200"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-xs font-medium mb-1 ${
-                              isCritical ? "text-red-600" : isWarning ? "text-amber-600" : "text-slate-500"
-                            }`}>
-                              {response.field_label || response.field_id}
-                              {response.required && <span className="text-red-400 ml-0.5">*</span>}
-                            </p>
-                            
-                            {/* Value display based on type */}
-                            <div className={`text-sm font-medium ${
-                              isCritical ? "text-red-800" : isWarning ? "text-amber-800" : "text-slate-800"
-                            }`}>
-                              {isSignature && response.value ? (
-                                <button
-                                  onClick={() => setViewingImage({ url: response.value, name: response.field_label || "Signature" })}
-                                  className="block bg-slate-50 border border-slate-200 rounded-lg p-2 hover:border-blue-300 hover:shadow-sm transition-all"
-                                >
-                                  <img 
-                                    src={response.value} 
-                                    alt="Signature" 
-                                    className="max-h-16 sm:max-h-20 w-auto object-contain"
-                                  />
-                                  <span className="text-[10px] text-slate-500 mt-1 block">Tap to enlarge</span>
-                                </button>
-                              ) : isBoolean ? (
-                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ${
-                                  response.value 
-                                    ? "bg-green-100 text-green-700" 
-                                    : "bg-slate-100 text-slate-600"
-                                }`}>
-                                  {response.value ? (
-                                    <><CheckCircle2 className="w-3 h-3" /> Yes</>
-                                  ) : (
-                                    <><X className="w-3 h-3" /> No</>
-                                  )}
-                                </span>
-                              ) : isArray ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {response.value.map((v, i) => (
-                                    <Badge key={`${response.field_id}-${i}`} variant="secondary" className="text-xs">
-                                      {String(v)}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              ) : isNumeric ? (
-                                <span className="font-mono text-base">
-                                  {response.value}
-                                  {response.unit && <span className="text-slate-500 ml-1 text-sm">{response.unit}</span>}
-                                </span>
-                              ) : hasAttachment ? (
-                                <button
-                                  onClick={() => {
-                                    if (isImage) {
-                                      setViewingImage({ url: attachmentFullUrl, name: response.field_label || "Image" });
-                                    } else {
-                                      window.open(attachmentFullUrl, '_blank');
-                                    }
-                                  }}
-                                  className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800"
-                                >
-                                  {isImage ? <Image className="w-4 h-4" /> : <Paperclip className="w-4 h-4" />}
-                                  <span className="underline">View attachment</span>
-                                </button>
-                              ) : (
-                                <span className="whitespace-pre-wrap break-words">
-                                  {String(response.value || "—")}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Status badges */}
-                          <div className="flex items-center gap-1 shrink-0">
-                            {(isWarning || isCritical) && (
-                              <Badge className={`text-[10px] ${isCritical ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
-                                {isCritical ? "Critical" : "Warning"}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
+            <>
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                {/* Title and Status */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-800">{selectedSubmission.form_template_name}</h2>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-sm text-slate-500">{selectedSubmission.submitted_by_name || "Unknown"}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-sm text-slate-500">{formatDate(selectedSubmission.submitted_at)}</span>
                       </div>
-                    );
-                  })}
-                  
-                  {(!selectedSubmission.responses?.length && !selectedSubmission.values?.length) && (
-                    <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                      <FileText className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                      <p className="text-sm text-slate-500">No responses recorded</p>
+                    </div>
+                  </div>
+                  <Badge className={`shrink-0 ${
+                    selectedSubmission.has_critical 
+                      ? "bg-red-100 text-red-700 border-red-200" 
+                      : selectedSubmission.has_warnings 
+                        ? "bg-amber-100 text-amber-700 border-amber-200" 
+                        : "bg-green-100 text-green-700 border-green-200"
+                  }`}>
+                    {selectedSubmission.has_critical ? "Critical" : selectedSubmission.has_warnings ? "Warning" : "Completed"}
+                  </Badge>
+                </div>
+                
+                {/* Info Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3 border-y border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-slate-400" />
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">Submitted by</p>
+                      <p className="text-sm font-medium text-slate-700 mt-0.5">{selectedSubmission.submitted_by_name || "Unknown"}</p>
+                    </div>
+                  </div>
+                  {selectedSubmission.equipment_name && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-slate-400" />
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Equipment</p>
+                        <p className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-1">
+                          <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                          {selectedSubmission.equipment_name}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {selectedSubmission.task_template_name && (
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-slate-400" />
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Task</p>
+                        <p className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-1">
+                          <FileText className="w-3.5 h-3.5 text-slate-400" />
+                          {selectedSubmission.task_template_name}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {selectedSubmission.discipline && (
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-4 h-4 text-slate-400" />
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Discipline</p>
+                        <p className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-1">
+                          <span className={`w-2 h-2 rounded-full ${getDisciplineInfo(selectedSubmission.discipline).color}`} />
+                          {getDisciplineInfo(selectedSubmission.discipline).label}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-              
-              {/* Attachments */}
-              {selectedSubmission.attachments?.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                    <Paperclip className="w-4 h-4 text-slate-500" />
-                    Attachments ({selectedSubmission.attachments.length})
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedSubmission.attachments.map((att, attIdx) => {
-                      const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name || att.filename || "");
-                      const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name || att.filename || "");
-                      const isDoc = /\.(doc|docx)$/i.test(att.name || att.filename || "");
-                      // Construct full URL for attachments stored in object storage
-                      // Include token in URL for browser image loading (can't send auth headers with <img>)
-                      const rawUrl = att.url || att.data;
-                      const authToken = localStorage.getItem('token');
-                      const previewUrl = rawUrl && !rawUrl.startsWith('data:') && !rawUrl.startsWith('http') 
-                        ? `${getBackendUrl()}/api/storage/${rawUrl}${authToken ? `?token=${authToken}` : ''}` 
-                        : rawUrl;
-                      const fileName = att.name || att.filename || "Attachment";
-                      const hasError = att.error || att.needs_migration;
-                      
-                      return (
-                        <button
-                          key={att.id || att.url || att.name}
-                          onClick={() => {
-                            if (hasError) return; // Don't allow interaction for unavailable attachments
-                            if (isImage && previewUrl) {
-                              setViewingImage({ url: previewUrl, name: fileName });
-                            } else if ((isPdf || isDoc) && previewUrl) {
-                              setViewingDocument({ url: previewUrl, name: fileName, type: att.type });
-                            } else if (previewUrl) {
-                              const link = document.createElement('a');
-                              link.href = previewUrl;
-                              link.download = fileName;
-                              link.click();
-                            }
-                          }}
-                          className={`relative group rounded-lg border overflow-hidden transition-all w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 ${
-                            hasError 
-                              ? 'bg-amber-50 border-amber-300 cursor-not-allowed opacity-75' 
-                              : 'bg-slate-100 border-slate-200 hover:border-blue-300 hover:shadow-md'
-                          }`}
-                          disabled={hasError}
-                        >
-                          {hasError ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center p-2">
-                              <AlertTriangle className="w-8 h-8 text-amber-500 mb-1" />
-                              <span className="text-[10px] text-amber-600 text-center px-1">
-                                Unavailable
-                              </span>
+                
+                {/* Checklist Section */}
+                {(() => {
+                  const responses = selectedSubmission?.values || selectedSubmission?.responses || [];
+                  if (responses.length === 0) return null;
+                  
+                  return (
+                    <div>
+                      <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                        <CheckSquare className="w-5 h-5 text-slate-600" />
+                        Checklist
+                      </h3>
+                      <div className="space-y-2">
+                        {responses.map((response, idx) => {
+                          const isWarning = response.threshold_status === "warning";
+                          const isCritical = response.threshold_status === "critical";
+                          const isBoolean = typeof response.value === "boolean";
+                          const isPass = isBoolean ? response.value : !isCritical && !isWarning;
+                          const isSignature = response.field_type === "signature" || 
+                            (typeof response.value === "string" && response.value?.startsWith("data:image/png;base64,"));
+                          const hasAttachment = response.attachment_url || response.file_url;
+                          const attachmentRawUrl = response.attachment_url || response.file_url || "";
+                          const isImage = hasAttachment && /\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentRawUrl);
+                          const authToken = localStorage.getItem('token');
+                          const attachmentFullUrl = attachmentRawUrl && !attachmentRawUrl.startsWith('data:') && !attachmentRawUrl.startsWith('http')
+                            ? `${getBackendUrl()}/api/storage/${attachmentRawUrl}${authToken ? `?token=${authToken}` : ''}`
+                            : attachmentRawUrl;
+                          
+                          return (
+                            <div 
+                              key={response.field_id || `response-${idx}`}
+                              className={`flex items-start gap-3 p-3 rounded-lg border-l-4 ${
+                                isCritical 
+                                  ? "bg-red-50 border-l-red-500" 
+                                  : isWarning 
+                                    ? "bg-amber-50 border-l-amber-500" 
+                                    : "bg-white border-l-green-500"
+                              } border border-l-4 border-slate-100`}
+                            >
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                                isCritical ? "bg-red-500" : isWarning ? "bg-amber-500" : "bg-green-500"
+                              }`}>
+                                {isCritical ? (
+                                  <X className="w-3 h-3 text-white" />
+                                ) : isWarning ? (
+                                  <AlertTriangle className="w-3 h-3 text-white" />
+                                ) : (
+                                  <Check className="w-3 h-3 text-white" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0 pr-2">
+                                <p className="font-medium text-slate-800 text-sm break-words">
+                                  {(response.field_label || response.field_id || "").replace(/_/g, ' ')}
+                                </p>
+                                <p className="text-sm text-slate-500 mt-0.5">
+                                  {isSignature && response.value ? (
+                                    <button
+                                      onClick={() => setViewingImage({ url: response.value, name: (response.field_label || "Signature").replace(/_/g, ' ') })}
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      View Signature
+                                    </button>
+                                  ) : isBoolean ? (
+                                    response.value ? "Yes" : "No"
+                                  ) : Array.isArray(response.value) ? (
+                                    response.value.join(", ")
+                                  ) : hasAttachment ? (
+                                    <button
+                                      onClick={() => {
+                                        if (isImage) {
+                                          setViewingImage({ url: attachmentFullUrl, name: (response.field_label || "Image").replace(/_/g, ' ') });
+                                        } else {
+                                          window.open(attachmentFullUrl, '_blank');
+                                        }
+                                      }}
+                                      className="text-blue-600 hover:underline flex items-center gap-1"
+                                    >
+                                      <Paperclip className="w-3 h-3" /> View Attachment
+                                    </button>
+                                  ) : (
+                                    <>
+                                      {String(response.value || "—")}
+                                      {response.unit && <span className="text-slate-400 ml-1">{response.unit}</span>}
+                                    </>
+                                  )}
+                                </p>
+                              </div>
+                              <Badge className={`shrink-0 text-xs font-medium ${
+                                isCritical 
+                                  ? "bg-red-100 text-red-700 border-red-200" 
+                                  : isWarning 
+                                    ? "bg-amber-100 text-amber-700 border-amber-200" 
+                                    : "bg-green-100 text-green-700 border-green-200"
+                              }`}>
+                                {isCritical ? "FAIL" : isWarning ? "WARNING" : "PASS"}
+                              </Badge>
                             </div>
-                          ) : isImage && previewUrl ? (
-                            <ImageWithFallback 
-                              src={previewUrl} 
-                              alt={fileName}
-                              fallback={
-                                <div className="w-full h-full flex flex-col items-center justify-center p-2">
-                                  <File className="w-8 h-8 text-slate-400 mb-1" />
-                                  <span className="text-[10px] text-slate-500 uppercase font-medium">
-                                    {fileName.split('.').pop()}
-                                  </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+                
+                {/* Insights Section */}
+                {(selectedSubmission?.values?.length > 0 || selectedSubmission?.responses?.length > 0) && (
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                      <Lightbulb className="w-5 h-5 text-slate-600" />
+                      Insights
+                    </h3>
+                    <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                      {(() => {
+                        const responses = selectedSubmission?.values || selectedSubmission?.responses || [];
+                        const totalItems = responses.length;
+                        const passedItems = responses.filter(r => {
+                          const isBoolean = typeof r.value === "boolean";
+                          return isBoolean ? r.value : r.threshold_status !== "critical" && r.threshold_status !== "warning";
+                        }).length;
+                        const warningItems = responses.filter(r => r.threshold_status === "warning").length;
+                        const criticalItems = responses.filter(r => r.threshold_status === "critical").length;
+                        
+                        return (
+                          <>
+                            {criticalItems > 0 && (
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-red-500" />
+                                <span className="text-sm text-slate-700">{criticalItems} critical issue{criticalItems > 1 ? 's' : ''} require immediate attention</span>
+                              </div>
+                            )}
+                            {warningItems > 0 && (
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                <span className="text-sm text-slate-700">{warningItems} warning{warningItems > 1 ? 's' : ''} detected - monitor closely</span>
+                              </div>
+                            )}
+                            {criticalItems === 0 && warningItems === 0 && (
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-green-500" />
+                                <span className="text-sm text-slate-700">No deviations detected in this round</span>
+                              </div>
+                            )}
+                            {passedItems > 0 && (
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-green-500" />
+                                <span className="text-sm text-slate-700">{passedItems} of {totalItems} checks passed</span>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                    
+                    {/* Recommendation */}
+                    <div className="bg-blue-50 rounded-lg p-4 mt-3 border border-blue-100">
+                      <h4 className="font-semibold text-slate-800 flex items-center gap-2 mb-2">
+                        <Sparkles className="w-4 h-4 text-blue-500" />
+                        Recommendation:
+                      </h4>
+                      <p className="text-sm text-slate-600">
+                        {(() => {
+                          const responses = selectedSubmission?.values || selectedSubmission?.responses || [];
+                          const criticalItems = responses.filter(r => r.threshold_status === "critical").length;
+                          const warningItems = responses.filter(r => r.threshold_status === "warning").length;
+                          
+                          if (criticalItems > 0) {
+                            return "Immediate corrective action required. Create observation and action items for critical issues.";
+                          } else if (warningItems > 0) {
+                            return "Schedule follow-up inspection to monitor warning conditions. Consider preventive maintenance.";
+                          } else {
+                            return "Continue current maintenance schedule. Equipment is operating normally.";
+                          }
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Attachments */}
+                {selectedSubmission?.attachments?.length > 0 && (
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                      <Paperclip className="w-5 h-5 text-slate-600" />
+                      Attachments ({selectedSubmission.attachments.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {selectedSubmission.attachments.map((att, idx) => {
+                        const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name || att.filename || "");
+                        const rawUrl = att.url || att.data;
+                        const authToken = localStorage.getItem('token');
+                        const previewUrl = rawUrl && !rawUrl.startsWith('data:') && !rawUrl.startsWith('http') 
+                          ? `${getBackendUrl()}/api/storage/${rawUrl}${authToken ? `?token=${authToken}` : ''}` 
+                          : rawUrl;
+                        const fileName = att.name || att.filename || "Attachment";
+                        const hasError = att.error || att.needs_migration;
+                        
+                        return (
+                          <div 
+                            key={att.url || att.id || `attachment-${idx}`}
+                            className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100"
+                          >
+                            {/* Thumbnail */}
+                            <div className="w-20 h-16 bg-slate-200 rounded-lg overflow-hidden flex-shrink-0">
+                              {hasError ? (
+                                <div className="w-full h-full flex items-center justify-center bg-amber-50">
+                                  <AlertTriangle className="w-6 h-6 text-amber-500" />
                                 </div>
-                              }
-                            />
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center p-2">
-                              {isPdf ? (
-                                <FileText className="w-8 h-8 text-red-400 mb-1" />
-                              ) : isDoc ? (
-                                <FileText className="w-8 h-8 text-blue-400 mb-1" />
+                              ) : isImage && previewUrl ? (
+                                <ImageWithFallback 
+                                  src={previewUrl} 
+                                  alt={fileName}
+                                  fallback={
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <FileText className="w-6 h-6 text-slate-400" />
+                                    </div>
+                                  }
+                                />
                               ) : (
-                                <File className="w-8 h-8 text-slate-400 mb-1" />
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <FileText className="w-6 h-6 text-slate-400" />
+                                </div>
                               )}
-                              <span className="text-[10px] text-slate-500 uppercase font-medium">
-                                {fileName.split('.').pop()}
-                              </span>
                             </div>
-                          )}
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">
-                            <p className="text-[10px] text-white truncate font-medium">{fileName}</p>
-                          </div>
-                          {!hasError && (
-                            <div className="absolute inset-0 bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <div className="bg-white/90 rounded-full p-1.5 shadow-lg">
-                                {isImage ? <ZoomIn className="w-4 h-4 text-blue-600" /> : <Eye className="w-4 h-4 text-blue-600" />}
+                            
+                            {/* Info and actions */}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-800 truncate">{fileName}</p>
+                              <div className="flex gap-2 mt-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => {
+                                    if (!hasError && previewUrl) {
+                                      if (isImage) {
+                                        setViewingImage({ url: previewUrl, name: fileName });
+                                      } else {
+                                        window.open(previewUrl, '_blank');
+                                      }
+                                    }
+                                  }}
+                                  disabled={hasError}
+                                >
+                                  View Full
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => {
+                                    if (!hasError && previewUrl) {
+                                      const link = document.createElement('a');
+                                      link.href = previewUrl;
+                                      link.download = fileName;
+                                      link.click();
+                                    }
+                                  }}
+                                  disabled={hasError}
+                                >
+                                  Download
+                                </Button>
                               </div>
                             </div>
-                          )}
-                        </button>
-                      );
-                    })}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+                
+                {/* Notes */}
+                {selectedSubmission?.notes && (
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-slate-600" />
+                      Notes
+                    </h3>
+                    <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedSubmission.notes}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
               
-              {/* Notes */}
-              {selectedSubmission.notes && (
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Notes</h4>
-                  <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-                    {selectedSubmission.notes}
-                  </p>
-                </div>
-              )}
-              
-              {/* Signature Indicator */}
-              {selectedSubmission.has_signature && (
-                <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Digitally signed</span>
-                </div>
-              )}
-              
-              {/* Delete Button */}
-              <div className="pt-4 border-t border-slate-200">
+              {/* Footer */}
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50 flex-shrink-0">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
                   onClick={() => setDeleteConfirm(selectedSubmission)}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Submission
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete
                 </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setSelectedSubmission(null)}>
+                    Close
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Export functionality placeholder
+                      toast.info("Export feature coming soon");
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Export
+                  </Button>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
