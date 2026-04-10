@@ -251,7 +251,7 @@ export default function FormSubmissionsPage() {
   if (isMobile) {
     return (
       <DesktopOnlyMessage 
-        title="Form Submissions" 
+        title="Forms" 
         icon={ClipboardList}
         description="Form submissions viewing is optimized for desktop. Please use a larger screen for the best experience."
       />

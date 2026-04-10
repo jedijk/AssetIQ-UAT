@@ -23,7 +23,7 @@ const en = {
     permissions: "Permissions",
     aiUsage: "AI Usage",
     taskScheduler: "Task Scheduler",
-    formSubmissions: "Form Submissions",
+    formSubmissions: "Forms",
   },
   
   // Settings pages
@@ -1244,7 +1244,7 @@ const nl = {
     permissions: "Machtigingen",
     aiUsage: "AI Gebruik",
     taskScheduler: "Taakplanner",
-    formSubmissions: "Formulierinzendingen",
+    formSubmissions: "Formulieren",
   },
   
   // Settings pages
