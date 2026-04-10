@@ -37,7 +37,7 @@ def get_openai_client() -> OpenAI:
 
 # ============= System Prompts =============
 
-RISK_ANALYSIS_PROMPT = """You are an AI Risk Analyst for industrial equipment. Analyze the given threat and provide a detailed risk assessment.
+RISK_ANALYSIS_PROMPT = """You are an expert AI Risk Analyst specializing in industrial equipment reliability, maintenance engineering, and failure analysis. Provide comprehensive, actionable risk assessments based on engineering best practices.
 
 IMPORTANT: Respond ONLY with valid JSON. No markdown, no explanations outside the JSON.
 
@@ -46,63 +46,90 @@ The threat already has a Risk Score calculated using FMEA methodology:
 - Scale: 10-250 (Low < 50, Medium 50-99, High 100-149, Critical >= 150)
 - Current threat risk score is provided in the context
 
-IMPORTANT: Use ALL available information to inform your analysis:
+IMPORTANT: Use ALL available information to inform your detailed analysis:
 - FIELD NOTES: Observer's additional context and on-site observations - these are firsthand accounts from personnel who witnessed the issue
 - ATTACHMENTS: Photos and documents that provide visual evidence of the condition
-- EQUIPMENT HISTORY: Past observations, maintenance actions, and completed tasks
+- EQUIPMENT HISTORY: Past observations, maintenance actions, and completed tasks - look for patterns and recurring issues
 - Consider the timeline and frequency of past issues
+- Apply your knowledge of failure mechanisms, degradation patterns, and industry standards
 
-Given the threat details, field notes, and equipment history, provide:
+Given the threat details, field notes, and equipment history, provide a COMPREHENSIVE assessment:
+
 1. DO NOT recalculate risk_score - use the provided threat's current risk score
+
 2. Failure Probability (0-100%):
-   - Based on failure mode patterns
-   - Equipment condition indicators from field notes and photos
-   - Historical data patterns from equipment history
-   - Account for recent maintenance actions completed
+   - Analyze failure mode patterns and mechanisms
+   - Consider equipment condition indicators from field notes and photos
+   - Evaluate historical data patterns from equipment history
+   - Account for recent maintenance actions and their effectiveness
+   - Provide detailed reasoning in factors
 
 3. Time-to-Failure Estimate:
-   - Based on degradation patterns
+   - Based on degradation patterns and failure physics
    - Consider past similar failures on this equipment
    - Use field observations to assess current condition severity
-   - Provide in hours (null if uncertain)
+   - Provide realistic estimate in hours (null if truly uncertain)
+   - Include confidence-based range in time_to_failure_display (e.g., "48-96 hours")
 
-4. Risk Trend:
+4. Risk Trend Analysis:
    - "increasing", "stable", or "decreasing" based on current conditions
    - Factor in field notes observations and their severity
    - Consider recent maintenance actions and their effectiveness
+   - Assess environmental and operational factors
 
 5. Trend Delta:
    - Expected change in risk score over time (positive = worsening, negative = improving)
+   - Base on degradation rate analysis
 
-6. Key Risk Factors (3-5 factors)
-   - Include factors from equipment history
+6. Key Risk Factors (provide 4-6 detailed factors):
+   - Include specific factors from equipment history
    - Include relevant details from field notes
+   - Reference industry standards or best practices where applicable
+   - Be specific about mechanism and contributing conditions
 
-7. Forecasts for next 7/14/30 days using the SAME FMEA scale (10-250)
-   - Start from the current risk score and project changes
+7. Key Insights (provide 3-5 actionable insights):
+   - What are the most critical findings?
+   - What patterns or concerns should be addressed?
+   - What does the equipment history tell us?
+   - Include both immediate concerns and long-term reliability considerations
+
+8. Forecasts for next 7/14/30 days using the SAME FMEA scale (10-250):
+   - Start from the current risk score and project realistic changes
    - Consider effectiveness of recent maintenance
+   - Account for known degradation mechanisms
+   - Provide meaningful probability changes
 
-8. Recommendations - IMPORTANT: Each recommendation must be a structured object with:
-   - action: The recommended action description
+9. Recommendations - IMPORTANT: Each recommendation must be specific and actionable:
+   - action: Detailed recommended action with clear scope
    - action_type: One of "CM" (Corrective Maintenance), "PM" (Preventive Maintenance), or "PDM" (Predictive Maintenance)
    - discipline: One of "Mechanical", "Electrical", "Instrumentation", "Process", "Operations", "Maintenance", "Safety", "Inspection", "Reliability", "Rotating Equipment", "Static Equipment", "Multi-discipline"
    - Avoid recommending actions that have already been completed recently
+   - Provide 3-5 prioritized recommendations
 
 RESPOND IN THIS EXACT JSON FORMAT:
 {
   "risk_score": <use_the_threats_current_score>,
   "failure_probability": 65.0,
   "time_to_failure_hours": 168,
-  "time_to_failure_display": "5-7 days",
+  "time_to_failure_display": "5-7 days (confidence: medium)",
   "confidence": "medium",
   "trend": "increasing",
   "trend_delta": 10,
-  "factors": ["factor1", "factor2", "factor3"],
-  "key_insights": ["insight1", "insight2"],
+  "factors": [
+    "Factor 1: Detailed description of risk factor with mechanism",
+    "Factor 2: Another specific risk factor",
+    "Factor 3: Historical pattern or recurring issue",
+    "Factor 4: Environmental or operational contributor"
+  ],
+  "key_insights": [
+    "Insight 1: Critical finding with actionable context",
+    "Insight 2: Pattern analysis from equipment history",
+    "Insight 3: Reliability concern or improvement opportunity"
+  ],
   "recommendations": [
-    {"action": "Perform vibration analysis on bearings", "action_type": "PDM", "discipline": "Mechanical"},
-    {"action": "Replace worn seals during next shutdown", "action_type": "PM", "discipline": "Mechanical"},
-    {"action": "Repair damaged component immediately", "action_type": "CM", "discipline": "Rotating Equipment"}
+    {"action": "Detailed action description with scope and expected outcome", "action_type": "PDM", "discipline": "Mechanical"},
+    {"action": "Another specific recommendation", "action_type": "PM", "discipline": "Mechanical"},
+    {"action": "Corrective action if needed", "action_type": "CM", "discipline": "Rotating Equipment"}
   ],
   "forecasts": [
     {"days_ahead": 7, "predicted_risk_score": 70, "predicted_probability": 70.0, "confidence": "medium"},
@@ -291,26 +318,26 @@ class AIRiskEngine:
     
     # Token limits for different analysis types
     TOKEN_LIMITS = {
-        'risk_analysis': 2000,
-        'cause_analysis': 2500,
-        'fault_tree': 2000,
-        'bow_tie': 2000,
-        'action_optimization': 2000
+        'risk_analysis': 4000,
+        'cause_analysis': 4000,
+        'fault_tree': 3000,
+        'bow_tie': 3000,
+        'action_optimization': 3000
     }
     
     def _call_openai(self, system_prompt: str, user_message: str, analysis_type: str = 'risk_analysis') -> str:
         """Make a chat completion call to OpenAI"""
-        max_tokens = self.TOKEN_LIMITS.get(analysis_type, 2000)
+        max_tokens = self.TOKEN_LIMITS.get(analysis_type, 3000)
         try:
             client = get_openai_client()
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.2",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
                 max_tokens=max_tokens,
-                temperature=0.5
+                temperature=0.4
             )
             return response.choices[0].message.content
         except Exception as e:
