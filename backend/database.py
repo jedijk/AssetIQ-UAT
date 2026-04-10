@@ -1,6 +1,7 @@
 """
 Centralized database connection and service initialization.
 Single source of truth for all shared state.
+Supports multiple database environments (Production, UAT).
 """
 import os
 import logging
@@ -21,8 +22,24 @@ if not mongo_url:
     logger.error("MONGO_URL environment variable not set!")
     raise ValueError("MONGO_URL environment variable is required")
 
-db_name = os.environ.get('DB_NAME', 'assetiq')
-logger.info(f"Initializing MongoDB connection to database: {db_name}")
+# Database configuration - supports multiple environments
+DEFAULT_DB_NAME = os.environ.get('DB_NAME', 'assetiq')
+AVAILABLE_DATABASES = {
+    "production": {
+        "name": "assetiq",
+        "label": "Production",
+        "description": "Live production database"
+    },
+    "uat": {
+        "name": "assetiq-UAT",
+        "label": "UAT",
+        "description": "User Acceptance Testing database"
+    }
+}
+
+# Current active database (can be changed at runtime for specific requests)
+_current_db_name = DEFAULT_DB_NAME
+logger.info(f"Initializing MongoDB connection to database: {_current_db_name}")
 
 client = AsyncIOMotorClient(
     mongo_url,
@@ -36,7 +53,23 @@ client = AsyncIOMotorClient(
     retryReads=True,  # Retry failed reads
     waitQueueTimeoutMS=5000,  # Wait up to 5s for a connection from pool (reduced)
 )
-db = client[db_name]
+
+# Default database reference
+db = client[_current_db_name]
+
+def get_database(db_name: str = None):
+    """Get a database reference by name."""
+    if db_name is None:
+        return db
+    return client[db_name]
+
+def get_available_databases():
+    """Get list of available database environments."""
+    return AVAILABLE_DATABASES
+
+def get_current_db_name():
+    """Get the current default database name."""
+    return _current_db_name
 
 
 async def verify_database_connection(max_retries: int = 3, timeout: float = 5.0) -> bool:

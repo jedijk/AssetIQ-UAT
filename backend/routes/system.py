@@ -8,6 +8,7 @@ Note: Some metrics may not be available in serverless environments (Vercel, Rail
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime, timezone
+from pydantic import BaseModel
 import time
 import logging
 import os
@@ -20,7 +21,7 @@ except ImportError:
     PSUTIL_AVAILABLE = False
 
 from auth import get_current_user
-from database import db
+from database import db, client, get_available_databases, get_current_db_name
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,148 @@ def get_deployment_environment():
     if os.environ.get("EMERGENT_PREVIEW"):
         return "emergent"
     return "standard"
+
+
+# ============= DATABASE ENVIRONMENT SWITCHER =============
+
+class DatabaseSwitchRequest(BaseModel):
+    environment: str  # "production" or "uat"
+
+@router.get("/system/databases")
+async def get_databases(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get available database environments.
+    Only accessible by owners.
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can view database environments"
+        )
+    
+    databases = get_available_databases()
+    current_db = get_current_db_name()
+    
+    # Find current environment key
+    current_env = "production"
+    for env_key, env_config in databases.items():
+        if env_config["name"] == current_db:
+            current_env = env_key
+            break
+    
+    return {
+        "available": [
+            {
+                "key": key,
+                "name": config["name"],
+                "label": config["label"],
+                "description": config["description"],
+                "is_current": config["name"] == current_db
+            }
+            for key, config in databases.items()
+        ],
+        "current": current_env,
+        "current_db_name": current_db
+    }
+
+@router.post("/system/databases/switch")
+async def switch_database(
+    request: DatabaseSwitchRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Switch to a different database environment.
+    Only accessible by owners.
+    
+    Note: This sets a preference that affects API calls when the X-Database header is used.
+    The actual switch happens per-request basis using middleware.
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can switch database environments"
+        )
+    
+    databases = get_available_databases()
+    
+    if request.environment not in databases:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid environment. Available: {list(databases.keys())}"
+        )
+    
+    target_db = databases[request.environment]
+    
+    # Verify the database is accessible
+    try:
+        target_db_ref = client[target_db["name"]]
+        await target_db_ref.command('ping')
+    except Exception as e:
+        logger.error(f"Failed to connect to {target_db['name']}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to connect to {target_db['label']} database"
+        )
+    
+    # Store the user's database preference
+    await db.users.update_one(
+        {"id": current_user.get("user_id")},
+        {"$set": {"database_preference": request.environment}}
+    )
+    
+    return {
+        "success": True,
+        "message": f"Switched to {target_db['label']} environment",
+        "environment": request.environment,
+        "database_name": target_db["name"]
+    }
+
+@router.get("/system/databases/status")
+async def get_database_status(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get status of all available databases.
+    Only accessible by owners.
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only owners can view database status"
+        )
+    
+    databases = get_available_databases()
+    status = []
+    
+    for env_key, config in databases.items():
+        try:
+            db_ref = client[config["name"]]
+            # Get database stats
+            stats = await db_ref.command("dbStats")
+            
+            status.append({
+                "key": env_key,
+                "name": config["name"],
+                "label": config["label"],
+                "connected": True,
+                "collections": stats.get("collections", 0),
+                "documents": stats.get("objects", 0),
+                "storage_size_mb": round(stats.get("storageSize", 0) / (1024 * 1024), 2),
+                "data_size_mb": round(stats.get("dataSize", 0) / (1024 * 1024), 2)
+            })
+        except Exception as e:
+            logger.error(f"Failed to get stats for {config['name']}: {e}")
+            status.append({
+                "key": env_key,
+                "name": config["name"],
+                "label": config["label"],
+                "connected": False,
+                "error": str(e)
+            })
+    
+    return {"databases": status}
 
 
 @router.get("/system/metrics")

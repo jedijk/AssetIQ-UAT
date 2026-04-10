@@ -28,6 +28,7 @@ import SettingsPermissionsPage from "./pages/SettingsPermissionsPage";
 import SettingsAIUsagePage from "./pages/SettingsAIUsagePage";
 import SettingsRiskCalculationPage from "./pages/SettingsRiskCalculationPage";
 import SettingsServerPerformancePage from "./pages/SettingsServerPerformancePage";
+import SettingsDatabasePage from "./pages/SettingsDatabasePage";
 import SettingsPreferencesPage from "./pages/SettingsPreferencesPage";
 import SettingsPage from "./pages/SettingsPage";
 import SettingsGeneralPage from "./pages/SettingsGeneralPage";
@@ -267,6 +268,7 @@ function App() {
                   <Route path="risk-calculation" element={<SettingsRiskCalculationPage />} />
                   <Route path="ai-usage" element={<SettingsAIUsagePage />} />
                   <Route path="server-performance" element={<SettingsServerPerformancePage />} />
+                  <Route path="database" element={<SettingsDatabasePage />} />
                   <Route path="insights" element={<InsightsPage />} />
                   <Route path="statistics" element={<UserStatisticsPage />} />
                   <Route path="criticality-definitions" element={<DefinitionsPage />} />
