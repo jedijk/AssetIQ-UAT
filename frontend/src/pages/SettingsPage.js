@@ -94,6 +94,14 @@ export default function SettingsPage() {
   const { t } = useLanguage();
   const [activeSection, setActiveSection] = useState("general");
   const [showMobileNav, setShowMobileNav] = useState(true);
+  const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
+
+  // Mobile detection with resize listener
+  useEffect(() => {
+    const checkMobile = () => setIsMobileView(window.innerWidth < 768);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Filter sections based on user role
   const visibleSections = SETTINGS_SECTIONS.filter(section => {
@@ -127,6 +135,13 @@ export default function SettingsPage() {
   const handleBackToNav = () => {
     setShowMobileNav(true);
   };
+
+  // On mobile user-management, render the page directly without the Settings wrapper
+  const isUserManagement = location.pathname.includes('/user-management');
+  
+  if (isMobileView && isUserManagement) {
+    return <Outlet />;
+  }
 
   return (
     <div className="h-[calc(100vh-48px)] flex bg-slate-50">
@@ -222,23 +237,29 @@ export default function SettingsPage() {
         "flex-1 overflow-hidden",
         showMobileNav ? "hidden md:block" : "block"
       )}>
-        {/* Mobile back button */}
-        <div className="md:hidden p-4 border-b border-slate-200 bg-white flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleBackToNav}
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <span className="font-medium text-slate-900">
-            {visibleSections.find(s => s.id === activeSection)?.label || "Settings"}
-          </span>
-        </div>
+        {/* Mobile back button - Hidden on user-management page which has its own header */}
+        {!location.pathname.includes('/user-management') && (
+          <div className="md:hidden p-4 border-b border-slate-200 bg-white flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleBackToNav}
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <span className="font-medium text-slate-900">
+              {visibleSections.find(s => s.id === activeSection)?.label || "Settings"}
+            </span>
+          </div>
+        )}
         
-        <ScrollArea className="h-full md:h-full" style={{ height: 'calc(100% - 56px)' }}>
-          <div className="p-4 md:p-6 xl:p-8">
+        <ScrollArea className="h-full md:h-full" style={{ height: location.pathname.includes('/user-management') ? '100%' : 'calc(100% - 56px)' }}>
+          <div className={cn(
+            "md:p-6 xl:p-8",
+            // No padding on mobile for user-management - it has its own layout
+            location.pathname.includes('/user-management') ? "p-0" : "p-4"
+          )}>
             <Outlet />
           </div>
         </ScrollArea>

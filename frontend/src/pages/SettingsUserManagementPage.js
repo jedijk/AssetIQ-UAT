@@ -1,5 +1,6 @@
 import { getBackendUrl } from '../lib/apiConfig';
 import React, { useState, useRef, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -43,6 +44,7 @@ import {
   Crown,
   KeyRound,
   PlayCircle,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -308,6 +310,7 @@ const SettingsUserManagementPage = () => {
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
   const loadedAvatarIdsRef = useRef(new Set());
+  const navigate = useNavigate();
   
   // Check if current user is owner
   const isOwner = currentUser?.role === "owner";
@@ -736,10 +739,15 @@ const SettingsUserManagementPage = () => {
         <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Users className="h-4 w-4 text-blue-600" />
-              </div>
-              <h1 className="text-lg font-bold text-slate-900">Users</h1>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => navigate("/")}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <h1 className="text-lg font-bold text-slate-900">Users & Roles</h1>
             </div>
             <Button variant="ghost" size="icon" onClick={() => refetch()}>
               <RefreshCw className="w-4 h-4" />
@@ -859,48 +867,44 @@ const SettingsUserManagementPage = () => {
                   className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm"
                   data-testid={`mobile-user-card-${user.id}`}
                 >
-                  <div className="flex items-start gap-3">
-                    {/* Avatar */}
-                    <div 
-                      className="relative cursor-pointer"
-                      onClick={() => handleAvatarUpload(user.id)}
-                    >
-                      <UserAvatar user={user} avatarUrl={avatarUrl} size="lg" />
-                      <div className="absolute -bottom-1 -right-1 h-5 w-5 bg-white rounded-full flex items-center justify-center shadow border">
-                        <Camera className="w-3 h-3 text-slate-500" />
+                  {/* Top row with avatar, name, and menu */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {/* Avatar */}
+                      <div 
+                        className="relative cursor-pointer shrink-0"
+                        onClick={() => handleAvatarUpload(user.id)}
+                      >
+                        <UserAvatar user={user} avatarUrl={avatarUrl} size="lg" />
+                        <div className="absolute -bottom-1 -right-1 h-5 w-5 bg-white rounded-full flex items-center justify-center shadow border">
+                          <Camera className="w-3 h-3 text-slate-500" />
+                        </div>
+                      </div>
+
+                      {/* Name and email */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-900 truncate">{user.name}</span>
+                          {user.is_active ? (
+                            <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" title="Active" />
+                          ) : (
+                            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" title="Inactive" />
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-500 truncate">{user.email}</p>
                       </div>
                     </div>
 
-                    {/* User Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-slate-900 truncate">{user.name}</span>
-                        {user.is_active ? (
-                          <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" title="Active" />
-                        ) : (
-                          <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" title="Inactive" />
-                        )}
-                      </div>
-                      <p className="text-sm text-slate-500 truncate mb-2">{user.email}</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge className={`${roleColors[user.role]} gap-1 text-xs`}>
-                          <RoleIcon className="w-3 h-3" />
-                          {user.role_name}
-                        </Badge>
-                        {user.department && (
-                          <Badge variant="outline" className="text-xs">
-                            <Building2 className="w-3 h-3 mr-1" />
-                            {user.department}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions Menu */}
+                    {/* Actions Menu Button */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid={`mobile-user-menu-${user.id}`}>
-                          <MoreVertical className="w-4 h-4" />
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-9 w-9 shrink-0 border-slate-200" 
+                          data-testid={`mobile-user-menu-${user.id}`}
+                        >
+                          <MoreVertical className="w-5 h-5 text-slate-600" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -961,6 +965,20 @@ const SettingsUserManagementPage = () => {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                  </div>
+
+                  {/* Role badges */}
+                  <div className="flex flex-wrap gap-2 mt-2 ml-14">
+                    <Badge className={`${roleColors[user.role]} gap-1 text-xs`}>
+                      <RoleIcon className="w-3 h-3" />
+                      {user.role_name}
+                    </Badge>
+                    {user.department && (
+                      <Badge variant="outline" className="text-xs">
+                        <Building2 className="w-3 h-3 mr-1" />
+                        {user.department}
+                      </Badge>
+                    )}
                   </div>
 
                   {/* Extra Info Row */}
