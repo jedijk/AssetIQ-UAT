@@ -524,7 +524,7 @@ export default function SettingsQRPage() {
             <div className="space-y-4">
               <div className="flex justify-center p-4 bg-slate-50 rounded-lg min-h-[200px] items-center">
                 <img 
-                  src={`${process.env.REACT_APP_BACKEND_URL}/api/qr/${viewQR.id}/image?size=large&show_label=true`}
+                  src={`${(process.env.REACT_APP_BACKEND_URL || '').replace(/\/$/, '')}/api/qr/${viewQR.id}/image?size=large&show_label=true`}
                   alt={viewQR.label}
                   className="w-48 h-48"
                   onLoad={(e) => e.target.style.opacity = 1}

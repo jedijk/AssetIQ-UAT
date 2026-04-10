@@ -53,7 +53,9 @@ const useVersionCheck = () => {
   useEffect(() => {
     const checkVersion = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/health`);
+        // Remove trailing slash from backend URL if present
+        const backendUrl = (process.env.REACT_APP_BACKEND_URL || '').replace(/\/$/, '');
+        const response = await fetch(`${backendUrl}/api/health`);
         const data = await response.json();
         const backendVersion = data.version;
         
