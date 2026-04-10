@@ -1051,15 +1051,6 @@ const SettingsUserManagementPage = () => {
                     className="mt-1"
                   />
                 </div>
-                <div>
-                  <Label className="text-sm font-medium">Phone</Label>
-                  <Input
-                    value={editForm.phone}
-                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                    placeholder="+31..."
-                    className="mt-1"
-                  />
-                </div>
               </div>
             </div>
           </DialogContent>
@@ -1681,14 +1672,6 @@ const SettingsUserManagementPage = () => {
                 placeholder="e.g., Reliability Engineer"
               />
             </div>
-            <div>
-              <Label>{t("userManagement.phone")}</Label>
-              <Input
-                value={editForm.phone}
-                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                placeholder="+31..."
-              />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingUser(null)}>{t("common.cancel")}</Button>
@@ -2114,26 +2097,6 @@ const SettingsUserManagementPage = () => {
               />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="create-phone">Phone</Label>
-                <Input
-                  id="create-phone"
-                  placeholder="+31 6 12345678"
-                  value={createUserForm.phone}
-                  onChange={(e) => setCreateUserForm({ ...createUserForm, phone: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="create-location">Location</Label>
-                <Input
-                  id="create-location"
-                  placeholder="Amsterdam"
-                  value={createUserForm.location}
-                  onChange={(e) => setCreateUserForm({ ...createUserForm, location: e.target.value })}
-                />
-              </div>
-            </div>
             
             {/* Installations Assignment */}
             <div className="space-y-2">

@@ -7,7 +7,7 @@ import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Phone, MapPin, Save, Database } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database } from "lucide-react";
 import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
@@ -1301,34 +1301,6 @@ const Layout = () => {
                   onChange={(e) => setProfileForm(prev => ({ ...prev, position: e.target.value }))}
                   placeholder={t("userManagement.enterPosition") || "Enter your position"}
                   data-testid="profile-position-input"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="profile-phone" className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-slate-400" />
-                  {t("userManagement.phone") || "Phone"}
-                </Label>
-                <Input
-                  id="profile-phone"
-                  value={profileForm.phone}
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder={t("userManagement.enterPhone") || "Enter your phone number"}
-                  data-testid="profile-phone-input"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="profile-location" className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-slate-400" />
-                  {t("userManagement.location") || "Location"}
-                </Label>
-                <Input
-                  id="profile-location"
-                  value={profileForm.location}
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, location: e.target.value }))}
-                  placeholder={t("userManagement.enterLocation") || "Enter your location"}
-                  data-testid="profile-location-input"
                 />
               </div>
             </div>
