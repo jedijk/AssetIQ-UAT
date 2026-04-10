@@ -1166,20 +1166,14 @@ export default function DashboardPage() {
       {/* Quick View Modal for Form Submissions */}
       <Dialog open={!!quickViewSubmission || loadingQuickView} onOpenChange={() => { setQuickViewSubmission(null); setLoadingQuickView(false); }}>
         <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
-          {/* Header with logo */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
+          {/* Header */}
+          <div className="flex items-center px-4 py-3 border-b border-slate-100 flex-shrink-0">
             <button 
               onClick={() => setQuickViewSubmission(null)}
               className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-slate-600" />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                <span className="text-white text-xs font-bold">A</span>
-              </div>
-              <span className="font-semibold text-slate-800">assetIQ</span>
-            </div>
           </div>
           
           {/* Loading state */}
