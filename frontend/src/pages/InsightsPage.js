@@ -627,7 +627,7 @@ const InsightsPage = ({ embedded = false }) => {
           {/* Section 6: AI Recommendations */}
           <Card data-testid="ai-recommendations">
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-blue-600" />
@@ -638,7 +638,7 @@ const InsightsPage = ({ embedded = false }) => {
                 <Button 
                   onClick={generateRecommendations} 
                   disabled={generatingRecommendations}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 w-full sm:w-auto"
                 >
                   {generatingRecommendations ? (
                     <>
