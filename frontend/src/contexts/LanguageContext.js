@@ -229,6 +229,7 @@ const en = {
     discipline: "Discipline",
     optional: "Optional",
     exporting: "Exporting...",
+    notes: "Notes",
   },
   
   // Threats page
@@ -1449,6 +1450,7 @@ const nl = {
     discipline: "Discipline",
     optional: "Optioneel",
     exporting: "Exporteren...",
+    notes: "Notities",
   },
   
   // Threats page
