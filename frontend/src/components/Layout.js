@@ -13,7 +13,7 @@ import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "2.7.0";
+const APP_VERSION = process.env.REACT_APP_VERSION || "2.7.6";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -946,11 +946,6 @@ const Layout = () => {
           width="280px"
           showCloseButton={false}
           className="pt-safe"
-          footer={
-            <div className="text-xs text-slate-400 text-center">
-              Version 2.7.5
-            </div>
-          }
         >
           <nav className="p-4 space-y-1" data-testid="mobile-nav">
             {/* Hierarchy toggle for mobile */}
