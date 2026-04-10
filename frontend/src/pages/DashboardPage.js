@@ -88,6 +88,7 @@ const ImageWithFallback = ({ src, alt, fallback, className = "" }) => {
 // User avatar component with optional hover card
 const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showPopover = false }) => {
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const sizeClasses = {
     xs: "w-5 h-5 text-[8px]",
     sm: "w-6 h-6 text-[9px]",
@@ -145,15 +146,27 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
   );
 
   const avatarElement = photoUrl ? (
-    <img
-      src={photoUrl}
-      alt={name || "User"}
-      className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0 cursor-pointer`}
-      onError={(e) => {
-        setImageError(true);
-        e.target.style.display = 'none';
-      }}
-    />
+    <div className="relative">
+      {/* Show initials as fallback while image loads or on error */}
+      {(!imageLoaded || imageError) && (
+        <div 
+          className={`${sizeClasses[size]} ${getAvatarColor(name)} rounded-full flex items-center justify-center text-white font-medium ring-2 ring-white flex-shrink-0 cursor-pointer absolute inset-0`}
+          title={!showPopover ? (name || "Unknown user") : undefined}
+        >
+          {initials || (name ? name.charAt(0).toUpperCase() : "?")}
+        </div>
+      )}
+      <img
+        src={photoUrl}
+        alt={name || "User"}
+        className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0 cursor-pointer ${imageLoaded && !imageError ? 'opacity-100' : 'opacity-0'}`}
+        onLoad={() => setImageLoaded(true)}
+        onError={(e) => {
+          setImageError(true);
+          setImageLoaded(false);
+        }}
+      />
+    </div>
   ) : initialsElement;
 
   if (showPopover && name) {
@@ -166,12 +179,20 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
         </HoverCardTrigger>
         <HoverCardContent className="w-48 p-3" side="top" align="center">
           <div className="flex items-center gap-3">
-            {photoUrl ? (
-              <img 
-                src={photoUrl} 
-                alt={name} 
-                className="w-10 h-10 rounded-full object-cover border border-slate-200"
-              />
+            {photoUrl && !imageError ? (
+              <div className="relative w-10 h-10">
+                {/* Initials fallback */}
+                <div className={`w-10 h-10 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-sm font-semibold text-white absolute inset-0`}>
+                  {initials || name.charAt(0).toUpperCase()}
+                </div>
+                {/* Photo overlay */}
+                <img 
+                  src={photoUrl} 
+                  alt={name} 
+                  className="w-10 h-10 rounded-full object-cover border border-slate-200 absolute inset-0"
+                  onError={() => setImageError(true)}
+                />
+              </div>
             ) : (
               <div className={`w-10 h-10 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-sm font-semibold text-white`}>
                 {initials || name.charAt(0).toUpperCase()}
@@ -1335,14 +1356,14 @@ export default function DashboardPage() {
                                 <Check className="w-3 h-3 text-white" />
                               )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-slate-800 text-sm">
-                                {response.field_label || response.field_id}
+                            <div className="flex-1 min-w-0 pr-2">
+                              <p className="font-medium text-slate-800 text-sm break-words">
+                                {(response.field_label || response.field_id || "").replace(/_/g, ' ')}
                               </p>
                               <p className="text-sm text-slate-500 mt-0.5">
                                 {isSignature && response.value ? (
                                   <button
-                                    onClick={() => setViewingImage({ url: response.value, name: response.field_label || "Signature" })}
+                                    onClick={() => setViewingImage({ url: response.value, name: (response.field_label || "Signature").replace(/_/g, ' ') })}
                                     className="text-blue-600 hover:underline"
                                   >
                                     View Signature
@@ -1355,7 +1376,7 @@ export default function DashboardPage() {
                                   <button
                                     onClick={() => {
                                       if (isImage) {
-                                        setViewingImage({ url: attachmentFullUrl, name: response.field_label || "Image" });
+                                        setViewingImage({ url: attachmentFullUrl, name: (response.field_label || "Image").replace(/_/g, ' ') });
                                       } else {
                                         window.open(attachmentFullUrl, '_blank');
                                       }
@@ -1656,12 +1677,26 @@ export default function DashboardPage() {
           </Button>
           
           <div className="relative max-w-full max-h-full flex items-center justify-center">
+            {/* Loading spinner - shown while image loads */}
+            <div id="lightbox-loading" className="absolute inset-0 flex items-center justify-center">
+              <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+            </div>
             {/* Image - Tap anywhere outside to close */}
             <img
               src={viewingImage.url}
               alt={viewingImage.name}
               className="max-w-full max-h-[80vh] sm:max-h-[85vh] object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
+              onLoad={(e) => {
+                // Hide loading spinner when image loads
+                const spinner = document.getElementById('lightbox-loading');
+                if (spinner) spinner.style.display = 'none';
+              }}
+              onError={(e) => {
+                // Hide spinner and show error on failure
+                const spinner = document.getElementById('lightbox-loading');
+                if (spinner) spinner.innerHTML = '<div class="text-white/70 text-center"><p class="text-lg mb-2">Failed to load image</p><p class="text-sm">Click anywhere to close</p></div>';
+              }}
             />
             
             {/* File name - Positioned below image */}

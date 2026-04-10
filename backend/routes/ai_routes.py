@@ -173,6 +173,7 @@ async def analyze_threat_risk(
     
     if equipment_id or threat.get("asset"):
         # Get past observations for this equipment (no owner filter - installation-based access)
+        # Include user_context, cause, attachments for rich AI context
         past_observations = await db.threats.find(
             {
                 "id": {"$ne": threat_id},
@@ -181,11 +182,12 @@ async def analyze_threat_risk(
                     {"asset": threat.get("asset")} if threat.get("asset") else {"_id": None}
                 ]
             },
-            {"_id": 0, "id": 1, "title": 1, "failure_mode": 1, "status": 1, "risk_score": 1, "created_at": 1}
+            {"_id": 0, "id": 1, "title": 1, "failure_mode": 1, "status": 1, "risk_score": 1, 
+             "created_at": 1, "user_context": 1, "cause": 1, "impact": 1, "image_url": 1, "attachments": 1}
         ).sort("created_at", -1).limit(10).to_list(10)
         equipment_history["observations"] = past_observations
         
-        # Get actions related to this equipment
+        # Get actions related to this equipment - include description and action_type
         past_actions = await db.central_actions.find(
             {
                 "$or": [
@@ -194,11 +196,12 @@ async def analyze_threat_risk(
                     {"source_id": threat_id}
                 ]
             },
-            {"_id": 0, "id": 1, "title": 1, "status": 1, "priority": 1, "created_at": 1}
+            {"_id": 0, "id": 1, "title": 1, "status": 1, "priority": 1, "created_at": 1, 
+             "description": 1, "action_type": 1, "discipline": 1, "completed_at": 1}
         ).sort("created_at", -1).limit(10).to_list(10)
         equipment_history["actions"] = past_actions
         
-        # Get completed tasks for this equipment
+        # Get completed tasks for this equipment - include notes and task_type
         past_tasks = await db.task_instances.find(
             {
                 "status": "completed",
@@ -207,7 +210,8 @@ async def analyze_threat_risk(
                     {"linked_equipment_id": equipment_id} if equipment_id else {"_id": None}
                 ]
             },
-            {"_id": 0, "id": 1, "name": 1, "status": 1, "completed_at": 1}
+            {"_id": 0, "id": 1, "name": 1, "status": 1, "completed_at": 1, 
+             "notes": 1, "completion_notes": 1, "task_type": 1}
         ).sort("completed_at", -1).limit(10).to_list(10)
         equipment_history["tasks"] = past_tasks
     

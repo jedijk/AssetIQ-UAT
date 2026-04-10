@@ -395,14 +395,19 @@ THREAT DETAILS:
 - Created: {safe_threat.get('created_at', 'Unknown')}
 """
         
-        # Add field notes/user context if available
+        # Add field notes/user context if available (CRITICAL - observer's firsthand account)
         user_context = threat.get('user_context')
         if user_context:
             safe_context = sanitize_for_ai_prompt(str(user_context), max_length=2000)
             context += f"""
-FIELD NOTES (Observer's Additional Context):
+FIELD NOTES (Observer's Additional Context - IMPORTANT):
 {safe_context}
 """
+        
+        # Add image evidence if available
+        image_url = threat.get('image_url')
+        if image_url:
+            context += "\nPHOTO EVIDENCE: Observer has attached a photo documenting the condition. Consider visual evidence in your assessment.\n"
         
         # Add attachment descriptions if available (pictures, documents)
         attachments = threat.get('attachments', [])
@@ -419,7 +424,6 @@ FIELD NOTES (Observer's Additional Context):
                     context += f"\n{i}. [IMAGE] {att_name}"
                     if att_description:
                         context += f" - {att_description}"
-                    # Note: We indicate that visual evidence exists, even if we can't analyze the image directly
                     context += " (Visual evidence provided by observer)"
                 elif att_type == 'document':
                     context += f"\n{i}. [DOCUMENT] {att_name}"
@@ -430,19 +434,45 @@ FIELD NOTES (Observer's Additional Context):
                     if att_description:
                         context += f" - {att_description}"
         
+        # Add existing recommended actions if any
+        existing_actions = threat.get('recommended_actions', [])
+        if existing_actions:
+            context += "\nPREVIOUSLY RECOMMENDED ACTIONS (from initial assessment):"
+            for i, action in enumerate(existing_actions[:5], 1):
+                if isinstance(action, dict):
+                    action_text = action.get('action', str(action))
+                else:
+                    action_text = str(action)
+                safe_action = sanitize_for_ai_prompt(action_text, max_length=200)
+                context += f"\n{i}. {safe_action}"
+        
         if equipment_data:
             # Sanitize equipment data
+            safe_equip_name = sanitize_for_ai_prompt(str(equipment_data.get('name', 'Unknown')), max_length=100)
             safe_equip_type = sanitize_for_ai_prompt(str(equipment_data.get('equipment_type', 'Unknown')), max_length=100)
             safe_discipline = sanitize_for_ai_prompt(str(equipment_data.get('discipline', 'Unknown')), max_length=100)
+            safe_description = sanitize_for_ai_prompt(str(equipment_data.get('description', '')), max_length=500)
             criticality = equipment_data.get('criticality', {})
             safe_crit_level = sanitize_for_ai_prompt(str(criticality.get('level', 'Unknown')), max_length=50)
             
             context += f"""
 EQUIPMENT INFORMATION:
+- Equipment Name: {safe_equip_name}
 - Equipment Type: {safe_equip_type}
 - Criticality Level: {safe_crit_level}
-- Discipline: {safe_discipline}
-"""
+- Discipline: {safe_discipline}"""
+            if safe_description:
+                context += f"\n- Description: {safe_description}"
+            
+            # Add criticality details if available
+            if criticality:
+                if criticality.get('production_loss_per_day'):
+                    context += f"\n- Production Loss/Day: €{criticality.get('production_loss_per_day')}"
+                if criticality.get('downtime_days'):
+                    context += f"\n- Expected Downtime: {criticality.get('downtime_days')} days"
+                if criticality.get('safety_impact'):
+                    context += f"\n- Safety Impact: {criticality.get('safety_impact')}/5"
+            context += "\n"
         
         # Sanitize and add equipment history
         if equipment_history:
@@ -452,22 +482,59 @@ EQUIPMENT INFORMATION:
             past_tasks = safe_history.get("tasks", [])
             
             if past_obs:
-                context += "\nEQUIPMENT HISTORY - PAST OBSERVATIONS:\n"
-                for i, obs in enumerate(past_obs[:5], 1):
-                    context += f"{i}. {obs.get('title', 'Unknown')[:50]} - Failure Mode: {obs.get('failure_mode', 'N/A')}, Risk: {obs.get('risk_score', 'N/A')}, Status: {obs.get('status', 'Unknown')}, Date: {obs.get('created_at', 'Unknown')[:10] if obs.get('created_at') else 'N/A'}\n"
+                context += "\nEQUIPMENT HISTORY - PAST OBSERVATIONS (Critical for pattern analysis):\n"
+                for i, obs in enumerate(past_obs[:8], 1):
+                    obs_title = obs.get('title', 'Unknown')[:60]
+                    obs_failure = obs.get('failure_mode', 'N/A')
+                    obs_risk = obs.get('risk_score', 'N/A')
+                    obs_status = obs.get('status', 'Unknown')
+                    obs_date = obs.get('created_at', 'Unknown')[:10] if obs.get('created_at') else 'N/A'
+                    context += f"{i}. [{obs_date}] {obs_title} - Failure Mode: {obs_failure}, Risk Score: {obs_risk}, Status: {obs_status}\n"
+                    
+                    # Include user_context (field notes) from past observations - VERY IMPORTANT
+                    past_user_context = obs.get('user_context')
+                    if past_user_context:
+                        safe_past_context = sanitize_for_ai_prompt(str(past_user_context), max_length=300)
+                        context += f"   Field Notes: {safe_past_context}\n"
+                    
+                    # Include cause if documented
+                    past_cause = obs.get('cause')
+                    if past_cause:
+                        safe_cause = sanitize_for_ai_prompt(str(past_cause), max_length=150)
+                        context += f"   Identified Cause: {safe_cause}\n"
             
             if past_actions:
                 context += "\nEQUIPMENT HISTORY - MAINTENANCE ACTIONS:\n"
-                for i, action in enumerate(past_actions[:5], 1):
-                    context += f"{i}. {action.get('title', 'Unknown')[:50]} - Status: {action.get('status', 'Unknown')}, Priority: {action.get('priority', 'N/A')}, Date: {action.get('created_at', 'Unknown')[:10] if action.get('created_at') else 'N/A'}\n"
+                for i, action in enumerate(past_actions[:8], 1):
+                    action_title = action.get('title', 'Unknown')[:60]
+                    action_type = action.get('action_type', 'N/A')
+                    action_status = action.get('status', 'Unknown')
+                    action_priority = action.get('priority', 'N/A')
+                    action_date = action.get('created_at', 'Unknown')[:10] if action.get('created_at') else 'N/A'
+                    context += f"{i}. [{action_date}] {action_title} - Type: {action_type}, Status: {action_status}, Priority: {action_priority}\n"
+                    
+                    # Include action description if available
+                    action_desc = action.get('description')
+                    if action_desc:
+                        safe_desc = sanitize_for_ai_prompt(str(action_desc), max_length=200)
+                        context += f"   Details: {safe_desc}\n"
             
             if past_tasks:
                 context += "\nEQUIPMENT HISTORY - COMPLETED MAINTENANCE TASKS:\n"
-                for i, task in enumerate(past_tasks[:5], 1):
-                    context += f"{i}. {task.get('name', 'Unknown')[:50]} - Completed: {task.get('completed_at', 'Unknown')[:10] if task.get('completed_at') else 'N/A'}\n"
+                for i, task in enumerate(past_tasks[:8], 1):
+                    task_name = task.get('name', 'Unknown')[:60]
+                    task_type = task.get('task_type', 'N/A')
+                    completed_at = task.get('completed_at', 'Unknown')[:10] if task.get('completed_at') else 'N/A'
+                    context += f"{i}. [{completed_at}] {task_name} - Type: {task_type}\n"
+                    
+                    # Include task notes if available
+                    task_notes = task.get('notes') or task.get('completion_notes')
+                    if task_notes:
+                        safe_notes = sanitize_for_ai_prompt(str(task_notes), max_length=200)
+                        context += f"   Completion Notes: {safe_notes}\n"
             
             if not past_obs and not past_actions and not past_tasks:
-                context += "\nEQUIPMENT HISTORY: No previous observations, actions, or completed tasks recorded for this equipment.\n"
+                context += "\nEQUIPMENT HISTORY: No previous observations, actions, or completed tasks recorded for this equipment. This is either new equipment or first recorded issue.\n"
         
         if historical_threats:
             context += "\nSIMILAR HISTORICAL THREATS (other equipment):\n"
