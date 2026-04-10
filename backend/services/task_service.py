@@ -32,7 +32,8 @@ def _safe_isoformat(value):
 class TaskService:
     """Service for task management operations."""
     
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db):
+        """Initialize with a database proxy (supports dynamic per-request switching)."""
         self.db = db
         self.templates = db["task_templates"]
         self.plans = db["task_plans"]

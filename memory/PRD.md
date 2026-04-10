@@ -10,32 +10,38 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 **BUG FIX - Fixed database switching to actually switch database contexts:**
 
 **Problem:**
-- Database switcher UI existed but Server Performance page always showed `assetiq` instead of `assetiq-UAT`
-- Backend was using a static `db` reference that never changed
-- Auth was validating tokens against the selected database (causing "User not found" errors when switching)
-- Frontend `fetch()` calls weren't including the database environment header
+- Database switcher UI existed but data (forms, plans, equipment) still showed Production data when UAT was selected
+- Backend services captured static collection references at startup time
+- Query cache wasn't isolating data by database environment
 
-**Solution:**
-1. **Backend `database.py`**: Created `DatabaseProxy` class using Python's `contextvars` for per-request database switching
-2. **Backend `server.py`**: Added `set_database_context` middleware to read `X-Database-Environment` header
-3. **Backend `auth.py`**: Updated to always validate tokens against production database (cross-environment auth)
-4. **Frontend `api.js`**: Added `X-Database-Environment` header to axios interceptor
-5. **Frontend `SettingsServerPerformancePage.js`**: Created `getAuthHeaders()` helper for all fetch calls
-6. **Frontend `SettingsPage.js`**: Added Database Environment to sidebar menu
+**Solution (3-part fix):**
+
+1. **Database Proxy with Collection Proxy** (`/app/backend/database.py`):
+   - Created `CollectionProxy` class that defers collection resolution until access time
+   - `db["collection"]` now returns a proxy that resolves to the correct DB per-request
+   - Services like `task_service`, `form_service` etc. now automatically use the right DB
+
+2. **Cache Isolation** (`/app/backend/services/query_cache.py`):
+   - Modified `QueryCache` to automatically prefix cache keys with the current database name
+   - Prevents Production cache entries from being served to UAT requests and vice versa
+
+3. **Auth Always Uses Production** (`/app/backend/auth.py`):
+   - Token validation always checks against Production database
+   - Allows same user credentials to work across both environments
 
 **Files Modified:**
-- `/app/backend/database.py` - DatabaseProxy + context variables
-- `/app/backend/server.py` - Database context middleware
+- `/app/backend/database.py` - DatabaseProxy + CollectionProxy classes
+- `/app/backend/services/query_cache.py` - Database-aware cache keys
 - `/app/backend/auth.py` - Production-only token validation
+- `/app/backend/server.py` - Database context middleware
 - `/app/frontend/src/lib/api.js` - X-Database-Environment header
-- `/app/frontend/src/pages/SettingsServerPerformancePage.js` - Auth headers helper
+- `/app/frontend/src/pages/SettingsServerPerformancePage.js` - Auth headers for fetch calls
 - `/app/frontend/src/pages/SettingsPage.js` - Sidebar menu entry
-- `/app/frontend/src/pages/SettingsDatabasePage.js` - (Already existed)
 
 **Verification:**
-- Switching to UAT now shows `assetiq-UAT` with 1.58 MB in Server Performance
-- Production shows `assetiq` with 145+ MB
-- Auth works across both environments with same token
+- Production Dashboard: 13 observations, 6 actions, 138 equipment
+- UAT Dashboard: 0 observations, 0 actions, 0 equipment, "No data" states
+- Server Performance correctly shows different DB sizes
 
 ---
 

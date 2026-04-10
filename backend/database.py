@@ -61,6 +61,30 @@ client = AsyncIOMotorClient(
 # Default database reference (static - for initialization)
 _default_db = client[_current_db_name]
 
+class CollectionProxy:
+    """
+    A proxy for a MongoDB collection that dynamically resolves to the current request's database.
+    This allows services initialized at startup to work with per-request database switching.
+    """
+    def __init__(self, collection_name: str):
+        self._collection_name = collection_name
+    
+    def _get_collection(self):
+        """Get the actual collection from the current request's database."""
+        current_db = get_request_db()
+        return current_db[self._collection_name]
+    
+    def __getattr__(self, name):
+        """Proxy all attribute access to the actual collection."""
+        return getattr(self._get_collection(), name)
+    
+    def __repr__(self):
+        return f"CollectionProxy({self._collection_name})"
+    
+    @property
+    def name(self):
+        return self._collection_name
+
 class DatabaseProxy:
     """
     A proxy that dynamically returns the correct database based on request context.
@@ -72,9 +96,8 @@ class DatabaseProxy:
         return getattr(current_db, name)
     
     def __getitem__(self, name):
-        """Proxy collection access via bracket notation."""
-        current_db = get_request_db()
-        return current_db[name]
+        """Return a CollectionProxy that resolves dynamically per-request."""
+        return CollectionProxy(name)
     
     @property
     def name(self):

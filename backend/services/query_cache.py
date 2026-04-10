@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class QueryCache:
-    """Simple in-memory cache with TTL support."""
+    """Simple in-memory cache with TTL support.
+    
+    Note: Cache keys automatically include the current database environment
+    to prevent cross-database cache pollution when using multi-database switching.
+    """
     
     def __init__(self):
         self._cache: Dict[str, Dict[str, Any]] = {}
@@ -24,21 +28,38 @@ class QueryCache:
             "misses": 0,
         }
     
-    def _make_key(self, prefix: str, params: dict) -> str:
-        """Generate a cache key from prefix and params."""
-        param_str = json.dumps(params, sort_keys=True, default=str)
-        param_hash = hashlib.md5(param_str.encode()).hexdigest()[:12]
-        return f"{prefix}:{param_hash}"
+    def _get_db_prefix(self) -> str:
+        """Get the current database name for cache key prefix."""
+        try:
+            from database import get_current_db_name
+            return get_current_db_name()
+        except Exception:
+            return "default"
+    
+    def _make_key(self, prefix: str, params: dict = None) -> str:
+        """Generate a cache key from prefix and params, including database context."""
+        db_name = self._get_db_prefix()
+        if params:
+            param_str = json.dumps(params, sort_keys=True, default=str)
+            param_hash = hashlib.md5(param_str.encode()).hexdigest()[:12]
+            return f"{db_name}:{prefix}:{param_hash}"
+        return f"{db_name}:{prefix}"
     
     def get(self, key: str) -> Optional[Any]:
-        """Get value from cache if not expired."""
-        entry = self._cache.get(key)
+        """Get value from cache if not expired.
+        
+        Note: The key should be a raw key. The database context is automatically prefixed.
+        """
+        # Add database prefix to ensure isolation between environments
+        full_key = self._make_key(key) if ":" not in key or not key.startswith(("assetiq", "default")) else key
+        
+        entry = self._cache.get(full_key)
         if entry is None:
             self._stats["misses"] += 1
             return None
         
         if time.time() > entry["expires_at"]:
-            del self._cache[key]
+            del self._cache[full_key]
             self._stats["misses"] += 1
             return None
         
@@ -46,8 +67,14 @@ class QueryCache:
         return entry["value"]
     
     def set(self, key: str, value: Any, ttl: int = 300):
-        """Set value in cache with TTL in seconds."""
-        self._cache[key] = {
+        """Set value in cache with TTL in seconds.
+        
+        Note: The key is automatically prefixed with the current database environment.
+        """
+        # Add database prefix to ensure isolation between environments
+        full_key = self._make_key(key) if ":" not in key or not key.startswith(("assetiq", "default")) else key
+        
+        self._cache[full_key] = {
             "value": value,
             "expires_at": time.time() + ttl,
             "created_at": time.time(),
