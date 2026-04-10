@@ -67,8 +67,8 @@ const ImageWithFallback = ({ src, alt, fallback, className = "" }) => {
   return (
     <>
       {isLoading && (
-        <div className={`flex items-center justify-center bg-slate-100 ${className}`}>
-          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className={`flex items-center justify-center bg-slate-50 ${className}`}>
+          <div className="animate-spin h-5 w-5 border-2 border-amber-500 border-t-transparent rounded-full" />
         </div>
       )}
       <img
@@ -1677,9 +1677,9 @@ export default function DashboardPage() {
           </Button>
           
           <div className="relative max-w-full max-h-full flex items-center justify-center">
-            {/* Loading spinner - shown while image loads */}
+            {/* Loading spinner - shown while image loads - matching statistics page style */}
             <div id="lightbox-loading" className="absolute inset-0 flex items-center justify-center">
-              <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+              <div className="animate-spin h-10 w-10 border-3 border-amber-500 border-t-transparent rounded-full" />
             </div>
             {/* Image - Tap anywhere outside to close */}
             <img

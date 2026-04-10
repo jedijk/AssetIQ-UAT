@@ -80,7 +80,7 @@ import { formatDate as formatDateUtil, formatDateTime as formatDateTimeUtil } fr
 
 const API_BASE_URL = getBackendUrl();
 
-// Image component with fallback for failed loads
+// Image component with fallback for failed loads - matching statistics page style
 const ImageWithFallback = ({ src, alt, fallback }) => {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,8 +98,8 @@ const ImageWithFallback = ({ src, alt, fallback }) => {
   return (
     <>
       {isLoading && (
-        <div className="w-full h-full flex items-center justify-center bg-slate-100">
-          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-full h-full flex items-center justify-center bg-slate-50">
+          <div className="animate-spin h-6 w-6 border-2 border-amber-500 border-t-transparent rounded-full" />
         </div>
       )}
       <img
@@ -1076,12 +1076,26 @@ export default function FormSubmissionsPage() {
           </Button>
           
           <div className="relative max-w-full max-h-full flex items-center justify-center">
+            {/* Loading spinner - shown while image loads - matching statistics page style */}
+            <div id="lightbox-loading-forms" className="absolute inset-0 flex items-center justify-center">
+              <div className="animate-spin h-10 w-10 border-3 border-amber-500 border-t-transparent rounded-full" />
+            </div>
             {/* Image - Tap anywhere outside to close */}
             <img
               src={viewingImage.url}
               alt={viewingImage.name}
               className="max-w-full max-h-[80vh] sm:max-h-[85vh] object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
+              onLoad={(e) => {
+                // Hide loading spinner when image loads
+                const spinner = document.getElementById('lightbox-loading-forms');
+                if (spinner) spinner.style.display = 'none';
+              }}
+              onError={(e) => {
+                // Hide spinner and show error on failure
+                const spinner = document.getElementById('lightbox-loading-forms');
+                if (spinner) spinner.innerHTML = '<div class="text-white/70 text-center"><p class="text-lg mb-2">Failed to load image</p><p class="text-sm">Click anywhere to close</p></div>';
+              }}
             />
             
             {/* File name - Positioned below image */}
