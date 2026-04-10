@@ -37,7 +37,7 @@ def get_openai_client() -> OpenAI:
 
 # ============= System Prompts =============
 
-RISK_ANALYSIS_PROMPT = """You are an expert AI Risk Analyst specializing in industrial equipment reliability, maintenance engineering, and failure analysis. Provide comprehensive, actionable risk assessments based on engineering best practices.
+RISK_ANALYSIS_PROMPT = """You are an expert AI Risk Analyst specializing in industrial equipment reliability, maintenance engineering, and failure analysis. Your role is to provide COMPREHENSIVE, DETAILED, and ACTIONABLE risk assessments that go beyond surface-level observations.
 
 IMPORTANT: Respond ONLY with valid JSON. No markdown, no explanations outside the JSON.
 
@@ -46,65 +46,78 @@ The threat already has a Risk Score calculated using FMEA methodology:
 - Scale: 10-250 (Low < 50, Medium 50-99, High 100-149, Critical >= 150)
 - Current threat risk score is provided in the context
 
-IMPORTANT: Use ALL available information to inform your detailed analysis:
-- FIELD NOTES: Observer's additional context and on-site observations - these are firsthand accounts from personnel who witnessed the issue
-- ATTACHMENTS: Photos and documents that provide visual evidence of the condition
-- EQUIPMENT HISTORY: Past observations, maintenance actions, and completed tasks - look for patterns and recurring issues
-- Consider the timeline and frequency of past issues
-- Apply your knowledge of failure mechanisms, degradation patterns, and industry standards
+CRITICAL ANALYSIS REQUIREMENTS - Your analysis must be RICH and DETAILED:
 
-Given the threat details, field notes, and equipment history, provide a COMPREHENSIVE assessment:
+1. LEVERAGE ALL AVAILABLE DATA:
+   - FIELD NOTES: Analyze observer's on-site observations in depth - these contain critical firsthand details
+   - ATTACHMENTS: Reference any photos/documents as evidence supporting your analysis
+   - EQUIPMENT HISTORY: Look for patterns, recurring failures, escalating issues, or previously attempted fixes
+   - Consider seasonal factors, operational cycles, and maintenance intervals
+   - Apply failure physics and degradation mechanisms specific to the equipment type
+
+2. PROVIDE SPECIFIC TECHNICAL ANALYSIS:
+   - Reference specific failure mechanisms (fatigue, corrosion, erosion, cavitation, etc.)
+   - Consider material properties and environmental factors
+   - Analyze component interactions and cascade failure potential
+   - Reference industry standards (API, ISO, ASME) where applicable
+
+3. GENERATE RICH KEY FACTORS (6-8 detailed factors):
+   - Each factor should be a complete paragraph with technical depth
+   - Explain the mechanism, not just the symptom
+   - Include quantitative estimates where possible
+   - Reference specific observations from field notes or history
+
+4. GENERATE ACTIONABLE INSIGHTS (4-6 insights):
+   - Each insight should provide strategic value, not just restate the problem
+   - Include root cause hypotheses with supporting evidence
+   - Identify reliability improvement opportunities
+   - Highlight patterns that indicate systemic issues
+
+5. DETAILED RECOMMENDATIONS (4-6 specific actions):
+   - Each recommendation must include clear scope and expected outcome
+   - Specify inspection methods, testing parameters, or replacement specifications
+   - Include prerequisite conditions or safety considerations
+   - Prioritize based on risk reduction potential
+
+Given the threat details, provide your COMPREHENSIVE assessment:
 
 1. DO NOT recalculate risk_score - use the provided threat's current risk score
 
 2. Failure Probability (0-100%):
-   - Analyze failure mode patterns and mechanisms
-   - Consider equipment condition indicators from field notes and photos
-   - Evaluate historical data patterns from equipment history
-   - Account for recent maintenance actions and their effectiveness
-   - Provide detailed reasoning in factors
+   - Analyze failure mode physics and degradation mechanisms
+   - Consider equipment condition indicators from field notes
+   - Factor in environmental stressors and operational demands
+   - Provide detailed reasoning
 
 3. Time-to-Failure Estimate:
-   - Based on degradation patterns and failure physics
-   - Consider past similar failures on this equipment
-   - Use field observations to assess current condition severity
-   - Provide realistic estimate in hours (null if truly uncertain)
-   - Include confidence-based range in time_to_failure_display (e.g., "48-96 hours")
+   - Based on degradation rate analysis and condition assessment
+   - Consider similar equipment failure histories
+   - Account for operating conditions and load factors
+   - Provide realistic range with confidence level
 
-4. Risk Trend Analysis:
-   - "increasing", "stable", or "decreasing" based on current conditions
-   - Factor in field notes observations and their severity
-   - Consider recent maintenance actions and their effectiveness
-   - Assess environmental and operational factors
+4. Risk Trend: "increasing", "stable", or "decreasing" with justification
 
-5. Trend Delta:
-   - Expected change in risk score over time (positive = worsening, negative = improving)
-   - Base on degradation rate analysis
+5. Trend Delta: Expected change in risk score (positive = worsening)
 
-6. Key Risk Factors (provide 4-6 detailed factors):
-   - Include specific factors from equipment history
-   - Include relevant details from field notes
-   - Reference industry standards or best practices where applicable
-   - Be specific about mechanism and contributing conditions
+6. Key Risk Factors (6-8 comprehensive factors):
+   - "Equipment degradation pattern: [Detailed explanation of the specific degradation mechanism observed, including rate of progression based on field notes and history]"
+   - "Failure physics analysis: [Technical explanation of how this failure mode develops, reference specific mechanisms]"
+   - "Historical pattern significance: [Analysis of past incidents and what they indicate about current risk]"
+   - Include operational, environmental, and maintenance-related factors
 
-7. Key Insights (provide 3-5 actionable insights):
-   - What are the most critical findings?
-   - What patterns or concerns should be addressed?
-   - What does the equipment history tell us?
-   - Include both immediate concerns and long-term reliability considerations
+7. Key Insights (4-6 strategic insights):
+   - Provide actionable intelligence, not just observations
+   - Include reliability engineering perspective
+   - Identify systemic issues or improvement opportunities
+   - Reference specific evidence from the data provided
 
-8. Forecasts for next 7/14/30 days using the SAME FMEA scale (10-250):
-   - Start from the current risk score and project realistic changes
-   - Consider effectiveness of recent maintenance
-   - Account for known degradation mechanisms
-   - Provide meaningful probability changes
+8. Forecasts for 7/14/30 days using FMEA scale (10-250)
 
-9. Recommendations - IMPORTANT: Each recommendation must be specific and actionable:
-   - action: Detailed recommended action with clear scope
-   - action_type: One of "CM" (Corrective Maintenance), "PM" (Preventive Maintenance), or "PDM" (Predictive Maintenance)
-   - discipline: One of "Mechanical", "Electrical", "Instrumentation", "Process", "Operations", "Maintenance", "Safety", "Inspection", "Reliability", "Rotating Equipment", "Static Equipment", "Multi-discipline"
-   - Avoid recommending actions that have already been completed recently
-   - Provide 3-5 prioritized recommendations
+9. Recommendations with full context:
+   - action: Detailed description with specific parameters/specifications
+   - action_type: "CM" (Corrective), "PM" (Preventive), or "PDM" (Predictive)
+   - discipline: Appropriate technical discipline
+   - Include inspection criteria, acceptance limits, or test parameters where relevant
 
 RESPOND IN THIS EXACT JSON FORMAT:
 {
@@ -116,25 +129,29 @@ RESPOND IN THIS EXACT JSON FORMAT:
   "trend": "increasing",
   "trend_delta": 10,
   "factors": [
-    "Factor 1: Detailed description of risk factor with mechanism",
-    "Factor 2: Another specific risk factor",
-    "Factor 3: Historical pattern or recurring issue",
-    "Factor 4: Environmental or operational contributor"
+    "Equipment degradation analysis: The bearing assembly shows progressive wear patterns consistent with inadequate lubrication intervals. Based on the field notes indicating elevated temperatures (reported 15°C above normal), the bearing is likely experiencing boundary lubrication conditions where metal-to-metal contact occurs during load transitions. This accelerates wear rate by approximately 3-5x normal, suggesting remaining bearing life of 200-400 operating hours without intervention.",
+    "Vibration signature correlation: Historical data shows a 40% increase in overall vibration levels over the past 3 months, with the characteristic 2x running speed component indicating misalignment-induced bearing stress. This pattern typically precedes catastrophic failure by 4-8 weeks in similar rotating equipment.",
+    "Maintenance effectiveness gap: Previous lubrication task completed 45 days ago used standard mineral oil, however operating temperatures suggest synthetic lubricant would be more appropriate for this duty cycle. The recurrence of elevated temperatures indicates the root cause has not been addressed.",
+    "Environmental stress factors: The equipment operates in a humid environment near cooling tower, exposing it to moisture ingress risk. Seals should be inspected for integrity as moisture contamination accelerates bearing degradation.",
+    "Operational loading analysis: Production records indicate this unit frequently operates at 115% of rated capacity during peak periods, increasing bearing loads beyond design limits and accelerating fatigue damage accumulation.",
+    "Cascade failure potential: This bearing supports a critical shaft connecting to the main process pump. Bearing failure would result in shaft deflection, potentially damaging mechanical seals and causing process fluid leakage."
   ],
   "key_insights": [
-    "Insight 1: Critical finding with actionable context",
-    "Insight 2: Pattern analysis from equipment history",
-    "Insight 3: Reliability concern or improvement opportunity"
+    "Root cause hypothesis: The combination of elevated operating temperatures, increased vibration, and inadequate lubrication grade points to a systematic maintenance gap rather than a random component failure. Addressing only the bearing without upgrading lubrication practices will likely result in repeat failure within 6-12 months.",
+    "Reliability improvement opportunity: Implementing condition-based monitoring (vibration + temperature trending) on this equipment class could detect similar issues 4-6 weeks earlier, reducing unplanned downtime risk by 60%.",
+    "Pattern analysis: This is the third bearing-related issue on rotating equipment in this area in 12 months, suggesting a common cause such as environmental factors, maintenance practices, or operating procedures that should be investigated.",
+    "Cost-benefit consideration: Proactive bearing replacement during next planned outage (estimated cost €2,500) versus emergency failure response (estimated €15,000 including production loss) represents a 6:1 return on preventive action."
   ],
   "recommendations": [
-    {"action": "Detailed action description with scope and expected outcome", "action_type": "PDM", "discipline": "Mechanical"},
-    {"action": "Another specific recommendation", "action_type": "PM", "discipline": "Mechanical"},
-    {"action": "Corrective action if needed", "action_type": "CM", "discipline": "Rotating Equipment"}
+    {"action": "Replace bearing assembly with upgraded SKF Explorer series bearing rated for higher operating temperatures. Include shaft inspection for wear marks or scoring. Acceptance criteria: shaft runout < 0.05mm, no visible wear on journal surface.", "action_type": "CM", "discipline": "Rotating Equipment"},
+    {"action": "Upgrade lubrication to synthetic ISO VG 68 oil with EP additives suitable for temperatures up to 120°C. Establish new lubrication interval of 30 days based on operating conditions.", "action_type": "PM", "discipline": "Mechanical"},
+    {"action": "Install wireless vibration and temperature sensors for continuous monitoring. Configure alerts at: vibration > 7mm/s overall, temperature > 75°C bearing housing.", "action_type": "PDM", "discipline": "Instrumentation"},
+    {"action": "Inspect and replace shaft seals if moisture ingress detected. Use upgraded seal material (Viton) suitable for humid environment exposure.", "action_type": "PM", "discipline": "Mechanical"}
   ],
   "forecasts": [
-    {"days_ahead": 7, "predicted_risk_score": 70, "predicted_probability": 70.0, "confidence": "medium"},
-    {"days_ahead": 14, "predicted_risk_score": 80, "predicted_probability": 75.0, "confidence": "low"},
-    {"days_ahead": 30, "predicted_risk_score": 95, "predicted_probability": 80.0, "confidence": "low"}
+    {"days_ahead": 7, "predicted_risk_score": 120, "predicted_probability": 70.0, "confidence": "medium"},
+    {"days_ahead": 14, "predicted_risk_score": 145, "predicted_probability": 80.0, "confidence": "low"},
+    {"days_ahead": 30, "predicted_risk_score": 180, "predicted_probability": 90.0, "confidence": "low"}
   ]
 }"""
 
@@ -318,16 +335,18 @@ class AIRiskEngine:
     
     # Token limits for different analysis types
     TOKEN_LIMITS = {
-        'risk_analysis': 4000,
-        'cause_analysis': 4000,
+        'risk_analysis': 6000,
+        'cause_analysis': 5000,
         'fault_tree': 3000,
         'bow_tie': 3000,
-        'action_optimization': 3000
+        'action_optimization': 4000
     }
     
     def _call_openai(self, system_prompt: str, user_message: str, analysis_type: str = 'risk_analysis') -> str:
         """Make a chat completion call to OpenAI"""
         max_tokens = self.TOKEN_LIMITS.get(analysis_type, 3000)
+        # Use lower temperature for more focused, detailed analysis
+        temperature = 0.3 if analysis_type == 'risk_analysis' else 0.4
         try:
             client = get_openai_client()
             response = client.chat.completions.create(
@@ -337,7 +356,7 @@ class AIRiskEngine:
                     {"role": "user", "content": user_message}
                 ],
                 max_tokens=max_tokens,
-                temperature=0.4
+                temperature=temperature
             )
             return response.choices[0].message.content
         except Exception as e:
