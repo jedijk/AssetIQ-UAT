@@ -37,6 +37,13 @@ import {
   ClipboardList,
   Paperclip,
   Download,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CheckSquare,
+  Lightbulb,
+  Settings,
+  Sparkles,
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card";
@@ -1609,18 +1616,6 @@ export default function DashboardPage() {
             >
               View All Submissions
               <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
-          </div>
-          </>
-          )}
-        </DialogContent>
-      </Dialog>
-                navigate(`/form-submissions`, { state: navState });
-              }}
-            >
-              <ExternalLink className="w-3.5 h-3.5 mr-1" />
-              <span className="hidden sm:inline">{t("dashboard.viewAllSubmissions") || "View All"}</span>
-              <span className="sm:hidden">View All</span>
             </Button>
           </div>
           </>
