@@ -331,6 +331,7 @@ async def create_indexes():
     
     total_created = 0
     total_skipped = 0
+    total_failed = 0
     
     for collection_name, indexes in INDEX_DEFINITIONS.items():
         collection = db[collection_name]
@@ -348,13 +349,24 @@ async def create_indexes():
                 continue
             
             try:
-                await collection.create_index(keys, unique=unique, name=idx_name)
+                # For unique indexes on 'id' field, use partial filter to exclude null values
+                # This prevents "duplicate key error on id: null" when multiple docs have null id
+                if unique and any(k == "id" for k, _ in keys):
+                    await collection.create_index(
+                        keys, 
+                        unique=unique, 
+                        name=idx_name,
+                        partialFilterExpression={"id": {"$type": "string"}}
+                    )
+                else:
+                    await collection.create_index(keys, unique=unique, name=idx_name)
                 logger.info(f"Created index {idx_name} on {collection_name}")
                 total_created += 1
             except Exception as e:
                 logger.warning(f"Failed to create index {idx_name} on {collection_name}: {e}")
+                total_failed += 1
     
-    logger.info(f"Index creation complete: {total_created} created, {total_skipped} already existed")
+    logger.info(f"Index creation complete: {total_created} created, {total_skipped} already existed, {total_failed} failed")
     client.close()
     
     return total_created, total_skipped

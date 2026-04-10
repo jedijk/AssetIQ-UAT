@@ -223,6 +223,10 @@ ALLOWED_ORIGINS = [
     "https://asset-iq-preview.preview.emergentagent.com",
     "https://assetiq-rmhd.vercel.app",
     "https://assetiq.vercel.app",
+    # UAT environment origins
+    "https://asset-iq-uat.vercel.app",
+    "https://assetiq-uat.vercel.app",
+    # Local development
     "http://localhost:3000",
     "http://localhost:5000",
 ]

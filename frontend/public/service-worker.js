@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = 'reliabilityos-v2.7.5';  // Update with each release
+const CACHE_NAME = 'reliabilityos-v2.7.9';  // Update with each release
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache on install
@@ -80,7 +80,8 @@ async function networkFirstStrategy(request) {
     const networkResponse = await fetch(request);
     
     // Cache successful GET responses for cacheable API routes
-    if (networkResponse.ok && API_CACHE_ROUTES.some(route => request.url.includes(route))) {
+    // IMPORTANT: Only cache responses with status 200 to prevent caching errors
+    if (networkResponse.status === 200 && API_CACHE_ROUTES.some(route => request.url.includes(route))) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone());
     }
@@ -123,8 +124,8 @@ async function cacheFirstStrategy(request) {
   try {
     const networkResponse = await fetch(request);
     
-    // Cache successful responses
-    if (networkResponse.ok) {
+    // Cache successful responses - ONLY cache status 200 to prevent caching errors
+    if (networkResponse.status === 200) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone());
     }
@@ -144,7 +145,8 @@ async function cacheFirstStrategy(request) {
 async function fetchAndCache(request) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    // Only cache status 200 responses to prevent caching errors/redirects
+    if (response.status === 200) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response);
     }
