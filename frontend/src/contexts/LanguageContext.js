@@ -22,7 +22,7 @@ const en = {
     feedback: "Feedback",
     permissions: "Permissions",
     aiUsage: "AI Usage",
-    taskScheduler: "Task Scheduler",
+    taskScheduler: "Scheduler",
     formSubmissions: "Forms",
   },
   
@@ -1243,7 +1243,7 @@ const nl = {
     feedback: "Feedback",
     permissions: "Machtigingen",
     aiUsage: "AI Gebruik",
-    taskScheduler: "Taakplanner",
+    taskScheduler: "Planner",
     formSubmissions: "Formulieren",
   },
   
