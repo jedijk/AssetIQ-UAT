@@ -461,7 +461,7 @@ const Layout = () => {
     { path: "/settings/server-performance", label: "Server Performance", icon: Server, ownerOnly: true },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
-    { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "settings" },
+    { path: "/definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "settings" },
   ];
   
   // Filter settings items based on device, role, and permissions
@@ -995,51 +995,7 @@ const Layout = () => {
             {/* Divider */}
             <div className="my-3 border-t border-slate-200" />
             
-            {/* Definitions Link */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: navItems.length * 0.05, ...springPresets.snappy }}
-            >
-              <NavLink
-                to="/definitions"
-                onClick={() => setMobileMenuOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                    isActive
-                      ? "bg-blue-50 text-blue-600"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`
-                }
-                data-testid="mobile-nav-definitions"
-              >
-                <Sliders className="w-5 h-5" />
-                {t("nav.criticalityDefinitions")}
-              </NavLink>
-            </motion.div>
-            
-            {/* Settings Link */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: (navItems.length + 1) * 0.05, ...springPresets.snappy }}
-            >
-              <NavLink
-                to="/settings"
-                onClick={() => setMobileMenuOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                    isActive
-                      ? "bg-blue-50 text-blue-600"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`
-                }
-                data-testid="mobile-nav-settings"
-              >
-                <Settings className="w-5 h-5" />
-                {t("nav.settings")}
-              </NavLink>
-            </motion.div>
+{/* Settings and Definitions removed from mobile drawer - accessible via gear wheel menu */}
           </nav>
         </AnimatedDrawer>
       </header>
