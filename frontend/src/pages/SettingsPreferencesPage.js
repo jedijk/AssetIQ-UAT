@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getBackendUrl } from "../lib/apiConfig";
 import { updateCachedPreferences } from "../lib/dateUtils";
@@ -15,6 +16,7 @@ import {
   ChevronDown,
   Search,
   Languages,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Switch } from "../components/ui/switch";
@@ -97,11 +99,20 @@ const getCurrentTimeInTimezone = (timezone) => {
 
 export default function SettingsPreferencesPage() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [detectedTimezone] = useState(detectTimezone);
   const [timezoneOpen, setTimezoneOpen] = useState(false);
   const [timezoneSearch, setTimezoneSearch] = useState("");
   const [currentTime, setCurrentTime] = useState("");
+  
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Fetch preferences
   const { data: preferences, isLoading: prefsLoading } = useQuery({
@@ -226,15 +237,32 @@ export default function SettingsPreferencesPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
-            Preferences
-          </h1>
-          <p className="text-slate-500">
-            Customize your time zone and display settings
-          </p>
-        </div>
+        {/* Mobile Header with Back Button */}
+        {isMobile && (
+          <div className="flex items-center gap-3 mb-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={() => navigate("/")}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-lg font-bold text-slate-900">Preferences</h1>
+          </div>
+        )}
+        
+        {/* Desktop Header */}
+        {!isMobile && (
+          <div className="mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
+              Preferences
+            </h1>
+            <p className="text-slate-500">
+              Customize your time zone and display settings
+            </p>
+          </div>
+        )}
 
         {/* Current Time Display */}
         <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 mb-8 text-white">

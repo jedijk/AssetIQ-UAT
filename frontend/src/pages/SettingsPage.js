@@ -136,10 +136,11 @@ export default function SettingsPage() {
     setShowMobileNav(true);
   };
 
-  // On mobile user-management, render the page directly without the Settings wrapper
-  const isUserManagement = location.pathname.includes('/user-management');
+  // On mobile, render settings pages directly without the Settings wrapper
+  // This applies to all settings sub-pages (user-management, statistics, preferences, etc.)
+  const isSettingsSubPage = location.pathname !== '/settings' && location.pathname.startsWith('/settings/');
   
-  if (isMobileView && isUserManagement) {
+  if (isMobileView && isSettingsSubPage) {
     return <Outlet />;
   }
 

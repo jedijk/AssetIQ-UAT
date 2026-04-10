@@ -1,5 +1,6 @@
 import { getBackendUrl } from '../lib/apiConfig';
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { formatDateTime } from "../lib/dateUtils";
@@ -20,6 +21,7 @@ import {
   Monitor,
   Smartphone,
   Tablet,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -167,10 +169,19 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 const UserStatisticsPage = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [timePeriod, setTimePeriod] = useState("30");
   const [roleFilter, setRoleFilter] = useState("all");
   const [activityFilter, setActivityFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
+  
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Fetch overview data
   const { 
@@ -238,26 +249,73 @@ const UserStatisticsPage = () => {
   ].filter(d => d.value > 0);
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto" data-testid="user-statistics-page">
-      {/* Header - matching Observations page style */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center">
-            <BarChart3 className="h-5 w-5 text-amber-600" />
+    <div className={`${isMobile ? 'p-4' : 'p-6 lg:p-8'} max-w-7xl mx-auto`} data-testid="user-statistics-page">
+      {/* Mobile Header with Back Button */}
+      {isMobile && (
+        <div className="flex items-center gap-3 mb-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8"
+            onClick={() => navigate("/")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-lg font-bold text-slate-900">User Statistics</h1>
+        </div>
+      )}
+      
+      {/* Header - matching Observations page style (Desktop) */}
+      {!isMobile && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center">
+              <BarChart3 className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800" data-testid="page-title">
+                {t("settings.statistics") || "User Statistics"}
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {t("settings.statisticsDesc") || "System usage and engagement overview"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800" data-testid="page-title">
-              {t("settings.statistics") || "User Statistics"}
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {t("settings.statisticsDesc") || "System usage and engagement overview"}
-            </p>
+          <div className="flex items-center gap-2">
+            {/* Time Period Filter */}
+            <Select value={timePeriod} onValueChange={setTimePeriod}>
+              <SelectTrigger className="w-[140px] h-9 text-xs border-slate-200 bg-white" data-testid="period-filter">
+                <Calendar className="w-3.5 h-3.5 mr-2 text-slate-400" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today" className="text-xs">Today</SelectItem>
+                <SelectItem value="7" className="text-xs">Last 7 days</SelectItem>
+                <SelectItem value="30" className="text-xs">Last 30 days</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {/* Refresh Button */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="h-9 px-3 text-xs border-slate-200 bg-white hover:bg-slate-50"
+              onClick={() => refetch()} 
+              disabled={isRefetching}
+              data-testid="refresh-button"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Time Period Filter */}
+      )}
+      
+      {/* Mobile Controls */}
+      {isMobile && (
+        <div className="flex items-center gap-2 mb-4">
           <Select value={timePeriod} onValueChange={setTimePeriod}>
-            <SelectTrigger className="w-[140px] h-9 text-xs border-slate-200 bg-white" data-testid="period-filter">
+            <SelectTrigger className="flex-1 h-9 text-xs border-slate-200 bg-white" data-testid="period-filter-mobile">
               <Calendar className="w-3.5 h-3.5 mr-2 text-slate-400" />
               <SelectValue />
             </SelectTrigger>
@@ -267,21 +325,17 @@ const UserStatisticsPage = () => {
               <SelectItem value="30" className="text-xs">Last 30 days</SelectItem>
             </SelectContent>
           </Select>
-          
-          {/* Refresh Button */}
           <Button 
             variant="outline" 
-            size="sm"
-            className="h-9 px-3 text-xs border-slate-200 bg-white hover:bg-slate-50"
+            size="icon"
+            className="h-9 w-9 border-slate-200 bg-white"
             onClick={() => refetch()} 
             disabled={isRefetching}
-            data-testid="refresh-button"
           >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefetching ? "animate-spin" : ""}`} />
-            Refresh
+            <RefreshCw className={`w-4 h-4 ${isRefetching ? "animate-spin" : ""}`} />
           </Button>
         </div>
-      </div>
+      )}
 
       {/* KPI Summary - matching Observations page stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
