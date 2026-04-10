@@ -215,31 +215,40 @@ async def routes_status():
 # CORS Configuration
 # =============================================================================
 
-ALLOWED_ORIGINS = [
+# Base allowed origins (always included)
+BASE_ORIGINS = [
+    # Production
     "https://assetiq.tech",
     "https://www.assetiq.tech",
     "https://assetiq-rho.vercel.app",
     "https://asset-iq-rho.vercel.app",
-    "https://asset-iq-preview.preview.emergentagent.com",
     "https://assetiq-rmhd.vercel.app",
     "https://assetiq.vercel.app",
-    # UAT environment origins
+    # UAT environment
     "https://asset-iq-uat.vercel.app",
     "https://assetiq-uat.vercel.app",
-    # Local development
+    # Preview/Development
+    "https://asset-iq-preview.preview.emergentagent.com",
     "http://localhost:3000",
     "http://localhost:5000",
 ]
 
+# Merge with any additional origins from environment
+ALLOWED_ORIGINS = BASE_ORIGINS.copy()
 env_origins = os.environ.get('CORS_ORIGINS', '')
 if env_origins and env_origins != '*':
-    ALLOWED_ORIGINS = [origin.strip() for origin in env_origins.split(',')]
+    additional_origins = [origin.strip() for origin in env_origins.split(',') if origin.strip()]
+    for origin in additional_origins:
+        if origin not in ALLOWED_ORIGINS:
+            ALLOWED_ORIGINS.append(origin)
+
+logger.info(f"CORS configured for {len(ALLOWED_ORIGINS)} origins including: {', '.join(ALLOWED_ORIGINS[:5])}...")
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.(vercel\.app|emergentagent\.com|emergent\.host)",
+    allow_origin_regex=r"https://.*\.(vercel\.app|emergentagent\.com|emergent\.host|railway\.app)",
     allow_methods=["*"],
     allow_headers=["*"],
 )
