@@ -33,6 +33,12 @@ import { toast } from "sonner";
 
 const API_URL = getBackendUrl();
 
+// Helper to get auth headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const InsightsPage = ({ embedded = false }) => {
   const { t } = useLanguage();
   
@@ -58,6 +64,7 @@ const InsightsPage = ({ embedded = false }) => {
     setError(null);
     
     try {
+      const headers = getAuthHeaders();
       const [
         summaryRes,
         actionsRes,
@@ -66,12 +73,12 @@ const InsightsPage = ({ embedded = false }) => {
         qualityRes,
         gapsRes
       ] = await Promise.all([
-        axios.get(`${API_URL}/api/insights/summary`),
-        axios.get(`${API_URL}/api/execution/actions`),
-        axios.get(`${API_URL}/api/execution/tasks`),
-        axios.get(`${API_URL}/api/execution/disciplines`),
-        axios.get(`${API_URL}/api/reliability/data-quality`),
-        axios.get(`${API_URL}/api/reliability/gaps`)
+        axios.get(`${API_URL}/api/insights/summary`, { headers }),
+        axios.get(`${API_URL}/api/execution/actions`, { headers }),
+        axios.get(`${API_URL}/api/execution/tasks`, { headers }),
+        axios.get(`${API_URL}/api/execution/disciplines`, { headers }),
+        axios.get(`${API_URL}/api/reliability/data-quality`, { headers }),
+        axios.get(`${API_URL}/api/reliability/gaps`, { headers })
       ]);
       
       setSummary(summaryRes.data);
@@ -92,7 +99,8 @@ const InsightsPage = ({ embedded = false }) => {
   const generateRecommendations = async () => {
     setGeneratingRecommendations(true);
     try {
-      const res = await axios.post(`${API_URL}/api/ai/recommendations`);
+      const headers = getAuthHeaders();
+      const res = await axios.post(`${API_URL}/api/ai/recommendations`, {}, { headers });
       setRecommendations(res.data);
       toast.success("Recommendations generated successfully");
     } catch (err) {

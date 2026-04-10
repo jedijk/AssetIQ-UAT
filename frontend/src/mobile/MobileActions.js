@@ -19,7 +19,7 @@ const MobileActions = () => {
 
   const { data: actionsData = {}, isLoading } = useQuery({
     queryKey: ["actions"],
-    queryFn: actionsAPI.getAll,
+    queryFn: () => actionsAPI.getAll(),
   });
 
   const actions = actionsData.actions || [];

@@ -440,7 +440,7 @@ export default function DashboardPage() {
 
   const { data: observationsData = [] } = useQuery({
     queryKey: ["threats"],
-    queryFn: threatsAPI.getAll,
+    queryFn: () => threatsAPI.getAll(),
   });
   const allObservations = Array.isArray(observationsData) ? observationsData : [];
 
@@ -465,7 +465,7 @@ export default function DashboardPage() {
 
   const { data: actionsData = { actions: [], stats: {} } } = useQuery({
     queryKey: ["actions"],
-    queryFn: actionsAPI.getAll,
+    queryFn: () => actionsAPI.getAll(),
   });
   const allActions = Array.isArray(actionsData?.actions) ? actionsData.actions : (Array.isArray(actionsData) ? actionsData : []);
   const actionsStats = actionsData?.stats || {};
