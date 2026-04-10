@@ -280,6 +280,31 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 
 # =============================================================================
+# Database Context Middleware (for multi-database support)
+# =============================================================================
+
+@app.middleware("http")
+async def set_database_context(request, call_next):
+    """Set the database context based on X-Database-Environment header."""
+    from database import set_request_db, get_db_name_for_environment, AVAILABLE_DATABASES, DEFAULT_DB_NAME
+    
+    # Get the environment from header
+    db_env = request.headers.get("X-Database-Environment", "production")
+    
+    # Validate and set the database name
+    if db_env in AVAILABLE_DATABASES:
+        db_name = AVAILABLE_DATABASES[db_env]["name"]
+    else:
+        db_name = DEFAULT_DB_NAME
+    
+    # Set the database for this request context
+    set_request_db(db_name)
+    
+    response = await call_next(request)
+    return response
+
+
+# =============================================================================
 # Request Logging Middleware
 # =============================================================================
 

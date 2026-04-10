@@ -7,6 +7,7 @@ import os
 import logging
 import asyncio
 from pathlib import Path
+from contextvars import ContextVar
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -37,6 +38,9 @@ AVAILABLE_DATABASES = {
     }
 }
 
+# Context variable for per-request database name
+_request_db_name: ContextVar[str] = ContextVar('request_db_name', default=DEFAULT_DB_NAME)
+
 # Current active database (can be changed at runtime for specific requests)
 _current_db_name = DEFAULT_DB_NAME
 logger.info(f"Initializing MongoDB connection to database: {_current_db_name}")
@@ -54,13 +58,46 @@ client = AsyncIOMotorClient(
     waitQueueTimeoutMS=5000,  # Wait up to 5s for a connection from pool (reduced)
 )
 
-# Default database reference
-db = client[_current_db_name]
+# Default database reference (static - for initialization)
+_default_db = client[_current_db_name]
+
+class DatabaseProxy:
+    """
+    A proxy that dynamically returns the correct database based on request context.
+    This allows `db.collection.find()` to work transparently with multi-database support.
+    """
+    def __getattr__(self, name):
+        """Proxy attribute access to the current context's database."""
+        current_db = get_request_db()
+        return getattr(current_db, name)
+    
+    def __getitem__(self, name):
+        """Proxy collection access via bracket notation."""
+        current_db = get_request_db()
+        return current_db[name]
+    
+    @property
+    def name(self):
+        """Return the current database name."""
+        return get_current_db_name()
+
+# Create the proxy instance - this is what routes will import as `db`
+db = DatabaseProxy()
+
+def set_request_db(db_name: str):
+    """Set the database name for the current request context."""
+    _request_db_name.set(db_name)
+
+def get_request_db():
+    """Get the database reference for the current request context."""
+    db_name = _request_db_name.get()
+    return client[db_name]
 
 def get_database(db_name: str = None):
-    """Get a database reference by name."""
+    """Get a database reference by name. Uses request context if no name provided."""
     if db_name is None:
-        return db
+        # Use request-scoped database if set, otherwise default
+        return get_request_db()
     return client[db_name]
 
 def get_available_databases():
@@ -68,8 +105,14 @@ def get_available_databases():
     return AVAILABLE_DATABASES
 
 def get_current_db_name():
-    """Get the current default database name."""
-    return _current_db_name
+    """Get the current database name (from request context or default)."""
+    return _request_db_name.get()
+
+def get_db_name_for_environment(env: str) -> str:
+    """Get database name for an environment key."""
+    if env in AVAILABLE_DATABASES:
+        return AVAILABLE_DATABASES[env]["name"]
+    return DEFAULT_DB_NAME
 
 
 async def verify_database_connection(max_retries: int = 3, timeout: float = 5.0) -> bool:

@@ -40,6 +40,20 @@ import { getBackendUrl } from "../lib/apiConfig";
 // Get API URL dynamically (supports Vercel + Railway deployment)
 const getApiUrl = () => getBackendUrl();
 
+// Helper to build headers with auth and database environment
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("token");
+  const dbEnv = localStorage.getItem("database_environment");
+  const headers = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (dbEnv) {
+    headers["X-Database-Environment"] = dbEnv;
+  }
+  return headers;
+};
+
 // Helper to format uptime
 const formatUptime = (seconds) => {
   if (!seconds) return "N/A";
@@ -228,9 +242,8 @@ const SettingsServerPerformancePage = () => {
     if (showRefreshing) setSecurityRefreshing(true);
     
     try {
-      const token = localStorage.getItem("token");
       const response = await fetch(`${getApiUrl()}/api/system/security`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       
       if (!response.ok) {
@@ -254,9 +267,8 @@ const SettingsServerPerformancePage = () => {
     if (!isOwner) return;
     
     try {
-      const token = localStorage.getItem("token");
       const response = await fetch(`${getApiUrl()}/api/system/database`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       
       if (!response.ok) {
@@ -281,12 +293,11 @@ const SettingsServerPerformancePage = () => {
     if (showRefreshing) setErrorLogsRefreshing(true);
     
     try {
-      const token = localStorage.getItem("token");
       const unresolved = errorFilter === "unresolved";
       const response = await fetch(
         `${getApiUrl()}/api/system/errors?limit=50&unresolved_only=${unresolved}`, 
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: getAuthHeaders()
         }
       );
       
@@ -309,10 +320,9 @@ const SettingsServerPerformancePage = () => {
   // Resolve an error
   const resolveError = async (errorId) => {
     try {
-      const token = localStorage.getItem("token");
       const response = await fetch(`${getApiUrl()}/api/system/errors/${errorId}/resolve`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       
       if (!response.ok) {
@@ -331,10 +341,9 @@ const SettingsServerPerformancePage = () => {
     if (!window.confirm("Are you sure you want to clear all error logs?")) return;
     
     try {
-      const token = localStorage.getItem("token");
       const response = await fetch(`${getApiUrl()}/api/system/errors`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       
       if (!response.ok) {
@@ -351,10 +360,9 @@ const SettingsServerPerformancePage = () => {
   // Create test error (for debugging)
   const createTestError = async () => {
     try {
-      const token = localStorage.getItem("token");
       const response = await fetch(`${getApiUrl()}/api/system/errors/test`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       
       if (!response.ok) {
@@ -374,9 +382,8 @@ const SettingsServerPerformancePage = () => {
     if (showRefreshIndicator) setIsRefreshing(true);
     
     try {
-      const token = localStorage.getItem("token");
       const response = await fetch(`${getApiUrl()}/api/system/metrics`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       
       if (!response.ok) {

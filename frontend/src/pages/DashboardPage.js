@@ -7,6 +7,7 @@ import { formAPI } from "../components/forms";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
 import { formatDate, formatDateTime } from "../lib/dateUtils";
+import { AuthenticatedImage, useAuthenticatedMedia } from "../components/AuthenticatedMedia";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -54,6 +55,149 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from "../components/ui/label";
 import InsightsPage from "./InsightsPage";
 import { DISCIPLINES } from "../constants/disciplines";
+
+// Authenticated Lightbox component for viewing images with proper mobile auth
+const AuthenticatedLightbox = ({ url, name, onClose }) => {
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let objectUrl = null;
+    
+    const fetchImage = async () => {
+      // If it's a data URL (base64 signature), use directly
+      if (url?.startsWith('data:')) {
+        setBlobUrl(url);
+        setIsLoading(false);
+        return;
+      }
+      
+      // If it's already a blob URL, use directly
+      if (url?.startsWith('blob:')) {
+        setBlobUrl(url);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem("token");
+        
+        // Build full URL if needed
+        let fullUrl = url;
+        if (url?.startsWith("/api/")) {
+          fullUrl = `${getBackendUrl()}${url}`;
+        }
+
+        const response = await fetch(fullUrl, {
+          headers: {
+            "Authorization": token ? `Bearer ${token}` : "",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+        setIsLoading(false);
+      } catch (err) {
+        console.error("Failed to load lightbox image:", err);
+        setError(err.message);
+        setIsLoading(false);
+      }
+    };
+
+    fetchImage();
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [url]);
+
+  const handleDownload = (e) => {
+    e.stopPropagation();
+    if (blobUrl) {
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = name || 'image';
+      link.click();
+    }
+  };
+
+  return (
+    <div 
+      data-testid="image-lightbox"
+      className="fixed inset-0 z-[9999] bg-black flex items-center justify-center p-2 sm:p-4"
+      onClick={onClose}
+    >
+      {/* Close button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-2 right-2 sm:top-4 sm:right-4 text-white hover:bg-white/20 active:bg-white/30 z-10 w-12 h-12 sm:w-10 sm:h-10 rounded-full bg-black/40"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+      >
+        <X className="w-7 h-7 sm:w-6 sm:h-6" />
+      </Button>
+      
+      {/* Download button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="absolute top-2 left-2 sm:top-4 sm:left-4 text-white hover:bg-white/20 active:bg-white/30 z-10 h-12 sm:h-auto px-3 sm:px-4 rounded-full sm:rounded-md bg-black/40"
+        onClick={handleDownload}
+        disabled={!blobUrl}
+      >
+        <Download className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+        <span className="hidden sm:inline">Download</span>
+      </Button>
+      
+      <div className="relative max-w-full max-h-full flex items-center justify-center">
+        {isLoading && (
+          <div className="flex items-center justify-center">
+            <div className="animate-spin h-10 w-10 border-3 border-amber-500 border-t-transparent rounded-full" />
+          </div>
+        )}
+        
+        {error && (
+          <div className="text-white/70 text-center">
+            <p className="text-lg mb-2">Failed to load image</p>
+            <p className="text-sm">Click anywhere to close</p>
+          </div>
+        )}
+        
+        {blobUrl && !isLoading && !error && (
+          <img
+            src={blobUrl}
+            alt={name}
+            className="max-w-full max-h-[80vh] sm:max-h-[85vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+        
+        {/* File name */}
+        {name && (
+          <div className="absolute -bottom-8 sm:-bottom-10 left-0 right-0 text-center px-4">
+            <p className="text-white/80 text-xs sm:text-sm truncate">{name}</p>
+          </div>
+        )}
+      </div>
+      
+      {/* Tap to close hint on mobile */}
+      <p className="absolute bottom-4 left-0 right-0 text-center text-white/50 text-xs sm:hidden">
+        Tap outside image to close
+      </p>
+    </div>
+  );
+};
 
 // Image component with fallback for failed loads
 const ImageWithFallback = ({ src, alt, fallback, className = "" }) => {
@@ -1329,6 +1473,11 @@ export default function DashboardPage() {
                         const hasAttachment = response.attachment_url || response.file_url;
                         const attachmentRawUrl = response.attachment_url || response.file_url || "";
                         const isImage = hasAttachment && /\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentRawUrl);
+                        // Build clean API path for AuthenticatedLightbox (no token query param)
+                        const attachmentApiPath = attachmentRawUrl && !attachmentRawUrl.startsWith('data:') && !attachmentRawUrl.startsWith('http')
+                          ? `/api/storage/${attachmentRawUrl}`
+                          : attachmentRawUrl;
+                        // Build full URL with token for non-image downloads (fallback)
                         const authToken = localStorage.getItem('token');
                         const attachmentFullUrl = attachmentRawUrl && !attachmentRawUrl.startsWith('data:') && !attachmentRawUrl.startsWith('http')
                           ? `${getBackendUrl()}/api/storage/${attachmentRawUrl}${authToken ? `?token=${authToken}` : ''}`
@@ -1376,7 +1525,8 @@ export default function DashboardPage() {
                                   <button
                                     onClick={() => {
                                       if (isImage) {
-                                        setViewingImage({ url: attachmentFullUrl, name: (response.field_label || "Image").replace(/_/g, ' ') });
+                                        // Use clean API path - AuthenticatedLightbox handles auth
+                                        setViewingImage({ url: attachmentApiPath, name: (response.field_label || "Image").replace(/_/g, ' ') });
                                       } else {
                                         window.open(attachmentFullUrl, '_blank');
                                       }
@@ -1499,8 +1649,13 @@ export default function DashboardPage() {
                     {quickViewSubmission.attachments.map((att, idx) => {
                       const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name || att.filename || "");
                       const rawUrl = att.url || att.data;
+                      // Clean API path for AuthenticatedImage/Lightbox (handles auth via headers)
+                      const apiPath = rawUrl && !rawUrl.startsWith('data:') && !rawUrl.startsWith('http') 
+                        ? `/api/storage/${rawUrl}` 
+                        : rawUrl;
+                      // Full URL with token for non-image downloads (fallback)
                       const authToken = localStorage.getItem('token');
-                      const previewUrl = rawUrl && !rawUrl.startsWith('data:') && !rawUrl.startsWith('http') 
+                      const downloadUrl = rawUrl && !rawUrl.startsWith('data:') && !rawUrl.startsWith('http') 
                         ? `${getBackendUrl()}/api/storage/${rawUrl}${authToken ? `?token=${authToken}` : ''}` 
                         : rawUrl;
                       const fileName = att.name || att.filename || "Attachment";
@@ -1511,15 +1666,15 @@ export default function DashboardPage() {
                           key={att.url || att.id || `attachment-${idx}`}
                           className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100"
                         >
-                          {/* Thumbnail */}
+                          {/* Thumbnail - Use AuthenticatedImage for proper mobile auth */}
                           <div className="w-20 h-16 bg-slate-200 rounded-lg overflow-hidden flex-shrink-0">
                             {hasError ? (
                               <div className="w-full h-full flex items-center justify-center bg-amber-50">
                                 <AlertTriangle className="w-6 h-6 text-amber-500" />
                               </div>
-                            ) : isImage && previewUrl ? (
-                              <ImageWithFallback 
-                                src={previewUrl} 
+                            ) : isImage && apiPath ? (
+                              <AuthenticatedImage 
+                                src={apiPath} 
                                 alt={fileName}
                                 className="w-full h-full object-cover"
                                 fallback={
@@ -1550,11 +1705,12 @@ export default function DashboardPage() {
                                 size="sm"
                                 className="h-7 text-xs"
                                 onClick={() => {
-                                  if (!hasError && previewUrl) {
+                                  if (!hasError && apiPath) {
                                     if (isImage) {
-                                      setViewingImage({ url: previewUrl, name: fileName });
+                                      // Use clean API path - AuthenticatedLightbox handles auth
+                                      setViewingImage({ url: apiPath, name: fileName });
                                     } else {
-                                      window.open(previewUrl, '_blank');
+                                      window.open(downloadUrl, '_blank');
                                     }
                                   }
                                 }}
@@ -1567,9 +1723,9 @@ export default function DashboardPage() {
                                 size="sm"
                                 className="h-7 text-xs"
                                 onClick={() => {
-                                  if (!hasError && previewUrl) {
+                                  if (!hasError && downloadUrl) {
                                     const link = document.createElement('a');
-                                    link.href = previewUrl;
+                                    link.href = downloadUrl;
                                     link.download = fileName;
                                     link.click();
                                   }
@@ -1641,75 +1797,11 @@ export default function DashboardPage() {
 
       {/* Image Lightbox - Using Portal to render above all dialogs */}
       {viewingImage && createPortal(
-        <div 
-          data-testid="image-lightbox"
-          className="fixed inset-0 z-[9999] bg-black flex items-center justify-center p-2 sm:p-4"
-          onClick={() => setViewingImage(null)}
-        >
-          {/* Close button - Fixed position in top right corner, larger on mobile */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-2 right-2 sm:top-4 sm:right-4 text-white hover:bg-white/20 active:bg-white/30 z-10 w-12 h-12 sm:w-10 sm:h-10 rounded-full bg-black/40"
-            onClick={(e) => {
-              e.stopPropagation();
-              setViewingImage(null);
-            }}
-          >
-            <X className="w-7 h-7 sm:w-6 sm:h-6" />
-          </Button>
-          
-          {/* Download button - Fixed position in top left corner, icon-only on mobile */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 left-2 sm:top-4 sm:left-4 text-white hover:bg-white/20 active:bg-white/30 z-10 h-12 sm:h-auto px-3 sm:px-4 rounded-full sm:rounded-md bg-black/40"
-            onClick={(e) => {
-              e.stopPropagation();
-              const link = document.createElement('a');
-              link.href = viewingImage.url;
-              link.download = viewingImage.name;
-              link.click();
-            }}
-          >
-            <Download className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Download</span>
-          </Button>
-          
-          <div className="relative max-w-full max-h-full flex items-center justify-center">
-            {/* Loading spinner - shown while image loads - matching statistics page style */}
-            <div id="lightbox-loading" className="absolute inset-0 flex items-center justify-center">
-              <div className="animate-spin h-10 w-10 border-3 border-amber-500 border-t-transparent rounded-full" />
-            </div>
-            {/* Image - Tap anywhere outside to close */}
-            <img
-              src={viewingImage.url}
-              alt={viewingImage.name}
-              className="max-w-full max-h-[80vh] sm:max-h-[85vh] object-contain rounded-lg shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-              onLoad={(e) => {
-                // Hide loading spinner when image loads
-                const spinner = document.getElementById('lightbox-loading');
-                if (spinner) spinner.style.display = 'none';
-              }}
-              onError={(e) => {
-                // Hide spinner and show error on failure
-                const spinner = document.getElementById('lightbox-loading');
-                if (spinner) spinner.innerHTML = '<div class="text-white/70 text-center"><p class="text-lg mb-2">Failed to load image</p><p class="text-sm">Click anywhere to close</p></div>';
-              }}
-            />
-            
-            {/* File name - Positioned below image */}
-            <div className="absolute -bottom-8 sm:-bottom-10 left-0 right-0 text-center px-4">
-              <p className="text-white/80 text-xs sm:text-sm truncate">{viewingImage.name}</p>
-            </div>
-          </div>
-          
-          {/* Tap to close hint on mobile */}
-          <p className="absolute bottom-4 left-0 right-0 text-center text-white/50 text-xs sm:hidden">
-            Tap outside image to close
-          </p>
-        </div>,
+        <AuthenticatedLightbox
+          url={viewingImage.url}
+          name={viewingImage.name}
+          onClose={() => setViewingImage(null)}
+        />,
         document.body
       )}
     </div>

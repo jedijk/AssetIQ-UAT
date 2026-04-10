@@ -8,9 +8,13 @@ from fastapi import Depends, HTTPException, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 
-from database import db, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS
+from database import db, client, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS
 
 security = HTTPBearer(auto_error=False)
+
+# Always use production database for user authentication
+# This ensures tokens work across database environments
+AUTH_DB = client["assetiq"]
 
 
 def hash_password(password: str) -> str:
@@ -30,11 +34,16 @@ def create_token(user_id: str) -> str:
 
 
 async def _validate_token(token: str) -> dict:
-    """Internal helper to validate a JWT token and return the user."""
+    """Internal helper to validate a JWT token and return the user.
+    
+    Note: Always validates against the production database to ensure
+    tokens work across database environments (production/UAT).
+    """
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id")
-        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        # Always use AUTH_DB (production) for user lookup
+        user = await AUTH_DB.users.find_one({"id": user_id}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         return user

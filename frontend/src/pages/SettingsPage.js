@@ -10,6 +10,7 @@ import {
   Sliders,
   Brain,
   Server,
+  Database,
   BarChart3,
   ChevronRight,
   ArrowLeft
@@ -75,6 +76,14 @@ const SETTINGS_SECTIONS = [
     description: "System health and diagnostics",
     icon: Server,
     path: "/settings/server-performance",
+    roles: ["owner"]
+  },
+  {
+    id: "database",
+    label: "Database Environment",
+    description: "Switch between Production and UAT",
+    icon: Database,
+    path: "/settings/database",
     roles: ["owner"]
   },
   {

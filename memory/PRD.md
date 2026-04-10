@@ -5,6 +5,68 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+
+### April 10, 2026 - Database Switcher Fix (COMPLETED)
+**BUG FIX - Fixed database switching to actually switch database contexts:**
+
+**Problem:**
+- Database switcher UI existed but Server Performance page always showed `assetiq` instead of `assetiq-UAT`
+- Backend was using a static `db` reference that never changed
+- Auth was validating tokens against the selected database (causing "User not found" errors when switching)
+- Frontend `fetch()` calls weren't including the database environment header
+
+**Solution:**
+1. **Backend `database.py`**: Created `DatabaseProxy` class using Python's `contextvars` for per-request database switching
+2. **Backend `server.py`**: Added `set_database_context` middleware to read `X-Database-Environment` header
+3. **Backend `auth.py`**: Updated to always validate tokens against production database (cross-environment auth)
+4. **Frontend `api.js`**: Added `X-Database-Environment` header to axios interceptor
+5. **Frontend `SettingsServerPerformancePage.js`**: Created `getAuthHeaders()` helper for all fetch calls
+6. **Frontend `SettingsPage.js`**: Added Database Environment to sidebar menu
+
+**Files Modified:**
+- `/app/backend/database.py` - DatabaseProxy + context variables
+- `/app/backend/server.py` - Database context middleware
+- `/app/backend/auth.py` - Production-only token validation
+- `/app/frontend/src/lib/api.js` - X-Database-Environment header
+- `/app/frontend/src/pages/SettingsServerPerformancePage.js` - Auth headers helper
+- `/app/frontend/src/pages/SettingsPage.js` - Sidebar menu entry
+- `/app/frontend/src/pages/SettingsDatabasePage.js` - (Already existed)
+
+**Verification:**
+- Switching to UAT now shows `assetiq-UAT` with 1.58 MB in Server Performance
+- Production shows `assetiq` with 145+ MB
+- Auth works across both environments with same token
+
+---
+
+### April 10, 2026 - Mobile Attachment Auth Fix (IN PROGRESS)
+**Created AuthenticatedMedia components for mobile-compatible file viewing:**
+
+**Problem:**
+- Mobile browsers have issues with `?token=` query params in `<img src>` attributes
+- Form attachments fail to load on mobile devices
+
+**Solution:**
+1. Created `/app/frontend/src/components/AuthenticatedMedia.js`:
+   - `AuthenticatedImage` - Fetches images using Authorization header, converts to blob URL
+   - `AuthenticatedVideo` - Same for videos
+   - `useAuthenticatedMedia` hook - Core fetch logic
+   - `AuthenticatedLightbox` - Full-screen viewer with blob-based loading
+
+2. Updated `DashboardPage.js` and `FormSubmissionsPage.js`:
+   - Replaced `ImageWithFallback` with `AuthenticatedImage` for attachment thumbnails
+   - Replaced inline lightbox with `AuthenticatedLightbox` component
+   - Changed attachment URLs to use `/api/storage/...` paths (no token in URL)
+
+**Files Modified:**
+- `/app/frontend/src/components/AuthenticatedMedia.js` (NEW)
+- `/app/frontend/src/pages/DashboardPage.js` - AuthenticatedLightbox + AuthenticatedImage
+- `/app/frontend/src/pages/FormSubmissionsPage.js` - AuthenticatedLightbox + AuthenticatedImage
+
+**Status:** Components created and integrated, needs mobile testing to verify fix.
+
+---
+
 ### April 10, 2026 - Quick Form View Redesign Fix (COMPLETED)
 **BUG FIX - Fixed Quick Form View dialog rendering errors:**
 

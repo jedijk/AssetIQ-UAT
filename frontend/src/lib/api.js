@@ -31,6 +31,13 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Add database environment header for multi-database support
+  const dbEnv = localStorage.getItem("database_environment");
+  if (dbEnv) {
+    config.headers["X-Database-Environment"] = dbEnv;
+  }
+  
   return config;
 });
 
