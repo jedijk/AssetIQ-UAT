@@ -456,7 +456,7 @@ const Layout = () => {
     { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2, desktopOnly: true, feature: "equipment" },
     { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, feature: "users" },
-    { path: "/settings/preferences", label: "Preferences", icon: Clock },
+    { path: "/settings/preferences", label: "Preferences", icon: Clock, desktopOnly: true },
     { path: "/settings/risk-calculation", label: "Risk Calculation", icon: Sliders, adminOnly: true, desktopOnly: true },
     { path: "/settings/server-performance", label: "Server Performance", icon: Server, ownerOnly: true },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
