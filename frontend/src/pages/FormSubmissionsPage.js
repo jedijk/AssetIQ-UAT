@@ -116,6 +116,79 @@ const ImageWithFallback = ({ src, alt, fallback }) => {
   );
 };
 
+// User Avatar component with photo support
+const UserAvatar = ({ name, photo, size = "sm" }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  
+  const sizeClasses = {
+    xs: "w-5 h-5 text-[8px]",
+    sm: "w-6 h-6 text-[9px]",
+    md: "w-8 h-8 text-xs",
+    lg: "w-10 h-10 text-sm"
+  };
+  
+  const getAvatarColor = (name) => {
+    const colors = [
+      "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500",
+      "bg-pink-500", "bg-teal-500", "bg-indigo-500", "bg-rose-500"
+    ];
+    if (!name) return colors[0];
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
+
+  const getPhotoUrl = () => {
+    if (!photo || imageError) return null;
+    
+    if (photo.startsWith("/api/")) {
+      const token = localStorage.getItem("token");
+      const backendUrl = getBackendUrl();
+      if (token && backendUrl && backendUrl.startsWith('http')) {
+        return `${backendUrl}${photo}?token=${token}`;
+      }
+      return null;
+    }
+    
+    if (photo.startsWith("http")) {
+      return photo;
+    }
+    
+    return null;
+  };
+
+  const photoUrl = getPhotoUrl();
+  const initials = name ? name.charAt(0).toUpperCase() : "?";
+
+  if (photoUrl) {
+    return (
+      <div className="relative">
+        {(!imageLoaded || imageError) && (
+          <div className={`${sizeClasses[size]} ${getAvatarColor(name)} rounded-full flex items-center justify-center text-white font-medium ring-2 ring-white flex-shrink-0 absolute inset-0`}>
+            {initials}
+          </div>
+        )}
+        <img
+          src={photoUrl}
+          alt={name || "User"}
+          className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white flex-shrink-0 ${imageLoaded && !imageError ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setImageLoaded(true)}
+          onError={() => {
+            setImageError(true);
+            setImageLoaded(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${sizeClasses[size]} ${getAvatarColor(name)} rounded-full flex items-center justify-center text-white font-medium ring-2 ring-white flex-shrink-0`}>
+      {initials}
+    </div>
+  );
+};
+
 // Hook to detect mobile
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -625,6 +698,11 @@ export default function FormSubmissionsPage() {
                     <div>
                       <h2 className="text-lg font-semibold text-slate-800">{selectedSubmission.form_template_name}</h2>
                       <div className="flex items-center gap-2 mt-0.5">
+                        <UserAvatar 
+                          name={selectedSubmission.submitted_by_name || "Unknown"} 
+                          photo={selectedSubmission.submitted_by_photo}
+                          size="xs"
+                        />
                         <span className="text-sm text-slate-500">{selectedSubmission.submitted_by_name || "Unknown"}</span>
                         <span className="text-slate-300">•</span>
                         <span className="text-sm text-slate-500">{formatDate(selectedSubmission.submitted_at)}</span>
@@ -645,7 +723,11 @@ export default function FormSubmissionsPage() {
                 {/* Info Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3 border-y border-slate-100">
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-slate-400" />
+                    <UserAvatar 
+                      name={selectedSubmission.submitted_by_name || "Unknown"} 
+                      photo={selectedSubmission.submitted_by_photo}
+                      size="md"
+                    />
                     <div>
                       <p className="text-[10px] text-slate-400 uppercase tracking-wide">Submitted by</p>
                       <p className="text-sm font-medium text-slate-700 mt-0.5">{selectedSubmission.submitted_by_name || "Unknown"}</p>

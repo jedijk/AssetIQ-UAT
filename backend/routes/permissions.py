@@ -22,9 +22,13 @@ DEFAULT_PERMISSIONS = {
         "investigations": {"read": True, "write": True, "delete": True},
         "actions": {"read": True, "write": True, "delete": True},
         "tasks": {"read": True, "write": True, "delete": True},
+        "scheduler": {"read": True, "write": True, "delete": True},
         "forms": {"read": True, "write": True, "delete": True},
         "equipment": {"read": True, "write": True, "delete": True},
         "library": {"read": True, "write": True, "delete": True},
+        "insights": {"read": True, "write": True, "delete": True},
+        "chat": {"read": True, "write": True, "delete": True},
+        "statistics": {"read": True, "write": True, "delete": True},
         "feedback": {"read": True, "write": True, "delete": True},
         "users": {"read": True, "write": True, "delete": True},
         "settings": {"read": True, "write": True, "delete": True},
@@ -34,9 +38,13 @@ DEFAULT_PERMISSIONS = {
         "investigations": {"read": True, "write": True, "delete": True},
         "actions": {"read": True, "write": True, "delete": True},
         "tasks": {"read": True, "write": True, "delete": True},
+        "scheduler": {"read": True, "write": True, "delete": True},
         "forms": {"read": True, "write": True, "delete": True},
         "equipment": {"read": True, "write": True, "delete": False},
         "library": {"read": True, "write": True, "delete": True},
+        "insights": {"read": True, "write": True, "delete": False},
+        "chat": {"read": True, "write": True, "delete": False},
+        "statistics": {"read": True, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": True},
         "users": {"read": True, "write": True, "delete": False},
         "settings": {"read": True, "write": False, "delete": False},
@@ -46,9 +54,13 @@ DEFAULT_PERMISSIONS = {
         "investigations": {"read": True, "write": True, "delete": True},
         "actions": {"read": True, "write": True, "delete": False},
         "tasks": {"read": True, "write": True, "delete": False},
+        "scheduler": {"read": True, "write": True, "delete": False},
         "forms": {"read": True, "write": True, "delete": False},
         "equipment": {"read": True, "write": True, "delete": False},
         "library": {"read": True, "write": True, "delete": False},
+        "insights": {"read": True, "write": True, "delete": False},
+        "chat": {"read": True, "write": True, "delete": False},
+        "statistics": {"read": True, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
         "users": {"read": True, "write": False, "delete": False},
         "settings": {"read": True, "write": False, "delete": False},
@@ -58,9 +70,13 @@ DEFAULT_PERMISSIONS = {
         "investigations": {"read": True, "write": False, "delete": False},
         "actions": {"read": True, "write": True, "delete": False},
         "tasks": {"read": True, "write": True, "delete": False},
+        "scheduler": {"read": True, "write": False, "delete": False},
         "forms": {"read": True, "write": False, "delete": False},
         "equipment": {"read": True, "write": False, "delete": False},
         "library": {"read": True, "write": False, "delete": False},
+        "insights": {"read": True, "write": False, "delete": False},
+        "chat": {"read": True, "write": True, "delete": False},
+        "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
         "users": {"read": False, "write": False, "delete": False},
         "settings": {"read": False, "write": False, "delete": False},
@@ -70,9 +86,13 @@ DEFAULT_PERMISSIONS = {
         "investigations": {"read": True, "write": False, "delete": False},
         "actions": {"read": True, "write": True, "delete": False},
         "tasks": {"read": True, "write": True, "delete": False},
+        "scheduler": {"read": True, "write": False, "delete": False},
         "forms": {"read": True, "write": False, "delete": False},
         "equipment": {"read": True, "write": False, "delete": False},
         "library": {"read": True, "write": False, "delete": False},
+        "insights": {"read": True, "write": False, "delete": False},
+        "chat": {"read": True, "write": True, "delete": False},
+        "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
         "users": {"read": False, "write": False, "delete": False},
         "settings": {"read": False, "write": False, "delete": False},
@@ -82,9 +102,13 @@ DEFAULT_PERMISSIONS = {
         "investigations": {"read": True, "write": False, "delete": False},
         "actions": {"read": True, "write": False, "delete": False},
         "tasks": {"read": True, "write": False, "delete": False},
+        "scheduler": {"read": True, "write": False, "delete": False},
         "forms": {"read": True, "write": False, "delete": False},
         "equipment": {"read": True, "write": False, "delete": False},
         "library": {"read": True, "write": False, "delete": False},
+        "insights": {"read": True, "write": False, "delete": False},
+        "chat": {"read": True, "write": True, "delete": False},
+        "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
         "users": {"read": False, "write": False, "delete": False},
         "settings": {"read": False, "write": False, "delete": False},
@@ -107,10 +131,14 @@ FEATURES = {
     },
     "tasks": {
         "name": "My Tasks",
-        "description": "Task execution and scheduling"
+        "description": "Task execution and completion"
+    },
+    "scheduler": {
+        "name": "Task Scheduler",
+        "description": "Task planning and scheduling"
     },
     "forms": {
-        "name": "Form Designer",
+        "name": "Forms",
         "description": "Form templates and submissions"
     },
     "equipment": {
@@ -120,6 +148,18 @@ FEATURES = {
     "library": {
         "name": "Library",
         "description": "Failure modes and maintenance strategies"
+    },
+    "insights": {
+        "name": "Reliability Insights",
+        "description": "AI-powered reliability analytics and dashboards"
+    },
+    "chat": {
+        "name": "AI Chat",
+        "description": "AI assistant for reliability questions"
+    },
+    "statistics": {
+        "name": "Statistics",
+        "description": "User activity and system usage analytics"
     },
     "feedback": {
         "name": "Feedback",
