@@ -346,6 +346,24 @@ const FormsPage = ({ embedded = false }) => {
   const templates = templatesData?.templates || [];
   const submissions = submissionsData?.submissions || [];
 
+  // Sync selectedTemplate with latest data from templates query
+  // This ensures documents, version, and field updates are reflected when viewing a template
+  useEffect(() => {
+    if (selectedTemplate && templates.length > 0) {
+      const updatedTemplate = templates.find(t => t.id === selectedTemplate.id);
+      if (updatedTemplate) {
+        // Check if anything important changed (version, documents, or fields)
+        const versionChanged = updatedTemplate.version !== selectedTemplate.version;
+        const documentsChanged = JSON.stringify(updatedTemplate.documents) !== JSON.stringify(selectedTemplate.documents);
+        const fieldsChanged = JSON.stringify(updatedTemplate.fields) !== JSON.stringify(selectedTemplate.fields);
+        
+        if (versionChanged || documentsChanged || fieldsChanged) {
+          setSelectedTemplate(updatedTemplate);
+        }
+      }
+    }
+  }, [templates, selectedTemplate]);
+
   // Stats for cards
   const stats = {
     totalTemplates: templates.length,
@@ -746,6 +764,8 @@ const FormsPage = ({ embedded = false }) => {
                             pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== docId),
                             documents: [...(prev.documents || []), result.document]
                           }));
+                          // Invalidate templates query to refresh documents list
+                          queryClient.invalidateQueries({ queryKey: ["form-templates"] });
                           toast.success(t("forms.documentUploaded"));
                         } catch (error) {
                           // Set error state on the pending document (allow retry)
@@ -806,6 +826,8 @@ const FormsPage = ({ embedded = false }) => {
                                 ...prev,
                                 documents: prev.documents?.filter(d => d.id !== doc.id)
                               }));
+                              // Invalidate templates query to refresh documents list
+                              queryClient.invalidateQueries({ queryKey: ["form-templates"] });
                               toast.success("Document deleted");
                             } catch (error) {
                               toast.error("Failed to delete document");
@@ -868,6 +890,8 @@ const FormsPage = ({ embedded = false }) => {
                                   pendingDocuments: prev.pendingDocuments?.filter(d => d.id !== doc.id),
                                   documents: [...(prev.documents || []), result.document]
                                 }));
+                                // Invalidate templates query to refresh documents list
+                                queryClient.invalidateQueries({ queryKey: ["form-templates"] });
                                 toast.success(t("forms.documentUploaded"));
                               } catch (error) {
                                 setNewTemplate(prev => ({
@@ -1427,7 +1451,7 @@ const FormsPage = ({ embedded = false }) => {
           setDocSearchResult(null);
         }
       }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -1517,7 +1541,7 @@ const FormsPage = ({ embedded = false }) => {
                 {previewMode === "desktop" && (
                   <div className="flex justify-center">
                     {/* Desktop Browser Frame */}
-                    <div className="w-full max-w-2xl">
+                    <div className="w-full max-w-3xl">
                       {/* Browser Chrome */}
                       <div className="bg-slate-200 rounded-t-lg px-4 py-2 flex items-center gap-2">
                         <div className="flex gap-1.5">
@@ -1541,7 +1565,7 @@ const FormsPage = ({ embedded = false }) => {
                         </div>
                         
                         {/* Form Fields */}
-                        <div className="p-6 space-y-5 max-h-[400px] overflow-y-auto">
+                        <div className="p-6 space-y-5 max-h-[50vh] overflow-y-auto">
                           {selectedTemplate?.fields?.map((field, idx) => (
                             <div key={idx} className="space-y-2">
                               <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
