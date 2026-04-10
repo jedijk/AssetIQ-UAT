@@ -256,8 +256,8 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
         if request.url.path in ["/health", "/", "/api/health"]:
             return await call_next(request)
         
-        # Use longer timeout for file storage/download endpoints
-        if "/storage/" in request.url.path or "/avatar" in request.url.path:
+        # Use longer timeout for file storage/download endpoints and AI analysis
+        if "/storage/" in request.url.path or "/avatar" in request.url.path or "/ai/" in request.url.path:
             request_timeout = self.long_timeout
         else:
             request_timeout = self.timeout

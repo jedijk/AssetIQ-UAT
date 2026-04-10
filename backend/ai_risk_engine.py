@@ -355,7 +355,7 @@ class AIRiskEngine:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                max_tokens=max_tokens,
+                max_completion_tokens=max_tokens,
                 temperature=temperature
             )
             return response.choices[0].message.content
