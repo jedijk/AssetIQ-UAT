@@ -656,40 +656,52 @@ async def send_approval_result_email(user_email: str, user_name: str, approved: 
 async def forgot_password(request: Request, body: ForgotPasswordRequest):
     """
     Request a password reset. Sends an email with a reset link if the email exists.
-    Always returns success to prevent email enumeration attacks.
+    Returns user_found status to provide feedback to the user.
     """
     # Find user by email
     user = await db.users.find_one({"email": body.email}, {"_id": 0})
     
-    if user:
-        # Generate reset token
-        reset_token = generate_reset_token()
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-        
-        # Store reset token in database
-        await db.password_resets.delete_many({"email": body.email})  # Remove old tokens
-        await db.password_resets.insert_one({
-            "email": body.email,
-            "token": reset_token,
-            "expires_at": expires_at,
-            "created_at": datetime.now(timezone.utc),
-            "used": False
-        })
-        
-        # Send email
-        email_sent = await send_reset_email(
-            email=body.email,
-            reset_token=reset_token,
-            user_name=user.get("name", "User")
-        )
-        
-        if not email_sent:
-            logger.warning(f"Could not send reset email to {body.email}")
+    if not user:
+        # User not found - return feedback
+        return {
+            "status": "not_found",
+            "user_found": False,
+            "message": "No account found with this email address."
+        }
     
-    # Always return success to prevent email enumeration
+    # User exists - generate reset token
+    reset_token = generate_reset_token()
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    # Store reset token in database
+    await db.password_resets.delete_many({"email": body.email})  # Remove old tokens
+    await db.password_resets.insert_one({
+        "email": body.email,
+        "token": reset_token,
+        "expires_at": expires_at,
+        "created_at": datetime.now(timezone.utc),
+        "used": False
+    })
+    
+    # Send email
+    email_sent = await send_reset_email(
+        email=body.email,
+        reset_token=reset_token,
+        user_name=user.get("name", "User")
+    )
+    
+    if not email_sent:
+        logger.warning(f"Could not send reset email to {body.email}")
+        return {
+            "status": "email_error",
+            "user_found": True,
+            "message": "Account found but we couldn't send the email. Please try again later."
+        }
+    
     return {
         "status": "success",
-        "message": "If an account with that email exists, we've sent a password reset link."
+        "user_found": True,
+        "message": "Password reset link sent to your email."
     }
 
 

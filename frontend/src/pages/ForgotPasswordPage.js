@@ -16,17 +16,30 @@ const ForgotPasswordPage = () => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setNotFound(false);
 
     try {
-      await authAPI.forgotPassword(email);
-      setEmailSent(true);
-      toast.success("Reset link sent! Check your email.");
+      const response = await authAPI.forgotPassword(email);
+      
+      if (response.status === "not_found" || response.user_found === false) {
+        // User not found
+        setNotFound(true);
+        toast.error("No account found with this email address.");
+      } else if (response.status === "email_error") {
+        // User found but email failed
+        toast.error("Could not send reset email. Please try again later.");
+      } else {
+        // Success
+        setEmailSent(true);
+        toast.success("Reset link sent! Check your email.");
+      }
     } catch (error) {
-      const message = error.response?.data?.detail || "Failed to send reset email. Please try again.";
+      const message = error.response?.data?.detail || error.response?.data?.message || "Failed to send reset email. Please try again.";
       toast.error(message);
     } finally {
       setLoading(false);
@@ -102,11 +115,22 @@ const ForgotPasswordPage = () => {
                     type="email"
                     placeholder="you@company.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setNotFound(false);
+                    }}
                     required
-                    className="h-11"
+                    className={`h-11 ${notFound ? 'border-red-500 focus:ring-red-500' : ''}`}
                     data-testid="forgot-email-input"
                   />
+                  {notFound && (
+                    <p className="text-sm text-red-600 flex items-center gap-1 mt-1" data-testid="email-not-found-error">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      No account found with this email. Please check and try again.
+                    </p>
+                  )}
                 </div>
 
                 <Button
@@ -125,6 +149,14 @@ const ForgotPasswordPage = () => {
                   )}
                 </Button>
               </form>
+
+              {notFound && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800">
+                    <strong>Need an account?</strong> Contact your administrator to get access to AssetIQ.
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             <div className="email-sent-state">
