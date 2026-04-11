@@ -109,6 +109,55 @@ async def enrich_with_creator_info(items: list) -> list:
     
     return items
 
+
+async def enrich_with_equipment_tags(items: list) -> list:
+    """Add equipment tag to items based on linked_equipment_id or asset name.
+    Uses batch lookup for efficiency."""
+    if not items:
+        return items
+    
+    # Collect equipment IDs and asset names for batch lookup
+    equipment_ids = list(set(item.get("linked_equipment_id") for item in items if item.get("linked_equipment_id")))
+    asset_names = list(set(item.get("asset", "").lower() for item in items if item.get("asset")))
+    
+    if not equipment_ids and not asset_names:
+        return items
+    
+    # Build query for equipment nodes
+    query_conditions = []
+    if equipment_ids:
+        query_conditions.append({"id": {"$in": equipment_ids}})
+    if asset_names:
+        # Case-insensitive name matching
+        query_conditions.append({"name": {"$regex": f"^({'|'.join(asset_names)})$", "$options": "i"}})
+    
+    equipment_nodes = await db.equipment_nodes.find(
+        {"$or": query_conditions} if query_conditions else {},
+        {"_id": 0, "id": 1, "name": 1, "tag": 1}
+    ).to_list(500)
+    
+    # Build lookup maps
+    equipment_by_id = {eq["id"]: eq for eq in equipment_nodes}
+    equipment_by_name = {eq["name"].lower(): eq for eq in equipment_nodes if eq.get("name")}
+    
+    # Enrich items with tags
+    for item in items:
+        tag = None
+        # First try by linked_equipment_id
+        eq_id = item.get("linked_equipment_id")
+        if eq_id and eq_id in equipment_by_id:
+            tag = equipment_by_id[eq_id].get("tag")
+        # Fallback to asset name lookup
+        if not tag:
+            asset_name = (item.get("asset") or "").lower()
+            if asset_name and asset_name in equipment_by_name:
+                tag = equipment_by_name[asset_name].get("tag")
+        
+        item["equipment_tag"] = tag
+    
+    return items
+
+
 @router.get("/threats", response_model=List[ThreatResponse])
 async def get_threats(
     status: Optional[str] = None,
@@ -146,6 +195,9 @@ async def get_threats(
     
     # Enrich with creator info
     threats = await enrich_with_creator_info(threats)
+    
+    # Enrich with equipment tags
+    threats = await enrich_with_equipment_tags(threats)
     
     # Ensure required fields have values and risk_score is int
     for idx, t in enumerate(threats):
@@ -208,6 +260,9 @@ async def get_top_threats(
     
     # Enrich with creator info (name, picture, position)
     threats = await enrich_with_creator_info(threats)
+    
+    # Enrich with equipment tags
+    threats = await enrich_with_equipment_tags(threats)
     
     # Ensure required fields have values and risk_score is int
     for idx, t in enumerate(threats):

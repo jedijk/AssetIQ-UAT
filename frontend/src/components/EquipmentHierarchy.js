@@ -28,6 +28,7 @@ import {
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 // ISO 14224 Level Configuration
 const ISO_LEVEL_CONFIG = {
@@ -270,7 +271,20 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           data-testid={`hierarchy-item-${node.id}`}
         >
           <Icon className={`w-4 h-4 ${critColor || config.color} flex-shrink-0`} />
-          <span className={`text-sm font-medium truncate flex-1 ${isSearchMatch ? 'text-yellow-800' : ''}`}>{node.name}</span>
+          {node.tag ? (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className={`text-sm font-medium truncate flex-1 cursor-default ${isSearchMatch ? 'text-yellow-800' : ''}`}>{node.name}</span>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-slate-800 text-white">
+                  <p className="font-mono text-xs">{node.tag}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <span className={`text-sm font-medium truncate flex-1 ${isSearchMatch ? 'text-yellow-800' : ''}`}>{node.name}</span>
+          )}
           {isSearchMatch && (
             <span className="text-[10px] bg-yellow-200 text-yellow-800 px-1 py-0.5 rounded">Match</span>
           )}

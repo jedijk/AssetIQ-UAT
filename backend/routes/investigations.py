@@ -118,6 +118,14 @@ async def get_investigations(
         inv["lead_picture"] = lead_picture
         inv["lead_name"] = lead_name
         inv["lead_position"] = lead_position
+        
+        # Add equipment tag if asset_name is present
+        if inv.get("asset_name"):
+            equipment = await db.equipment_nodes.find_one(
+                {"name": {"$regex": f"^{inv['asset_name']}$", "$options": "i"}},
+                {"_id": 0, "tag": 1}
+            )
+            inv["equipment_tag"] = equipment.get("tag") if equipment else None
     
     return {"investigations": investigations}
 

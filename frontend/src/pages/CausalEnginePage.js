@@ -879,7 +879,10 @@ export default function CausalEnginePage() {
                       {inv.asset_name && (
                         <div className="flex items-center gap-1.5">
                           <Target className="w-3.5 h-3.5 text-slate-400" />
-                          <span className="truncate max-w-[120px]">{inv.asset_name}</span>
+                          <span className="truncate max-w-[120px]">
+                            {inv.asset_name}
+                            {inv.equipment_tag && <span className="text-slate-400 ml-1">({inv.equipment_tag})</span>}
+                          </span>
                         </div>
                       )}
                       {inv.incident_date && (
@@ -1199,7 +1202,7 @@ export default function CausalEnginePage() {
 
                     {/* Info cards */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {investigation.asset_name && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Target className="w-3 h-3" />Equipment</div><p className="font-medium text-sm">{investigation.asset_name}</p></div>}
+                      {investigation.asset_name && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Target className="w-3 h-3" />Equipment</div><p className="font-medium text-sm">{investigation.asset_name}{investigation.equipment_tag && <span className="text-slate-400 ml-1">({investigation.equipment_tag})</span>}</p></div>}
                       {investigation.location && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><MapPin className="w-3 h-3" />Location</div><p className="font-medium text-sm">{investigation.location}</p></div>}
                       {investigation.incident_date && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Calendar className="w-3 h-3" />Date</div><p className="font-medium text-sm">{formatDate(investigation.incident_date)}</p></div>}
                       {investigation.investigation_leader && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><User className="w-3 h-3" />Lead</div><p className="font-medium text-sm">{investigation.investigation_leader}</p></div>}
