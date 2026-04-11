@@ -351,7 +351,7 @@ class AIRiskEngine:
             logger.info(f"Calling OpenAI with model gpt-4o, max_tokens={max_tokens}")
             client = get_openai_client()
             response = client.chat.completions.create(
-                model="gpt-4o",  # Use gpt-4o instead of gpt-5.2
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
@@ -360,7 +360,6 @@ class AIRiskEngine:
                 temperature=temperature
             )
             content = response.choices[0].message.content
-            logger.info(f"OpenAI response received, length: {len(content) if content else 0}")
             return content
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
@@ -463,8 +462,8 @@ FIELD NOTES (Observer's Additional Context - IMPORTANT):
             safe_equip_type = sanitize_for_ai_prompt(str(equipment_data.get('equipment_type', 'Unknown')), max_length=100)
             safe_discipline = sanitize_for_ai_prompt(str(equipment_data.get('discipline', 'Unknown')), max_length=100)
             safe_description = sanitize_for_ai_prompt(str(equipment_data.get('description', '')), max_length=500)
-            criticality = equipment_data.get('criticality', {})
-            safe_crit_level = sanitize_for_ai_prompt(str(criticality.get('level', 'Unknown')), max_length=50)
+            criticality = equipment_data.get('criticality') or {}
+            safe_crit_level = sanitize_for_ai_prompt(str(criticality.get('level', 'Unknown') if isinstance(criticality, dict) else 'Unknown'), max_length=50)
             
             context += f"""
 EQUIPMENT INFORMATION:
@@ -569,14 +568,16 @@ EQUIPMENT INFORMATION:
             context = self._build_threat_context(threat, equipment_data, historical_threats, equipment_history)
             
             response = self._call_openai(RISK_ANALYSIS_PROMPT, f"Analyze this threat:\n{context}", 'risk_analysis')
-            data = self._parse_json_response(response)
             
-            # Use the threat's actual risk_score for consistency
-            threat_risk_score = threat.get("risk_score", 50)
+            data = self._parse_json_response(response) or {}
             
-            # Build DynamicRiskScore - always use threat's risk score
+            # Use the threat's actual risk_score for consistency, but clamp to 0-100
+            raw_threat_risk_score = threat.get("risk_score", 50)
+            threat_risk_score = max(0, min(100, raw_threat_risk_score if isinstance(raw_threat_risk_score, (int, float)) else 50))
+            
+            # Build DynamicRiskScore - always use threat's risk score (clamped)
             dynamic_risk = DynamicRiskScore(
-                risk_score=threat_risk_score,  # Use threat's actual score, not AI's
+                risk_score=int(threat_risk_score),  # Use threat's actual score, clamped to 0-100
                 failure_probability=data.get("failure_probability", 50.0),
                 time_to_failure_hours=data.get("time_to_failure_hours"),
                 time_to_failure_display=data.get("time_to_failure_display"),
@@ -615,10 +616,13 @@ EQUIPMENT INFORMATION:
         except Exception as e:
             logger.error(f"Risk analysis failed: {e}")
             # Return a default risk insight on error
+            # Clamp risk_score to 0-100 range
+            raw_risk_score = threat.get("risk_score", 50)
+            clamped_risk_score = max(0, min(100, raw_risk_score if isinstance(raw_risk_score, int) else 50))
             return RiskInsight(
                 threat_id=threat.get("id", "unknown"),
                 dynamic_risk=DynamicRiskScore(
-                    risk_score=threat.get("risk_score", 50),
+                    risk_score=clamped_risk_score,
                     failure_probability=50.0,
                     confidence=ConfidenceLevel.LOW,
                     trend=RiskTrend.STABLE,
@@ -714,7 +718,9 @@ EQUIPMENT INFORMATION:
             )
             
         except Exception as e:
+            import traceback
             logger.error(f"Cause generation failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return CausalExplanation(
                 threat_id=threat.get("id", "unknown"),
                 summary="Unable to complete causal analysis",
