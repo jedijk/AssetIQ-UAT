@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI } from "../lib/api";
 import { formAPI } from "../components/forms";
 import { useLanguage } from "../contexts/LanguageContext";
-import { getBackendUrl } from "../lib/apiConfig";
+import { getBackendUrl, getAuthHeaders } from "../lib/apiConfig";
 import { formatDate, formatDateTime } from "../lib/dateUtils";
 import { AuthenticatedImage, useAuthenticatedMedia } from "../components/AuthenticatedMedia";
 import { motion } from "framer-motion";
@@ -515,9 +515,7 @@ export default function DashboardPage() {
     try {
       const apiUrl = getBackendUrl();
       const response = await fetch(`${apiUrl}/api/form-submissions/${submission.id}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: getAuthHeaders(),
       });
       if (response.ok) {
         const fullSubmission = await response.json();

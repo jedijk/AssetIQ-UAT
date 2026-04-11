@@ -334,6 +334,7 @@ class EquipmentNodeCreate(BaseModel):
     parent_id: Optional[str] = None
     equipment_type_id: Optional[str] = None
     description: Optional[str] = None
+    tag: Optional[str] = None  # Equipment tag number (e.g., P-101, HX-201)
     process_step: Optional[str] = None  # Process step mapping (editable at subunit and maintainable_item levels)
 
 class EquipmentNodeUpdate(BaseModel):
@@ -341,6 +342,7 @@ class EquipmentNodeUpdate(BaseModel):
     parent_id: Optional[str] = None
     equipment_type_id: Optional[str] = None
     description: Optional[str] = None
+    tag: Optional[str] = None  # Equipment tag number (e.g., P-101, HX-201)
     process_step: Optional[str] = None  # Process step mapping
 
 class CriticalityAssignment(BaseModel):

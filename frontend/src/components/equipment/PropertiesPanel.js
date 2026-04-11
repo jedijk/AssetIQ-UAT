@@ -73,6 +73,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editTag, setEditTag] = useState("");
   const [showAllTypes, setShowAllTypes] = useState(false);
   const [typeSearchOpen, setTypeSearchOpen] = useState(false);
   const [typeSearchQuery, setTypeSearchQuery] = useState("");
@@ -198,8 +199,8 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   
-  const handleSave = () => { onUpdate(node.id, { name: editName, description: editDesc }); setIsEditing(false); };
-  const startEdit = () => { setEditName(node.name); setEditDesc(node.description || ""); setIsEditing(true); };
+  const handleSave = () => { onUpdate(node.id, { name: editName, description: editDesc, tag: editTag }); setIsEditing(false); };
+  const startEdit = () => { setEditName(node.name); setEditDesc(node.description || ""); setEditTag(node.tag || ""); setIsEditing(true); };
   
   return (
     <div className="h-full flex flex-col" data-testid="properties-panel">
@@ -237,6 +238,15 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
               <Input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Add description..." className="h-8 text-sm" />
             ) : (
               <p className="text-sm text-slate-700">{node.description || <span className="text-slate-400 italic">{t("taskScheduler.noDescription")}</span>}</p>
+            )}
+          </div>
+          
+          <div>
+            <Label className="text-xs text-slate-500 mb-1">{t("common.tag") || "Tag"}</Label>
+            {isEditing ? (
+              <Input value={editTag} onChange={e => setEditTag(e.target.value)} placeholder="Add tag (e.g., P-101, HX-201)..." className="h-8 text-sm" data-testid="edit-tag-input" />
+            ) : (
+              <p className="text-sm text-slate-700">{node.tag || <span className="text-slate-400 italic">No tag</span>}</p>
             )}
           </div>
           

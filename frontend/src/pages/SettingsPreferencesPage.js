@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getBackendUrl } from "../lib/apiConfig";
+import { getBackendUrl, getAuthHeaders } from "../lib/apiConfig";
 import { updateCachedPreferences } from "../lib/dateUtils";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -48,7 +48,7 @@ const API_URL = getBackendUrl();
 const preferencesAPI = {
   getPreferences: async () => {
     const response = await fetch(`${API_URL}/api/users/me/preferences`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error("Failed to fetch preferences");
     return response.json();
@@ -56,10 +56,7 @@ const preferencesAPI = {
   updatePreferences: async (data) => {
     const response = await fetch(`${API_URL}/api/users/me/preferences`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error("Failed to update preferences");
@@ -67,7 +64,7 @@ const preferencesAPI = {
   },
   getTimezones: async () => {
     const response = await fetch(`${API_URL}/api/timezones`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error("Failed to fetch timezones");
     return response.json();

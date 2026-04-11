@@ -1,4 +1,4 @@
-import { getBackendUrl } from '../lib/apiConfig';
+import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -274,7 +274,7 @@ const FormsPage = ({ embedded = false }) => {
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/equipment-hierarchy/search?q=${encodeURIComponent(query)}&limit=10`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        { headers: getAuthHeaders() }
       );
       if (response.ok) {
         const data = await response.json();

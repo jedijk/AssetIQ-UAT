@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { getBackendUrl } from '../lib/apiConfig';
+import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useLanguage } from "../contexts/LanguageContext";
 import { AuthenticatedImage } from "../components/AuthenticatedMedia";
 import { toast } from "sonner";
@@ -358,9 +358,7 @@ const fetchSubmissions = async (filters) => {
   if (filters.hasCritical) params.append("has_critical", "true");
   
   const response = await fetch(`${API_BASE_URL}/api/form-submissions?${params}`, {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
+    headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error("Failed to fetch submissions");
   return response.json();
@@ -369,9 +367,7 @@ const fetchSubmissions = async (filters) => {
 // Fetch single submission
 const fetchSubmission = async (id) => {
   const response = await fetch(`${API_BASE_URL}/api/form-submissions/${id}`, {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
+    headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error("Failed to fetch submission");
   return response.json();
@@ -453,9 +449,7 @@ export default function FormSubmissionsPage() {
     mutationFn: async (submissionId) => {
       const response = await fetch(`${API_BASE_URL}/api/form-submissions/${submissionId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: getAuthHeaders(),
       });
       if (!response.ok) throw new Error("Failed to delete submission");
       return response.json();

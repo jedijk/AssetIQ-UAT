@@ -1,4 +1,4 @@
-import { getBackendUrl } from '../lib/apiConfig';
+import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -74,7 +74,7 @@ const userStatsAPI = {
     let url = `${API_BASE_URL}/api/user-stats/overview?period=${period}`;
     if (roleFilter) url += `&role_filter=${roleFilter}`;
     const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) {
       if (response.status === 403) {
@@ -86,7 +86,7 @@ const userStatsAPI = {
   },
   getTrends: async (period = "30") => {
     const response = await fetch(`${API_BASE_URL}/api/user-stats/trends?period=${period}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch trends");
     return response.json();

@@ -1,4 +1,4 @@
-import { getBackendUrl } from '../lib/apiConfig';
+import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -102,7 +102,7 @@ const myTasksAPI = {
     if (params.discipline) queryParams.append("discipline", params.discipline);
     
     const response = await fetch(`${API_BASE_URL}/api/my-tasks?${queryParams}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch tasks");
     return response.json();
@@ -112,9 +112,13 @@ const myTasksAPI = {
     const formData = new FormData();
     formData.append("file", file);
     
+    // For file uploads, remove Content-Type so browser sets it with boundary
+    const headers = getAuthHeaders();
+    delete headers["Content-Type"];
+    
     const response = await fetch(`${API_BASE_URL}/api/tasks/upload-attachment`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers,
       body: formData
     });
     if (!response.ok) throw new Error("Failed to upload attachment");
@@ -123,7 +127,7 @@ const myTasksAPI = {
   
   getAdhocPlans: async () => {
     const response = await fetch(`${API_BASE_URL}/api/adhoc-plans`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch ad-hoc plans");
     return response.json();
@@ -132,7 +136,7 @@ const myTasksAPI = {
   executeAdhocPlan: async (planId) => {
     const response = await fetch(`${API_BASE_URL}/api/adhoc-plans/${planId}/execute`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -143,7 +147,7 @@ const myTasksAPI = {
   
   getTaskDetail: async (taskId) => {
     const response = await fetch(`${API_BASE_URL}/api/my-tasks/${taskId}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch task details");
     return response.json();
@@ -155,7 +159,7 @@ const myTasksAPI = {
       : `${API_BASE_URL}/api/task-instances/${taskId}/start`;
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to start task");
     return response.json();
@@ -166,10 +170,7 @@ const myTasksAPI = {
       // Complete action via the action endpoint
       const response = await fetch(`${API_BASE_URL}/api/my-tasks/action/${taskId}/complete`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data)
       });
       if (!response.ok) throw new Error("Failed to complete action");
@@ -178,10 +179,7 @@ const myTasksAPI = {
       // Complete task instance
       const response = await fetch(`${API_BASE_URL}/api/task-instances/${taskId}/complete`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data)
       });
       if (!response.ok) throw new Error("Failed to complete task");
@@ -197,7 +195,7 @@ const myTasksAPI = {
     
     const response = await fetch(endpoint, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error(isAction ? "Failed to delete action" : "Failed to delete task");
     return response.json();

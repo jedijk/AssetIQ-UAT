@@ -174,7 +174,7 @@ async def export_equipment_hierarchy_excel(
     
     # Define headers
     headers = [
-        "ID", "Name", "Level", "Parent", "Full Path", "Equipment Type",
+        "ID", "Name", "Tag", "Level", "Parent", "Full Path", "Equipment Type",
         "Discipline", "Process Step", "Description",
         "Safety", "Production", "Environmental", "Reputation", "Total Criticality",
         "Created At"
@@ -241,6 +241,7 @@ async def export_equipment_hierarchy_excel(
         row_data = [
             node.get("id", ""),
             node.get("name", ""),
+            node.get("tag", ""),
             level_label,
             parent_name,
             get_path(node),
@@ -266,8 +267,8 @@ async def export_equipment_hierarchy_excel(
             if col <= 3:
                 cell.fill = row_fill
     
-    # Adjust column widths
-    column_widths = [38, 25, 18, 20, 50, 20, 15, 20, 30, 8, 10, 12, 10, 14, 12]
+    # Adjust column widths (added Tag column)
+    column_widths = [38, 25, 15, 18, 20, 50, 20, 15, 20, 30, 8, 10, 12, 10, 14, 12]
     for col, width in enumerate(column_widths, 1):
         ws.column_dimensions[get_column_letter(col)].width = width
     
@@ -377,6 +378,7 @@ async def create_equipment_node(
         "parent_id": node_data.parent_id,
         "equipment_type_id": node_data.equipment_type_id,
         "description": node_data.description,
+        "tag": node_data.tag,
         "process_step": inherited_process_step,
         "criticality": None,
         "discipline": None,

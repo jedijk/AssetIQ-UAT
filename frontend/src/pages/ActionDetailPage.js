@@ -1,4 +1,4 @@
-import { getBackendUrl } from '../lib/apiConfig';
+import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { compressImage, formatFileSize, getCompressionPercent } from '../lib/imageCompression';
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -135,9 +135,8 @@ export default function ActionDetailPage() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const token = localStorage.getItem("token");
         const response = await fetch(`${API_BASE_URL}/api/rbac/users`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAuthHeaders(),
         });
         if (response.ok) {
           const data = await response.json();

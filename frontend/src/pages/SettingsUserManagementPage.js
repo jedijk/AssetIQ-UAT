@@ -1,4 +1,4 @@
-import { getBackendUrl } from '../lib/apiConfig';
+import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -108,7 +108,7 @@ const rbacAPI = {
     if (params.is_active !== undefined) queryParams.append("is_active", params.is_active);
     
     const response = await fetch(`${getApiBaseUrl()}/api/rbac/users?${queryParams}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch users");
     return response.json();
@@ -116,7 +116,7 @@ const rbacAPI = {
   
   getPendingUsers: async () => {
     const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/pending`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch pending users");
     return response.json();
@@ -125,10 +125,7 @@ const rbacAPI = {
   approveUser: async ({ userId, action, role, rejectionReason, assignedInstallations }) => {
     const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/approve`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ 
         action, 
         role,
@@ -142,7 +139,7 @@ const rbacAPI = {
   
   getRoles: async () => {
     const response = await fetch(`${getApiBaseUrl()}/api/rbac/roles`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch roles");
     return response.json();
@@ -151,10 +148,7 @@ const rbacAPI = {
   updateUserRole: async ({ userId, role }) => {
     const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/role`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ role })
     });
     if (!response.ok) throw new Error("Failed to update role");
@@ -164,10 +158,7 @@ const rbacAPI = {
   updateUserStatus: async ({ userId, isActive }) => {
     const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/status`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ is_active: isActive })
     });
     if (!response.ok) throw new Error("Failed to update status");
@@ -177,10 +168,7 @@ const rbacAPI = {
   updateUserProfile: async ({ userId, data }) => {
     const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/profile`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error("Failed to update profile");
@@ -191,11 +179,13 @@ const rbacAPI = {
     const formData = new FormData();
     formData.append("file", file);
     
+    // For file uploads, we need to remove Content-Type so browser sets it with boundary
+    const headers = getAuthHeaders();
+    delete headers["Content-Type"];
+    
     const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/avatar`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers,
       body: formData
     });
     if (!response.ok) {
@@ -206,9 +196,8 @@ const rbacAPI = {
   },
   
   getUserAvatar: async (userId) => {
-    const token = localStorage.getItem("token");
-    const response = await fetch(`${getApiBaseUrl()}/api/users/${userId}/avatar?token=${token}`, {
-      headers: { Authorization: `Bearer ${token}` }
+    const response = await fetch(`${getApiBaseUrl()}/api/users/${userId}/avatar`, {
+      headers: getAuthHeaders()
     });
     if (!response.ok) return null;
     const blob = await response.blob();
@@ -218,9 +207,7 @@ const rbacAPI = {
   deleteUser: async (userId) => {
     const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}`, {
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      }
+      headers: getAuthHeaders()
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
@@ -238,10 +225,7 @@ const rbacAPI = {
       
       const response = await fetch(`${getApiBaseUrl()}/api/auth/admin-reset-password`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ user_id: userId })
       });
       
@@ -396,7 +380,7 @@ const SettingsUserManagementPage = () => {
     queryKey: ["all-installations"],
     queryFn: async () => {
       const response = await fetch(`${getApiBaseUrl()}/api/equipment-hierarchy/installations`, {
-        headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+        headers: getAuthHeaders()
       });
       return response.json();
     },
@@ -408,7 +392,7 @@ const SettingsUserManagementPage = () => {
     queryKey: ["threats-for-locations"],
     queryFn: async () => {
       const response = await fetch(`${getApiBaseUrl()}/api/threats`, {
-        headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+        headers: getAuthHeaders()
       });
       return response.json();
     },
@@ -538,9 +522,7 @@ const SettingsUserManagementPage = () => {
     mutationFn: async (userId) => {
       const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/reset-intro`, {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
-        }
+        headers: getAuthHeaders()
       });
       if (!response.ok) {
         const error = await response.json();
@@ -561,10 +543,7 @@ const SettingsUserManagementPage = () => {
     mutationFn: async (userData) => {
       const response = await fetch(`${getApiBaseUrl()}/api/users/create`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(userData)
       });
       if (!response.ok) {

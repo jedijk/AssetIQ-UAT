@@ -1,4 +1,4 @@
-import { getBackendUrl } from '../lib/apiConfig';
+import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -82,7 +82,7 @@ const taskAPI = {
     if (params.discipline) queryParams.append("discipline", params.discipline);
     if (params.search) queryParams.append("search", params.search);
     const response = await fetch(`${API_BASE_URL}/api/task-templates?${queryParams}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch templates");
     return response.json();
@@ -90,10 +90,7 @@ const taskAPI = {
   createTemplate: async (data) => {
     const response = await fetch(`${API_BASE_URL}/api/task-templates`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error("Failed to create template");
@@ -102,7 +99,7 @@ const taskAPI = {
   deleteTemplate: async (id) => {
     const response = await fetch(`${API_BASE_URL}/api/task-templates/${id}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -113,10 +110,7 @@ const taskAPI = {
   updateTemplate: async (id, data) => {
     const response = await fetch(`${API_BASE_URL}/api/task-templates/${id}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!response.ok) {
@@ -131,7 +125,7 @@ const taskAPI = {
     const queryParams = new URLSearchParams();
     if (params.equipment_id) queryParams.append("equipment_id", params.equipment_id);
     const response = await fetch(`${API_BASE_URL}/api/task-plans?${queryParams}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch plans");
     return response.json();
@@ -139,10 +133,7 @@ const taskAPI = {
   createPlan: async (data) => {
     const response = await fetch(`${API_BASE_URL}/api/task-plans`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!response.ok) {
@@ -154,7 +145,7 @@ const taskAPI = {
   deletePlan: async (id) => {
     const response = await fetch(`${API_BASE_URL}/api/task-plans/${id}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -165,10 +156,7 @@ const taskAPI = {
   updatePlan: async (id, data) => {
     const response = await fetch(`${API_BASE_URL}/api/task-plans/${id}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!response.ok) {
@@ -185,7 +173,7 @@ const taskAPI = {
     if (params.status) queryParams.append("status", params.status);
     if (params.plan_id) queryParams.append("plan_id", params.plan_id);
     const response = await fetch(`${API_BASE_URL}/api/task-instances?${queryParams}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch instances");
     return response.json();
@@ -193,7 +181,7 @@ const taskAPI = {
   getCalendar: async (startDate, endDate) => {
     const response = await fetch(
       `${API_BASE_URL}/api/task-instances/calendar?start_date=${startDate}&end_date=${endDate}`,
-      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }}
+      { headers: getAuthHeaders() }
     );
     if (!response.ok) throw new Error("Failed to fetch calendar");
     return response.json();
@@ -201,7 +189,7 @@ const taskAPI = {
   startInstance: async (id) => {
     const response = await fetch(`${API_BASE_URL}/api/task-instances/${id}/start`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to start task");
     return response.json();
@@ -209,10 +197,7 @@ const taskAPI = {
   completeInstance: async ({ id, data }) => {
     const response = await fetch(`${API_BASE_URL}/api/task-instances/${id}/complete`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error("Failed to complete task");
@@ -221,7 +206,7 @@ const taskAPI = {
   generateInstances: async () => {
     const response = await fetch(`${API_BASE_URL}/api/tasks/generate-all`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to generate instances");
     return response.json();
@@ -229,14 +214,14 @@ const taskAPI = {
   deleteInstance: async (id) => {
     const response = await fetch(`${API_BASE_URL}/api/task-instances/${id}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to delete execution");
     return response.json();
   },
   getStats: async () => {
     const response = await fetch(`${API_BASE_URL}/api/tasks/stats`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch stats");
     return response.json();

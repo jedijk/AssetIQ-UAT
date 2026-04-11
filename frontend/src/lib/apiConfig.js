@@ -98,3 +98,48 @@ export const getApiUrl = () => {
 
 // Export as default for convenience
 export default getBackendUrl;
+
+/**
+ * Get standard auth headers including database environment for fetch() calls.
+ * Use this for any raw fetch() calls to ensure database switching works.
+ * 
+ * @param {Object} additionalHeaders - Additional headers to merge
+ * @returns {Object} Headers object with Authorization and X-Database-Environment
+ */
+export const getAuthHeaders = (additionalHeaders = {}) => {
+  const token = localStorage.getItem("token");
+  const dbEnv = localStorage.getItem("database_environment");
+  
+  const headers = {
+    "Content-Type": "application/json",
+    ...additionalHeaders
+  };
+  
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  
+  if (dbEnv) {
+    headers["X-Database-Environment"] = dbEnv;
+  }
+  
+  return headers;
+};
+
+/**
+ * Wrapper for fetch() that automatically includes auth and database headers.
+ * Drop-in replacement for fetch() in authenticated API calls.
+ * 
+ * @param {string} url - The URL to fetch
+ * @param {Object} options - Fetch options (method, body, etc.)
+ * @returns {Promise<Response>} Fetch response
+ */
+export const authFetch = async (url, options = {}) => {
+  const headers = getAuthHeaders(options.headers || {});
+  
+  return fetch(url, {
+    ...options,
+    headers
+  });
+};
+

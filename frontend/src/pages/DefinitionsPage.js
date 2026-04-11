@@ -1,4 +1,4 @@
-import { getBackendUrl } from '../lib/apiConfig';
+import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Sliders, AlertTriangle, BarChart2, Eye, Info, Building2, Check, Pencil, RotateCcw, Save, X, Gauge, ArrowLeft } from "lucide-react";
@@ -159,7 +159,7 @@ const CriticalityTable = ({ data, isEditing, onUpdateRow, t }) => {
 const definitionsAPI = {
   getInstallations: async () => {
     const response = await fetch(`${API_BASE_URL}/api/definitions/installations`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch installations");
     return response.json();
@@ -167,7 +167,7 @@ const definitionsAPI = {
   
   getDefinitions: async (equipmentId) => {
     const response = await fetch(`${API_BASE_URL}/api/definitions/equipment/${equipmentId}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch definitions");
     return response.json();
@@ -175,7 +175,7 @@ const definitionsAPI = {
   
   getDefaults: async () => {
     const response = await fetch(`${API_BASE_URL}/api/definitions/defaults`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to fetch defaults");
     return response.json();
@@ -184,10 +184,7 @@ const definitionsAPI = {
   saveDefinitions: async ({ equipmentId, severity, occurrence, detection, criticality }) => {
     const response = await fetch(`${API_BASE_URL}/api/definitions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         equipment_id: equipmentId,
         severity,
@@ -203,7 +200,7 @@ const definitionsAPI = {
   resetDefinitions: async (equipmentId) => {
     const response = await fetch(`${API_BASE_URL}/api/definitions/${equipmentId}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error("Failed to reset definitions");
     return response.json();

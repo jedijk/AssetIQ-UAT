@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { equipmentHierarchyAPI } from "../lib/api";
-import { getBackendUrl } from "../lib/apiConfig";
+import { getBackendUrl, getAuthHeaders } from "../lib/apiConfig";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -346,7 +346,12 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
               <LevelIcon className={`w-4 h-4 ${critColors?.text || "text-slate-600"}`} />
             </div>
             
-            <span className={`flex-1 text-sm font-medium truncate ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>{node.name}</span>
+            <div className="flex-1 min-w-0 flex items-center gap-2">
+              <span className={`text-sm font-medium truncate ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>{node.name}</span>
+              {node.tag && (
+                <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-mono shrink-0">{node.tag}</span>
+              )}
+            </div>
             
             {isDragOver && dropPosition === "child" && (
               <span className="text-xs text-blue-600 font-medium">Drop as child</span>
@@ -958,7 +963,7 @@ export default function EquipmentManagerPage() {
     setIsExporting(true);
     try {
       const response = await fetch(`${getBackendUrl()}/api/equipment-hierarchy/export`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: getAuthHeaders()
       });
       if (!response.ok) throw new Error('Export failed');
       const blob = await response.blob();
