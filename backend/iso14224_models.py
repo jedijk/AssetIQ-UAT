@@ -16,6 +16,8 @@ class ISOLevel(str, Enum):
     UNIT = "unit"                      # Maps to PLANT_UNIT
     SYSTEM = "system"                  # Maps to SECTION_SYSTEM
     EQUIPMENT = "equipment"            # Maps to EQUIPMENT_UNIT
+    PLANT = "plant"                    # Legacy alias for PLANT_UNIT
+    SECTION = "section"                # Legacy alias for SECTION_SYSTEM
 
 # ISO 14224 Level hierarchy order (parent -> child relationships)
 ISO_LEVEL_ORDER = [
@@ -31,7 +33,9 @@ ISO_LEVEL_ORDER = [
 LEGACY_LEVEL_MAP = {
     "unit": "plant_unit",
     "system": "section_system",
-    "equipment": "equipment_unit"
+    "equipment": "equipment_unit",
+    "plant": "plant_unit",
+    "section": "section_system"
 }
 
 # Display labels for ISO 14224 levels
@@ -45,7 +49,9 @@ ISO_LEVEL_LABELS = {
     # Legacy level labels
     ISOLevel.UNIT: "Plant/Unit",
     ISOLevel.SYSTEM: "Section/System",
-    ISOLevel.EQUIPMENT: "Equipment Unit"
+    ISOLevel.EQUIPMENT: "Equipment Unit",
+    ISOLevel.PLANT: "Plant/Unit",
+    ISOLevel.SECTION: "Section/System"
 }
 
 def normalize_level(level: ISOLevel) -> ISOLevel:
@@ -56,6 +62,10 @@ def normalize_level(level: ISOLevel) -> ISOLevel:
         return ISOLevel.SECTION_SYSTEM
     if level == ISOLevel.EQUIPMENT:
         return ISOLevel.EQUIPMENT_UNIT
+    if level == ISOLevel.PLANT:
+        return ISOLevel.PLANT_UNIT
+    if level == ISOLevel.SECTION:
+        return ISOLevel.SECTION_SYSTEM
     return level
 
 def get_valid_parent_level(level: ISOLevel) -> Optional[ISOLevel]:
