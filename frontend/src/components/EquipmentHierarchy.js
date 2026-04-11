@@ -97,27 +97,44 @@ function buildTreeData(nodes, parentId = null) {
     }));
 }
 
-// Get threat count per equipment node
+// Get threat count per equipment node - uses linked_equipment_id for accurate matching
 function getThreatCountByAsset(threats) {
-  const countMap = new Map();
+  const countByName = new Map();
+  const countById = new Map();
+  
   threats.forEach(threat => {
+    // Primary: count by linked_equipment_id (accurate)
+    if (threat.linked_equipment_id) {
+      countById.set(threat.linked_equipment_id, (countById.get(threat.linked_equipment_id) || 0) + 1);
+    }
+    // Fallback: count by asset name (for older threats without linked_equipment_id)
     const asset = threat.asset;
     if (asset) {
-      countMap.set(asset, (countMap.get(asset) || 0) + 1);
+      countByName.set(asset, (countByName.get(asset) || 0) + 1);
     }
   });
-  return countMap;
+  
+  return { countByName, countById };
 }
 
 // Get cumulative threat count for a node and all its descendants
-function getCumulativeThreatCount(node, threatCountMap) {
-  let count = threatCountMap.get(node.name) || 0;
+function getCumulativeThreatCount(node, threatCounts) {
+  const { countByName, countById } = threatCounts;
+  // Prefer ID-based count, fallback to name-based
+  let count = countById.get(node.id) || countByName.get(node.name) || 0;
   if (node.children && node.children.length > 0) {
     node.children.forEach(child => {
-      count += getCumulativeThreatCount(child, threatCountMap);
+      count += getCumulativeThreatCount(child, threatCounts);
     });
   }
   return count;
+}
+
+// Get direct threat count for a specific node (not cumulative)
+function getDirectThreatCount(node, threatCounts) {
+  const { countByName, countById } = threatCounts;
+  // Prefer ID-based count, fallback to name-based only if no ID match
+  return countById.get(node.id) || 0;
 }
 
 // Tree node component
@@ -719,8 +736,8 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
         return !filterLevel || node.level === filterLevel;
       })
       .map(node => {
-        // Only show direct threat count for this specific node
-        const threatCount = threatCountByAsset.get(node.name) || 0;
+        // Only show direct threat count for this specific node (by ID, not name)
+        const threatCount = getDirectThreatCount(node, threatCountByAsset);
         const isSearchMatch = searchQuery && matchingIds.has(node.id);
         return (
           <TreeNode

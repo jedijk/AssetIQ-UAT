@@ -88,6 +88,8 @@ class ThreatResponse(BaseModel):
     # User context from chat
     user_context: Optional[str] = None
     context_added_at: Optional[str] = None
+    # Equipment tag (from hierarchy)
+    equipment_tag: Optional[str] = None
 
 
 class ThreatUpdate(BaseModel):
