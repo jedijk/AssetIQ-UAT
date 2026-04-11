@@ -5,6 +5,46 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 11, 2026 - Bulk Excel Import Feature (COMPLETED)
+**FEATURE - Added bulk Excel import for equipment hierarchy:**
+
+**Implemented:**
+1. **Backend API** (`/app/backend/routes/equipment/equipment_import.py`):
+   - `POST /api/equipment-hierarchy/import-excel` endpoint
+   - Accepts FormData with Excel file + installation_id
+   - Parses ISO 14224 levels sequentially
+   - Updates existing nodes with tags if match by name+parent
+   - Creates new nodes where missing
+   - Returns created/updated/skipped counts
+
+2. **Frontend UI** (`/app/frontend/src/pages/EquipmentManagerPage.js`):
+   - Added "Import Excel" button in toolbar (admin/owner only)
+   - Import Excel Hierarchy dialog with:
+     - Installation selector dropdown
+     - File upload input
+     - Expected columns documentation
+   - Real-time import progress feedback
+
+3. **Translations** (`/app/frontend/src/contexts/LanguageContext.js`):
+   - Added English and Dutch translations for import dialog
+
+4. **ISO 14224 Level Support** (`/app/backend/iso14224_models.py`):
+   - Added legacy level aliases: `plant`, `section` for backward compatibility
+   - Updated `normalize_level()` function
+   - Updated `ISO_LEVEL_LABELS` mapping
+
+**Import Script** (`/app/backend/scripts/import_equipment.py`):
+- Standalone script for command-line bulk imports
+- Successfully imported 274 equipment nodes for Tyromer installation
+
+---
+
+### April 11, 2026 - Version Update + Translation Fix (COMPLETED)
+- Updated app version to 3.0.0
+- Added `common.tag` translation for English and Dutch
+
+---
+
 
 ### April 10, 2026 - Database Switcher Fix (COMPLETED)
 **BUG FIX - Fixed database switching to actually switch database contexts:**

@@ -539,6 +539,11 @@ export default function EquipmentManagerPage() {
   const [newNode, setNewNode] = useState({ name: "", level: "installation", parent_id: null });
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
+  // State for Excel hierarchy import
+  const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
+  const [excelImportFile, setExcelImportFile] = useState(null);
+  const [excelImportInstallation, setExcelImportInstallation] = useState("");
+  const [isImportingExcel, setIsImportingExcel] = useState(false);
   // State for assigning unstructured items with level selection
   const [assignDialog, setAssignDialog] = useState({ open: false, item: null, parentNode: null, selectedLevel: "" });
   // State for move mode (legacy - kept for compatibility but not actively used with drag-drop)
@@ -990,6 +995,52 @@ export default function EquipmentManagerPage() {
     }
   };
 
+  // Import Excel hierarchy
+  const handleExcelImport = async () => {
+    if (!excelImportFile || !excelImportInstallation) {
+      toast.error("Please select a file and installation");
+      return;
+    }
+    
+    setIsImportingExcel(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', excelImportFile);
+      formData.append('installation_id', excelImportInstallation);
+      
+      const headers = getAuthHeaders();
+      delete headers['Content-Type']; // Let browser set it for FormData
+      
+      const response = await fetch(`${getBackendUrl()}/api/equipment-hierarchy/import-excel`, {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Import failed');
+      }
+      
+      toast.success(`Import complete: ${data.created_count} created, ${data.updated_count} updated`);
+      queryClient.invalidateQueries(["equipment-hierarchy"]);
+      setIsExcelImportOpen(false);
+      setExcelImportFile(null);
+      setExcelImportInstallation("");
+    } catch (error) {
+      console.error("Excel import error:", error);
+      toast.error(error.message || "Failed to import Excel file");
+    } finally {
+      setIsImportingExcel(false);
+    }
+  };
+
+  // Get installations for import dropdown
+  const installations = useMemo(() => {
+    return nodes.filter(n => n.level === "installation");
+  }, [nodes]);
+
   if (isLoading) return <div className="flex items-center justify-center h-[calc(100vh-64px)]"><div className="loading-dots"><span></span><span></span><span></span></div></div>;
 
   // Filter rows - show matching nodes and their parents (for tree structure)
@@ -1057,6 +1108,11 @@ export default function EquipmentManagerPage() {
         {/* Toolbar */}
         <div className="px-4 py-2 border-b border-slate-200 bg-white flex items-center gap-2 flex-wrap">
           <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
+          {(isOwner || user?.role === "admin") && installations.length > 0 && (
+            <Button onClick={() => setIsExcelImportOpen(true)} size="sm" variant="outline" data-testid="import-excel-btn">
+              <FileText className="w-4 h-4 mr-1" />{t("equipment.importExcel") || "Import Excel"}
+            </Button>
+          )}
           <Button onClick={handleExportExcel} size="sm" variant="outline" disabled={isExporting || nodes.length === 0} data-testid="export-excel-btn">
             <Download className="w-4 h-4 mr-1" />{isExporting ? (t("common.exporting") || "Exporting...") : (t("equipment.exportExcel") || "Export Excel")}
           </Button>
@@ -1190,6 +1246,71 @@ export default function EquipmentManagerPage() {
             </div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setIsImportOpen(false)}>{t("common.cancel")}</Button><Button onClick={() => parseListMutation.mutate({ content: importText, source: "paste" })} disabled={!importText.trim() || parseListMutation.isPending} data-testid="parse-list-btn">{parseListMutation.isPending ? t("common.parsing") : t("equipment.parseList")}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Excel Hierarchy Import Dialog */}
+      <Dialog open={isExcelImportOpen} onOpenChange={(open) => { if (!open) { setExcelImportFile(null); setExcelImportInstallation(""); } setIsExcelImportOpen(open); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("equipment.importExcelHierarchy") || "Import Excel Hierarchy"}</DialogTitle>
+            <DialogDescription>
+              {t("equipment.importExcelDescription") || "Upload an Excel file with equipment hierarchy data. The file should have columns: ID (tag), Name, Level, and optionally Equipment Type, Description, and criticality scores."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>{t("equipment.selectInstallation") || "Select Installation"}</Label>
+              <Select value={excelImportInstallation} onValueChange={setExcelImportInstallation}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder={t("equipment.selectInstallation") || "Select installation..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {installations.map(inst => (
+                    <SelectItem key={inst.id} value={inst.id}>
+                      {inst.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{t("equipment.selectFile") || "Select Excel File"}</Label>
+              <div className="mt-1">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => setExcelImportFile(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  data-testid="excel-import-file-input"
+                />
+              </div>
+              {excelImportFile && (
+                <p className="text-sm text-green-600 mt-1">Selected: {excelImportFile.name}</p>
+              )}
+            </div>
+            <div className="bg-slate-50 p-3 rounded-md text-sm text-slate-600">
+              <p className="font-medium mb-1">{t("equipment.expectedColumns") || "Expected columns:"}</p>
+              <ul className="list-disc list-inside space-y-0.5 text-xs">
+                <li><strong>ID</strong> or <strong>Tag</strong> - Equipment identifier</li>
+                <li><strong>Name</strong> - Display name</li>
+                <li><strong>Level</strong> - Plant/Unit, Section/System, Equipment Unit, Subunit, or Maintainable Item</li>
+                <li><strong>Equipment Type</strong> (optional) - Type classification</li>
+                <li><strong>Description</strong> (optional) - Equipment description</li>
+                <li><strong>Safety, Production, Environmental, Reputation</strong> (optional) - Criticality scores 0-5</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExcelImportOpen(false)}>{t("common.cancel")}</Button>
+            <Button 
+              onClick={handleExcelImport} 
+              disabled={!excelImportFile || !excelImportInstallation || isImportingExcel}
+              data-testid="import-excel-submit-btn"
+            >
+              {isImportingExcel ? (t("common.importing") || "Importing...") : (t("equipment.import") || "Import")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

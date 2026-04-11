@@ -1,12 +1,13 @@
 """
 Equipment Hierarchy Import operations.
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from datetime import datetime, timezone
 import uuid
 import io
 import logging
+import pandas as pd
 from database import db
 from auth import get_current_user
 from iso14224_models import (
@@ -337,6 +338,198 @@ class ExcelHierarchyImportRequest(BaseModel):
     installation_id: str
     excel_url: str
     replace_existing: bool = True
+
+
+# ISO 14224 Level mapping for file imports
+ISO_LEVEL_MAPPING = {
+    "Plant/Unit": "plant_unit",
+    "Section/System": "section_system",
+    "Equipment Unit": "equipment_unit",
+    "Subunit": "subunit",
+    "Maintainable Item": "maintainable_item",
+}
+
+# Level hierarchy order
+ISO_LEVEL_ORDER = ["plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"]
+
+
+@router.post("/equipment-hierarchy/import-excel")
+async def import_excel_file(
+    file: UploadFile = File(...),
+    installation_id: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Import equipment hierarchy from an uploaded Excel file.
+    
+    The Excel file should have columns:
+    - ID: Tag/identifier for the equipment (required)
+    - Name: Display name (required)
+    - Level: ISO 14224 level (Plant/Unit, Section/System, Equipment Unit, Subunit, Maintainable Item) (required)
+    - Parent: (optional) - If not provided, hierarchy is inferred from sequential order
+    - Equipment Type: Type of equipment (optional)
+    - Description: Description text (optional)
+    - Safety, Production, Environmental, Reputation: Criticality scores 0-5 (optional)
+    """
+    import pandas as pd
+    
+    if current_user.get("role") not in ["admin", "owner"]:
+        raise HTTPException(status_code=403, detail="Admin or Owner access required")
+    
+    # Get the installation
+    if not installation_id:
+        raise HTTPException(status_code=400, detail="installation_id is required")
+    
+    installation = await db.equipment_nodes.find_one({
+        "id": installation_id,
+        "level": "installation"
+    })
+    if not installation:
+        raise HTTPException(status_code=404, detail="Installation not found")
+    
+    # Read the Excel file
+    try:
+        content = await file.read()
+        df = pd.read_excel(io.BytesIO(content))
+    except Exception as e:
+        logger.error(f"Failed to read Excel file: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to read Excel file: {str(e)}")
+    
+    # Get existing nodes for deduplication
+    existing_nodes = await db.equipment_nodes.find(
+        {"installation_id": installation_id},
+        {"_id": 0, "id": 1, "name": 1, "tag": 1, "parent_id": 1, "level": 1}
+    ).to_list(10000)
+    
+    nodes_by_tag = {n.get("tag"): n for n in existing_nodes if n.get("tag")}
+    nodes_by_name_parent = {(n.get("name", "").lower(), n.get("parent_id")): n for n in existing_nodes}
+    
+    # Track parent at each level for sequential hierarchy inference
+    current_parents = {
+        -1: {"id": installation_id, "name": installation.get("name")}
+    }
+    
+    # Determine column names
+    id_col = 'ID' if 'ID' in df.columns else 'Tag' if 'Tag' in df.columns else None
+    name_col = 'Name' if 'Name' in df.columns else 'Line Item Name' if 'Line Item Name' in df.columns else None
+    
+    if not name_col:
+        raise HTTPException(status_code=400, detail="Excel file must have a 'Name' or 'Line Item Name' column")
+    
+    # Stats
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
+    errors = []
+    
+    # Process rows
+    rows = df.to_dict('records')
+    for idx, row in enumerate(rows):
+        try:
+            tag = str(row.get(id_col, '')).strip() if id_col and pd.notna(row.get(id_col)) else None
+            name = str(row.get(name_col, '')).strip() if pd.notna(row.get(name_col)) else None
+            level_str = str(row.get('Level', '')).strip() if pd.notna(row.get('Level')) else None
+            description = str(row.get('Description', '')).strip() if pd.notna(row.get('Description')) else None
+            equipment_type = str(row.get('Equipment Type', '')).strip() if pd.notna(row.get('Equipment Type')) else None
+            
+            # Skip rows without valid level
+            iso_level = ISO_LEVEL_MAPPING.get(level_str) if level_str else None
+            if not iso_level:
+                continue
+            
+            # Skip rows without name
+            if not name:
+                continue
+            
+            # Use tag as name if tag exists but name is empty
+            if not name and tag:
+                name = tag
+            
+            # Calculate criticality if scores provided
+            criticality = None
+            safety = int(row.get('Safety') or 0) if pd.notna(row.get('Safety')) else 0
+            production = int(row.get('Production') or 0) if pd.notna(row.get('Production')) else 0
+            environmental = int(row.get('Environmental') or 0) if pd.notna(row.get('Environmental')) else 0
+            reputation = int(row.get('Reputation') or 0) if pd.notna(row.get('Reputation')) else 0
+            
+            if safety > 0 or production > 0 or environmental > 0 or reputation > 0:
+                criticality = calculate_criticality_from_excel(safety, production, environmental, reputation)
+            
+            # Determine parent from level hierarchy
+            level_idx = ISO_LEVEL_ORDER.index(iso_level)
+            parent_level_idx = level_idx - 1
+            
+            if parent_level_idx not in current_parents:
+                skipped_count += 1
+                continue
+            
+            parent_id = current_parents[parent_level_idx]["id"]
+            
+            # Check if exists by tag
+            if tag and tag in nodes_by_tag:
+                existing = nodes_by_tag[tag]
+                current_parents[level_idx] = existing
+                skipped_count += 1
+                continue
+            
+            # Check if exists by name + parent
+            lookup_key = (name.lower(), parent_id)
+            if lookup_key in nodes_by_name_parent:
+                existing = nodes_by_name_parent[lookup_key]
+                # Update with tag if missing
+                if tag and not existing.get("tag"):
+                    update_data = {"tag": tag, "updated_at": datetime.now(timezone.utc).isoformat()}
+                    if description:
+                        update_data["description"] = description
+                    if criticality:
+                        update_data["criticality"] = criticality
+                    await db.equipment_nodes.update_one({"id": existing["id"]}, {"$set": update_data})
+                    updated_count += 1
+                current_parents[level_idx] = existing
+                if tag:
+                    nodes_by_tag[tag] = existing
+                continue
+            
+            # Create new node
+            node_id = str(uuid.uuid4())
+            node_doc = {
+                "id": node_id,
+                "name": name,
+                "level": iso_level,
+                "parent_id": parent_id,
+                "installation_id": installation_id,
+                "tag": tag,
+                "equipment_type": equipment_type,
+                "description": description,
+                "criticality": criticality,
+                "created_by": current_user["id"],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            await db.equipment_nodes.insert_one(node_doc)
+            node_doc.pop("_id", None)
+            
+            current_parents[level_idx] = node_doc
+            if tag:
+                nodes_by_tag[tag] = node_doc
+            nodes_by_name_parent[(name.lower(), parent_id)] = node_doc
+            created_count += 1
+            
+        except Exception as e:
+            errors.append(f"Row {idx + 2}: {str(e)}")
+            logger.error(f"Error processing row {idx + 2}: {e}")
+    
+    return {
+        "success": True,
+        "installation_id": installation_id,
+        "installation_name": installation.get("name"),
+        "created_count": created_count,
+        "updated_count": updated_count,
+        "skipped_count": skipped_count,
+        "errors": errors[:10] if errors else [],
+        "message": f"Import complete: {created_count} created, {updated_count} updated, {skipped_count} skipped"
+    }
 
 
 @router.post("/equipment/import-hierarchy-excel")
