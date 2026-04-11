@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { ScrollArea } from "../components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -347,9 +348,19 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
             </div>
             
             <div className="flex-1 min-w-0 flex items-center gap-2">
-              <span className={`text-sm font-medium truncate ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>{node.name}</span>
-              {node.tag && (
-                <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-mono shrink-0">{node.tag}</span>
+              {node.tag ? (
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={`text-sm font-medium truncate cursor-default ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>{node.name}</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-slate-800 text-white">
+                      <p className="font-mono text-xs">{node.tag}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <span className={`text-sm font-medium truncate ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>{node.name}</span>
               )}
             </div>
             

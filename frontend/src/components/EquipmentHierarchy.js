@@ -361,6 +361,14 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
 
           {/* Details Grid */}
           <div className="space-y-3">
+            {/* Tag */}
+            {node.tag && (
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">{t ? t("common.tag") : "Tag"}</label>
+                <Badge variant="outline" className="bg-slate-50 font-mono text-xs">{node.tag}</Badge>
+              </div>
+            )}
+
             {/* Equipment Type */}
             <div>
               <label className="text-xs text-slate-500 block mb-1">{t ? t("hierarchy.equipmentType") : "Equipment Type"}</label>
