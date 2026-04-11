@@ -704,6 +704,10 @@ const ThreatsPage = () => {
                   <span className="sm:hidden">{threat.failure_mode || threat.title}</span>
                   <span className="hidden sm:inline">{threat.title}</span>
                 </h3>
+                {/* Tag displayed under title */}
+                {threat.equipment_tag && (
+                  <div className="text-xs text-slate-400 font-mono mb-1">{threat.equipment_tag}</div>
+                )}
                 <div className="flex items-center gap-2">
                   {/* Risk Badge - Hidden on mobile */}
                   <span className="hidden sm:inline">
@@ -712,12 +716,7 @@ const ThreatsPage = () => {
                   {/* Mobile: Show equipment, Desktop: Show asset */}
                   <span className="text-xs sm:text-sm text-slate-500 truncate">
                     <span className="sm:hidden">{threat.asset || threat.title}</span>
-                    <span className="hidden sm:inline">
-                      {threat.asset}
-                      {threat.equipment_tag && (
-                        <span className="text-slate-400 ml-1">({threat.equipment_tag})</span>
-                      )}
-                    </span>
+                    <span className="hidden sm:inline">{threat.asset}</span>
                   </span>
                 </div>
               </div>
