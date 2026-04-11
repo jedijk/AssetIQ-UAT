@@ -323,10 +323,10 @@ async def get_my_tasks(
     if equipment_ids:
         equipment_cursor = db.equipment.find(
             {"_id": {"$in": list(equipment_ids)}},
-            {"_id": 1, "name": 1}
+            {"_id": 1, "name": 1, "tag": 1}
         )
         async for eq in equipment_cursor:
-            equipment_map[eq["_id"]] = eq.get("name", "Unknown")
+            equipment_map[eq["_id"]] = {"name": eq.get("name", "Unknown"), "tag": eq.get("tag")}
     
     # Batch fetch plans
     plan_map = {}
@@ -388,9 +388,15 @@ async def get_my_tasks(
     # ============================================
     tasks = []
     for task in raw_tasks:
-        # Get equipment name from map
+        # Get equipment name and tag from map
         if task.get("equipment_id") and not task.get("equipment_name"):
-            task["equipment_name"] = equipment_map.get(task["equipment_id"], "Unknown")
+            eq_data = equipment_map.get(task["equipment_id"], {})
+            if isinstance(eq_data, dict):
+                task["equipment_name"] = eq_data.get("name", "Unknown")
+                task["equipment_tag"] = eq_data.get("tag")
+            else:
+                # Backward compat: if it's just a string name
+                task["equipment_name"] = eq_data
         
         # Get plan details for recurring info
         task_plan_id = task.get("task_plan_id")

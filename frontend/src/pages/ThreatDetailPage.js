@@ -546,6 +546,12 @@ const ThreatDetailPage = () => {
                 {threat.title}
               </h1>
             </div>
+            {/* Tag display */}
+            {threat.equipment_tag && (
+              <div className="pl-7 -mt-1">
+                <span className="text-xs text-slate-400 font-mono">{threat.equipment_tag}</span>
+              </div>
+            )}
             {/* Row 2: Scores + Status + Menu */}
             <div className="flex items-center justify-between pl-7">
               <div className="flex items-center gap-2">
@@ -644,6 +650,9 @@ const ThreatDetailPage = () => {
               <h1 className="font-semibold text-base text-slate-900 truncate">
                 {threat.title}
               </h1>
+              {threat.equipment_tag && (
+                <span className="text-xs text-slate-400 font-mono">{threat.equipment_tag}</span>
+              )}
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">

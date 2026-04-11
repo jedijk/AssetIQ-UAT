@@ -143,6 +143,14 @@ async def get_investigation(
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
+    # Add equipment tag if asset_name is present
+    if inv.get("asset_name"):
+        equipment = await db.equipment_nodes.find_one(
+            {"name": {"$regex": f"^{inv['asset_name']}$", "$options": "i"}},
+            {"_id": 0, "tag": 1}
+        )
+        inv["equipment_tag"] = equipment.get("tag") if equipment else None
+    
     # Get related data
     events = await db.timeline_events.find(
         {"investigation_id": inv_id}, {"_id": 0}

@@ -253,6 +253,9 @@ export default function ActionDetailPage() {
                   {action.title}
                 </h1>
               </div>
+              {action.equipment_tag && (
+                <div className="text-xs text-slate-400 font-mono mt-0.5 ml-0">{action.equipment_tag}</div>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2">

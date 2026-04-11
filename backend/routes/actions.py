@@ -184,17 +184,16 @@ async def get_all_actions(
     # Batch fetch threat data for actions that need enrichment
     threat_ids_to_fetch = []
     for action in actions:
-        if action.get("rpn") is None:
-            threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
-            if threat_id:
-                threat_ids_to_fetch.append(threat_id)
+        threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
+        if threat_id:
+            threat_ids_to_fetch.append(threat_id)
     
     # Fetch all threats in one query
     threat_data_map = {}
     if threat_ids_to_fetch:
         threats = await db.threats.find(
             {"id": {"$in": list(set(threat_ids_to_fetch))}},
-            {"_id": 0, "id": 1, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1}
+            {"_id": 0, "id": 1, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1, "asset": 1, "linked_equipment_id": 1}
         ).to_list(500)
         threat_data_map = {t["id"]: t for t in threats}
     
@@ -203,7 +202,11 @@ async def get_all_actions(
     for action in actions:
         enriched_action = dict(action)
         
-        # Use stored values if available
+        # Get threat data for asset/equipment info
+        threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
+        threat = threat_data_map.get(threat_id) if threat_id else None
+        
+        # Use stored values if available for RPN
         if action.get("rpn") is not None:
             enriched_action["threat_rpn"] = action.get("rpn")
             enriched_action["threat_risk_score"] = action.get("risk_score")
@@ -213,13 +216,16 @@ async def get_all_actions(
             enriched_action["threat_risk_score"] = None
             enriched_action["threat_risk_level"] = None
             
-            # Use batch-fetched threat data
-            threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
-            if threat_id and threat_id in threat_data_map:
-                threat = threat_data_map[threat_id]
+            # Use batch-fetched threat data for RPN
+            if threat:
                 enriched_action["threat_rpn"] = threat.get("fmea_rpn")
                 enriched_action["threat_risk_score"] = threat.get("risk_score")
                 enriched_action["threat_risk_level"] = threat.get("risk_level")
+        
+        # Always add asset and equipment info from threat
+        if threat:
+            enriched_action["threat_asset"] = threat.get("asset")
+            enriched_action["linked_equipment_id"] = threat.get("linked_equipment_id")
         
         enriched_actions.append(enriched_action)
     
@@ -261,6 +267,19 @@ async def get_all_actions(
             }
         else:
             stats = {"total": 0, "open": 0, "in_progress": 0, "completed": 0, "overdue": 0}
+    
+    # Enrich actions with equipment tags
+    equipment_ids = list(set(a.get("linked_equipment_id") for a in enriched_actions if a.get("linked_equipment_id")))
+    if equipment_ids:
+        equipment_nodes = await db.equipment_nodes.find(
+            {"id": {"$in": equipment_ids}},
+            {"_id": 0, "id": 1, "tag": 1}
+        ).to_list(500)
+        equipment_tags = {eq["id"]: eq.get("tag") for eq in equipment_nodes}
+        for action in enriched_actions:
+            eq_id = action.get("linked_equipment_id")
+            if eq_id:
+                action["equipment_tag"] = equipment_tags.get(eq_id)
     
     return {
         "actions": enriched_actions,
@@ -386,6 +405,26 @@ async def get_central_action(
     
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
+    
+    # Enrich with equipment tag from linked threat
+    threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
+    if threat_id:
+        threat = await db.threats.find_one(
+            {"id": threat_id},
+            {"_id": 0, "asset": 1, "linked_equipment_id": 1}
+        )
+        if threat:
+            action["threat_asset"] = threat.get("asset")
+            eq_id = threat.get("linked_equipment_id")
+            if eq_id:
+                action["linked_equipment_id"] = eq_id
+                equipment = await db.equipment_nodes.find_one(
+                    {"id": eq_id},
+                    {"_id": 0, "tag": 1}
+                )
+                if equipment:
+                    action["equipment_tag"] = equipment.get("tag")
+    
     return action
 
 

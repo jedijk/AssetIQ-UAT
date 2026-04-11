@@ -680,6 +680,10 @@ export default function ActionsPage() {
                         {action.title}
                       </h3>
                     </div>
+                    {/* Equipment Tag */}
+                    {action.equipment_tag && (
+                      <div className="text-xs text-slate-400 font-mono mb-0.5">{action.equipment_tag}</div>
+                    )}
                     <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                       {/* Priority Badge - Always show */}
                       <Badge className={`${priority.color} text-[10px] sm:text-xs px-1.5 py-0`}>

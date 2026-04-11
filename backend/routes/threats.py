@@ -589,6 +589,10 @@ async def get_threat(
         if isinstance(threat.get("risk_score"), float):
             threat["risk_score"] = int(threat["risk_score"])
         
+        # Add equipment tag from equipment node
+        if equipment_node and equipment_node.get("tag"):
+            threat["equipment_tag"] = equipment_node.get("tag")
+        
         # Add required fields that may be missing
         if "rank" not in threat:
             threat["rank"] = 1

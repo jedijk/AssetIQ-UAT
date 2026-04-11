@@ -348,9 +348,10 @@ class AIRiskEngine:
         # Use lower temperature for more focused, detailed analysis
         temperature = 0.3 if analysis_type == 'risk_analysis' else 0.4
         try:
+            logger.info(f"Calling OpenAI with model gpt-4o, max_tokens={max_tokens}")
             client = get_openai_client()
             response = client.chat.completions.create(
-                model="gpt-5.2",
+                model="gpt-4o",  # Use gpt-4o instead of gpt-5.2
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
@@ -358,20 +359,30 @@ class AIRiskEngine:
                 max_completion_tokens=max_tokens,
                 temperature=temperature
             )
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            logger.info(f"OpenAI response received, length: {len(content) if content else 0}")
+            return content
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
             raise
     
     def _parse_json_response(self, response: str) -> dict:
         """Parse JSON from LLM response, handling markdown code blocks"""
+        if response is None:
+            logger.error("Response is None")
+            return {}
         clean_response = response.strip()
+        logger.info(f"Parsing response (first 200 chars): {clean_response[:200]}")
         if clean_response.startswith("```"):
             clean_response = clean_response.split("```")[1]
             if clean_response.startswith("json"):
                 clean_response = clean_response[4:]
         clean_response = clean_response.strip()
-        return json.loads(clean_response)
+        try:
+            return json.loads(clean_response)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parse error: {e}. Response: {clean_response[:500]}")
+            return {}
     
     def _build_threat_context(self, threat: dict, equipment_data: dict = None, historical_threats: list = None, equipment_history: dict = None) -> str:
         """Build context string for AI analysis with sanitized inputs"""
