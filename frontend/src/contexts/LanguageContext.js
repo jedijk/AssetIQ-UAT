@@ -230,6 +230,7 @@ const en = {
     optional: "Optional",
     exporting: "Exporting...",
     notes: "Notes",
+    tag: "Tag",
   },
   
   // Threats page
@@ -1451,6 +1452,7 @@ const nl = {
     optional: "Optioneel",
     exporting: "Exporteren...",
     notes: "Notities",
+    tag: "Tag",
   },
   
   // Threats page

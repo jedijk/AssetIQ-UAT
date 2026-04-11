@@ -389,41 +389,57 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(Array.isArray(features) && features.length > 0 ? features : Object.keys(FEATURE_ICONS)).map((feature, idx) => {
-                    const Icon = FEATURE_ICONS[feature] || FileText;
-                    const perm = permissions?.[selectedRole]?.[feature] || {};
-                    return (
-                      <tr key={feature} className={idx % 2 === 0 ? "" : "bg-slate-50/50"}>
-                        <td className="py-2 px-3">
-                          <div className="flex items-center gap-2">
-                            <Icon className="w-4 h-4 text-slate-400" />
-                            <span className="capitalize">{feature.replace(/_/g, " ")}</span>
-                          </div>
-                        </td>
+                  {(() => {
+                    // Handle both array and object formats for features
+                    let featureEntries = [];
+                    if (features && typeof features === 'object' && !Array.isArray(features)) {
+                      // features is an object like { observations: { name: 'Observations', description: '...' } }
+                      featureEntries = Object.entries(features);
+                    } else if (Array.isArray(features) && features.length > 0) {
+                      // features is an array of feature keys
+                      featureEntries = features.map(f => [f, { name: f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) }]);
+                    } else {
+                      // fallback to FEATURE_ICONS keys
+                      featureEntries = Object.keys(FEATURE_ICONS).map(f => [f, { name: f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) }]);
+                    }
+                    
+                    return featureEntries.map(([featureKey, featureInfo], idx) => {
+                      const Icon = FEATURE_ICONS[featureKey] || FileText;
+                      const perm = permissions?.[selectedRole]?.[featureKey] || {};
+                      const displayName = featureInfo?.name || featureKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                      return (
+                        <tr key={featureKey} className={idx % 2 === 0 ? "" : "bg-slate-50/50"}>
+                          <td className="py-2 px-3">
+                            <div className="flex items-center gap-2">
+                              <Icon className="w-4 h-4 text-slate-400" />
+                              <span>{displayName}</span>
+                            </div>
+                          </td>
                         <td className="text-center py-2 px-3">
                           <Switch
                             checked={perm.read !== false}
-                            onCheckedChange={() => handleTogglePermission(selectedRole, feature, "read", perm.read !== false)}
+                            onCheckedChange={() => handleTogglePermission(selectedRole, featureKey, "read", perm.read !== false)}
                             disabled={updateMutation.isPending || selectedRole === "owner"}
                           />
                         </td>
                         <td className="text-center py-2 px-3">
                           <Switch
                             checked={perm.write || false}
-                            onCheckedChange={() => handleTogglePermission(selectedRole, feature, "write", perm.write)}
+                            onCheckedChange={() => handleTogglePermission(selectedRole, featureKey, "write", perm.write)}
                             disabled={updateMutation.isPending || selectedRole === "owner"}
                           />
                         </td>
                         <td className="text-center py-2 px-3">
                           <Switch
                             checked={perm.delete || false}
-                            onCheckedChange={() => handleTogglePermission(selectedRole, feature, "delete", perm.delete)}
+                            onCheckedChange={() => handleTogglePermission(selectedRole, featureKey, "delete", perm.delete)}
                             disabled={updateMutation.isPending || selectedRole === "owner"}
                           />
                         </td>
                       </tr>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
