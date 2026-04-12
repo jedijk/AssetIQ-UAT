@@ -335,8 +335,7 @@ export default function CausalEnginePage() {
       updateInvMutation.mutate({ id: selectedInvId, data: { notes: localNotes } });
     }, 1000);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localNotes, selectedInvId, investigationData]);
+  }, [localNotes, selectedInvId, investigationData]); // updateInvMutation excluded - stable in behavior
 
   // File upload handler
   const handleFileUpload = async (event) => {
