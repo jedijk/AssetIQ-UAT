@@ -320,15 +320,33 @@ async def get_my_tasks(
             else:
                 plan_ids_oid.add(task_plan_id)
     
-    # Batch fetch equipment
+    # Batch fetch equipment (from both legacy equipment collection and equipment_nodes)
     equipment_map = {}
     if equipment_ids:
-        equipment_cursor = db.equipment.find(
-            {"_id": {"$in": list(equipment_ids)}},
-            {"_id": 1, "name": 1, "tag": 1}
+        # Try equipment_nodes first (string IDs with tags)
+        equip_nodes_cursor = db.equipment_nodes.find(
+            {"id": {"$in": list(equipment_ids)}},
+            {"_id": 0, "id": 1, "name": 1, "tag": 1}
         )
-        async for eq in equipment_cursor:
-            equipment_map[eq["_id"]] = {"name": eq.get("name", "Unknown"), "tag": eq.get("tag")}
+        async for eq in equip_nodes_cursor:
+            equipment_map[eq["id"]] = {"name": eq.get("name", "Unknown"), "tag": eq.get("tag")}
+        
+        # Fallback: legacy equipment collection (ObjectId _id)
+        missing_ids = [eid for eid in equipment_ids if eid not in equipment_map]
+        if missing_ids:
+            oid_list = []
+            for eid in missing_ids:
+                try:
+                    oid_list.append(ObjectId(eid))
+                except Exception:
+                    pass
+            if oid_list:
+                legacy_cursor = db.equipment.find(
+                    {"_id": {"$in": oid_list}},
+                    {"_id": 1, "name": 1, "tag": 1}
+                )
+                async for eq in legacy_cursor:
+                    equipment_map[str(eq["_id"])] = {"name": eq.get("name", "Unknown"), "tag": eq.get("tag")}
     
     # Batch fetch plans
     plan_map = {}
@@ -392,7 +410,8 @@ async def get_my_tasks(
     for task in raw_tasks:
         # Get equipment name and tag from map
         if task.get("equipment_id"):
-            eq_data = equipment_map.get(task["equipment_id"], {})
+            eid = str(task["equipment_id"])
+            eq_data = equipment_map.get(eid, {})
             if isinstance(eq_data, dict):
                 if not task.get("equipment_name"):
                     task["equipment_name"] = eq_data.get("name", "Unknown")
