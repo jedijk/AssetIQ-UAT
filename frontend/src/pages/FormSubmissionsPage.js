@@ -871,8 +871,7 @@ export default function FormSubmissionsPage() {
                       <Building2 className="w-4 h-4 text-slate-400" />
                       <div>
                         <p className="text-[10px] text-slate-400 uppercase tracking-wide">Equipment</p>
-                        <p className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-1">
-                          <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                        <p className="text-sm font-medium text-slate-700 mt-0.5">
                           {selectedSubmission.equipment_name}
                         </p>
                         {selectedSubmission.equipment_tag && (
@@ -886,8 +885,7 @@ export default function FormSubmissionsPage() {
                       <FileText className="w-4 h-4 text-slate-400" />
                       <div>
                         <p className="text-[10px] text-slate-400 uppercase tracking-wide">Task</p>
-                        <p className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-1">
-                          <FileText className="w-3.5 h-3.5 text-slate-400" />
+                        <p className="text-sm font-medium text-slate-700 mt-0.5">
                           {selectedSubmission.task_template_name}
                         </p>
                       </div>
@@ -895,11 +893,12 @@ export default function FormSubmissionsPage() {
                   )}
                   {selectedSubmission.discipline && (
                     <div className="flex items-center gap-2">
-                      <Settings className="w-4 h-4 text-slate-400" />
+                      <span className={`w-4 h-4 flex items-center justify-center`}>
+                        <span className={`w-2.5 h-2.5 rounded-full ${getDisciplineInfo(selectedSubmission.discipline).color}`} />
+                      </span>
                       <div>
                         <p className="text-[10px] text-slate-400 uppercase tracking-wide">Discipline</p>
-                        <p className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-1">
-                          <span className={`w-2 h-2 rounded-full ${getDisciplineInfo(selectedSubmission.discipline).color}`} />
+                        <p className="text-sm font-medium text-slate-700 mt-0.5">
                           {getDisciplineInfo(selectedSubmission.discipline).label}
                         </p>
                       </div>
@@ -1203,8 +1202,8 @@ export default function FormSubmissionsPage() {
                 )}
               </div>
               
-              {/* Footer */}
-              <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50 flex-shrink-0">
+              {/* Footer - Hidden on mobile */}
+              <div className="hidden sm:flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50 flex-shrink-0">
                 <Button
                   variant="outline"
                   size="sm"
