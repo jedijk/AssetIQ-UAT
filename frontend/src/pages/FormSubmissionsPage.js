@@ -465,17 +465,6 @@ export default function FormSubmissionsPage() {
     },
   });
 
-  // Show mobile restriction message
-  if (isMobile) {
-    return (
-      <DesktopOnlyMessage 
-        title="Forms" 
-        icon={ClipboardList}
-        description="Form submissions viewing is optimized for desktop. Please use a larger screen for the best experience."
-      />
-    );
-  }
-
   const submissions = submissionsData?.submissions || [];
 
   // Filter submissions
