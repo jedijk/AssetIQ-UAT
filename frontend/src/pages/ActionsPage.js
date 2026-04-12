@@ -645,7 +645,7 @@ export default function ActionsPage() {
                 )}
                 
                 {/* Grid layout for perfect column alignment - Score and RPN as separate fixed columns */}
-                <div className="grid grid-cols-[auto_1fr_3rem_3rem_auto] sm:grid-cols-[auto_auto_1fr_4rem_4rem_auto] items-center gap-2 sm:gap-4">
+                <div className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_auto_1fr_4rem_4rem_auto] items-center gap-2 sm:gap-4">
                   {/* Status Icon */}
                   <button
                     onClick={(e) => {
