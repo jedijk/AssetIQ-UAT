@@ -1416,8 +1416,7 @@ export default function DashboardPage() {
                     <Building2 className="w-4 h-4 text-slate-400" />
                     <div>
                       <p className="text-[10px] text-slate-400 uppercase tracking-wide">Equipment</p>
-                      <p className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-1">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                      <p className="text-sm font-medium text-slate-700 mt-0.5">
                         {quickViewSubmission.equipment_name}
                       </p>
                     </div>
@@ -1428,8 +1427,7 @@ export default function DashboardPage() {
                     <FileText className="w-4 h-4 text-slate-400" />
                     <div>
                       <p className="text-[10px] text-slate-400 uppercase tracking-wide">Task</p>
-                      <p className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-1">
-                        <FileText className="w-3.5 h-3.5 text-slate-400" />
+                      <p className="text-sm font-medium text-slate-700 mt-0.5">
                         {quickViewSubmission.task_template_name}
                       </p>
                     </div>
@@ -1437,11 +1435,12 @@ export default function DashboardPage() {
                 )}
                 {quickViewSubmission?.discipline && (
                   <div className="flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-slate-400" />
+                    <span className="w-4 h-4 flex items-center justify-center">
+                      <span className={`w-2.5 h-2.5 rounded-full bg-blue-500`} />
+                    </span>
                     <div>
                       <p className="text-[10px] text-slate-400 uppercase tracking-wide">Discipline</p>
-                      <p className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-1">
-                        <Settings className="w-3.5 h-3.5 text-slate-400" />
+                      <p className="text-sm font-medium text-slate-700 mt-0.5">
                         {quickViewSubmission.discipline}
                       </p>
                     </div>
@@ -1756,8 +1755,8 @@ export default function DashboardPage() {
             </div>
           </div>
           
-          {/* Fixed footer with actions */}
-          <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
+          {/* Fixed footer with actions - Hidden on mobile */}
+          <div className="hidden sm:flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
