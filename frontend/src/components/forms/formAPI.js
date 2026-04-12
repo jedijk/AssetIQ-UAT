@@ -2,7 +2,7 @@
  * Form Designer API
  * Centralized API calls for form templates and submissions
  */
-import { getBackendUrl } from '../../lib/apiConfig';
+import { getBackendUrl, getAuthHeaders } from '../../lib/apiConfig';
 
 const API_BASE_URL = getBackendUrl();
 
@@ -12,7 +12,7 @@ export const formAPI = {
     if (params.search) queryParams.append("search", params.search);
     if (params.discipline) queryParams.append("discipline", params.discipline);
     const response = await fetch(`${API_BASE_URL}/api/form-templates?${queryParams}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers: getAuthHeaders(),
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: "Failed to load templates" }));
@@ -23,7 +23,7 @@ export const formAPI = {
 
   getTemplate: async (id) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers: getAuthHeaders(),
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: "Template not found" }));
@@ -35,10 +35,7 @@ export const formAPI = {
   createTemplate: async (data) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error("Failed to create template");
@@ -46,49 +43,40 @@ export const formAPI = {
   },
 
   updateTemplate: async (params) => {
-    // Support both { id, data } object and (id, data) separate args
     let id, data;
     if (typeof params === 'object' && params.id && params.data) {
       id = params.id;
       data = params.data;
     } else if (typeof params === 'string') {
-      // Legacy support for (id, data) - shouldn't happen but safe guard
       id = params;
       data = arguments[1];
     } else {
       throw new Error("Invalid arguments for updateTemplate. Expected { id, data } object.");
     }
     
-    // Clean the data - remove non-serializable or unwanted fields
     const cleanedData = { ...data };
-    delete cleanedData.id; // Don't send ID in body
-    delete cleanedData.pendingDocuments; // Don't send pending docs to backend
+    delete cleanedData.id;
+    delete cleanedData.pendingDocuments;
     
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(cleanedData),
     });
     
     if (!response.ok) {
-      // Surface detailed error from backend
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.detail || errorData.message || `Failed to update template (${response.status})`;
-      console.error('[formAPI] Update template failed:', { status: response.status, error: errorData });
       throw new Error(errorMessage);
     }
     
-    const result = await response.json();
-    return result;
+    return response.json();
   },
 
   deleteTemplate: async (id) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error("Failed to delete template");
     return response.json();
@@ -100,7 +88,7 @@ export const formAPI = {
     if (params.status) queryParams.append("status", params.status);
     if (params.limit) queryParams.append("limit", params.limit);
     const response = await fetch(`${API_BASE_URL}/api/form-submissions?${queryParams}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers: getAuthHeaders(),
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: "Failed to load submissions" }));
@@ -111,7 +99,7 @@ export const formAPI = {
 
   getTemplateAnalytics: async (templateId) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/analytics`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers: getAuthHeaders(),
     });
     return response.json();
   },
@@ -121,9 +109,11 @@ export const formAPI = {
     formData.append("file", file);
     if (description) formData.append("description", description);
 
+    const headers = getAuthHeaders();
+    delete headers["Content-Type"];
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers,
       body: formData,
     });
     if (!response.ok) {
@@ -136,7 +126,7 @@ export const formAPI = {
   deleteDocument: async (templateId, documentId) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents/${documentId}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error("Failed to delete document");
     return response.json();
@@ -145,10 +135,7 @@ export const formAPI = {
   searchDocuments: async (templateId, query) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents/search`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ query }),
     });
     return response.json();
@@ -157,7 +144,7 @@ export const formAPI = {
   searchEquipment: async (query) => {
     const response = await fetch(
       `${API_BASE_URL}/api/equipment-hierarchy/search?query=${encodeURIComponent(query)}`,
-      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      { headers: getAuthHeaders() }
     );
     if (response.ok) {
       return response.json();
