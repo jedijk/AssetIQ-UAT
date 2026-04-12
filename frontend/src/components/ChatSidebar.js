@@ -485,9 +485,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             
             {/* Cancel option */}
             <button
-              onClick={() => {
-                // Clear chat and reset locally — no AI round-trip
-                chatAPI.clearHistory();
+              onClick={async () => {
+                await chatAPI.cancelFlow();
                 queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
               }}
               className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
@@ -561,10 +560,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             
             {/* Cancel option for failure modes */}
             <button
-              onClick={() => {
+              onClick={async () => {
                 setShowNewFailureModeInput(false);
                 setNewFailureModeName("");
-                chatAPI.clearHistory();
+                await chatAPI.cancelFlow();
                 queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
               }}
               className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"

@@ -103,6 +103,10 @@ export const chatAPI = {
     const response = await api.delete("/chat/clear");
     return response.data;
   },
+  cancelFlow: async () => {
+    const response = await api.post("/chat/cancel");
+    return response.data;
+  },
 };
 
 // Voice API

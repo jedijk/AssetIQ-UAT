@@ -491,6 +491,30 @@ async def clear_chat_history(
     }
 
 
+@router.post("/chat/cancel")
+async def cancel_chat_flow(
+    current_user: dict = Depends(get_current_user)
+):
+    """Reset conversation state without clearing chat history."""
+    user_id = current_user["id"]
+    await db.chat_conversations.update_one(
+        {"user_id": user_id},
+        {"$set": {"state": ChatState.INITIAL, "pending_data": {}, "equipment_suggestions": None, "failure_mode_suggestions": None}},
+        upsert=True
+    )
+    # Add a system message so the user sees confirmation
+    cancel_msg = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "role": "assistant",
+        "content": "Cancelled. What would you like to report?",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.chat_messages.insert_one(cancel_msg)
+    return {"success": True, "message": "Cancelled"}
+
+
+
 # ============= VOICE ENDPOINT =============
 
 @router.post("/voice/transcribe", response_model=VoiceTranscriptionResponse)
