@@ -378,6 +378,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                     <span><strong>Equipment:</strong> {msg.threat_asset}</span>
                   </div>
                 )}
+                {msg.threat_equipment_tag && (
+                  <div className="flex items-center gap-1.5 ml-[18px]">
+                    <span className="text-slate-400 font-mono">{msg.threat_equipment_tag}</span>
+                  </div>
+                )}
                 {msg.threat_failure_mode && (
                   <div className="flex items-center gap-1.5">
                     <AlertTriangle className="w-3 h-3 text-slate-400" />
@@ -481,10 +486,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             {/* Cancel option */}
             <button
               onClick={() => {
-                sendMutation.mutate({ content: "cancel", image: null });
+                // Clear chat and reset locally — no AI round-trip
+                chatAPI.clearHistory();
+                queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
               }}
-              disabled={isSending}
-              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm disabled:opacity-50"
+              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
             >
               <X className="w-3.5 h-3.5 inline mr-1" />
               None of these / Cancel
@@ -558,10 +564,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               onClick={() => {
                 setShowNewFailureModeInput(false);
                 setNewFailureModeName("");
-                sendMutation.mutate({ content: "cancel", image: null });
+                chatAPI.clearHistory();
+                queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
               }}
-              disabled={isSending}
-              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm disabled:opacity-50"
+              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
             >
               <X className="w-3.5 h-3.5 inline mr-1" />
               None of these / Describe differently

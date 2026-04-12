@@ -410,6 +410,7 @@ async def send_chat_message(
         ai_response["threat_title"] = updated_threat["title"]
         ai_response["threat_asset"] = updated_threat["asset"]
         ai_response["threat_equipment_type"] = updated_threat["equipment_type"]
+        ai_response["threat_equipment_tag"] = obs_data.get("equipment", {}).get("tag")
         ai_response["threat_failure_mode"] = updated_threat["failure_mode"]
         ai_response["threat_risk_level"] = updated_threat["risk_level"]
         ai_response["threat_risk_score"] = updated_threat["risk_score"]
