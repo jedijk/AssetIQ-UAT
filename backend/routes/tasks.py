@@ -116,7 +116,10 @@ async def create_task_template(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new task template."""
-    return await task_service.create_template(data.model_dump(), current_user["id"])
+    from services.query_cache import query_cache
+    result = await task_service.create_template(data.model_dump(), current_user["id"])
+    query_cache.invalidate_all()
+    return result
 
 @router.patch("/task-templates/{template_id}")
 async def update_task_template(
@@ -125,9 +128,11 @@ async def update_task_template(
     current_user: dict = Depends(get_current_user)
 ):
     """Update a task template."""
+    from services.query_cache import query_cache
     result = await task_service.update_template(template_id, data.model_dump(exclude_unset=True))
     if not result:
         raise HTTPException(status_code=404, detail="Task template not found")
+    query_cache.invalidate_all()
     return result
 
 @router.delete("/task-templates/{template_id}")
@@ -136,10 +141,12 @@ async def delete_task_template(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete (deactivate) a task template."""
+    from services.query_cache import query_cache
     try:
         deleted = await task_service.delete_template(template_id)
         if not deleted:
             raise HTTPException(status_code=404, detail="Task template not found")
+        query_cache.invalidate_all()
         return {"message": "Task template deactivated"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

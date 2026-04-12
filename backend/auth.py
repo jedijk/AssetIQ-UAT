@@ -1,6 +1,7 @@
 """
 Authentication helpers: password hashing, JWT tokens, current user dependency.
 """
+import os
 import jwt
 import bcrypt
 from datetime import datetime, timezone, timedelta
@@ -14,7 +15,7 @@ security = HTTPBearer(auto_error=False)
 
 # Always use production database for user authentication
 # This ensures tokens work across database environments
-AUTH_DB = client["assetiq"]
+AUTH_DB = client[os.environ.get("DB_NAME", "assetiq")]
 
 
 def hash_password(password: str) -> str:
