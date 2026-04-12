@@ -271,6 +271,27 @@ async def process_chat_message(
     original_message = conv_state.get("original_message", message_content)
     
     # ============================================
+    # HANDLE CANCEL from any state
+    # ============================================
+    if message_content.strip().lower() == "cancel":
+        # Clear conversation state and reset
+        await db.chat_conversations.update_one(
+            {"session_id": session_id},
+            {"$set": {"state": ChatState.INITIAL, "pending_data": {}, "equipment_suggestions": None, "failure_mode_suggestions": None}},
+            upsert=True
+        )
+        return {
+            "response_text": "Cancelled. What would you like to report?",
+            "state": ChatState.INITIAL,
+            "equipment_suggestions": None,
+            "failure_mode_suggestions": None,
+            "create_observation": False,
+            "observation_data": None,
+            "pending_data": {},
+            "original_message": None
+        }
+
+    # ============================================
     # STATE: AWAITING EQUIPMENT SELECTION
     # ============================================
     if current_state == ChatState.AWAITING_EQUIPMENT:

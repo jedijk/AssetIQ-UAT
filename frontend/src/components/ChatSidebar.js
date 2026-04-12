@@ -137,12 +137,18 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     }
   }, [isOpen]);
 
-  // Scroll to bottom smoothly on new messages
+  // Scroll to bottom smoothly on new messages or when AI starts processing
   useEffect(() => {
     if (isOpen && messages.length > 0) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (isOpen && (isSending || isTranscribing)) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [isSending, isTranscribing]);
 
   // Handle send
   const handleSend = () => {
@@ -475,10 +481,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             {/* Cancel option */}
             <button
               onClick={() => {
-                setMessage("");
-                if (textareaRef.current) {
-                  textareaRef.current.focus();
-                }
+                sendMutation.mutate({ content: "cancel", image: null });
               }}
               disabled={isSending}
               className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm disabled:opacity-50"
@@ -553,12 +556,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             {/* Cancel option for failure modes */}
             <button
               onClick={() => {
-                setMessage("");
                 setShowNewFailureModeInput(false);
                 setNewFailureModeName("");
-                if (textareaRef.current) {
-                  textareaRef.current.focus();
-                }
+                sendMutation.mutate({ content: "cancel", image: null });
               }}
               disabled={isSending}
               className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm disabled:opacity-50"
