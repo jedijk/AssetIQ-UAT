@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -67,7 +68,7 @@ const fetchWithAuth = async (url, options = {}) => {
 export default function SettingsAIUsagePage() {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const [isMobile] = useState(window.innerWidth < 768);
+  const isMobile = useIsMobile();
   const [dateRange, setDateRange] = useState("30");
   const [installationFilter, setInstallationFilter] = useState("all");
 

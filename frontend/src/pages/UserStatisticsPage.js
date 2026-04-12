@@ -1,5 +1,5 @@
-import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -66,32 +66,7 @@ import {
   AreaChart,
 } from "recharts";
 
-const API_BASE_URL = getBackendUrl();
-
-// API functions
-const userStatsAPI = {
-  getOverview: async (period = "30", roleFilter = null) => {
-    let url = `${API_BASE_URL}/api/user-stats/overview?period=${period}`;
-    if (roleFilter) url += `&role_filter=${roleFilter}`;
-    const response = await fetch(url, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) {
-      if (response.status === 403) {
-        throw new Error("Access denied");
-      }
-      throw new Error("Failed to fetch statistics");
-    }
-    return response.json();
-  },
-  getTrends: async (period = "30") => {
-    const response = await fetch(`${API_BASE_URL}/api/user-stats/trends?period=${period}`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch trends");
-    return response.json();
-  }
-};
+import { userStatsAPI } from "../lib/api";
 
 // Chart colors matching Observations page (amber/blue/green palette)
 const CHART_COLORS = [
@@ -175,13 +150,7 @@ const UserStatisticsPage = () => {
   const [activityFilter, setActivityFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
   
-  // Mobile detection
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const isMobile = useIsMobile();
 
   // Fetch overview data
   const { 

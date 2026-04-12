@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -101,14 +102,7 @@ const FailureModesPage = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  // Mobile detection
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const isMobile = useIsMobile();
   
   // Initialize state from URL params (for FMEA linkage from Maintenance Strategies)
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "");

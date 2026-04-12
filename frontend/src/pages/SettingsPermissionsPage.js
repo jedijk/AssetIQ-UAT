@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { permissionsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -113,17 +114,10 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedRole, setSelectedRole] = useState("admin");
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const isMobile = useIsMobile();
   const [showCreateRoleDialog, setShowCreateRoleDialog] = useState(false);
   const [newRole, setNewRole] = useState({ name: "", display_name: "", description: "", base_role: "viewer" });
   const [deleteRoleConfirm, setDeleteRoleConfirm] = useState(null);
-
-  // Mobile detection
-  useState(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  });
 
   // Fetch permissions
   const { data: permissionsData, isLoading, error } = useQuery({

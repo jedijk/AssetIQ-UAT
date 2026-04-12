@@ -1,5 +1,6 @@
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -89,14 +90,7 @@ const FormsPage = ({ embedded = false }) => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   
-  // Mobile detection
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const isMobile = useIsMobile();
   
   const [activeTab, setActiveTab] = useState("templates");
   const [searchQuery, setSearchQuery] = useState("");
@@ -347,19 +341,12 @@ const FormsPage = ({ embedded = false }) => {
   const submissions = submissionsData?.submissions || [];
 
   // Sync selectedTemplate with latest data from templates query
-  // This ensures documents, version, and field updates are reflected when viewing a template
+  // Uses version number as the primary change indicator to avoid expensive deep comparisons
   useEffect(() => {
     if (selectedTemplate && templates.length > 0) {
       const updatedTemplate = templates.find(t => t.id === selectedTemplate.id);
-      if (updatedTemplate) {
-        // Check if anything important changed (version, documents, or fields)
-        const versionChanged = updatedTemplate.version !== selectedTemplate.version;
-        const documentsChanged = JSON.stringify(updatedTemplate.documents) !== JSON.stringify(selectedTemplate.documents);
-        const fieldsChanged = JSON.stringify(updatedTemplate.fields) !== JSON.stringify(selectedTemplate.fields);
-        
-        if (versionChanged || documentsChanged || fieldsChanged) {
-          setSelectedTemplate(updatedTemplate);
-        }
+      if (updatedTemplate && updatedTemplate.version !== selectedTemplate.version) {
+        setSelectedTemplate(updatedTemplate);
       }
     }
   }, [templates, selectedTemplate]);

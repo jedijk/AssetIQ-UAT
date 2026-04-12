@@ -94,34 +94,6 @@ except Exception as e:
     logger.warning(f"Rate limiter not available: {e}")
 
 
-# Swagger UI at root level for direct Railway access
-try:
-    from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
-
-    @app.get("/docs", include_in_schema=False)
-    async def swagger_ui_html():
-        return get_swagger_ui_html(
-            openapi_url="/openapi.json",
-            title=app.title + " - Swagger UI",
-            swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-bundle.js",
-            swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css",
-        )
-
-    @app.get("/redoc", include_in_schema=False)
-    async def redoc_html():
-        return get_redoc_html(
-            openapi_url="/openapi.json",
-            title=app.title + " - ReDoc",
-            redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js",
-        )
-
-    @app.get("/openapi.json", include_in_schema=False)
-    async def openapi_json():
-        return JSONResponse(app.openapi())
-except Exception as e:
-    logger.warning(f"Swagger UI setup failed: {e}")
-
-
 # Error logging function (with fallback)
 def log_error(error_type, message, details=None, source="backend"):
     """Log error - with fallback if routes.system not available."""

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { investigationAPI, actionsAPI, usersAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
@@ -69,8 +70,7 @@ export default function CausalEnginePage() {
   const { t } = useLanguage();
   const { user } = useAuth();
   
-  // Check for mobile viewport
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   
   const [selectedInvId, setSelectedInvId] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
@@ -119,13 +119,6 @@ export default function CausalEnginePage() {
   const [closureSuggestion, setClosureSuggestion] = useState(null); // Investigation closure suggestion
   const fileInputRef = useRef(null);
   
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
   // Handle inv query parameter - auto-select investigation from URL
   useEffect(() => {
     const invId = searchParams.get('inv');
@@ -334,13 +327,16 @@ export default function CausalEnginePage() {
   }, [investigationData]);
 
   // Debounced save for notes
+  // Note: updateInvMutation intentionally excluded from deps - it returns a new ref each render
+  // which would cause the timer to reset infinitely. The mutate function is stable in behavior.
   useEffect(() => {
     if (!selectedInvId || localNotes === (investigationData?.notes || "")) return;
     const timer = setTimeout(() => {
       updateInvMutation.mutate({ id: selectedInvId, data: { notes: localNotes } });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [localNotes, selectedInvId, investigationData, updateInvMutation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localNotes, selectedInvId, investigationData]);
 
   // File upload handler
   const handleFileUpload = async (event) => {

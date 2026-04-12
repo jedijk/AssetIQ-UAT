@@ -4,10 +4,11 @@ import { getApiUrl, getBackendUrl } from "./apiConfig";
 // Get API URL at initialization for static uses
 const API_URL = getApiUrl();
 
-// Log API configuration at startup
-console.log("[API] Initializing API client...");
-console.log("[API] Backend URL:", getBackendUrl());
-console.log("[API] Full API URL:", API_URL);
+// Log API configuration at startup (development only)
+if (process.env.NODE_ENV === 'development') {
+  console.log("[API] Backend URL:", getBackendUrl());
+  console.log("[API] Full API URL:", API_URL);
+}
 
 // Create axios instance with dynamic baseURL getter
 const api = axios.create({
@@ -17,13 +18,9 @@ const api = axios.create({
 
 // Add request interceptor to validate URL and add auth
 api.interceptors.request.use((config) => {
-  // Log request URL for debugging
-  console.log("[API] Request:", config.method?.toUpperCase(), `${config.baseURL}${config.url}`);
-  
   // Validate the URL includes /api
   if (!config.baseURL?.includes('/api')) {
     console.error("[API] WARNING: API URL does not include /api prefix:", config.baseURL);
-    console.error("[API] This will cause 404 errors. Check REACT_APP_BACKEND_URL configuration.");
   }
   
   // Add auth token
@@ -656,6 +653,7 @@ export const actionsAPI = {
     return response.data;
   },
   
+  // Alias for get() - kept for backward compatibility
   getById: async (actionId) => {
     const response = await api.get(`/actions/${actionId}`);
     return response.data;
@@ -1182,6 +1180,261 @@ export const qrCodeAPI = {
   getImageUrl: (qrId, size = "medium", showLabel = true) => {
     return `${API_URL}/qr/${qrId}/image?size=${size}&show_label=${showLabel}`;
   }
+};
+
+// ==================== TASK SCHEDULER API ====================
+export const taskSchedulerAPI = {
+  // Templates
+  getTemplates: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.discipline) searchParams.append("discipline", params.discipline);
+    if (params.search) searchParams.append("search", params.search);
+    const response = await api.get(`/task-templates?${searchParams}`);
+    return response.data;
+  },
+  createTemplate: async (data) => {
+    const response = await api.post("/task-templates", data);
+    return response.data;
+  },
+  deleteTemplate: async (id) => {
+    const response = await api.delete(`/task-templates/${id}`);
+    return response.data;
+  },
+  updateTemplate: async (id, data) => {
+    const response = await api.patch(`/task-templates/${id}`, data);
+    return response.data;
+  },
+
+  // Plans
+  getPlans: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.equipment_id) searchParams.append("equipment_id", params.equipment_id);
+    const response = await api.get(`/task-plans?${searchParams}`);
+    return response.data;
+  },
+  createPlan: async (data) => {
+    const response = await api.post("/task-plans", data);
+    return response.data;
+  },
+  deletePlan: async (id) => {
+    const response = await api.delete(`/task-plans/${id}`);
+    return response.data;
+  },
+  updatePlan: async (id, data) => {
+    const response = await api.patch(`/task-plans/${id}`, data);
+    return response.data;
+  },
+
+  // Instances
+  getInstances: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    searchParams.append("limit", "30");
+    if (params.status) searchParams.append("status", params.status);
+    if (params.plan_id) searchParams.append("plan_id", params.plan_id);
+    const response = await api.get(`/task-instances?${searchParams}`);
+    return response.data;
+  },
+  getCalendar: async (startDate, endDate) => {
+    const response = await api.get(`/task-instances/calendar?start_date=${startDate}&end_date=${endDate}`);
+    return response.data;
+  },
+  startInstance: async (id) => {
+    const response = await api.post(`/task-instances/${id}/start`);
+    return response.data;
+  },
+  completeInstance: async ({ id, data }) => {
+    const response = await api.post(`/task-instances/${id}/complete`, data);
+    return response.data;
+  },
+  generateInstances: async () => {
+    const response = await api.post("/tasks/generate-all");
+    return response.data;
+  },
+  deleteInstance: async (id) => {
+    const response = await api.delete(`/task-instances/${id}`);
+    return response.data;
+  },
+  getStats: async () => {
+    const response = await api.get("/tasks/stats");
+    return response.data;
+  },
+};
+
+// ==================== MY TASKS API ====================
+export const myTasksAPI = {
+  getTasks: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.filter) searchParams.append("filter", params.filter);
+    if (params.date) searchParams.append("date", params.date);
+    if (params.status) searchParams.append("status", params.status);
+    if (params.discipline) searchParams.append("discipline", params.discipline);
+    const response = await api.get(`/my-tasks?${searchParams}`);
+    return response.data;
+  },
+  uploadAttachment: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post("/tasks/upload-attachment", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
+  getAdhocPlans: async () => {
+    const response = await api.get("/adhoc-plans");
+    return response.data;
+  },
+  executeAdhocPlan: async (planId) => {
+    const response = await api.post(`/adhoc-plans/${planId}/execute`);
+    return response.data;
+  },
+  getTaskDetail: async (taskId) => {
+    const response = await api.get(`/my-tasks/${taskId}`);
+    return response.data;
+  },
+  startTask: async (taskId, isAction = false) => {
+    const endpoint = isAction ? `/my-tasks/action/${taskId}/start` : `/task-instances/${taskId}/start`;
+    const response = await api.post(endpoint);
+    return response.data;
+  },
+  completeTask: async ({ taskId, data, isAction = false }) => {
+    const endpoint = isAction ? `/my-tasks/action/${taskId}/complete` : `/task-instances/${taskId}/complete`;
+    const response = await api.post(endpoint, data);
+    return response.data;
+  },
+  deleteTask: async (taskId, isAction = false) => {
+    const endpoint = isAction ? `/actions/${taskId}` : `/task-instances/${taskId}`;
+    const response = await api.delete(endpoint);
+    return response.data;
+  },
+};
+
+// ==================== DEFINITIONS API ====================
+export const definitionsAPI = {
+  getInstallations: async () => {
+    const response = await api.get("/definitions/installations");
+    return response.data;
+  },
+  getDefinitions: async (equipmentId) => {
+    const response = await api.get(`/definitions/equipment/${equipmentId}`);
+    return response.data;
+  },
+  getDefaults: async () => {
+    const response = await api.get("/definitions/defaults");
+    return response.data;
+  },
+  saveDefinitions: async ({ equipmentId, severity, occurrence, detection, criticality }) => {
+    const response = await api.post("/definitions", {
+      equipment_id: equipmentId,
+      severity,
+      occurrence,
+      detection,
+      criticality,
+    });
+    return response.data;
+  },
+  resetDefinitions: async (equipmentId) => {
+    const response = await api.delete(`/definitions/${equipmentId}`);
+    return response.data;
+  },
+};
+
+// ==================== PREFERENCES API ====================
+export const preferencesAPI = {
+  getPreferences: async () => {
+    const response = await api.get("/users/me/preferences");
+    return response.data;
+  },
+  updatePreferences: async (data) => {
+    const response = await api.put("/users/me/preferences", data);
+    return response.data;
+  },
+  getTimezones: async () => {
+    const response = await api.get("/timezones");
+    return response.data;
+  },
+};
+
+// ==================== USER STATISTICS API ====================
+export const userStatsAPI = {
+  getOverview: async (period = "30", roleFilter = null) => {
+    const params = new URLSearchParams({ period });
+    if (roleFilter) params.append("role_filter", roleFilter);
+    const response = await api.get(`/user-stats/overview?${params}`);
+    return response.data;
+  },
+  getTrends: async (period = "30") => {
+    const response = await api.get(`/user-stats/trends?period=${period}`);
+    return response.data;
+  },
+};
+
+// ==================== RBAC API (User Management) ====================
+export const rbacAPI = {
+  getUsers: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.search) searchParams.append("search", params.search);
+    if (params.role) searchParams.append("role", params.role);
+    if (params.is_active !== undefined) searchParams.append("is_active", params.is_active);
+    const response = await api.get(`/rbac/users?${searchParams}`);
+    return response.data;
+  },
+  getPendingUsers: async () => {
+    const response = await api.get("/rbac/users/pending");
+    return response.data;
+  },
+  approveUser: async ({ userId, action, role, rejectionReason, assignedInstallations }) => {
+    const response = await api.patch(`/rbac/users/${userId}/approve`, {
+      action,
+      role,
+      rejection_reason: rejectionReason,
+      assigned_installations: assignedInstallations,
+    });
+    return response.data;
+  },
+  getRoles: async () => {
+    const response = await api.get("/rbac/roles");
+    return response.data;
+  },
+  updateUserRole: async ({ userId, role }) => {
+    const response = await api.patch(`/rbac/users/${userId}/role`, { role });
+    return response.data;
+  },
+  updateUserStatus: async ({ userId, isActive }) => {
+    const response = await api.patch(`/rbac/users/${userId}/status`, { is_active: isActive });
+    return response.data;
+  },
+  updateUserProfile: async ({ userId, data }) => {
+    const response = await api.patch(`/rbac/users/${userId}/profile`, data);
+    return response.data;
+  },
+  uploadUserAvatar: async ({ userId, file }) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(`/rbac/users/${userId}/avatar`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
+  getUserAvatar: async (userId) => {
+    const response = await api.get(`/users/${userId}/avatar`, { responseType: "blob" });
+    return URL.createObjectURL(response.data);
+  },
+  deleteUser: async (userId) => {
+    const response = await api.delete(`/rbac/users/${userId}`);
+    return response.data;
+  },
+  resetPassword: async (userId) => {
+    const response = await api.post("/auth/admin-reset-password", { user_id: userId });
+    return response.data;
+  },
+  resetIntro: async (userId) => {
+    const response = await api.post(`/rbac/users/${userId}/reset-intro`);
+    return response.data;
+  },
+  createUser: async (userData) => {
+    const response = await api.post("/users/create", userData);
+    return response.data;
+  },
 };
 
 /**

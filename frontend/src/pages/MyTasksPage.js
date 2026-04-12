@@ -1,4 +1,3 @@
-import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -90,117 +89,8 @@ import { DISCIPLINES } from "../constants/disciplines";
 import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame";
 import TaskCard, { priorityColors, taskTypeIcons } from "../components/task-execution/TaskCard";
 
-const API_BASE_URL = getBackendUrl();
-
 // API functions for My Tasks
-const myTasksAPI = {
-  getTasks: async (params = {}) => {
-    const queryParams = new URLSearchParams();
-    if (params.filter) queryParams.append("filter", params.filter);
-    if (params.date) queryParams.append("date", params.date);
-    if (params.status) queryParams.append("status", params.status);
-    if (params.discipline) queryParams.append("discipline", params.discipline);
-    
-    const response = await fetch(`${API_BASE_URL}/api/my-tasks?${queryParams}`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch tasks");
-    return response.json();
-  },
-  
-  uploadAttachment: async (file) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    
-    // For file uploads, remove Content-Type so browser sets it with boundary
-    const headers = getAuthHeaders();
-    delete headers["Content-Type"];
-    
-    const response = await fetch(`${API_BASE_URL}/api/tasks/upload-attachment`, {
-      method: "POST",
-      headers,
-      body: formData
-    });
-    if (!response.ok) throw new Error("Failed to upload attachment");
-    return response.json();
-  },
-  
-  getAdhocPlans: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/adhoc-plans`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch ad-hoc plans");
-    return response.json();
-  },
-  
-  executeAdhocPlan: async (planId) => {
-    const response = await fetch(`${API_BASE_URL}/api/adhoc-plans/${planId}/execute`, {
-      method: "POST",
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || "Failed to execute ad-hoc plan");
-    }
-    return response.json();
-  },
-  
-  getTaskDetail: async (taskId) => {
-    const response = await fetch(`${API_BASE_URL}/api/my-tasks/${taskId}`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch task details");
-    return response.json();
-  },
-  
-  startTask: async (taskId, isAction = false) => {
-    const endpoint = isAction 
-      ? `${API_BASE_URL}/api/my-tasks/action/${taskId}/start`
-      : `${API_BASE_URL}/api/task-instances/${taskId}/start`;
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to start task");
-    return response.json();
-  },
-  
-  completeTask: async ({ taskId, data, isAction = false }) => {
-    if (isAction) {
-      // Complete action via the action endpoint
-      const response = await fetch(`${API_BASE_URL}/api/my-tasks/action/${taskId}/complete`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data)
-      });
-      if (!response.ok) throw new Error("Failed to complete action");
-      return response.json();
-    } else {
-      // Complete task instance
-      const response = await fetch(`${API_BASE_URL}/api/task-instances/${taskId}/complete`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data)
-      });
-      if (!response.ok) throw new Error("Failed to complete task");
-      return response.json();
-    }
-  },
-  
-  deleteTask: async (taskId, isAction = false) => {
-    // Use different endpoint for actions vs task instances
-    const endpoint = isAction 
-      ? `${API_BASE_URL}/api/actions/${taskId}`
-      : `${API_BASE_URL}/api/task-instances/${taskId}`;
-    
-    const response = await fetch(endpoint, {
-      method: "DELETE",
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error(isAction ? "Failed to delete action" : "Failed to delete task");
-    return response.json();
-  },
-};
+import { myTasksAPI } from "../lib/api";
 
 // Source badges
 const sourceBadges = {

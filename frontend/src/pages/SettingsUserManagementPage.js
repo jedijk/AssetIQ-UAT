@@ -1,5 +1,6 @@
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -8,7 +9,7 @@ import { toast } from "sonner";
 import { formatDate as formatDateUtil } from "../lib/dateUtils";
 import ImageEditor from "../components/ImageEditor";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
-import { usersAPI, equipmentHierarchyAPI } from "../lib/api";
+import { usersAPI, equipmentHierarchyAPI, rbacAPI } from "../lib/api";
 import {
   Users,
   Search,
@@ -75,10 +76,6 @@ import { Label } from "../components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import SettingsPermissionsPage from "./SettingsPermissionsPage";
 
-// Get base URL without /api suffix
-// Get API base URL dynamically
-const getApiBaseUrl = () => getBackendUrl();
-
 // Role icons mapping
 const roleIcons = {
   owner: Crown,
@@ -97,168 +94,6 @@ const roleColors = {
   maintenance: "bg-amber-100 text-amber-800 border-amber-200",
   operations: "bg-green-100 text-green-800 border-green-200",
   viewer: "bg-slate-100 text-slate-800 border-slate-200",
-};
-
-// API functions
-const rbacAPI = {
-  getUsers: async (params = {}) => {
-    const queryParams = new URLSearchParams();
-    if (params.search) queryParams.append("search", params.search);
-    if (params.role) queryParams.append("role", params.role);
-    if (params.is_active !== undefined) queryParams.append("is_active", params.is_active);
-    
-    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users?${queryParams}`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch users");
-    return response.json();
-  },
-  
-  getPendingUsers: async () => {
-    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/pending`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch pending users");
-    return response.json();
-  },
-  
-  approveUser: async ({ userId, action, role, rejectionReason, assignedInstallations }) => {
-    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/approve`, {
-      method: "PATCH",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ 
-        action, 
-        role,
-        rejection_reason: rejectionReason,
-        assigned_installations: assignedInstallations
-      })
-    });
-    if (!response.ok) throw new Error("Failed to process approval");
-    return response.json();
-  },
-  
-  getRoles: async () => {
-    const response = await fetch(`${getApiBaseUrl()}/api/rbac/roles`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch roles");
-    return response.json();
-  },
-  
-  updateUserRole: async ({ userId, role }) => {
-    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/role`, {
-      method: "PATCH",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ role })
-    });
-    if (!response.ok) throw new Error("Failed to update role");
-    return response.json();
-  },
-  
-  updateUserStatus: async ({ userId, isActive }) => {
-    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/status`, {
-      method: "PATCH",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ is_active: isActive })
-    });
-    if (!response.ok) throw new Error("Failed to update status");
-    return response.json();
-  },
-  
-  updateUserProfile: async ({ userId, data }) => {
-    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/profile`, {
-      method: "PATCH",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) throw new Error("Failed to update profile");
-    return response.json();
-  },
-  
-  uploadUserAvatar: async ({ userId, file }) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    
-    // For file uploads, we need to remove Content-Type so browser sets it with boundary
-    const headers = getAuthHeaders();
-    delete headers["Content-Type"];
-    
-    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/avatar`, {
-      method: "POST",
-      headers,
-      body: formData
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.detail || "Failed to upload avatar");
-    }
-    return response.json();
-  },
-  
-  getUserAvatar: async (userId) => {
-    const response = await fetch(`${getApiBaseUrl()}/api/users/${userId}/avatar`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) return null;
-    const blob = await response.blob();
-    return URL.createObjectURL(blob);
-  },
-  
-  deleteUser: async (userId) => {
-    const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}`, {
-      method: "DELETE",
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.detail || "Failed to delete user");
-    }
-    return response.json();
-  },
-
-  resetPassword: async (userId) => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("Not authenticated. Please log in again.");
-      }
-      
-      const response = await fetch(`${getApiBaseUrl()}/api/auth/admin-reset-password`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ user_id: userId })
-      });
-      
-      // Parse response body first
-      let responseData;
-      try {
-        responseData = await response.json();
-      } catch (parseError) {
-        console.error("Reset password response parse error:", parseError);
-        throw new Error("Server returned invalid response");
-      }
-      
-      if (!response.ok) {
-        // Log detailed error for debugging
-        console.error("Reset password API error:", {
-          status: response.status,
-          statusText: response.statusText,
-          detail: responseData?.detail,
-          response: responseData
-        });
-        throw new Error(responseData?.detail || `Failed to send password reset email (${response.status})`);
-      }
-      
-      return responseData;
-    } catch (error) {
-      // Handle network errors specifically
-      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-        console.error("Network error during password reset:", error);
-        throw new Error("Network error: Unable to reach server. Please check your connection.");
-      }
-      throw error;
-    }
-  }
 };
 
 // Helper component for user avatars with proper fallback
@@ -299,14 +134,7 @@ const SettingsUserManagementPage = () => {
   // Check if current user is owner
   const isOwner = currentUser?.role === "owner";
   
-  // Mobile detection
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const isMobile = useIsMobile();
   
   // State
   const [search, setSearch] = useState("");
@@ -379,44 +207,16 @@ const SettingsUserManagementPage = () => {
   const { data: installationsData } = useQuery({
     queryKey: ["all-installations"],
     queryFn: async () => {
-      const response = await fetch(`${getApiBaseUrl()}/api/equipment-hierarchy/installations`, {
-        headers: getAuthHeaders()
-      });
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-  
-  // Also fetch threats to extract locations as fallback
-  const { data: threatsData } = useQuery({
-    queryKey: ["threats-for-locations"],
-    queryFn: async () => {
-      const response = await fetch(`${getApiBaseUrl()}/api/threats`, {
-        headers: getAuthHeaders()
-      });
-      return response.json();
+      const data = await equipmentHierarchyAPI.getNodes();
+      // Extract installations from equipment nodes
+      const installationNodes = (data?.nodes || []).filter(n => n.level === 'installation');
+      return { installations: installationNodes };
     },
     staleTime: 5 * 60 * 1000,
   });
   
   // Get installations from the API
-  const equipmentInstallations = installationsData?.installations || [];
-  
-  // Extract unique locations from threats as fallback installations
-  const locationInstallations = useMemo(() => {
-    const threats = Array.isArray(threatsData) ? threatsData : [];
-    const locations = new Set();
-    threats.forEach(t => {
-      if (t.location) locations.add(t.location);
-      if (t.plant_unit) locations.add(t.plant_unit);
-    });
-    return Array.from(locations).map(loc => ({ id: loc, name: loc, source: 'location' }));
-  }, [threatsData]);
-  
-  // Combine equipment installations and location-based installations
-  const installations = equipmentInstallations.length > 0 
-    ? equipmentInstallations 
-    : locationInstallations;
+  const installations = installationsData?.installations || [];
 
   // Approval mutation
   const approvalMutation = useMutation({
@@ -519,17 +319,7 @@ const SettingsUserManagementPage = () => {
 
   // Reset intro tour mutation
   const resetIntroMutation = useMutation({
-    mutationFn: async (userId) => {
-      const response = await fetch(`${getApiBaseUrl()}/api/rbac/users/${userId}/reset-intro`, {
-        method: "POST",
-        headers: getAuthHeaders()
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to reset intro tour");
-      }
-      return response.json();
-    },
+    mutationFn: rbacAPI.resetIntro,
     onSuccess: (data) => {
       toast.success(data.message || "Intro tour will show on next login");
     },
@@ -540,18 +330,7 @@ const SettingsUserManagementPage = () => {
 
   // Create user mutation
   const createUserMutation = useMutation({
-    mutationFn: async (userData) => {
-      const response = await fetch(`${getApiBaseUrl()}/api/users/create`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(userData)
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to create user");
-      }
-      return response.json();
-    },
+    mutationFn: rbacAPI.createUser,
     onSuccess: (data) => {
       queryClient.invalidateQueries(["rbac-users"]);
       const emailMsg = data.email_sent ? " Welcome email sent." : "";

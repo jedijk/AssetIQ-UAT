@@ -1,5 +1,5 @@
-import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Sliders, AlertTriangle, BarChart2, Eye, Info, Building2, Check, Pencil, RotateCcw, Save, X, Gauge, ArrowLeft } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -37,8 +37,6 @@ import {
 import { toast } from "sonner";
 
 import { Shield, Factory, Leaf, Award } from "lucide-react";
-
-const API_BASE_URL = getBackendUrl();
 
 // Criticality dimension icons
 const CRITICALITY_DIMENSIONS = [
@@ -156,56 +154,7 @@ const CriticalityTable = ({ data, isEditing, onUpdateRow, t }) => {
 };
 
 // API functions
-const definitionsAPI = {
-  getInstallations: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/definitions/installations`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch installations");
-    return response.json();
-  },
-  
-  getDefinitions: async (equipmentId) => {
-    const response = await fetch(`${API_BASE_URL}/api/definitions/equipment/${equipmentId}`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch definitions");
-    return response.json();
-  },
-  
-  getDefaults: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/definitions/defaults`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch defaults");
-    return response.json();
-  },
-  
-  saveDefinitions: async ({ equipmentId, severity, occurrence, detection, criticality }) => {
-    const response = await fetch(`${API_BASE_URL}/api/definitions`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        equipment_id: equipmentId,
-        severity,
-        occurrence,
-        detection,
-        criticality
-      })
-    });
-    if (!response.ok) throw new Error("Failed to save definitions");
-    return response.json();
-  },
-  
-  resetDefinitions: async (equipmentId) => {
-    const response = await fetch(`${API_BASE_URL}/api/definitions/${equipmentId}`, {
-      method: "DELETE",
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to reset definitions");
-    return response.json();
-  }
-};
+import { definitionsAPI } from "../lib/api";
 
 // Row edit dialog component
 const EditRowDialog = ({ row, type, onSave, onClose, t }) => {
@@ -451,15 +400,7 @@ export default function DefinitionsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   
-  // Check if mobile viewport
-  const [isMobile, setIsMobile] = useState(false);
-  
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const isMobile = useIsMobile();
   
   // Local state for editing
   const [localSeverity, setLocalSeverity] = useState([]);

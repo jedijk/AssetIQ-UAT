@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -131,15 +132,7 @@ const FeedbackPage = () => {
   const canWrite = hasPermission("feedback", "write");
   const canDelete = hasPermission("feedback", "delete");
 
-  // Check if mobile viewport
-  const [isMobile, setIsMobile] = useState(false);
-  
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const isMobile = useIsMobile();
 
   // State
   const [isModalOpen, setIsModalOpen] = useState(false);

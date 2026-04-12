@@ -1,5 +1,5 @@
-import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useState, useEffect } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -72,161 +72,8 @@ import { CompleteDialog, DeleteExecutionDialog } from "../components/task-schedu
 import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 
 // Get base URL without /api suffix
-const API_BASE_URL = getBackendUrl();
-
-// API functions
-const taskAPI = {
-  // Templates
-  getTemplates: async (params = {}) => {
-    const queryParams = new URLSearchParams();
-    if (params.discipline) queryParams.append("discipline", params.discipline);
-    if (params.search) queryParams.append("search", params.search);
-    const response = await fetch(`${API_BASE_URL}/api/task-templates?${queryParams}`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch templates");
-    return response.json();
-  },
-  createTemplate: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-templates`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) throw new Error("Failed to create template");
-    return response.json();
-  },
-  deleteTemplate: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-templates/${id}`, {
-      method: "DELETE",
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || "Failed to delete template");
-    }
-    return response.json();
-  },
-  updateTemplate: async (id, data) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-templates/${id}`, {
-      method: "PATCH",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || "Failed to update template");
-    }
-    return response.json();
-  },
-
-  // Plans
-  getPlans: async (params = {}) => {
-    const queryParams = new URLSearchParams();
-    if (params.equipment_id) queryParams.append("equipment_id", params.equipment_id);
-    const response = await fetch(`${API_BASE_URL}/api/task-plans?${queryParams}`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch plans");
-    return response.json();
-  },
-  createPlan: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-plans`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || "Failed to create plan");
-    }
-    return response.json();
-  },
-  deletePlan: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-plans/${id}`, {
-      method: "DELETE",
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || "Failed to delete plan");
-    }
-    return response.json();
-  },
-  updatePlan: async (id, data) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-plans/${id}`, {
-      method: "PATCH",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || "Failed to update plan");
-    }
-    return response.json();
-  },
-
-  // Instances
-  getInstances: async (params = {}) => {
-    const queryParams = new URLSearchParams();
-    queryParams.append("limit", "30");  // Optimized limit for fast loading
-    if (params.status) queryParams.append("status", params.status);
-    if (params.plan_id) queryParams.append("plan_id", params.plan_id);
-    const response = await fetch(`${API_BASE_URL}/api/task-instances?${queryParams}`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch instances");
-    return response.json();
-  },
-  getCalendar: async (startDate, endDate) => {
-    const response = await fetch(
-      `${API_BASE_URL}/api/task-instances/calendar?start_date=${startDate}&end_date=${endDate}`,
-      { headers: getAuthHeaders() }
-    );
-    if (!response.ok) throw new Error("Failed to fetch calendar");
-    return response.json();
-  },
-  startInstance: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-instances/${id}/start`, {
-      method: "POST",
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to start task");
-    return response.json();
-  },
-  completeInstance: async ({ id, data }) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-instances/${id}/complete`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) throw new Error("Failed to complete task");
-    return response.json();
-  },
-  generateInstances: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/tasks/generate-all`, {
-      method: "POST",
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to generate instances");
-    return response.json();
-  },
-  deleteInstance: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/task-instances/${id}`, {
-      method: "DELETE",
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to delete execution");
-    return response.json();
-  },
-  getStats: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/tasks/stats`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("Failed to fetch stats");
-    return response.json();
-  }
-};
+import { taskSchedulerAPI as taskAPI, equipmentHierarchyAPI } from "../lib/api";
+import { formAPI } from "../components/forms";
 
 // Status badge component
 const StatusBadge = ({ status }) => {
@@ -261,14 +108,7 @@ const TaskSchedulerPage = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
   
-  // Mobile detection
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const isMobile = useIsMobile();
   
   // State
   const [searchParams, setSearchParams] = useSearchParams();
@@ -386,25 +226,13 @@ const TaskSchedulerPage = () => {
 
   const { data: equipmentData } = useQuery({
     queryKey: ["equipment-nodes"],
-    queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/api/equipment-hierarchy/nodes`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
-      if (!response.ok) throw new Error("Failed to fetch equipment");
-      return response.json();
-    },
+    queryFn: () => equipmentHierarchyAPI.getNodes(),
     enabled: showPlanDialog
   });
 
   const { data: formTemplatesData } = useQuery({
     queryKey: ["form-templates"],
-    queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/api/form-templates`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
-      if (!response.ok) throw new Error("Failed to fetch form templates");
-      return response.json();
-    },
+    queryFn: () => formAPI.getTemplates({}),
     enabled: showPlanDialog || showTemplateDialog
   });
 

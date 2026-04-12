@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getBackendUrl, getAuthHeaders } from "../lib/apiConfig";
 import { updateCachedPreferences } from "../lib/dateUtils";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
@@ -42,34 +42,7 @@ import {
   PopoverTrigger,
 } from "../components/ui/popover";
 
-const API_URL = getBackendUrl();
-
-// API functions
-const preferencesAPI = {
-  getPreferences: async () => {
-    const response = await fetch(`${API_URL}/api/users/me/preferences`, {
-      headers: getAuthHeaders(),
-    });
-    if (!response.ok) throw new Error("Failed to fetch preferences");
-    return response.json();
-  },
-  updatePreferences: async (data) => {
-    const response = await fetch(`${API_URL}/api/users/me/preferences`, {
-      method: "PUT",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error("Failed to update preferences");
-    return response.json();
-  },
-  getTimezones: async () => {
-    const response = await fetch(`${API_URL}/api/timezones`, {
-      headers: getAuthHeaders(),
-    });
-    if (!response.ok) throw new Error("Failed to fetch timezones");
-    return response.json();
-  },
-};
+import { preferencesAPI } from "../lib/api";
 
 // Detect browser timezone
 const detectTimezone = () => {
@@ -103,13 +76,7 @@ export default function SettingsPreferencesPage() {
   const [timezoneSearch, setTimezoneSearch] = useState("");
   const [currentTime, setCurrentTime] = useState("");
   
-  // Mobile detection
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const isMobile = useIsMobile();
 
   // Fetch preferences
   const { data: preferences, isLoading: prefsLoading } = useQuery({

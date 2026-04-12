@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { actionsAPI, usersAPI } from "../lib/api";
@@ -150,13 +151,7 @@ export default function ActionsPage() {
   const canWrite = hasPermission("actions", "write");
   const canDelete = hasPermission("actions", "delete");
   
-  // Mobile detection
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  useState(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  const isMobile = useIsMobile();
 
   // Toggle status in multi-select
   const toggleStatus = (status) => {
