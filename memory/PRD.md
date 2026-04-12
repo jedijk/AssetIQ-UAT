@@ -5,6 +5,57 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+
+### April 12, 2026 - Structural Code Audit & Architectural Fixes (COMPLETED)
+**AUDIT + FIX - 10 architectural issues detected and resolved:**
+
+**Critical Fixes:**
+1. **Race Condition in CausalEnginePage Notes Auto-Save** - Removed `updateInvMutation` from useEffect dependency array (it returned a new reference each render, causing timer resets)
+2. **Split-Brain API Architecture** - Unified 6 inline API objects into centralized `api.js`:
+   - `taskSchedulerAPI` (TaskSchedulerPage, ~150 lines removed)
+   - `myTasksAPI` (MyTasksPage, ~110 lines removed)
+   - `rbacAPI` (SettingsUserManagementPage, ~160 lines removed)
+   - `definitionsAPI` (DefinitionsPage, ~50 lines removed)
+   - `preferencesAPI` (SettingsPreferencesPage, ~25 lines removed)
+   - `userStatsAPI` (UserStatisticsPage, ~25 lines removed)
+   - Now all pages get: auto auth tokens, X-Database-Environment headers, 401 redirects, timeout handling
+3. **Removed unnecessary /api/threats fetch** from SettingsUserManagementPage (was loading ALL threats just for location names)
+
+**Medium Fixes:**
+4. **Mobile Detection Standardized** - Replaced 13 copy-pasted `useEffect + window.innerWidth` blocks with existing `useIsMobile` hook across: CausalEnginePage, FormsPage, SettingsUserManagementPage, EquipmentManagerPage, FailureModesPage, FeedbackPage, DefinitionsPage, SettingsPermissionsPage, SettingsPreferencesPage, TaskSchedulerPage, UserStatisticsPage, SettingsAIUsagePage, ActionsPage
+5. **FormsPage Template Sync** - Replaced expensive `JSON.stringify` deep comparison with version number check
+6. **Consolidated rbacAPI** - Removed duplicate from SettingsUserManagementPage (now imports from api.js)
+7. **actionsAPI duplicate** - Documented `get()` and `getById()` as alias
+
+**Cleanup:**
+8. **Console.log in api.js** - Gated behind `NODE_ENV === 'development'`
+9. **Duplicate Swagger routes** - Removed broken `/docs`, `/redoc`, `/openapi.json` (FastAPI already serves at `/api/docs`)
+
+**Files Modified (Frontend):**
+- `/app/frontend/src/lib/api.js` - Added 6 new API modules (~300 lines), gated console.logs
+- `/app/frontend/src/pages/CausalEnginePage.js` - Race condition fix, useIsMobile
+- `/app/frontend/src/pages/SettingsUserManagementPage.js` - Removed inline rbacAPI, threats query, useIsMobile
+- `/app/frontend/src/pages/TaskSchedulerPage.js` - Removed inline taskAPI, useIsMobile
+- `/app/frontend/src/pages/MyTasksPage.js` - Removed inline myTasksAPI, useIsMobile
+- `/app/frontend/src/pages/DefinitionsPage.js` - Removed inline definitionsAPI, useIsMobile
+- `/app/frontend/src/pages/SettingsPreferencesPage.js` - Removed inline preferencesAPI, useIsMobile
+- `/app/frontend/src/pages/UserStatisticsPage.js` - Removed inline userStatsAPI, useIsMobile
+- `/app/frontend/src/pages/FormsPage.js` - Template sync fix, useIsMobile
+- `/app/frontend/src/pages/EquipmentManagerPage.js` - useIsMobile
+- `/app/frontend/src/pages/FailureModesPage.js` - useIsMobile
+- `/app/frontend/src/pages/FeedbackPage.js` - useIsMobile
+- `/app/frontend/src/pages/SettingsPermissionsPage.js` - useIsMobile
+- `/app/frontend/src/pages/ActionsPage.js` - useIsMobile
+- `/app/frontend/src/pages/SettingsAIUsagePage.js` - useIsMobile
+
+**Files Modified (Backend):**
+- `/app/backend/server.py` - Removed duplicate Swagger UI routes
+
+**Testing:** 15/15 pages passed smoke test (100% success rate)
+**Audit Report:** Saved to `/app/memory/AUDIT_REPORT.md`
+
+---
+
 ### April 11, 2026 - Bulk Excel Import Feature (COMPLETED)
 **FEATURE - Added bulk Excel import for equipment hierarchy:**
 
