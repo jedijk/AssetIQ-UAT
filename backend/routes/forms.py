@@ -264,6 +264,23 @@ async def get_form_submissions(
         
         raw_submissions = await asyncio.wait_for(execute_query(), timeout=2.0)
         
+        # Collect equipment IDs for tag lookup
+        equipment_ids = list(set(doc.get("equipment_id") for doc in raw_submissions if doc.get("equipment_id")))
+        
+        # Batch fetch equipment tags
+        equipment_tag_map = {}
+        if equipment_ids:
+            try:
+                equip_cursor = db.equipment_nodes.find(
+                    {"id": {"$in": equipment_ids}},
+                    {"_id": 0, "id": 1, "tag": 1}
+                )
+                async for eq in equip_cursor:
+                    if eq.get("tag"):
+                        equipment_tag_map[eq["id"]] = eq["tag"]
+            except Exception:
+                pass
+        
         # Collect user IDs for avatar lookup (fast batch query)
         user_ids = list(set(doc.get("submitted_by") for doc in raw_submissions if doc.get("submitted_by")))
         
@@ -307,6 +324,7 @@ async def get_form_submissions(
                 "task_template_name": doc.get("task_template_name"),
                 "equipment_id": doc.get("equipment_id"),
                 "equipment_name": doc.get("equipment_name"),
+                "equipment_tag": equipment_tag_map.get(doc.get("equipment_id")),
                 "submitted_by": submitted_by,
                 "submitted_by_name": doc.get("submitted_by_name"),
                 "submitted_by_photo": submitted_by_photo,

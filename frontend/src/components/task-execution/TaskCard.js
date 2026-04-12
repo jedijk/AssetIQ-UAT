@@ -92,6 +92,9 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
           </div>
           
           {/* Asset / Location */}
+          {task.equipment_tag && (
+            <div className="text-xs text-slate-400 font-mono mb-1 ml-6">{task.equipment_tag}</div>
+          )}
           <div className={cn(
             "flex items-center gap-1.5 text-sm mb-2",
             isCompleted ? "text-slate-400" : "text-slate-500"

@@ -134,6 +134,7 @@ def serialize_task(task: dict) -> dict:
         "action_type": task.get("action_type"),  # CM/PM/PDM for actions
         "risk_score": task.get("risk_score"),
         "rpn": task.get("rpn"),
+        "equipment_tag": task.get("equipment_tag"),
     }
     
     return result
@@ -191,6 +192,7 @@ def serialize_action_as_task(action: dict) -> dict:
         "comments": action.get("comments", ""),
         "risk_score": action.get("threat_risk_score") or action.get("risk_score"),
         "rpn": action.get("threat_rpn") or action.get("rpn"),
+        "equipment_tag": action.get("equipment_tag"),
     }
     
     return result
@@ -305,7 +307,7 @@ async def get_my_tasks(
     plan_ids_oid = set()
     
     for task in raw_tasks:
-        if task.get("equipment_id") and not task.get("equipment_name"):
+        if task.get("equipment_id"):
             equipment_ids.add(task["equipment_id"])
         task_plan_id = task.get("task_plan_id")
         if task_plan_id:
@@ -389,13 +391,14 @@ async def get_my_tasks(
     tasks = []
     for task in raw_tasks:
         # Get equipment name and tag from map
-        if task.get("equipment_id") and not task.get("equipment_name"):
+        if task.get("equipment_id"):
             eq_data = equipment_map.get(task["equipment_id"], {})
             if isinstance(eq_data, dict):
-                task["equipment_name"] = eq_data.get("name", "Unknown")
-                task["equipment_tag"] = eq_data.get("tag")
-            else:
-                # Backward compat: if it's just a string name
+                if not task.get("equipment_name"):
+                    task["equipment_name"] = eq_data.get("name", "Unknown")
+                if not task.get("equipment_tag"):
+                    task["equipment_tag"] = eq_data.get("tag")
+            elif not task.get("equipment_name"):
                 task["equipment_name"] = eq_data
         
         # Get plan details for recurring info

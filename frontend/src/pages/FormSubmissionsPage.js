@@ -691,6 +691,9 @@ export default function FormSubmissionsPage() {
                             </Badge>
                           )}
                         </div>
+                        {submission.equipment_tag && (
+                          <div className="text-xs text-slate-400 font-mono mb-1">{submission.equipment_tag}</div>
+                        )}
                         
                         {/* Meta Info Row - Simplified on mobile */}
                         <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-4 gap-y-0.5 text-xs sm:text-sm text-slate-500">
@@ -835,6 +838,9 @@ export default function FormSubmissionsPage() {
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-slate-800">{selectedSubmission.form_template_name}</h2>
+                      {selectedSubmission.equipment_tag && (
+                        <div className="text-xs text-slate-400 font-mono">{selectedSubmission.equipment_tag}</div>
+                      )}
                       <div className="flex items-center gap-2 mt-0.5">
                         <UserAvatar 
                           name={selectedSubmission.submitted_by_name || "Unknown"} 
@@ -880,6 +886,9 @@ export default function FormSubmissionsPage() {
                           <Building2 className="w-3.5 h-3.5 text-slate-400" />
                           {selectedSubmission.equipment_name}
                         </p>
+                        {selectedSubmission.equipment_tag && (
+                          <p className="text-xs text-slate-400 font-mono mt-0.5">{selectedSubmission.equipment_tag}</p>
+                        )}
                       </div>
                     </div>
                   )}
