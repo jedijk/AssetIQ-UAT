@@ -28,8 +28,6 @@ import { useLanguage } from "../contexts/LanguageContext";
 const LANGUAGE_OPTIONS = [
   { code: "en", label: "English", flag: "EN" },
   { code: "nl", label: "Nederlands", flag: "NL" },
-  { code: "de", label: "Deutsch", flag: "DE" },
-  { code: "fr", label: "Francais", flag: "FR" },
 ];
 
 const ChatPage = () => {

@@ -22,8 +22,6 @@ router = APIRouter(tags=["Chat"])
 # Language detection using common word frequency
 _LANG_WORDS = {
     "nl": {"de", "het", "een", "is", "van", "en", "in", "dat", "niet", "op", "te", "zijn", "voor", "met", "aan", "er", "ook", "maar", "als", "nog", "wel", "geen", "moet", "wordt", "kan", "naar", "bij", "dit", "wat", "meer", "uit", "over", "zo", "dan", "hun", "werd", "heeft", "hoe", "nee", "ja", "kapot", "stuk", "lek", "pomp", "klep", "sensor", "storing", "onderhoud", "controleer", "draait"},
-    "de": {"der", "die", "und", "ist", "ein", "eine", "nicht", "von", "mit", "auf", "das", "den", "auch", "sich", "des", "dem", "wird", "sind", "wie", "oder", "noch", "kann", "nach", "aber", "nur", "aus", "wenn", "hat", "haben", "ich", "wir", "sie", "es", "kaputt", "defekt", "pumpe", "ventil"},
-    "fr": {"le", "la", "les", "de", "des", "est", "un", "une", "du", "et", "en", "que", "qui", "dans", "pas", "sur", "pour", "avec", "sont", "ce", "cette", "au", "aux", "ne", "ont", "il", "elle", "nous", "vous", "ils", "mais", "ou", "comme", "pompe", "vanne", "capteur"},
 }
 
 def detect_language(text: str) -> str:
