@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { useLanguage } from "../contexts/LanguageContext";
 
 const LANGUAGE_OPTIONS = [
   { code: "en", label: "English", flag: "EN" },
@@ -39,6 +40,7 @@ const LANGUAGE_OPTIONS = [
 ];
 
 const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
+  const { language: appLanguage, setLanguage: setAppLanguage } = useLanguage();
   const [message, setMessage] = useState("");
   const [imageBase64, setImageBase64] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -97,6 +99,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
       setNewFailureModeName("");
       if (data?.detected_language) {
         setDetectedLanguage(data.detected_language);
+        // Sync app language if detected language is supported (en/nl)
+        const lang = data.detected_language;
+        if ((lang === "en" || lang === "nl") && lang !== appLanguage) {
+          setAppLanguage(lang);
+        }
       }
     },
     onError: (error) => {
@@ -879,6 +886,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                         onClick={() => {
                           setManualLanguage(lang.code);
                           setShowLangPicker(false);
+                          if (lang.code === "en" || lang.code === "nl") {
+                            setAppLanguage(lang.code);
+                          }
                         }}
                         data-testid={`chat-language-option-${lang.code}`}
                       >

@@ -33,7 +33,7 @@ const LANGUAGE_OPTIONS = [
 ];
 
 const ChatPage = () => {
-  const { t } = useLanguage();
+  const { t, language: appLanguage, setLanguage: setAppLanguage } = useLanguage();
   const [message, setMessage] = useState("");
   const [imageBase64, setImageBase64] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -67,6 +67,10 @@ const ChatPage = () => {
       setImagePreview(null);
       if (data?.detected_language) {
         setDetectedLanguage(data.detected_language);
+        const lang = data.detected_language;
+        if ((lang === "en" || lang === "nl") && lang !== appLanguage) {
+          setAppLanguage(lang);
+        }
       }
     },
     onError: (error) => {
@@ -446,6 +450,9 @@ const ChatPage = () => {
                     onClick={() => {
                       setManualLanguage(lang.code);
                       setShowLangPicker(false);
+                      if (lang.code === "en" || lang.code === "nl") {
+                        setAppLanguage(lang.code);
+                      }
                     }}
                     data-testid={`language-option-${lang.code}`}
                   >
