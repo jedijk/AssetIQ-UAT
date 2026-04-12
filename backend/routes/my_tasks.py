@@ -533,24 +533,77 @@ async def get_my_tasks(
         # Collect all actions first to batch threat lookup
         raw_actions = await db.central_actions.find(action_query, {"_id": 0}).to_list(length=100)
         
-        # Batch fetch threat risk data
-        source_ids = [a["source_id"] for a in raw_actions if a.get("source_id")]
+        # Batch fetch threat risk data + equipment link
+        # Actions can reference threats directly (source_type=threat) or via investigations
+        threat_source_ids = set()
+        investigation_source_ids = set()
+        for a in raw_actions:
+            sid = a.get("source_id")
+            if not sid:
+                continue
+            if a.get("threat_id"):
+                threat_source_ids.add(a["threat_id"])
+            elif a.get("source_type") == "investigation":
+                investigation_source_ids.add(sid)
+            else:
+                threat_source_ids.add(sid)
+        
+        # Also look up investigations to find their threat_ids
+        if investigation_source_ids:
+            inv_cursor = db.investigations.find(
+                {"id": {"$in": list(investigation_source_ids)}},
+                {"_id": 0, "id": 1, "threat_id": 1}
+            )
+            inv_threat_map = {}
+            async for inv in inv_cursor:
+                if inv.get("threat_id"):
+                    inv_threat_map[inv["id"]] = inv["threat_id"]
+                    threat_source_ids.add(inv["threat_id"])
+        else:
+            inv_threat_map = {}
+        
         threat_map = {}
-        if source_ids:
+        threat_equipment_ids = set()
+        if threat_source_ids:
             threats_cursor = db.threats.find(
-                {"id": {"$in": source_ids}},
-                {"_id": 0, "id": 1, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1}
+                {"id": {"$in": list(threat_source_ids)}},
+                {"_id": 0, "id": 1, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1, "linked_equipment_id": 1}
             )
             async for threat in threats_cursor:
                 threat_map[threat["id"]] = threat
+                if threat.get("linked_equipment_id"):
+                    threat_equipment_ids.add(threat["linked_equipment_id"])
         
-        # Process actions with pre-fetched threat data
+        # Batch fetch equipment tags for action-linked threats
+        action_equip_tag_map = {}
+        if threat_equipment_ids:
+            equip_cursor = db.equipment_nodes.find(
+                {"id": {"$in": list(threat_equipment_ids)}},
+                {"_id": 0, "id": 1, "tag": 1}
+            )
+            async for eq in equip_cursor:
+                if eq.get("tag"):
+                    action_equip_tag_map[eq["id"]] = eq["tag"]
+        
+        # Process actions with pre-fetched threat data + equipment tags
         for action in raw_actions:
-            if action.get("source_id"):
+            # Resolve the threat for this action
+            threat = None
+            if action.get("threat_id"):
+                threat = threat_map.get(action["threat_id"])
+            elif action.get("source_type") == "investigation" and action.get("source_id"):
+                inv_threat_id = inv_threat_map.get(action["source_id"])
+                if inv_threat_id:
+                    threat = threat_map.get(inv_threat_id)
+            elif action.get("source_id"):
                 threat = threat_map.get(action["source_id"])
-                if threat:
-                    action["threat_rpn"] = threat.get("fmea_rpn")
-                    action["threat_risk_score"] = threat.get("risk_score")
+            
+            if threat:
+                action["threat_rpn"] = threat.get("fmea_rpn")
+                action["threat_risk_score"] = threat.get("risk_score")
+                equip_id = threat.get("linked_equipment_id")
+                if equip_id:
+                    action["equipment_tag"] = action_equip_tag_map.get(equip_id)
             tasks.append(serialize_action_as_task(action))
     
     # Sort combined list: Risk Score (highest first) -> Status -> Priority -> Due Date
