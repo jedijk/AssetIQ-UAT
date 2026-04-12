@@ -758,11 +758,21 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               ))}
               {/* AI Processing Indicator */}
               {(isSending || isTranscribing) && (
-                <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-2xl rounded-bl-sm px-4 py-3 bg-white border border-slate-200 shadow-sm">
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                      <span>{isTranscribing ? "Transcribing voice..." : "Processing..."}</span>
+                <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="max-w-[85%] rounded-2xl rounded-bl-sm px-4 py-3 bg-blue-50 border border-blue-200">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        </div>
+                        <div className="absolute inset-0 rounded-full bg-blue-400 animate-ping opacity-30" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">
+                          {isTranscribing ? "Transcribing & translating..." : "AI is processing..."}
+                        </p>
+                        <p className="text-xs text-blue-500">This may take a few seconds</p>
+                      </div>
                     </div>
                   </div>
                 </div>
