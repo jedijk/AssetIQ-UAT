@@ -363,5 +363,5 @@ async def get_reliability_scores(
 
 @router.get("/")
 async def root():
-    return {"message": "ThreatBase API", "version": "1.0.0"}
+    return {"message": "ThreatBase API", "version": "3.0.0"}
 
