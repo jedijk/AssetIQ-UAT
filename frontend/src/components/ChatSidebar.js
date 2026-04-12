@@ -318,7 +318,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   }, []);
 
   // Render message content
-  const renderMessageContent = (msg) => {
+  const renderMessageContent = (msg, isInteractive = true) => {
     if (msg.role === "user") {
       return (
         <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm p-3 max-w-[85%] shadow-sm text-sm">
@@ -437,8 +437,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           <p className="whitespace-pre-wrap">{msg.content}</p>
         )}
         
-        {/* Equipment Suggestions */}
-        {msg.equipment_suggestions && msg.equipment_suggestions.length > 0 && (
+        {/* Equipment Suggestions - only on latest message */}
+        {isInteractive && msg.equipment_suggestions && msg.equipment_suggestions.length > 0 && (
           <div className="mt-3 space-y-2">
             {msg.equipment_suggestions.map((eq) => (
               <button
@@ -492,8 +492,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           </div>
         )}
         
-        {/* Failure Mode Suggestions */}
-        {msg.failure_mode_suggestions && msg.failure_mode_suggestions.length > 0 && (
+        {/* Failure Mode Suggestions - only on latest message */}
+        {isInteractive && msg.failure_mode_suggestions && msg.failure_mode_suggestions.length > 0 && (
           <div className="mt-3 space-y-2">
             {msg.failure_mode_suggestions.map((fm) => (
               <button
@@ -627,7 +627,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
         )}
         
         {/* Show "New Failure Mode" option when no failure modes found (empty array) */}
-        {msg.failure_mode_suggestions && msg.failure_mode_suggestions.length === 0 && !showNewFailureModeInput && (
+        {/* New failure mode option - only on latest message */}
+        {isInteractive && msg.failure_mode_suggestions && msg.failure_mode_suggestions.length === 0 && !showNewFailureModeInput && (
           <div className="mt-3 space-y-2">
             <p className="text-sm text-amber-700">No matching failure modes found in the library.</p>
             <button
@@ -654,7 +655,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           </div>
         )}
         
-        {isFollowUp && !msg.threat_id && !msg.equipment_suggestions && !msg.failure_mode_suggestions && !showNewFailureModeInput && (
+        {/* Skip context - only on latest message */}
+        {isInteractive && isFollowUp && !msg.threat_id && !msg.equipment_suggestions && !msg.failure_mode_suggestions && !showNewFailureModeInput && (
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1 text-blue-600 text-xs">
             <HelpCircle className="w-3 h-3" />
             <span>Please provide more details</span>
@@ -748,14 +750,18 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             </div>
           ) : (
             <>
-              {messages.map((msg, idx) => (
-                <div
-                  key={msg.id || idx}
-                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  {renderMessageContent(msg)}
-                </div>
-              ))}
+              {messages.map((msg, idx) => {
+                const isLastAssistant = msg.role === "assistant" && 
+                  !messages.slice(idx + 1).some(m => m.role === "assistant");
+                return (
+                  <div
+                    key={msg.id || idx}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    {renderMessageContent(msg, isLastAssistant)}
+                  </div>
+                );
+              })}
               {/* AI Processing Indicator */}
               {(isSending || isTranscribing) && (
                 <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
