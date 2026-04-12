@@ -87,11 +87,10 @@ export const authAPI = {
 
 // Chat API
 export const chatAPI = {
-  sendMessage: async (content, imageBase64 = null) => {
-    const response = await api.post("/chat/send", {
-      content,
-      image_base64: imageBase64,
-    });
+  sendMessage: async (content, imageBase64 = null, language = null) => {
+    const payload = { content, image_base64: imageBase64 };
+    if (language) payload.language = language;
+    const response = await api.post("/chat/send", payload);
     return response.data;
   },
   

@@ -14,13 +14,23 @@ import {
   ArrowRight,
   HelpCircle,
   Plus,
-  Settings
+  Settings,
+  Globe,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { Input } from "../components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import ThreatCard from "../components/ThreatCard";
 import { useLanguage } from "../contexts/LanguageContext";
+
+const LANGUAGE_OPTIONS = [
+  { code: "en", label: "English", flag: "EN" },
+  { code: "nl", label: "Nederlands", flag: "NL" },
+  { code: "de", label: "Deutsch", flag: "DE" },
+  { code: "fr", label: "Francais", flag: "FR" },
+];
 
 const ChatPage = () => {
   const { t } = useLanguage();
@@ -31,6 +41,9 @@ const ChatPage = () => {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [showNewFailureModeInput, setShowNewFailureModeInput] = useState(false);
   const [newFailureModeName, setNewFailureModeName] = useState("");
+  const [detectedLanguage, setDetectedLanguage] = useState(null);
+  const [manualLanguage, setManualLanguage] = useState(null);
+  const [showLangPicker, setShowLangPicker] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
@@ -44,14 +57,17 @@ const ChatPage = () => {
 
   // Send message mutation
   const sendMutation = useMutation({
-    mutationFn: ({ content, image }) => chatAPI.sendMessage(content, image),
-    onSuccess: () => {
+    mutationFn: ({ content, image }) => chatAPI.sendMessage(content, image, manualLanguage),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       setMessage("");
       setImageBase64(null);
       setImagePreview(null);
+      if (data?.detected_language) {
+        setDetectedLanguage(data.detected_language);
+      }
     },
     onError: (error) => {
       const errorMsg = error.response?.data?.detail || "Failed to send message";
@@ -405,6 +421,57 @@ const ChatPage = () => {
 
       {/* Input Area */}
       <div className="chat-input-area" data-testid="chat-input-area">
+        {/* Language Detection Indicator */}
+        {(detectedLanguage || manualLanguage) && (
+          <div className="flex items-center gap-2 mb-2">
+            <Popover open={showLangPicker} onOpenChange={setShowLangPicker}>
+              <PopoverTrigger asChild>
+                <button
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors"
+                  data-testid="language-selector"
+                >
+                  <Globe className="w-3 h-3" />
+                  {LANGUAGE_OPTIONS.find(l => l.code === (manualLanguage || detectedLanguage))?.flag || (manualLanguage || detectedLanguage)?.toUpperCase()}
+                  {!manualLanguage && <span className="text-slate-400">detected</span>}
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-44 p-1" sideOffset={4}>
+                {LANGUAGE_OPTIONS.map(lang => (
+                  <button
+                    key={lang.code}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
+                      (manualLanguage || detectedLanguage) === lang.code ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700"
+                    }`}
+                    onClick={() => {
+                      setManualLanguage(lang.code);
+                      setShowLangPicker(false);
+                    }}
+                    data-testid={`language-option-${lang.code}`}
+                  >
+                    <span className="text-xs font-bold w-6">{lang.flag}</span>
+                    {lang.label}
+                  </button>
+                ))}
+                {manualLanguage && (
+                  <>
+                    <div className="border-t border-slate-100 my-1" />
+                    <button
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-slate-500 hover:bg-slate-100"
+                      onClick={() => {
+                        setManualLanguage(null);
+                        setShowLangPicker(false);
+                      }}
+                      data-testid="language-auto-detect"
+                    >
+                      Auto-detect
+                    </button>
+                  </>
+                )}
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
         {/* Image Preview */}
         <AnimatePresence>
           {imagePreview && (

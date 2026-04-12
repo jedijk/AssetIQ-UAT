@@ -19,6 +19,24 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Chat"])
 
+# Language detection using common word frequency
+_LANG_WORDS = {
+    "nl": {"de", "het", "een", "is", "van", "en", "in", "dat", "niet", "op", "te", "zijn", "voor", "met", "aan", "er", "ook", "maar", "als", "nog", "wel", "geen", "moet", "wordt", "kan", "naar", "bij", "dit", "wat", "meer", "uit", "over", "zo", "dan", "hun", "werd", "heeft", "hoe", "nee", "ja", "kapot", "stuk", "lek", "pomp", "klep", "sensor", "storing", "onderhoud", "controleer", "draait"},
+    "de": {"der", "die", "und", "ist", "ein", "eine", "nicht", "von", "mit", "auf", "das", "den", "auch", "sich", "des", "dem", "wird", "sind", "wie", "oder", "noch", "kann", "nach", "aber", "nur", "aus", "wenn", "hat", "haben", "ich", "wir", "sie", "es", "kaputt", "defekt", "pumpe", "ventil"},
+    "fr": {"le", "la", "les", "de", "des", "est", "un", "une", "du", "et", "en", "que", "qui", "dans", "pas", "sur", "pour", "avec", "sont", "ce", "cette", "au", "aux", "ne", "ont", "il", "elle", "nous", "vous", "ils", "mais", "ou", "comme", "pompe", "vanne", "capteur"},
+}
+
+def detect_language(text: str) -> str:
+    """Detect language from text using word frequency matching. Returns ISO code."""
+    words = set(text.lower().split())
+    if len(words) < 2:
+        return "en"
+    scores = {}
+    for lang, lang_words in _LANG_WORDS.items():
+        scores[lang] = len(words & lang_words)
+    best = max(scores, key=scores.get)
+    return best if scores[best] >= 2 else "en"
+
 
 async def get_failure_modes_from_db():
     """Fetch ALL failure modes from MongoDB, fallback to static library if empty."""
@@ -54,6 +72,9 @@ async def send_chat_message(
     """
     session_id = f"user_{current_user['id']}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
     user_id = current_user["id"]
+    
+    # Detect or use manually set language
+    detected_lang = message.language or detect_language(message.content)
     
     # Store user message
     image_thumbnail = None
@@ -97,7 +118,8 @@ async def send_chat_message(
             await db.chat_messages.insert_one(skip_response)
             
             return ChatResponse(
-                message="Got it! Your observation has been saved. What else would you like to report?"
+                message="Got it! Your observation has been saved. What else would you like to report?",
+                detected_language=detected_lang
             )
         
         # User is providing context - update the threat with the additional info
@@ -152,7 +174,8 @@ async def send_chat_message(
             await db.chat_messages.insert_one(context_added_response)
             
             return ChatResponse(
-                message=confirmation
+                message=confirmation,
+                detected_language=detected_lang
             )
     
     # Check for data queries (skip if image provided)
@@ -177,7 +200,8 @@ async def send_chat_message(
             return ChatResponse(
                 message=answer,
                 follow_up_question=None,
-                question_type="data_query"
+                question_type="data_query",
+                detected_language=detected_lang
             )
     
     # Process with clean 2-step chat handler
@@ -415,7 +439,8 @@ async def send_chat_message(
             threat=ThreatResponse(**updated_threat),
             follow_up_question=context_prompt,
             question_type="context",
-            awaiting_context_for_threat=threat_id
+            awaiting_context_for_threat=threat_id,
+            detected_language=detected_lang
         )
     
     # No observation created - store the regular response
@@ -428,7 +453,8 @@ async def send_chat_message(
         question_type="asset" if result.get("equipment_suggestions") else ("failure" if result.get("failure_mode_suggestions") is not None else None),
         equipment_suggestions=result.get("equipment_suggestions"),
         failure_mode_suggestions=result.get("failure_mode_suggestions"),
-        show_new_failure_mode_option=result.get("show_new_failure_mode_option")
+        show_new_failure_mode_option=result.get("show_new_failure_mode_option"),
+        detected_language=detected_lang
     )
 @router.get("/chat/history")
 async def get_chat_history(
