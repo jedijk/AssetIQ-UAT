@@ -6,6 +6,35 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ---
 
 
+### April 12, 2026 - Criticality/RPN Propagation to Investigations & Actions (COMPLETED)
+**FEATURE - Risk score changes now propagate through the full chain: Equipment → Threats → Actions/Investigations**
+
+**Problem:** When equipment criticality or threat RPN changed, linked actions and investigations retained stale risk values (set at creation time).
+
+**Implemented:**
+1. `propagate_risk_to_linked_entities()` helper in `threat_score_service.py`
+   - Updates `rpn`, `risk_score`, `risk_level` on all actions linked via `threat_id` or `source_type: "threat"` + `source_id`
+   - Finds investigations linked to threats, then updates their actions too
+2. Called from 4 trigger points:
+   - `recalculate_threat_scores_for_asset()` - when equipment criticality changes
+   - `recalculate_threat_scores_for_failure_mode()` - when failure mode SOD changes
+   - Threat GET auto-sync - when viewing a threat triggers recalculation
+   - Threat PATCH - when directly editing risk fields
+3. Fixed stale equipment cache: `cache.invalidate_equipment()` called on criticality update
+4. Fixed actions GET enrichment: now prefers live threat data over stale stored values
+5. Removed `created_by` filter from `recalculate_threat_scores_for_asset()` - threats are shared tenant entities
+
+**Files Modified:**
+- `/app/backend/services/threat_score_service.py` - Added `propagate_risk_to_linked_entities()`, removed `created_by` filter
+- `/app/backend/routes/threats.py` - Added propagation calls to GET auto-sync, PATCH, and recalculate-scores
+- `/app/backend/routes/actions.py` - Fixed enrichment to prefer live threat data
+- `/app/backend/routes/equipment/equipment_criticality.py` - Added cache invalidation on criticality change
+
+**Verified:** Criticality change 5,5,5,5 → 1,1,1,1 → 3,4,2,1 — threat risk_score and all linked actions updated in real-time.
+
+---
+
+
 ### April 12, 2026 - Criticality Quick Info Buttons (COMPLETED)
 **FEATURE - Added info buttons next to each criticality dimension in Equipment Manager:**
 

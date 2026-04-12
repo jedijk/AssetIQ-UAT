@@ -206,8 +206,12 @@ async def get_all_actions(
         threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
         threat = threat_data_map.get(threat_id) if threat_id else None
         
-        # Use stored values if available for RPN
-        if action.get("rpn") is not None:
+        # Prefer live threat data (always fresh), fall back to stored action values
+        if threat:
+            enriched_action["threat_rpn"] = threat.get("fmea_rpn") or action.get("rpn")
+            enriched_action["threat_risk_score"] = threat.get("risk_score") or action.get("risk_score")
+            enriched_action["threat_risk_level"] = threat.get("risk_level") or action.get("risk_level")
+        elif action.get("rpn") is not None:
             enriched_action["threat_rpn"] = action.get("rpn")
             enriched_action["threat_risk_score"] = action.get("risk_score")
             enriched_action["threat_risk_level"] = action.get("risk_level")
@@ -215,12 +219,6 @@ async def get_all_actions(
             enriched_action["threat_rpn"] = None
             enriched_action["threat_risk_score"] = None
             enriched_action["threat_risk_level"] = None
-            
-            # Use batch-fetched threat data for RPN
-            if threat:
-                enriched_action["threat_rpn"] = threat.get("fmea_rpn")
-                enriched_action["threat_risk_score"] = threat.get("risk_score")
-                enriched_action["threat_risk_level"] = threat.get("risk_level")
         
         # Always add asset and equipment info from threat
         if threat:

@@ -7,6 +7,7 @@ import logging
 from database import db, installation_filter
 from auth import get_current_user
 from services.threat_score_service import recalculate_threat_scores_for_asset
+from services.cache_service import cache
 from iso14224_models import ISOLevel, ISO_LEVEL_ORDER, Discipline, CriticalityAssignment
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,10 @@ async def assign_criticality(
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
+    
+    # Invalidate equipment cache so threat auto-sync reads fresh data
+    cache.invalidate_equipment(node_id)
+    cache.invalidate_equipment(f"name:{node.get('name')}")
     
     # Recalculate risk scores for all threats linked to this asset
     asset_name = node.get("name")

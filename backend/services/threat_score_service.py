@@ -83,9 +83,10 @@ async def update_all_ranks(user_id: str):
 
 
 async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new_criticality: dict = None, equipment_node_id: str = None, installation_id: str = None):
-    query_conditions = [{"asset": asset_name, "created_by": user_id}]
+    # Threats are shared tenant entities - match by asset name or equipment node ID without created_by filter
+    query_conditions = [{"asset": asset_name}]
     if equipment_node_id:
-        query_conditions.append({"linked_equipment_id": equipment_node_id, "created_by": user_id})
+        query_conditions.append({"linked_equipment_id": equipment_node_id})
 
     threats = await db.threats.find({"$or": query_conditions}).to_list(1000)
     if not threats:
@@ -166,8 +167,103 @@ async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new
         await db.threats.update_one({"id": threat["id"]}, {"$set": update_data})
         updated_count += 1
 
+    # Propagate updated risk scores to linked actions and investigations
+    threat_ids = [t["id"] for t in threats]
+    await propagate_risk_to_linked_entities(threat_ids)
+
     await update_all_ranks(user_id)
     return updated_count
+
+
+async def propagate_risk_to_linked_entities(threat_ids: list, threats: list = None):
+    """
+    Propagate updated risk_score, rpn, and risk_level from threats
+    to all linked central_actions and investigations.
+    Called after any threat risk recalculation.
+    """
+    if not threat_ids:
+        return 0, 0
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Build a lookup map from threat data (re-read if not provided)
+    if threats:
+        threat_map = {}
+        for t in threats:
+            tid = t.get("id") or t.get("_id")
+            if tid:
+                threat_map[str(tid)] = t
+    else:
+        threat_docs = await db.threats.find(
+            {"id": {"$in": threat_ids}},
+            {"_id": 0, "id": 1, "risk_score": 1, "risk_level": 1, "fmea_rpn": 1, "fmea_score": 1}
+        ).to_list(len(threat_ids))
+        threat_map = {t["id"]: t for t in threat_docs}
+
+    # 1. Update central_actions that reference these threats
+    # Actions can reference threats via either `threat_id` or `source_type: "threat"` + `source_id`
+    actions_updated = 0
+    actions = await db.central_actions.find(
+        {"$or": [
+            {"threat_id": {"$in": threat_ids}},
+            {"source_type": "threat", "source_id": {"$in": threat_ids}},
+        ]},
+        {"_id": 0, "id": 1, "threat_id": 1, "source_type": 1, "source_id": 1}
+    ).to_list(10000)
+
+    for action in actions:
+        # Determine which threat this action references
+        action_threat_id = action.get("threat_id") or (
+            action.get("source_id") if action.get("source_type") == "threat" else None
+        )
+        threat = threat_map.get(action_threat_id)
+        if threat:
+            await db.central_actions.update_one(
+                {"id": action["id"]},
+                {"$set": {
+                    "rpn": threat.get("fmea_rpn") or threat.get("rpn"),
+                    "risk_score": threat.get("risk_score"),
+                    "risk_level": threat.get("risk_level"),
+                    "updated_at": now,
+                }}
+            )
+            actions_updated += 1
+
+    # 2. Find investigations linked to these threats and update their actions too
+    investigations = await db.investigations.find(
+        {"threat_id": {"$in": threat_ids}},
+        {"_id": 0, "id": 1, "threat_id": 1}
+    ).to_list(10000)
+
+    inv_ids = [inv["id"] for inv in investigations]
+    if inv_ids:
+        # Update actions sourced from these investigations
+        inv_actions = await db.central_actions.find(
+            {"source_type": "investigation", "source_id": {"$in": inv_ids}},
+            {"_id": 0, "id": 1, "source_id": 1}
+        ).to_list(10000)
+
+        # Map investigation_id -> threat_id
+        inv_threat_map = {inv["id"]: inv["threat_id"] for inv in investigations}
+
+        for action in inv_actions:
+            inv_threat_id = inv_threat_map.get(action.get("source_id"))
+            threat = threat_map.get(inv_threat_id) if inv_threat_id else None
+            if threat:
+                await db.central_actions.update_one(
+                    {"id": action["id"]},
+                    {"$set": {
+                        "rpn": threat.get("fmea_rpn") or threat.get("rpn"),
+                        "risk_score": threat.get("risk_score"),
+                        "risk_level": threat.get("risk_level"),
+                        "updated_at": now,
+                    }}
+                )
+                actions_updated += 1
+
+    inv_updated = len(investigations)
+    logger.info(f"Propagated risk to {actions_updated} actions, {inv_updated} investigations for {len(threat_ids)} threats")
+    return actions_updated, inv_updated
 
 
 async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new_severity: int, new_occurrence: int, new_detectability: int):
@@ -234,6 +330,10 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
         updated_count += 1
         users_updated.add(threat.get("created_by"))
 
+    # Propagate updated risk scores to linked actions and investigations
+    threat_ids = [t["id"] for t in threats]
+    await propagate_risk_to_linked_entities(threat_ids)
+
     for user_id in users_updated:
         if user_id:
             await update_all_ranks(user_id)
@@ -294,7 +394,6 @@ async def recalculate_all_for_installation(installation_id: str) -> dict:
             # Get the parent threat's new risk score
             parent_threat = next((t for t in threats if t["id"] == action.get("threat_id")), None)
             if parent_threat:
-                new_threat_risk = parent_threat.get("risk_score", 0)
                 # Recalculate with new settings
                 crit_score = parent_threat.get("criticality_score", 0)
                 fmea = parent_threat.get("fmea_score", 50)

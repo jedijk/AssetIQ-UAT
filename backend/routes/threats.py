@@ -10,7 +10,7 @@ from database import db, failure_modes_service, efm_service, installation_filter
 from auth import get_current_user
 from models.api_models import ThreatResponse, ThreatUpdate
 from failure_modes import FAILURE_MODES_LIBRARY
-from services.threat_score_service import calculate_rank, update_all_ranks, recalculate_threat_scores_for_asset, recalculate_threat_scores_for_failure_mode
+from services.threat_score_service import calculate_rank, update_all_ranks, recalculate_threat_scores_for_asset, recalculate_threat_scores_for_failure_mode, propagate_risk_to_linked_entities
 from services.cache_service import cache
 from investigation_models import (
     InvestigationCreate, InvestigationUpdate, InvestigationStatus,
@@ -419,9 +419,15 @@ async def recalculate_all_threat_scores(
     # Update all ranks
     await update_all_ranks(current_user["id"])
     
+    # Propagate updated risk scores to linked actions and investigations
+    threat_ids = [t["id"] for t in threats]
+    actions_updated, inv_updated = await propagate_risk_to_linked_entities(threat_ids)
+    
     return {
         "message": f"Successfully recalculated {updated_count} threat scores",
-        "updated_count": updated_count
+        "updated_count": updated_count,
+        "actions_propagated": actions_updated,
+        "investigations_propagated": inv_updated
     }
 
 @router.get("/threats/{threat_id}", response_model=ThreatResponse)
@@ -584,6 +590,9 @@ async def get_threat(
                 threat["linked_equipment_id"] = equipment_node["id"]
             
             logger.info(f"Auto-synced threat {threat_id}: risk={new_risk_score}, crit={new_criticality_score}, fmea={fmea_score}")
+            
+            # Propagate updated risk to linked actions and investigations
+            await propagate_risk_to_linked_entities([threat_id], [threat])
         
         # Ensure risk_score is int
         if isinstance(threat.get("risk_score"), float):
@@ -671,6 +680,11 @@ async def update_threat(
         # Recalculate ranks if status changed
         if "status" in update_data:
             await update_all_ranks(current_user["id"])
+        
+        # Propagate risk changes to linked actions and investigations
+        if any(f in update_data for f in ["risk_score", "risk_level", "fmea_rpn"]):
+            updated_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+            await propagate_risk_to_linked_entities([threat_id], [updated_threat])
         
         # Invalidate stats cache
         cache.invalidate_stats(f"stats:{current_user['id']}")
