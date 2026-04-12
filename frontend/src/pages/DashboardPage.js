@@ -1036,6 +1036,9 @@ export default function DashboardPage() {
                     <p className="text-xs font-medium text-slate-700 truncate">{obs.title}</p>
                     <div className="flex items-center gap-1.5">
                       <p className="text-[10px] text-slate-400 truncate">{obs.asset || obs.equipment_name || "-"}</p>
+                      {obs.equipment_tag && (
+                        <span className="text-[9px] font-mono text-slate-400">{obs.equipment_tag}</span>
+                      )}
                       {obs.discipline && (
                         <span className="text-[9px] px-1 py-0 rounded bg-slate-100 text-slate-500">{obs.discipline}</span>
                       )}
