@@ -305,27 +305,36 @@ async def process_chat_message(
         
         selected_equipment = None
         
-        # First pass: Look for EXACT matches only
+        # First pass: Look for EXACT match including tag (highest priority)
         for eq in prev_suggestions:
             eq_name = eq.get("name", "")
-            eq_name_normalized = normalize_text(eq_name)
             eq_tag = eq.get("tag", "")
             
-            # Build possible match strings
+            # Build "Name (Tag)" format
             eq_with_tag = f"{eq_name} ({eq_tag})" if eq_tag else eq_name
             eq_with_tag_normalized = normalize_text(eq_with_tag)
             
-            # Exact match check
-            if eq_name_normalized and (
-                eq_name_normalized == message_normalized or
-                eq_name_normalized == message_without_tag_normalized or
-                eq_with_tag_normalized == message_normalized
-            ):
+            # Match full "Name (Tag)" string first
+            if eq_tag and eq_with_tag_normalized == message_normalized:
                 selected_equipment = eq
-                logger.info(f"Equipment EXACT matched: {eq_name} from message: {message_content}")
+                logger.info(f"Equipment TAG matched: {eq_name} ({eq_tag}) from message: {message_content}")
                 break
         
-        # Second pass: If no exact match, try partial matches (longer matches first)
+        # Second pass: Name-only exact match (only if no tag match)
+        if not selected_equipment:
+            for eq in prev_suggestions:
+                eq_name = eq.get("name", "")
+                eq_name_normalized = normalize_text(eq_name)
+                
+                if eq_name_normalized and (
+                    eq_name_normalized == message_normalized or
+                    eq_name_normalized == message_without_tag_normalized
+                ):
+                    selected_equipment = eq
+                    logger.info(f"Equipment NAME matched: {eq_name} from message: {message_content}")
+                    break
+        
+        # Third pass: Partial matches (longer matches first)
         if not selected_equipment:
             # Sort by name length descending to prefer more specific matches
             sorted_suggestions = sorted(prev_suggestions, key=lambda x: len(x.get("name", "")), reverse=True)

@@ -227,6 +227,8 @@ async def send_chat_message(
         "pending_data": result.get("pending_data", {}),
         "equipment_suggestions": result.get("equipment_suggestions"),
         "failure_mode_suggestions": result.get("failure_mode_suggestions"),
+        "show_new_failure_mode_option": result.get("show_new_failure_mode_option"),
+        "question_type": "asset" if result.get("equipment_suggestions") else ("failure" if result.get("failure_mode_suggestions") is not None else None),
         "original_message": result.get("original_message"),
         "created_at": datetime.now(timezone.utc).isoformat()
     }
