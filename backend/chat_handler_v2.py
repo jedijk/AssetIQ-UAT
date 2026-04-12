@@ -16,6 +16,13 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 logger = logging.getLogger(__name__)
 
 
+def _equip_label(equipment: dict) -> str:
+    """Format equipment name with tag for display in chat messages."""
+    name = equipment.get("name", "Unknown")
+    tag = equipment.get("tag")
+    return f"{name} ({tag})" if tag else name
+
+
 class ChatState:
     """Tracks conversation state for multi-step flow"""
     INITIAL = "initial"  # Fresh start
@@ -336,7 +343,7 @@ async def process_chat_message(
                 pending_data["failure_mode_name"] = selected_fm.get("failure_mode")
                 
                 return {
-                    "response_text": "Observation recorded successfully.",
+                    "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
                     "state": ChatState.COMPLETE,
                     "equipment_suggestions": None,
                     "failure_mode_suggestions": None,
@@ -347,9 +354,9 @@ async def process_chat_message(
                 }
             
             elif len(fm_matches) > 1:
-                # Multiple matches - ask user to select, also show new failure mode option
+                # Multiple matches - ask user to select
                 return {
-                    "response_text": "What type of failure is it? Please select:",
+                    "response_text": f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. What type of failure is it? Please select:",
                     "state": ChatState.AWAITING_FAILURE_MODE,
                     "equipment_suggestions": None,
                     "failure_mode_suggestions": fm_matches,
@@ -363,7 +370,7 @@ async def process_chat_message(
             else:
                 # No failure mode matches - ask user to specify or create new
                 return {
-                    "response_text": "No matching failure mode found. Would you like to specify the failure mode?",
+                    "response_text": f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. No matching failure mode found. Would you like to specify the failure mode?",
                     "state": ChatState.AWAITING_FAILURE_MODE,
                     "equipment_suggestions": None,
                     "failure_mode_suggestions": [],
@@ -399,7 +406,7 @@ async def process_chat_message(
                     pending_data["failure_mode_name"] = fm_matches[0].get("failure_mode")
                     
                     return {
-                        "response_text": "Observation recorded successfully.",
+                        "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
                         "state": ChatState.COMPLETE,
                         "equipment_suggestions": None,
                         "failure_mode_suggestions": None,
@@ -410,7 +417,7 @@ async def process_chat_message(
                     }
                 elif len(fm_matches) > 1:
                     return {
-                        "response_text": "What type of failure is it? Please select:",
+                        "response_text": f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. What type of failure is it? Please select:",
                         "state": ChatState.AWAITING_FAILURE_MODE,
                         "equipment_suggestions": None,
                         "failure_mode_suggestions": fm_matches,
@@ -422,7 +429,7 @@ async def process_chat_message(
                 else:
                     pending_data["failure_mode_name"] = "Unknown"
                     return {
-                        "response_text": "Observation recorded successfully.",
+                        "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
                         "state": ChatState.COMPLETE,
                         "equipment_suggestions": None,
                         "failure_mode_suggestions": None,
@@ -472,7 +479,7 @@ async def process_chat_message(
                 pending_data["is_custom_failure_mode"] = True
                 
                 return {
-                    "response_text": "Observation recorded successfully.",
+                    "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
                     "state": ChatState.COMPLETE,
                     "equipment_suggestions": None,
                     "failure_mode_suggestions": None,
@@ -525,7 +532,7 @@ async def process_chat_message(
             pending_data["recommended_actions"] = selected_fm.get("recommended_actions", [])
             
             return {
-                "response_text": "Observation recorded successfully.",
+                "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
                 "state": ChatState.COMPLETE,
                 "equipment_suggestions": None,
                 "failure_mode_suggestions": None,
@@ -550,7 +557,7 @@ async def process_chat_message(
                 pending_data["failure_mode_name"] = selected_fm.get("failure_mode")
                 
                 return {
-                    "response_text": "Observation recorded successfully.",
+                    "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
                     "state": ChatState.COMPLETE,
                     "equipment_suggestions": None,
                     "failure_mode_suggestions": None,
@@ -562,7 +569,7 @@ async def process_chat_message(
             
             elif len(fm_matches) > 1:
                 return {
-                    "response_text": "Which failure type? Please select:",
+                    "response_text": f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. Which failure type? Please select:",
                     "state": ChatState.AWAITING_FAILURE_MODE,
                     "equipment_suggestions": None,
                     "failure_mode_suggestions": fm_matches,
@@ -576,7 +583,7 @@ async def process_chat_message(
             else:
                 # No match - ask user to specify the failure mode
                 return {
-                    "response_text": "No matching failure mode found. Would you like to specify the failure mode?",
+                    "response_text": f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. No matching failure mode found. Would you like to specify the failure mode?",
                     "state": ChatState.AWAITING_FAILURE_MODE,
                     "equipment_suggestions": None,
                     "failure_mode_suggestions": [],
@@ -603,7 +610,7 @@ async def process_chat_message(
             pending_data["is_custom_failure_mode"] = True
             
             return {
-                "response_text": "Observation recorded successfully.",
+                "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
                 "state": ChatState.COMPLETE,
                 "equipment_suggestions": None,
                 "failure_mode_suggestions": None,
@@ -672,7 +679,7 @@ async def process_chat_message(
             pending_data["recommended_actions"] = selected_fm.get("recommended_actions", [])
             
             return {
-                "response_text": "Observation recorded successfully.",
+                "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
                 "state": ChatState.COMPLETE,
                 "equipment_suggestions": None,
                 "failure_mode_suggestions": None,
@@ -685,7 +692,7 @@ async def process_chat_message(
         elif len(fm_matches) > 1:
             # Multiple failure mode matches - ask user to select
             return {
-                "response_text": f"Issue reported for {selected_equipment.get('name')}. What type of failure is it? Please select:",
+                "response_text": f"Issue reported for {_equip_label(selected_equipment)}. What type of failure is it? Please select:",
                 "state": ChatState.AWAITING_FAILURE_MODE,
                 "equipment_suggestions": None,
                 "failure_mode_suggestions": fm_matches,
@@ -699,7 +706,7 @@ async def process_chat_message(
         else:
             # No failure mode match - ask user to specify
             return {
-                "response_text": f"Issue reported for {selected_equipment.get('name')}. No matching failure mode found. Would you like to specify the failure mode?",
+                "response_text": f"Issue reported for {_equip_label(selected_equipment)}. No matching failure mode found. Would you like to specify the failure mode?",
                 "state": ChatState.AWAITING_FAILURE_MODE,
                 "equipment_suggestions": None,
                 "failure_mode_suggestions": [],
