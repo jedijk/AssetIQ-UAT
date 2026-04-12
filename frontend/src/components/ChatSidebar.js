@@ -196,7 +196,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             ? 'audio/ogg;codecs=opus'
             : 'audio/webm';
       
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 32000 });
       const chunks = [];
 
       recorder.ondataavailable = (e) => {
@@ -251,45 +251,47 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   };
 
   const sendRecording = async () => {
-    if (mediaRecorder && audioChunks.length > 0) {
-      clearInterval(recordingTimerRef.current);
-      mediaRecorder.stop();
+    if (!mediaRecorder || audioChunks.length === 0) return;
+    
+    clearInterval(recordingTimerRef.current);
+    setIsTranscribing(true);
+    
+    // Build blob immediately from current chunks
+    const mimeType = mediaRecorder.mimeType || "audio/webm";
+    const blob = new Blob(audioChunks, { type: mimeType });
+    
+    // Stop recorder and clean up state
+    mediaRecorder.stop();
+    setIsRecording(false);
+    setIsPaused(false);
+    setRecordingTime(0);
+    setAudioChunks([]);
+    setMediaRecorder(null);
+    
+    try {
+      // Single request: transcribe + process chat in one call
+      const result = await voiceAPI.sendVoice(blob, manualLanguage);
       
-      setIsTranscribing(true);
+      if (result?.detected_language) {
+        setDetectedLanguage(result.detected_language);
+        const lang = result.detected_language;
+        if ((lang === "en" || lang === "nl") && lang !== appLanguage) {
+          setAppLanguage(lang);
+        }
+      }
       
-      // Wait a bit for final chunks
-      setTimeout(async () => {
-        // Use the MIME type from the recorder
-        const mimeType = mediaRecorder.mimeType || "audio/webm";
-        const blob = new Blob(audioChunks, { type: mimeType });
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64 = reader.result.split(",")[1];
-          try {
-            const result = await voiceAPI.transcribe(base64);
-            const transcribedText = result.text;
-            
-            // Directly submit the transcribed text
-            if (transcribedText && transcribedText.trim()) {
-              setIsTranscribing(false); // Reset before mutation
-              sendMutation.mutate({ content: transcribedText, image: imageBase64 });
-            } else {
-              toast.error("Could not transcribe voice - no text detected");
-              setIsTranscribing(false);
-            }
-          } catch (error) {
-            toast.error("Failed to transcribe voice");
-            setIsTranscribing(false);
-          }
-        };
-        reader.readAsDataURL(blob);
-        
-        setIsRecording(false);
-        setIsPaused(false);
-        setRecordingTime(0);
-        setAudioChunks([]);
-        setMediaRecorder(null);
-      }, 200);
+      if (result?.transcribed_text) {
+        // Refresh chat history to show both user message and response
+        queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+        queryClient.invalidateQueries({ queryKey: ["threats"] });
+        queryClient.invalidateQueries({ queryKey: ["stats"] });
+      } else {
+        toast.error("Could not transcribe voice - no text detected");
+      }
+    } catch (error) {
+      toast.error("Failed to process voice message");
+    } finally {
+      setIsTranscribing(false);
     }
   };
 

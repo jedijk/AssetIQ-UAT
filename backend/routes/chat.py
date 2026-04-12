@@ -1,7 +1,7 @@
 """
 Chat routes.
 """
-from fastapi import APIRouter, Depends, Form
+from fastapi import APIRouter, Depends, Form, File
 from typing import Optional
 from datetime import datetime, timezone
 import uuid
@@ -497,4 +497,117 @@ async def transcribe_voice(
 ):
     text = await transcribe_audio_with_ai(audio_base64)
     return VoiceTranscriptionResponse(text=text)
+
+
+@router.post("/chat/voice-send")
+async def voice_send(
+    audio: bytes = File(...),
+    language: Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Combined voice transcribe + chat send in a single request.
+    Accepts raw audio file upload, transcribes, then processes as chat message.
+    Eliminates the extra round-trip of separate transcribe → send calls.
+    """
+    import base64
+    user_id = current_user["id"]
+    session_id = f"user_{user_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+
+    # Transcribe audio
+    audio_base64 = base64.b64encode(audio).decode("utf-8")
+    transcribed_text = await transcribe_audio_with_ai(audio_base64)
+
+    if not transcribed_text or not transcribed_text.strip():
+        return {"message": "Could not transcribe voice - no text detected", "transcribed_text": "", "detected_language": None}
+
+    # Detect language
+    detected_lang = language or detect_language(transcribed_text)
+
+    # Store user message
+    chat_msg = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "role": "user",
+        "content": transcribed_text,
+        "source": "voice",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.chat_messages.insert_one(chat_msg)
+
+    # Process with chat handler (same logic as send_chat_message)
+    failure_modes_library = await get_failure_modes_from_db()
+    result = await process_chat_message(
+        db=db,
+        message_content=transcribed_text,
+        session_id=session_id,
+        user_id=user_id,
+        failure_modes_library=failure_modes_library
+    )
+
+    # Handle observation creation
+    if result.get("create_observation") and result.get("observation_data"):
+        obs_data = result["observation_data"]
+        equipment_name = obs_data.get("equipment_name", "Unknown")
+        failure_mode_name = obs_data.get("failure_mode_name", "Unknown")
+        equipment_type = obs_data.get("equipment_type", "")
+        failure_mode_data = obs_data.get("failure_mode", {})
+
+        threat_id = str(uuid.uuid4())
+        rpn = failure_mode_data.get("rpn", 0) if isinstance(failure_mode_data, dict) else 0
+
+        threat = {
+            "id": threat_id,
+            "title": f"{equipment_name} - {failure_mode_name}",
+            "asset": equipment_name,
+            "equipment_type": equipment_type,
+            "failure_mode": failure_mode_name,
+            "failure_mode_id": obs_data.get("failure_mode_id"),
+            "failure_mode_data": failure_mode_data,
+            "is_new_failure_mode": obs_data.get("is_new_failure_mode", False),
+            "cause": obs_data.get("cause", "To be determined"),
+            "impact": failure_mode_data.get("impact", "Operational") if isinstance(failure_mode_data, dict) else "Operational",
+            "frequency": "Occasional",
+            "risk_priority_number": rpn,
+            "rpn": rpn,
+            "fmea_rpn": rpn,
+            "status": "Open",
+            "risk_score": 0,
+            "risk_level": "Low",
+            "recommended_actions": obs_data.get("recommended_actions", []),
+            "linked_equipment_id": obs_data.get("equipment_id"),
+            "original_description": obs_data.get("original_description", transcribed_text),
+            "created_by": user_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.threats.insert_one(threat)
+        rank, total = await calculate_rank(threat["risk_score"], user_id)
+        threat["rank"] = rank
+        threat["total_threats"] = total
+
+    # Store assistant response
+    ai_response = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "role": "assistant",
+        "content": result["response_text"],
+        "equipment_suggestions": result.get("equipment_suggestions"),
+        "failure_mode_suggestions": result.get("failure_mode_suggestions"),
+        "show_new_failure_mode_option": result.get("show_new_failure_mode_option"),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.chat_messages.insert_one(ai_response)
+
+    return {
+        "message": result["response_text"],
+        "transcribed_text": transcribed_text,
+        "detected_language": detected_lang,
+        "follow_up_question": result["response_text"] if result.get("state") != ChatState.COMPLETE else None,
+        "question_type": "asset" if result.get("equipment_suggestions") else ("failure" if result.get("failure_mode_suggestions") is not None else None),
+        "equipment_suggestions": result.get("equipment_suggestions"),
+        "failure_mode_suggestions": result.get("failure_mode_suggestions"),
+        "show_new_failure_mode_option": result.get("show_new_failure_mode_option"),
+        "threat": threat if result.get("create_observation") else None,
+    }
 

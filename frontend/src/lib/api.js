@@ -113,6 +113,17 @@ export const voiceAPI = {
     const response = await api.post("/voice/transcribe", formData);
     return response.data;
   },
+  /** Combined transcribe + send in one request (faster) */
+  sendVoice: async (audioBlob, language = null) => {
+    const formData = new FormData();
+    formData.append("audio", audioBlob, "recording.webm");
+    if (language) formData.append("language", language);
+    const response = await api.post("/chat/voice-send", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 60000,
+    });
+    return response.data;
+  },
 };
 
 // Threats API
