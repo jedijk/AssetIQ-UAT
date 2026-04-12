@@ -6,6 +6,29 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ---
 
 
+### April 12, 2026 - Criticality Quick Info Buttons (COMPLETED)
+**FEATURE - Added info buttons next to each criticality dimension in Equipment Manager:**
+
+**Implemented:**
+- Info (ⓘ) button next to each criticality dimension label (Safety, Production, Environmental, Reputation)
+- Click opens a popover showing what levels 1-5 mean for that specific dimension
+- Each level shows: number badge, label (Negligible/Minor/Moderate/Major/Catastrophic), and description
+- Descriptions are ISO 14224-aligned and dimension-specific
+- Hover tooltip on each bar segment showing the level name
+- Color-matched styling per dimension (red/orange/green/purple)
+
+**Scale Definitions:**
+- Safety: No injury → First aid → Medical treatment → Serious injury → Fatality
+- Production: No loss → < 1 day → 1-3 days → 3-7 days → > 7 days plant shutdown
+- Environmental: No release → Contained → Local cleanup → Regulatory → Lasting damage
+- Reputation: No awareness → Local → Regional media → National media → International
+
+**Files Modified:**
+- `/app/frontend/src/components/equipment/PropertiesPanel.js` - Added CRITICALITY_SCALES definitions, Info icon, Popover with scale descriptions, Tooltip on bar segments
+
+---
+
+
 ### April 12, 2026 - Structural Code Audit & Architectural Fixes (COMPLETED)
 **AUDIT + FIX - 10 architectural issues detected and resolved:**
 

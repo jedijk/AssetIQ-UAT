@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { failureModesAPI, qrCodeAPI } from "../../lib/api";
 import {
-  Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle, QrCode,
+  Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle, QrCode, Info,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "../ui/command";
 import { QRCodeDialog } from "./QRCodeDialog";
 
@@ -45,28 +46,114 @@ const CRIT_COLORS = {
   low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } 
 };
 
-const CriticalityDimension = ({ label, color, value, onClick }) => (
-  <div>
-    <div className="flex items-center justify-between mb-1">
-      <span className={`text-xs font-medium text-${color}-700`}>{label}</span>
-      <span className="text-xs text-slate-500">{value || 0}/5</span>
+// Criticality scale descriptions per dimension (ISO 14224 aligned)
+const CRITICALITY_SCALES = {
+  safety: {
+    1: { label: "Negligible", desc: "No injury risk, no health impact" },
+    2: { label: "Minor", desc: "First aid level injury, minor discomfort" },
+    3: { label: "Moderate", desc: "Medical treatment required, restricted work" },
+    4: { label: "Major", desc: "Serious injury, permanent disability possible" },
+    5: { label: "Catastrophic", desc: "Fatality or multiple severe injuries" },
+  },
+  production: {
+    1: { label: "Negligible", desc: "No production loss, no impact on output" },
+    2: { label: "Minor", desc: "< 1 day production loss, easily recoverable" },
+    3: { label: "Moderate", desc: "1-3 days production loss, partial shutdown" },
+    4: { label: "Major", desc: "3-7 days loss, full unit shutdown" },
+    5: { label: "Catastrophic", desc: "> 7 days loss, plant-wide shutdown" },
+  },
+  environmental: {
+    1: { label: "Negligible", desc: "No release, no environmental effect" },
+    2: { label: "Minor", desc: "Small contained release, no off-site impact" },
+    3: { label: "Moderate", desc: "Moderate release, local cleanup required" },
+    4: { label: "Major", desc: "Significant release, regulatory reporting" },
+    5: { label: "Catastrophic", desc: "Major spill/emission, lasting ecosystem damage" },
+  },
+  reputation: {
+    1: { label: "Negligible", desc: "No external awareness, no media interest" },
+    2: { label: "Minor", desc: "Local community awareness, minor complaint" },
+    3: { label: "Moderate", desc: "Regional media coverage, customer concern" },
+    4: { label: "Major", desc: "National media, regulatory scrutiny, contract risk" },
+    5: { label: "Catastrophic", desc: "International coverage, license/permit threat" },
+  },
+};
+
+const CriticalityDimension = ({ label, color, value, onClick, dimension }) => {
+  const scale = CRITICALITY_SCALES[dimension];
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-1">
+          <span className={`text-xs font-medium text-${color}-700`}>{label}</span>
+          {scale && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className={`inline-flex items-center justify-center h-4 w-4 rounded-full hover:bg-${color}-100 transition-colors`}
+                  data-testid={`criticality-info-${dimension}`}
+                >
+                  <Info className={`h-3 w-3 text-${color}-400 hover:text-${color}-600`} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="right" align="start" className="w-64 p-0" sideOffset={8}>
+                <div className="px-3 py-2 border-b border-slate-100">
+                  <p className={`text-xs font-semibold text-${color}-700`}>{label} Impact Scale</p>
+                </div>
+                <div className="p-2 space-y-0.5">
+                  {[1, 2, 3, 4, 5].map(level => (
+                    <div
+                      key={level}
+                      className={`flex items-start gap-2 px-2 py-1.5 rounded text-xs ${
+                        value === level ? `bg-${color}-50 ring-1 ring-${color}-200` : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className={`inline-flex items-center justify-center h-4 w-4 rounded text-[10px] font-bold flex-shrink-0 mt-0.5 ${
+                        value >= level ? `bg-${color}-500 text-white` : `bg-${color}-100 text-${color}-600`
+                      }`}>
+                        {level}
+                      </span>
+                      <div className="min-w-0">
+                        <span className="font-medium text-slate-800">{scale[level].label}</span>
+                        <p className="text-slate-500 leading-tight">{scale[level].desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+        <span className="text-xs text-slate-500">{value || 0}/5</span>
+      </div>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map(level => (
+          <TooltipProvider key={level} delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onClick(level)}
+                  className={`flex-1 h-6 rounded transition-all ${
+                    (value || 0) >= level 
+                      ? `bg-${color}-500` 
+                      : `bg-${color}-100 hover:bg-${color}-200`
+                  }`}
+                  data-testid={`criticality-${dimension}-${level}`}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-48">
+                {scale ? (
+                  <p><span className="font-semibold">{level}:</span> {scale[level].label}</p>
+                ) : (
+                  <p>{label}: {level}</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ))}
+      </div>
     </div>
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map(level => (
-        <button
-          key={level}
-          onClick={() => onClick(level)}
-          className={`flex-1 h-6 rounded transition-all ${
-            (value || 0) >= level 
-              ? `bg-${color}-500` 
-              : `bg-${color}-100 hover:bg-${color}-200`
-          }`}
-          title={`${label}: ${level}`}
-        />
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
 export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCriticality, onDelete, allNodes }) {
   const { t } = useLanguage();
@@ -450,24 +537,28 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
               <CriticalityDimension
                 label={t("equipment.safetyImpact") || "Safety"}
                 color="red"
+                dimension="safety"
                 value={node.criticality?.safety_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, safety_impact: node.criticality?.safety_impact === level ? null : level })}
               />
               <CriticalityDimension
                 label={t("equipment.productionImpact") || "Production"}
                 color="orange"
+                dimension="production"
                 value={node.criticality?.production_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, production_impact: node.criticality?.production_impact === level ? null : level })}
               />
               <CriticalityDimension
                 label={t("equipment.environmentalImpact") || "Environmental"}
                 color="green"
+                dimension="environmental"
                 value={node.criticality?.environmental_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, environmental_impact: node.criticality?.environmental_impact === level ? null : level })}
               />
               <CriticalityDimension
                 label={t("equipment.reputationImpact") || "Reputation"}
                 color="purple"
+                dimension="reputation"
                 value={node.criticality?.reputation_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, reputation_impact: node.criticality?.reputation_impact === level ? null : level })}
               />
