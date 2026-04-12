@@ -721,19 +721,19 @@ const ThreatsPage = () => {
                 </div>
               </div>
 
-              {/* Score Display - Compact on mobile, full on desktop */}
-              <div className="flex items-center gap-3 sm:gap-6 flex-shrink-0">
+              {/* Score Display - Stacked on mobile, side-by-side on desktop */}
+              <div className="flex sm:flex-row flex-col items-end sm:items-center gap-1 sm:gap-6 flex-shrink-0">
                 {/* Business Risk Score */}
-                <div className="text-center w-12 sm:w-16">
-                  <div className="text-[10px] sm:text-xs text-slate-400 hidden sm:block mb-0.5">Score</div>
+                <div className="flex sm:flex-col items-center sm:items-center gap-1.5 sm:gap-0 w-auto sm:w-16">
+                  <div className="text-[10px] text-slate-400 sm:mb-0.5">Score</div>
                   <div className="text-sm sm:text-lg font-bold text-slate-700 tabular-nums">
                     {threat.risk_score}
                   </div>
                 </div>
                 
-                {/* RPN - Compact on mobile */}
-                <div className="text-center w-12 sm:w-16">
-                  <div className="text-[10px] sm:text-xs text-slate-400 hidden sm:block mb-0.5">RPN</div>
+                {/* RPN */}
+                <div className="flex sm:flex-col items-center sm:items-center gap-1.5 sm:gap-0 w-auto sm:w-16">
+                  <div className="text-[10px] text-slate-400 sm:mb-0.5">RPN</div>
                   {rpnValue ? (
                     <div className={`text-sm sm:text-lg font-bold tabular-nums ${
                       rpnValue >= 300 ? "text-red-600" :
