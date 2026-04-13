@@ -366,6 +366,7 @@ export default function ProductionDashboardPage() {
   const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mp4: false, t_product_ir: false, screenChange: false, magnetCleaning: false });
   const [showCustomDate, setShowCustomDate] = useState(false);
   const [formExec, setFormExec] = useState(null); // { templateId, templateName }
+  const [selectedTime, setSelectedTime] = useState(null); // highlighted time from chart click
 
   // Template IDs (fetched once)
   const { data: formTemplates } = useQuery({
@@ -713,7 +714,9 @@ export default function ProductionDashboardPage() {
             </div>
             {combinedSeries.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <ComposedChart data={combinedSeries}>
+                <ComposedChart data={combinedSeries} onClick={(e) => {
+                  if (e?.activeLabel) setSelectedTime((prev) => prev === e.activeLabel ? null : e.activeLabel);
+                }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <ReferenceArea yAxisId="left" y1={50} y2={60} fill="#22c55e" fillOpacity={0.1} />
                   <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#94a3b8" />
@@ -723,7 +726,10 @@ export default function ProductionDashboardPage() {
                   )}
                   <Tooltip content={<ViscosityTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line yAxisId="left" type="monotone" dataKey="viscosity" name="Viscosity (MU)" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 4, fill: "#8b5cf6" }} connectNulls />
+                  <Line yAxisId="left" type="monotone" dataKey="viscosity" name="Viscosity (MU)" stroke="#8b5cf6" strokeWidth={2.5} dot={(props) => {
+                    const isSelected = props.payload?.time === selectedTime;
+                    return <circle cx={props.cx} cy={props.cy} r={isSelected ? 7 : 4} fill={isSelected ? "#7c3aed" : "#8b5cf6"} stroke={isSelected ? "#fff" : "none"} strokeWidth={isSelected ? 2 : 0} style={{ cursor: "pointer" }} />;
+                  }} connectNulls activeDot={{ r: 6, stroke: "#7c3aed", strokeWidth: 2, fill: "#fff", cursor: "pointer" }} />
                   {chartSeries.rpm && <Line yAxisId="right" type="monotone" dataKey="rpm" name="RPM" stroke="#3b82f6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
                   {chartSeries.feed && <Line yAxisId="right" type="monotone" dataKey="feed" name="Feed (kg)" stroke="#f97316" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
                   {chartSeries.mp4 && <Line yAxisId="right" type="monotone" dataKey="mp4" name="MP4" stroke="#14b8a6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
@@ -910,11 +916,13 @@ export default function ProductionDashboardPage() {
                   {filteredLog.length > 0 ? (
                     filteredLog.map((entry, i) => {
                       const anomaly = isAnomalyRow(entry);
+                      const isHighlighted = selectedTime && entry.time === selectedTime;
                       return (
                         <tr
                           key={`${entry.time}-${i}`}
-                          className={`border-b border-slate-50 ${anomaly ? "bg-amber-50" : "hover:bg-slate-50"}`}
+                          className={`border-b border-slate-50 transition-colors ${isHighlighted ? "bg-purple-50 ring-1 ring-purple-300" : anomaly ? "bg-amber-50" : "hover:bg-slate-50"}`}
                           data-testid={`log-row-${entry.time}`}
+                          ref={isHighlighted ? (el) => el?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined}
                         >
                           <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{entry.time}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.rpm}</td>
