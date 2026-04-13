@@ -719,7 +719,6 @@ export default function ProductionDashboardPage() {
               label="Runtime"
               value={kpis.runtime_hours || "0"}
               unit="hours"
-              detail={kpis.shift_hours || ""}
             />
           </div>
 
