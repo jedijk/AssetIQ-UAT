@@ -1496,6 +1496,10 @@ export const productionAPI = {
     const response = await api.delete(`/form-submissions/${submissionId}`);
     return response.data;
   },
+  generateAiInsights: async (dashboardData) => {
+    const response = await api.post("/production/ai-insights", dashboardData);
+    return response.data;
+  },
 };
 
 export const getErrorMessage = (error, fallback = "An error occurred") => {

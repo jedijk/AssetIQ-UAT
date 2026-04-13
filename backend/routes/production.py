@@ -498,3 +498,106 @@ async def clear_seed_data(
         "submissions_deleted": result_subs.deleted_count,
         "events_deleted": result_events.deleted_count,
     }
+
+
+@router.post("/production/ai-insights")
+async def generate_ai_insights(
+    data: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate AI-powered daily insights by analyzing the current production data."""
+    import os
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+
+    date = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    production_log = data.get("production_log", [])
+    viscosity_values = data.get("viscosity_values", [])
+    kpis = data.get("kpis", {})
+
+    # Build the analysis prompt
+    log_text = ""
+    for entry in production_log:
+        log_text += f"  {entry.get('time','')} | RPM:{entry.get('rpm','')} Feed:{entry.get('feed','')} M%:{entry.get('moisture','')} Energy:{entry.get('energy','')} MT1:{entry.get('mt1','')} MT2:{entry.get('mt2','')} MT3:{entry.get('mt3','')} MP4:{entry.get('mp4','')} CO2:{entry.get('co2_feed_p','')} T_IR:{entry.get('t_product_ir','')} Waste:{entry.get('waste','')} Remarks:{entry.get('remarks','')}\n"
+
+    visc_text = ", ".join([str(v) for v in viscosity_values]) if viscosity_values else "No samples"
+
+    kpi_text = f"""Total Input: {kpis.get('total_input', 0)} kg
+Waste: {kpis.get('waste', 0)} kg ({kpis.get('waste_pct', 0)}%)
+Yield: {kpis.get('yield_pct', 0)}% (target: {kpis.get('yield_target', 92)}%)
+Avg Mooney Viscosity: {kpis.get('avg_viscosity', 0)} MU (range: {kpis.get('viscosity_range', '55-60')})
+RSD: {kpis.get('rsd', 0)}% (target: <{kpis.get('rsd_target', 7)}%)
+Runtime: {kpis.get('runtime_hours', 0)} hours
+Samples: {kpis.get('sample_count', 0)} extruder, {kpis.get('viscosity_sample_count', 0)} viscosity"""
+
+    prompt = f"""Analyze this production data for Line-90 extruder on {date} and generate 3-5 concise daily insights.
+
+KPIs:
+{kpi_text}
+
+Mooney Viscosity samples: {visc_text}
+
+Production Log:
+{log_text}
+
+Rules:
+- Each insight should have a severity: critical, warning, success, or info
+- Focus on anomalies, trends, quality issues, and operational efficiency
+- Be specific with times and values
+- Keep each insight title under 50 chars, description under 100 chars
+- Return ONLY valid JSON array, no markdown, no explanation
+
+Format:
+[{{"title": "...", "description": "...", "severity": "critical|warning|success|info", "time": "HH:MM"}}]"""
+
+    try:
+        api_key = os.environ.get("EMERGENT_LLM_KEY")
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"production-insights-{date}-{uuid.uuid4().hex[:8]}",
+            system_message="You are a production engineer AI assistant analyzing extruder and rubber compound production data. Return only valid JSON."
+        )
+        chat.with_model("openai", "gpt-4o")
+
+        response = await chat.send_message(UserMessage(text=prompt))
+
+        # Parse JSON response
+        import json as json_module
+        # Strip markdown code blocks if present
+        clean = response.strip()
+        if clean.startswith("```"):
+            clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
+        if clean.endswith("```"):
+            clean = clean[:-3]
+        clean = clean.strip()
+
+        insights = json_module.loads(clean)
+
+        # Delete existing AI insights for this date
+        await db.production_events.delete_many({"date": date, "type": "insight", "_ai_generated": True})
+
+        # Save new AI insights
+        saved = []
+        for ins in insights:
+            event = {
+                "id": str(uuid.uuid4()),
+                "title": ins.get("title", ""),
+                "description": ins.get("description", ""),
+                "type": "insight",
+                "severity": ins.get("severity", "info"),
+                "date": date,
+                "time": ins.get("time", ""),
+                "equipment_name": EQUIPMENT_NAME,
+                "created_by": current_user["id"],
+                "created_by_name": "AI",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "_ai_generated": True,
+            }
+            await db.production_events.insert_one(event)
+            event.pop("_id", None)
+            saved.append(event)
+
+        return {"status": "ok", "insights": saved, "count": len(saved)}
+
+    except Exception as e:
+        logger.error(f"AI insights generation failed: {e}")
+        return {"status": "error", "error": str(e), "insights": []}

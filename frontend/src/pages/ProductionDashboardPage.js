@@ -21,6 +21,7 @@ import {
   X,
   Pencil,
   Settings,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -472,6 +473,22 @@ export default function ProductionDashboardPage() {
   // Edit state for big bag entries
   const [editBigBag, setEditBigBag] = useState(null);
 
+  // Mutation for AI insights generation
+  const aiInsightsMutation = useMutation({
+    mutationFn: () => productionAPI.generateAiInsights({
+      date: fromStr,
+      production_log: data?.production_log || [],
+      viscosity_values: data?.viscosity_values || [],
+      kpis: data?.kpis || {},
+      actions: data?.actions || [],
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      toast.success("AI insights generated");
+    },
+    onError: () => toast.error("Failed to generate insights"),
+  });
+
   // Date navigation (day mode only)
   const prevDay = () => { const d = new Date(fromDate.getTime() - 86400000); setFromDate(d); setToDate(d); };
   const nextDay = () => { const d = new Date(fromDate.getTime() + 86400000); setFromDate(d); setToDate(d); };
@@ -896,9 +913,22 @@ export default function ProductionDashboardPage() {
             <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="insights-panel">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-slate-700">Daily Insights</h3>
-                {data?.insights?.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">{data.insights.length}</Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {data?.insights?.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">{data.insights.length}</Badge>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    disabled={aiInsightsMutation.isPending || !data?.production_log?.length}
+                    onClick={() => aiInsightsMutation.mutate()}
+                    data-testid="ai-insights-btn"
+                  >
+                    <Sparkles className={`w-3 h-3 ${aiInsightsMutation.isPending ? "animate-spin" : ""}`} />
+                    {aiInsightsMutation.isPending ? "Analyzing..." : "AI Refresh"}
+                  </Button>
+                </div>
               </div>
               <div className="max-h-[200px] overflow-y-auto">
                 {data?.insights?.length > 0 ? (
