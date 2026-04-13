@@ -18,9 +18,6 @@ import {
   CheckCircle2,
   Info,
   Search,
-  Download,
-  Columns3,
-  ChevronDown,
   X,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -42,8 +39,6 @@ import {
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import {
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -53,10 +48,8 @@ import {
   ScatterChart,
   Scatter,
   ZAxis,
-  LineChart,
   Line,
   ComposedChart,
-  Area,
 } from "recharts";
 import { toast } from "sonner";
 
@@ -68,6 +61,15 @@ const displayDate = (d) => {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 };
+const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+const startOfMonth = () => { const d = today(); d.setDate(1); return d; };
+const startOfYear = () => { const d = today(); d.setMonth(0, 1); return d; };
+
+const PERIOD_OPTIONS = [
+  { key: "day", label: "Day" },
+  { key: "month", label: "Month" },
+  { key: "ytd", label: "YTD" },
+];
 
 // ──────────────────────────────────────────
 // KPI Card
@@ -163,6 +165,37 @@ const ScatterTooltip = ({ active, payload }) => {
 };
 
 // ──────────────────────────────────────────
+// Chart series toggle buttons
+// ──────────────────────────────────────────
+const OPTIONAL_SERIES = [
+  { key: "rpm", label: "RPM", color: "#3b82f6" },
+  { key: "feed", label: "Feed", color: "#f97316" },
+  { key: "mt4", label: "MT4", color: "#14b8a6" },
+  { key: "temperature", label: "Temperature", color: "#ef4444" },
+];
+
+const ChartSeriesToggles = ({ active, onToggle }) => (
+  <div className="flex items-center gap-1.5 flex-wrap" data-testid="chart-toggles">
+    {OPTIONAL_SERIES.map((s) => (
+      <button
+        key={s.key}
+        onClick={() => onToggle(s.key)}
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+          active[s.key]
+            ? "border-transparent text-white"
+            : "border-slate-200 text-slate-500 bg-white hover:bg-slate-50"
+        }`}
+        style={active[s.key] ? { backgroundColor: s.color } : undefined}
+        data-testid={`toggle-${s.key}`}
+      >
+        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active[s.key] ? "#fff" : s.color }} />
+        {s.label}
+      </button>
+    ))}
+  </div>
+);
+
+// ──────────────────────────────────────────
 // Main component
 // ──────────────────────────────────────────
 export default function ProductionDashboardPage() {
@@ -170,18 +203,36 @@ export default function ProductionDashboardPage() {
   const queryClient = useQueryClient();
 
   // State
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [period, setPeriod] = useState("day");
+  const [fromDate, setFromDate] = useState(today());
+  const [toDate, setToDate] = useState(today());
   const [shift, setShift] = useState("day");
   const [logSearch, setLogSearch] = useState("");
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", description: "", type: "action", severity: "info" });
+  const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mt4: false, temperature: false });
 
-  const dateStr = fmtDate(selectedDate);
+  // Period change handler
+  const handlePeriod = (p) => {
+    setPeriod(p);
+    const t = today();
+    if (p === "day") { setFromDate(t); setToDate(t); }
+    else if (p === "month") { setFromDate(startOfMonth()); setToDate(t); }
+    else if (p === "ytd") { setFromDate(startOfYear()); setToDate(t); }
+  };
+
+  const fromStr = fmtDate(fromDate);
+  const toStr = fmtDate(toDate);
+
+  // Build query params
+  const queryParams = period === "day"
+    ? { date: fromStr, shift }
+    : { from_date: fromStr, to_date: toStr, shift };
 
   // Fetch dashboard data
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["production-dashboard", dateStr, shift],
-    queryFn: () => productionAPI.getDashboard(dateStr, shift),
+    queryKey: ["production-dashboard", fromStr, toStr, period, shift],
+    queryFn: () => productionAPI.getDashboard(queryParams),
     refetchInterval: 60000,
     staleTime: 30000,
   });
@@ -198,9 +249,9 @@ export default function ProductionDashboardPage() {
     onError: () => toast.error("Failed to create event"),
   });
 
-  // Date navigation
-  const prevDay = () => setSelectedDate((d) => new Date(d.getTime() - 86400000));
-  const nextDay = () => setSelectedDate((d) => new Date(d.getTime() + 86400000));
+  // Date navigation (day mode only)
+  const prevDay = () => { const d = new Date(fromDate.getTime() - 86400000); setFromDate(d); setToDate(d); };
+  const nextDay = () => { const d = new Date(fromDate.getTime() + 86400000); setFromDate(d); setToDate(d); };
 
   // Filtered production log
   const filteredLog = useMemo(() => {
@@ -215,6 +266,34 @@ export default function ProductionDashboardPage() {
         String(e.feed).includes(s)
     );
   }, [data?.production_log, logSearch]);
+
+  // Combined time series for Mooney Viscosity chart (merges viscosity + production log data)
+  const combinedSeries = useMemo(() => {
+    const log = data?.production_log || [];
+    const viscSeries = data?.viscosity_series || [];
+    const viscVals = data?.viscosity_values || [];
+    // Build a time-indexed map from production log
+    const timeMap = {};
+    log.forEach((entry, i) => {
+      timeMap[entry.time] = {
+        time: entry.time,
+        rpm: entry.rpm,
+        feed: entry.feed,
+        mt4: entry.mt4,
+        temperature: entry.mt1,
+        viscosity: i < viscVals.length ? viscVals[i] : null,
+      };
+    });
+    // Also add any viscosity entries not already covered
+    viscSeries.forEach((v) => {
+      if (!timeMap[v.time]) {
+        timeMap[v.time] = { time: v.time, viscosity: v.viscosity, rpm: null, feed: null, mt4: null, temperature: null };
+      } else if (timeMap[v.time].viscosity == null) {
+        timeMap[v.time].viscosity = v.viscosity;
+      }
+    });
+    return Object.values(timeMap).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values]);
 
   const kpis = data?.kpis || {};
 
@@ -246,18 +325,59 @@ export default function ProductionDashboardPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Date selector */}
-          <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden" data-testid="date-selector">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={prevDay} data-testid="prev-day">
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-sm font-medium text-slate-700 px-2 tabular-nums whitespace-nowrap">
-              {displayDate(selectedDate)}
-            </span>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={nextDay} data-testid="next-day">
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+          {/* Period quick filters */}
+          <div className="inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5" data-testid="period-selector">
+            {PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => handlePeriod(opt.key)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  period === opt.key
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+                data-testid={`period-${opt.key}`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
+
+          {/* From date */}
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs text-slate-500">From</label>
+            <input
+              type="date"
+              value={fromStr}
+              onChange={(e) => { setFromDate(new Date(e.target.value + "T00:00:00")); setPeriod(""); }}
+              className="h-8 px-2 text-sm border border-slate-200 rounded-lg bg-white"
+              data-testid="from-date"
+            />
+          </div>
+
+          {/* To date */}
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs text-slate-500">To</label>
+            <input
+              type="date"
+              value={toStr}
+              onChange={(e) => { setToDate(new Date(e.target.value + "T00:00:00")); setPeriod(""); }}
+              className="h-8 px-2 text-sm border border-slate-200 rounded-lg bg-white"
+              data-testid="to-date"
+            />
+          </div>
+
+          {/* Day-mode prev/next arrows */}
+          {period === "day" && (
+            <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={prevDay} data-testid="prev-day">
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={nextDay} data-testid="next-day">
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
 
           {/* Shift selector */}
           <Select value={shift} onValueChange={setShift}>
@@ -346,79 +466,59 @@ export default function ProductionDashboardPage() {
             />
           </div>
 
-          {/* ── Charts Row ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Waste & Downtime Over Time */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="waste-chart">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-700">Waste & Downtime Over Time</h3>
-              </div>
-              {data?.waste_downtime_series?.length > 0 ? (
-                <ResponsiveContainer width="100%" height={260}>
-                  <ComposedChart data={data.waste_downtime_series}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                    <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="#94a3b8" label={{ value: "kg", position: "insideTopLeft", offset: -5, fontSize: 11 }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar yAxisId="left" dataKey="waste" name="Waste" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={20} />
-                    <Bar yAxisId="left" dataKey="downtime" name="Downtime" fill="#475569" radius={[4, 4, 0, 0]} barSize={20} />
-                    <Line yAxisId="right" type="monotone" dataKey="feed" name="Feed" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-[260px] text-sm text-slate-400">
-                  No data for this date/shift
-                </div>
-              )}
+          {/* ── Mooney Viscosity Chart (full width) ── */}
+          <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="viscosity-chart">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <h3 className="text-sm font-semibold text-slate-700">Mooney Viscosity</h3>
+              <ChartSeriesToggles active={chartSeries} onToggle={(k) => setChartSeries(prev => ({ ...prev, [k]: !prev[k] }))} />
             </div>
+            {combinedSeries.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={combinedSeries}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#94a3b8" />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="#94a3b8" domain={['auto', 'auto']} label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 11 }} />
+                  {(chartSeries.rpm || chartSeries.feed || chartSeries.mt4 || chartSeries.temperature) && (
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="#94a3b8" />
+                  )}
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line yAxisId="left" type="monotone" dataKey="viscosity" name="Viscosity (MU)" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 4, fill: "#8b5cf6" }} connectNulls />
+                  {chartSeries.rpm && <Line yAxisId="right" type="monotone" dataKey="rpm" name="RPM" stroke="#3b82f6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+                  {chartSeries.feed && <Line yAxisId="right" type="monotone" dataKey="feed" name="Feed (kg)" stroke="#f97316" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+                  {chartSeries.mt4 && <Line yAxisId="right" type="monotone" dataKey="mt4" name="MT4" stroke="#14b8a6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+                  {chartSeries.temperature && <Line yAxisId="right" type="monotone" dataKey="temperature" name="Temperature (MT1)" stroke="#ef4444" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-sm text-slate-400">
+                No viscosity data for this period
+              </div>
+            )}
+          </div>
 
+          {/* ── Scatter + Actions + Insights Row ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Feed vs RPM vs Viscosity */}
             <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="scatter-chart">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-slate-700">Feed vs RPM vs Viscosity</h3>
-                  <Info className="w-3.5 h-3.5 text-slate-400" />
-                </div>
+              <div className="flex items-center gap-2 mb-3">
+                <h3 className="text-sm font-semibold text-slate-700">Feed vs RPM vs Viscosity</h3>
+                <Info className="w-3.5 h-3.5 text-slate-400" />
               </div>
               {data?.scatter_data?.length > 0 ? (
-                <ResponsiveContainer width="100%" height={260}>
+                <ResponsiveContainer width="100%" height={200}>
                   <ScatterChart>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="feed" name="Feed" tick={{ fontSize: 11 }} stroke="#94a3b8" label={{ value: "Feed (kg)", position: "insideBottom", offset: -3, fontSize: 11 }} />
-                    <YAxis dataKey="viscosity" name="Viscosity" tick={{ fontSize: 11 }} stroke="#94a3b8" label={{ value: "Viscosity (MU)", angle: -90, position: "insideLeft", offset: 10, fontSize: 11 }} />
+                    <XAxis dataKey="feed" name="Feed" tick={{ fontSize: 10 }} stroke="#94a3b8" />
+                    <YAxis dataKey="viscosity" name="Viscosity" tick={{ fontSize: 10 }} stroke="#94a3b8" />
                     <ZAxis dataKey="rpm" name="RPM" range={[40, 400]} />
                     <Tooltip content={<ScatterTooltip />} />
                     <Scatter data={data.scatter_data} fill="#6366f1" fillOpacity={0.7} />
                   </ScatterChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-[260px] text-sm text-slate-400">
-                  No data for this date/shift
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Viscosity Trend + Actions/Insights Row ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Viscosity Trend */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="viscosity-chart">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3">Viscosity Trend</h3>
-              {data?.viscosity_series?.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={data.viscosity_series}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                    <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" domain={['auto', 'auto']} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Line type="monotone" dataKey="viscosity" name="Viscosity (MU)" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 4, fill: "#8b5cf6" }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
                 <div className="flex items-center justify-center h-[200px] text-sm text-slate-400">
-                  No viscosity data
+                  No data
                 </div>
               )}
             </div>
@@ -613,7 +713,7 @@ export default function ProductionDashboardPage() {
                 onClick={() =>
                   createEventMutation.mutate({
                     ...newEvent,
-                    date: dateStr,
+                    date: fromStr,
                     time: new Date().toTimeString().slice(0, 5),
                   })
                 }

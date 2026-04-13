@@ -1460,11 +1460,13 @@ export const rbacAPI = {
  */
 // Production Dashboard API
 export const productionAPI = {
-  getDashboard: async (date, shift = "day") => {
-    const params = new URLSearchParams();
-    if (date) params.append("date", date);
-    if (shift) params.append("shift", shift);
-    const response = await api.get(`/production/dashboard?${params.toString()}`);
+  getDashboard: async (params = {}) => {
+    const qs = new URLSearchParams();
+    if (params.date) qs.append("date", params.date);
+    if (params.from_date) qs.append("from_date", params.from_date);
+    if (params.to_date) qs.append("to_date", params.to_date);
+    if (params.shift) qs.append("shift", params.shift);
+    const response = await api.get(`/production/dashboard?${qs.toString()}`);
     return response.data;
   },
   getEvents: async (date, eventType) => {

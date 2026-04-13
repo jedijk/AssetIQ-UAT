@@ -66,31 +66,53 @@ def parse_submitted_at(sub):
 
 @router.get("/production/dashboard")
 async def get_production_dashboard(
-    date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format"),
+    date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format (single day, used if from_date not set)"),
+    from_date: Optional[str] = Query(None, description="Range start YYYY-MM-DD"),
+    to_date: Optional[str] = Query(None, description="Range end YYYY-MM-DD"),
     shift: Optional[str] = Query("day", description="Shift: day or night"),
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Get aggregated production dashboard data for a specific date and shift.
-    Pulls data from form submissions (Extruder settings, Mooney Viscosity, etc.)
+    Get aggregated production dashboard data.
+    Supports single-day (date) or range (from_date + to_date).
     """
-    # Parse date
-    if date:
-        try:
-            target_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        except ValueError:
-            target_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    else:
-        target_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    now = datetime.now(timezone.utc)
 
-    # Build time range for the shift
-    shift_config = SHIFTS.get(shift, SHIFTS["day"])
-    if shift == "night":
-        shift_start = target_date.replace(hour=22, minute=0, second=0, microsecond=0)
-        shift_end = (target_date + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)
+    # Determine the effective date range
+    if from_date and to_date:
+        try:
+            range_start = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            range_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        try:
+            range_end = datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            range_end = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        # Full days: start at 00:00 of from_date, end at 23:59 of to_date
+        range_start = range_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        range_end = range_end.replace(hour=23, minute=59, second=59, microsecond=999999)
+        target_date = range_start
+        is_range = True
     else:
-        shift_start = target_date.replace(hour=6, minute=0, second=0, microsecond=0)
-        shift_end = target_date.replace(hour=22, minute=0, second=0, microsecond=0)
+        # Single day mode (backward compatible)
+        if date:
+            try:
+                target_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            except ValueError:
+                target_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            target_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        shift_config = SHIFTS.get(shift, SHIFTS["day"])
+        if shift == "night":
+            range_start = target_date.replace(hour=22, minute=0, second=0, microsecond=0)
+            range_end = (target_date + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)
+        else:
+            range_start = target_date.replace(hour=6, minute=0, second=0, microsecond=0)
+            range_end = target_date.replace(hour=22, minute=0, second=0, microsecond=0)
+        is_range = False
+
+    shift_config = SHIFTS.get(shift, SHIFTS["day"])
 
     # Query all form submissions for production forms for Line-90 in date range
     # submitted_at can be stored as string or datetime, handle both
@@ -119,7 +141,7 @@ async def get_production_dashboard(
                 pass
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        if shift_start <= dt <= shift_end:
+        if range_start <= dt <= range_end:
             sub["_parsed_time"] = dt
             submissions.append(sub)
 
@@ -270,18 +292,17 @@ async def get_production_dashboard(
         })
 
     # Get production actions/insights from dedicated collection
-    actions_query = {
-        "date": target_date.strftime("%Y-%m-%d"),
-        "type": "action",
-    }
+    if is_range:
+        event_date_query = {"date": {"$gte": range_start.strftime("%Y-%m-%d"), "$lte": range_end.strftime("%Y-%m-%d")}}
+    else:
+        event_date_query = {"date": target_date.strftime("%Y-%m-%d")}
+
+    actions_query = {**event_date_query, "type": "action"}
     actions = await db.production_events.find(
         actions_query, {"_id": 0}
     ).sort("created_at", -1).to_list(50)
 
-    insights_query = {
-        "date": target_date.strftime("%Y-%m-%d"),
-        "type": "insight",
-    }
+    insights_query = {**event_date_query, "type": "insight"}
     insights = await db.production_events.find(
         insights_query, {"_id": 0}
     ).sort("created_at", -1).to_list(50)
@@ -298,6 +319,9 @@ async def get_production_dashboard(
 
     return {
         "date": target_date.strftime("%Y-%m-%d"),
+        "from_date": range_start.strftime("%Y-%m-%d"),
+        "to_date": range_end.strftime("%Y-%m-%d"),
+        "is_range": is_range,
         "shift": shift,
         "shift_label": shift_config["label"],
         "equipment_name": EQUIPMENT_NAME,
