@@ -3,6 +3,7 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { equipmentHierarchyAPI } from "../lib/api";
+import api from "../lib/api";
 import { getBackendUrl, getAuthHeaders } from "../lib/apiConfig";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -1013,29 +1014,21 @@ export default function EquipmentManagerPage() {
       formData.append('file', excelImportFile);
       formData.append('installation_id', excelImportInstallation);
       
-      const headers = getAuthHeaders();
-      delete headers['Content-Type']; // Let browser set it for FormData
-      
-      const response = await fetch(`${getBackendUrl()}/api/equipment-hierarchy/import-excel`, {
-        method: 'POST',
-        headers,
-        body: formData
+      const response = await api.post('/equipment-hierarchy/import-excel', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000,
       });
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.detail || 'Import failed');
-      }
+      const data = response.data;
       
       toast.success(`Import complete: ${data.created_count} created, ${data.updated_count} updated`);
-      queryClient.invalidateQueries(["equipment-hierarchy"]);
+      queryClient.invalidateQueries(["equipment-nodes"]);
       setIsExcelImportOpen(false);
       setExcelImportFile(null);
       setExcelImportInstallation("");
     } catch (error) {
       console.error("Excel import error:", error);
-      toast.error(error.message || "Failed to import Excel file");
+      toast.error(error.response?.data?.detail || error.message || "Failed to import Excel file");
     } finally {
       setIsImportingExcel(false);
     }
