@@ -174,8 +174,13 @@ async def get_production_dashboard(
         mt1 = extract_numeric(sub, "MT1") or 0
         mt2 = extract_numeric(sub, "MT2") or 0
         mt3 = extract_numeric(sub, "MT3") or 0
-        mt4 = extract_numeric(sub, "MT4") or 0
-        co2 = extract_numeric(sub, "CO2 Feeds") or 0
+        mp1 = extract_numeric(sub, "MP1") or 0
+        mp2 = extract_numeric(sub, "MP2") or 0
+        mp3 = extract_numeric(sub, "MP3") or 0
+        mp4 = extract_numeric(sub, "MP4") or 0
+        co2_feed_p = extract_numeric(sub, "CO2 Feed/P") or extract_numeric(sub, "CO2 Feeds") or 0
+        t_product_ir = extract_numeric(sub, "T Product IR") or 0
+        remarks = extract_field(sub, "Remarks") or extract_field(sub, "REMARKS") or ""
         waste = extract_numeric(sub, "Waste") or 0
 
         total_feed += feed
@@ -192,8 +197,13 @@ async def get_production_dashboard(
             "mt1": mt1,
             "mt2": mt2,
             "mt3": mt3,
-            "mt4": mt4,
-            "co2_feeds": co2,
+            "mp1": mp1,
+            "mp2": mp2,
+            "mp3": mp3,
+            "mp4": mp4,
+            "co2_feed_p": co2_feed_p,
+            "t_product_ir": t_product_ir,
+            "remarks": remarks,
             "waste": waste,
             "submission_id": sub.get("id", ""),
         })

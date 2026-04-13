@@ -609,7 +609,7 @@ export default function ProductionDashboardPage() {
               <table className="w-full text-sm" data-testid="production-log-table">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    {["Time", "RPM", "Feed (kg)", "Viscosity", "Energy", "MT1", "MT2", "MT3", "MT4", "CO2", "Waste", "By", ""].map((h) => (
+                    {["Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Remarks", "By", ""].map((h) => (
                       <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap">
                         {h}
                       </th>
@@ -629,24 +629,18 @@ export default function ProductionDashboardPage() {
                           <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{entry.time}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.rpm}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.feed}</td>
-                          <td className="py-2 px-2 tabular-nums">
-                            {data?.viscosity_values?.[i] !== undefined
-                              ? data.viscosity_values[i]
-                              : "-"}
-                          </td>
+                          <td className="py-2 px-2 tabular-nums">{entry.moisture}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.energy}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.mt1}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.mt2}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.mt3}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.mt4}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.co2_feeds}</td>
-                          <td className="py-2 px-2 tabular-nums">
-                            {anomaly ? (
-                              <span className="text-red-600 font-semibold">{entry.waste}</span>
-                            ) : (
-                              entry.waste
-                            )}
-                          </td>
+                          <td className="py-2 px-2 tabular-nums">{entry.mp1}</td>
+                          <td className="py-2 px-2 tabular-nums">{entry.mp2}</td>
+                          <td className="py-2 px-2 tabular-nums">{entry.mp3}</td>
+                          <td className="py-2 px-2 tabular-nums">{entry.mp4}</td>
+                          <td className="py-2 px-2 tabular-nums">{entry.co2_feed_p}</td>
+                          <td className="py-2 px-2 tabular-nums">{entry.t_product_ir}</td>
+                          <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]">{entry.remarks || ""}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[80px]">{entry.submitted_by}</td>
                           <td className="py-1.5 px-2">
                             <button
@@ -663,7 +657,7 @@ export default function ProductionDashboardPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={13} className="py-8 text-center text-slate-400 text-sm">
+                      <td colSpan={17} className="py-8 text-center text-slate-400 text-sm">
                         {data?.production_log?.length === 0
                           ? "No production data for this date/shift. Submit Extruder settings samples to see data here."
                           : "No matching results"}
@@ -775,15 +769,18 @@ export default function ProductionDashboardPage() {
             <div className="grid grid-cols-2 gap-3 pt-2">
               {[
                 { key: "rpm", label: "RPM" },
-                { key: "feed", label: "Feed (kg)" },
-                { key: "energy", label: "Energy" },
+                { key: "feed", label: "Feed" },
                 { key: "moisture", label: "M%" },
+                { key: "energy", label: "Energy" },
                 { key: "mt1", label: "MT1" },
                 { key: "mt2", label: "MT2" },
                 { key: "mt3", label: "MT3" },
-                { key: "mt4", label: "MT4" },
-                { key: "co2_feeds", label: "CO2 Feeds" },
-                { key: "waste", label: "Waste (kg)" },
+                { key: "mp1", label: "MP1" },
+                { key: "mp2", label: "MP2" },
+                { key: "mp3", label: "MP3" },
+                { key: "mp4", label: "MP4" },
+                { key: "co2_feed_p", label: "CO2 Feed/P" },
+                { key: "t_product_ir", label: "T Product IR" },
               ].map(({ key, label }) => (
                 <div key={key}>
                   <Label className="text-xs">{label}</Label>
@@ -797,6 +794,15 @@ export default function ProductionDashboardPage() {
                   />
                 </div>
               ))}
+              <div className="col-span-2">
+                <Label className="text-xs">Remarks</Label>
+                <Input
+                  className="h-9 mt-1"
+                  value={editEntry.remarks ?? ""}
+                  onChange={(e) => setEditEntry((prev) => ({ ...prev, remarks: e.target.value }))}
+                  data-testid="edit-remarks"
+                />
+              </div>
               <div className="col-span-2 flex justify-end gap-2 pt-2">
                 <Button variant="outline" size="sm" onClick={() => setEditEntry(null)}>
                   Cancel
@@ -806,9 +812,11 @@ export default function ProductionDashboardPage() {
                   disabled={updateSubmissionMutation.isPending}
                   onClick={() => {
                     const fieldMap = {
-                      rpm: "RPM", feed: "FEED", energy: "ENERGY", moisture: "M%",
-                      mt1: "MT1", mt2: "MT2", mt3: "MT3", mt4: "MT4",
-                      co2_feeds: "CO2 Feeds", waste: "Waste",
+                      rpm: "RPM", feed: "FEED", moisture: "M%", energy: "ENERGY",
+                      mt1: "MT1", mt2: "MT2", mt3: "MT3",
+                      mp1: "MP1", mp2: "MP2", mp3: "MP3", mp4: "MP4",
+                      co2_feed_p: "CO2 Feed/P", t_product_ir: "T Product IR",
+                      remarks: "Remarks",
                     };
                     const values = {};
                     Object.entries(fieldMap).forEach(([k, fieldLabel]) => {
