@@ -790,8 +790,7 @@ export default function DashboardPage({ initialTab }) {
               data-testid="production-tab"
             >
               <Gauge className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline">Production Line 90</span>
-              <span className="sm:hidden">Production</span>
+              <span>Production</span>
             </button>
           </div>
           
