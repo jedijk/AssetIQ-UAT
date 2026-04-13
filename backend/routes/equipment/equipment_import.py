@@ -371,7 +371,6 @@ async def import_excel_file(
     - Description: Description text (optional)
     - Safety, Production, Environmental, Reputation: Criticality scores 0-5 (optional)
     """
-    import pandas as pd
     
     if current_user.get("role") not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin or Owner access required")
@@ -424,6 +423,7 @@ async def import_excel_file(
     
     # Process rows
     rows = df.to_dict('records')
+    batch_inserts = []
     for idx, row in enumerate(rows):
         try:
             tag = str(row.get(id_col, '')).strip() if id_col and pd.notna(row.get(id_col)) else None
@@ -507,8 +507,7 @@ async def import_excel_file(
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
             
-            await db.equipment_nodes.insert_one(node_doc)
-            node_doc.pop("_id", None)
+            batch_inserts.append(node_doc)
             
             current_parents[level_idx] = node_doc
             if tag:
@@ -519,6 +518,13 @@ async def import_excel_file(
         except Exception as e:
             errors.append(f"Row {idx + 2}: {str(e)}")
             logger.error(f"Error processing row {idx + 2}: {e}")
+    
+    # Batch insert all new nodes
+    if batch_inserts:
+        await db.equipment_nodes.insert_many(batch_inserts)
+        # Remove _id from docs
+        for doc in batch_inserts:
+            doc.pop("_id", None)
     
     return {
         "success": True,
