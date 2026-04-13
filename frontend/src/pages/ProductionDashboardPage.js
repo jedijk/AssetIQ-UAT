@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionAPI } from "../lib/api";
+import api from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { formatDateTime } from "../lib/dateUtils";
 import {
@@ -483,10 +484,10 @@ export default function ProductionDashboardPage() {
             <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
           </Button>
 
-          {/* Add Event */}
-          <Button size="sm" className="h-8 gap-1" onClick={() => setShowAddEvent(true)} data-testid="add-event-btn">
-            <Plus className="w-3.5 h-3.5" /> Add Log
-          </Button>
+          {/* Date display */}
+          <span className="text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-3 h-8 flex items-center tabular-nums whitespace-nowrap" data-testid="date-display">
+            {fromStr === toStr ? displayDate(fromDate) : `${displayDate(fromDate)} — ${displayDate(toDate)}`}
+          </span>
         </div>
       </div>
 
