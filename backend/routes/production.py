@@ -16,7 +16,7 @@ router = APIRouter(tags=["Production Dashboard"])
 
 # Form template names that contain production data
 EXTRUDER_FORM = "Extruder settings sample"
-VISCOSITY_FORM = "Mooney Viscosity sample"
+VISCOSITY_FORM = "Mooney viscosity sample"
 BIG_BAG_FORM = "Big Bag Loading"
 SCREEN_CHANGE_FORM = "Screen change"
 MAGNET_CLEANING_FORM = "Magnet cleaning"
@@ -115,9 +115,10 @@ async def get_production_dashboard(
     shift_config = SHIFTS.get(shift, SHIFTS["day"])
 
     # Query all form submissions for production forms for Line-90 in date range
-    # submitted_at can be stored as string or datetime, handle both
+    # Use case-insensitive regex to match template names
+    form_patterns = "|".join(PRODUCTION_FORMS)
     query = {
-        "form_template_name": {"$in": PRODUCTION_FORMS},
+        "form_template_name": {"$regex": f"^({form_patterns})$", "$options": "i"},
         "$or": [
             {"equipment_name": {"$regex": "Line.?90", "$options": "i"}},
             {"equipment_name": EQUIPMENT_NAME},
@@ -145,18 +146,21 @@ async def get_production_dashboard(
             sub["_parsed_time"] = dt
             submissions.append(sub)
 
-    # Separate by form type
+    # Separate by form type (case-insensitive)
+    def match_template(sub, name):
+        return sub.get("form_template_name", "").lower() == name.lower()
+
     extruder_subs = sorted(
-        [s for s in submissions if s.get("form_template_name") == EXTRUDER_FORM],
+        [s for s in submissions if match_template(s, EXTRUDER_FORM)],
         key=lambda s: s.get("_parsed_time", datetime.min.replace(tzinfo=timezone.utc)),
     )
     viscosity_subs = sorted(
-        [s for s in submissions if s.get("form_template_name") == VISCOSITY_FORM],
+        [s for s in submissions if match_template(s, VISCOSITY_FORM)],
         key=lambda s: s.get("_parsed_time", datetime.min.replace(tzinfo=timezone.utc)),
     )
-    big_bag_subs = [s for s in submissions if s.get("form_template_name") == BIG_BAG_FORM]
-    screen_change_subs = [s for s in submissions if s.get("form_template_name") == SCREEN_CHANGE_FORM]
-    magnet_subs = [s for s in submissions if s.get("form_template_name") == MAGNET_CLEANING_FORM]
+    big_bag_subs = [s for s in submissions if match_template(s, BIG_BAG_FORM)]
+    screen_change_subs = [s for s in submissions if match_template(s, SCREEN_CHANGE_FORM)]
+    magnet_subs = [s for s in submissions if match_template(s, MAGNET_CLEANING_FORM)]
 
     # Build production log entries from extruder data
     production_log = []

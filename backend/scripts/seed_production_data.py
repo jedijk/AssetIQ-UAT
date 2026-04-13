@@ -46,7 +46,7 @@ PRODUCTION_LOG = [
     {"time": "20:30", "rpm": 165, "feed": 520, "m_pct": 0.81, "energy": 0.210, "mt1": 210, "mt2": 168, "mt3": 156, "mp1": None, "mp2": 19, "mp3": 13, "mp4": 23, "co2_feed_p": "148.1/100", "t_product_ir": 193, "remarks": "Reduced to 500/160 - Sheet breaking. Increased at 16:43 to 165/520. SC 17:20. SC3 19:30"},
 ]
 
-# Mooney Viscosity samples (from Sample List sheet)
+# Mooney viscosity samples (from Sample List sheet)
 VISCOSITY_SAMPLES = [
     {"time": "08:15", "sample_no": "165-520-23-189", "value": 55.43},
     {"time": "09:15", "sample_no": "165-520-23-191", "value": 58.90},
@@ -122,7 +122,7 @@ async def seed_production_data(target_date_str=None):
 
     # Find template IDs
     ext_t = await db.form_templates.find_one({"name": "Extruder settings sample"}, {"_id": 0, "id": 1})
-    vis_t = await db.form_templates.find_one({"name": "Mooney Viscosity sample"}, {"_id": 0, "id": 1})
+    vis_t = await db.form_templates.find_one({"name": "Mooney viscosity sample"}, {"_id": 0, "id": 1})
     bag_t = await db.form_templates.find_one({"name": "Big Bag Loading"}, {"_id": 0, "id": 1})
 
     ext_id = ext_t.get("id", "") if ext_t else ""
@@ -179,14 +179,14 @@ async def seed_production_data(target_date_str=None):
             "_seeded": True,
         })
 
-    # Mooney Viscosity samples
+    # Mooney viscosity samples
     for i, sample in enumerate(VISCOSITY_SAMPLES):
         h, m = map(int, sample["time"].split(":"))
         dt = target_date.replace(hour=h, minute=m, second=0, microsecond=0)
         submissions.append({
             "id": str(uuid.uuid4()),
             "form_template_id": vis_id,
-            "form_template_name": "Mooney Viscosity sample",
+            "form_template_name": "Mooney viscosity sample",
             "task_instance_id": None,
             "task_template_name": None,
             "equipment_id": equipment_id,
