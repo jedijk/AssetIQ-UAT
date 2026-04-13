@@ -736,7 +736,7 @@ export default function ProductionDashboardPage() {
                           <td className="py-2 px-2 tabular-nums">{entry.co2_feed_p}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.t_product_ir}</td>
                           <td className="py-2 px-2 tabular-nums">{data?.viscosity_values?.[i] !== undefined ? data.viscosity_values[i] : "-"}</td>
-                          <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]">{entry.remarks || ""}</td>
+                          <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]" title={entry.remarks || ""}>{entry.remarks || ""}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[80px]">{entry.submitted_by}</td>
                           <td className="py-1.5 px-2">
                             <button
