@@ -258,7 +258,7 @@ export default function ProductionDashboardPage() {
 
   // Fetch dashboard data
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["production-dashboard", fromStr, toStr, period, shift],
+    queryKey: ["production-dashboard", fromStr, toStr, shift],
     queryFn: () => productionAPI.getDashboard(queryParams),
     refetchInterval: 60000,
     staleTime: 30000,
@@ -408,7 +408,7 @@ export default function ProductionDashboardPage() {
             ))}
             {/* Custom date gear toggle */}
             <button
-              onClick={() => { setShowCustomDate(!showCustomDate); if (!showCustomDate) setPeriod(""); }}
+              onClick={() => { setShowCustomDate(!showCustomDate); if (!showCustomDate) setPeriod("custom"); }}
               className={`px-1.5 py-1.5 rounded-md transition-colors ${
                 showCustomDate ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
               }`}
@@ -427,7 +427,12 @@ export default function ProductionDashboardPage() {
                 <input
                   type="date"
                   value={fromStr}
-                  onChange={(e) => { setFromDate(new Date(e.target.value + "T00:00:00")); setPeriod(""); }}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    const d = new Date(v + "T00:00:00");
+                    if (!isNaN(d)) { setFromDate(d); setPeriod("custom"); }
+                  }}
                   className="h-8 px-2 text-sm border border-slate-200 rounded-lg bg-white"
                   data-testid="from-date"
                 />
@@ -437,7 +442,12 @@ export default function ProductionDashboardPage() {
                 <input
                   type="date"
                   value={toStr}
-                  onChange={(e) => { setToDate(new Date(e.target.value + "T00:00:00")); setPeriod(""); }}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    const d = new Date(v + "T00:00:00");
+                    if (!isNaN(d)) { setToDate(d); setPeriod("custom"); }
+                  }}
                   className="h-8 px-2 text-sm border border-slate-200 rounded-lg bg-white"
                   data-testid="to-date"
                 />
