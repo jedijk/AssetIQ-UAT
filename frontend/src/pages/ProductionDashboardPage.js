@@ -16,7 +16,6 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
-  Info,
   Search,
   X,
 } from "lucide-react";
@@ -45,9 +44,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ScatterChart,
-  Scatter,
-  ZAxis,
+  Bar,
   Line,
   ComposedChart,
 } from "recharts";
@@ -143,23 +140,6 @@ const ChartTooltip = ({ active, payload, label }) => {
           <span className="font-medium text-slate-800">{entry.value}</span>
         </div>
       ))}
-    </div>
-  );
-};
-
-// ──────────────────────────────────────────
-// Scatter tooltip
-// ──────────────────────────────────────────
-const ScatterTooltip = ({ active, payload }) => {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
-  if (!d) return null;
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs">
-      <p className="font-semibold text-slate-700 mb-1">{d.time || ""}</p>
-      <p className="text-slate-600">RPM: <span className="font-medium">{d.rpm}</span></p>
-      <p className="text-slate-600">Feed: <span className="font-medium">{d.feed} kg</span></p>
-      <p className="text-slate-600">Viscosity: <span className="font-medium">{d.viscosity} MU</span></p>
     </div>
   );
 };
@@ -497,24 +477,22 @@ export default function ProductionDashboardPage() {
             )}
           </div>
 
-          {/* ── Scatter + Actions + Insights Row ── */}
+          {/* ── Waste & Downtime + Actions + Insights Row ── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Feed vs RPM vs Viscosity */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="scatter-chart">
-              <div className="flex items-center gap-2 mb-3">
-                <h3 className="text-sm font-semibold text-slate-700">Feed vs RPM vs Viscosity</h3>
-                <Info className="w-3.5 h-3.5 text-slate-400" />
-              </div>
-              {data?.scatter_data?.length > 0 ? (
+            {/* Waste & Downtime */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="waste-chart">
+              <h3 className="text-sm font-semibold text-slate-700 mb-3">Waste & Downtime</h3>
+              {data?.waste_downtime_series?.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
-                  <ScatterChart>
+                  <ComposedChart data={data.waste_downtime_series}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="feed" name="Feed" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-                    <YAxis dataKey="viscosity" name="Viscosity" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-                    <ZAxis dataKey="rpm" name="RPM" range={[40, 400]} />
-                    <Tooltip content={<ScatterTooltip />} />
-                    <Scatter data={data.scatter_data} fill="#6366f1" fillOpacity={0.7} />
-                  </ScatterChart>
+                    <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                    <Bar dataKey="waste" name="Waste (kg)" fill="#ef4444" radius={[3, 3, 0, 0]} barSize={14} />
+                    <Bar dataKey="downtime" name="Downtime" fill="#475569" radius={[3, 3, 0, 0]} barSize={14} />
+                  </ComposedChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-[200px] text-sm text-slate-400">
