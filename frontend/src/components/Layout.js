@@ -7,7 +7,7 @@ import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, ChevronDown, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database, Factory } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database } from "lucide-react";
 import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
@@ -432,13 +432,7 @@ const Layout = () => {
 
   // Navigation Items with feature permissions
   const allNavItems = [
-    { 
-      path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard,
-      subItems: [
-        { path: "/dashboard", label: "Overview", icon: LayoutDashboard },
-        { path: "/production", label: "Production Line 90", icon: Factory },
-      ]
-    },
+    { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { path: "/threats", label: t("nav.observations"), icon: AlertTriangle, feature: "observations" },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true, feature: "investigations" },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList, feature: "actions" },
@@ -538,38 +532,7 @@ const Layout = () => {
 
             {/* Desktop Navigation - Scrollable on smaller screens */}
             <nav className="hidden md:flex items-center gap-0.5 overflow-x-auto scrollbar-hide max-w-[calc(100vw-400px)]" data-testid="desktop-nav">
-              {navItems.map((item) => 
-                item.subItems ? (
-                  <DropdownMenu key={item.path}>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap ${
-                          location.pathname === "/dashboard" || location.pathname === "/production"
-                            ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
-                            : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                        }`}
-                        data-testid="nav-dashboard-dropdown"
-                      >
-                        <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                        {item.label}
-                        <ChevronDown className="w-3 h-3 ml-0.5 opacity-50" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="min-w-[180px]">
-                      {item.subItems.map((sub) => (
-                        <DropdownMenuItem
-                          key={sub.path}
-                          onClick={() => navigate(sub.path)}
-                          className={`gap-2 ${location.pathname === sub.path ? "bg-blue-50 text-blue-700" : ""}`}
-                          data-testid={`nav-sub-${sub.label.toLowerCase().replace(/\s+/g, '-')}`}
-                        >
-                          <sub.icon className="w-3.5 h-3.5" />
-                          {sub.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
+              {navItems.map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
@@ -598,8 +561,7 @@ const Layout = () => {
                     </motion.div>
                   )}
                 </NavLink>
-                )
-              )}
+              ))}
             </nav>
           </div>
 

@@ -55,6 +55,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from "../components/ui/label";
 import InsightsPage from "./InsightsPage";
 import { DISCIPLINES } from "../constants/disciplines";
+import ProductionDashboardPage from "./ProductionDashboardPage";
 
 // Authenticated Lightbox component for viewing images with proper mobile auth
 const AuthenticatedLightbox = ({ url, name, onClose }) => {
@@ -493,10 +494,10 @@ const RecentItemCard = ({ items, title, icon: Icon, emptyMessage, renderItem, on
   </div>
 );
 
-export default function DashboardPage() {
+export default function DashboardPage({ initialTab }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("operational");
+  const [activeTab, setActiveTab] = useState(initialTab || "operational");
   
   // Filter states
   const [disciplineFilter, setDisciplineFilter] = useState("all");
@@ -782,6 +783,15 @@ export default function DashboardPage() {
               <Activity className="w-4 h-4 flex-shrink-0" />
               <span className="hidden sm:inline">Reliability Insights</span>
               <span className="sm:hidden">Insights</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab("production")}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "production" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+              data-testid="production-tab"
+            >
+              <Gauge className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Production Line 90</span>
+              <span className="sm:hidden">Production</span>
             </button>
           </div>
           
@@ -1324,6 +1334,13 @@ export default function DashboardPage() {
           {activeTab === "reliability" && (
             <div className="animate-fade-in -mx-4 sm:-mx-6">
               <InsightsPage embedded={true} />
+            </div>
+          )}
+
+          {/* Production Dashboard Tab */}
+          {activeTab === "production" && (
+            <div className="animate-fade-in -mx-4 sm:-mx-6">
+              <ProductionDashboardPage />
             </div>
           )}
         </div>
