@@ -622,9 +622,14 @@ export default function ProductionDashboardPage() {
             <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="big-bag-panel">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-slate-700">Input Material</h3>
-                {data?.big_bag_entries?.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">{data.big_bag_entries.length}</Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {data?.big_bag_entries?.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">{data.big_bag_entries.length}</Badge>
+                  )}
+                  <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowAddEvent(true)} data-testid="big-bag-add-btn">
+                    <Plus className="w-3 h-3" /> Add
+                  </Button>
+                </div>
               </div>
               <div className="max-h-[200px] overflow-y-auto">
                 {data?.big_bag_entries?.length > 0 ? (
