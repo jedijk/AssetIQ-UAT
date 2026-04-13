@@ -996,7 +996,7 @@ export default function ProductionDashboardPage() {
             {/* Daily Insights */}
             <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="insights-panel">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-slate-700">Daily Insights</h3>
+                <h3 className="text-sm font-semibold text-slate-700">Insights</h3>
                 <div className="flex items-center gap-2">
                   {data?.insights?.length > 0 && (
                     <Badge variant="secondary" className="text-xs">{data.insights.length}</Badge>
