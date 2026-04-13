@@ -556,6 +556,9 @@ export default function ProductionDashboardPage() {
                     data-testid="log-search"
                   />
                 </div>
+                <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={() => setShowAddEvent(true)} data-testid="log-add-btn">
+                  <Plus className="w-3 h-3" /> Add
+                </Button>
               </div>
             </div>
 
