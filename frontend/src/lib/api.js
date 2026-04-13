@@ -1492,6 +1492,10 @@ export const productionAPI = {
     const response = await api.delete("/production/seed-data");
     return response.data;
   },
+  deleteSubmission: async (submissionId) => {
+    const response = await api.delete(`/form-submissions/${submissionId}`);
+    return response.data;
+  },
 };
 
 export const getErrorMessage = (error, fallback = "An error occurred") => {

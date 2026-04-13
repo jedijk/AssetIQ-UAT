@@ -459,6 +459,19 @@ export default function ProductionDashboardPage() {
     onError: () => toast.error("Failed to update entry"),
   });
 
+  // Mutation for deleting a submission
+  const deleteSubmissionMutation = useMutation({
+    mutationFn: (id) => productionAPI.deleteSubmission(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      toast.success("Entry deleted");
+    },
+    onError: () => toast.error("Failed to delete entry"),
+  });
+
+  // Edit state for big bag entries
+  const [editBigBag, setEditBigBag] = useState(null);
+
   // Date navigation (day mode only)
   const prevDay = () => { const d = new Date(fromDate.getTime() - 86400000); setFromDate(d); setToDate(d); };
   const nextDay = () => { const d = new Date(fromDate.getTime() + 86400000); setFromDate(d); setToDate(d); };
@@ -834,16 +847,41 @@ export default function ProductionDashboardPage() {
                         <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Bag No.</th>
                         <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Lot No.</th>
                         <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Prod. Date</th>
+                        <th className="w-14"></th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.big_bag_entries.map((bag, i) => (
-                        <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
+                        <tr key={bag.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 group">
                           <td className="py-1.5 px-1 text-slate-700">{bag.material}</td>
                           <td className="py-1.5 px-1 text-slate-700">{bag.supplier}</td>
                           <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.bag_no}</td>
                           <td className="py-1.5 px-1 text-slate-700">{bag.lot_no}</td>
                           <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.production_date || ""}</td>
+                          <td className="py-1 px-1">
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => setEditBigBag({ ...bag, _index: i })}
+                                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                title="Edit"
+                                data-testid={`edit-bag-${i}`}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (bag.submission_id && confirm("Delete this entry?")) {
+                                    deleteSubmissionMutation.mutate(bag.submission_id);
+                                  }
+                                }}
+                                className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                                title="Delete"
+                                data-testid={`delete-bag-${i}`}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1143,6 +1181,66 @@ export default function ProductionDashboardPage() {
                     updateSubmissionMutation.mutate({ id: editEntry.submission_id, values });
                   }}
                   data-testid="save-edit-btn"
+                >
+                  {updateSubmissionMutation.isPending ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Big Bag Dialog ── */}
+      <Dialog open={!!editBigBag} onOpenChange={(open) => { if (!open) setEditBigBag(null); }}>
+        <DialogContent className="max-w-md" data-testid="edit-bigbag-dialog">
+          <DialogHeader>
+            <DialogTitle>Edit Input Material</DialogTitle>
+          </DialogHeader>
+          {editBigBag && (
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              {[
+                { key: "material", label: "Input Material" },
+                { key: "supplier", label: "Supplier" },
+                { key: "bag_no", label: "Bag No." },
+                { key: "lot_no", label: "Lot No." },
+              ].map(({ key, label }) => (
+                <div key={key}>
+                  <Label className="text-xs">{label}</Label>
+                  <Input
+                    className="h-9 mt-1"
+                    value={editBigBag[key] ?? ""}
+                    onChange={(e) => setEditBigBag((prev) => ({ ...prev, [key]: e.target.value }))}
+                    data-testid={`edit-bag-${key}`}
+                  />
+                </div>
+              ))}
+              <div className="col-span-2">
+                <Label className="text-xs">Production Date</Label>
+                <Input
+                  type="date"
+                  className="h-9 mt-1"
+                  value={editBigBag.production_date ?? ""}
+                  onChange={(e) => setEditBigBag((prev) => ({ ...prev, production_date: e.target.value }))}
+                  data-testid="edit-bag-production_date"
+                />
+              </div>
+              <div className="col-span-2 flex justify-end gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => setEditBigBag(null)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  disabled={updateSubmissionMutation.isPending}
+                  onClick={() => {
+                    const values = {
+                      "Input material": editBigBag.material,
+                      "Supplier": editBigBag.supplier,
+                      "Bag No.": editBigBag.bag_no,
+                      "Lot No.": editBigBag.lot_no,
+                      "Production Date": editBigBag.production_date,
+                    };
+                    updateSubmissionMutation.mutate({ id: editBigBag.submission_id, values });
+                    setEditBigBag(null);
+                  }}
+                  data-testid="save-bag-edit-btn"
                 >
                   {updateSubmissionMutation.isPending ? "Saving..." : "Save"}
                 </Button>

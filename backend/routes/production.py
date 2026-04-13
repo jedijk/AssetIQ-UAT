@@ -270,6 +270,7 @@ async def get_production_dashboard(
             "bag_no": bag_no,
             "lot_no": lot_no,
             "production_date": production_date,
+            "submission_id": sub.get("id", ""),
         })
 
     # Calculate KPIs
