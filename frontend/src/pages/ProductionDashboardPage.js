@@ -549,7 +549,27 @@ export default function ProductionDashboardPage() {
         wsBag["!cols"] = bagHeader.map(() => ({ wch: 16 }));
         XLSX.utils.book_append_sheet(wb, wsBag, "Input Material");
 
-        // Sheet 5: Daily Insights
+        // Sheet 5: Waste & Downtime
+        const wasteHeader = ["Time", "Waste (kg)", "Downtime", "Feed (kg)", "RPM"];
+        const wasteRows = [wasteHeader];
+        (data.waste_downtime_series || []).forEach((w) => {
+          wasteRows.push([w.time, w.waste, w.downtime, w.feed, w.rpm]);
+        });
+        const wsWaste = XLSX.utils.aoa_to_sheet(wasteRows);
+        wsWaste["!cols"] = wasteHeader.map(() => ({ wch: 14 }));
+        XLSX.utils.book_append_sheet(wb, wsWaste, "Waste & Downtime");
+
+        // Sheet 6: Actions
+        const actHeader = ["Time", "Severity", "Title", "Description"];
+        const actRows = [actHeader];
+        (data.actions || []).forEach((ev) => {
+          actRows.push([ev.time, ev.severity, ev.title, ev.description]);
+        });
+        const wsAct = XLSX.utils.aoa_to_sheet(actRows);
+        wsAct["!cols"] = [{ wch: 8 }, { wch: 10 }, { wch: 30 }, { wch: 50 }];
+        XLSX.utils.book_append_sheet(wb, wsAct, "Actions");
+
+        // Sheet 7: Insights
         const insHeader = ["Time", "Severity", "Title", "Description"];
         const insRows = [insHeader];
         (data.insights || []).forEach((ev) => {
@@ -557,7 +577,7 @@ export default function ProductionDashboardPage() {
         });
         const wsIns = XLSX.utils.aoa_to_sheet(insRows);
         wsIns["!cols"] = [{ wch: 8 }, { wch: 10 }, { wch: 30 }, { wch: 50 }];
-        XLSX.utils.book_append_sheet(wb, wsIns, "Daily Insights");
+        XLSX.utils.book_append_sheet(wb, wsIns, "Insights");
 
         // Save
         const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
