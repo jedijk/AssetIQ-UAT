@@ -382,6 +382,17 @@ export default function ProductionDashboardPage() {
     staleTime: 600000,
   });
 
+  // Fetch Line-90 equipment ID for form submissions
+  const { data: line90Equipment } = useQuery({
+    queryKey: ["line90-equipment"],
+    queryFn: async () => {
+      const res = await api.get("/equipment-hierarchy/search?q=Line-90&limit=1");
+      const results = res.data?.results || res.data?.nodes || [];
+      return results[0] || null;
+    },
+    staleTime: 600000,
+  });
+
   // Period change handler
   const handlePeriod = (p) => {
     setPeriod(p);
@@ -799,7 +810,7 @@ export default function ProductionDashboardPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => {
-                        if (formTemplates?.bigBag) setFormExec({ templateId: formTemplates.bigBag.id, templateName: "Big Bag Loading" });
+                        if (formTemplates?.bigBag) setFormExec({ templateId: formTemplates.bigBag.id, templateName: "Big Bag Loading", equipmentId: line90Equipment?.id });
                         else toast.error("Big Bag Loading template not found");
                       }} data-testid="add-bigbag-option">
                         Big Bag Loading
@@ -880,7 +891,7 @@ export default function ProductionDashboardPage() {
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
                       onClick={() => {
-                        if (formTemplates?.extruder) setFormExec({ templateId: formTemplates.extruder.id, templateName: "Extruder Settings" });
+                        if (formTemplates?.extruder) setFormExec({ templateId: formTemplates.extruder.id, templateName: "Extruder Settings", equipmentId: line90Equipment?.id });
                         else toast.error("Extruder template not found");
                       }}
                       data-testid="add-extruder-option"
@@ -889,7 +900,7 @@ export default function ProductionDashboardPage() {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => {
-                        if (formTemplates?.viscosity) setFormExec({ templateId: formTemplates.viscosity.id, templateName: "Viscosity Sample" });
+                        if (formTemplates?.viscosity) setFormExec({ templateId: formTemplates.viscosity.id, templateName: "Viscosity Sample", equipmentId: line90Equipment?.id });
                         else toast.error("Viscosity template not found");
                       }}
                       data-testid="add-viscosity-option"
@@ -1141,6 +1152,7 @@ export default function ProductionDashboardPage() {
         onClose={() => setFormExec(null)}
         templateId={formExec?.templateId}
         templateName={formExec?.templateName || ""}
+        equipmentId={formExec?.equipmentId || ""}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ["production-dashboard"] })}
       />
     </div>

@@ -497,6 +497,26 @@ class FormService:
         if template.get("require_signature") and not data.get("signature_data"):
             raise ValueError("Signature is required for this form")
         
+        # Resolve equipment name/tag if equipment_id provided
+        equipment_name = ""
+        equipment_tag = ""
+        if data.get("equipment_id"):
+            equip = await self.db.equipment_nodes.find_one(
+                {"id": data["equipment_id"]}, {"_id": 0, "name": 1, "tag": 1}
+            )
+            if equip:
+                equipment_name = equip.get("name", "")
+                equipment_tag = equip.get("tag", "")
+
+        # Resolve submitted_by_name
+        submitted_by_name = ""
+        if submitted_by:
+            user = await self.db.users.find_one(
+                {"id": submitted_by}, {"_id": 0, "name": 1}
+            )
+            if user:
+                submitted_by_name = user.get("name", "")
+
         # Create submission document
         doc = {
             "id": str(uuid.uuid4()),  # Custom string ID for consistency
@@ -504,7 +524,10 @@ class FormService:
             "form_template_name": template["name"],
             "form_template_version": template.get("version", 1),
             "task_instance_id": data.get("task_instance_id"),
+            "task_template_name": data.get("task_template_name"),
             "equipment_id": data.get("equipment_id"),
+            "equipment_name": equipment_name,
+            "equipment_tag": equipment_tag,
             "efm_id": data.get("efm_id"),
             "values": evaluated_values,
             "threshold_breaches": threshold_breaches,
@@ -515,6 +538,7 @@ class FormService:
             "notes": data.get("notes"),
             "signature_data": data.get("signature_data"),
             "submitted_by": submitted_by,
+            "submitted_by_name": submitted_by_name,
             "submitted_at": now,
             "created_at": now,
         }
