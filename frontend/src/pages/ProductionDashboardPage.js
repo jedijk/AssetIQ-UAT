@@ -238,7 +238,7 @@ export default function ProductionDashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-slate-900" data-testid="production-title">
-            Daily Production Overview
+            Production Overview
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Track performance, monitor trends, and take action
