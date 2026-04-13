@@ -19,6 +19,7 @@ import {
   Search,
   X,
   Pencil,
+  Settings,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -48,6 +49,7 @@ import {
   Bar,
   Line,
   ComposedChart,
+  ReferenceArea,
 } from "recharts";
 import { toast } from "sonner";
 
@@ -60,12 +62,17 @@ const displayDate = (d) => {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 };
 const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
-const startOfMonth = () => { const d = today(); d.setDate(1); return d; };
+const daysAgo = (n) => { const d = today(); d.setDate(d.getDate() - n); return d; };
+const monthsAgo = (n) => { const d = today(); d.setMonth(d.getMonth() - n); return d; };
 const startOfYear = () => { const d = today(); d.setMonth(0, 1); return d; };
 
 const PERIOD_OPTIONS = [
-  { key: "day", label: "Day" },
-  { key: "month", label: "Month" },
+  { key: "1d", label: "1D" },
+  { key: "1w", label: "1W" },
+  { key: "1m", label: "1M" },
+  { key: "3m", label: "3M" },
+  { key: "6m", label: "6M" },
+  { key: "1y", label: "1Y" },
   { key: "ytd", label: "YTD" },
 ];
 
@@ -145,6 +152,33 @@ const ChartTooltip = ({ active, payload, label }) => {
   );
 };
 
+// Viscosity chart tooltip — always shows RPM, Feed, MT4, Temperature
+const ViscosityTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  const d = payload[0]?.payload;
+  if (!d) return null;
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs min-w-[150px]">
+      <p className="font-semibold text-slate-700 mb-1.5">{label}</p>
+      {d.viscosity != null && (
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#8b5cf6]" /><span className="text-slate-600">Viscosity:</span><span className="font-medium text-slate-800">{d.viscosity} MU</span></div>
+      )}
+      {d.rpm != null && (
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#3b82f6]" /><span className="text-slate-600">RPM:</span><span className="font-medium text-slate-800">{d.rpm}</span></div>
+      )}
+      {d.feed != null && (
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#f97316]" /><span className="text-slate-600">Feed:</span><span className="font-medium text-slate-800">{d.feed} kg</span></div>
+      )}
+      {d.mt4 != null && (
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#14b8a6]" /><span className="text-slate-600">MT4:</span><span className="font-medium text-slate-800">{d.mt4}</span></div>
+      )}
+      {d.temperature != null && (
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#ef4444]" /><span className="text-slate-600">Temp (MT1):</span><span className="font-medium text-slate-800">{d.temperature}</span></div>
+      )}
+    </div>
+  );
+};
+
 // ──────────────────────────────────────────
 // Chart series toggle buttons
 // ──────────────────────────────────────────
@@ -186,7 +220,7 @@ export default function ProductionDashboardPage() {
   const queryClient = useQueryClient();
 
   // State
-  const [period, setPeriod] = useState("day");
+  const [period, setPeriod] = useState("1d");
   const [fromDate, setFromDate] = useState(today());
   const [toDate, setToDate] = useState(today());
   const [shift, setShift] = useState("day");
@@ -194,21 +228,31 @@ export default function ProductionDashboardPage() {
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", description: "", type: "action", severity: "info" });
   const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mt4: false, temperature: false, screenChange: false, magnetCleaning: false });
+  const [showCustomDate, setShowCustomDate] = useState(false);
 
   // Period change handler
   const handlePeriod = (p) => {
     setPeriod(p);
+    setShowCustomDate(false);
     const t = today();
-    if (p === "day") { setFromDate(t); setToDate(t); }
-    else if (p === "month") { setFromDate(startOfMonth()); setToDate(t); }
-    else if (p === "ytd") { setFromDate(startOfYear()); setToDate(t); }
+    setToDate(t);
+    switch (p) {
+      case "1d": setFromDate(t); break;
+      case "1w": setFromDate(daysAgo(7)); break;
+      case "1m": setFromDate(monthsAgo(1)); break;
+      case "3m": setFromDate(monthsAgo(3)); break;
+      case "6m": setFromDate(monthsAgo(6)); break;
+      case "1y": setFromDate(monthsAgo(12)); break;
+      case "ytd": setFromDate(startOfYear()); break;
+      default: setFromDate(t);
+    }
   };
 
   const fromStr = fmtDate(fromDate);
   const toStr = fmtDate(toDate);
 
   // Build query params
-  const queryParams = period === "day"
+  const queryParams = period === "1d"
     ? { date: fromStr, shift }
     : { from_date: fromStr, to_date: toStr, shift };
 
@@ -352,7 +396,7 @@ export default function ProductionDashboardPage() {
               <button
                 key={opt.key}
                 onClick={() => handlePeriod(opt.key)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                   period === opt.key
                     ? "bg-white text-slate-900 shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
@@ -362,34 +406,47 @@ export default function ProductionDashboardPage() {
                 {opt.label}
               </button>
             ))}
+            {/* Custom date gear toggle */}
+            <button
+              onClick={() => { setShowCustomDate(!showCustomDate); if (!showCustomDate) setPeriod(""); }}
+              className={`px-1.5 py-1.5 rounded-md transition-colors ${
+                showCustomDate ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
+              }`}
+              data-testid="custom-date-toggle"
+              title="Custom date range"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          {/* From date */}
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs text-slate-500">From</label>
-            <input
-              type="date"
-              value={fromStr}
-              onChange={(e) => { setFromDate(new Date(e.target.value + "T00:00:00")); setPeriod(""); }}
-              className="h-8 px-2 text-sm border border-slate-200 rounded-lg bg-white"
-              data-testid="from-date"
-            />
-          </div>
-
-          {/* To date */}
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs text-slate-500">To</label>
-            <input
-              type="date"
-              value={toStr}
-              onChange={(e) => { setToDate(new Date(e.target.value + "T00:00:00")); setPeriod(""); }}
-              className="h-8 px-2 text-sm border border-slate-200 rounded-lg bg-white"
-              data-testid="to-date"
-            />
-          </div>
+          {/* Custom date pickers (unfold) */}
+          {showCustomDate && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-slate-500">From</label>
+                <input
+                  type="date"
+                  value={fromStr}
+                  onChange={(e) => { setFromDate(new Date(e.target.value + "T00:00:00")); setPeriod(""); }}
+                  className="h-8 px-2 text-sm border border-slate-200 rounded-lg bg-white"
+                  data-testid="from-date"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-slate-500">To</label>
+                <input
+                  type="date"
+                  value={toStr}
+                  onChange={(e) => { setToDate(new Date(e.target.value + "T00:00:00")); setPeriod(""); }}
+                  className="h-8 px-2 text-sm border border-slate-200 rounded-lg bg-white"
+                  data-testid="to-date"
+                />
+              </div>
+            </>
+          )}
 
           {/* Day-mode prev/next arrows */}
-          {period === "day" && (
+          {period === "1d" && (
             <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={prevDay} data-testid="prev-day">
                 <ChevronLeft className="w-4 h-4" />
@@ -497,12 +554,13 @@ export default function ProductionDashboardPage() {
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={combinedSeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <ReferenceArea yAxisId="left" y1={50} y2={60} fill="#22c55e" fillOpacity={0.08} label={{ value: "Target 50-60 MU", position: "insideTopLeft", fontSize: 10, fill: "#16a34a", fontWeight: 500 }} />
                   <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#94a3b8" />
                   <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="#94a3b8" domain={['auto', 'auto']} label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 11 }} />
                   {(chartSeries.rpm || chartSeries.feed || chartSeries.mt4 || chartSeries.temperature) && (
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="#94a3b8" />
                   )}
-                  <Tooltip content={<ChartTooltip />} />
+                  <Tooltip content={<ViscosityTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Line yAxisId="left" type="monotone" dataKey="viscosity" name="Viscosity (MU)" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 4, fill: "#8b5cf6" }} connectNulls />
                   {chartSeries.rpm && <Line yAxisId="right" type="monotone" dataKey="rpm" name="RPM" stroke="#3b82f6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
