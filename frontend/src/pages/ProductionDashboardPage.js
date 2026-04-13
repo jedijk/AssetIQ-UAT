@@ -424,7 +424,8 @@ export default function ProductionDashboardPage() {
     queryKey: ["production-dashboard", fromStr, toStr, shift],
     queryFn: () => productionAPI.getDashboard(queryParams),
     refetchInterval: 60000,
-    staleTime: 30000,
+    staleTime: 5000,
+    refetchOnWindowFocus: true,
   });
 
   // Mutation for creating events
