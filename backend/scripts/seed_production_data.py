@@ -231,6 +231,66 @@ async def seed_production_data(target_date_str=None):
             "_seeded": True,
         })
 
+    # Generate Screen Change entries
+    screen_times = [(10, 0), (15, 30)]
+    for hour, minute in screen_times:
+        dt = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        submissions.append({
+            "id": str(uuid.uuid4()),
+            "form_template_id": "",
+            "form_template_name": "Screen change",
+            "task_instance_id": None,
+            "task_template_name": None,
+            "equipment_id": equipment_id,
+            "equipment_name": equipment_name,
+            "equipment_tag": equipment_tag,
+            "discipline": "Mechanical",
+            "values": [
+                {"field_id": "date_time", "field_label": "Date & Time", "value": dt.isoformat()},
+            ],
+            "attachments": [],
+            "notes": "",
+            "submitted_by": "seed-script",
+            "submitted_by_name": "Operator",
+            "submitted_at": dt.isoformat(),
+            "has_warnings": False,
+            "has_critical": False,
+            "has_signature": False,
+            "status": "submitted",
+            "created_at": dt.isoformat(),
+            "_seeded": True,
+        })
+
+    # Generate Magnet Cleaning entries
+    magnet_times = [(9, 0), (14, 0), (19, 0)]
+    for hour, minute in magnet_times:
+        dt = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        submissions.append({
+            "id": str(uuid.uuid4()),
+            "form_template_id": "",
+            "form_template_name": "Magnet cleaning",
+            "task_instance_id": None,
+            "task_template_name": None,
+            "equipment_id": equipment_id,
+            "equipment_name": equipment_name,
+            "equipment_tag": equipment_tag,
+            "discipline": "Mechanical",
+            "values": [
+                {"field_id": "date_time", "field_label": "Date & Time", "value": dt.isoformat()},
+            ],
+            "attachments": [],
+            "notes": "",
+            "submitted_by": "seed-script",
+            "submitted_by_name": "Operator",
+            "submitted_at": dt.isoformat(),
+            "has_warnings": False,
+            "has_critical": False,
+            "has_signature": False,
+            "status": "submitted",
+            "created_at": dt.isoformat(),
+            "_seeded": True,
+        })
+
     # Insert all form submissions
     if submissions:
         await db.form_submissions.insert_many(submissions)

@@ -1484,6 +1484,10 @@ export const productionAPI = {
     const response = await api.delete(`/production/events/${eventId}`);
     return response.data;
   },
+  updateSubmission: async (submissionId, values) => {
+    const response = await api.patch(`/production/submission/${submissionId}`, { values });
+    return response.data;
+  },
   clearSeedData: async () => {
     const response = await api.delete("/production/seed-data");
     return response.data;

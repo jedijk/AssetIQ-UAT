@@ -347,8 +347,8 @@ async def get_production_dashboard(
         "viscosity_series": viscosity_series,
         "viscosity_values": viscosity_values,
         "big_bag_entries": big_bag_entries,
-        "screen_changes": len(screen_change_subs),
-        "magnet_cleanings": len(magnet_subs),
+        "screen_changes": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else ""} for s in screen_change_subs],
+        "magnet_cleanings": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else ""} for s in magnet_subs],
         "actions": actions,
         "insights": insights,
         "submissions_count": len(submissions),
@@ -407,6 +407,39 @@ async def delete_production_event(
     if result.deleted_count == 0:
         return {"error": "Event not found"}
     return {"status": "deleted", "id": event_id}
+
+
+@router.patch("/production/submission/{submission_id}")
+async def update_production_submission(
+    submission_id: str,
+    data: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update field values on a production form submission."""
+    # data.values is a dict of {field_label: new_value}
+    updates = data.get("values", {})
+    if not updates:
+        return {"error": "No values provided"}
+
+    sub = await db.form_submissions.find_one({"id": submission_id}, {"_id": 0})
+    if not sub:
+        return {"error": "Submission not found"}
+
+    # Update matching fields in the values array
+    new_values = []
+    for v in sub.get("values", []):
+        label = v.get("field_label", "")
+        if label in updates:
+            new_values.append({**v, "value": str(updates[label])})
+        else:
+            new_values.append(v)
+
+    await db.form_submissions.update_one(
+        {"id": submission_id},
+        {"$set": {"values": new_values, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"status": "updated", "id": submission_id}
+
 
 
 @router.delete("/production/seed-data")

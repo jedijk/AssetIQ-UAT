@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Search,
   X,
+  Pencil,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -152,6 +153,8 @@ const OPTIONAL_SERIES = [
   { key: "feed", label: "Feed", color: "#f97316" },
   { key: "mt4", label: "MT4", color: "#14b8a6" },
   { key: "temperature", label: "Temperature", color: "#ef4444" },
+  { key: "screenChange", label: "Screen Change", color: "#a855f7" },
+  { key: "magnetCleaning", label: "Magnet Cleaning", color: "#ec4899" },
 ];
 
 const ChartSeriesToggles = ({ active, onToggle }) => (
@@ -190,7 +193,7 @@ export default function ProductionDashboardPage() {
   const [logSearch, setLogSearch] = useState("");
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", description: "", type: "action", severity: "info" });
-  const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mt4: false, temperature: false });
+  const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mt4: false, temperature: false, screenChange: false, magnetCleaning: false });
 
   // Period change handler
   const handlePeriod = (p) => {
@@ -229,6 +232,20 @@ export default function ProductionDashboardPage() {
     onError: () => toast.error("Failed to create event"),
   });
 
+  // Edit log entry state
+  const [editEntry, setEditEntry] = useState(null);
+
+  // Mutation for updating a submission
+  const updateSubmissionMutation = useMutation({
+    mutationFn: ({ id, values }) => productionAPI.updateSubmission(id, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      setEditEntry(null);
+      toast.success("Entry updated");
+    },
+    onError: () => toast.error("Failed to update entry"),
+  });
+
   // Date navigation (day mode only)
   const prevDay = () => { const d = new Date(fromDate.getTime() - 86400000); setFromDate(d); setToDate(d); };
   const nextDay = () => { const d = new Date(fromDate.getTime() + 86400000); setFromDate(d); setToDate(d); };
@@ -252,6 +269,8 @@ export default function ProductionDashboardPage() {
     const log = data?.production_log || [];
     const viscSeries = data?.viscosity_series || [];
     const viscVals = data?.viscosity_values || [];
+    const screenChanges = new Set((data?.screen_changes || []).map(s => s.time));
+    const magnetCleanings = new Set((data?.magnet_cleanings || []).map(s => s.time));
     // Build a time-indexed map from production log
     const timeMap = {};
     log.forEach((entry, i) => {
@@ -262,18 +281,40 @@ export default function ProductionDashboardPage() {
         mt4: entry.mt4,
         temperature: entry.mt1,
         viscosity: i < viscVals.length ? viscVals[i] : null,
+        screenChange: null,
+        magnetCleaning: null,
       };
     });
     // Also add any viscosity entries not already covered
     viscSeries.forEach((v) => {
       if (!timeMap[v.time]) {
-        timeMap[v.time] = { time: v.time, viscosity: v.viscosity, rpm: null, feed: null, mt4: null, temperature: null };
+        timeMap[v.time] = { time: v.time, viscosity: v.viscosity, rpm: null, feed: null, mt4: null, temperature: null, screenChange: null, magnetCleaning: null };
       } else if (timeMap[v.time].viscosity == null) {
         timeMap[v.time].viscosity = v.viscosity;
       }
     });
-    return Object.values(timeMap).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values]);
+    // Add screen change and magnet cleaning events as reference points
+    // We place them at the nearest time slot, or create a new one
+    const addEvent = (timeSet, fieldName) => {
+      timeSet.forEach((t) => {
+        if (timeMap[t]) {
+          timeMap[t][fieldName] = timeMap[t].viscosity || 0;
+        } else {
+          timeMap[t] = { time: t, viscosity: null, rpm: null, feed: null, mt4: null, temperature: null, screenChange: null, magnetCleaning: null, [fieldName]: 0 };
+        }
+      });
+    };
+    addEvent(screenChanges, "screenChange");
+    addEvent(magnetCleanings, "magnetCleaning");
+    // For event markers, use the viscosity value at that point so the marker sits on the line
+    const sorted = Object.values(timeMap).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+    // Fill event marker values to match viscosity for visual alignment
+    sorted.forEach((p) => {
+      if (p.screenChange !== null) p.screenChange = p.viscosity || p.screenChange;
+      if (p.magnetCleaning !== null) p.magnetCleaning = p.viscosity || p.magnetCleaning;
+    });
+    return sorted;
+  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings]);
 
   const kpis = data?.kpis || {};
 
@@ -468,6 +509,8 @@ export default function ProductionDashboardPage() {
                   {chartSeries.feed && <Line yAxisId="right" type="monotone" dataKey="feed" name="Feed (kg)" stroke="#f97316" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
                   {chartSeries.mt4 && <Line yAxisId="right" type="monotone" dataKey="mt4" name="MT4" stroke="#14b8a6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
                   {chartSeries.temperature && <Line yAxisId="right" type="monotone" dataKey="temperature" name="Temperature (MT1)" stroke="#ef4444" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+                  {chartSeries.screenChange && <Line yAxisId="left" type="monotone" dataKey="screenChange" name="Screen Change" stroke="#a855f7" strokeWidth={0} dot={{ r: 6, fill: "#a855f7", strokeWidth: 2, stroke: "#fff" }} connectNulls={false} legendType="diamond" />}
+                  {chartSeries.magnetCleaning && <Line yAxisId="left" type="monotone" dataKey="magnetCleaning" name="Magnet Cleaning" stroke="#ec4899" strokeWidth={0} dot={{ r: 6, fill: "#ec4899", strokeWidth: 2, stroke: "#fff" }} connectNulls={false} legendType="diamond" />}
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (
@@ -566,7 +609,7 @@ export default function ProductionDashboardPage() {
               <table className="w-full text-sm" data-testid="production-log-table">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    {["Time", "RPM", "Feed (kg)", "Viscosity", "Energy", "MT1", "MT2", "MT3", "MT4", "CO2", "Waste", "By"].map((h) => (
+                    {["Time", "RPM", "Feed (kg)", "Viscosity", "Energy", "MT1", "MT2", "MT3", "MT4", "CO2", "Waste", "By", ""].map((h) => (
                       <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap">
                         {h}
                       </th>
@@ -605,12 +648,22 @@ export default function ProductionDashboardPage() {
                             )}
                           </td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[80px]">{entry.submitted_by}</td>
+                          <td className="py-1.5 px-2">
+                            <button
+                              onClick={() => setEditEntry({ ...entry, _index: i })}
+                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                              data-testid={`edit-row-${entry.time}`}
+                              title="Edit"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan={12} className="py-8 text-center text-slate-400 text-sm">
+                      <td colSpan={13} className="py-8 text-center text-slate-400 text-sm">
                         {data?.production_log?.length === 0
                           ? "No production data for this date/shift. Submit Extruder settings samples to see data here."
                           : "No matching results"}
@@ -625,9 +678,9 @@ export default function ProductionDashboardPage() {
               <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
                 <span className="text-xs text-slate-500">{filteredLog.length} entries</span>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <span>Screen changes: {data?.screen_changes || 0}</span>
+                  <span>Screen changes: {data?.screen_changes?.length || 0}</span>
                   <span className="text-slate-300">|</span>
-                  <span>Magnet cleanings: {data?.magnet_cleanings || 0}</span>
+                  <span>Magnet cleanings: {data?.magnet_cleanings?.length || 0}</span>
                 </div>
               </div>
             )}
@@ -709,6 +762,69 @@ export default function ProductionDashboardPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Log Entry Dialog ── */}
+      <Dialog open={!!editEntry} onOpenChange={(open) => { if (!open) setEditEntry(null); }}>
+        <DialogContent className="max-w-lg" data-testid="edit-entry-dialog">
+          <DialogHeader>
+            <DialogTitle>Edit Log Entry — {editEntry?.time}</DialogTitle>
+          </DialogHeader>
+          {editEntry && (
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              {[
+                { key: "rpm", label: "RPM" },
+                { key: "feed", label: "Feed (kg)" },
+                { key: "energy", label: "Energy" },
+                { key: "moisture", label: "M%" },
+                { key: "mt1", label: "MT1" },
+                { key: "mt2", label: "MT2" },
+                { key: "mt3", label: "MT3" },
+                { key: "mt4", label: "MT4" },
+                { key: "co2_feeds", label: "CO2 Feeds" },
+                { key: "waste", label: "Waste (kg)" },
+              ].map(({ key, label }) => (
+                <div key={key}>
+                  <Label className="text-xs">{label}</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    className="h-9 mt-1 tabular-nums"
+                    value={editEntry[key] ?? ""}
+                    onChange={(e) => setEditEntry((prev) => ({ ...prev, [key]: e.target.value }))}
+                    data-testid={`edit-${key}`}
+                  />
+                </div>
+              ))}
+              <div className="col-span-2 flex justify-end gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => setEditEntry(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={updateSubmissionMutation.isPending}
+                  onClick={() => {
+                    const fieldMap = {
+                      rpm: "RPM", feed: "FEED", energy: "ENERGY", moisture: "M%",
+                      mt1: "MT1", mt2: "MT2", mt3: "MT3", mt4: "MT4",
+                      co2_feeds: "CO2 Feeds", waste: "Waste",
+                    };
+                    const values = {};
+                    Object.entries(fieldMap).forEach(([k, fieldLabel]) => {
+                      if (editEntry[k] !== undefined && editEntry[k] !== "") {
+                        values[fieldLabel] = editEntry[k];
+                      }
+                    });
+                    updateSubmissionMutation.mutate({ id: editEntry.submission_id, values });
+                  }}
+                  data-testid="save-edit-btn"
+                >
+                  {updateSubmissionMutation.isPending ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
