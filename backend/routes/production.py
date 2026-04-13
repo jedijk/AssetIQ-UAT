@@ -178,7 +178,7 @@ async def get_production_dashboard(
         mp2 = extract_numeric(sub, "MP2") or 0
         mp3 = extract_numeric(sub, "MP3") or 0
         mp4 = extract_numeric(sub, "MP4") or 0
-        co2_feed_p = extract_numeric(sub, "CO2 Feed/P") or extract_numeric(sub, "CO2 Feeds") or 0
+        co2_feed_p = extract_field(sub, "CO2 Feed/P") or extract_field(sub, "CO2 Feeds") or ""
         t_product_ir = extract_numeric(sub, "T Product IR") or 0
         remarks = extract_field(sub, "Remarks") or extract_field(sub, "REMARKS") or ""
         waste = extract_numeric(sub, "Waste") or 0
