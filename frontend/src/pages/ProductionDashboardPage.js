@@ -617,19 +617,40 @@ export default function ProductionDashboardPage() {
               )}
             </div>
 
-            {/* Actions */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="actions-panel">
+            {/* Input Material / Big Bag Loading */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="big-bag-panel">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-slate-700">Actions</h3>
-                {data?.actions?.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">{data.actions.length}</Badge>
+                <h3 className="text-sm font-semibold text-slate-700">Input Material</h3>
+                {data?.big_bag_entries?.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">{data.big_bag_entries.length}</Badge>
                 )}
               </div>
               <div className="max-h-[200px] overflow-y-auto">
-                {data?.actions?.length > 0 ? (
-                  data.actions.map((ev) => <EventCard key={ev.id} event={ev} />)
+                {data?.big_bag_entries?.length > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Material</th>
+                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Supplier</th>
+                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Bag No.</th>
+                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Lot No.</th>
+                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Prod. Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.big_bag_entries.map((bag, i) => (
+                        <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
+                          <td className="py-1.5 px-1 text-slate-700">{bag.material}</td>
+                          <td className="py-1.5 px-1 text-slate-700">{bag.supplier}</td>
+                          <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.bag_no}</td>
+                          <td className="py-1.5 px-1 text-slate-700">{bag.lot_no}</td>
+                          <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.production_date || ""}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 ) : (
-                  <p className="text-xs text-slate-400 py-4 text-center">No actions recorded</p>
+                  <p className="text-xs text-slate-400 py-4 text-center">No input material data</p>
                 )}
               </div>
             </div>

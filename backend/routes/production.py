@@ -233,12 +233,14 @@ async def get_production_dashboard(
         supplier = extract_field(sub, "Supplier") or ""
         bag_no = extract_field(sub, "Bag No.") or ""
         lot_no = extract_field(sub, "Lot No.") or ""
+        production_date = extract_field(sub, "Production Date") or ""
         big_bag_entries.append({
             "time": time_label,
             "material": material,
             "supplier": supplier,
             "bag_no": bag_no,
             "lot_no": lot_no,
+            "production_date": production_date,
         })
 
     # Calculate KPIs
