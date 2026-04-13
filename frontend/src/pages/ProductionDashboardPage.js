@@ -514,12 +514,14 @@ export default function ProductionDashboardPage() {
         // Sheet 2: Production Log
         const logHeader = ["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By"];
         const logRows = [logHeader];
+        const viscMap = {};
+        (data.viscosity_series || []).forEach((v) => { if (v.time) viscMap[v.time] = v.viscosity; });
         (data.production_log || []).forEach((e, i) => {
           logRows.push([
             i + 1, e.time, e.rpm, e.feed, e.moisture, e.energy,
             e.mt1, e.mt2, e.mt3, e.mp1, e.mp2, e.mp3, e.mp4,
             e.co2_feed_p, e.t_product_ir,
-            data.viscosity_values?.[i] !== undefined ? data.viscosity_values[i] : "TBD",
+            viscMap[e.time] !== undefined ? viscMap[e.time] : "TBD",
             e.remarks || "", e.submitted_by || "",
           ]);
         });
@@ -638,15 +640,23 @@ export default function ProductionDashboardPage() {
 
   const kpis = data?.kpis || {};
 
+  // Build time-to-viscosity map for accurate matching
+  const viscosityByTime = useMemo(() => {
+    const map = {};
+    (data?.viscosity_series || []).forEach((v) => {
+      if (v.time) map[v.time] = v.viscosity;
+    });
+    return map;
+  }, [data?.viscosity_series]);
+
   // Anomaly highlight row
   const isAnomalyRow = (entry) => {
-    if (!data?.viscosity_values?.length) return false;
     const avgVisc = kpis.avg_viscosity || 0;
-    const idx = data.production_log?.indexOf(entry);
-    if (idx >= 0 && idx < data.viscosity_values.length) {
-      return Math.abs(data.viscosity_values[idx] - avgVisc) > 4;
+    const visc = viscosityByTime[entry.time];
+    if (visc !== undefined) {
+      return Math.abs(visc - avgVisc) > 4;
     }
-    return entry.waste > 200;
+    return false;
   };
 
   // ──────────────────────────────────────────
@@ -1107,7 +1117,7 @@ export default function ProductionDashboardPage() {
                           <td className="py-2 px-2 tabular-nums">{entry.mp4}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.co2_feed_p}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.t_product_ir}</td>
-                          <td className="py-2 px-2 tabular-nums">{data?.viscosity_values?.[i] !== undefined ? data.viscosity_values[i] : <span className="text-amber-500 font-medium">TBD</span>}</td>
+                          <td className="py-2 px-2 tabular-nums">{viscosityByTime[entry.time] !== undefined ? viscosityByTime[entry.time] : <span className="text-amber-500 font-medium">TBD</span>}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]" title={entry.remarks || ""}>{entry.remarks || ""}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[80px]">{entry.submitted_by}</td>
                           <td className="py-1.5 px-2">
