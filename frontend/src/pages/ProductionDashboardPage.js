@@ -152,7 +152,7 @@ const ChartTooltip = ({ active, payload, label }) => {
   );
 };
 
-// Viscosity chart tooltip — always shows RPM, Feed, MT4, Temperature
+// Viscosity chart tooltip — always shows RPM, Feed, MP4, T Product IR
 const ViscosityTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
@@ -169,11 +169,11 @@ const ViscosityTooltip = ({ active, payload, label }) => {
       {d.feed != null && (
         <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#f97316]" /><span className="text-slate-600">Feed:</span><span className="font-medium text-slate-800">{d.feed} kg</span></div>
       )}
-      {d.mt4 != null && (
-        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#14b8a6]" /><span className="text-slate-600">MT4:</span><span className="font-medium text-slate-800">{d.mt4}</span></div>
+      {d.mp4 != null && (
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#14b8a6]" /><span className="text-slate-600">MP4:</span><span className="font-medium text-slate-800">{d.mp4}</span></div>
       )}
-      {d.temperature != null && (
-        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#ef4444]" /><span className="text-slate-600">Temp (MT1):</span><span className="font-medium text-slate-800">{d.temperature}</span></div>
+      {d.t_product_ir != null && (
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#ef4444]" /><span className="text-slate-600">T Product IR:</span><span className="font-medium text-slate-800">{d.t_product_ir}</span></div>
       )}
     </div>
   );
@@ -185,8 +185,8 @@ const ViscosityTooltip = ({ active, payload, label }) => {
 const OPTIONAL_SERIES = [
   { key: "rpm", label: "RPM", color: "#3b82f6" },
   { key: "feed", label: "Feed", color: "#f97316" },
-  { key: "mt4", label: "MT4", color: "#14b8a6" },
-  { key: "temperature", label: "Temperature", color: "#ef4444" },
+  { key: "mp4", label: "MP4", color: "#14b8a6" },
+  { key: "t_product_ir", label: "T Product IR", color: "#ef4444" },
   { key: "screenChange", label: "Screen Change", color: "#a855f7" },
   { key: "magnetCleaning", label: "Magnet Cleaning", color: "#ec4899" },
 ];
@@ -227,7 +227,7 @@ export default function ProductionDashboardPage() {
   const [logSearch, setLogSearch] = useState("");
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", description: "", type: "action", severity: "info" });
-  const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mt4: false, temperature: false, screenChange: false, magnetCleaning: false });
+  const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mp4: false, t_product_ir: false, screenChange: false, magnetCleaning: false });
   const [showCustomDate, setShowCustomDate] = useState(false);
 
   // Period change handler
@@ -322,8 +322,8 @@ export default function ProductionDashboardPage() {
         time: entry.time,
         rpm: entry.rpm,
         feed: entry.feed,
-        mt4: entry.mt4,
-        temperature: entry.mt1,
+        mp4: entry.mp4,
+        t_product_ir: entry.t_product_ir,
         viscosity: i < viscVals.length ? viscVals[i] : null,
         screenChange: null,
         magnetCleaning: null,
@@ -332,7 +332,7 @@ export default function ProductionDashboardPage() {
     // Also add any viscosity entries not already covered
     viscSeries.forEach((v) => {
       if (!timeMap[v.time]) {
-        timeMap[v.time] = { time: v.time, viscosity: v.viscosity, rpm: null, feed: null, mt4: null, temperature: null, screenChange: null, magnetCleaning: null };
+        timeMap[v.time] = { time: v.time, viscosity: v.viscosity, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null };
       } else if (timeMap[v.time].viscosity == null) {
         timeMap[v.time].viscosity = v.viscosity;
       }
@@ -344,7 +344,7 @@ export default function ProductionDashboardPage() {
         if (timeMap[t]) {
           timeMap[t][fieldName] = timeMap[t].viscosity || 0;
         } else {
-          timeMap[t] = { time: t, viscosity: null, rpm: null, feed: null, mt4: null, temperature: null, screenChange: null, magnetCleaning: null, [fieldName]: 0 };
+          timeMap[t] = { time: t, viscosity: null, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null, [fieldName]: 0 };
         }
       });
     };
@@ -567,7 +567,7 @@ export default function ProductionDashboardPage() {
                   <ReferenceArea yAxisId="left" y1={50} y2={60} fill="#22c55e" fillOpacity={0.1} />
                   <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#94a3b8" />
                   <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="#94a3b8" domain={[48, 62]} label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 11 }} />
-                  {(chartSeries.rpm || chartSeries.feed || chartSeries.mt4 || chartSeries.temperature) && (
+                  {(chartSeries.rpm || chartSeries.feed || chartSeries.mp4 || chartSeries.t_product_ir) && (
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="#94a3b8" />
                   )}
                   <Tooltip content={<ViscosityTooltip />} />
@@ -575,8 +575,8 @@ export default function ProductionDashboardPage() {
                   <Line yAxisId="left" type="monotone" dataKey="viscosity" name="Viscosity (MU)" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 4, fill: "#8b5cf6" }} connectNulls />
                   {chartSeries.rpm && <Line yAxisId="right" type="monotone" dataKey="rpm" name="RPM" stroke="#3b82f6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
                   {chartSeries.feed && <Line yAxisId="right" type="monotone" dataKey="feed" name="Feed (kg)" stroke="#f97316" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
-                  {chartSeries.mt4 && <Line yAxisId="right" type="monotone" dataKey="mt4" name="MT4" stroke="#14b8a6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
-                  {chartSeries.temperature && <Line yAxisId="right" type="monotone" dataKey="temperature" name="Temperature (MT1)" stroke="#ef4444" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+                  {chartSeries.mp4 && <Line yAxisId="right" type="monotone" dataKey="mp4" name="MP4" stroke="#14b8a6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+                  {chartSeries.t_product_ir && <Line yAxisId="right" type="monotone" dataKey="t_product_ir" name="T Product IR" stroke="#ef4444" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
                   {chartSeries.screenChange && <Line yAxisId="left" type="monotone" dataKey="screenChange" name="Screen Change" stroke="#a855f7" strokeWidth={0} dot={{ r: 6, fill: "#a855f7", strokeWidth: 2, stroke: "#fff" }} connectNulls={false} legendType="diamond" />}
                   {chartSeries.magnetCleaning && <Line yAxisId="left" type="monotone" dataKey="magnetCleaning" name="Magnet Cleaning" stroke="#ec4899" strokeWidth={0} dot={{ r: 6, fill: "#ec4899", strokeWidth: 2, stroke: "#fff" }} connectNulls={false} legendType="diamond" />}
                 </ComposedChart>
