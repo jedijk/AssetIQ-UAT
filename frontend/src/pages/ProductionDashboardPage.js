@@ -41,6 +41,12 @@ import {
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import {
   XAxis,
   YAxis,
   CartesianGrid,
@@ -841,9 +847,33 @@ export default function ProductionDashboardPage() {
                     data-testid="log-search"
                   />
                 </div>
-                <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={() => setShowAddEvent(true)} data-testid="log-add-btn">
-                  <Plus className="w-3 h-3" /> Add
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" data-testid="log-add-btn">
+                      <Plus className="w-3 h-3" /> Add
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (formTemplates?.extruder) setFormExec({ templateId: formTemplates.extruder.id, templateName: "Extruder Settings" });
+                        else toast.error("Extruder template not found");
+                      }}
+                      data-testid="add-extruder-option"
+                    >
+                      Extruder Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (formTemplates?.viscosity) setFormExec({ templateId: formTemplates.viscosity.id, templateName: "Viscosity Sample" });
+                        else toast.error("Viscosity template not found");
+                      }}
+                      data-testid="add-viscosity-option"
+                    >
+                      Viscosity Sample
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 
