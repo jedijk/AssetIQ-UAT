@@ -1458,6 +1458,36 @@ export const rbacAPI = {
  * @param {string} fallback - Fallback message if extraction fails
  * @returns {string} The error message as a string
  */
+// Production Dashboard API
+export const productionAPI = {
+  getDashboard: async (date, shift = "day") => {
+    const params = new URLSearchParams();
+    if (date) params.append("date", date);
+    if (shift) params.append("shift", shift);
+    const response = await api.get(`/production/dashboard?${params.toString()}`);
+    return response.data;
+  },
+  getEvents: async (date, eventType) => {
+    const params = new URLSearchParams();
+    if (date) params.append("date", date);
+    if (eventType) params.append("event_type", eventType);
+    const response = await api.get(`/production/events?${params.toString()}`);
+    return response.data;
+  },
+  createEvent: async (data) => {
+    const response = await api.post("/production/events", data);
+    return response.data;
+  },
+  deleteEvent: async (eventId) => {
+    const response = await api.delete(`/production/events/${eventId}`);
+    return response.data;
+  },
+  clearSeedData: async () => {
+    const response = await api.delete("/production/seed-data");
+    return response.data;
+  },
+};
+
 export const getErrorMessage = (error, fallback = "An error occurred") => {
   const detail = error?.response?.data?.detail;
   

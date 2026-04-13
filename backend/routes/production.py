@@ -1,11 +1,12 @@
 """
 Production Dashboard API endpoints.
-Aggregates form submission data for the Daily Production Overview.
+Aggregates form submission data for the Daily Production Overview (Line 90).
 """
 from fastapi import APIRouter, Depends, Query
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import logging
+import uuid
 
 from database import db
 from auth import get_current_user
@@ -16,49 +17,58 @@ router = APIRouter(tags=["Production Dashboard"])
 # Form template names that contain production data
 EXTRUDER_FORM = "Extruder settings sample"
 VISCOSITY_FORM = "Mooney Viscosity sample"
-PRODUCTION_FORMS = [EXTRUDER_FORM, VISCOSITY_FORM, "Big Bag Loading", "Screen change", "Magnet cleaning"]
+BIG_BAG_FORM = "Big Bag Loading"
+SCREEN_CHANGE_FORM = "Screen change"
+MAGNET_CLEANING_FORM = "Magnet cleaning"
+
+PRODUCTION_FORMS = [EXTRUDER_FORM, VISCOSITY_FORM, BIG_BAG_FORM, SCREEN_CHANGE_FORM, MAGNET_CLEANING_FORM]
+
+EQUIPMENT_NAME = "Line-90"
 
 # Shift definitions
 SHIFTS = {
-    "day": {"label": "Day (06:00 - 22:00)", "start": 6, "end": 22},
-    "night": {"label": "Night (22:00 - 06:00)", "start": 22, "end": 6},
+    "day": {"label": "Day (06:00 - 22:00)", "start_hour": 6, "end_hour": 22},
+    "night": {"label": "Night (22:00 - 06:00)", "start_hour": 22, "end_hour": 6},
 }
 
 
-def parse_submission_time(sub):
-    """Extract datetime from a form submission."""
-    # Try to get time from the values (Date & Time field)
-    for v in sub.get("values", []):
-        if v.get("field_label", "").lower() in ("date & time", "date", "datetime"):
-            try:
-                return datetime.fromisoformat(str(v["value"]).replace("Z", "+00:00"))
-            except Exception:
-                pass
-    # Fallback to submitted_at
+def extract_field(submission, field_label):
+    """Extract a value from a submission's values array by field_label (case-insensitive)."""
+    target = field_label.strip().lower()
+    for v in submission.get("values", []):
+        label = v.get("field_label", "").strip().lower()
+        if label == target:
+            return v.get("value")
+    return None
+
+
+def extract_numeric(submission, field_label):
+    """Extract numeric value from submission by field label."""
+    val = extract_field(submission, field_label)
+    if val is None:
+        return None
     try:
-        return datetime.fromisoformat(str(sub.get("submitted_at", "")).replace("Z", "+00:00"))
-    except Exception:
+        return float(val)
+    except (ValueError, TypeError):
         return None
 
 
-def extract_numeric(sub, field_label):
-    """Extract numeric value from submission by field label."""
-    for v in sub.get("values", []):
-        label = v.get("field_label", "").strip().upper()
-        if label == field_label.upper():
-            try:
-                return float(v["value"])
-            except (ValueError, TypeError):
-                return None
-    return None
+def parse_submitted_at(sub):
+    """Parse submitted_at into a datetime object."""
+    raw = sub.get("submitted_at", "")
+    if isinstance(raw, datetime):
+        return raw
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except Exception:
+        return None
 
 
 @router.get("/production/dashboard")
 async def get_production_dashboard(
     date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format"),
     shift: Optional[str] = Query("day", description="Shift: day or night"),
-    equipment_id: Optional[str] = Query(None, description="Equipment/line ID"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Get aggregated production dashboard data for a specific date and shift.
@@ -67,11 +77,11 @@ async def get_production_dashboard(
     # Parse date
     if date:
         try:
-            target_date = datetime.strptime(date, "%Y-%m-%d")
+            target_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         except ValueError:
-            target_date = datetime.now(timezone.utc)
+            target_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     else:
-        target_date = datetime.now(timezone.utc)
+        target_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Build time range for the shift
     shift_config = SHIFTS.get(shift, SHIFTS["day"])
@@ -82,61 +92,125 @@ async def get_production_dashboard(
         shift_start = target_date.replace(hour=6, minute=0, second=0, microsecond=0)
         shift_end = target_date.replace(hour=22, minute=0, second=0, microsecond=0)
 
-    shift_start_str = shift_start.isoformat()
-    shift_end_str = shift_end.isoformat()
-
-    # Query form submissions for this date range
+    # Query all form submissions for production forms for Line-90 in date range
+    # submitted_at can be stored as string or datetime, handle both
     query = {
-        "submitted_at": {"$gte": shift_start_str, "$lte": shift_end_str},
+        "form_template_name": {"$in": PRODUCTION_FORMS},
+        "$or": [
+            {"equipment_name": {"$regex": "Line.?90", "$options": "i"}},
+            {"equipment_name": EQUIPMENT_NAME},
+        ],
     }
-    if equipment_id:
-        query["equipment_id"] = equipment_id
 
-    submissions = await db.form_submissions.find(query, {"_id": 0}).to_list(500)
+    all_subs = await db.form_submissions.find(query, {"_id": 0}).to_list(1000)
+
+    # Filter by date range
+    submissions = []
+    for sub in all_subs:
+        dt = parse_submitted_at(sub)
+        if dt is None:
+            continue
+        # Also check the Date & Time field inside values
+        date_time_val = extract_field(sub, "Date & Time")
+        if date_time_val:
+            try:
+                dt = datetime.fromisoformat(str(date_time_val).replace("Z", "+00:00"))
+            except Exception:
+                pass
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if shift_start <= dt <= shift_end:
+            sub["_parsed_time"] = dt
+            submissions.append(sub)
 
     # Separate by form type
-    extruder_subs = [s for s in submissions if s.get("form_template_name") == EXTRUDER_FORM]
-    viscosity_subs = [s for s in submissions if s.get("form_template_name") == VISCOSITY_FORM]
+    extruder_subs = sorted(
+        [s for s in submissions if s.get("form_template_name") == EXTRUDER_FORM],
+        key=lambda s: s.get("_parsed_time", datetime.min.replace(tzinfo=timezone.utc)),
+    )
+    viscosity_subs = sorted(
+        [s for s in submissions if s.get("form_template_name") == VISCOSITY_FORM],
+        key=lambda s: s.get("_parsed_time", datetime.min.replace(tzinfo=timezone.utc)),
+    )
+    big_bag_subs = [s for s in submissions if s.get("form_template_name") == BIG_BAG_FORM]
+    screen_change_subs = [s for s in submissions if s.get("form_template_name") == SCREEN_CHANGE_FORM]
+    magnet_subs = [s for s in submissions if s.get("form_template_name") == MAGNET_CLEANING_FORM]
 
-    # Sort by time
-    extruder_subs.sort(key=lambda s: s.get("submitted_at", ""))
-    viscosity_subs.sort(key=lambda s: s.get("submitted_at", ""))
-
-    # Build production log entries
+    # Build production log entries from extruder data
     production_log = []
-    total_feed = 0
-    total_waste = 0
-    viscosity_values = []
-    rsd_values = []
+    total_feed = 0.0
+    total_waste = 0.0
 
     for sub in extruder_subs:
-        entry = {
-            "time": sub.get("submitted_at", ""),
-            "submitted_by": sub.get("submitted_by_name", ""),
-        }
-        # Extract all numeric fields
-        for v in sub.get("values", []):
-            label = v.get("field_label", "").strip()
-            try:
-                val = float(v["value"])
-                entry[label.lower().replace(" ", "_").replace("%", "pct").replace("&", "")] = val
-            except (ValueError, TypeError):
-                entry[label.lower().replace(" ", "_").replace("%", "")] = v.get("value")
+        dt = sub.get("_parsed_time")
+        time_label = dt.strftime("%H:%M") if dt else ""
 
-        rpm = entry.get("rpm", 0) or 0
-        feed = entry.get("feed", 0) or 0
+        rpm = extract_numeric(sub, "RPM") or 0
+        feed = extract_numeric(sub, "FEED") or 0
+        moisture = extract_numeric(sub, "M%") or 0
+        energy = extract_numeric(sub, "ENERGY") or 0
+        mt1 = extract_numeric(sub, "MT1") or 0
+        mt2 = extract_numeric(sub, "MT2") or 0
+        mt3 = extract_numeric(sub, "MT3") or 0
+        mt4 = extract_numeric(sub, "MT4") or 0
+        co2 = extract_numeric(sub, "CO2 Feeds") or 0
+        waste = extract_numeric(sub, "Waste") or 0
+
         total_feed += feed
-        production_log.append(entry)
+        total_waste += waste
+
+        production_log.append({
+            "time": time_label,
+            "datetime": dt.isoformat() if dt else "",
+            "submitted_by": sub.get("submitted_by_name", ""),
+            "rpm": rpm,
+            "feed": feed,
+            "moisture": moisture,
+            "energy": energy,
+            "mt1": mt1,
+            "mt2": mt2,
+            "mt3": mt3,
+            "mt4": mt4,
+            "co2_feeds": co2,
+            "waste": waste,
+            "submission_id": sub.get("id", ""),
+        })
 
     # Viscosity data
+    viscosity_values = []
+    viscosity_entries = []
     for sub in viscosity_subs:
+        dt = sub.get("_parsed_time")
+        time_label = dt.strftime("%H:%M") if dt else ""
         measurement = extract_numeric(sub, "Measurement")
+        sample_no = extract_field(sub, "Sample No.")
         if measurement is not None:
             viscosity_values.append(measurement)
+            viscosity_entries.append({
+                "time": time_label,
+                "sample_no": sample_no,
+                "value": measurement,
+            })
+
+    # Big Bag Loading data
+    big_bag_entries = []
+    for sub in big_bag_subs:
+        dt = sub.get("_parsed_time")
+        time_label = dt.strftime("%H:%M") if dt else ""
+        material = extract_field(sub, "Input material") or ""
+        supplier = extract_field(sub, "Supplier") or ""
+        bag_no = extract_field(sub, "Bag No.") or ""
+        lot_no = extract_field(sub, "Lot No.") or ""
+        big_bag_entries.append({
+            "time": time_label,
+            "material": material,
+            "supplier": supplier,
+            "bag_no": bag_no,
+            "lot_no": lot_no,
+        })
 
     # Calculate KPIs
     avg_viscosity = round(sum(viscosity_values) / len(viscosity_values), 2) if viscosity_values else 0
-    # RSD = (std dev / mean) * 100
     if len(viscosity_values) > 1 and avg_viscosity > 0:
         mean = sum(viscosity_values) / len(viscosity_values)
         variance = sum((v - mean) ** 2 for v in viscosity_values) / (len(viscosity_values) - 1)
@@ -145,30 +219,33 @@ async def get_production_dashboard(
     else:
         rsd = 0
 
-    # Estimate waste and yield from the data (simplified)
-    waste_kg = total_waste if total_waste > 0 else round(total_feed * 0.08, 1)  # Default 8% waste
-    yield_pct = round((1 - waste_kg / total_feed) * 100, 2) if total_feed > 0 else 0
+    # Waste calculation
+    waste_kg = total_waste if total_waste > 0 else round(total_feed * 0.08, 1)
+    waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 else 0
+    yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
 
-    # Runtime = number of log entries * interval (assume 15 min intervals)
-    runtime_hours = round(len(production_log) * 0.25, 2) if production_log else 0
+    # Runtime estimation
+    if len(production_log) >= 2:
+        first_t = production_log[0].get("datetime", "")
+        last_t = production_log[-1].get("datetime", "")
+        try:
+            t1 = datetime.fromisoformat(first_t)
+            t2 = datetime.fromisoformat(last_t)
+            runtime_hours = round((t2 - t1).total_seconds() / 3600, 2)
+        except Exception:
+            runtime_hours = round(len(production_log) * 0.25, 2)
+    else:
+        runtime_hours = round(len(production_log) * 0.25, 2)
 
-    # Build time series for charts
+    # Build chart time series (waste + downtime over time)
     waste_downtime_series = []
     for entry in production_log:
-        t = entry.get("time", "")
-        try:
-            dt = datetime.fromisoformat(t.replace("Z", "+00:00"))
-            time_label = dt.strftime("%H:%M")
-        except Exception:
-            time_label = t[:5] if t else ""
-
         waste_downtime_series.append({
-            "time": time_label,
-            "waste": round(entry.get("feed", 0) * 0.08, 1) if entry.get("feed") else 0,
+            "time": entry["time"],
+            "waste": entry.get("waste", 0),
             "downtime": 0,
             "feed": entry.get("feed", 0),
             "rpm": entry.get("rpm", 0),
-            "viscosity": 0,
         })
 
     # Build scatter data (Feed vs RPM vs Viscosity)
@@ -179,33 +256,56 @@ async def get_production_dashboard(
             "feed": entry.get("feed", 0),
             "rpm": entry.get("rpm", 0),
             "viscosity": visc,
-            "waste": round(entry.get("feed", 0) * 0.08, 1) if entry.get("feed") else 0,
+            "waste": entry.get("waste", 0),
+            "time": entry.get("time", ""),
         })
 
-    # Get production actions (from central_actions linked to this equipment)
-    actions = []
-    if equipment_id:
-        action_docs = await db.central_actions.find(
-            {"created_at": {"$gte": shift_start_str, "$lte": shift_end_str}},
-            {"_id": 0, "id": 1, "title": 1, "description": 1, "status": 1, "created_at": 1, "priority": 1}
-        ).sort("created_at", -1).to_list(20)
-        actions = action_docs
+    # Viscosity over time series
+    viscosity_series = []
+    for entry in viscosity_entries:
+        viscosity_series.append({
+            "time": entry["time"],
+            "viscosity": entry["value"],
+            "sample": entry.get("sample_no", ""),
+        })
 
-    # Get production events / insights
-    insights = await db.production_insights.find(
-        {"date": date or target_date.strftime("%Y-%m-%d"), "equipment_id": equipment_id or ""},
-        {"_id": 0}
-    ).sort("created_at", -1).to_list(20)
+    # Get production actions/insights from dedicated collection
+    actions_query = {
+        "date": target_date.strftime("%Y-%m-%d"),
+        "type": "action",
+    }
+    actions = await db.production_events.find(
+        actions_query, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+
+    insights_query = {
+        "date": target_date.strftime("%Y-%m-%d"),
+        "type": "insight",
+    }
+    insights = await db.production_events.find(
+        insights_query, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+
+    # Lot info from Big Bag Loading
+    lot_info = ""
+    if big_bag_entries:
+        lots = [e.get("lot_no", "") for e in big_bag_entries if e.get("lot_no")]
+        materials = [e.get("material", "") for e in big_bag_entries if e.get("material")]
+        if lots:
+            lot_info = f"Lot: {lots[0]}"
+        if materials:
+            lot_info += f" {materials[0]}" if lot_info else materials[0]
 
     return {
         "date": target_date.strftime("%Y-%m-%d"),
         "shift": shift,
         "shift_label": shift_config["label"],
-        "equipment_id": equipment_id,
+        "equipment_name": EQUIPMENT_NAME,
         "kpis": {
             "total_input": round(total_feed, 1),
+            "lot_info": lot_info,
             "waste": round(waste_kg, 1),
-            "waste_pct": round((waste_kg / total_feed * 100), 1) if total_feed > 0 else 0,
+            "waste_pct": waste_pct,
             "yield_pct": yield_pct,
             "yield_target": 92.0,
             "avg_viscosity": avg_viscosity,
@@ -213,64 +313,89 @@ async def get_production_dashboard(
             "rsd": rsd,
             "rsd_target": 7,
             "runtime_hours": runtime_hours,
-            "shift_hours": f"{shift_config['start']:02d}:00 - {shift_config['end']:02d}:00",
+            "shift_hours": f"{shift_config['start_hour']:02d}:00 - {shift_config['end_hour']:02d}:00",
             "sample_count": len(production_log),
+            "viscosity_sample_count": len(viscosity_values),
         },
         "production_log": production_log,
         "waste_downtime_series": waste_downtime_series,
         "scatter_data": scatter_data,
+        "viscosity_series": viscosity_series,
         "viscosity_values": viscosity_values,
+        "big_bag_entries": big_bag_entries,
+        "screen_changes": len(screen_change_subs),
+        "magnet_cleanings": len(magnet_subs),
         "actions": actions,
         "insights": insights,
         "submissions_count": len(submissions),
     }
 
 
-@router.post("/production/actions")
-async def create_production_action(
-    data: dict,
-    current_user: dict = Depends(get_current_user)
+@router.get("/production/events")
+async def get_production_events(
+    date: Optional[str] = Query(None),
+    event_type: Optional[str] = Query(None, description="action or insight"),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Create a production action/event."""
-    import uuid
-    action = {
+    """Get production events/actions/insights for a given date."""
+    query = {}
+    if date:
+        query["date"] = date
+    if event_type:
+        query["type"] = event_type
+
+    events = await db.production_events.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"events": events, "total": len(events)}
+
+
+@router.post("/production/events")
+async def create_production_event(
+    data: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """Create a production action or insight event."""
+    event = {
         "id": str(uuid.uuid4()),
         "title": data.get("title", ""),
         "description": data.get("description", ""),
-        "type": data.get("type", "action"),  # action, event, insight
-        "severity": data.get("severity", "info"),  # info, warning, critical
-        "date": data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-        "time": data.get("time", datetime.now(timezone.utc).strftime("%H:%M")),
-        "equipment_id": data.get("equipment_id", ""),
-        "created_by": current_user["id"],
-        "created_by_name": current_user.get("name", ""),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.production_insights.insert_one(action)
-    del action["_id"] if "_id" in action else None
-    return action
-
-
-@router.post("/production/insights")
-async def create_production_insight(
-    data: dict,
-    current_user: dict = Depends(get_current_user)
-):
-    """Create a daily production insight."""
-    import uuid
-    insight = {
-        "id": str(uuid.uuid4()),
-        "title": data.get("title", ""),
-        "description": data.get("description", ""),
-        "type": data.get("type", "insight"),
+        "type": data.get("type", "action"),
         "severity": data.get("severity", "info"),
         "date": data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
         "time": data.get("time", datetime.now(timezone.utc).strftime("%H:%M")),
-        "equipment_id": data.get("equipment_id", ""),
+        "equipment_name": EQUIPMENT_NAME,
         "created_by": current_user["id"],
         "created_by_name": current_user.get("name", ""),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.production_insights.insert_one(insight)
-    del insight["_id"] if "_id" in insight else None
-    return insight
+    await db.production_events.insert_one(event)
+    # Remove MongoDB _id before returning
+    event.pop("_id", None)
+    return event
+
+
+@router.delete("/production/events/{event_id}")
+async def delete_production_event(
+    event_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a production event."""
+    result = await db.production_events.delete_one({"id": event_id})
+    if result.deleted_count == 0:
+        return {"error": "Event not found"}
+    return {"status": "deleted", "id": event_id}
+
+
+@router.delete("/production/seed-data")
+async def clear_seed_data(
+    current_user: dict = Depends(get_current_user),
+):
+    """Clear all seeded production sample data. Use this to remove demo data."""
+    # Delete seeded form submissions
+    result_subs = await db.form_submissions.delete_many({"_seeded": True})
+    # Delete seeded production events
+    result_events = await db.production_events.delete_many({"_seeded": True})
+    return {
+        "status": "cleared",
+        "submissions_deleted": result_subs.deleted_count,
+        "events_deleted": result_events.deleted_count,
+    }

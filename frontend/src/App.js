@@ -43,6 +43,7 @@ import FeedbackPage from "./pages/FeedbackPage";
 import DefinitionsPage from "./pages/DefinitionsPage";
 import MobileApp from "./mobile/MobileApp";
 import QRScanPage from "./pages/QRScanPage";
+import ProductionDashboardPage from "./pages/ProductionDashboardPage";
 import { useEffect } from "react";
 import "./App.css";
 
@@ -242,6 +243,7 @@ function App() {
               }>
                 <Route index element={<DashboardPage />} />
                 <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="production" element={<ProductionDashboardPage />} />
                 <Route path="definitions" element={<DefinitionsPage />} />
                 <Route path="threats" element={<ThreatsPage />} />
                 <Route path="threats/:id" element={<ThreatDetailPage />} />
