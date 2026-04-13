@@ -609,7 +609,7 @@ export default function ProductionDashboardPage() {
               <table className="w-full text-sm" data-testid="production-log-table">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    {["Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Remarks", "By", ""].map((h) => (
+                    {["Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By", ""].map((h) => (
                       <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap">
                         {h}
                       </th>
@@ -640,6 +640,7 @@ export default function ProductionDashboardPage() {
                           <td className="py-2 px-2 tabular-nums">{entry.mp4}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.co2_feed_p}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.t_product_ir}</td>
+                          <td className="py-2 px-2 tabular-nums">{data?.viscosity_values?.[i] !== undefined ? data.viscosity_values[i] : "-"}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]">{entry.remarks || ""}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[80px]">{entry.submitted_by}</td>
                           <td className="py-1.5 px-2">
@@ -657,7 +658,7 @@ export default function ProductionDashboardPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={17} className="py-8 text-center text-slate-400 text-sm">
+                      <td colSpan={18} className="py-8 text-center text-slate-400 text-sm">
                         {data?.production_log?.length === 0
                           ? "No production data for this date/shift. Submit Extruder settings samples to see data here."
                           : "No matching results"}
