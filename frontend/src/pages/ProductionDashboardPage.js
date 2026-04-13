@@ -61,14 +61,19 @@ import {
 import { toast } from "sonner";
 
 // ──────────────────────────────────────────
-// Date helpers
+// Date helpers (timezone-safe: use local date strings, not UTC)
 // ──────────────────────────────────────────
-const fmtDate = (d) => d.toISOString().slice(0, 10);
+const fmtDate = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 const displayDate = (d) => {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 };
-const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+const today = () => { const d = new Date(); d.setHours(12,0,0,0); return d; };
 const daysAgo = (n) => { const d = today(); d.setDate(d.getDate() - n); return d; };
 const monthsAgo = (n) => { const d = today(); d.setMonth(d.getMonth() - n); return d; };
 const startOfYear = () => { const d = today(); d.setMonth(0, 1); return d; };
