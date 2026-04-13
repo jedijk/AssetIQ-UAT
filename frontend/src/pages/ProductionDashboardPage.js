@@ -214,6 +214,135 @@ const ChartSeriesToggles = ({ active, onToggle }) => (
 );
 
 // ──────────────────────────────────────────
+// Form Execution Dialog
+// ──────────────────────────────────────────
+const FIELD_TYPE_MAP = {
+  text: "text", numeric: "number", number: "number",
+  date: "date", datetime: "datetime-local", dropdown: "text",
+};
+
+const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmentId, equipmentName, equipmentTag, onSuccess }) => {
+  const [fields, setFields] = useState([]);
+  const [formData, setFormData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [dropdownOptions, setDropdownOptions] = useState({});
+
+  // Fetch template fields when dialog opens
+  useEffect(() => {
+    if (!open || !templateId) return;
+    setLoading(true);
+    api.get(`/form-templates/${templateId}`).then((res) => {
+      const t = res.data;
+      const f = t.fields || [];
+      setFields(f);
+      // Set defaults
+      const defaults = {};
+      f.forEach((field) => {
+        const ft = field.type || field.field_type || "text";
+        if (ft === "datetime") defaults[field.id] = new Date().toISOString().slice(0, 16);
+        else if (ft === "date") defaults[field.id] = new Date().toISOString().slice(0, 10);
+        else defaults[field.id] = "";
+        // Collect dropdown options
+        if (ft === "dropdown" && field.options) {
+          setDropdownOptions((prev) => ({ ...prev, [field.id]: field.options }));
+        }
+      });
+      setFormData(defaults);
+    }).catch(() => toast.error("Failed to load form")).finally(() => setLoading(false));
+  }, [open, templateId]);
+
+  const handleSubmit = async () => {
+    // Validate required
+    for (const field of fields) {
+      if (field.required && !formData[field.id] && formData[field.id] !== 0) {
+        toast.error(`${field.label} is required`);
+        return;
+      }
+    }
+    setSubmitting(true);
+    try {
+      const values = fields.map((f) => ({
+        field_id: f.id,
+        field_label: f.label,
+        value: String(formData[f.id] ?? ""),
+      }));
+      await api.post("/form-submissions", {
+        form_template_id: templateId,
+        equipment_id: equipmentId || "",
+        values,
+        notes: "",
+      });
+      toast.success(`${templateName} submitted`);
+      onSuccess?.();
+      onClose();
+    } catch (err) {
+      toast.error("Submission failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" data-testid="form-execution-dialog">
+        <DialogHeader>
+          <DialogTitle>{templateName}</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <div className="flex items-center justify-center py-8"><RefreshCw className="w-5 h-5 animate-spin text-blue-500" /></div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            {fields.map((field) => {
+              const ft = field.type || field.field_type || "text";
+              const inputType = FIELD_TYPE_MAP[ft] || "text";
+              const opts = dropdownOptions[field.id];
+              return (
+                <div key={field.id} className={ft === "datetime" ? "col-span-2" : ""}>
+                  <Label className="text-xs">
+                    {field.label}
+                    {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                  </Label>
+                  {opts ? (
+                    <Select value={formData[field.id] || ""} onValueChange={(v) => setFormData((p) => ({ ...p, [field.id]: v }))}>
+                      <SelectTrigger className="h-9 mt-1" data-testid={`form-field-${field.id}`}>
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {opts.map((o) => (
+                          <SelectItem key={typeof o === "string" ? o : o.value} value={typeof o === "string" ? o : o.value}>
+                            {typeof o === "string" ? o : o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      type={inputType}
+                      step={inputType === "number" ? "any" : undefined}
+                      className="h-9 mt-1"
+                      value={formData[field.id] ?? ""}
+                      onChange={(e) => setFormData((p) => ({ ...p, [field.id]: e.target.value }))}
+                      data-testid={`form-field-${field.id}`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+            <div className="col-span-2 flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+              <Button size="sm" disabled={submitting} onClick={handleSubmit} data-testid="form-submit-btn">
+                {submitting ? "Submitting..." : "Submit"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ──────────────────────────────────────────
 // Main component
 // ──────────────────────────────────────────
 export default function ProductionDashboardPage() {
@@ -230,6 +359,21 @@ export default function ProductionDashboardPage() {
   const [newEvent, setNewEvent] = useState({ title: "", description: "", type: "action", severity: "info" });
   const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mp4: false, t_product_ir: false, screenChange: false, magnetCleaning: false });
   const [showCustomDate, setShowCustomDate] = useState(false);
+  const [formExec, setFormExec] = useState(null); // { templateId, templateName }
+
+  // Template IDs (fetched once)
+  const { data: formTemplates } = useQuery({
+    queryKey: ["production-form-templates"],
+    queryFn: async () => {
+      const res = await api.get("/form-templates");
+      const list = Array.isArray(res.data) ? res.data : res.data.templates || [];
+      const bigBag = list.find((t) => t.name === "Big Bag Loading");
+      const extruder = list.find((t) => t.name === "Extruder settings sample");
+      const viscosity = list.find((t) => /mooney viscosity/i.test(t.name));
+      return { bigBag, extruder, viscosity };
+    },
+    staleTime: 600000,
+  });
 
   // Period change handler
   const handlePeriod = (p) => {
@@ -626,7 +770,10 @@ export default function ProductionDashboardPage() {
                   {data?.big_bag_entries?.length > 0 && (
                     <Badge variant="secondary" className="text-xs">{data.big_bag_entries.length}</Badge>
                   )}
-                  <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowAddEvent(true)} data-testid="big-bag-add-btn">
+                  <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => {
+                    if (formTemplates?.bigBag) setFormExec({ templateId: formTemplates.bigBag.id, templateName: "Big Bag Loading" });
+                    else toast.error("Big Bag Loading template not found");
+                  }} data-testid="big-bag-add-btn">
                     <Plus className="w-3 h-3" /> Add
                   </Button>
                 </div>
@@ -931,6 +1078,15 @@ export default function ProductionDashboardPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Form Execution Dialog ── */}
+      <FormExecutionDialog
+        open={!!formExec}
+        onClose={() => setFormExec(null)}
+        templateId={formExec?.templateId}
+        templateName={formExec?.templateName || ""}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["production-dashboard"] })}
+      />
     </div>
   );
 }
