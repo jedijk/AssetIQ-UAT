@@ -33,11 +33,14 @@ SHIFTS = {
 
 
 def extract_field(submission, field_label):
-    """Extract a value from a submission's values array by field_label (case-insensitive)."""
+    """Extract a value from a submission's values array by field_label or field_id (case-insensitive)."""
     target = field_label.strip().lower()
+    # Normalize: "Date & Time" -> also match "date_&_time"
+    target_normalized = target.replace(" ", "_").replace("&", "&")
     for v in submission.get("values", []):
-        label = v.get("field_label", "").strip().lower()
-        if label == target:
+        label = (v.get("field_label") or "").strip().lower()
+        fid = (v.get("field_id") or "").strip().lower()
+        if label == target or fid == target or label == target_normalized or fid == target_normalized:
             return v.get("value")
     return None
 
@@ -117,12 +120,34 @@ async def get_production_dashboard(
     # Query all form submissions for production forms for Line-90 in date range
     # Use case-insensitive regex to match template names
     form_patterns = "|".join(PRODUCTION_FORMS)
+
+    # Find Line-90 equipment ID and all ancestor/descendant IDs
+    line90 = await db.equipment_nodes.find_one(
+        {"name": {"$regex": "Line.?90", "$options": "i"}}, {"_id": 0, "id": 1, "parent_id": 1}
+    )
+    equipment_ids = []
+    if line90:
+        equipment_ids.append(line90["id"])
+        # Also include parent (e.g. "Tyromer") since tasks may be assigned at parent level
+        if line90.get("parent_id"):
+            equipment_ids.append(line90["parent_id"])
+            # Get grandparent too
+            parent = await db.equipment_nodes.find_one(
+                {"id": line90["parent_id"]}, {"_id": 0, "parent_id": 1}
+            )
+            if parent and parent.get("parent_id"):
+                equipment_ids.append(parent["parent_id"])
+
+    equipment_match = [
+        {"equipment_name": {"$regex": "Line.?90", "$options": "i"}},
+        {"equipment_name": EQUIPMENT_NAME},
+    ]
+    if equipment_ids:
+        equipment_match.append({"equipment_id": {"$in": equipment_ids}})
+
     query = {
         "form_template_name": {"$regex": f"^({form_patterns})$", "$options": "i"},
-        "$or": [
-            {"equipment_name": {"$regex": "Line.?90", "$options": "i"}},
-            {"equipment_name": EQUIPMENT_NAME},
-        ],
+        "$or": equipment_match,
     }
 
     all_subs = await db.form_submissions.find(query, {"_id": 0}).to_list(1000)
