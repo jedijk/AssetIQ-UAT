@@ -22,6 +22,7 @@ import {
   Pencil,
   Settings,
   Sparkles,
+  Download,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -489,6 +490,82 @@ export default function ProductionDashboardPage() {
     onError: () => toast.error("Failed to generate insights"),
   });
 
+  // Export to Excel
+  const exportToExcel = () => {
+    if (!data) return;
+    import("xlsx").then((XLSX) => {
+      import("file-saver").then(({ saveAs }) => {
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: KPIs
+        const kpiRows = [
+          ["KPI", "Value", "Unit", "Detail"],
+          ["Total Input", kpis.total_input, "kg", kpis.lot_info || ""],
+          ["Waste", kpis.waste, "kg", `${kpis.waste_pct}% of input`],
+          ["Yield", kpis.yield_pct, "%", `Target: ${kpis.yield_target}%`],
+          ["Avg Mooney Viscosity", kpis.avg_viscosity, "MU", `Range: ${kpis.viscosity_range}`],
+          ["RSD", kpis.rsd, "%", `Target: < ${kpis.rsd_target}`],
+          ["Runtime", kpis.runtime_hours, "hours", ""],
+        ];
+        const wsKpi = XLSX.utils.aoa_to_sheet(kpiRows);
+        wsKpi["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 8 }, { wch: 24 }];
+        XLSX.utils.book_append_sheet(wb, wsKpi, "KPIs");
+
+        // Sheet 2: Production Log
+        const logHeader = ["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By"];
+        const logRows = [logHeader];
+        (data.production_log || []).forEach((e, i) => {
+          logRows.push([
+            i + 1, e.time, e.rpm, e.feed, e.moisture, e.energy,
+            e.mt1, e.mt2, e.mt3, e.mp1, e.mp2, e.mp3, e.mp4,
+            e.co2_feed_p, e.t_product_ir,
+            data.viscosity_values?.[i] !== undefined ? data.viscosity_values[i] : "TBD",
+            e.remarks || "", e.submitted_by || "",
+          ]);
+        });
+        const wsLog = XLSX.utils.aoa_to_sheet(logRows);
+        wsLog["!cols"] = logHeader.map(() => ({ wch: 12 }));
+        XLSX.utils.book_append_sheet(wb, wsLog, "Production Log");
+
+        // Sheet 3: Viscosity Samples
+        const viscHeader = ["Time", "Sample No.", "Viscosity (MU)"];
+        const viscRows = [viscHeader];
+        (data.viscosity_series || []).forEach((v) => {
+          viscRows.push([v.time, v.sample || "", v.viscosity]);
+        });
+        const wsVisc = XLSX.utils.aoa_to_sheet(viscRows);
+        wsVisc["!cols"] = [{ wch: 10 }, { wch: 20 }, { wch: 14 }];
+        XLSX.utils.book_append_sheet(wb, wsVisc, "Viscosity Samples");
+
+        // Sheet 4: Input Material
+        const bagHeader = ["Material", "Supplier", "Bag No.", "Lot No.", "Production Date"];
+        const bagRows = [bagHeader];
+        (data.big_bag_entries || []).forEach((b) => {
+          bagRows.push([b.material, b.supplier, b.bag_no, b.lot_no, b.production_date || ""]);
+        });
+        const wsBag = XLSX.utils.aoa_to_sheet(bagRows);
+        wsBag["!cols"] = bagHeader.map(() => ({ wch: 16 }));
+        XLSX.utils.book_append_sheet(wb, wsBag, "Input Material");
+
+        // Sheet 5: Daily Insights
+        const insHeader = ["Time", "Severity", "Title", "Description"];
+        const insRows = [insHeader];
+        (data.insights || []).forEach((ev) => {
+          insRows.push([ev.time, ev.severity, ev.title, ev.description]);
+        });
+        const wsIns = XLSX.utils.aoa_to_sheet(insRows);
+        wsIns["!cols"] = [{ wch: 8 }, { wch: 10 }, { wch: 30 }, { wch: 50 }];
+        XLSX.utils.book_append_sheet(wb, wsIns, "Daily Insights");
+
+        // Save
+        const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        saveAs(blob, `Production_Log_${fromStr}.xlsx`);
+        toast.success("Excel exported");
+      });
+    });
+  };
+
   // Date navigation (day mode only)
   const prevDay = () => { const d = new Date(fromDate.getTime() - 86400000); setFromDate(d); setToDate(d); };
   const nextDay = () => { const d = new Date(fromDate.getTime() + 86400000); setFromDate(d); setToDate(d); };
@@ -686,6 +763,11 @@ export default function ProductionDashboardPage() {
           <span className="text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-3 h-8 flex items-center tabular-nums whitespace-nowrap" data-testid="date-display">
             {fromStr === toStr ? displayDate(fromDate) : `${displayDate(fromDate)} — ${displayDate(toDate)}`}
           </span>
+
+          {/* Export */}
+          <Button variant="outline" size="sm" className="h-8 gap-1" onClick={exportToExcel} disabled={!data?.production_log?.length} data-testid="export-btn">
+            <Download className="w-3.5 h-3.5" /> Export
+          </Button>
         </div>
       </div>
 
