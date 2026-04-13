@@ -554,9 +554,9 @@ export default function ProductionDashboardPage() {
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={combinedSeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <ReferenceArea yAxisId="left" y1={50} y2={60} fill="#22c55e" fillOpacity={0.08} label={{ value: "Target 50-60 MU", position: "insideTopLeft", fontSize: 10, fill: "#16a34a", fontWeight: 500 }} />
+                  <ReferenceArea yAxisId="left" y1={50} y2={60} fill="#22c55e" fillOpacity={0.1} />
                   <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="#94a3b8" domain={['auto', 'auto']} label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 11 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="#94a3b8" domain={[48, 62]} label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 11 }} />
                   {(chartSeries.rpm || chartSeries.feed || chartSeries.mt4 || chartSeries.temperature) && (
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="#94a3b8" />
                   )}
