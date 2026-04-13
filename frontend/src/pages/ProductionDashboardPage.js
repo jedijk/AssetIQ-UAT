@@ -745,9 +745,18 @@ export default function ProductionDashboardPage() {
             <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="waste-chart">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-slate-700">Waste & Downtime</h3>
-                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowAddEvent(true)} data-testid="waste-add-btn">
-                  <Plus className="w-3 h-3" /> Add
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" data-testid="waste-add-btn">
+                      <Plus className="w-3 h-3" /> Add
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setShowAddEvent(true)} data-testid="add-event-option">
+                      Event
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               {data?.waste_downtime_series?.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
