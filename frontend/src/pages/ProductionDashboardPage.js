@@ -665,39 +665,79 @@ export default function ProductionDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Period quick filters */}
-          <div className="inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5" data-testid="period-selector">
-            {PERIOD_OPTIONS.map((opt) => (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Period quick filters */}
+            <div className="inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5" data-testid="period-selector">
+              {PERIOD_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => handlePeriod(opt.key)}
+                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    period === opt.key
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                  data-testid={`period-${opt.key}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+              {/* Custom date gear toggle */}
               <button
-                key={opt.key}
-                onClick={() => handlePeriod(opt.key)}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  period === opt.key
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
+                onClick={() => { setShowCustomDate(!showCustomDate); if (!showCustomDate) setPeriod("custom"); }}
+                className={`px-1.5 py-1.5 rounded-md transition-colors ${
+                  showCustomDate ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
                 }`}
-                data-testid={`period-${opt.key}`}
+                data-testid="custom-date-toggle"
+                title="Custom date range"
               >
-                {opt.label}
+                <Settings className="w-3.5 h-3.5" />
               </button>
-            ))}
-            {/* Custom date gear toggle */}
-            <button
-              onClick={() => { setShowCustomDate(!showCustomDate); if (!showCustomDate) setPeriod("custom"); }}
-              className={`px-1.5 py-1.5 rounded-md transition-colors ${
-                showCustomDate ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
-              }`}
-              data-testid="custom-date-toggle"
-              title="Custom date range"
-            >
-              <Settings className="w-3.5 h-3.5" />
-            </button>
+            </div>
+
+            {/* Day-mode prev/next arrows */}
+            {period === "1d" && (
+              <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={prevDay} data-testid="prev-day">
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={nextDay} data-testid="next-day">
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+
+            {/* Shift selector */}
+            <Select value={shift} onValueChange={setShift}>
+              <SelectTrigger className="w-[180px] h-8 text-sm bg-white" data-testid="shift-selector">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">Day (06:00 - 22:00)</SelectItem>
+                <SelectItem value="night">Night (22:00 - 06:00)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Refresh */}
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => refetch()} data-testid="refresh-btn">
+              <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+            </Button>
+
+            {/* Date display */}
+            <span className="text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-3 h-8 flex items-center tabular-nums whitespace-nowrap" data-testid="date-display">
+              {fromStr === toStr ? displayDate(fromDate) : `${displayDate(fromDate)} — ${displayDate(toDate)}`}
+            </span>
+
+            {/* Export */}
+            <Button variant="outline" size="sm" className="h-8 gap-1" onClick={exportToExcel} disabled={!data?.production_log?.length} data-testid="export-btn">
+              <Download className="w-3.5 h-3.5" /> Export
+            </Button>
           </div>
 
-          {/* Custom date pickers (unfold) */}
+          {/* Custom date pickers (unfold below) */}
           {showCustomDate && (
-            <>
+            <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <label className="text-xs text-slate-500">From</label>
                 <input
@@ -706,7 +746,7 @@ export default function ProductionDashboardPage() {
                   onChange={(e) => {
                     const v = e.target.value;
                     if (!v) return;
-                    const d = new Date(v + "T00:00:00");
+                    const d = new Date(v + "T12:00:00");
                     if (!isNaN(d)) { setFromDate(d); setPeriod("custom"); }
                   }}
                   className="h-8 px-2 text-sm border border-slate-200 rounded-lg bg-white"
@@ -721,53 +761,15 @@ export default function ProductionDashboardPage() {
                   onChange={(e) => {
                     const v = e.target.value;
                     if (!v) return;
-                    const d = new Date(v + "T00:00:00");
+                    const d = new Date(v + "T12:00:00");
                     if (!isNaN(d)) { setToDate(d); setPeriod("custom"); }
                   }}
                   className="h-8 px-2 text-sm border border-slate-200 rounded-lg bg-white"
                   data-testid="to-date"
                 />
               </div>
-            </>
-          )}
-
-          {/* Day-mode prev/next arrows */}
-          {period === "1d" && (
-            <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={prevDay} data-testid="prev-day">
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={nextDay} data-testid="next-day">
-                <ChevronRight className="w-4 h-4" />
-              </Button>
             </div>
           )}
-
-          {/* Shift selector */}
-          <Select value={shift} onValueChange={setShift}>
-            <SelectTrigger className="w-[180px] h-8 text-sm bg-white" data-testid="shift-selector">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="day">Day (06:00 - 22:00)</SelectItem>
-              <SelectItem value="night">Night (22:00 - 06:00)</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Refresh */}
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => refetch()} data-testid="refresh-btn">
-            <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-
-          {/* Date display */}
-          <span className="text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-3 h-8 flex items-center tabular-nums whitespace-nowrap" data-testid="date-display">
-            {fromStr === toStr ? displayDate(fromDate) : `${displayDate(fromDate)} — ${displayDate(toDate)}`}
-          </span>
-
-          {/* Export */}
-          <Button variant="outline" size="sm" className="h-8 gap-1" onClick={exportToExcel} disabled={!data?.production_log?.length} data-testid="export-btn">
-            <Download className="w-3.5 h-3.5" /> Export
-          </Button>
         </div>
       </div>
 
