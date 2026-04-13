@@ -251,6 +251,7 @@ async def get_production_dashboard(
                 "time": time_label,
                 "sample_no": sample_no,
                 "value": measurement,
+                "submission_id": sub.get("id", ""),
             })
 
     # Big Bag Loading data
@@ -331,6 +332,7 @@ async def get_production_dashboard(
             "time": entry["time"],
             "viscosity": entry["value"],
             "sample": entry.get("sample_no", ""),
+            "submission_id": entry.get("submission_id", ""),
         })
 
     # Get production actions/insights from dedicated collection

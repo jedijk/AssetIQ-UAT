@@ -664,7 +664,7 @@ export default function ProductionDashboardPage() {
   const viscosityByTime = useMemo(() => {
     const map = {};
     (data?.viscosity_series || []).forEach((v) => {
-      if (v.time) map[v.time] = v.viscosity;
+      if (v.time) map[v.time] = { value: v.viscosity, submission_id: v.submission_id };
     });
     return map;
   }, [data?.viscosity_series]);
@@ -672,7 +672,7 @@ export default function ProductionDashboardPage() {
   // Anomaly highlight row
   const isAnomalyRow = (entry) => {
     const avgVisc = kpis.avg_viscosity || 0;
-    const visc = viscosityByTime[entry.time];
+    const visc = viscosityByTime[entry.time]?.value;
     if (visc !== undefined) {
       return Math.abs(visc - avgVisc) > 4;
     }
@@ -1137,13 +1137,15 @@ export default function ProductionDashboardPage() {
                           <td className="py-2 px-2 tabular-nums">{entry.mp4}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.co2_feed_p}</td>
                           <td className="py-2 px-2 tabular-nums">{entry.t_product_ir}</td>
-                          <td className="py-2 px-2 tabular-nums">{viscosityByTime[entry.time] !== undefined ? viscosityByTime[entry.time] : <span className="text-amber-500 font-medium">TBD</span>}</td>
+                          <td className="py-2 px-2 tabular-nums">{viscosityByTime[entry.time]?.value !== undefined ? viscosityByTime[entry.time].value : <span className="text-amber-500 font-medium">TBD</span>}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]" title={entry.remarks || ""}>{entry.remarks || ""}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[80px]">{entry.submitted_by}</td>
                           <td className="py-1.5 px-2">
                             <button
-                              onClick={() => setEditEntry({ ...entry, _index: i })}
-                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                              onClick={() => {
+                                const viscData = viscosityByTime[entry.time];
+                                setEditEntry({ ...entry, _index: i, viscosity: viscData?.value ?? "", _viscosity_submission_id: viscData?.submission_id || "" });
+                              }}                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
                               data-testid={`edit-row-${entry.time}`}
                               title="Edit"
                             >
@@ -1301,6 +1303,18 @@ export default function ProductionDashboardPage() {
                   data-testid="edit-remarks"
                 />
               </div>
+              <div className="col-span-2">
+                <Label className="text-xs">Viscosity (MU)</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  className="h-9 mt-1 tabular-nums"
+                  placeholder={editEntry._viscosity_submission_id ? "" : "No viscosity sample at this time"}
+                  value={editEntry.viscosity ?? ""}
+                  onChange={(e) => setEditEntry((prev) => ({ ...prev, viscosity: e.target.value }))}
+                  data-testid="edit-viscosity"
+                />
+              </div>
               <div className="col-span-2 flex justify-end gap-2 pt-2">
                 <Button variant="outline" size="sm" onClick={() => setEditEntry(null)}>
                   Cancel
@@ -1308,7 +1322,8 @@ export default function ProductionDashboardPage() {
                 <Button
                   size="sm"
                   disabled={updateSubmissionMutation.isPending}
-                  onClick={() => {
+                  onClick={async () => {
+                    // Update extruder submission
                     const fieldMap = {
                       rpm: "RPM", feed: "FEED", moisture: "M%", energy: "ENERGY",
                       mt1: "MT1", mt2: "MT2", mt3: "MT3",
@@ -1323,6 +1338,13 @@ export default function ProductionDashboardPage() {
                       }
                     });
                     updateSubmissionMutation.mutate({ id: editEntry.submission_id, values });
+
+                    // Update viscosity submission if it exists and value changed
+                    if (editEntry._viscosity_submission_id && editEntry.viscosity !== "") {
+                      try {
+                        await productionAPI.updateSubmission(editEntry._viscosity_submission_id, { Measurement: editEntry.viscosity });
+                      } catch {}
+                    }
                   }}
                   data-testid="save-edit-btn"
                 >
