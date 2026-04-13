@@ -482,8 +482,8 @@ export default function ProductionDashboardPage() {
     const log = data?.production_log || [];
     const viscSeries = data?.viscosity_series || [];
     const viscVals = data?.viscosity_values || [];
-    const screenChanges = new Set((data?.screen_changes || []).map(s => s.time));
-    const magnetCleanings = new Set((data?.magnet_cleanings || []).map(s => s.time));
+    const screenChanges = chartSeries.screenChange ? new Set((data?.screen_changes || []).map(s => s.time)) : new Set();
+    const magnetCleanings = chartSeries.magnetCleaning ? new Set((data?.magnet_cleanings || []).map(s => s.time)) : new Set();
     // Build a time-indexed map from production log
     const timeMap = {};
     log.forEach((entry, i) => {
@@ -527,7 +527,7 @@ export default function ProductionDashboardPage() {
       if (p.magnetCleaning !== null) p.magnetCleaning = p.viscosity || p.magnetCleaning;
     });
     return sorted;
-  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings]);
+  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings, chartSeries.screenChange, chartSeries.magnetCleaning]);
 
   const kpis = data?.kpis || {};
 
