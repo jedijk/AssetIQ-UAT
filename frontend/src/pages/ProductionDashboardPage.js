@@ -785,12 +785,21 @@ export default function ProductionDashboardPage() {
                   {data?.big_bag_entries?.length > 0 && (
                     <Badge variant="secondary" className="text-xs">{data.big_bag_entries.length}</Badge>
                   )}
-                  <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => {
-                    if (formTemplates?.bigBag) setFormExec({ templateId: formTemplates.bigBag.id, templateName: "Big Bag Loading" });
-                    else toast.error("Big Bag Loading template not found");
-                  }} data-testid="big-bag-add-btn">
-                    <Plus className="w-3 h-3" /> Add
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" data-testid="big-bag-add-btn">
+                        <Plus className="w-3 h-3" /> Add
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => {
+                        if (formTemplates?.bigBag) setFormExec({ templateId: formTemplates.bigBag.id, templateName: "Big Bag Loading" });
+                        else toast.error("Big Bag Loading template not found");
+                      }} data-testid="add-bigbag-option">
+                        Big Bag Loading
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
               <div className="max-h-[200px] overflow-y-auto">
