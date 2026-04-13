@@ -481,7 +481,12 @@ export default function ProductionDashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Waste & Downtime */}
             <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="waste-chart">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3">Waste & Downtime</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-700">Waste & Downtime</h3>
+                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowAddEvent(true)} data-testid="waste-add-btn">
+                  <Plus className="w-3 h-3" /> Add
+                </Button>
+              </div>
               {data?.waste_downtime_series?.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <ComposedChart data={data.waste_downtime_series}>
