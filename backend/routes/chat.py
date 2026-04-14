@@ -176,8 +176,21 @@ async def send_chat_message(
                 detected_language=detected_lang
             )
     
-    # Check for data queries (skip if image provided)
-    if not message.image_base64:
+    # Check for data queries (skip if image provided or in active conversation flow)
+    # First check if we're in an active conversation state that should bypass intent classification
+    conv_state_check = await db.chat_messages.find(
+        {"user_id": user_id, "role": "assistant", "chat_state": {"$exists": True, "$ne": None}},
+        {"_id": 0, "chat_state": 1}
+    ).sort("created_at", -1).limit(1).to_list(1)
+    
+    active_state = conv_state_check[0].get("chat_state") if conv_state_check else None
+    is_in_flow = active_state in [
+        ChatState.AWAITING_EQUIPMENT, 
+        ChatState.AWAITING_FAILURE_MODE, 
+        ChatState.AWAITING_NEW_FAILURE_MODE
+    ]
+    
+    if not message.image_base64 and not is_in_flow:
         intent = await classify_user_intent(message.content, session_id)
         
         if intent.get("is_data_query", False) and intent.get("confidence", 0) > 0.6:
