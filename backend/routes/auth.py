@@ -43,9 +43,9 @@ REQUIRE_PASSWORD_COMPLEXITY = os.environ.get("REQUIRE_PASSWORD_COMPLEXITY", "tru
 # Email configuration
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
-FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
 # EMAIL_FRONTEND_URL is the URL used in emails - should be the live/production URL
-EMAIL_FRONTEND_URL = os.environ.get("EMAIL_FRONTEND_URL", os.environ.get("FRONTEND_URL", "http://localhost:3000"))
+EMAIL_FRONTEND_URL = os.environ.get("EMAIL_FRONTEND_URL") or os.environ.get("FRONTEND_URL") or os.environ.get("REACT_APP_BACKEND_URL", "")
 
 # Initialize Resend if available
 if RESEND_AVAILABLE and RESEND_API_KEY:
