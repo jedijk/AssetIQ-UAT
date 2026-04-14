@@ -1,6 +1,7 @@
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useState } from "react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Zap } from "lucide-react";
+import { Calendar as CalendarIcon, Zap, ChevronsUpDown, Check, Search } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -8,6 +9,7 @@ import { Textarea } from "../ui/textarea";
 import { Calendar } from "../ui/calendar";
 import { Badge } from "../ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +25,54 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+
+const EquipmentCombobox = ({ nodes, value, onChange, disabled, placeholder }) => {
+  const [open, setOpen] = useState(false);
+  const selected = nodes.find((n) => n.id === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={`w-full justify-between font-normal ${disabled ? "opacity-60" : ""} ${!selected ? "text-muted-foreground" : ""}`}
+          data-testid="equipment-combobox-trigger"
+        >
+          <span className="truncate">{selected ? (selected.tag ? `${selected.name} (${selected.tag})` : selected.name) : placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search equipment..." data-testid="equipment-search-input" />
+          <CommandList>
+            <CommandEmpty>No equipment found.</CommandEmpty>
+            <CommandGroup className="max-h-60 overflow-y-auto">
+              {nodes.map((eq) => (
+                <CommandItem
+                  key={eq.id}
+                  value={`${eq.name} ${eq.tag || ""} ${eq.equipment_type || ""}`}
+                  onSelect={() => { onChange(eq.id); setOpen(false); }}
+                  data-testid={`equipment-option-${eq.id}`}
+                >
+                  <Check className={`mr-2 h-4 w-4 ${value === eq.id ? "opacity-100" : "opacity-0"}`} />
+                  <div className="flex flex-col">
+                    <span className="text-sm">{eq.name}</span>
+                    {eq.tag && <span className="text-xs text-muted-foreground">{eq.tag}</span>}
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 
 export const PlanDialog = ({
   open,
@@ -88,20 +138,13 @@ export const PlanDialog = ({
           </div>
           <div>
             <Label>{t("taskScheduler.equipment")} *</Label>
-            <Select 
-              value={planForm.equipment_id} 
-              onValueChange={(v) => setPlanForm({ ...planForm, equipment_id: v })}
-              disabled={isEditMode} // Can't change equipment in edit mode
-            >
-              <SelectTrigger className={isEditMode ? "opacity-60" : ""}>
-                <SelectValue placeholder={t("taskScheduler.selectEquipment")} />
-              </SelectTrigger>
-              <SelectContent>
-                {(equipmentData?.nodes || []).map((eq) => (
-                  <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <EquipmentCombobox
+              nodes={equipmentData?.nodes || []}
+              value={planForm.equipment_id}
+              onChange={(v) => setPlanForm({ ...planForm, equipment_id: v })}
+              disabled={isEditMode}
+              placeholder={t("taskScheduler.selectEquipment")}
+            />
           </div>
           <div>
             <Label className="flex items-center justify-between">
