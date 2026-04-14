@@ -17,24 +17,28 @@ const ForgotPasswordPage = () => {
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [fallbackLink, setFallbackLink] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setNotFound(false);
+    setFallbackLink(null);
 
     try {
       const response = await authAPI.forgotPassword(email);
       
       if (response.status === "not_found" || response.user_found === false) {
-        // User not found
         setNotFound(true);
         toast.error("No account found with this email address.");
       } else if (response.status === "email_error") {
-        // User found but email failed
-        toast.error("Could not send reset email. Please try again later.");
+        if (response.reset_link) {
+          setFallbackLink(response.reset_link);
+          toast.error("Could not send email. Use the direct link below to reset your password.");
+        } else {
+          toast.error("Could not send reset email. Please try again later.");
+        }
       } else {
-        // Success
         setEmailSent(true);
         toast.success("Reset link sent! Check your email.");
       }
@@ -155,6 +159,20 @@ const ForgotPasswordPage = () => {
                   <p className="text-sm text-amber-800">
                     <strong>Need an account?</strong> Contact your administrator to get access to AssetIQ.
                   </p>
+                </div>
+              )}
+
+              {fallbackLink && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg" data-testid="fallback-reset-link">
+                  <p className="text-sm text-blue-800 mb-2">
+                    <strong>Email delivery failed.</strong> Use this direct link to reset your password:
+                  </p>
+                  <a
+                    href={fallbackLink}
+                    className="text-sm text-blue-600 underline break-all hover:text-blue-800"
+                  >
+                    Reset Password
+                  </a>
                 </div>
               )}
             </>

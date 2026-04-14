@@ -500,7 +500,7 @@ async def send_reset_email(email: str, reset_token: str, user_name: str):
         logger.info(f"Password reset email sent to {email}")
         return True
     except Exception as e:
-        logger.error(f"Failed to send reset email: {str(e)}")
+        logger.error(f"Failed to send reset email to {email}: {type(e).__name__}: {str(e)}")
         return False
 
 
@@ -691,11 +691,14 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
     )
     
     if not email_sent:
-        logger.warning(f"Could not send reset email to {body.email}")
+        logger.warning(f"Could not send reset email to {body.email}. Returning direct reset link.")
+        # Build the reset link so the frontend can show it as fallback
+        reset_link = f"{EMAIL_FRONTEND_URL}/reset-password?token={reset_token}"
         return {
             "status": "email_error",
             "user_found": True,
-            "message": "Account found but we couldn't send the email. Please try again later."
+            "message": "Account found but we couldn't send the email. Please try again later.",
+            "reset_link": reset_link
         }
     
     return {
