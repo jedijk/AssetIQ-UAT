@@ -1173,19 +1173,39 @@ export default function ProductionDashboardPage() {
                           <td className="py-2 px-2 tabular-nums">{viscValue !== undefined ? viscValue : <span className="text-amber-500 font-medium">TBD</span>}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]" title={entry.remarks || ""}>{isViscOnly ? "" : entry.remarks || ""}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[80px]">{entry.submitted_by}</td>
-                          <td className="py-1.5 px-2">
-                            {!isViscOnly && (
+                          <td className="py-1.5 px-2 flex items-center gap-0.5">
                             <button
                               onClick={() => {
-                                const viscData = viscosityByTime[entry.time];
-                                setEditEntry({ ...entry, _index: i, viscosity: viscData?.value ?? "", _viscosity_submission_id: viscData?.submission_id || "" });
-                              }}                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                                if (isViscOnly) {
+                                  setEditEntry({ ...entry, _index: i, viscosity: entry._viscosity_value ?? "", _viscosity_submission_id: entry._viscosity_submission_id || "", _viscosity_only: true });
+                                } else {
+                                  const viscData = viscosityByTime[entry.time];
+                                  setEditEntry({ ...entry, _index: i, viscosity: viscData?.value ?? "", _viscosity_submission_id: viscData?.submission_id || "" });
+                                }
+                              }}
+                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
                               data-testid={`edit-row-${entry.time}`}
                               title="Edit"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
-                            )}
+                            <button
+                              onClick={() => {
+                                if (!confirm("Delete this entry?")) return;
+                                if (isViscOnly) {
+                                  if (entry._viscosity_submission_id) deleteSubmissionMutation.mutate(entry._viscosity_submission_id);
+                                } else {
+                                  if (entry.submission_id) deleteSubmissionMutation.mutate(entry.submission_id);
+                                  const vId = viscosityByTime[entry.time]?.submission_id;
+                                  if (vId) deleteSubmissionMutation.mutate(vId);
+                                }
+                              }}
+                              className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
+                              data-testid={`delete-row-${entry.time}`}
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </td>
                         </tr>
                       );
@@ -1298,11 +1318,11 @@ export default function ProductionDashboardPage() {
       <Dialog open={!!editEntry} onOpenChange={(open) => { if (!open) setEditEntry(null); }}>
         <DialogContent className="max-w-lg" data-testid="edit-entry-dialog">
           <DialogHeader>
-            <DialogTitle>Edit Log Entry — {editEntry?.time}</DialogTitle>
+            <DialogTitle>{editEntry?._viscosity_only ? `Edit Viscosity — ${editEntry?.time}` : `Edit Log Entry — ${editEntry?.time}`}</DialogTitle>
           </DialogHeader>
           {editEntry && (
             <div className="grid grid-cols-2 gap-3 pt-2">
-              {[
+              {!editEntry._viscosity_only && [
                 { key: "rpm", label: "RPM" },
                 { key: "feed", label: "Feed" },
                 { key: "moisture", label: "M%" },
@@ -1329,6 +1349,7 @@ export default function ProductionDashboardPage() {
                   />
                 </div>
               ))}
+              {!editEntry._viscosity_only && (
               <div className="col-span-2">
                 <Label className="text-xs">Remarks</Label>
                 <Input
@@ -1338,6 +1359,7 @@ export default function ProductionDashboardPage() {
                   data-testid="edit-remarks"
                 />
               </div>
+              )}
               <div className="col-span-2">
                 <Label className="text-xs">Viscosity (MU)</Label>
                 <Input
@@ -1358,7 +1380,23 @@ export default function ProductionDashboardPage() {
                   size="sm"
                   disabled={updateSubmissionMutation.isPending}
                   onClick={async () => {
-                    // Update extruder submission
+                    const refresh = () => {
+                      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+                      setEditEntry(null);
+                      toast.success("Entry updated");
+                    };
+
+                    // Viscosity-only row: only update viscosity
+                    if (editEntry._viscosity_only) {
+                      if (editEntry._viscosity_submission_id && editEntry.viscosity !== "") {
+                        productionAPI.updateSubmission(editEntry._viscosity_submission_id, { Measurement: editEntry.viscosity }).then(refresh).catch(() => toast.error("Failed to update viscosity"));
+                      } else {
+                        toast.error("No viscosity submission to update");
+                      }
+                      return;
+                    }
+
+                    // Regular row: update extruder submission
                     const fieldMap = {
                       rpm: "RPM", feed: "FEED", moisture: "M%", energy: "ENERGY",
                       mt1: "MT1", mt2: "MT2", mt3: "MT3",
@@ -1373,13 +1411,9 @@ export default function ProductionDashboardPage() {
                       }
                     });
 
-                    const refresh = () => {
-                      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
-                      setEditEntry(null);
-                      toast.success("Entry updated");
-                    };
-
-                    productionAPI.updateSubmission(editEntry.submission_id, values).then(refresh).catch(() => toast.error("Failed to update extruder entry"));
+                    if (editEntry.submission_id) {
+                      productionAPI.updateSubmission(editEntry.submission_id, values).then(refresh).catch(() => toast.error("Failed to update extruder entry"));
+                    }
 
                     if (editEntry._viscosity_submission_id && editEntry.viscosity !== "") {
                       productionAPI.updateSubmission(editEntry._viscosity_submission_id, { Measurement: editEntry.viscosity }).then(refresh).catch(() => toast.error("Failed to update viscosity"));
