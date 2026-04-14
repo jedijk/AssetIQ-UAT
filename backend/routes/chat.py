@@ -189,20 +189,33 @@ async def send_chat_message(
     # First check if we're in an active conversation state that should bypass intent classification
     conv_state_check = await db.chat_messages.find(
         {"user_id": user_id, "role": "assistant", "chat_state": {"$exists": True, "$ne": None}},
-        {"_id": 0, "chat_state": 1}
+        {"_id": 0, "chat_state": 1, "equipment_suggestions": 1}
     ).sort("created_at", -1).limit(1).to_list(1)
     
     active_state = conv_state_check[0].get("chat_state") if conv_state_check else None
+    prev_had_equipment = bool(conv_state_check[0].get("equipment_suggestions")) if conv_state_check else False
+    
+    # Also detect if message looks like an equipment selection (Name (TAG) format)
+    # This handles race condition where user clicks before first response is stored
+    import re
+    looks_like_equipment_selection = bool(re.match(r'^.+\s*\([A-Z0-9][A-Z0-9\-]+\)\s*$', message.content))
+    
     is_in_flow = active_state in [
         ChatState.AWAITING_EQUIPMENT, 
         ChatState.AWAITING_FAILURE_MODE, 
         ChatState.AWAITING_NEW_FAILURE_MODE
     ]
     
+    # If message looks like equipment selection but state not found, force equipment flow
+    if looks_like_equipment_selection and not is_in_flow:
+        logger.warning(f"Message looks like equipment selection but state={active_state}. Forcing equipment flow.")
+        active_state = ChatState.AWAITING_EQUIPMENT
+        is_in_flow = True
+    
     # Debug: Log database being used
     from database import get_current_db_name
     current_db_name = get_current_db_name()
-    logger.info(f"Chat state check: db={current_db_name}, user_id={user_id[:20]}..., active_state={active_state}, is_in_flow={is_in_flow}, message='{message.content[:50]}...'")
+    logger.info(f"Chat state check: db={current_db_name}, user_id={user_id[:20]}..., active_state={active_state}, is_in_flow={is_in_flow}, looks_like_equip={looks_like_equipment_selection}, message='{message.content[:50]}...'")
     
     if not message.image_base64 and not is_in_flow:
         intent = await classify_user_intent(message.content, session_id)

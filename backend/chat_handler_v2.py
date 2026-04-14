@@ -303,7 +303,7 @@ async def process_chat_message(
             for i, eq in enumerate(prev_suggestions[:3]):
                 logger.info(f"  Suggestion {i}: name='{eq.get('name')}' tag='{eq.get('tag')}'")
         else:
-            logger.warning(f"AWAITING_EQUIPMENT: NO previous suggestions found! conv_state keys={list(conv_state.keys())}")
+            logger.warning(f"AWAITING_EQUIPMENT: NO previous suggestions found! Will try direct tag lookup.")
         
         # Check if user selected one of the suggested equipment
         message_normalized = normalize_text(message_content)
@@ -316,6 +316,30 @@ async def process_chat_message(
         logger.info(f"Equipment matching: message='{message_content}', normalized='{message_normalized}', has_tag={user_input_has_tag}, suggestions={len(prev_suggestions)}")
         
         selected_equipment = None
+        
+        # If no suggestions but user has a tag, try direct database lookup first
+        if not prev_suggestions and user_input_has_tag:
+            tag_match = re.search(r'\(([^)]+)\)\s*$', message_content)
+            if tag_match:
+                exact_tag = tag_match.group(1).strip()
+                logger.info(f"No suggestions available, trying direct tag lookup: {exact_tag}")
+                tag_eq = await db.equipment_nodes.find_one(
+                    {"tag": exact_tag},
+                    {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1, 
+                     "equipment_type": 1, "equipment_type_name": 1, "description": 1, 
+                     "level": 1, "criticality": 1, "parent_id": 1}
+                )
+                if tag_eq:
+                    logger.info(f"Direct tag lookup SUCCESS: {tag_eq.get('name')} ({exact_tag})")
+                    selected_equipment = {
+                        "id": tag_eq.get("id"),
+                        "name": tag_eq.get("name"),
+                        "tag": tag_eq.get("tag") or tag_eq.get("tag_number"),
+                        "equipment_type": tag_eq.get("equipment_type") or tag_eq.get("equipment_type_name"),
+                        "description": tag_eq.get("description"),
+                        "level": tag_eq.get("level"),
+                        "criticality": tag_eq.get("criticality")
+                    }
         
         # First pass: Look for EXACT match including tag (highest priority)
         for eq in prev_suggestions:
