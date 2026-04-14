@@ -126,6 +126,20 @@ async def switch_database(
             detail=f"Failed to connect to {target_db['label']} database"
         )
     
+    # Check if user exists in the target database
+    target_user = await target_db_ref.users.find_one(
+        {"id": current_user.get("user_id")},
+        {"_id": 0, "id": 1, "email": 1}
+    )
+    
+    if not target_user:
+        # User doesn't exist in target database - warn them
+        logger.warning(f"User {current_user.get('user_id')} not found in {target_db['name']}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Your account does not exist in the {target_db['label']} environment. Please contact an administrator to set up your account there, or continue using your current environment."
+        )
+    
     # Store the user's database preference
     await db.users.update_one(
         {"id": current_user.get("user_id")},
