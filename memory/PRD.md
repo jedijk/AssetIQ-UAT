@@ -104,6 +104,11 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
   3. The existing direct DB tag lookup (line ~320) then executes correctly, finding the equipment by exact tag without needing the previous suggestions list
 - Files: `/app/backend/routes/chat.py`, `/app/backend/chat_handler_v2.py`
 
+**BUG FIX - Context Message Treated as New Search (Phase 3 - AWAITING_CONTEXT Fallback):**
+- **Root Cause**: After an observation is created, the system sets `chat_state=AWAITING_CONTEXT`. But the primary check uses `chat_conversations` collection which can be empty/stale. When this check fails, `AWAITING_CONTEXT` was NOT in the `is_in_flow` list, so the intent classifier fired on context messages. The `process_chat_message` state machine had no handler for `AWAITING_CONTEXT`, causing it to fall through to the INITIAL handler which treated the message as a new equipment search.
+- **Fix**: Added a fallback check in `routes/chat.py` that reads `awaiting_context` state from `chat_messages` collection (always populated). If found, handles context saving inline (same logic as the primary `chat_conversations` path: saves user_context to threat, clears state, returns confirmation). Covers both "skip" and context-providing flows.
+- Files: `/app/backend/routes/chat.py`
+
 **FEATURE - Auto-Skip Context Prompt:**
 - Added 60-second countdown timer for "add context" prompt after observation creation
 - Visual countdown on Skip button: "Skip (55s)"

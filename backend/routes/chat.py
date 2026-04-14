@@ -189,11 +189,98 @@ async def send_chat_message(
     # First check if we're in an active conversation state that should bypass intent classification
     conv_state_check = await db.chat_messages.find(
         {"user_id": user_id, "role": "assistant", "chat_state": {"$exists": True, "$ne": None}},
-        {"_id": 0, "chat_state": 1, "equipment_suggestions": 1}
+        {"_id": 0, "chat_state": 1, "equipment_suggestions": 1, "awaiting_context_for_threat": 1}
     ).sort("created_at", -1).limit(1).to_list(1)
     
     active_state = conv_state_check[0].get("chat_state") if conv_state_check else None
     prev_had_equipment = bool(conv_state_check[0].get("equipment_suggestions")) if conv_state_check else False
+    
+    # FALLBACK: If chat_messages shows awaiting_context but chat_conversations missed it,
+    # handle context saving here (covers race conditions / stale chat_conversations)
+    if active_state == ChatState.AWAITING_CONTEXT:
+        threat_id = conv_state_check[0].get("awaiting_context_for_threat") if conv_state_check else None
+        logger.info(f"AWAITING_CONTEXT fallback: handling context for threat={threat_id}, message='{message.content[:50]}'")
+        
+        # Check if user wants to skip
+        skip_phrases = ["skip", "no", "done", "next", "nee", "klaar", "volgende"]
+        user_wants_skip = message.content.strip().lower() in skip_phrases
+        
+        if user_wants_skip:
+            await db.chat_conversations.update_one(
+                {"user_id": user_id},
+                {"$set": {"state": ChatState.INITIAL, "awaiting_context_for_threat": None}},
+                upsert=True
+            )
+            skip_response = {
+                "id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "role": "assistant",
+                "content": "Got it! Your observation has been saved. What else would you like to report?",
+                "chat_state": ChatState.INITIAL,
+                "pending_data": {},
+                "equipment_suggestions": None,
+                "failure_mode_suggestions": None,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.chat_messages.insert_one(skip_response)
+            return ChatResponse(
+                message="Got it! Your observation has been saved. What else would you like to report?",
+                detected_language=detected_lang
+            )
+        
+        # User is providing context
+        if threat_id:
+            context_update = {
+                "user_context": message.content,
+                "context_added_at": datetime.now(timezone.utc).isoformat()
+            }
+            if message.image_base64:
+                attachment = {
+                    "type": "image",
+                    "data": image_thumbnail,
+                    "description": message.content,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.threats.update_one(
+                    {"id": threat_id},
+                    {"$set": context_update, "$push": {"attachments": attachment}}
+                )
+            else:
+                await db.threats.update_one(
+                    {"id": threat_id},
+                    {"$set": context_update}
+                )
+        
+        # Clear awaiting context state
+        await db.chat_conversations.update_one(
+            {"user_id": user_id},
+            {"$set": {"state": ChatState.INITIAL, "awaiting_context_for_threat": None}},
+            upsert=True
+        )
+        
+        confirmation = "Thanks! I've added your context to the observation"
+        if message.image_base64:
+            confirmation += " along with the photo"
+        confirmation += ". What else would you like to report?"
+        
+        context_response = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "role": "assistant",
+            "content": confirmation,
+            "context_added_to_threat": threat_id,
+            "chat_state": ChatState.INITIAL,
+            "pending_data": {},
+            "equipment_suggestions": None,
+            "failure_mode_suggestions": None,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.chat_messages.insert_one(context_response)
+        
+        return ChatResponse(
+            message=confirmation,
+            detected_language=detected_lang
+        )
     
     # Also detect if message looks like an equipment selection (Name (TAG) format)
     # This handles race condition where user clicks before first response is stored
@@ -527,6 +614,8 @@ async def clear_chat_history(
     
     # Also clear the conversation state
     await db.chat_conversations.delete_many({"user_id": user_id})
+    
+    logger.info(f"Chat cleared: {result.deleted_count} messages for user {user_id[:20]}")
     
     return {
         "success": True,
