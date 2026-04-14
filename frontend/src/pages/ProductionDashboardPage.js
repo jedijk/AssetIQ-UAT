@@ -596,16 +596,40 @@ export default function ProductionDashboardPage() {
   // Filtered production log
   const filteredLog = useMemo(() => {
     if (!data?.production_log) return [];
-    if (!logSearch) return data.production_log;
+
+    // Merge standalone viscosity entries (no matching extruder time) as separate rows
+    const logTimes = new Set((data.production_log || []).map((e) => e.time));
+    const standaloneVisc = (data?.viscosity_series || [])
+      .filter((v) => v.time && !logTimes.has(v.time))
+      .map((v) => ({
+        time: v.time,
+        datetime: "",
+        submitted_by: "",
+        rpm: null, feed: null, moisture: null, energy: null,
+        mt1: null, mt2: null, mt3: null,
+        mp1: null, mp2: null, mp3: null, mp4: null,
+        co2_feed_p: null, t_product_ir: null,
+        remarks: "", waste: null,
+        submission_id: "",
+        _viscosity_only: true,
+        _viscosity_value: v.viscosity,
+        _viscosity_submission_id: v.submission_id,
+      }));
+
+    const merged = [...data.production_log, ...standaloneVisc].sort((a, b) =>
+      (a.time || "").localeCompare(b.time || "")
+    );
+
+    if (!logSearch) return merged;
     const s = logSearch.toLowerCase();
-    return data.production_log.filter(
+    return merged.filter(
       (e) =>
         e.time?.toLowerCase().includes(s) ||
         e.submitted_by?.toLowerCase().includes(s) ||
         String(e.rpm).includes(s) ||
         String(e.feed).includes(s)
     );
-  }, [data?.production_log, logSearch]);
+  }, [data?.production_log, data?.viscosity_series, logSearch]);
 
   // Combined time series for Mooney Viscosity chart (merges viscosity + production log data)
   const combinedSeries = useMemo(() => {
@@ -1116,32 +1140,41 @@ export default function ProductionDashboardPage() {
                     filteredLog.map((entry, i) => {
                       const anomaly = isAnomalyRow(entry);
                       const isHighlighted = selectedTime && entry.time === selectedTime;
+                      const isViscOnly = entry._viscosity_only;
+                      const viscValue = isViscOnly
+                        ? entry._viscosity_value
+                        : viscosityByTime[entry.time]?.value;
+                      const viscSubId = isViscOnly
+                        ? entry._viscosity_submission_id
+                        : viscosityByTime[entry.time]?.submission_id;
+                      const tbdCell = <span className="text-slate-300">—</span>;
                       return (
                         <tr
                           key={`${entry.time}-${i}`}
-                          className={`border-b border-slate-50 transition-colors ${isHighlighted ? "bg-purple-50 ring-1 ring-purple-300" : anomaly ? "bg-amber-50" : "hover:bg-slate-50"}`}
+                          className={`border-b border-slate-50 transition-colors ${isHighlighted ? "bg-purple-50 ring-1 ring-purple-300" : isViscOnly ? "bg-blue-50/40" : anomaly ? "bg-amber-50" : "hover:bg-slate-50"}`}
                           data-testid={`log-row-${entry.time}`}
                           ref={isHighlighted ? (el) => el?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined}
                         >
                           <td className="py-2 px-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
                           <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{entry.time}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.rpm}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.feed}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.moisture}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.energy}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.mt1}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.mt2}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.mt3}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.mp1}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.mp2}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.mp3}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.mp4}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.co2_feed_p}</td>
-                          <td className="py-2 px-2 tabular-nums">{entry.t_product_ir}</td>
-                          <td className="py-2 px-2 tabular-nums">{viscosityByTime[entry.time]?.value !== undefined ? viscosityByTime[entry.time].value : <span className="text-amber-500 font-medium">TBD</span>}</td>
-                          <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]" title={entry.remarks || ""}>{entry.remarks || ""}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.rpm}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.feed}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.moisture}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.energy}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.mt1}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.mt2}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.mt3}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.mp1}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.mp2}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.mp3}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.mp4}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.co2_feed_p}</td>
+                          <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.t_product_ir}</td>
+                          <td className="py-2 px-2 tabular-nums">{viscValue !== undefined ? viscValue : <span className="text-amber-500 font-medium">TBD</span>}</td>
+                          <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]" title={entry.remarks || ""}>{isViscOnly ? "" : entry.remarks || ""}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[80px]">{entry.submitted_by}</td>
                           <td className="py-1.5 px-2">
+                            {!isViscOnly && (
                             <button
                               onClick={() => {
                                 const viscData = viscosityByTime[entry.time];
@@ -1152,6 +1185,7 @@ export default function ProductionDashboardPage() {
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
+                            )}
                           </td>
                         </tr>
                       );
