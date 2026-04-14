@@ -56,6 +56,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [autoSkipCountdown, setAutoSkipCountdown] = useState(null); // Countdown timer for auto-skip
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const recordingTimerRef = useRef(null);
@@ -202,26 +203,31 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     },
   });
 
-  // Scroll to bottom when chat opens (instant) and on new messages (smooth)
+  // Scroll to bottom helper
+  const scrollToBottom = (behavior = "smooth") => {
+    const el = messagesContainerRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior });
+    }
+  };
+
+  // Scroll to bottom when chat opens (instant)
   useEffect(() => {
-    if (isOpen && messagesEndRef.current) {
-      // Use setTimeout to ensure DOM has rendered
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
-      }, 100);
+    if (isOpen) {
+      setTimeout(() => scrollToBottom("instant"), 100);
     }
   }, [isOpen]);
 
-  // Scroll to bottom smoothly on new messages or when AI starts processing
+  // Scroll to bottom smoothly on new messages
   useEffect(() => {
     if (isOpen && messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      scrollToBottom("smooth");
     }
   }, [messages]);
 
   useEffect(() => {
     if (isOpen && (isSending || isTranscribing)) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      scrollToBottom("smooth");
     }
   }, [isSending, isTranscribing]);
 
@@ -812,7 +818,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="loading-dots">
