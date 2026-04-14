@@ -1,664 +1,532 @@
 """
-Chat routes.
+Chat routes — single source of truth state machine.
+
+State lives in `chat_conversations` (one doc per user).
+`chat_messages` stores history only, never queried for state.
 """
-from fastapi import APIRouter, Depends, Form, File
-from typing import Optional
-from datetime import datetime, timezone
+import re
 import uuid
+import base64
+import logging
+from datetime import datetime, timezone
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Form, File
 from database import db, failure_modes_service
 from auth import get_current_user
-from models.api_models import ChatMessageCreate, ChatResponse, ThreatResponse, VoiceTranscriptionResponse
-from ai_helpers import classify_user_intent, get_data_context, answer_data_query, analyze_threat_with_ai, transcribe_audio_with_ai
-from chat_handler_v2 import process_chat_message, ChatState
+from models.api_models import (
+    ChatMessageCreate, ChatResponse, ThreatResponse, VoiceTranscriptionResponse,
+)
+from ai_helpers import (
+    classify_user_intent, get_data_context, answer_data_query, transcribe_audio_with_ai,
+)
+from chat_handler_v2 import (
+    process_chat_message, ChatState, message_looks_like_equipment,
+    extract_tag_from_message, lookup_equipment_by_tag,
+)
 from failure_modes import FAILURE_MODES_LIBRARY
-from services.threat_score_service import calculate_rank, update_all_ranks
+from services.threat_score_service import (
+    calculate_rank, update_all_ranks, get_risk_settings_for_installation, calculate_risk_score,
+)
 from services.cache_service import cache
-import logging
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(tags=["Chat"])
 
-# Language detection using common word frequency
+# ---------------------------------------------------------------------------
+# Language detection
+# ---------------------------------------------------------------------------
 _LANG_WORDS = {
-    "nl": {"de", "het", "een", "is", "van", "en", "in", "dat", "niet", "op", "te", "zijn", "voor", "met", "aan", "er", "ook", "maar", "als", "nog", "wel", "geen", "moet", "wordt", "kan", "naar", "bij", "dit", "wat", "meer", "uit", "over", "zo", "dan", "hun", "werd", "heeft", "hoe", "nee", "ja", "kapot", "stuk", "lek", "pomp", "klep", "sensor", "storing", "onderhoud", "controleer", "draait"},
+    "nl": {"de", "het", "een", "is", "van", "en", "in", "dat", "niet", "op",
+           "te", "zijn", "voor", "met", "aan", "er", "ook", "maar", "als",
+           "nog", "wel", "geen", "moet", "wordt", "kan", "naar", "bij", "dit",
+           "wat", "meer", "uit", "over", "zo", "dan", "hun", "werd", "heeft",
+           "hoe", "nee", "ja", "kapot", "stuk", "lek", "pomp", "klep",
+           "sensor", "storing", "onderhoud", "controleer", "draait"},
 }
 
 def detect_language(text: str) -> str:
-    """Detect language from text using word frequency matching. Returns ISO code."""
     words = set(text.lower().split())
     if len(words) < 2:
         return "en"
-    scores = {}
-    for lang, lang_words in _LANG_WORDS.items():
-        scores[lang] = len(words & lang_words)
+    scores = {lang: len(words & lw) for lang, lw in _LANG_WORDS.items()}
     best = max(scores, key=scores.get)
     return best if scores[best] >= 2 else "en"
 
 
+# ---------------------------------------------------------------------------
+# Failure mode loader
+# ---------------------------------------------------------------------------
 async def get_failure_modes_from_db():
-    """Fetch ALL failure modes from MongoDB, fallback to static library if empty."""
     try:
-        # Fetch all failure modes (no limit) to ensure we always have the latest complete set
         result = await failure_modes_service.get_all(limit=2000)
-        failure_modes = result.get("failure_modes", [])
-        total = result.get("total", 0)
-        
-        if failure_modes and len(failure_modes) > 0:
-            logger.info(f"Chat using {len(failure_modes)}/{total} failure modes from database")
-            return failure_modes
-        else:
-            logger.warning("No failure modes found in database, using static library")
+        fm = result.get("failure_modes", [])
+        if fm:
+            logger.info(f"Chat using {len(fm)}/{result.get('total',0)} failure modes from database")
+            return fm
     except Exception as e:
         logger.error(f"Failed to fetch failure modes from DB: {e}")
-    
-    # Fallback to static library
-    logger.info(f"Using static FAILURE_MODES_LIBRARY with {len(FAILURE_MODES_LIBRARY)} entries")
+    logger.info(f"Using static FAILURE_MODES_LIBRARY ({len(FAILURE_MODES_LIBRARY)} entries)")
     return FAILURE_MODES_LIBRARY
+
+
+# ---------------------------------------------------------------------------
+# Conversation state helpers (single source of truth: chat_conversations)
+# ---------------------------------------------------------------------------
+async def _read_conv(user_id: str) -> dict:
+    """Read conversation state. Returns empty-ish dict if none exists."""
+    doc = await db.chat_conversations.find_one({"user_id": user_id}, {"_id": 0})
+    if doc:
+        return doc
+
+    # Migration fallback: check chat_messages for state from old system
+    msgs = await db.chat_messages.find(
+        {"user_id": user_id, "role": "assistant", "chat_state": {"$exists": True, "$ne": None}},
+        {"_id": 0, "chat_state": 1, "equipment_suggestions": 1,
+         "failure_mode_suggestions": 1, "pending_data": 1,
+         "original_message": 1, "awaiting_context_for_threat": 1}
+    ).sort("created_at", -1).limit(1).to_list(1)
+
+    if msgs:
+        m = msgs[0]
+        state = m.get("chat_state")
+        if state and state != ChatState.INITIAL:
+            logger.info(f"Migrating state '{state}' from chat_messages to chat_conversations")
+            migrated = {
+                "user_id": user_id,
+                "state": state,
+                "pending_data": m.get("pending_data", {}),
+                "equipment_suggestions": m.get("equipment_suggestions"),
+                "failure_mode_suggestions": m.get("failure_mode_suggestions"),
+                "original_message": m.get("original_message"),
+                "awaiting_context_for_threat": m.get("awaiting_context_for_threat"),
+            }
+            await db.chat_conversations.update_one(
+                {"user_id": user_id}, {"$set": migrated}, upsert=True
+            )
+            return migrated
+
+    return {"user_id": user_id, "state": ChatState.INITIAL}
+
+
+async def _write_conv(user_id: str, **fields):
+    """Atomically update conversation state."""
+    fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.chat_conversations.update_one(
+        {"user_id": user_id}, {"$set": fields}, upsert=True
+    )
+
+
+async def _reset_conv(user_id: str):
+    await _write_conv(
+        user_id,
+        state=ChatState.INITIAL,
+        pending_data={},
+        equipment_suggestions=None,
+        failure_mode_suggestions=None,
+        original_message=None,
+        awaiting_context_for_threat=None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Store assistant message helper
+# ---------------------------------------------------------------------------
+async def _store_assistant_msg(user_id: str, content: str, **extra) -> dict:
+    msg = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "role": "assistant",
+        "content": content,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        **extra,
+    }
+    await db.chat_messages.insert_one(msg)
+    return msg
+
+
+# ---------------------------------------------------------------------------
+# Observation creation
+# ---------------------------------------------------------------------------
+async def _create_observation(user_id: str, obs_data: dict, session_id: str,
+                              image_thumbnail: str = None) -> dict:
+    threat_id = str(uuid.uuid4())
+    equipment_name = obs_data.get("equipment_name", "Unknown")
+    failure_mode_name = obs_data.get("failure_mode_name", "Unknown")
+
+    fmea_data = obs_data.get("failure_mode", {})
+    rpn = fmea_data.get("rpn", 100) if isinstance(fmea_data, dict) else 100
+    fmea_score = min(100, int(rpn / 10))
+
+    equipment_type = obs_data.get("equipment_type") or (fmea_data.get("equipment") if isinstance(fmea_data, dict) else None) or "Equipment"
+    installation_id = obs_data.get("installation_id")
+
+    criticality = obs_data.get("criticality", {})
+    criticality_score = 0
+    if isinstance(criticality, dict):
+        s = criticality.get("safety_impact", 0) or 0
+        p = criticality.get("production_impact", 0) or 0
+        e = criticality.get("environmental_impact", 0) or 0
+        r = criticality.get("reputation_impact", 0) or 0
+        criticality_score = min(100, int(((s * 25) + (p * 20) + (e * 15) + (r * 10)) / 3.5))
+
+    risk_settings = await get_risk_settings_for_installation(installation_id)
+    final_risk_score, risk_level = calculate_risk_score(criticality_score, fmea_score, risk_settings)
+    rank, total = await calculate_rank(final_risk_score, user_id)
+
+    threat_doc = {
+        "id": threat_id,
+        "title": f"{equipment_name} - {failure_mode_name}",
+        "asset": equipment_name,
+        "equipment_type": equipment_type,
+        "failure_mode": failure_mode_name,
+        "failure_mode_id": obs_data.get("failure_mode_id"),
+        "failure_mode_data": fmea_data if fmea_data else None,
+        "is_new_failure_mode": obs_data.get("is_custom_failure_mode", False),
+        "cause": None,
+        "impact": "Equipment Damage",
+        "frequency": "First Time",
+        "likelihood": "Possible",
+        "detectability": "Moderate",
+        "risk_level": risk_level,
+        "risk_score": final_risk_score,
+        "fmea_score": fmea_score,
+        "fmea_rpn": rpn if fmea_data else None,
+        "criticality_score": criticality_score,
+        "base_risk_score": fmea_score,
+        "rank": rank,
+        "total_threats": total,
+        "status": "Open",
+        "recommended_actions": obs_data.get("recommended_actions", (fmea_data.get("recommended_actions", []) if isinstance(fmea_data, dict) else [])),
+        "created_by": user_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "occurrence_count": 1,
+        "image_url": None,
+        "location": None,
+        "linked_equipment_id": obs_data.get("equipment_id"),
+        "installation_id": installation_id,
+        "risk_settings_used": {
+            "criticality_weight": risk_settings["criticality_weight"],
+            "fmea_weight": risk_settings["fmea_weight"],
+            "installation_id": installation_id,
+        },
+        "equipment_criticality": criticality.get("level") if isinstance(criticality, dict) else None,
+        "equipment_criticality_data": criticality if isinstance(criticality, dict) else None,
+        "session_id": session_id,
+        "attachments": [],
+    }
+
+    if image_thumbnail:
+        threat_doc["attachments"] = [{"type": "image", "data": image_thumbnail,
+                                      "created_at": datetime.now(timezone.utc).isoformat()}]
+
+    await db.threats.insert_one(threat_doc)
+
+    # Auto-create actions
+    auto_created = []
+    rec_actions = obs_data.get("recommended_actions", [])
+    if not rec_actions and isinstance(fmea_data, dict):
+        rec_actions = fmea_data.get("recommended_actions", [])
+
+    for ra in rec_actions:
+        if isinstance(ra, dict) and ra.get("auto_create"):
+            aid = str(uuid.uuid4())
+            desc = ra.get("action") or ra.get("description", "")
+            action_doc = {
+                "id": aid, "title": desc[:200], "description": desc,
+                "status": "Open", "priority": "Medium",
+                "type": ra.get("action_type", "CM"),
+                "discipline": ra.get("discipline", "Mechanical"),
+                "threat_id": threat_id, "threat_title": threat_doc["title"],
+                "auto_created_from_failure_mode": True,
+                "failure_mode_id": obs_data.get("failure_mode_id"),
+                "failure_mode_name": failure_mode_name,
+                "created_by": user_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "installation_id": installation_id,
+            }
+            await db.actions.insert_one(action_doc)
+            auto_created.append({"id": aid, "title": desc[:100], "type": ra.get("action_type", "CM")})
+
+    if auto_created:
+        await db.threats.update_one(
+            {"id": threat_id},
+            {"$set": {"auto_created_action_ids": [a["id"] for a in auto_created]}}
+        )
+
+    await update_all_ranks(user_id)
+
+    updated = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+    if isinstance(updated.get("risk_score"), float):
+        updated["risk_score"] = int(updated["risk_score"])
+
+    cache.invalidate_stats(f"stats:{user_id}")
+
+    return {"threat": updated, "auto_created_actions": auto_created, "threat_id": threat_id}
+
+
+# ---------------------------------------------------------------------------
+# Core chat processing (shared by text and voice endpoints)
+# ---------------------------------------------------------------------------
+async def _core_chat_process(user_id: str, content: str, session_id: str,
+                             detected_lang: str, image_base64: str = None):
+    """
+    Central chat processing used by both /chat/send and /chat/voice-send.
+    Returns a ChatResponse-compatible dict.
+    """
+    image_thumbnail = None
+    if image_base64:
+        image_thumbnail = image_base64[:50000] if len(image_base64) > 50000 else image_base64
+
+    # 1. Store user message
+    user_msg = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "role": "user",
+        "content": content,
+        "has_image": image_base64 is not None,
+        "image_data": image_thumbnail,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.chat_messages.insert_one(user_msg)
+
+    # 2. Read conversation state (single source of truth)
+    conv = await _read_conv(user_id)
+    state = conv.get("state", ChatState.INITIAL)
+    pending_data = conv.get("pending_data", {})
+    original_message = conv.get("original_message")
+    eq_suggestions = conv.get("equipment_suggestions") or []
+    fm_suggestions = conv.get("failure_mode_suggestions") or []
+    threat_id = conv.get("awaiting_context_for_threat")
+
+    from database import get_current_db_name
+    logger.info(f"Chat: db={get_current_db_name()}, user={user_id[:20]}, state={state}, msg='{content[:50]}'")
+
+    # ------------------------------------------------------------------
+    # 3. AWAITING_CONTEXT — handle context/skip (highest priority)
+    # ------------------------------------------------------------------
+    if state == ChatState.AWAITING_CONTEXT:
+        skip_phrases = {"skip", "no", "done", "next", "nee", "klaar", "volgende"}
+        is_skip = content.strip().lower() in skip_phrases
+
+        if not is_skip and threat_id:
+            ctx = {"user_context": content, "context_added_at": datetime.now(timezone.utc).isoformat()}
+            if image_base64:
+                att = {"type": "image", "data": image_thumbnail,
+                       "description": content, "created_at": datetime.now(timezone.utc).isoformat()}
+                await db.threats.update_one({"id": threat_id}, {"$set": ctx, "$push": {"attachments": att}})
+            else:
+                await db.threats.update_one({"id": threat_id}, {"$set": ctx})
+
+        # Reset state
+        await _reset_conv(user_id)
+
+        reply = ("Thanks! I've added your context to the observation"
+                 + (" along with the photo" if image_base64 and not is_skip else "")
+                 + ". What else would you like to report?"
+                 if not is_skip
+                 else "Got it! Your observation has been saved. What else would you like to report?")
+
+        await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
+        return ChatResponse(message=reply, detected_language=detected_lang)
+
+    # ------------------------------------------------------------------
+    # 4. Race-condition guard: message looks like equipment but state is INITIAL
+    # ------------------------------------------------------------------
+    is_equip_format = message_looks_like_equipment(content)
+    if state == ChatState.INITIAL and is_equip_format:
+        logger.info("Equipment format detected with state=INITIAL, forcing AWAITING_EQUIPMENT")
+        state = ChatState.AWAITING_EQUIPMENT
+
+    # ------------------------------------------------------------------
+    # 5. Intent classification (only in INITIAL, no image, not in-flow)
+    # ------------------------------------------------------------------
+    in_flow = state in {ChatState.AWAITING_EQUIPMENT, ChatState.AWAITING_FAILURE_MODE,
+                        ChatState.AWAITING_NEW_FAILURE_MODE}
+    if state == ChatState.INITIAL and not in_flow and not image_base64:
+        intent = await classify_user_intent(content, session_id)
+        if intent.get("is_data_query") and intent.get("confidence", 0) > 0.6:
+            data_ctx = await get_data_context(user_id, intent.get("entities"))
+            answer = (await answer_data_query(content, session_id, data_ctx)).get(
+                "answer", "I couldn't find the information you're looking for."
+            )
+            await _store_assistant_msg(user_id, answer, chat_state=ChatState.INITIAL, is_data_query=True)
+            return ChatResponse(message=answer, question_type="data_query", detected_language=detected_lang)
+
+    # ------------------------------------------------------------------
+    # 6. Process with state machine (equipment / failure mode flow)
+    # ------------------------------------------------------------------
+    fm_library = await get_failure_modes_from_db()
+
+    result = await process_chat_message(
+        db=db,
+        user_id=user_id,
+        message_content=content,
+        failure_modes_library=fm_library,
+        current_state=state,
+        pending_data=pending_data,
+        prev_equipment_suggestions=eq_suggestions,
+        prev_failure_mode_suggestions=fm_suggestions,
+        original_message=original_message,
+    )
+
+    new_state = result["state"]
+    resp_text = result["response_text"]
+
+    # ------------------------------------------------------------------
+    # 7. If COMPLETE → create observation → move to AWAITING_CONTEXT
+    # ------------------------------------------------------------------
+    if result.get("create_observation") and result.get("observation_data"):
+        obs = await _create_observation(user_id, result["observation_data"],
+                                        session_id, image_thumbnail)
+        threat = obs["threat"]
+        auto_actions = obs["auto_created_actions"]
+        new_threat_id = obs["threat_id"]
+
+        # Build context prompt
+        actions_info = ""
+        if auto_actions:
+            actions_info = f"\n\n**{len(auto_actions)} action(s) auto-created:**\n"
+            for a in auto_actions[:3]:
+                actions_info += f"- {a['title'][:50]}{'...' if len(a['title'])>50 else ''}\n"
+            if len(auto_actions) > 3:
+                actions_info += f"- ...and {len(auto_actions)-3} more\n"
+
+        context_prompt = (
+            f"Observation recorded: **{threat['title']}**{actions_info}\n\n"
+            f"Would you like to add any additional context? You can:\n"
+            f"- Add comments about what you observed\n"
+            f"- Provide temperature or measurement readings\n"
+            f"- Describe the conditions (weather, operating state)\n"
+            f"- Upload a photo of the issue\n\n"
+            f"Type your observations or say 'skip' to continue."
+        )
+
+        # Write AWAITING_CONTEXT state
+        await _write_conv(
+            user_id,
+            state=ChatState.AWAITING_CONTEXT,
+            pending_data={},
+            equipment_suggestions=None,
+            failure_mode_suggestions=None,
+            original_message=None,
+            awaiting_context_for_threat=new_threat_id,
+        )
+
+        # Store assistant message with threat summary
+        eq_data = result["observation_data"].get("equipment", {})
+        await _store_assistant_msg(
+            user_id, context_prompt,
+            chat_state=ChatState.AWAITING_CONTEXT,
+            threat_id=new_threat_id,
+            threat_title=threat["title"],
+            threat_asset=threat["asset"],
+            threat_equipment_type=threat.get("equipment_type"),
+            threat_equipment_tag=eq_data.get("tag"),
+            threat_failure_mode=threat["failure_mode"],
+            threat_risk_level=threat["risk_level"],
+            threat_risk_score=threat["risk_score"],
+            threat_rank=threat.get("rank"),
+            threat_summary=True,
+            awaiting_context_for_threat=new_threat_id,
+            question_type="context",
+        )
+
+        return ChatResponse(
+            message=context_prompt,
+            threat=ThreatResponse(**threat),
+            follow_up_question=context_prompt,
+            question_type="context",
+            awaiting_context_for_threat=new_threat_id,
+            detected_language=detected_lang,
+        )
+
+    # ------------------------------------------------------------------
+    # 8. Non-observation result: write new state, store message, return
+    # ------------------------------------------------------------------
+    await _write_conv(
+        user_id,
+        state=new_state,
+        pending_data=result.get("pending_data", {}),
+        equipment_suggestions=result.get("equipment_suggestions"),
+        failure_mode_suggestions=result.get("failure_mode_suggestions"),
+        original_message=result.get("original_message"),
+        awaiting_context_for_threat=None,
+    )
+
+    q_type = ("asset" if result.get("equipment_suggestions")
+              else ("failure" if result.get("failure_mode_suggestions") is not None else None))
+
+    await _store_assistant_msg(
+        user_id, resp_text,
+        chat_state=new_state,
+        pending_data=result.get("pending_data", {}),
+        equipment_suggestions=result.get("equipment_suggestions"),
+        failure_mode_suggestions=result.get("failure_mode_suggestions"),
+        show_new_failure_mode_option=result.get("show_new_failure_mode_option"),
+        question_type=q_type,
+        original_message=result.get("original_message"),
+    )
+
+    return ChatResponse(
+        message=resp_text,
+        follow_up_question=resp_text if new_state != ChatState.COMPLETE else None,
+        question_type=q_type,
+        equipment_suggestions=result.get("equipment_suggestions"),
+        failure_mode_suggestions=result.get("failure_mode_suggestions"),
+        show_new_failure_mode_option=result.get("show_new_failure_mode_option"),
+        detected_language=detected_lang,
+    )
+
+
+# ===========================================================================
+# Endpoints
+# ===========================================================================
 
 @router.post("/chat/send", response_model=ChatResponse)
 async def send_chat_message(
     message: ChatMessageCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
-    """
-    Clean 2-step chat flow:
-    1. Match equipment from hierarchy (subunit level and below)
-    2. Match failure mode from FMEA library
-    3. After observation creation, ask for additional context
-    Auto-creates observation if confident (1 match each)
-    """
     session_id = f"user_{current_user['id']}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
-    user_id = current_user["id"]
-    
-    # Detect or use manually set language
     detected_lang = message.language or detect_language(message.content)
-    
-    # Store user message
-    image_thumbnail = None
-    if message.image_base64:
-        image_thumbnail = message.image_base64[:50000] if len(message.image_base64) > 50000 else message.image_base64
-    
-    chat_msg = {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "role": "user",
-        "content": message.content,
-        "has_image": message.image_base64 is not None,
-        "image_data": image_thumbnail,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    user_insert_result = await db.chat_messages.insert_one(chat_msg)
-    logger.info(f"User message stored: id={chat_msg['id']}, inserted_id={user_insert_result.inserted_id}")
-    
-    # Check if user is in AWAITING_CONTEXT state (after observation was created)
-    conversation_state = await db.chat_conversations.find_one({"user_id": user_id})
-    if conversation_state and conversation_state.get("state") == ChatState.AWAITING_CONTEXT:
-        threat_id = conversation_state.get("awaiting_context_for_threat")
-        
-        # Check if user wants to skip
-        skip_phrases = ["skip", "no", "done", "next", "nee", "klaar", "volgende"]
-        user_wants_skip = message.content.strip().lower() in skip_phrases
-        
-        if user_wants_skip:
-            # Clear the awaiting context state
-            await db.chat_conversations.update_one(
-                {"user_id": user_id},
-                {"$set": {"state": ChatState.INITIAL, "awaiting_context_for_threat": None}}
-            )
-            
-            skip_response = {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "role": "assistant",
-                "content": "Got it! Your observation has been saved. What else would you like to report?",
-                "chat_state": ChatState.INITIAL,
-                "pending_data": {},
-                "equipment_suggestions": None,
-                "failure_mode_suggestions": None,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            await db.chat_messages.insert_one(skip_response)
-            
-            return ChatResponse(
-                message="Got it! Your observation has been saved. What else would you like to report?",
-                detected_language=detected_lang
-            )
-        
-        # User is providing context - update the threat with the additional info
-        if threat_id:
-            # Build context update
-            context_update = {
-                "user_context": message.content,
-                "context_added_at": datetime.now(timezone.utc).isoformat()
-            }
-            
-            # If user uploaded an image with the context, add it as attachment
-            if message.image_base64:
-                attachment = {
-                    "type": "image",
-                    "data": image_thumbnail,
-                    "description": message.content,
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }
-                await db.threats.update_one(
-                    {"id": threat_id},
-                    {
-                        "$set": context_update,
-                        "$push": {"attachments": attachment}
-                    }
-                )
-            else:
-                await db.threats.update_one(
-                    {"id": threat_id},
-                    {"$set": context_update}
-                )
-            
-            # Clear the awaiting context state
-            await db.chat_conversations.update_one(
-                {"user_id": user_id},
-                {"$set": {"state": ChatState.INITIAL, "awaiting_context_for_threat": None}}
-            )
-            
-            # Build confirmation message
-            confirmation = "Thanks! I've added your context to the observation"
-            if message.image_base64:
-                confirmation += " along with the photo"
-            confirmation += ". What else would you like to report?"
-            
-            context_added_response = {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "role": "assistant",
-                "content": confirmation,
-                "context_added_to_threat": threat_id,
-                "chat_state": ChatState.INITIAL,
-                "pending_data": {},
-                "equipment_suggestions": None,
-                "failure_mode_suggestions": None,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            await db.chat_messages.insert_one(context_added_response)
-            
-            return ChatResponse(
-                message=confirmation,
-                detected_language=detected_lang
-            )
-    
-    # Check for data queries (skip if image provided or in active conversation flow)
-    # First check if we're in an active conversation state that should bypass intent classification
-    conv_state_check = await db.chat_messages.find(
-        {"user_id": user_id, "role": "assistant", "chat_state": {"$exists": True, "$ne": None}},
-        {"_id": 0, "chat_state": 1, "equipment_suggestions": 1, "awaiting_context_for_threat": 1}
-    ).sort("created_at", -1).limit(1).to_list(1)
-    
-    active_state = conv_state_check[0].get("chat_state") if conv_state_check else None
-    prev_had_equipment = bool(conv_state_check[0].get("equipment_suggestions")) if conv_state_check else False
-    
-    # FALLBACK: If chat_messages shows awaiting_context but chat_conversations missed it,
-    # handle context saving here (covers race conditions / stale chat_conversations)
-    if active_state == ChatState.AWAITING_CONTEXT:
-        threat_id = conv_state_check[0].get("awaiting_context_for_threat") if conv_state_check else None
-        logger.info(f"AWAITING_CONTEXT fallback: handling context for threat={threat_id}, message='{message.content[:50]}'")
-        
-        # Check if user wants to skip
-        skip_phrases = ["skip", "no", "done", "next", "nee", "klaar", "volgende"]
-        user_wants_skip = message.content.strip().lower() in skip_phrases
-        
-        if user_wants_skip:
-            await db.chat_conversations.update_one(
-                {"user_id": user_id},
-                {"$set": {"state": ChatState.INITIAL, "awaiting_context_for_threat": None}},
-                upsert=True
-            )
-            skip_response = {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "role": "assistant",
-                "content": "Got it! Your observation has been saved. What else would you like to report?",
-                "chat_state": ChatState.INITIAL,
-                "pending_data": {},
-                "equipment_suggestions": None,
-                "failure_mode_suggestions": None,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            await db.chat_messages.insert_one(skip_response)
-            return ChatResponse(
-                message="Got it! Your observation has been saved. What else would you like to report?",
-                detected_language=detected_lang
-            )
-        
-        # User is providing context
-        if threat_id:
-            context_update = {
-                "user_context": message.content,
-                "context_added_at": datetime.now(timezone.utc).isoformat()
-            }
-            if message.image_base64:
-                attachment = {
-                    "type": "image",
-                    "data": image_thumbnail,
-                    "description": message.content,
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }
-                await db.threats.update_one(
-                    {"id": threat_id},
-                    {"$set": context_update, "$push": {"attachments": attachment}}
-                )
-            else:
-                await db.threats.update_one(
-                    {"id": threat_id},
-                    {"$set": context_update}
-                )
-        
-        # Clear awaiting context state
-        await db.chat_conversations.update_one(
-            {"user_id": user_id},
-            {"$set": {"state": ChatState.INITIAL, "awaiting_context_for_threat": None}},
-            upsert=True
-        )
-        
-        confirmation = "Thanks! I've added your context to the observation"
-        if message.image_base64:
-            confirmation += " along with the photo"
-        confirmation += ". What else would you like to report?"
-        
-        context_response = {
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "role": "assistant",
-            "content": confirmation,
-            "context_added_to_threat": threat_id,
-            "chat_state": ChatState.INITIAL,
-            "pending_data": {},
-            "equipment_suggestions": None,
-            "failure_mode_suggestions": None,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.chat_messages.insert_one(context_response)
-        
-        return ChatResponse(
-            message=confirmation,
-            detected_language=detected_lang
-        )
-    
-    # Also detect if message looks like an equipment selection (Name (TAG) format)
-    # This handles race condition where user clicks before first response is stored
-    import re
-    looks_like_equipment_selection = bool(re.match(r'^.+\s*\([A-Z0-9][A-Z0-9\-]+\)\s*$', message.content))
-    
-    is_in_flow = active_state in [
-        ChatState.AWAITING_EQUIPMENT, 
-        ChatState.AWAITING_FAILURE_MODE, 
-        ChatState.AWAITING_NEW_FAILURE_MODE
-    ]
-    
-    # If message looks like equipment selection but state not found, force equipment flow
-    if looks_like_equipment_selection and not is_in_flow:
-        logger.warning(f"Message looks like equipment selection but state={active_state}. Forcing equipment flow.")
-        active_state = ChatState.AWAITING_EQUIPMENT
-        is_in_flow = True
-    
-    # Debug: Log database being used
-    from database import get_current_db_name
-    current_db_name = get_current_db_name()
-    logger.info(f"Chat state check: db={current_db_name}, user_id={user_id[:20]}..., active_state={active_state}, is_in_flow={is_in_flow}, looks_like_equip={looks_like_equipment_selection}, message='{message.content[:50]}...'")
-    
-    if not message.image_base64 and not is_in_flow:
-        intent = await classify_user_intent(message.content, session_id)
-        
-        if intent.get("is_data_query", False) and intent.get("confidence", 0) > 0.6:
-            data_context = await get_data_context(user_id, intent.get("entities"))
-            query_response = await answer_data_query(message.content, session_id, data_context)
-            answer = query_response.get("answer", "I couldn't find the information you're looking for.")
-            
-            ai_response = {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "role": "assistant",
-                "content": answer,
-                "is_data_query": True,
-                "chat_state": ChatState.INITIAL,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            await db.chat_messages.insert_one(ai_response)
-            
-            return ChatResponse(
-                message=answer,
-                follow_up_question=None,
-                question_type="data_query",
-                detected_language=detected_lang
-            )
-    
-    # Process with clean 2-step chat handler
-    # Fetch latest failure modes from database
-    failure_modes_library = await get_failure_modes_from_db()
-    
-    # Pass forced_state when we detected equipment format but DB state was stale (race condition)
-    forced = ChatState.AWAITING_EQUIPMENT if (looks_like_equipment_selection and not conv_state_check) else None
-    
-    result = await process_chat_message(
-        db=db,
-        user_id=user_id,
-        message_content=message.content,
-        failure_modes_library=failure_modes_library,
-        session_id=session_id,
-        image_base64=message.image_base64,
-        forced_state=forced
+    return await _core_chat_process(
+        current_user["id"], message.content, session_id, detected_lang, message.image_base64
     )
-    
-    # Store assistant response
-    ai_response = {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "role": "assistant",
-        "content": result["response_text"],
-        "chat_state": result["state"],
-        "pending_data": result.get("pending_data", {}),
-        "equipment_suggestions": result.get("equipment_suggestions"),
-        "failure_mode_suggestions": result.get("failure_mode_suggestions"),
-        "show_new_failure_mode_option": result.get("show_new_failure_mode_option"),
-        "question_type": "asset" if result.get("equipment_suggestions") else ("failure" if result.get("failure_mode_suggestions") is not None else None),
-        "original_message": result.get("original_message"),
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    # If we need to create an observation
-    if result.get("create_observation") and result.get("observation_data"):
-        obs_data = result["observation_data"]
-        
-        # Build the threat/observation
-        threat_id = str(uuid.uuid4())
-        equipment_name = obs_data.get("equipment_name", "Unknown")
-        failure_mode_name = obs_data.get("failure_mode_name", "Unknown")
-        
-        # Get FMEA data for risk calculation
-        fmea_data = obs_data.get("failure_mode", {})
-        rpn = fmea_data.get("rpn", 100)
-        fmea_score = min(100, int(rpn / 10))
-        
-        # Get equipment_type - prefer from equipment hierarchy, fallback to FMEA data
-        equipment_type = obs_data.get("equipment_type") or fmea_data.get("equipment") or "Equipment"
-        
-        # Get installation_id for this observation
-        installation_id = obs_data.get("installation_id")
-        
-        # Get criticality data if available
-        criticality = obs_data.get("criticality", {})
-        criticality_score = 0
-        if isinstance(criticality, dict):
-            safety = criticality.get("safety_impact", 0) or 0
-            production = criticality.get("production_impact", 0) or 0
-            environmental = criticality.get("environmental_impact", 0) or 0
-            reputation = criticality.get("reputation_impact", 0) or 0
-            criticality_score = int(((safety * 25) + (production * 20) + (environmental * 15) + (reputation * 10)) / 3.5)
-            criticality_score = min(100, criticality_score)
-        
-        # Get installation-specific risk settings
-        from services.threat_score_service import get_risk_settings_for_installation, calculate_risk_score
-        risk_settings = await get_risk_settings_for_installation(installation_id)
-        
-        # Calculate risk score using installation settings
-        final_risk_score, risk_level = calculate_risk_score(criticality_score, fmea_score, risk_settings)
-        
-        # Calculate rank
-        rank, total = await calculate_rank(final_risk_score, user_id)
-        
-        # Create threat document
-        threat_doc = {
-            "id": threat_id,
-            "title": f"{equipment_name} - {failure_mode_name}",
-            "asset": equipment_name,
-            "equipment_type": equipment_type,
-            "failure_mode": failure_mode_name,
-            "failure_mode_id": obs_data.get("failure_mode_id"),
-            "failure_mode_data": fmea_data if fmea_data else None,
-            "is_new_failure_mode": obs_data.get("is_custom_failure_mode", False),  # Track if this is a new/custom failure mode
-            "cause": None,
-            "impact": "Equipment Damage",
-            "frequency": "First Time",
-            "likelihood": "Possible",
-            "detectability": "Moderate",
-            "risk_level": risk_level,
-            "risk_score": final_risk_score,
-            "fmea_score": fmea_score,
-            "fmea_rpn": rpn if fmea_data else None,
-            "criticality_score": criticality_score,
-            "base_risk_score": fmea_score,
-            "rank": rank,
-            "total_threats": total,
-            "status": "Open",
-            "recommended_actions": obs_data.get("recommended_actions", fmea_data.get("recommended_actions", [])),
-            "created_by": user_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "occurrence_count": 1,
-            "image_url": None,
-            "location": None,
-            "linked_equipment_id": obs_data.get("equipment_id"),
-            "installation_id": installation_id,
-            "risk_settings_used": {
-                "criticality_weight": risk_settings["criticality_weight"],
-                "fmea_weight": risk_settings["fmea_weight"],
-                "installation_id": installation_id
-            },
-            "equipment_criticality": criticality.get("level") if isinstance(criticality, dict) else None,
-            "equipment_criticality_data": criticality if isinstance(criticality, dict) else None,
-            "session_id": session_id,
-            "attachments": []
-        }
-        
-        # Add images if available
-        if message.image_base64:
-            threat_doc["attachments"] = [{
-                "type": "image",
-                "data": image_thumbnail,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }]
-        
-        await db.threats.insert_one(threat_doc)
-        
-        # Auto-create actions from failure mode's recommended actions with auto_create flag
-        auto_created_actions = []
-        recommended_actions = obs_data.get("recommended_actions", [])
-        if not recommended_actions and fmea_data:
-            recommended_actions = fmea_data.get("recommended_actions", [])
-        
-        for rec_action in recommended_actions:
-            # Check if auto_create is enabled for this action
-            auto_create = False
-            if isinstance(rec_action, dict):
-                auto_create = rec_action.get("auto_create", False)
-            
-            if auto_create:
-                action_id = str(uuid.uuid4())
-                action_description = rec_action.get("action") or rec_action.get("description") if isinstance(rec_action, dict) else str(rec_action)
-                action_type = rec_action.get("action_type", "CM") if isinstance(rec_action, dict) else "CM"
-                discipline = rec_action.get("discipline", "Mechanical") if isinstance(rec_action, dict) else "Mechanical"
-                
-                action_doc = {
-                    "id": action_id,
-                    "title": action_description[:200],  # Limit title length
-                    "description": action_description,
-                    "status": "Open",
-                    "priority": "Medium",
-                    "type": action_type,
-                    "discipline": discipline,
-                    "threat_id": threat_id,
-                    "threat_title": threat_doc["title"],
-                    "auto_created_from_failure_mode": True,
-                    "failure_mode_id": obs_data.get("failure_mode_id"),
-                    "failure_mode_name": failure_mode_name,
-                    "created_by": user_id,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "installation_id": installation_id
-                }
-                await db.actions.insert_one(action_doc)
-                auto_created_actions.append({
-                    "id": action_id,
-                    "title": action_description[:100],
-                    "type": action_type
-                })
-        
-        # Update threat with auto-created action IDs
-        if auto_created_actions:
-            await db.threats.update_one(
-                {"id": threat_id},
-                {"$set": {"auto_created_action_ids": [a["id"] for a in auto_created_actions]}}
-            )
-        
-        # Update all ranks
-        await update_all_ranks(user_id)
-        
-        # Get updated threat
-        updated_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0})
-        if isinstance(updated_threat.get("risk_score"), float):
-            updated_threat["risk_score"] = int(updated_threat["risk_score"])
-        
-        # Build context prompt message (this is the ONLY message we store for observations)
-        actions_info = ""
-        if auto_created_actions:
-            actions_info = f"\n\n🎯 **{len(auto_created_actions)} action(s) auto-created:**\n"
-            for act in auto_created_actions[:3]:  # Show max 3
-                actions_info += f"• {act['title'][:50]}{'...' if len(act['title']) > 50 else ''}\n"
-            if len(auto_created_actions) > 3:
-                actions_info += f"• ...and {len(auto_created_actions) - 3} more\n"
-        
-        context_prompt = (
-            f"✅ Observation recorded: **{updated_threat['title']}**{actions_info}\n\n"
-            f"Would you like to add any additional context? You can:\n"
-            f"• Add comments about what you observed\n"
-            f"• Provide temperature or measurement readings\n"
-            f"• Describe the conditions (weather, operating state)\n"
-            f"• Upload a photo of the issue\n\n"
-            f"Type your observations or say 'skip' to continue."
-        )
-        
-        # Update the ai_response content to be the context prompt (single message)
-        ai_response["content"] = context_prompt
-        ai_response["chat_state"] = ChatState.AWAITING_CONTEXT
-        ai_response["threat_id"] = threat_id
-        ai_response["threat_title"] = updated_threat["title"]
-        ai_response["threat_asset"] = updated_threat["asset"]
-        ai_response["threat_equipment_type"] = updated_threat["equipment_type"]
-        ai_response["threat_equipment_tag"] = obs_data.get("equipment", {}).get("tag")
-        ai_response["threat_failure_mode"] = updated_threat["failure_mode"]
-        ai_response["threat_risk_level"] = updated_threat["risk_level"]
-        ai_response["threat_risk_score"] = updated_threat["risk_score"]
-        ai_response["threat_rank"] = updated_threat["rank"]
-        ai_response["threat_summary"] = True
-        ai_response["awaiting_context_for_threat"] = threat_id
-        
-        # Store this single combined message
-        await db.chat_messages.insert_one(ai_response)
-        
-        # Invalidate stats cache since a new threat was created
-        cache.invalidate_stats(f"stats:{user_id}")
-        
-        # Update conversation state
-        await db.chat_conversations.update_one(
-            {"user_id": user_id},
-            {
-                "$set": {
-                    "state": ChatState.AWAITING_CONTEXT,
-                    "awaiting_context_for_threat": threat_id,
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }
-            },
-            upsert=True
-        )
-        
-        return ChatResponse(
-            message=context_prompt,
-            threat=ThreatResponse(**updated_threat),
-            follow_up_question=context_prompt,
-            question_type="context",
-            awaiting_context_for_threat=threat_id,
-            detected_language=detected_lang
-        )
-    
-    # No observation created - store the regular response
-    insert_result = await db.chat_messages.insert_one(ai_response)
-    logger.info(f"Assistant message stored: id={ai_response['id']}, state={ai_response.get('chat_state')}, inserted_id={insert_result.inserted_id}")
-    
-    # Return follow-up question response
-    return ChatResponse(
-        message=result["response_text"],
-        follow_up_question=result["response_text"] if result["state"] != ChatState.COMPLETE else None,
-        question_type="asset" if result.get("equipment_suggestions") else ("failure" if result.get("failure_mode_suggestions") is not None else None),
-        equipment_suggestions=result.get("equipment_suggestions"),
-        failure_mode_suggestions=result.get("failure_mode_suggestions"),
-        show_new_failure_mode_option=result.get("show_new_failure_mode_option"),
-        detected_language=detected_lang
-    )
+
+
 @router.get("/chat/history")
-async def get_chat_history(
-    limit: int = 50,
-    current_user: dict = Depends(get_current_user)
-):
+async def get_chat_history(limit: int = 50, current_user: dict = Depends(get_current_user)):
     messages = await db.chat_messages.find(
-        {"user_id": current_user["id"]},
-        {"_id": 0}
+        {"user_id": current_user["id"]}, {"_id": 0}
     ).sort("created_at", -1).limit(limit).to_list(limit)
     return list(reversed(messages))
 
 
 @router.delete("/chat/clear")
-async def clear_chat_history(
-    current_user: dict = Depends(get_current_user)
-):
-    """Clear all chat messages and conversation state for the current user."""
+async def clear_chat_history(current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
-    
-    # Delete all chat messages for this user
     result = await db.chat_messages.delete_many({"user_id": user_id})
-    
-    # Also clear the conversation state
     await db.chat_conversations.delete_many({"user_id": user_id})
-    
-    logger.info(f"Chat cleared: {result.deleted_count} messages for user {user_id[:20]}")
-    
-    return {
-        "success": True,
-        "deleted_messages": result.deleted_count,
-        "message": "Chat history cleared"
-    }
+    return {"success": True, "deleted_messages": result.deleted_count, "message": "Chat history cleared"}
 
 
 @router.post("/chat/cancel")
-async def cancel_chat_flow(
-    current_user: dict = Depends(get_current_user)
-):
-    """Reset conversation state without clearing chat history."""
+async def cancel_chat_flow(current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
-    await db.chat_conversations.update_one(
-        {"user_id": user_id},
-        {"$set": {"state": ChatState.INITIAL, "pending_data": {}, "equipment_suggestions": None, "failure_mode_suggestions": None}},
-        upsert=True
-    )
-    # Add a system message so the user sees confirmation
-    cancel_msg = {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "role": "assistant",
-        "content": "Cancelled. What would you like to report?",
-        "chat_state": ChatState.INITIAL,
-        "pending_data": {},
-        "equipment_suggestions": None,
-        "failure_mode_suggestions": None,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.chat_messages.insert_one(cancel_msg)
+    await _reset_conv(user_id)
+    await _store_assistant_msg(user_id, "Cancelled. What would you like to report?",
+                               chat_state=ChatState.INITIAL)
     return {"success": True, "message": "Cancelled"}
 
 
-
-# ============= VOICE ENDPOINT =============
+# ===========================================================================
+# Voice endpoints
+# ===========================================================================
 
 @router.post("/voice/transcribe", response_model=VoiceTranscriptionResponse)
-async def transcribe_voice(
-    audio_base64: str = Form(...),
-    current_user: dict = Depends(get_current_user)
-):
+async def transcribe_voice(audio_base64: str = Form(...),
+                           current_user: dict = Depends(get_current_user)):
     text = await transcribe_audio_with_ai(audio_base64)
     return VoiceTranscriptionResponse(text=text)
 
@@ -667,111 +535,32 @@ async def transcribe_voice(
 async def voice_send(
     audio: bytes = File(...),
     language: Optional[str] = Form(None),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
-    """
-    Combined voice transcribe + chat send in a single request.
-    Accepts raw audio file upload, transcribes, then processes as chat message.
-    Eliminates the extra round-trip of separate transcribe → send calls.
-    """
-    import base64
+    """Transcribe audio then process as chat message (single round-trip)."""
     user_id = current_user["id"]
     session_id = f"user_{user_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
 
-    # Transcribe audio
-    audio_base64 = base64.b64encode(audio).decode("utf-8")
-    transcribed_text = await transcribe_audio_with_ai(audio_base64)
+    audio_b64 = base64.b64encode(audio).decode("utf-8")
+    transcribed = await transcribe_audio_with_ai(audio_b64)
 
-    if not transcribed_text or not transcribed_text.strip():
-        return {"message": "Could not transcribe voice - no text detected", "transcribed_text": "", "detected_language": None}
+    if not transcribed or not transcribed.strip():
+        return {"message": "Could not transcribe voice - no text detected",
+                "transcribed_text": "", "detected_language": None}
 
-    # Detect language
-    detected_lang = language or detect_language(transcribed_text)
+    detected_lang = language or detect_language(transcribed)
 
-    # Store user message
-    chat_msg = {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "role": "user",
-        "content": transcribed_text,
-        "source": "voice",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.chat_messages.insert_one(chat_msg)
-
-    # Process with chat handler (same logic as send_chat_message)
-    failure_modes_library = await get_failure_modes_from_db()
-    result = await process_chat_message(
-        db=db,
-        message_content=transcribed_text,
-        session_id=session_id,
-        user_id=user_id,
-        failure_modes_library=failure_modes_library
-    )
-
-    # Handle observation creation
-    if result.get("create_observation") and result.get("observation_data"):
-        obs_data = result["observation_data"]
-        equipment_name = obs_data.get("equipment_name", "Unknown")
-        failure_mode_name = obs_data.get("failure_mode_name", "Unknown")
-        equipment_type = obs_data.get("equipment_type", "")
-        failure_mode_data = obs_data.get("failure_mode", {})
-
-        threat_id = str(uuid.uuid4())
-        rpn = failure_mode_data.get("rpn", 0) if isinstance(failure_mode_data, dict) else 0
-
-        threat = {
-            "id": threat_id,
-            "title": f"{equipment_name} - {failure_mode_name}",
-            "asset": equipment_name,
-            "equipment_type": equipment_type,
-            "failure_mode": failure_mode_name,
-            "failure_mode_id": obs_data.get("failure_mode_id"),
-            "failure_mode_data": failure_mode_data,
-            "is_new_failure_mode": obs_data.get("is_new_failure_mode", False),
-            "cause": obs_data.get("cause", "To be determined"),
-            "impact": failure_mode_data.get("impact", "Operational") if isinstance(failure_mode_data, dict) else "Operational",
-            "frequency": "Occasional",
-            "risk_priority_number": rpn,
-            "rpn": rpn,
-            "fmea_rpn": rpn,
-            "status": "Open",
-            "risk_score": 0,
-            "risk_level": "Low",
-            "recommended_actions": obs_data.get("recommended_actions", []),
-            "linked_equipment_id": obs_data.get("equipment_id"),
-            "original_description": obs_data.get("original_description", transcribed_text),
-            "created_by": user_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.threats.insert_one(threat)
-        rank, total = await calculate_rank(threat["risk_score"], user_id)
-        threat["rank"] = rank
-        threat["total_threats"] = total
-
-    # Store assistant response
-    ai_response = {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "role": "assistant",
-        "content": result["response_text"],
-        "equipment_suggestions": result.get("equipment_suggestions"),
-        "failure_mode_suggestions": result.get("failure_mode_suggestions"),
-        "show_new_failure_mode_option": result.get("show_new_failure_mode_option"),
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.chat_messages.insert_one(ai_response)
+    # Reuse the same core processing as text chat
+    resp = await _core_chat_process(user_id, transcribed, session_id, detected_lang)
 
     return {
-        "message": result["response_text"],
-        "transcribed_text": transcribed_text,
+        "message": resp.message,
+        "transcribed_text": transcribed,
         "detected_language": detected_lang,
-        "follow_up_question": result["response_text"] if result.get("state") != ChatState.COMPLETE else None,
-        "question_type": "asset" if result.get("equipment_suggestions") else ("failure" if result.get("failure_mode_suggestions") is not None else None),
-        "equipment_suggestions": result.get("equipment_suggestions"),
-        "failure_mode_suggestions": result.get("failure_mode_suggestions"),
-        "show_new_failure_mode_option": result.get("show_new_failure_mode_option"),
-        "threat": threat if result.get("create_observation") else None,
+        "follow_up_question": resp.follow_up_question,
+        "question_type": resp.question_type,
+        "equipment_suggestions": resp.equipment_suggestions,
+        "failure_mode_suggestions": resp.failure_mode_suggestions,
+        "show_new_failure_mode_option": resp.show_new_failure_mode_option,
+        "threat": resp.threat,
     }
-

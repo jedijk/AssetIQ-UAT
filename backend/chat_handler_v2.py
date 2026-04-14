@@ -1,111 +1,78 @@
 """
-Chat Handler V2 - Clean, Simple 2-Step Flow
+Chat Handler V2 - Pure Business Logic
 
-Step 1: Match Equipment from Hierarchy (subunit level and below)
-Step 2: Match Failure Mode from FMEA Library
-Auto-create if confident (1 match each), otherwise ask user to select
+Matches equipment from hierarchy and failure modes from FMEA library.
+No DB state queries — state is passed in by the caller (routes/chat.py).
 """
 
 import re
-import uuid
 import logging
-from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, Tuple
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
 
+class ChatState:
+    INITIAL = "initial"
+    AWAITING_EQUIPMENT = "awaiting_equipment"
+    AWAITING_FAILURE_MODE = "awaiting_failure_mode"
+    AWAITING_NEW_FAILURE_MODE = "awaiting_new_failure_mode"
+    AWAITING_CONTEXT = "awaiting_context"
+    COMPLETE = "complete"
+
+
 def _equip_label(equipment: dict) -> str:
-    """Format equipment name with tag for display in chat messages."""
     name = equipment.get("name", "Unknown")
     tag = equipment.get("tag")
     return f"{name} ({tag})" if tag else name
 
 
-class ChatState:
-    """Tracks conversation state for multi-step flow"""
-    INITIAL = "initial"  # Fresh start
-    AWAITING_EQUIPMENT = "awaiting_equipment"  # User needs to select equipment
-    AWAITING_FAILURE_MODE = "awaiting_failure_mode"  # User needs to select failure mode
-    AWAITING_NEW_FAILURE_MODE = "awaiting_new_failure_mode"  # User is specifying a new failure mode
-    AWAITING_CONTEXT = "awaiting_context"  # Ask for additional context after observation created
-    COMPLETE = "complete"  # Ready to create observation
-
-
 def normalize_text(text: str) -> str:
-    """Normalize text for matching"""
     return ' '.join(text.lower().strip().split())
 
 
 def extract_keywords(text: str) -> List[str]:
-    """Extract meaningful keywords from text (3+ chars)"""
     words = re.findall(r'\b[a-zA-Z0-9]{3,}\b', text.lower())
-    # Remove common stop words
-    stop_words = {'the', 'and', 'for', 'has', 'have', 'had', 'was', 'were', 'are', 'been', 
+    stop_words = {'the', 'and', 'for', 'has', 'have', 'had', 'was', 'were', 'are', 'been',
                   'being', 'with', 'from', 'this', 'that', 'these', 'those', 'there'}
     return [w for w in words if w not in stop_words]
 
 
-async def search_equipment_hierarchy(
-    db: AsyncIOMotorDatabase,
-    search_text: str,
-    user_id: str
-) -> List[Dict[str, Any]]:
-    """
-    Search equipment hierarchy for matching equipment.
-    Only searches subunit level and below (not sites, plants, units).
-    Matches by name, tag, description, or equipment_type.
-    For maintainable items, includes the parent subunit name for context.
-    """
+# ------------------------------------------------------------------
+# Equipment search
+# ------------------------------------------------------------------
+
+async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List[Dict[str, Any]]:
+    """Search equipment at operational levels by name/tag/type/description."""
     keywords = extract_keywords(search_text)
     if not keywords:
         return []
-    
-    # Only search equipment at operational levels
+
     operational_levels = ["subunit", "maintainable_item", "equipment", "component", "equipment_unit"]
-    
-    # Build search query - match any keyword in any field
+
     search_conditions = []
-    for keyword in keywords:
-        keyword_regex = {"$regex": keyword, "$options": "i"}
-        search_conditions.append({"name": keyword_regex})
-        search_conditions.append({"tag": keyword_regex})
-        search_conditions.append({"tag_number": keyword_regex})
-        search_conditions.append({"description": keyword_regex})
-        search_conditions.append({"equipment_type": keyword_regex})
-        search_conditions.append({"equipment_type_name": keyword_regex})
-    
-    query = {
-        "$and": [
-            {"level": {"$in": operational_levels}},
-            {"$or": search_conditions}
-        ]
-    }
-    
+    for kw in keywords:
+        r = {"$regex": kw, "$options": "i"}
+        search_conditions += [{"name": r}, {"tag": r}, {"tag_number": r},
+                              {"description": r}, {"equipment_type": r}, {"equipment_type_name": r}]
+
     equipment_list = await db.equipment_nodes.find(
-        query,
-        {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1, 
-         "equipment_type": 1, "equipment_type_name": 1, "description": 1, 
+        {"$and": [{"level": {"$in": operational_levels}}, {"$or": search_conditions}]},
+        {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1,
+         "equipment_type": 1, "equipment_type_name": 1, "description": 1,
          "level": 1, "criticality": 1, "parent_id": 1, "installation_id": 1}
     ).limit(20).to_list(20)
-    
-    # Collect parent IDs for maintainable items to fetch parent names
-    parent_ids = set()
-    for eq in equipment_list:
-        if eq.get("level") == "maintainable_item" and eq.get("parent_id"):
-            parent_ids.add(eq["parent_id"])
-    
-    # Fetch parent equipment (subunits) in a single batch query
+
+    # Batch-fetch parent names for maintainable items
+    parent_ids = {eq["parent_id"] for eq in equipment_list
+                  if eq.get("level") == "maintainable_item" and eq.get("parent_id")}
     parent_map = {}
     if parent_ids:
         parents = await db.equipment_nodes.find(
-            {"id": {"$in": list(parent_ids)}},
-            {"_id": 0, "id": 1, "name": 1, "level": 1}
+            {"id": {"$in": list(parent_ids)}}, {"_id": 0, "id": 1, "name": 1}
         ).to_list(100)
         parent_map = {p["id"]: p for p in parents}
-    
-    # Score and rank results
+
     scored = []
     for eq in equipment_list:
         score = 0
@@ -113,60 +80,67 @@ async def search_equipment_hierarchy(
         tag = (eq.get("tag") or eq.get("tag_number") or "").lower()
         desc = (eq.get("description") or "").lower()
         eq_type = (eq.get("equipment_type") or eq.get("equipment_type_name") or "").lower()
-        
-        for keyword in keywords:
-            # Name match (highest priority)
-            if keyword in name:
+
+        for kw in keywords:
+            if kw in name:
                 score += 10
-            # Tag match (high priority)
-            if keyword in tag:
+            if kw in tag:
                 score += 8
-            # Equipment type match
-            if keyword in eq_type:
+            if kw in eq_type:
                 score += 5
-            # Description match
-            if keyword in desc:
+            if kw in desc:
                 score += 3
-        
+
         if score > 0:
-            # Get parent subunit name for maintainable items
             parent_name = None
             if eq.get("level") == "maintainable_item" and eq.get("parent_id"):
-                parent = parent_map.get(eq["parent_id"])
-                if parent:
-                    parent_name = parent.get("name")
-            
+                p = parent_map.get(eq["parent_id"])
+                if p:
+                    parent_name = p.get("name")
+
             scored.append({
-                "id": eq.get("id"),
-                "name": eq.get("name"),
+                "id": eq.get("id"), "name": eq.get("name"),
                 "tag": eq.get("tag") or eq.get("tag_number"),
                 "equipment_type": eq.get("equipment_type") or eq.get("equipment_type_name"),
-                "description": eq.get("description"),
-                "level": eq.get("level"),
-                "criticality": eq.get("criticality"),
-                "parent_name": parent_name,  # Parent subunit name for context
-                "score": score
+                "description": eq.get("description"), "level": eq.get("level"),
+                "criticality": eq.get("criticality"), "parent_name": parent_name,
+                "score": score,
             })
-    
-    # Sort by score descending
+
     scored.sort(key=lambda x: x["score"], reverse=True)
-    return scored[:10]  # Return top 10
+    return scored[:10]
 
 
-def search_failure_modes(
-    failure_modes_library: List[Dict],
-    search_text: str,
-    equipment_type: str = None
-) -> List[Dict[str, Any]]:
-    """
-    Search FMEA failure modes library for matching failure modes.
-    Matches by failure_mode name, keywords, category, or equipment.
-    Optionally filters by equipment type.
-    """
+async def lookup_equipment_by_tag(db, tag: str) -> Dict[str, Any] | None:
+    """Find a single equipment node by exact tag."""
+    doc = await db.equipment_nodes.find_one(
+        {"tag": tag},
+        {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1,
+         "equipment_type": 1, "equipment_type_name": 1, "description": 1,
+         "level": 1, "criticality": 1, "parent_id": 1, "installation_id": 1}
+    )
+    if not doc:
+        return None
+    return {
+        "id": doc.get("id"), "name": doc.get("name"),
+        "tag": doc.get("tag") or doc.get("tag_number"),
+        "equipment_type": doc.get("equipment_type") or doc.get("equipment_type_name"),
+        "description": doc.get("description"), "level": doc.get("level"),
+        "criticality": doc.get("criticality"),
+        "installation_id": doc.get("installation_id"),
+    }
+
+
+# ------------------------------------------------------------------
+# Failure mode search
+# ------------------------------------------------------------------
+
+def search_failure_modes(failure_modes_library: List[Dict], search_text: str,
+                         equipment_type: str = None) -> List[Dict[str, Any]]:
     keywords = extract_keywords(search_text)
     if not keywords:
         return []
-    
+
     scored = []
     for fm in failure_modes_library:
         score = 0
@@ -174,720 +148,282 @@ def search_failure_modes(
         fm_keywords = [k.lower() for k in fm.get("keywords", [])]
         fm_category = (fm.get("category") or "").lower()
         fm_equipment = (fm.get("equipment") or "").lower()
-        
-        for keyword in keywords:
-            # Direct name match (highest priority)
-            if keyword in fm_name or fm_name in keyword:
+
+        for kw in keywords:
+            if kw in fm_name or fm_name in kw:
                 score += 20
-            # Keyword match (high priority)
-            for fm_kw in fm_keywords:
-                if keyword in fm_kw or fm_kw in keyword:
+            for fk in fm_keywords:
+                if kw in fk or fk in kw:
                     score += 15
                     break
-            # Category match
-            if keyword in fm_category:
+            if kw in fm_category:
                 score += 5
-            # Equipment match
-            if keyword in fm_equipment:
+            if kw in fm_equipment:
                 score += 3
-        
-        # Boost if equipment type matches
+
         if equipment_type:
-            eq_type_lower = equipment_type.lower()
-            if eq_type_lower in fm_equipment or fm_equipment in eq_type_lower:
+            et = equipment_type.lower()
+            if et in fm_equipment or fm_equipment in et:
                 score += 10
-        
+
         if score > 0:
             scored.append({
-                "id": fm.get("id"),
-                "failure_mode": fm.get("failure_mode"),
-                "category": fm.get("category"),
-                "equipment": fm.get("equipment"),
-                "severity": fm.get("severity"),
-                "occurrence": fm.get("occurrence"),
-                "detectability": fm.get("detectability"),
-                "rpn": fm.get("rpn"),
+                "id": fm.get("id"), "failure_mode": fm.get("failure_mode"),
+                "category": fm.get("category"), "equipment": fm.get("equipment"),
+                "severity": fm.get("severity"), "occurrence": fm.get("occurrence"),
+                "detectability": fm.get("detectability"), "rpn": fm.get("rpn"),
                 "recommended_actions": fm.get("recommended_actions", []),
-                "score": score
+                "score": score,
             })
-    
-    # Sort by score descending
+
     scored.sort(key=lambda x: x["score"], reverse=True)
-    return scored[:10]  # Return top 10
+    return scored[:10]
 
 
-async def get_conversation_state(
-    db: AsyncIOMotorDatabase,
-    user_id: str
-) -> Dict[str, Any]:
-    """Get the current conversation state from recent messages"""
-    # Get last 5 assistant messages
-    recent_msgs = await db.chat_messages.find(
-        {"user_id": user_id, "role": "assistant"},
-        {"_id": 0}
-    ).sort("created_at", -1).limit(5).to_list(5)
-    
-    # Find the most recent state-related message
-    for msg in recent_msgs:
-        if msg.get("chat_state"):
-            return {
-                "state": msg.get("chat_state"),
-                "pending_data": msg.get("pending_data", {}),
-                "equipment_suggestions": msg.get("equipment_suggestions"),
-                "failure_mode_suggestions": msg.get("failure_mode_suggestions"),
-                "original_message": msg.get("original_message")
-            }
-    
-    return {"state": ChatState.INITIAL, "pending_data": {}}
+# ------------------------------------------------------------------
+# Equipment matching helpers
+# ------------------------------------------------------------------
 
+def match_equipment_from_suggestions(message: str, suggestions: list) -> Dict | None:
+    """Try to match user message against previous equipment suggestions."""
+    if not suggestions:
+        return None
+
+    msg_norm = normalize_text(message)
+    msg_no_tag = re.sub(r'\s*\([^)]*\)\s*$', '', message).strip()
+    msg_no_tag_norm = normalize_text(msg_no_tag)
+    has_tag = bool(re.search(r'\([^)]+\)\s*$', message))
+
+    # Pass 1: exact "Name (Tag)" match
+    for eq in suggestions:
+        eq_label = f"{eq.get('name','')} ({eq.get('tag','')})" if eq.get("tag") else eq.get("name", "")
+        if eq.get("tag") and normalize_text(eq_label) == msg_norm:
+            return eq
+
+    # Pass 2: name-only exact (skip if user provided a tag – they want that specific tag)
+    if not has_tag:
+        for eq in suggestions:
+            if normalize_text(eq.get("name", "")) == msg_norm:
+                return eq
+
+    # Pass 3: partial (skip if user has a tag)
+    if not has_tag:
+        for eq in sorted(suggestions, key=lambda x: len(x.get("name", "")), reverse=True):
+            n = normalize_text(eq.get("name", ""))
+            if n and len(n) >= 3 and (n in msg_norm or msg_no_tag_norm in n):
+                return eq
+
+    return None
+
+
+def extract_tag_from_message(message: str) -> str | None:
+    """Extract tag from 'Name (TAG)' format."""
+    m = re.search(r'\(([A-Z0-9][A-Z0-9\-]+)\)\s*$', message)
+    return m.group(1).strip() if m else None
+
+
+def message_looks_like_equipment(message: str) -> bool:
+    return bool(re.match(r'^.+\s*\([A-Z0-9][A-Z0-9\-]+\)\s*$', message))
+
+
+# ------------------------------------------------------------------
+# Failure mode matching helpers
+# ------------------------------------------------------------------
+
+def match_failure_mode_from_suggestions(message: str, suggestions: list) -> Dict | None:
+    if not suggestions:
+        return None
+
+    text = message
+    if text.lower().startswith("failure mode:"):
+        text = text.split(":", 1)[1].strip()
+
+    msg_norm = normalize_text(text)
+
+    for fm in suggestions:
+        fn = normalize_text(fm.get("failure_mode", ""))
+        if fn and (fn == msg_norm or fn in msg_norm or msg_norm in fn):
+            return fm
+    return None
+
+
+# ------------------------------------------------------------------
+# Core state machine (pure logic)
+# ------------------------------------------------------------------
 
 async def process_chat_message(
-    db: AsyncIOMotorDatabase,
+    db,
     user_id: str,
     message_content: str,
     failure_modes_library: List[Dict],
-    session_id: str,
-    image_base64: str = None,
-    forced_state: str = None
+    current_state: str = ChatState.INITIAL,
+    pending_data: Dict = None,
+    prev_equipment_suggestions: List = None,
+    prev_failure_mode_suggestions: List = None,
+    original_message: str = None,
 ) -> Dict[str, Any]:
     """
-    Main chat processing function with clean 2-step flow.
-    
-    Args:
-        forced_state: If provided, overrides DB-based state lookup. Used to handle
-                      race conditions where the previous assistant message hasn't been
-                      persisted yet but we can infer the correct state from the message format.
-    
-    Returns:
-    {
-        "response_text": str,
-        "state": str,
-        "equipment_suggestions": list or None,
-        "failure_mode_suggestions": list or None,
-        "create_observation": bool,
-        "observation_data": dict or None,
-        "pending_data": dict
-    }
+    Pure state-machine logic. Receives state, returns new state + response.
+    Caller is responsible for reading/writing state to DB.
     """
-    
-    # Get current conversation state
-    conv_state = await get_conversation_state(db, user_id)
-    current_state = conv_state.get("state", ChatState.INITIAL)
-    pending_data = conv_state.get("pending_data", {})
-    original_message = conv_state.get("original_message", message_content)
-    
-    # Override state if forced (race condition handling)
-    if forced_state and current_state == ChatState.INITIAL:
-        logger.info(f"Overriding DB state '{current_state}' with forced_state '{forced_state}' (race condition bypass)")
-        current_state = forced_state
-    
-    # ============================================
-    # HANDLE CANCEL from any state
-    # ============================================
-    if message_content.strip().lower() == "cancel":
-        # Clear conversation state and reset
-        await db.chat_conversations.update_one(
-            {"session_id": session_id},
-            {"$set": {"state": ChatState.INITIAL, "pending_data": {}, "equipment_suggestions": None, "failure_mode_suggestions": None}},
-            upsert=True
-        )
+    pending_data = dict(pending_data or {})
+    prev_equipment_suggestions = prev_equipment_suggestions or []
+    prev_failure_mode_suggestions = prev_failure_mode_suggestions or []
+    original_message = original_message or message_content
+
+    def _result(**kw):
         return {
-            "response_text": "Cancelled. What would you like to report?",
-            "state": ChatState.INITIAL,
-            "equipment_suggestions": None,
-            "failure_mode_suggestions": None,
-            "create_observation": False,
-            "observation_data": None,
-            "pending_data": {},
-            "original_message": None
+            "response_text": kw.get("text", ""),
+            "state": kw.get("state", ChatState.INITIAL),
+            "pending_data": kw.get("pending", pending_data),
+            "equipment_suggestions": kw.get("eq_sugg"),
+            "failure_mode_suggestions": kw.get("fm_sugg"),
+            "show_new_failure_mode_option": kw.get("new_fm_opt", False),
+            "create_observation": kw.get("create", False),
+            "observation_data": kw.get("obs_data"),
+            "original_message": kw.get("orig", original_message),
         }
 
-    # ============================================
-    # STATE: AWAITING EQUIPMENT SELECTION
-    # ============================================
-    if current_state == ChatState.AWAITING_EQUIPMENT:
-        prev_suggestions = conv_state.get("equipment_suggestions") or []
-        
-        # Log the suggestions for debugging
-        if prev_suggestions:
-            logger.info(f"AWAITING_EQUIPMENT: Found {len(prev_suggestions)} previous suggestions")
-            for i, eq in enumerate(prev_suggestions[:3]):
-                logger.info(f"  Suggestion {i}: name='{eq.get('name')}' tag='{eq.get('tag')}'")
-        else:
-            logger.warning(f"AWAITING_EQUIPMENT: NO previous suggestions found! Will try direct tag lookup.")
-        
-        # Check if user selected one of the suggested equipment
-        message_normalized = normalize_text(message_content)
-        # Also handle "NAME (TAG)" format from frontend
-        message_without_tag = re.sub(r'\s*\([^)]*\)\s*$', '', message_content).strip()
-        message_without_tag_normalized = normalize_text(message_without_tag)
-        # Check if user input contains a tag (parentheses at end)
-        user_input_has_tag = bool(re.search(r'\([^)]+\)\s*$', message_content))
-        
-        logger.info(f"Equipment matching: message='{message_content}', normalized='{message_normalized}', has_tag={user_input_has_tag}, suggestions={len(prev_suggestions)}")
-        
-        selected_equipment = None
-        
-        # If no suggestions but user has a tag, try direct database lookup first
-        if not prev_suggestions and user_input_has_tag:
-            tag_match = re.search(r'\(([^)]+)\)\s*$', message_content)
-            if tag_match:
-                exact_tag = tag_match.group(1).strip()
-                logger.info(f"No suggestions available, trying direct tag lookup: {exact_tag}")
-                tag_eq = await db.equipment_nodes.find_one(
-                    {"tag": exact_tag},
-                    {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1, 
-                     "equipment_type": 1, "equipment_type_name": 1, "description": 1, 
-                     "level": 1, "criticality": 1, "parent_id": 1}
-                )
-                if tag_eq:
-                    logger.info(f"Direct tag lookup SUCCESS: {tag_eq.get('name')} ({exact_tag})")
-                    selected_equipment = {
-                        "id": tag_eq.get("id"),
-                        "name": tag_eq.get("name"),
-                        "tag": tag_eq.get("tag") or tag_eq.get("tag_number"),
-                        "equipment_type": tag_eq.get("equipment_type") or tag_eq.get("equipment_type_name"),
-                        "description": tag_eq.get("description"),
-                        "level": tag_eq.get("level"),
-                        "criticality": tag_eq.get("criticality")
-                    }
-        
-        # First pass: Look for EXACT match including tag (highest priority)
-        for eq in prev_suggestions:
-            eq_name = eq.get("name", "")
-            eq_tag = eq.get("tag", "")
-            
-            # Build "Name (Tag)" format
-            eq_with_tag = f"{eq_name} ({eq_tag})" if eq_tag else eq_name
-            eq_with_tag_normalized = normalize_text(eq_with_tag)
-            
-            # Match full "Name (Tag)" string first
-            if eq_tag and eq_with_tag_normalized == message_normalized:
-                selected_equipment = eq
-                logger.info(f"Equipment TAG matched: {eq_name} ({eq_tag}) from message: {message_content}")
-                break
-            else:
-                # Debug: Log first few comparisons
-                if prev_suggestions.index(eq) < 3:
-                    logger.debug(f"No TAG match: '{eq_with_tag_normalized}' != '{message_normalized}'")
-        
-        # Second pass: Name-only exact match (only if no tag match AND user input has no tag)
-        # IMPORTANT: Skip this if user provided a specific tag - they want that exact equipment
-        if not selected_equipment and not user_input_has_tag:
-            for eq in prev_suggestions:
-                eq_name = eq.get("name", "")
-                eq_name_normalized = normalize_text(eq_name)
-                
-                if eq_name_normalized and (
-                    eq_name_normalized == message_normalized or
-                    eq_name_normalized == message_without_tag_normalized
-                ):
-                    selected_equipment = eq
-                    logger.info(f"Equipment NAME matched: {eq_name} from message: {message_content}")
-                    break
-        
-        # Third pass: Partial matches (only if user input has no specific tag)
-        if not selected_equipment and not user_input_has_tag:
-            # Sort by name length descending to prefer more specific matches
-            sorted_suggestions = sorted(prev_suggestions, key=lambda x: len(x.get("name", "")), reverse=True)
-            for eq in sorted_suggestions:
-                eq_name = eq.get("name", "")
-                eq_name_normalized = normalize_text(eq_name)
-                
-                if eq_name_normalized and len(eq_name_normalized) >= 3:
-                    # Check partial match
-                    if (eq_name_normalized in message_normalized or
-                        message_without_tag_normalized in eq_name_normalized):
-                        selected_equipment = eq
-                        logger.info(f"Equipment PARTIAL matched: {eq_name} from message: {message_content}")
-                        break
-        
-        if selected_equipment:
-            # Equipment selected! Now search for failure modes
-            pending_data["equipment"] = selected_equipment
-            pending_data["equipment_id"] = selected_equipment.get("id")
-            pending_data["equipment_name"] = selected_equipment.get("name")
-            pending_data["equipment_type"] = selected_equipment.get("equipment_type")
-            pending_data["criticality"] = selected_equipment.get("criticality")
-            
-            # Search failure modes based on original message and equipment type
-            fm_matches = search_failure_modes(
-                failure_modes_library,
-                original_message,
-                selected_equipment.get("equipment_type")
-            )
-            
-            if len(fm_matches) == 1:
-                # Single match - auto-select and create observation
-                selected_fm = fm_matches[0]
-                pending_data["failure_mode"] = selected_fm
-                pending_data["failure_mode_id"] = selected_fm.get("id")
-                pending_data["failure_mode_name"] = selected_fm.get("failure_mode")
-                
-                return {
-                    "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                    "state": ChatState.COMPLETE,
-                    "equipment_suggestions": None,
-                    "failure_mode_suggestions": None,
-                    "create_observation": True,
-                    "observation_data": pending_data,
-                    "pending_data": pending_data,
-                    "original_message": original_message
-                }
-            
-            elif len(fm_matches) > 1:
-                # Multiple matches - ask user to select
-                return {
-                    "response_text": f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. What type of failure is it? Please select:",
-                    "state": ChatState.AWAITING_FAILURE_MODE,
-                    "equipment_suggestions": None,
-                    "failure_mode_suggestions": fm_matches,
-                    "show_new_failure_mode_option": True,
-                    "create_observation": False,
-                    "observation_data": None,
-                    "pending_data": pending_data,
-                    "original_message": original_message
-                }
-            
-            else:
-                # No failure mode matches - ask user to specify or create new
-                return {
-                    "response_text": f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. No matching failure mode found. Would you like to specify the failure mode?",
-                    "state": ChatState.AWAITING_FAILURE_MODE,
-                    "equipment_suggestions": None,
-                    "failure_mode_suggestions": [],
-                    "show_new_failure_mode_option": True,
-                    "create_observation": False,
-                    "observation_data": None,
-                    "pending_data": pending_data,
-                    "original_message": original_message
-                }
-        
-        else:
-            # User didn't select from suggestions - search again with their new input
-            logger.warning(f"Equipment NOT matched from {len(prev_suggestions)} suggestions. User input: '{message_content}'. Searching again...")
-            
-            # If user input contains a tag, try to find exact tag match first
-            if user_input_has_tag:
-                # Extract tag from input (e.g., "Temperature Sensor (1TX-3003-0143)" -> "1TX-3003-0143")
-                tag_match = re.search(r'\(([^)]+)\)\s*$', message_content)
-                if tag_match:
-                    exact_tag = tag_match.group(1).strip()
-                    # Search for exact tag match in database
-                    tag_eq = await db.equipment_nodes.find_one(
-                        {"tag": exact_tag},
-                        {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1, 
-                         "equipment_type": 1, "equipment_type_name": 1, "description": 1, 
-                         "level": 1, "criticality": 1, "parent_id": 1}
-                    )
-                    if tag_eq:
-                        logger.info(f"Equipment EXACT TAG found: {tag_eq.get('name')} ({exact_tag})")
-                        selected_equipment = {
-                            "id": tag_eq.get("id"),
-                            "name": tag_eq.get("name"),
-                            "tag": tag_eq.get("tag") or tag_eq.get("tag_number"),
-                            "equipment_type": tag_eq.get("equipment_type") or tag_eq.get("equipment_type_name"),
-                            "description": tag_eq.get("description"),
-                            "level": tag_eq.get("level"),
-                            "criticality": tag_eq.get("criticality")
-                        }
-                        # Found exact equipment! Now search for failure modes
-                        pending_data["equipment"] = selected_equipment
-                        pending_data["equipment_id"] = selected_equipment.get("id")
-                        pending_data["equipment_name"] = selected_equipment.get("name")
-                        pending_data["equipment_type"] = selected_equipment.get("equipment_type")
-                        
-                        fm_matches = search_failure_modes(
-                            failure_modes_library,
-                            original_message,
-                            selected_equipment.get("equipment_type")
-                        )
-                        
-                        if len(fm_matches) == 1:
-                            pending_data["failure_mode"] = fm_matches[0]
-                            pending_data["failure_mode_id"] = fm_matches[0].get("id")
-                            pending_data["failure_mode_name"] = fm_matches[0].get("failure_mode")
-                            
-                            return {
-                                "response_text": f"Equipment: {_equip_label(selected_equipment)}. Observation recorded.",
-                                "state": ChatState.COMPLETE,
-                                "equipment_suggestions": None,
-                                "failure_mode_suggestions": None,
-                                "create_observation": True,
-                                "observation_data": pending_data,
-                                "pending_data": pending_data,
-                                "original_message": original_message
-                            }
-                        elif len(fm_matches) > 1:
-                            return {
-                                "response_text": f"Equipment: {_equip_label(selected_equipment)}. What type of failure is it? Please select:",
-                                "state": ChatState.AWAITING_FAILURE_MODE,
-                                "equipment_suggestions": None,
-                                "failure_mode_suggestions": fm_matches,
-                                "show_new_failure_mode_option": True,
-                                "create_observation": False,
-                                "observation_data": None,
-                                "pending_data": pending_data,
-                                "original_message": original_message
-                            }
-                        else:
-                            return {
-                                "response_text": f"Equipment: {_equip_label(selected_equipment)}. What type of failure is it? Please specify:",
-                                "state": ChatState.AWAITING_FAILURE_MODE,
-                                "equipment_suggestions": None,
-                                "failure_mode_suggestions": [],
-                                "show_new_failure_mode_option": True,
-                                "create_observation": False,
-                                "observation_data": None,
-                                "pending_data": pending_data,
-                                "original_message": original_message
-                            }
-            
-            # Fall back to regular search
-            eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
-            
-            if len(eq_matches) == 1:
-                # Found single match with new input
-                selected_equipment = eq_matches[0]
-                pending_data["equipment"] = selected_equipment
-                pending_data["equipment_id"] = selected_equipment.get("id")
-                pending_data["equipment_name"] = selected_equipment.get("name")
-                pending_data["equipment_type"] = selected_equipment.get("equipment_type")
-                
-                # Now search for failure modes
-                fm_matches = search_failure_modes(
-                    failure_modes_library,
-                    original_message + " " + message_content,
-                    selected_equipment.get("equipment_type")
-                )
-                
-                if len(fm_matches) == 1:
-                    pending_data["failure_mode"] = fm_matches[0]
-                    pending_data["failure_mode_id"] = fm_matches[0].get("id")
-                    pending_data["failure_mode_name"] = fm_matches[0].get("failure_mode")
-                    
-                    return {
-                        "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                        "state": ChatState.COMPLETE,
-                        "equipment_suggestions": None,
-                        "failure_mode_suggestions": None,
-                        "create_observation": True,
-                        "observation_data": pending_data,
-                        "pending_data": pending_data,
-                        "original_message": original_message
-                    }
-                elif len(fm_matches) > 1:
-                    return {
-                        "response_text": f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. What type of failure is it? Please select:",
-                        "state": ChatState.AWAITING_FAILURE_MODE,
-                        "equipment_suggestions": None,
-                        "failure_mode_suggestions": fm_matches,
-                        "create_observation": False,
-                        "observation_data": None,
-                        "pending_data": pending_data,
-                        "original_message": original_message
-                    }
-                else:
-                    pending_data["failure_mode_name"] = "Unknown"
-                    return {
-                        "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                        "state": ChatState.COMPLETE,
-                        "equipment_suggestions": None,
-                        "failure_mode_suggestions": None,
-                        "create_observation": True,
-                        "observation_data": pending_data,
-                        "pending_data": pending_data,
-                        "original_message": original_message
-                    }
-            
-            elif len(eq_matches) > 1:
-                logger.warning(f"DOUBLE EQUIPMENT PROMPT: User input '{message_content}' matched {len(eq_matches)} equipment after failing to match suggestions")
-                return {
-                    "response_text": "Which equipment? Please select:",
-                    "state": ChatState.AWAITING_EQUIPMENT,
-                    "equipment_suggestions": eq_matches,
-                    "failure_mode_suggestions": None,
-                    "create_observation": False,
-                    "observation_data": None,
-                    "pending_data": pending_data,
-                    "original_message": original_message
-                }
-            else:
-                return {
-                    "response_text": "I couldn't find that equipment. Please specify the equipment name or tag:",
-                    "state": ChatState.AWAITING_EQUIPMENT,
-                    "equipment_suggestions": prev_suggestions,  # Show previous suggestions again
-                    "failure_mode_suggestions": None,
-                    "create_observation": False,
-                    "observation_data": None,
-                    "pending_data": pending_data,
-                    "original_message": original_message
-                }
-    
-    # ============================================
-    # STATE: AWAITING FAILURE MODE SELECTION
-    # ============================================
-    if current_state == ChatState.AWAITING_FAILURE_MODE:
-        prev_suggestions = conv_state.get("failure_mode_suggestions") or []
-        
-        # Check if user selected one of the suggested failure modes
-        message_text = message_content
-        
-        # Handle "New failure mode: X" pattern - user is specifying a custom failure mode
-        if message_text.lower().startswith("new failure mode:"):
-            custom_failure_mode = message_text.split(":", 1)[1].strip()
-            if custom_failure_mode and len(custom_failure_mode) >= 3:
-                pending_data["failure_mode_name"] = custom_failure_mode
-                pending_data["is_custom_failure_mode"] = True
-                
-                return {
-                    "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                    "state": ChatState.COMPLETE,
-                    "equipment_suggestions": None,
-                    "failure_mode_suggestions": None,
-                    "create_observation": True,
-                    "observation_data": pending_data,
-                    "pending_data": pending_data,
-                    "original_message": original_message
-                }
-            else:
-                return {
-                    "response_text": "Please provide a valid failure mode name (at least 3 characters):",
-                    "state": ChatState.AWAITING_FAILURE_MODE,
-                    "equipment_suggestions": None,
-                    "failure_mode_suggestions": prev_suggestions,
-                    "show_new_failure_mode_option": True,
-                    "create_observation": False,
-                    "observation_data": None,
-                    "pending_data": pending_data,
-                    "original_message": original_message
-                }
-        
-        # Handle "Failure mode: X" pattern from frontend buttons
-        if message_text.lower().startswith("failure mode:"):
-            message_text = message_text.split(":", 1)[1].strip()
-        
-        message_normalized = normalize_text(message_text)
-        logger.info(f"Looking for failure mode match: '{message_text}' (normalized: '{message_normalized}')")
-        
-        selected_fm = None
-        
-        for fm in prev_suggestions:
-            fm_name = fm.get("failure_mode", "")
-            fm_name_normalized = normalize_text(fm_name)
-            logger.info(f"  Checking FM: '{fm_name}' (normalized: '{fm_name_normalized}')")
-            
-            if fm_name_normalized and (
-                fm_name_normalized == message_normalized or
-                fm_name_normalized in message_normalized or
-                message_normalized in fm_name_normalized
-            ):
-                selected_fm = fm
-                logger.info("  -> MATCHED!")
-                break
-        
-        if selected_fm:
-            # Failure mode selected! Create observation
-            pending_data["failure_mode"] = selected_fm
-            pending_data["failure_mode_id"] = selected_fm.get("id")
-            pending_data["failure_mode_name"] = selected_fm.get("failure_mode")
-            pending_data["recommended_actions"] = selected_fm.get("recommended_actions", [])
-            
-            return {
-                "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                "state": ChatState.COMPLETE,
-                "equipment_suggestions": None,
-                "failure_mode_suggestions": None,
-                "create_observation": True,
-                "observation_data": pending_data,
-                "pending_data": pending_data,
-                "original_message": original_message
-            }
-        
-        else:
-            # User didn't select - search again with their input
-            fm_matches = search_failure_modes(
-                failure_modes_library,
-                message_content,
-                pending_data.get("equipment_type")
-            )
-            
-            if len(fm_matches) == 1:
-                selected_fm = fm_matches[0]
-                pending_data["failure_mode"] = selected_fm
-                pending_data["failure_mode_id"] = selected_fm.get("id")
-                pending_data["failure_mode_name"] = selected_fm.get("failure_mode")
-                
-                return {
-                    "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                    "state": ChatState.COMPLETE,
-                    "equipment_suggestions": None,
-                    "failure_mode_suggestions": None,
-                    "create_observation": True,
-                    "observation_data": pending_data,
-                    "pending_data": pending_data,
-                    "original_message": original_message
-                }
-            
-            elif len(fm_matches) > 1:
-                return {
-                    "response_text": f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. Which failure type? Please select:",
-                    "state": ChatState.AWAITING_FAILURE_MODE,
-                    "equipment_suggestions": None,
-                    "failure_mode_suggestions": fm_matches,
-                    "show_new_failure_mode_option": True,
-                    "create_observation": False,
-                    "observation_data": None,
-                    "pending_data": pending_data,
-                    "original_message": original_message
-                }
-            
-            else:
-                # No match - ask user to specify the failure mode
-                return {
-                    "response_text": f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. No matching failure mode found. Would you like to specify the failure mode?",
-                    "state": ChatState.AWAITING_FAILURE_MODE,
-                    "equipment_suggestions": None,
-                    "failure_mode_suggestions": [],
-                    "show_new_failure_mode_option": True,
-                    "create_observation": False,
-                    "observation_data": None,
-                    "pending_data": pending_data,
-                    "original_message": original_message
-                }
-    
-    # ============================================
-    # STATE: AWAITING NEW FAILURE MODE (User specifying custom failure mode)
-    # ============================================
-    if current_state == ChatState.AWAITING_NEW_FAILURE_MODE:
-        # User is specifying a new/custom failure mode name
-        custom_failure_mode = message_content.strip()
-        
-        # Handle the "New failure mode:" prefix if frontend sends it
-        if custom_failure_mode.lower().startswith("new failure mode:"):
-            custom_failure_mode = custom_failure_mode.split(":", 1)[1].strip()
-        
-        if custom_failure_mode and len(custom_failure_mode) >= 3:
-            pending_data["failure_mode_name"] = custom_failure_mode
-            pending_data["is_custom_failure_mode"] = True
-            
-            return {
-                "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                "state": ChatState.COMPLETE,
-                "equipment_suggestions": None,
-                "failure_mode_suggestions": None,
-                "create_observation": True,
-                "observation_data": pending_data,
-                "pending_data": pending_data,
-                "original_message": original_message
-            }
-        else:
-            return {
-                "response_text": "Please provide a valid failure mode name (at least 3 characters):",
-                "state": ChatState.AWAITING_NEW_FAILURE_MODE,
-                "equipment_suggestions": None,
-                "failure_mode_suggestions": None,
-                "show_new_failure_mode_option": False,
-                "create_observation": False,
-                "observation_data": None,
-                "pending_data": pending_data,
-                "original_message": original_message
-            }
-    
-    # ============================================
-    # STATE: INITIAL - Fresh message
-    # ============================================
-    # Step 1: Search for equipment
-    eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
-    
-    if len(eq_matches) == 0:
-        # No equipment found - ask user to specify
-        return {
-            "response_text": "Which equipment are you reporting an issue for? Please specify the equipment name or tag:",
-            "state": ChatState.AWAITING_EQUIPMENT,
-            "equipment_suggestions": None,
-            "failure_mode_suggestions": None,
-            "create_observation": False,
-            "observation_data": None,
-            "pending_data": {"original_description": message_content},
-            "original_message": message_content
-        }
-    
-    elif len(eq_matches) == 1:
-        # Single equipment match - auto-select and proceed to failure mode
-        selected_equipment = eq_matches[0]
-        pending_data = {
-            "equipment": selected_equipment,
-            "equipment_id": selected_equipment.get("id"),
-            "equipment_name": selected_equipment.get("name"),
-            "equipment_type": selected_equipment.get("equipment_type"),
-            "criticality": selected_equipment.get("criticality"),
-            "original_description": message_content
-        }
-        
-        # Search for failure modes
-        fm_matches = search_failure_modes(
-            failure_modes_library,
-            message_content,
-            selected_equipment.get("equipment_type")
-        )
-        
+    # --- CANCEL from any state ---
+    if message_content.strip().lower() == "cancel":
+        return _result(text="Cancelled. What would you like to report?",
+                       state=ChatState.INITIAL, pending={}, orig=None)
+
+    # --- Helper: after equipment is selected, search failure modes ---
+    def _after_equipment_selected(equipment, fm_library, orig_msg, pdata):
+        pdata["equipment"] = equipment
+        pdata["equipment_id"] = equipment.get("id")
+        pdata["equipment_name"] = equipment.get("name")
+        pdata["equipment_type"] = equipment.get("equipment_type")
+        pdata["criticality"] = equipment.get("criticality")
+        pdata["installation_id"] = equipment.get("installation_id")
+
+        fm_matches = search_failure_modes(fm_library, orig_msg, equipment.get("equipment_type"))
+
         if len(fm_matches) == 1:
-            # Single match for both - auto-create observation
-            selected_fm = fm_matches[0]
-            pending_data["failure_mode"] = selected_fm
-            pending_data["failure_mode_id"] = selected_fm.get("id")
-            pending_data["failure_mode_name"] = selected_fm.get("failure_mode")
-            pending_data["recommended_actions"] = selected_fm.get("recommended_actions", [])
-            
-            return {
-                "response_text": f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                "state": ChatState.COMPLETE,
-                "equipment_suggestions": None,
-                "failure_mode_suggestions": None,
-                "create_observation": True,
-                "observation_data": pending_data,
-                "pending_data": pending_data,
-                "original_message": message_content
-            }
-        
+            fm = fm_matches[0]
+            pdata["failure_mode"] = fm
+            pdata["failure_mode_id"] = fm.get("id")
+            pdata["failure_mode_name"] = fm.get("failure_mode")
+            pdata["recommended_actions"] = fm.get("recommended_actions", [])
+            return _result(text=f"Observation recorded for {_equip_label(equipment)}.",
+                           state=ChatState.COMPLETE, pending=pdata, create=True, obs_data=pdata, orig=orig_msg)
         elif len(fm_matches) > 1:
-            # Multiple failure mode matches - ask user to select
-            return {
-                "response_text": f"Issue reported for {_equip_label(selected_equipment)}. What type of failure is it? Please select:",
-                "state": ChatState.AWAITING_FAILURE_MODE,
-                "equipment_suggestions": None,
-                "failure_mode_suggestions": fm_matches,
-                "show_new_failure_mode_option": True,
-                "create_observation": False,
-                "observation_data": None,
-                "pending_data": pending_data,
-                "original_message": message_content
-            }
-        
+            return _result(text=f"Equipment: {_equip_label(equipment)}. What type of failure is it? Please select:",
+                           state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=fm_matches,
+                           new_fm_opt=True, pending=pdata, orig=orig_msg)
         else:
-            # No failure mode match - ask user to specify
-            return {
-                "response_text": f"Issue reported for {_equip_label(selected_equipment)}. No matching failure mode found. Would you like to specify the failure mode?",
-                "state": ChatState.AWAITING_FAILURE_MODE,
-                "equipment_suggestions": None,
-                "failure_mode_suggestions": [],
-                "show_new_failure_mode_option": True,
-                "create_observation": False,
-                "observation_data": None,
-                "pending_data": pending_data,
-                "original_message": message_content
-            }
-    
-    else:
-        # Multiple equipment matches - ask user to select
-        return {
-            "response_text": "Which equipment are you reporting an issue for? Please select:",
-            "state": ChatState.AWAITING_EQUIPMENT,
-            "equipment_suggestions": eq_matches,
-            "failure_mode_suggestions": None,
-            "create_observation": False,
-            "observation_data": None,
-            "pending_data": {"original_description": message_content},
-            "original_message": message_content
-        }
+            return _result(text=f"Equipment: {_equip_label(equipment)}. No matching failure mode found. Would you like to specify the failure mode?",
+                           state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=[],
+                           new_fm_opt=True, pending=pdata, orig=orig_msg)
+
+    # ==============================
+    # AWAITING_EQUIPMENT
+    # ==============================
+    if current_state == ChatState.AWAITING_EQUIPMENT:
+        selected = match_equipment_from_suggestions(message_content, prev_equipment_suggestions)
+
+        # Direct tag lookup fallback (handles race condition or tag not in suggestions)
+        if not selected:
+            tag = extract_tag_from_message(message_content)
+            if tag:
+                selected = await lookup_equipment_by_tag(db, tag)
+                if selected:
+                    logger.info(f"Direct tag lookup: {selected.get('name')} ({tag})")
+
+        if selected:
+            return _after_equipment_selected(selected, failure_modes_library, original_message, pending_data)
+
+        # No match — re-search with user's new input
+        tag = extract_tag_from_message(message_content)
+        if tag:
+            eq = await lookup_equipment_by_tag(db, tag)
+            if eq:
+                return _after_equipment_selected(eq, failure_modes_library, original_message, pending_data)
+
+        eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
+        if len(eq_matches) == 1:
+            return _after_equipment_selected(eq_matches[0], failure_modes_library, original_message, pending_data)
+        elif len(eq_matches) > 1:
+            return _result(text="Which equipment? Please select:",
+                           state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches, orig=original_message)
+        else:
+            return _result(text="I couldn't find that equipment. Please specify the equipment name or tag:",
+                           state=ChatState.AWAITING_EQUIPMENT,
+                           eq_sugg=prev_equipment_suggestions, orig=original_message)
+
+    # ==============================
+    # AWAITING_FAILURE_MODE
+    # ==============================
+    if current_state == ChatState.AWAITING_FAILURE_MODE:
+        # Custom failure mode
+        if message_content.lower().startswith("new failure mode:"):
+            custom = message_content.split(":", 1)[1].strip()
+            if custom and len(custom) >= 3:
+                pending_data["failure_mode_name"] = custom
+                pending_data["is_custom_failure_mode"] = True
+                return _result(text=f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                               state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
+            return _result(text="Please provide a valid failure mode name (at least 3 characters):",
+                           state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=prev_failure_mode_suggestions,
+                           new_fm_opt=True)
+
+        selected = match_failure_mode_from_suggestions(message_content, prev_failure_mode_suggestions)
+        if selected:
+            pending_data["failure_mode"] = selected
+            pending_data["failure_mode_id"] = selected.get("id")
+            pending_data["failure_mode_name"] = selected.get("failure_mode")
+            pending_data["recommended_actions"] = selected.get("recommended_actions", [])
+            return _result(text=f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                           state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
+
+        # Re-search
+        fm_matches = search_failure_modes(failure_modes_library, message_content,
+                                          pending_data.get("equipment_type"))
+        if len(fm_matches) == 1:
+            fm = fm_matches[0]
+            pending_data["failure_mode"] = fm
+            pending_data["failure_mode_id"] = fm.get("id")
+            pending_data["failure_mode_name"] = fm.get("failure_mode")
+            return _result(text=f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                           state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
+        elif len(fm_matches) > 1:
+            return _result(text=f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. Which failure type? Please select:",
+                           state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=fm_matches, new_fm_opt=True)
+        else:
+            return _result(text=f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. No matching failure mode found. Would you like to specify the failure mode?",
+                           state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=[], new_fm_opt=True)
+
+    # ==============================
+    # AWAITING_NEW_FAILURE_MODE
+    # ==============================
+    if current_state == ChatState.AWAITING_NEW_FAILURE_MODE:
+        custom = message_content.strip()
+        if custom.lower().startswith("new failure mode:"):
+            custom = custom.split(":", 1)[1].strip()
+        if custom and len(custom) >= 3:
+            pending_data["failure_mode_name"] = custom
+            pending_data["is_custom_failure_mode"] = True
+            return _result(text=f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                           state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
+        return _result(text="Please provide a valid failure mode name (at least 3 characters):",
+                       state=ChatState.AWAITING_NEW_FAILURE_MODE)
+
+    # ==============================
+    # INITIAL — fresh message
+    # ==============================
+    eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
+
+    if len(eq_matches) == 0:
+        return _result(text="Which equipment are you reporting an issue for? Please specify the equipment name or tag:",
+                       state=ChatState.AWAITING_EQUIPMENT,
+                       pending={"original_description": message_content}, orig=message_content)
+
+    if len(eq_matches) == 1:
+        pd = {"original_description": message_content}
+        return _after_equipment_selected(eq_matches[0], failure_modes_library, message_content, pd)
+
+    # Multiple equipment matches
+    return _result(text="Which equipment are you reporting an issue for? Please select:",
+                   state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches,
+                   pending={"original_description": message_content}, orig=message_content)
