@@ -91,6 +91,14 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ### April 14, 2026 - Bug Fixes (COMPLETED)
 
+### April 14, 2026 - Production Dashboard Data Fix (COMPLETED)
+
+**BUG FIX - Form submissions from child equipment not appearing on Production Dashboard:**
+- **Root Cause**: The dashboard query only included Line-90 and its ancestors (parent plant, grandparent installation) in the equipment filter. Submissions assigned to child equipment units (EXU - Extrusion Unit, STU - Straining Unit, etc.) were excluded because their equipment_ids weren't in the query.
+- **Fix**: Extended equipment query to include all descendants (children + grandchildren) of Line-90, not just ancestors. Now submissions from any level of the Line-90 hierarchy appear on the dashboard.
+- **Edit visibility**: Edits to production log entries were always persisting correctly (PATCH endpoint works), but if the submission's equipment wasn't in the query, the edited data wouldn't appear on re-fetch. This is now resolved by the same fix.
+- Files: `/app/backend/routes/production.py`
+
 ### April 14, 2026 - Chat System V2 Rewrite (COMPLETED)
 
 **REWRITE - Chat Backend with Single Source of Truth State Machine:**

@@ -128,15 +128,27 @@ async def get_production_dashboard(
     equipment_ids = []
     if line90:
         equipment_ids.append(line90["id"])
-        # Also include parent (e.g. "Tyromer") since tasks may be assigned at parent level
+        # Include ancestors (parent, grandparent) — submissions may be assigned at installation level
         if line90.get("parent_id"):
             equipment_ids.append(line90["parent_id"])
-            # Get grandparent too
             parent = await db.equipment_nodes.find_one(
                 {"id": line90["parent_id"]}, {"_id": 0, "parent_id": 1}
             )
             if parent and parent.get("parent_id"):
                 equipment_ids.append(parent["parent_id"])
+
+        # Include descendants (children, grandchildren) — submissions may be assigned to sub-units
+        children = await db.equipment_nodes.find(
+            {"parent_id": line90["id"]}, {"_id": 0, "id": 1}
+        ).to_list(50)
+        child_ids = [c["id"] for c in children]
+        equipment_ids.extend(child_ids)
+
+        if child_ids:
+            grandchildren = await db.equipment_nodes.find(
+                {"parent_id": {"$in": child_ids}}, {"_id": 0, "id": 1}
+            ).to_list(200)
+            equipment_ids.extend([gc["id"] for gc in grandchildren])
 
     equipment_match = [
         {"equipment_name": {"$regex": "Line.?90", "$options": "i"}},
