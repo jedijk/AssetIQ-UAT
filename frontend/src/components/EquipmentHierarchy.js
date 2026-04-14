@@ -207,7 +207,8 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
 
   const handleAddThreatClick = () => {
     setContextMenu({ show: false, x: 0, y: 0 });
-    onAddThreat?.(node.name);
+    const label = node.tag ? `${node.name} (${node.tag})` : node.name;
+    onAddThreat?.(label);
   };
 
   const handleShowDetails = () => {
