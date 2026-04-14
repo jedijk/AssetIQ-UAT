@@ -412,7 +412,8 @@ async def process_chat_message(
                 }
         
         else:
-            # User didn't select - search again with their new input
+            # User didn't select from suggestions - search again with their new input
+            logger.warning(f"Equipment NOT matched from {len(prev_suggestions)} suggestions. User input: '{message_content}'. Searching again...")
             eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
             
             if len(eq_matches) == 1:
@@ -470,6 +471,7 @@ async def process_chat_message(
                     }
             
             elif len(eq_matches) > 1:
+                logger.warning(f"DOUBLE EQUIPMENT PROMPT: User input '{message_content}' matched {len(eq_matches)} equipment after failing to match suggestions")
                 return {
                     "response_text": "Which equipment? Please select:",
                     "state": ChatState.AWAITING_EQUIPMENT,

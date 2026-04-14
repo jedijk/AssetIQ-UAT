@@ -198,6 +198,8 @@ async def send_chat_message(
         ChatState.AWAITING_NEW_FAILURE_MODE
     ]
     
+    logger.info(f"Chat state check: active_state={active_state}, is_in_flow={is_in_flow}, message='{message.content[:50]}...'")
+    
     if not message.image_base64 and not is_in_flow:
         intent = await classify_user_intent(message.content, session_id)
         
