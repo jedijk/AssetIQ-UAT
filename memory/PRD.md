@@ -89,6 +89,24 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - Server Performance & Security monitoring
 - Excel Import for Equipment Hierarchy
 
+### April 14, 2026 - Bug Fixes (COMPLETED)
+
+**BUG FIX - Double Equipment Prompt in AI Chat:**
+- **Root Cause**: When user clicked on equipment with a specific tag (e.g., "Temperature Sensor (1TX-3003-0143)") that wasn't in the current suggestions list, the name-only matching would incorrectly match to a different equipment with the same name but different tag
+- **Fix**: 
+  1. If user input contains a tag, skip name-only and partial matching (which could match wrong equipment)
+  2. Added exact tag lookup in database when user provides specific tag not in suggestions
+  3. Now correctly finds equipment by exact tag match instead of re-prompting
+- Files: `/app/backend/chat_handler_v2.py`
+
+**FEATURE - Auto-Skip Context Prompt:**
+- Added 60-second countdown timer for "add context" prompt after observation creation
+- Visual countdown on Skip button: "Skip (55s)"
+- Helper text: "Auto-skip in 55s"
+- Auto-sends "skip" after 60 seconds of inactivity
+- Timer clears when user manually sends message or clicks Skip
+- Files: `/app/frontend/src/components/ChatSidebar.js`
+
 ---
 
 ## Prioritized Backlog

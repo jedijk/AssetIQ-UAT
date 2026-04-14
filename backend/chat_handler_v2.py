@@ -302,6 +302,8 @@ async def process_chat_message(
         # Also handle "NAME (TAG)" format from frontend
         message_without_tag = re.sub(r'\s*\([^)]*\)\s*$', '', message_content).strip()
         message_without_tag_normalized = normalize_text(message_without_tag)
+        # Check if user input contains a tag (parentheses at end)
+        user_input_has_tag = bool(re.search(r'\([^)]+\)\s*$', message_content))
         
         selected_equipment = None
         
@@ -320,8 +322,9 @@ async def process_chat_message(
                 logger.info(f"Equipment TAG matched: {eq_name} ({eq_tag}) from message: {message_content}")
                 break
         
-        # Second pass: Name-only exact match (only if no tag match)
-        if not selected_equipment:
+        # Second pass: Name-only exact match (only if no tag match AND user input has no tag)
+        # IMPORTANT: Skip this if user provided a specific tag - they want that exact equipment
+        if not selected_equipment and not user_input_has_tag:
             for eq in prev_suggestions:
                 eq_name = eq.get("name", "")
                 eq_name_normalized = normalize_text(eq_name)
@@ -334,8 +337,8 @@ async def process_chat_message(
                     logger.info(f"Equipment NAME matched: {eq_name} from message: {message_content}")
                     break
         
-        # Third pass: Partial matches (longer matches first)
-        if not selected_equipment:
+        # Third pass: Partial matches (only if user input has no specific tag)
+        if not selected_equipment and not user_input_has_tag:
             # Sort by name length descending to prefer more specific matches
             sorted_suggestions = sorted(prev_suggestions, key=lambda x: len(x.get("name", "")), reverse=True)
             for eq in sorted_suggestions:
@@ -414,6 +417,84 @@ async def process_chat_message(
         else:
             # User didn't select from suggestions - search again with their new input
             logger.warning(f"Equipment NOT matched from {len(prev_suggestions)} suggestions. User input: '{message_content}'. Searching again...")
+            
+            # If user input contains a tag, try to find exact tag match first
+            if user_input_has_tag:
+                # Extract tag from input (e.g., "Temperature Sensor (1TX-3003-0143)" -> "1TX-3003-0143")
+                tag_match = re.search(r'\(([^)]+)\)\s*$', message_content)
+                if tag_match:
+                    exact_tag = tag_match.group(1).strip()
+                    # Search for exact tag match in database
+                    tag_eq = await db.equipment_nodes.find_one(
+                        {"tag": exact_tag},
+                        {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1, 
+                         "equipment_type": 1, "equipment_type_name": 1, "description": 1, 
+                         "level": 1, "criticality": 1, "parent_id": 1}
+                    )
+                    if tag_eq:
+                        logger.info(f"Equipment EXACT TAG found: {tag_eq.get('name')} ({exact_tag})")
+                        selected_equipment = {
+                            "id": tag_eq.get("id"),
+                            "name": tag_eq.get("name"),
+                            "tag": tag_eq.get("tag") or tag_eq.get("tag_number"),
+                            "equipment_type": tag_eq.get("equipment_type") or tag_eq.get("equipment_type_name"),
+                            "description": tag_eq.get("description"),
+                            "level": tag_eq.get("level"),
+                            "criticality": tag_eq.get("criticality")
+                        }
+                        # Found exact equipment! Now search for failure modes
+                        pending_data["equipment"] = selected_equipment
+                        pending_data["equipment_id"] = selected_equipment.get("id")
+                        pending_data["equipment_name"] = selected_equipment.get("name")
+                        pending_data["equipment_type"] = selected_equipment.get("equipment_type")
+                        
+                        fm_matches = search_failure_modes(
+                            failure_modes_library,
+                            original_message,
+                            selected_equipment.get("equipment_type")
+                        )
+                        
+                        if len(fm_matches) == 1:
+                            pending_data["failure_mode"] = fm_matches[0]
+                            pending_data["failure_mode_id"] = fm_matches[0].get("id")
+                            pending_data["failure_mode_name"] = fm_matches[0].get("failure_mode")
+                            
+                            return {
+                                "response_text": f"Equipment: {_equip_label(selected_equipment)}. Observation recorded.",
+                                "state": ChatState.COMPLETE,
+                                "equipment_suggestions": None,
+                                "failure_mode_suggestions": None,
+                                "create_observation": True,
+                                "observation_data": pending_data,
+                                "pending_data": pending_data,
+                                "original_message": original_message
+                            }
+                        elif len(fm_matches) > 1:
+                            return {
+                                "response_text": f"Equipment: {_equip_label(selected_equipment)}. What type of failure is it? Please select:",
+                                "state": ChatState.AWAITING_FAILURE_MODE,
+                                "equipment_suggestions": None,
+                                "failure_mode_suggestions": fm_matches,
+                                "show_new_failure_mode_option": True,
+                                "create_observation": False,
+                                "observation_data": None,
+                                "pending_data": pending_data,
+                                "original_message": original_message
+                            }
+                        else:
+                            return {
+                                "response_text": f"Equipment: {_equip_label(selected_equipment)}. What type of failure is it? Please specify:",
+                                "state": ChatState.AWAITING_FAILURE_MODE,
+                                "equipment_suggestions": None,
+                                "failure_mode_suggestions": [],
+                                "show_new_failure_mode_option": True,
+                                "create_observation": False,
+                                "observation_data": None,
+                                "pending_data": pending_data,
+                                "original_message": original_message
+                            }
+            
+            # Fall back to regular search
             eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
             
             if len(eq_matches) == 1:
