@@ -65,8 +65,14 @@ export default function SettingsDatabasePage() {
     },
     onSuccess: (data) => {
       toast.success(data.message);
+      // Clear chat history cache immediately before reload
+      queryClient.removeQueries({ queryKey: ["chatHistory"] });
       queryClient.invalidateQueries(["databases"]);
       queryClient.invalidateQueries(["databases-status"]);
+      // Clear all other queries that depend on database
+      queryClient.invalidateQueries(["threats"]);
+      queryClient.invalidateQueries(["equipment"]);
+      queryClient.invalidateQueries(["stats"]);
       // Store the preference in localStorage for the frontend
       localStorage.setItem("database_environment", data.environment);
       // Reload the page to apply the new database context

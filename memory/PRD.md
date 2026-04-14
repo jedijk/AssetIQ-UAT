@@ -107,6 +107,28 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 - Timer clears when user manually sends message or clicks Skip
 - Files: `/app/frontend/src/components/ChatSidebar.js`
 
+**BUG FIX - Database Environment Mismatch in Chat:**
+- **Root Cause**: When user switched database environments (UAT ↔ Production), chat history was cached from previous environment. Backend couldn't find chat state in new database, causing "double equipment" prompts.
+- **Fix**:
+  1. Clear chat history cache when switching database environments
+  2. Force refetch chat history when chat sidebar opens
+  3. Detect and warn user when state mismatch occurs (equipment selection returns equipment options again)
+- Files: `/app/frontend/src/pages/SettingsDatabasePage.js`, `/app/frontend/src/components/ChatSidebar.js`
+
+**FEATURE - Production Dashboard Mobile Compatibility:**
+- Made period selector wrap on small screens
+- Reduced chart height on mobile (250px vs 300px desktop)
+- Made chart toggles smaller and wrap-friendly on mobile
+- Reduced padding on panels (p-3 mobile, p-4 desktop)
+- Export button shows icon-only on mobile
+- Grid layouts adjusted for tablet breakpoint (md:grid-cols-2)
+- Files: `/app/frontend/src/pages/ProductionDashboardPage.js`
+
+**FEATURE - Hide Reliability & Production Tabs on Mobile:**
+- Added `hidden sm:flex` to hide these tabs on screens < 640px
+- Auto-redirect to "Operational" tab if user is on hidden tab when screen resizes
+- Files: `/app/frontend/src/pages/DashboardPage.js`
+
 ---
 
 ## Prioritized Backlog

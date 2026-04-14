@@ -76,11 +76,19 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   }, [prefillEquipment, isOpen]);
 
   // Fetch chat history
-  const { data: messages = [], isLoading } = useQuery({
+  const { data: messages = [], isLoading, refetch: refetchHistory } = useQuery({
     queryKey: ["chatHistory"],
     queryFn: () => chatAPI.getHistory(100),
     enabled: isOpen,
   });
+  
+  // Track database environment changes
+  useEffect(() => {
+    if (isOpen) {
+      // Force refetch when sidebar opens to ensure we have fresh data for current database
+      refetchHistory();
+    }
+  }, [isOpen, refetchHistory]);
 
   // Auto-skip context prompt after 60 seconds
   useEffect(() => {
@@ -139,10 +147,26 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
       }
       setAutoSkipCountdown(null);
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
+      
+      // Detect database environment mismatch
+      // If user sent what looks like an equipment selection but got equipment options back
+      const sentContent = variables?.content || "";
+      const looksLikeEquipmentSelection = /\([A-Z0-9-]+\)/.test(sentContent);
+      const gotEquipmentOptionsBack = data?.equipment_suggestions?.length > 0;
+      
+      if (looksLikeEquipmentSelection && gotEquipmentOptionsBack) {
+        // This likely means the chat state was lost (database environment changed)
+        toast.warning("Chat state was reset. Your previous session may have been in a different database environment.", {
+          duration: 5000,
+        });
+        // Force refetch chat history to sync with current database
+        queryClient.refetchQueries({ queryKey: ["chatHistory"] });
+      }
+      
       setMessage("");
       setImageBase64(null);
       setImagePreview(null);
