@@ -20,6 +20,7 @@ from models.api_models import (
 )
 from ai_helpers import (
     classify_user_intent, get_data_context, answer_data_query, transcribe_audio_with_ai,
+    analyze_attachment_image,
 )
 from chat_handler_v2 import (
     process_chat_message, ChatState, message_looks_like_equipment,
@@ -366,17 +367,82 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 att = {"type": "image", "data": image_thumbnail,
                        "description": content, "created_at": datetime.now(timezone.utc).isoformat()}
                 await db.threats.update_one({"id": threat_id}, {"$set": ctx, "$push": {"attachments": att}})
+
+                # AI image analysis — analyze photo and update threat with findings
+                threat_doc = await db.threats.find_one({"id": threat_id}, {"_id": 0, "title": 1, "asset": 1, "failure_mode": 1})
+                threat_context = f"{threat_doc.get('title', '')} — {threat_doc.get('asset', '')} — {threat_doc.get('failure_mode', '')}" if threat_doc else content
+                analysis = await analyze_attachment_image(image_thumbnail, threat_context)
+                if analysis:
+                    analysis_update = {
+                        "image_analysis": analysis,
+                        "image_analysis_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    if analysis.get("severity"):
+                        sev = analysis["severity"].lower()
+                        if sev in ("critical", "high"):
+                            analysis_update["ai_severity"] = sev
+                    await db.threats.update_one({"id": threat_id}, {"$set": analysis_update})
+
+                    # Create actions from AI recommendations
+                    ai_actions = analysis.get("recommended_actions", [])
+                    created_action_ids = []
+                    for ra in ai_actions:
+                        action_desc = ra.get("action", "")
+                        if not action_desc:
+                            continue
+                        aid = str(uuid.uuid4())
+                        action_doc = {
+                            "id": aid,
+                            "title": action_desc[:200],
+                            "description": action_desc,
+                            "status": "Open",
+                            "priority": ra.get("priority", "Medium").capitalize(),
+                            "type": ra.get("type", "CM"),
+                            "threat_id": threat_id,
+                            "threat_title": threat_doc.get("title", "") if threat_doc else "",
+                            "auto_created_from_image_analysis": True,
+                            "created_by": user_id,
+                            "created_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                        await db.actions.insert_one(action_doc)
+                        created_action_ids.append(aid)
+
+                    if created_action_ids:
+                        await db.threats.update_one(
+                            {"id": threat_id},
+                            {"$push": {"auto_created_action_ids": {"$each": created_action_ids}}}
+                        )
             else:
                 await db.threats.update_one({"id": threat_id}, {"$set": ctx})
 
         # Reset state
         await _reset_conv(user_id)
 
-        reply = ("Thanks! I've added your context to the observation"
-                 + (" along with the photo" if image_base64 and not is_skip else "")
-                 + ". What else would you like to report?"
-                 if not is_skip
-                 else "Got it! Your observation has been saved. What else would you like to report?")
+        # Build reply
+        if is_skip:
+            reply = "Got it! Your observation has been saved. What else would you like to report?"
+        elif image_base64 and analysis:
+            parts = ["Thanks! I've added your photo and context to the observation."]
+            desc = analysis.get("image_description")
+            if desc:
+                parts.append(f"\n\n**Image analysis:** {desc}")
+            severity = analysis.get("severity")
+            if severity:
+                parts.append(f"\n**Assessed severity:** {severity.capitalize()}")
+            safety = analysis.get("safety_concerns", [])
+            if safety:
+                parts.append("\n**Safety concerns:** " + "; ".join(safety))
+            ai_actions = analysis.get("recommended_actions", [])
+            if ai_actions:
+                parts.append(f"\n\n**{len(ai_actions)} action(s) created from photo analysis:**")
+                for a in ai_actions[:3]:
+                    parts.append(f"- [{a.get('priority','').capitalize()}] {a.get('action','')[:80]}")
+            parts.append("\n\nWhat else would you like to report?")
+            reply = "".join(parts)
+        elif image_base64:
+            reply = "Thanks! I've added your context to the observation along with the photo. What else would you like to report?"
+        else:
+            reply = "Thanks! I've added your context to the observation. What else would you like to report?"
 
         await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
         return ChatResponse(message=reply, detected_language=detected_lang)

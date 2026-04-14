@@ -4,6 +4,7 @@ AI Helper functions and prompts for threat analysis, chat, and data queries.
 import os
 import re
 import json
+import asyncio
 import base64
 import logging
 import tempfile
@@ -356,6 +357,58 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
             }
 
         raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
+
+
+
+async def analyze_attachment_image(image_base64: str, threat_context: str) -> dict:
+    """Analyze an image attachment for an existing observation and return findings + action recommendations."""
+    try:
+        client = get_openai_client()
+
+        messages = [
+            {"role": "system", "content": (
+                "You are an equipment reliability AI. Analyze this photo attached to an observation. "
+                "The observation context is provided below.\n\n"
+                "Return JSON with:\n"
+                "{\n"
+                '  "image_description": "What you see in the image (2-3 sentences)",\n'
+                '  "visible_damage": ["list of visible damage/issues"],\n'
+                '  "severity": "low|medium|high|critical",\n'
+                '  "safety_concerns": ["any safety issues spotted"],\n'
+                '  "recommended_actions": [\n'
+                '    {"action": "description of action", "priority": "high|medium|low", "type": "CM|PM|inspection"}\n'
+                "  ]\n"
+                "}\n"
+                "Be concise and technical. Only flag what you can actually see."
+            )},
+            {"role": "user", "content": [
+                {"type": "text", "text": f"Observation context: {threat_context}"},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+            ]}
+        ]
+
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
+            model="gpt-4o",
+            messages=messages,
+            temperature=0.3,
+            max_tokens=500,
+        )
+
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        raw = raw.strip().rstrip("```")
+
+        result = json.loads(raw)
+        logger.info(f"Image analysis complete: severity={result.get('severity')}, actions={len(result.get('recommended_actions', []))}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Image analysis failed: {e}")
+        return None
 
 
 def detect_audio_format(audio_data: bytes) -> str:
