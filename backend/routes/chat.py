@@ -7,6 +7,7 @@ State lives in `chat_conversations` (one doc per user).
 import re
 import uuid
 import base64
+import io
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -32,6 +33,41 @@ from services.cache_service import cache
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
+
+# ---------------------------------------------------------------------------
+# Image compression
+# ---------------------------------------------------------------------------
+MAX_IMAGE_BYTES = 100_000  # ~100KB base64 target
+
+def _compress_image(b64_data: str) -> str:
+    """Compress a base64 image to a reasonable size for chat storage."""
+    if len(b64_data) <= MAX_IMAGE_BYTES:
+        return b64_data
+    try:
+        from PIL import Image
+        raw = base64.b64decode(b64_data)
+        img = Image.open(io.BytesIO(raw))
+        # Resize if very large
+        max_dim = 800
+        if max(img.size) > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+        # Compress as JPEG
+        buf = io.BytesIO()
+        rgb = img.convert("RGB") if img.mode != "RGB" else img
+        quality = 70
+        rgb.save(buf, format="JPEG", quality=quality, optimize=True)
+        # If still too large, reduce quality further
+        while buf.tell() > MAX_IMAGE_BYTES * 0.75 and quality > 20:
+            quality -= 15
+            buf = io.BytesIO()
+            rgb.save(buf, format="JPEG", quality=quality, optimize=True)
+        result = base64.b64encode(buf.getvalue()).decode("utf-8")
+        logger.info(f"Image compressed: {len(b64_data)//1024}KB -> {len(result)//1024}KB (q={quality})")
+        return result
+    except Exception as e:
+        logger.warning(f"Image compression failed: {e}, storing original (truncated)")
+        return b64_data[:MAX_IMAGE_BYTES] if len(b64_data) > MAX_IMAGE_BYTES else b64_data
+
 
 # ---------------------------------------------------------------------------
 # Language detection
@@ -276,7 +312,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
     """
     image_thumbnail = None
     if image_base64:
-        image_thumbnail = image_base64[:50000] if len(image_base64) > 50000 else image_base64
+        image_thumbnail = _compress_image(image_base64)
 
     # 1. Store user message
     user_msg = {

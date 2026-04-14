@@ -398,11 +398,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
       return (
         <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm p-3 max-w-[85%] shadow-sm text-sm">
           {msg.has_image && msg.image_data && (
-            <div className="mb-2">
+            <div className="mb-2 -mx-1 -mt-1">
               <img 
-                src={`data:image/jpeg;base64,${msg.image_data}`}
+                src={msg.image_data.startsWith("data:") ? msg.image_data : `data:image/jpeg;base64,${msg.image_data}`}
                 alt="Attached"
-                className="rounded-lg max-w-full max-h-48 object-cover border border-blue-400"
+                className="rounded-lg w-full max-h-60 object-contain bg-black/10"
               />
             </div>
           )}
