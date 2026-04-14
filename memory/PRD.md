@@ -94,9 +94,13 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ### April 14, 2026 - Production Dashboard Data Fix (COMPLETED)
 
 **BUG FIX - Form submissions from child equipment not appearing on Production Dashboard:**
-- **Root Cause**: The dashboard query only included Line-90 and its ancestors (parent plant, grandparent installation) in the equipment filter. Submissions assigned to child equipment units (EXU - Extrusion Unit, STU - Straining Unit, etc.) were excluded because their equipment_ids weren't in the query.
-- **Fix**: Extended equipment query to include all descendants (children + grandchildren) of Line-90, not just ancestors. Now submissions from any level of the Line-90 hierarchy appear on the dashboard.
-- **Edit visibility**: Edits to production log entries were always persisting correctly (PATCH endpoint works), but if the submission's equipment wasn't in the query, the edited data wouldn't appear on re-fetch. This is now resolved by the same fix.
+- **Root Cause**: Dashboard query only included Line-90 + ancestors (parent plant, grandparent installation). Submissions assigned to child equipment (EXU - Extrusion Unit, etc.) were excluded.
+- **Fix**: Extended equipment query to include all descendants (children + grandchildren) of Line-90.
+- Files: `/app/backend/routes/production.py`
+
+**BUG FIX - Production Log edits not persisting for multi-word fields:**
+- **Root Cause**: The PATCH endpoint's field matching compared `"co2 feed/p"` (frontend label, lowercased) against `"co2_feed/p"` (DB label). Space vs underscore mismatch caused `CO2 Feed/P` and `T Product IR` fields to silently fail to update.
+- **Fix**: Added space/underscore normalization to PATCH matching logic — both the sent key and the DB label are normalized before comparison.
 - Files: `/app/backend/routes/production.py`
 
 ### April 14, 2026 - Chat System V2 Rewrite (COMPLETED)

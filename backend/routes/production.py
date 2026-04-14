@@ -472,7 +472,6 @@ async def update_production_submission(
     current_user: dict = Depends(get_current_user),
 ):
     """Update field values on a production form submission."""
-    # data.values is a dict of {field_label: new_value}
     updates = data.get("values", {})
     if not updates:
         return {"error": "No values provided"}
@@ -481,23 +480,38 @@ async def update_production_submission(
     if not sub:
         return {"error": "Submission not found"}
 
-    # Update matching fields in the values array (case-insensitive label matching)
+    # Update matching fields in the values array (case-insensitive, space/underscore normalized)
     updates_lower = {k.lower(): v for k, v in updates.items()}
+    # Also create underscore-normalized keys for matching multi-word fields
+    updates_normalized = {k.replace(" ", "_"): v for k, v in updates_lower.items()}
     new_values = []
+    matched_count = 0
     for v in sub.get("values", []):
         label = v.get("field_label", "")
         fid = v.get("field_id", "")
         label_lower = label.lower()
         fid_lower = fid.lower()
+        # Also normalize underscores for comparison
+        label_norm = label_lower.replace(" ", "_")
+        fid_norm = fid_lower.replace(" ", "_")
         matched_key = None
         for k in updates_lower:
-            if k == label_lower or k == fid_lower:
+            k_norm = k.replace(" ", "_")
+            if k == label_lower or k == fid_lower or k_norm == label_norm or k_norm == fid_norm:
                 matched_key = k
                 break
         if matched_key is not None:
-            new_values.append({**v, "value": str(updates_lower[matched_key])})
+            old_val = v.get("value")
+            new_val = str(updates_lower[matched_key])
+            if old_val != new_val:
+                logger.info(f"PATCH {submission_id[:15]}: '{label}' {old_val} -> {new_val}")
+            new_values.append({**v, "value": new_val})
+            matched_count += 1
         else:
             new_values.append(v)
+
+    if matched_count == 0:
+        logger.warning(f"PATCH {submission_id[:15]}: NO fields matched! sent={list(updates.keys())}, db={[v.get('field_label','') for v in sub.get('values',[])]}")
 
     await db.form_submissions.update_one(
         {"id": submission_id},
