@@ -499,6 +499,23 @@ export default function DashboardPage({ initialTab }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(initialTab || "operational");
   
+  // Redirect to operational tab on mobile if viewing hidden tabs
+  useEffect(() => {
+    const handleResize = () => {
+      // sm breakpoint is 640px
+      if (window.innerWidth < 640 && (activeTab === "reliability" || activeTab === "production")) {
+        setActiveTab("operational");
+      }
+    };
+    
+    // Check on mount
+    handleResize();
+    
+    // Listen for resize
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [activeTab]);
+  
   // Filter states
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
@@ -777,7 +794,7 @@ export default function DashboardPage({ initialTab }) {
             </button>
             <button 
               onClick={() => setActiveTab("reliability")}
-              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+              className={`hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
               data-testid="reliability-tab"
             >
               <Activity className="w-4 h-4 flex-shrink-0" />
@@ -786,7 +803,7 @@ export default function DashboardPage({ initialTab }) {
             </button>
             <button 
               onClick={() => setActiveTab("production")}
-              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "production" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+              className={`hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "production" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
               data-testid="production-tab"
             >
               <Gauge className="w-4 h-4 flex-shrink-0" />
