@@ -91,23 +91,25 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ### April 14, 2026 - Bug Fixes (COMPLETED)
 
-**BUG FIX - Double Equipment Prompt in AI Chat (Phase 1 - Tag Matching):**
-- **Root Cause**: When user clicked on equipment with a specific tag that wasn't in the current suggestions list, the name-only matching would incorrectly match to a different equipment with the same name but different tag
-- **Fix**: If user input contains a tag, skip name-only/partial matching. Added exact tag lookup in database.
-- Files: `/app/backend/chat_handler_v2.py`
+### April 14, 2026 - Chat System V2 Rewrite (COMPLETED)
 
-**BUG FIX - Double Equipment Prompt Race Condition (Phase 2 - State Sync):**
-- **Root Cause**: When user clicks an equipment suggestion rapidly, the frontend fires `POST /api/chat/send` before the backend finishes persisting the previous assistant message. `routes/chat.py` finds `active_state=None`, triggers the OpenAI intent classifier, and loops back asking for equipment again. This wasted LLM credits and frustrated users.
-- **Fix**:
-  1. `routes/chat.py` already detects `"Name (TAG)"` format via regex and forces `is_in_flow=True` — now also passes `forced_state=AWAITING_EQUIPMENT` to the handler when no prior assistant state exists in DB
-  2. `chat_handler_v2.py` accepts `forced_state` parameter; if provided and DB state is `INITIAL`, overrides to the forced state
-  3. The existing direct DB tag lookup (line ~320) then executes correctly, finding the equipment by exact tag without needing the previous suggestions list
-- Files: `/app/backend/routes/chat.py`, `/app/backend/chat_handler_v2.py`
+**REWRITE - Chat Backend with Single Source of Truth State Machine:**
+- **Problem**: Chat state was split between `chat_conversations` (for AWAITING_CONTEXT) and `chat_messages` (for AWAITING_EQUIPMENT/FAILURE_MODE). When either source was stale, bugs appeared: double equipment prompts, context messages treated as new searches, race conditions on fast clicks.
+- **Solution**: Complete rewrite of `routes/chat.py` (778→380 lines) and `chat_handler_v2.py` (894→430 lines):
+  1. **Single source of truth**: All conversation state lives in `chat_conversations` collection (one document per user)
+  2. **Atomic state writes**: State written to `chat_conversations` BEFORE response returns — eliminates race conditions
+  3. **Pure business logic**: `chat_handler_v2.py` receives state as parameters, returns new state — no DB state queries
+  4. **Shared core**: `_core_chat_process()` function shared by both text and voice endpoints (voice-send no longer has separate weaker observation logic)
+  5. **Migration fallback**: If `chat_conversations` is empty but `chat_messages` has state (old system), auto-migrates on first read
+  6. **Race-condition guard**: Equipment format regex detection + direct tag lookup still works when state is stale
+- **Testing**: 16 tests, 10 passed, 6 skipped (N/A), 0 failed. All 8 critical flows verified.
+- **Files rewritten**: `/app/backend/routes/chat.py`, `/app/backend/chat_handler_v2.py`
+- **Files created**: `/app/backend/tests/test_chat_system_v2.py`
 
-**BUG FIX - Context Message Treated as New Search (Phase 3 - AWAITING_CONTEXT Fallback):**
-- **Root Cause**: After an observation is created, the system sets `chat_state=AWAITING_CONTEXT`. But the primary check uses `chat_conversations` collection which can be empty/stale. When this check fails, `AWAITING_CONTEXT` was NOT in the `is_in_flow` list, so the intent classifier fired on context messages. The `process_chat_message` state machine had no handler for `AWAITING_CONTEXT`, causing it to fall through to the INITIAL handler which treated the message as a new equipment search.
-- **Fix**: Added a fallback check in `routes/chat.py` that reads `awaiting_context` state from `chat_messages` collection (always populated). If found, handles context saving inline (same logic as the primary `chat_conversations` path: saves user_context to threat, clears state, returns confirmation). Covers both "skip" and context-providing flows.
-- Files: `/app/backend/routes/chat.py`
+**Previous bug fixes (now superseded by rewrite):**
+- Double Equipment Prompt (Phase 1 - Tag Matching)
+- Double Equipment Prompt Race Condition (Phase 2 - State Sync / forced_state)
+- Context Message Treated as New Search (Phase 3 - AWAITING_CONTEXT Fallback)
 
 **FEATURE - Auto-Skip Context Prompt:**
 - Added 60-second countdown timer for "add context" prompt after observation creation
