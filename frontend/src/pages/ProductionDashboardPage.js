@@ -1338,20 +1338,16 @@ export default function ProductionDashboardPage() {
                       }
                     });
 
-                    try {
-                      // Run both updates in parallel
-                      const promises = [
-                        productionAPI.updateSubmission(editEntry.submission_id, values),
-                      ];
-                      if (editEntry._viscosity_submission_id && editEntry.viscosity !== "") {
-                        promises.push(productionAPI.updateSubmission(editEntry._viscosity_submission_id, { Measurement: editEntry.viscosity }));
-                      }
-                      await Promise.all(promises);
+                    const refresh = () => {
                       queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
                       setEditEntry(null);
                       toast.success("Entry updated");
-                    } catch {
-                      toast.error("Failed to update entry");
+                    };
+
+                    productionAPI.updateSubmission(editEntry.submission_id, values).then(refresh).catch(() => toast.error("Failed to update extruder entry"));
+
+                    if (editEntry._viscosity_submission_id && editEntry.viscosity !== "") {
+                      productionAPI.updateSubmission(editEntry._viscosity_submission_id, { Measurement: editEntry.viscosity }).then(refresh).catch(() => toast.error("Failed to update viscosity"));
                     }
                   }}
                   data-testid="save-edit-btn"
