@@ -54,11 +54,13 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   const [detectedLanguage, setDetectedLanguage] = useState(null);
   const [manualLanguage, setManualLanguage] = useState(null);
   const [showLangPicker, setShowLangPicker] = useState(false);
+  const [autoSkipCountdown, setAutoSkipCountdown] = useState(null); // Countdown timer for auto-skip
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const recordingTimerRef = useRef(null);
   const newFailureModeInputRef = useRef(null);
+  const autoSkipTimerRef = useRef(null);
   const queryClient = useQueryClient();
 
   // Pre-fill message when equipment is provided
@@ -80,11 +82,62 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     enabled: isOpen,
   });
 
+  // Auto-skip context prompt after 60 seconds
+  useEffect(() => {
+    // Check if the latest assistant message is awaiting context
+    const lastAssistantMsg = messages.filter(m => m.role === "assistant").pop();
+    const isAwaitingContext = lastAssistantMsg?.chat_state === "awaiting_context" || lastAssistantMsg?.awaiting_context_for_threat;
+    
+    if (isAwaitingContext && isOpen && !isSending) {
+      // Start 60-second countdown
+      setAutoSkipCountdown(60);
+      
+      autoSkipTimerRef.current = setInterval(() => {
+        setAutoSkipCountdown(prev => {
+          if (prev <= 1) {
+            // Time's up - auto-skip by calling API directly
+            clearInterval(autoSkipTimerRef.current);
+            setIsSending(true);
+            chatAPI.sendMessage("skip", null, manualLanguage)
+              .then(() => {
+                queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+                queryClient.invalidateQueries({ queryKey: ["threats"] });
+                queryClient.invalidateQueries({ queryKey: ["stats"] });
+              })
+              .finally(() => {
+                setIsSending(false);
+                setAutoSkipCountdown(null);
+              });
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      return () => {
+        if (autoSkipTimerRef.current) {
+          clearInterval(autoSkipTimerRef.current);
+        }
+      };
+    } else {
+      // Clear countdown if not in awaiting context state
+      setAutoSkipCountdown(null);
+      if (autoSkipTimerRef.current) {
+        clearInterval(autoSkipTimerRef.current);
+      }
+    }
+  }, [messages, isOpen, isSending, manualLanguage, queryClient]);
+
   // Send message mutation
   const sendMutation = useMutation({
     mutationFn: ({ content, image }) => chatAPI.sendMessage(content, image, manualLanguage),
     onMutate: () => {
       setIsSending(true);
+      // Clear auto-skip timer when user sends any message
+      if (autoSkipTimerRef.current) {
+        clearInterval(autoSkipTimerRef.current);
+      }
+      setAutoSkipCountdown(null);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
@@ -411,7 +464,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                 <p className="text-xs text-slate-600 mb-2">
                   Would you like to add more details? (temperature, conditions, photos) — add your comments in the chat below ↓
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isSending}
@@ -422,13 +475,24 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                     Add Photo
                   </button>
                   <button
-                    onClick={() => sendMutation.mutate({ content: "skip", image: null })}
+                    onClick={() => {
+                      if (autoSkipTimerRef.current) {
+                        clearInterval(autoSkipTimerRef.current);
+                      }
+                      setAutoSkipCountdown(null);
+                      sendMutation.mutate({ content: "skip", image: null });
+                    }}
                     disabled={isSending}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-500 rounded-lg hover:bg-slate-100 transition-colors text-xs font-medium disabled:opacity-50"
                     data-testid="skip-context-btn"
                   >
-                    Skip
+                    Skip {autoSkipCountdown && `(${autoSkipCountdown}s)`}
                   </button>
+                  {autoSkipCountdown && (
+                    <span className="text-xs text-slate-400 ml-1">
+                      Auto-skip in {autoSkipCountdown}s
+                    </span>
+                  )}
                 </div>
               </div>
             )}
