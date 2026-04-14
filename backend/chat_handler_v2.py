@@ -247,10 +247,16 @@ async def process_chat_message(
     message_content: str,
     failure_modes_library: List[Dict],
     session_id: str,
-    image_base64: str = None
+    image_base64: str = None,
+    forced_state: str = None
 ) -> Dict[str, Any]:
     """
     Main chat processing function with clean 2-step flow.
+    
+    Args:
+        forced_state: If provided, overrides DB-based state lookup. Used to handle
+                      race conditions where the previous assistant message hasn't been
+                      persisted yet but we can infer the correct state from the message format.
     
     Returns:
     {
@@ -269,6 +275,11 @@ async def process_chat_message(
     current_state = conv_state.get("state", ChatState.INITIAL)
     pending_data = conv_state.get("pending_data", {})
     original_message = conv_state.get("original_message", message_content)
+    
+    # Override state if forced (race condition handling)
+    if forced_state and current_state == ChatState.INITIAL:
+        logger.info(f"Overriding DB state '{current_state}' with forced_state '{forced_state}' (race condition bypass)")
+        current_state = forced_state
     
     # ============================================
     # HANDLE CANCEL from any state

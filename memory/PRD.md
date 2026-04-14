@@ -91,13 +91,18 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ### April 14, 2026 - Bug Fixes (COMPLETED)
 
-**BUG FIX - Double Equipment Prompt in AI Chat:**
-- **Root Cause**: When user clicked on equipment with a specific tag (e.g., "Temperature Sensor (1TX-3003-0143)") that wasn't in the current suggestions list, the name-only matching would incorrectly match to a different equipment with the same name but different tag
-- **Fix**: 
-  1. If user input contains a tag, skip name-only and partial matching (which could match wrong equipment)
-  2. Added exact tag lookup in database when user provides specific tag not in suggestions
-  3. Now correctly finds equipment by exact tag match instead of re-prompting
+**BUG FIX - Double Equipment Prompt in AI Chat (Phase 1 - Tag Matching):**
+- **Root Cause**: When user clicked on equipment with a specific tag that wasn't in the current suggestions list, the name-only matching would incorrectly match to a different equipment with the same name but different tag
+- **Fix**: If user input contains a tag, skip name-only/partial matching. Added exact tag lookup in database.
 - Files: `/app/backend/chat_handler_v2.py`
+
+**BUG FIX - Double Equipment Prompt Race Condition (Phase 2 - State Sync):**
+- **Root Cause**: When user clicks an equipment suggestion rapidly, the frontend fires `POST /api/chat/send` before the backend finishes persisting the previous assistant message. `routes/chat.py` finds `active_state=None`, triggers the OpenAI intent classifier, and loops back asking for equipment again. This wasted LLM credits and frustrated users.
+- **Fix**:
+  1. `routes/chat.py` already detects `"Name (TAG)"` format via regex and forces `is_in_flow=True` — now also passes `forced_state=AWAITING_EQUIPMENT` to the handler when no prior assistant state exists in DB
+  2. `chat_handler_v2.py` accepts `forced_state` parameter; if provided and DB state is `INITIAL`, overrides to the forced state
+  3. The existing direct DB tag lookup (line ~320) then executes correctly, finding the equipment by exact tag without needing the previous suggestions list
+- Files: `/app/backend/routes/chat.py`, `/app/backend/chat_handler_v2.py`
 
 **FEATURE - Auto-Skip Context Prompt:**
 - Added 60-second countdown timer for "add context" prompt after observation creation

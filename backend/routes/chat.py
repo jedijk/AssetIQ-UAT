@@ -247,13 +247,17 @@ async def send_chat_message(
     # Fetch latest failure modes from database
     failure_modes_library = await get_failure_modes_from_db()
     
+    # Pass forced_state when we detected equipment format but DB state was stale (race condition)
+    forced = ChatState.AWAITING_EQUIPMENT if (looks_like_equipment_selection and not conv_state_check) else None
+    
     result = await process_chat_message(
         db=db,
         user_id=user_id,
         message_content=message.content,
         failure_modes_library=failure_modes_library,
         session_id=session_id,
-        image_base64=message.image_base64
+        image_base64=message.image_base64,
+        forced_state=forced
     )
     
     # Store assistant response
