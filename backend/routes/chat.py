@@ -88,7 +88,8 @@ async def send_chat_message(
         "image_data": image_thumbnail,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.chat_messages.insert_one(chat_msg)
+    result = await db.chat_messages.insert_one(chat_msg)
+    logger.info(f"User message stored: id={chat_msg['id']}, inserted_id={result.inserted_id}, db={get_current_db_name()}")
     
     # Check if user is in AWAITING_CONTEXT state (after observation was created)
     conversation_state = await db.chat_conversations.find_one({"user_id": user_id})
@@ -472,7 +473,8 @@ async def send_chat_message(
         )
     
     # No observation created - store the regular response
-    await db.chat_messages.insert_one(ai_response)
+    result = await db.chat_messages.insert_one(ai_response)
+    logger.info(f"Assistant message stored: id={ai_response['id']}, state={ai_response.get('chat_state')}, inserted_id={result.inserted_id}, db={get_current_db_name()}")
     
     # Return follow-up question response
     return ChatResponse(
