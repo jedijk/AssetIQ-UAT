@@ -1337,13 +1337,21 @@ export default function ProductionDashboardPage() {
                         values[fieldLabel] = editEntry[k];
                       }
                     });
-                    updateSubmissionMutation.mutate({ id: editEntry.submission_id, values });
 
-                    // Update viscosity submission if it exists and value changed
-                    if (editEntry._viscosity_submission_id && editEntry.viscosity !== "") {
-                      try {
-                        await productionAPI.updateSubmission(editEntry._viscosity_submission_id, { Measurement: editEntry.viscosity });
-                      } catch {}
+                    try {
+                      // Run both updates in parallel
+                      const promises = [
+                        productionAPI.updateSubmission(editEntry.submission_id, values),
+                      ];
+                      if (editEntry._viscosity_submission_id && editEntry.viscosity !== "") {
+                        promises.push(productionAPI.updateSubmission(editEntry._viscosity_submission_id, { Measurement: editEntry.viscosity }));
+                      }
+                      await Promise.all(promises);
+                      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+                      setEditEntry(null);
+                      toast.success("Entry updated");
+                    } catch {
+                      toast.error("Failed to update entry");
                     }
                   }}
                   data-testid="save-edit-btn"
