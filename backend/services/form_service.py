@@ -180,6 +180,7 @@ class FormService:
             
             # Create new version with all data from existing + updates
             new_doc = {
+                "id": str(uuid.uuid4()),
                 "name": data.get("name", existing["name"]),
                 "description": data.get("description", existing.get("description")),
                 "discipline": data.get("discipline", existing.get("discipline")),
