@@ -206,12 +206,12 @@ const OPTIONAL_SERIES = [
 ];
 
 const ChartSeriesToggles = ({ active, onToggle }) => (
-  <div className="flex items-center gap-1.5 flex-wrap" data-testid="chart-toggles">
+  <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap" data-testid="chart-toggles">
     {OPTIONAL_SERIES.map((s) => (
       <button
         key={s.key}
         onClick={() => onToggle(s.key)}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+        className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border transition-colors ${
           active[s.key]
             ? "border-transparent text-white"
             : "border-slate-200 text-slate-500 bg-white hover:bg-slate-50"
@@ -220,7 +220,8 @@ const ChartSeriesToggles = ({ active, onToggle }) => (
         data-testid={`toggle-${s.key}`}
       >
         <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active[s.key] ? "#fff" : s.color }} />
-        {s.label}
+        <span className="hidden sm:inline">{s.label}</span>
+        <span className="sm:hidden">{s.label.length > 4 ? s.label.substring(0, 4) : s.label}</span>
       </button>
     ))}
   </div>
@@ -697,13 +698,13 @@ export default function ProductionDashboardPage() {
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Period quick filters */}
-            <div className="inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5" data-testid="period-selector">
+            {/* Period quick filters - stack on small mobile */}
+            <div className="inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5 flex-wrap sm:flex-nowrap" data-testid="period-selector">
               {PERIOD_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
                   onClick={() => handlePeriod(opt.key)}
-                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-2 sm:px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     period === opt.key
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-500 hover:text-slate-700"
@@ -738,9 +739,9 @@ export default function ProductionDashboardPage() {
               </div>
             )}
 
-            {/* Shift selector */}
+            {/* Shift selector - hide label on mobile */}
             <Select value={shift} onValueChange={setShift}>
-              <SelectTrigger className="w-[180px] h-8 text-sm bg-white" data-testid="shift-selector">
+              <SelectTrigger className="w-[140px] sm:w-[180px] h-8 text-xs sm:text-sm bg-white" data-testid="shift-selector">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -754,14 +755,14 @@ export default function ProductionDashboardPage() {
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
 
-            {/* Date display */}
-            <span className="text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-3 h-8 flex items-center tabular-nums whitespace-nowrap" data-testid="date-display">
+            {/* Date display - shorter on mobile */}
+            <span className="text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2 sm:px-3 h-8 flex items-center tabular-nums whitespace-nowrap" data-testid="date-display">
               {fromStr === toStr ? displayDate(fromDate) : `${displayDate(fromDate)} — ${displayDate(toDate)}`}
             </span>
 
-            {/* Export */}
+            {/* Export - icon only on mobile */}
             <Button variant="outline" size="sm" className="h-8 gap-1" onClick={exportToExcel} disabled={!data?.production_log?.length} data-testid="export-btn">
-              <Download className="w-3.5 h-3.5" /> Export
+              <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Export</span>
             </Button>
           </div>
 
@@ -867,25 +868,25 @@ export default function ProductionDashboardPage() {
           </div>
 
           {/* ── Mooney Viscosity Chart (full width) ── */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="viscosity-chart">
+          <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="viscosity-chart">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
               <h3 className="text-sm font-semibold text-slate-700">Mooney Viscosity</h3>
               <ChartSeriesToggles active={chartSeries} onToggle={(k) => setChartSeries(prev => ({ ...prev, [k]: !prev[k] }))} />
             </div>
             {combinedSeries.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
                 <ComposedChart data={combinedSeries} onClick={(e) => {
                   if (e?.activeLabel) setSelectedTime((prev) => prev === e.activeLabel ? null : e.activeLabel);
                 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <ReferenceArea yAxisId="left" y1={50} y2={60} fill="#22c55e" fillOpacity={0.1} />
-                  <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="#94a3b8" domain={[48, 62]} label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 11 }} />
+                  <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" interval="preserveStartEnd" />
+                  <YAxis yAxisId="left" tick={{ fontSize: 10 }} stroke="#94a3b8" domain={[48, 62]} label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 10 }} />
                   {(chartSeries.rpm || chartSeries.feed || chartSeries.mp4 || chartSeries.t_product_ir) && (
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="#94a3b8" />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} stroke="#94a3b8" />
                   )}
                   <Tooltip content={<ViscosityTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
                   <Line yAxisId="left" type="monotone" dataKey="viscosity" name="Viscosity (MU)" stroke="#8b5cf6" strokeWidth={2.5} dot={(props) => {
                     const isSelected = props.payload?.time === selectedTime;
                     return <circle cx={props.cx} cy={props.cy} r={isSelected ? 7 : 4} fill={isSelected ? "#7c3aed" : "#8b5cf6"} stroke={isSelected ? "#fff" : "none"} strokeWidth={isSelected ? 2 : 0} style={{ cursor: "pointer" }} />;
@@ -899,16 +900,16 @@ export default function ProductionDashboardPage() {
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[300px] text-sm text-slate-400">
+              <div className="flex items-center justify-center h-[250px] sm:h-[300px] text-sm text-slate-400">
                 No viscosity data for this period
               </div>
             )}
           </div>
 
           {/* ── Waste & Downtime + Actions + Insights Row ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {/* Waste & Downtime */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="waste-chart">
+            <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="waste-chart">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-slate-700">Waste & Downtime</h3>
                 <DropdownMenu>
@@ -944,7 +945,7 @@ export default function ProductionDashboardPage() {
             </div>
 
             {/* Input Material / Big Bag Loading */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="big-bag-panel">
+            <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="big-bag-panel">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-slate-700">Input Material</h3>
                 <div className="flex items-center gap-2">
@@ -1024,7 +1025,7 @@ export default function ProductionDashboardPage() {
             </div>
 
             {/* Daily Insights */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="insights-panel">
+            <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="insights-panel">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-slate-700">Insights</h3>
                 <div className="flex items-center gap-2">
@@ -1055,24 +1056,24 @@ export default function ProductionDashboardPage() {
           </div>
 
           {/* ── Production Log Table ── */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4" data-testid="production-log">
+          <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="production-log">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
               <h3 className="text-sm font-semibold text-slate-700">Production Log</h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <Input
                     placeholder="Search..."
                     value={logSearch}
                     onChange={(e) => setLogSearch(e.target.value)}
-                    className="pl-8 h-8 w-44 text-sm"
+                    className="pl-8 h-8 w-32 sm:w-44 text-sm"
                     data-testid="log-search"
                   />
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" data-testid="log-add-btn">
-                      <Plus className="w-3 h-3" /> Add
+                      <Plus className="w-3 h-3" /> <span className="hidden xs:inline">Add</span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">

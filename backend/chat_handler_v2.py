@@ -297,6 +297,14 @@ async def process_chat_message(
     if current_state == ChatState.AWAITING_EQUIPMENT:
         prev_suggestions = conv_state.get("equipment_suggestions") or []
         
+        # Log the suggestions for debugging
+        if prev_suggestions:
+            logger.info(f"AWAITING_EQUIPMENT: Found {len(prev_suggestions)} previous suggestions")
+            for i, eq in enumerate(prev_suggestions[:3]):
+                logger.info(f"  Suggestion {i}: name='{eq.get('name')}' tag='{eq.get('tag')}'")
+        else:
+            logger.warning(f"AWAITING_EQUIPMENT: NO previous suggestions found! conv_state keys={list(conv_state.keys())}")
+        
         # Check if user selected one of the suggested equipment
         message_normalized = normalize_text(message_content)
         # Also handle "NAME (TAG)" format from frontend
@@ -304,6 +312,8 @@ async def process_chat_message(
         message_without_tag_normalized = normalize_text(message_without_tag)
         # Check if user input contains a tag (parentheses at end)
         user_input_has_tag = bool(re.search(r'\([^)]+\)\s*$', message_content))
+        
+        logger.info(f"Equipment matching: message='{message_content}', normalized='{message_normalized}', has_tag={user_input_has_tag}, suggestions={len(prev_suggestions)}")
         
         selected_equipment = None
         
@@ -321,6 +331,10 @@ async def process_chat_message(
                 selected_equipment = eq
                 logger.info(f"Equipment TAG matched: {eq_name} ({eq_tag}) from message: {message_content}")
                 break
+            else:
+                # Debug: Log first few comparisons
+                if prev_suggestions.index(eq) < 3:
+                    logger.debug(f"No TAG match: '{eq_with_tag_normalized}' != '{message_normalized}'")
         
         # Second pass: Name-only exact match (only if no tag match AND user input has no tag)
         # IMPORTANT: Skip this if user provided a specific tag - they want that exact equipment
