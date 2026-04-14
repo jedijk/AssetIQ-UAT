@@ -469,12 +469,21 @@ async def update_production_submission(
     if not sub:
         return {"error": "Submission not found"}
 
-    # Update matching fields in the values array
+    # Update matching fields in the values array (case-insensitive label matching)
+    updates_lower = {k.lower(): v for k, v in updates.items()}
     new_values = []
     for v in sub.get("values", []):
         label = v.get("field_label", "")
-        if label in updates:
-            new_values.append({**v, "value": str(updates[label])})
+        fid = v.get("field_id", "")
+        label_lower = label.lower()
+        fid_lower = fid.lower()
+        matched_key = None
+        for k in updates_lower:
+            if k == label_lower or k == fid_lower:
+                matched_key = k
+                break
+        if matched_key is not None:
+            new_values.append({**v, "value": str(updates_lower[matched_key])})
         else:
             new_values.append(v)
 
