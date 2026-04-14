@@ -111,6 +111,10 @@ async def send_chat_message(
                 "user_id": user_id,
                 "role": "assistant",
                 "content": "Got it! Your observation has been saved. What else would you like to report?",
+                "chat_state": ChatState.INITIAL,
+                "pending_data": {},
+                "equipment_suggestions": None,
+                "failure_mode_suggestions": None,
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
             await db.chat_messages.insert_one(skip_response)
@@ -167,6 +171,10 @@ async def send_chat_message(
                 "role": "assistant",
                 "content": confirmation,
                 "context_added_to_threat": threat_id,
+                "chat_state": ChatState.INITIAL,
+                "pending_data": {},
+                "equipment_suggestions": None,
+                "failure_mode_suggestions": None,
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
             await db.chat_messages.insert_one(context_added_response)
@@ -204,6 +212,7 @@ async def send_chat_message(
                 "role": "assistant",
                 "content": answer,
                 "is_data_query": True,
+                "chat_state": ChatState.INITIAL,
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
             await db.chat_messages.insert_one(ai_response)
@@ -519,6 +528,10 @@ async def cancel_chat_flow(
         "user_id": user_id,
         "role": "assistant",
         "content": "Cancelled. What would you like to report?",
+        "chat_state": ChatState.INITIAL,
+        "pending_data": {},
+        "equipment_suggestions": None,
+        "failure_mode_suggestions": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.chat_messages.insert_one(cancel_msg)
