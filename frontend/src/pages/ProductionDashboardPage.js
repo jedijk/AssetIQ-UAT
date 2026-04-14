@@ -40,6 +40,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import {
@@ -450,6 +460,9 @@ export default function ProductionDashboardPage() {
 
   // Edit log entry state
   const [editEntry, setEditEntry] = useState(null);
+
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { type, ids[], label }
 
   // Mutation for updating a submission
   const updateSubmissionMutation = useMutation({
@@ -1026,8 +1039,8 @@ export default function ProductionDashboardPage() {
                               </button>
                               <button
                                 onClick={() => {
-                                  if (bag.submission_id && confirm("Delete this entry?")) {
-                                    deleteSubmissionMutation.mutate(bag.submission_id);
+                                  if (bag.submission_id) {
+                                    setDeleteConfirm({ ids: [bag.submission_id], label: `big bag entry (${bag.material || bag.lot_no || "item"})` });
                                   }
                                 }}
                                 className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
@@ -1191,13 +1204,11 @@ export default function ProductionDashboardPage() {
                             </button>
                             <button
                               onClick={() => {
-                                if (!confirm("Delete this entry?")) return;
                                 if (isViscOnly) {
-                                  if (entry._viscosity_submission_id) deleteSubmissionMutation.mutate(entry._viscosity_submission_id);
+                                  setDeleteConfirm({ ids: [entry._viscosity_submission_id].filter(Boolean), label: `viscosity sample at ${entry.time}` });
                                 } else {
-                                  if (entry.submission_id) deleteSubmissionMutation.mutate(entry.submission_id);
-                                  const vId = viscosityByTime[entry.time]?.submission_id;
-                                  if (vId) deleteSubmissionMutation.mutate(vId);
+                                  const ids = [entry.submission_id, viscosityByTime[entry.time]?.submission_id].filter(Boolean);
+                                  setDeleteConfirm({ ids, label: `log entry at ${entry.time}` });
                                 }
                               }}
                               className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
@@ -1498,6 +1509,31 @@ export default function ProductionDashboardPage() {
         equipmentId={formExec?.equipmentId || ""}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ["production-dashboard"] })}
       />
+
+      {/* ── Delete Confirmation Dialog ── */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open) setDeleteConfirm(null); }}>
+        <AlertDialogContent data-testid="delete-confirm-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete entry</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the {deleteConfirm?.label || "entry"}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="delete-cancel-btn">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              data-testid="delete-confirm-btn"
+              onClick={() => {
+                (deleteConfirm?.ids || []).forEach((id) => deleteSubmissionMutation.mutate(id));
+                setDeleteConfirm(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
