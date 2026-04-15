@@ -436,7 +436,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
     try {
       const blob = await equipmentHierarchyAPI.downloadEquipmentFile(file.id);
       const url = window.URL.createObjectURL(blob);
-      setPreviewFile({ url, filename: file.filename, contentType: file.content_type });
+      setPreviewFile({ url, filename: file.filename, contentType: file.content_type, fileId: file.id });
     } catch { toast.error("Could not load file"); }
   };
 
@@ -544,7 +544,11 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
                 {files.map((f) => {
                   const isImage = f.content_type?.startsWith("image/");
                   const isPdf = f.content_type?.includes("pdf");
-                  const FIcon = isImage ? ImageIcon : isPdf ? FileText : FileIcon;
+                  const isOffice = f.content_type?.includes("presentation") || f.content_type?.includes("powerpoint") || f.content_type?.includes("ppt")
+                    || f.content_type?.includes("spreadsheet") || f.content_type?.includes("excel") || f.content_type?.includes("xls")
+                    || f.content_type?.includes("msword") || f.content_type?.includes("wordprocessing") || f.content_type?.includes("doc");
+                  const FIcon = isImage ? ImageIcon : (isPdf || isOffice) ? FileText : FileIcon;
+                  const canView = isImage || isPdf || isOffice;
                   return (
                     <div key={f.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 group" data-testid={`detail-file-${f.id}`}>
                       <FIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
@@ -553,7 +557,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
                         <p className="text-[10px] text-slate-400">{formatFileSize(f.size)} &middot; {f.uploaded_by_name}</p>
                       </div>
                       <div className="flex items-center gap-0.5">
-                        {(isImage || isPdf) && (
+                        {canView && (
                           <button onClick={() => handleView(f)} className="p-1.5 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors" title="View" data-testid={`view-file-${f.id}`}>
                             <Eye className="w-3.5 h-3.5" />
                           </button>
@@ -599,6 +603,15 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
               <img src={previewFile.url} alt={previewFile.filename} className="max-w-full max-h-[70vh] object-contain rounded-lg" />
             ) : previewFile.contentType?.includes("pdf") ? (
               <iframe src={previewFile.url} title={previewFile.filename} className="w-full rounded-lg border" style={{ height: "70vh" }} />
+            ) : (previewFile.contentType?.includes("presentation") || previewFile.contentType?.includes("powerpoint") || previewFile.contentType?.includes("ppt")
+              || previewFile.contentType?.includes("spreadsheet") || previewFile.contentType?.includes("excel")
+              || previewFile.contentType?.includes("msword") || previewFile.contentType?.includes("wordprocessing")) ? (
+              <iframe
+                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(window.location.origin + "/api/equipment-files/" + previewFile.fileId + "/view")}`}
+                title={previewFile.filename}
+                className="w-full rounded-lg border"
+                style={{ height: "70vh" }}
+              />
             ) : (
               <p className="text-sm text-slate-500 py-8">Preview not available for this file type</p>
             )}

@@ -77,6 +77,25 @@ async def download_equipment_file(file_id: str, current_user: dict = Depends(get
     )
 
 
+@router.get("/equipment-files/{file_id}/view")
+async def view_equipment_file_public(file_id: str):
+    """Public endpoint for Office Online viewer — no auth required."""
+    doc = await db.equipment_files.find_one({"id": file_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    from fastapi.responses import Response
+    content = base64.b64decode(doc["data"])
+    return Response(
+        content=content,
+        media_type=doc.get("content_type", "application/octet-stream"),
+        headers={
+            "Content-Disposition": f'inline; filename="{doc["filename"]}"',
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
 @router.delete("/equipment-files/{file_id}")
 async def delete_equipment_file(file_id: str, current_user: dict = Depends(get_current_user)):
     result = await db.equipment_files.delete_one({"id": file_id})

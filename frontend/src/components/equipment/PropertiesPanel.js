@@ -162,7 +162,23 @@ const CriticalityDimension = ({ label, color, value, onClick, dimension }) => {
 function getFileIcon(contentType) {
   if (contentType?.startsWith("image/")) return Image;
   if (contentType?.includes("pdf")) return FileText;
+  if (contentType?.includes("presentation") || contentType?.includes("powerpoint") || contentType?.includes("ppt")) return FileText;
   return FileIcon;
+}
+
+function canPreviewFile(contentType) {
+  if (!contentType) return false;
+  if (contentType.startsWith("image/")) return true;
+  if (contentType.includes("pdf")) return true;
+  if (contentType.includes("presentation") || contentType.includes("powerpoint") || contentType.includes("ppt")) return true;
+  return false;
+}
+
+function isOfficeFile(contentType) {
+  if (!contentType) return false;
+  return contentType.includes("presentation") || contentType.includes("powerpoint") || contentType.includes("ppt")
+    || contentType.includes("spreadsheet") || contentType.includes("excel") || contentType.includes("xls")
+    || contentType.includes("msword") || contentType.includes("wordprocessing") || contentType.includes("doc");
 }
 
 function formatFileSize(bytes) {
@@ -218,7 +234,7 @@ function EquipmentFiles({ equipmentId }) {
     try {
       const blob = await equipmentHierarchyAPI.downloadEquipmentFile(file.id);
       const url = window.URL.createObjectURL(blob);
-      setPreviewFile({ url, filename: file.filename, contentType: file.content_type });
+      setPreviewFile({ url, filename: file.filename, contentType: file.content_type, fileId: file.id });
     } catch {
       toast.error("Could not load file");
     }
@@ -266,7 +282,7 @@ function EquipmentFiles({ equipmentId }) {
         <div className="space-y-1">
           {files.map((f) => {
             const FIcon = getFileIcon(f.content_type);
-            const canPreview = f.content_type?.startsWith("image/") || f.content_type?.includes("pdf");
+            const canView = canPreviewFile(f.content_type);
             return (
               <div
                 key={f.id}
@@ -278,7 +294,7 @@ function EquipmentFiles({ equipmentId }) {
                   <p className="text-xs text-slate-700 truncate">{f.filename}</p>
                   <p className="text-[10px] text-slate-400">{formatFileSize(f.size)}</p>
                 </div>
-                {canPreview && (
+                {canView && (
                   <button
                     className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all"
                     onClick={() => handleView(f)}
@@ -327,6 +343,13 @@ function EquipmentFiles({ equipmentId }) {
               <img src={previewFile.url} alt={previewFile.filename} className="max-w-full max-h-[70vh] object-contain rounded-lg" />
             ) : previewFile.contentType?.includes("pdf") ? (
               <iframe src={previewFile.url} title={previewFile.filename} className="w-full rounded-lg border" style={{ height: "70vh" }} />
+            ) : isOfficeFile(previewFile.contentType) ? (
+              <iframe
+                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(window.location.origin + "/api/equipment-files/" + previewFile.fileId + "/view")}`}
+                title={previewFile.filename}
+                className="w-full rounded-lg border"
+                style={{ height: "70vh" }}
+              />
             ) : (
               <p className="text-sm text-slate-500 py-8">Preview not available</p>
             )}
