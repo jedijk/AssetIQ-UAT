@@ -14,6 +14,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { toast } from "sonner";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "../ui/command";
 import { QRCodeDialog } from "./QRCodeDialog";
@@ -173,6 +174,7 @@ function formatFileSize(bytes) {
 function EquipmentFiles({ equipmentId }) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
+  const [previewFile, setPreviewFile] = useState(null);
 
   const { data } = useQuery({
     queryKey: ["equipment-files", equipmentId],
@@ -212,10 +214,21 @@ function EquipmentFiles({ equipmentId }) {
     }
   };
 
+  const handleView = async (file) => {
+    try {
+      const blob = await equipmentHierarchyAPI.downloadEquipmentFile(file.id);
+      const url = window.URL.createObjectURL(blob);
+      setPreviewFile({ url, filename: file.filename, contentType: file.content_type });
+    } catch {
+      toast.error("Could not load file");
+    }
+  };
+
   const files = data?.files || [];
   const Icon = Paperclip;
 
   return (
+    <>
     <div className="pt-4 border-t border-slate-200">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
@@ -253,6 +266,7 @@ function EquipmentFiles({ equipmentId }) {
         <div className="space-y-1">
           {files.map((f) => {
             const FIcon = getFileIcon(f.content_type);
+            const canPreview = f.content_type?.startsWith("image/") || f.content_type?.includes("pdf");
             return (
               <div
                 key={f.id}
@@ -264,6 +278,16 @@ function EquipmentFiles({ equipmentId }) {
                   <p className="text-xs text-slate-700 truncate">{f.filename}</p>
                   <p className="text-[10px] text-slate-400">{formatFileSize(f.size)}</p>
                 </div>
+                {canPreview && (
+                  <button
+                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all"
+                    onClick={() => handleView(f)}
+                    title="View"
+                    data-testid={`view-file-${f.id}`}
+                  >
+                    <Eye className="w-3 h-3" />
+                  </button>
+                )}
                 <button
                   className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
                   onClick={() => handleDownload(f.id, f.filename)}
@@ -286,6 +310,31 @@ function EquipmentFiles({ equipmentId }) {
         </div>
       )}
     </div>
+
+    {previewFile && (
+      <Dialog open={!!previewFile} onOpenChange={() => { if (previewFile?.url) window.URL.revokeObjectURL(previewFile.url); setPreviewFile(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-hidden" data-testid="file-preview-dialog">
+          <DialogHeader className="p-4 pb-2">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-sm truncate pr-4">{previewFile.filename}</DialogTitle>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs flex-shrink-0" onClick={() => { const a = document.createElement("a"); a.href = previewFile.url; a.download = previewFile.filename; a.click(); }}>
+                <Download className="w-3.5 h-3.5 mr-1" />Download
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="px-4 pb-4 flex items-center justify-center overflow-auto" style={{ maxHeight: "calc(90vh - 80px)" }}>
+            {previewFile.contentType?.startsWith("image/") ? (
+              <img src={previewFile.url} alt={previewFile.filename} className="max-w-full max-h-[70vh] object-contain rounded-lg" />
+            ) : previewFile.contentType?.includes("pdf") ? (
+              <iframe src={previewFile.url} title={previewFile.filename} className="w-full rounded-lg border" style={{ height: "70vh" }} />
+            ) : (
+              <p className="text-sm text-slate-500 py-8">Preview not available</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
+    </>
   );
 }
 
