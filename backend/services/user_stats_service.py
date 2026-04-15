@@ -294,42 +294,54 @@ class UserStatsService:
             return None
 
         results = []
+        user_ids = [u["id"] for u in all_users if u.get("id")]
+
+        # Batch: aggregate counts and latest dates per user from all collections at once
+        async def agg_by_user(collection, user_field="created_by", date_field="created_at"):
+            pipe = [
+                {"$match": {user_field: {"$in": user_ids}}},
+                {"$group": {"_id": f"${user_field}", "count": {"$sum": 1}, "latest": {"$max": f"${date_field}"}}}
+            ]
+            out = {}
+            async for d in self.db[collection].aggregate(pipe):
+                out[d["_id"]] = {"count": d["count"], "latest": d.get("latest")}
+            return out
+
+        threats_m = await agg_by_user("threats")
+        actions_m = await agg_by_user("actions")
+        ca_m = await agg_by_user("central_actions")
+        forms_m = await agg_by_user("form_submissions", "submitted_by", "submitted_at")
+
         for user in all_users:
             uid = user.get("id")
             if not uid:
                 continue
             
-            # Count business activity across all relevant collections
-            threats_count = await self.db.threats.count_documents({"created_by": uid})
-            actions_count = await self.db.actions.count_documents({"created_by": uid})
-            central_actions_count = await self.db.central_actions.count_documents({"created_by": uid})
-            form_count = await self.db.form_submissions.count_documents({"submitted_by": uid})
-            total_actions = threats_count + actions_count + central_actions_count + form_count
+            t = threats_m.get(uid, {})
+            a = actions_m.get(uid, {})
+            ca = ca_m.get(uid, {})
+            f = forms_m.get(uid, {})
+            total_actions = t.get("count", 0) + a.get("count", 0) + ca.get("count", 0) + f.get("count", 0)
 
-            # Determine most used module from business data
-            biz_modules = []
-            if threats_count:
-                biz_modules.append(("Observations", threats_count))
-            if actions_count + central_actions_count:
-                biz_modules.append(("Actions", actions_count + central_actions_count))
-            if form_count:
-                biz_modules.append(("Forms", form_count))
-
-            # Find last active from business data
+            # Find last active across all sources
             last_active = None
-            for col, field in [("threats", "created_at"), ("actions", "created_at"), ("central_actions", "created_at"), ("form_submissions", "submitted_at")]:
-                doc = await self.db[col].find_one({"created_by": uid} if col != "form_submissions" else {"submitted_by": uid}, {"_id": 0, field: 1}, sort=[(field, -1)])
-                if doc:
-                    dt = parse_dt(doc.get(field))
-                    if dt and (not last_active or dt > last_active):
-                        last_active = dt
-            
-            # Merge with tracked event data
+            for dt_val in [t.get("latest"), a.get("latest"), ca.get("latest"), f.get("latest")]:
+                dt = parse_dt(dt_val)
+                if dt and (not last_active or dt > last_active):
+                    last_active = dt
+
             tracked = tracked_users.get(uid, {})
-            sessions = tracked.get("sessions", 0)
             tracked_last = parse_dt(tracked.get("last_active"))
             if tracked_last and (not last_active or tracked_last > last_active):
                 last_active = tracked_last
+
+            biz_modules = []
+            if t.get("count"):
+                biz_modules.append(("Observations", t["count"]))
+            if a.get("count", 0) + ca.get("count", 0):
+                biz_modules.append(("Actions", a.get("count", 0) + ca.get("count", 0)))
+            if f.get("count"):
+                biz_modules.append(("Forms", f["count"]))
 
             most_used = tracked.get("most_used_module")
             if not most_used and biz_modules:
@@ -343,7 +355,7 @@ class UserStatsService:
                 "email": user.get("email", ""),
                 "role": user.get("role", "user"),
                 "last_active": last_active.isoformat() if last_active else None,
-                "sessions": sessions,
+                "sessions": tracked.get("sessions", 0),
                 "actions": total_actions,
                 "most_used_module": most_used,
             })
