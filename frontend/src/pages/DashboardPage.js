@@ -1031,7 +1031,7 @@ export default function DashboardPage({ initialTab }) {
               {topObservations.map((obs, index) => (
                 <div 
                   key={obs.id} 
-                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors flex-wrap sm:flex-nowrap"
                   onClick={() => navigate(`/threats/${obs.id}`, { state: navState })}
                   data-testid={`top-obs-${obs.id}`}
                 >
@@ -1059,20 +1059,28 @@ export default function DashboardPage({ initialTab }) {
                   
                   {/* Title and Asset */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-slate-700 truncate">{obs.title}</p>
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-[10px] text-slate-400 truncate">{obs.asset || obs.equipment_name || "-"}</p>
+                    <p className="text-xs font-medium text-slate-700 truncate">
+                      {obs.title?.includes(" - ") ? obs.title.split(" - ")[0] : obs.title}
+                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {obs.title?.includes(" - ") && (
+                        <span className="text-[10px] text-slate-500 truncate">{obs.title.split(" - ").slice(1).join(" - ")}</span>
+                      )}
                       {obs.equipment_tag && (
                         <span className="text-[9px] font-mono text-slate-400">{obs.equipment_tag}</span>
-                      )}
-                      {obs.discipline && (
-                        <span className="text-[9px] px-1 py-0 rounded bg-slate-100 text-slate-500">{obs.discipline}</span>
                       )}
                     </div>
                   </div>
                   
-                  {/* RPN Badge - Fixed width for alignment */}
-                  <div className="w-16 flex-shrink-0 text-right">
+                  {/* Risk Score - First on mobile */}
+                  <div className="w-8 flex-shrink-0 text-right order-first sm:order-none">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold tabular-nums inline-block" title="Risk Score">
+                      {typeof obs.risk_score === 'number' ? Math.round(obs.risk_score) : obs.risk_score || 0}
+                    </span>
+                  </div>
+
+                  {/* RPN Badge */}
+                  <div className="w-16 flex-shrink-0 text-right hidden sm:block">
                     {obs.fmea_rpn ? (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium inline-block" title="Risk Priority Number">
                         RPN: {obs.fmea_rpn}
@@ -1080,13 +1088,6 @@ export default function DashboardPage({ initialTab }) {
                     ) : (
                       <span className="text-[10px] text-slate-300">—</span>
                     )}
-                  </div>
-                  
-                  {/* Risk Score - Fixed width for alignment */}
-                  <div className="w-8 flex-shrink-0 text-right">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold tabular-nums inline-block" title="Risk Score">
-                      {typeof obs.risk_score === 'number' ? Math.round(obs.risk_score) : obs.risk_score || 0}
-                    </span>
                   </div>
                   
                   {/* Status Badge - Fixed width for alignment */}
