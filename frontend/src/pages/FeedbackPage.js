@@ -220,7 +220,7 @@ const FeedbackPage = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["my-feedback"]);
+      queryClient.invalidateQueries({ queryKey: ["my-feedback"] });
       toast.success(t("feedback.submitted") || "Feedback submitted successfully");
       resetForm();
       setIsModalOpen(false);
@@ -265,7 +265,7 @@ const FeedbackPage = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["my-feedback"]);
+      queryClient.invalidateQueries({ queryKey: ["my-feedback"] });
       toast.success(t("feedback.updated") || "Feedback updated successfully");
       resetForm();
       setIsModalOpen(false);
@@ -283,7 +283,7 @@ const FeedbackPage = () => {
   const deleteMutation = useMutation({
     mutationFn: (id) => feedbackAPI.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["my-feedback"]);
+      queryClient.invalidateQueries({ queryKey: ["my-feedback"] });
       toast.success(t("feedback.deleted") || "Feedback deleted");
       setDeleteConfirmId(null);
       setIsSheetOpen(false);
@@ -298,7 +298,7 @@ const FeedbackPage = () => {
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }) => feedbackAPI.update(id, { status }),
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["my-feedback"]);
+      queryClient.invalidateQueries({ queryKey: ["my-feedback"] });
       setSelectedFeedback(data);
       toast.success(t("feedback.statusUpdated") || "Status updated");
     },
@@ -311,7 +311,7 @@ const FeedbackPage = () => {
   const bulkUpdateStatusMutation = useMutation({
     mutationFn: ({ feedbackIds, status }) => feedbackAPI.bulkUpdateStatus(feedbackIds, status),
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["my-feedback"]);
+      queryClient.invalidateQueries({ queryKey: ["my-feedback"] });
       toast.success(t("feedback.bulkStatusUpdated")?.replace("{count}", data.updated_count) || `Updated ${data.updated_count} items`);
       cancelSelection();
     },

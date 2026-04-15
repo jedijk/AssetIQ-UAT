@@ -258,7 +258,7 @@ const FailureModesPage = () => {
   const createTypeMutation = useMutation({ 
     mutationFn: equipmentHierarchyAPI.createEquipmentType, 
     onSuccess: () => { 
-      queryClient.invalidateQueries(["equipment-types"]); 
+      queryClient.invalidateQueries({ queryKey: ["equipment-types"] }); 
       toast.success("Equipment type created"); 
       setIsTypeDialogOpen(false); 
       resetTypeForm(); 
@@ -269,7 +269,7 @@ const FailureModesPage = () => {
   const updateTypeMutation = useMutation({ 
     mutationFn: ({ typeId, data }) => equipmentHierarchyAPI.updateEquipmentType(typeId, data), 
     onSuccess: () => { 
-      queryClient.invalidateQueries(["equipment-types"]); 
+      queryClient.invalidateQueries({ queryKey: ["equipment-types"] }); 
       toast.success("Equipment type updated"); 
       setIsTypeDialogOpen(false); 
       setEditingType(null); 
@@ -281,7 +281,7 @@ const FailureModesPage = () => {
   const deleteTypeMutation = useMutation({ 
     mutationFn: equipmentHierarchyAPI.deleteEquipmentType, 
     onSuccess: () => { 
-      queryClient.invalidateQueries(["equipment-types"]); 
+      queryClient.invalidateQueries({ queryKey: ["equipment-types"] }); 
       toast.success("Equipment type deleted"); 
     }, 
     onError: e => toast.error(getErrorMessage(e, "Failed")) 
@@ -291,7 +291,7 @@ const FailureModesPage = () => {
   const createFmMutation = useMutation({
     mutationFn: failureModesAPI.create,
     onSuccess: () => {
-      queryClient.invalidateQueries(["failureModes"]);
+      queryClient.invalidateQueries({ queryKey: ["failureModes"] });
       toast.success("Failure mode created");
       setIsFmDialogOpen(false);
       resetFmForm();
@@ -319,7 +319,7 @@ const FailureModesPage = () => {
               recommended_actions: oldData.recommended_actions || [],
               equipment_type_ids: oldData.equipment_type_ids || []
             });
-            queryClient.invalidateQueries(["failureModes"]);
+            queryClient.invalidateQueries({ queryKey: ["failureModes"] });
           },
         });
       }
@@ -327,7 +327,7 @@ const FailureModesPage = () => {
       if (selectedFm && selectedFm.id === id && result) {
         setSelectedFm(result);
       }
-      queryClient.invalidateQueries(["failureModes"]);
+      queryClient.invalidateQueries({ queryKey: ["failureModes"] });
       toast.success(`Failure mode updated (v${result?.version || '?'})`);
       setIsFmDialogOpen(false);
       setEditingFm(null);
@@ -361,11 +361,11 @@ const FailureModesPage = () => {
               recommended_actions: deletedFm.recommended_actions || [],
               equipment_type_ids: deletedFm.equipment_type_ids || []
             });
-            queryClient.invalidateQueries(["failureModes"]);
+            queryClient.invalidateQueries({ queryKey: ["failureModes"] });
           },
         });
       }
-      queryClient.invalidateQueries(["failureModes"]);
+      queryClient.invalidateQueries({ queryKey: ["failureModes"] });
       toast.success("Failure mode deleted");
     },
     onError: e => toast.error(getErrorMessage(e, "Cannot delete built-in failure modes"))
@@ -376,7 +376,7 @@ const FailureModesPage = () => {
     mutationFn: ({ id, validatorName, validatorPosition, validatorId }) => 
       failureModesAPI.validate(id, validatorName, validatorPosition, validatorId),
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["failureModes"]);
+      queryClient.invalidateQueries({ queryKey: ["failureModes"] });
       // Update selected FM if it matches
       if (selectedFm && selectedFm.id === data.id) {
         setSelectedFm(data);
@@ -389,7 +389,7 @@ const FailureModesPage = () => {
   const unvalidateFmMutation = useMutation({
     mutationFn: (id) => failureModesAPI.unvalidate(id),
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["failureModes"]);
+      queryClient.invalidateQueries({ queryKey: ["failureModes"] });
       // Update selected FM if it matches
       if (selectedFm && selectedFm.id === data.id) {
         setSelectedFm(data);
@@ -427,7 +427,7 @@ const FailureModesPage = () => {
   const rollbackMutation = useMutation({
     mutationFn: ({ fmId, versionId }) => failureModesAPI.rollback(fmId, versionId),
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["failureModes"]);
+      queryClient.invalidateQueries({ queryKey: ["failureModes"] });
       if (selectedFm && selectedFm.id === data.id) {
         setSelectedFm(data);
       }

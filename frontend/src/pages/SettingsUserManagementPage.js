@@ -222,8 +222,8 @@ const SettingsUserManagementPage = () => {
   const approvalMutation = useMutation({
     mutationFn: rbacAPI.approveUser,
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries(["rbac-users"]);
-      queryClient.invalidateQueries(["pending-users"]);
+      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+      queryClient.invalidateQueries({ queryKey: ["pending-users"] });
       const action = variables.action === "approve" ? "approved" : "rejected";
       toast.success(`User ${action} successfully`);
       setApprovalDialogUser(null);
@@ -239,7 +239,7 @@ const SettingsUserManagementPage = () => {
   const updateInstallationsMutation = useMutation({
     mutationFn: ({ userId, installations }) => usersAPI.updateInstallations(userId, installations),
     onSuccess: () => {
-      queryClient.invalidateQueries(["rbac-users"]);
+      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
       toast.success("Installations updated successfully");
       setInstallationDialogUser(null);
       setSelectedInstallations([]);
@@ -253,7 +253,7 @@ const SettingsUserManagementPage = () => {
   const updateRoleMutation = useMutation({
     mutationFn: rbacAPI.updateUserRole,
     onSuccess: () => {
-      queryClient.invalidateQueries(["rbac-users"]);
+      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
       toast.success("Role updated successfully");
       setChangeRoleUser(null);
     },
@@ -263,7 +263,7 @@ const SettingsUserManagementPage = () => {
   const updateStatusMutation = useMutation({
     mutationFn: rbacAPI.updateUserStatus,
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["rbac-users"]);
+      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
       toast.success(data.is_active ? "User activated" : "User deactivated");
     },
     onError: () => toast.error("Failed to update status")
@@ -272,7 +272,7 @@ const SettingsUserManagementPage = () => {
   const updateProfileMutation = useMutation({
     mutationFn: rbacAPI.updateUserProfile,
     onSuccess: () => {
-      queryClient.invalidateQueries(["rbac-users"]);
+      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
       toast.success("Profile updated successfully");
       setEditingUser(null);
     },
@@ -282,7 +282,7 @@ const SettingsUserManagementPage = () => {
   const uploadAvatarMutation = useMutation({
     mutationFn: rbacAPI.uploadUserAvatar,
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries(["rbac-users"]);
+      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
       toast.success(t("userManagement.photoUploaded") || "Photo uploaded successfully");
       setEditingUserId(null);
       // Refresh avatar URL
@@ -297,7 +297,7 @@ const SettingsUserManagementPage = () => {
   const deleteUserMutation = useMutation({
     mutationFn: rbacAPI.deleteUser,
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["rbac-users"]);
+      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
       toast.success(`User "${data.deleted_user_name}" deleted successfully`);
       setDeleteConfirmUser(null);
     },
@@ -332,7 +332,7 @@ const SettingsUserManagementPage = () => {
   const createUserMutation = useMutation({
     mutationFn: rbacAPI.createUser,
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["rbac-users"]);
+      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
       const emailMsg = data.email_sent ? " Welcome email sent." : "";
       toast.success(`User "${data.user.name}" created successfully.${emailMsg}`);
       setShowCreateUser(false);

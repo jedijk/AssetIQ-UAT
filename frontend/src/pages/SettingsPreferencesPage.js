@@ -117,7 +117,7 @@ export default function SettingsPreferencesPage() {
   const updateMutation = useMutation({
     mutationFn: preferencesAPI.updatePreferences,
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["user-preferences"]);
+      queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
       // Update cached preferences for date formatting across the app
       updateCachedPreferences(data);
       toast.success("Preferences saved successfully");

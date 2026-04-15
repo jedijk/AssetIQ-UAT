@@ -254,7 +254,7 @@ const Layout = () => {
       }
 
       // Refresh user data
-      queryClient.invalidateQueries(["user"]);
+      queryClient.invalidateQueries({ queryKey: ["user"] });
       toast.success(t("profile.updateSuccess") || "Profile updated successfully");
       setProfileDialogOpen(false);
     } catch (error) {

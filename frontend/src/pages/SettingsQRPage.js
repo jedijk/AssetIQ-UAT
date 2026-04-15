@@ -98,7 +98,7 @@ export default function SettingsQRPage() {
     mutationFn: ({ qrId, permanent }) => qrCodeAPI.delete(qrId, permanent),
     onSuccess: (data, variables) => {
       toast.success(variables.permanent ? "QR code permanently deleted" : "QR code deactivated");
-      queryClient.invalidateQueries(["qr-codes-list"]);
+      queryClient.invalidateQueries({ queryKey: ["qr-codes-list"] });
     },
     onError: () => {
       toast.error("Failed to delete QR code");

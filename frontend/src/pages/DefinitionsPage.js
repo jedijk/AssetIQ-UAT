@@ -460,20 +460,20 @@ export default function DefinitionsPage() {
     mutationFn: definitionsAPI.saveDefinitions,
     onSuccess: (data) => {
       // Invalidate definitions queries
-      queryClient.invalidateQueries(["definitions", selectedInstallation]);
-      queryClient.invalidateQueries(["definitions-installations"]);
+      queryClient.invalidateQueries({ queryKey: ["definitions", selectedInstallation] });
+      queryClient.invalidateQueries({ queryKey: ["definitions-installations"] });
       
       // Invalidate threat-related queries to reflect updated FMEA data
-      queryClient.invalidateQueries(["threats"]);
-      queryClient.invalidateQueries(["threat"]);
-      queryClient.invalidateQueries(["observations"]);
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["threat"] });
+      queryClient.invalidateQueries({ queryKey: ["observations"] });
       
       // Invalidate chat queries to ensure chat uses latest definitions
-      queryClient.invalidateQueries(["chat"]);
+      queryClient.invalidateQueries({ queryKey: ["chat"] });
       
       // Invalidate dashboard and stats
-      queryClient.invalidateQueries(["dashboard"]);
-      queryClient.invalidateQueries(["stats"]);
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
       
       const threatsUpdated = data?.threats_updated || 0;
       if (threatsUpdated > 0) {
@@ -490,16 +490,16 @@ export default function DefinitionsPage() {
     mutationFn: definitionsAPI.resetDefinitions,
     onSuccess: () => {
       // Invalidate definitions queries
-      queryClient.invalidateQueries(["definitions", selectedInstallation]);
-      queryClient.invalidateQueries(["definitions-installations"]);
+      queryClient.invalidateQueries({ queryKey: ["definitions", selectedInstallation] });
+      queryClient.invalidateQueries({ queryKey: ["definitions-installations"] });
       
       // Invalidate threat-related queries
-      queryClient.invalidateQueries(["threats"]);
-      queryClient.invalidateQueries(["threat"]);
-      queryClient.invalidateQueries(["observations"]);
-      queryClient.invalidateQueries(["chat"]);
-      queryClient.invalidateQueries(["dashboard"]);
-      queryClient.invalidateQueries(["stats"]);
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["threat"] });
+      queryClient.invalidateQueries({ queryKey: ["observations"] });
+      queryClient.invalidateQueries({ queryKey: ["chat"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
       
       toast.success("Definitions reset to defaults");
       setShowResetConfirm(false);

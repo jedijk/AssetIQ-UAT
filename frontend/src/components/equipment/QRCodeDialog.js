@@ -88,7 +88,7 @@ export function QRCodeDialog({ open, onOpenChange, equipment, existingQR = null 
     onSuccess: (data) => {
       setQrData(data);
       toast.success("QR Code generated successfully!");
-      queryClient.invalidateQueries(["qr-codes"]);
+      queryClient.invalidateQueries({ queryKey: ["qr-codes"] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.detail || "Failed to generate QR code");
@@ -101,7 +101,7 @@ export function QRCodeDialog({ open, onOpenChange, equipment, existingQR = null 
     onSuccess: (data) => {
       setQrData(data);
       toast.success("QR Code updated!");
-      queryClient.invalidateQueries(["qr-codes"]);
+      queryClient.invalidateQueries({ queryKey: ["qr-codes"] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.detail || "Failed to update QR code");
@@ -431,7 +431,7 @@ export function BulkQRDialog({ open, onOpenChange, selectedItems = [] }) {
     onSuccess: (data) => {
       setResults(data);
       toast.success(`Generated ${data.created} QR codes!`);
-      queryClient.invalidateQueries(["qr-codes"]);
+      queryClient.invalidateQueries({ queryKey: ["qr-codes"] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.detail || "Failed to generate QR codes");

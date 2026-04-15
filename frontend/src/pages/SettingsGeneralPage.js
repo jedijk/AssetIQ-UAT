@@ -102,7 +102,7 @@ export default function SettingsGeneralPage() {
       setLanguage(preferences.language);
       setHasChanges(false);
       toast.success("Preferences saved successfully!");
-      queryClient.invalidateQueries(["user"]);
+      queryClient.invalidateQueries({ queryKey: ["user"] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.detail || "Failed to save preferences");

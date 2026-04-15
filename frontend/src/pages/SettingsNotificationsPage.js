@@ -96,7 +96,7 @@ export default function SettingsNotificationsPage() {
       }));
       setHasChanges(false);
       toast.success("Notification settings saved!");
-      queryClient.invalidateQueries(["user"]);
+      queryClient.invalidateQueries({ queryKey: ["user"] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.detail || "Failed to save settings");
