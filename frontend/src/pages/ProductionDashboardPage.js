@@ -262,10 +262,12 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
       setFields(f);
       // Set defaults
       const defaults = {};
+      const now = new Date();
+      const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
       f.forEach((field) => {
         const ft = field.type || field.field_type || "text";
-        if (ft === "datetime") defaults[field.id] = new Date().toISOString().slice(0, 16);
-        else if (ft === "date") defaults[field.id] = new Date().toISOString().slice(0, 10);
+        if (ft === "datetime") defaults[field.id] = localISO.slice(0, 16);
+        else if (ft === "date") defaults[field.id] = localISO.slice(0, 10);
         else defaults[field.id] = "";
         // Collect dropdown options
         if (ft === "dropdown" && field.options) {
