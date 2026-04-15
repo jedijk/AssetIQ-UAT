@@ -445,7 +445,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
   return (
     <>
     <Dialog open={open && !previewFile} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto" data-testid="equipment-details-dialog">
+      <DialogContent className="w-[95vw] max-w-sm sm:max-w-md max-h-[85vh] overflow-y-auto p-4 sm:p-6" data-testid="equipment-details-dialog">
         <DialogHeader className="pb-2">
           <div className="flex items-start gap-3">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -589,20 +589,20 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
     {/* File Preview Dialog */}
     {previewFile && (
       <Dialog open={!!previewFile} onOpenChange={() => { if (previewFile?.url) window.URL.revokeObjectURL(previewFile.url); setPreviewFile(null); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-hidden" data-testid="file-preview-dialog">
-          <DialogHeader className="p-4 pb-2">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-sm truncate pr-4">{previewFile.filename}</DialogTitle>
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] p-0 overflow-hidden" data-testid="file-preview-dialog">
+          <DialogHeader className="p-3 sm:p-4 pb-2">
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle className="text-xs sm:text-sm truncate">{previewFile.filename}</DialogTitle>
               <Button variant="ghost" size="sm" className="h-7 px-2 text-xs flex-shrink-0" onClick={() => { const a = document.createElement("a"); a.href = previewFile.url; a.download = previewFile.filename; a.click(); }}>
                 <Download className="w-3.5 h-3.5 mr-1" />Download
               </Button>
             </div>
           </DialogHeader>
-          <div className="px-4 pb-4 flex items-center justify-center overflow-auto" style={{ maxHeight: "calc(90vh - 80px)" }}>
+          <div className="px-3 sm:px-4 pb-3 sm:pb-4 overflow-auto touch-pan-x touch-pan-y" style={{ maxHeight: "calc(90vh - 70px)", WebkitOverflowScrolling: "touch" }}>
             {previewFile.contentType?.startsWith("image/") ? (
-              <img src={previewFile.url} alt={previewFile.filename} className="max-w-full max-h-[70vh] object-contain rounded-lg" />
+              <img src={previewFile.url} alt={previewFile.filename} className="max-w-full object-contain rounded-lg" style={{ touchAction: "pinch-zoom", maxHeight: "75vh" }} />
             ) : previewFile.contentType?.includes("pdf") ? (
-              <iframe src={previewFile.url} title={previewFile.filename} className="w-full rounded-lg border" style={{ height: "70vh" }} />
+              <iframe src={previewFile.url} title={previewFile.filename} className="w-full rounded-lg border" style={{ height: "75vh", minHeight: "300px" }} />
             ) : (previewFile.contentType?.includes("presentation") || previewFile.contentType?.includes("powerpoint") || previewFile.contentType?.includes("ppt")
               || previewFile.contentType?.includes("spreadsheet") || previewFile.contentType?.includes("excel")
               || previewFile.contentType?.includes("msword") || previewFile.contentType?.includes("wordprocessing")) ? (
@@ -610,7 +610,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
                 src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(window.location.origin + "/api/equipment-files/" + previewFile.fileId + "/view")}`}
                 title={previewFile.filename}
                 className="w-full rounded-lg border"
-                style={{ height: "70vh" }}
+                style={{ height: "75vh", minHeight: "300px" }}
               />
             ) : (
               <p className="text-sm text-slate-500 py-8">Preview not available for this file type</p>
