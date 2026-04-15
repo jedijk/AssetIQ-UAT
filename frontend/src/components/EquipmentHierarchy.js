@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
+import { toast } from "sonner";
 import { 
   ChevronRight, 
   ChevronDown,
@@ -23,12 +24,20 @@ import {
   Leaf,
   Star,
   Filter,
-  Search
+  Search,
+  Paperclip,
+  Upload,
+  Download,
+  FileText,
+  Image as ImageIcon,
+  File as FileIcon,
+  Eye,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 
 // ISO 14224 Level Configuration
 const ISO_LEVEL_CONFIG = {
@@ -151,7 +160,6 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0 });
   const [showDetails, setShowDetails] = useState(false);
   const contextMenuRef = useRef(null);
-  const detailsRef = useRef(null);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -159,11 +167,8 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
         setContextMenu({ show: false, x: 0, y: 0 });
       }
-      if (detailsRef.current && !detailsRef.current.contains(e.target)) {
-        setShowDetails(false);
-      }
     };
-    if (contextMenu.show || showDetails) {
+    if (contextMenu.show) {
       document.addEventListener("mousedown", handleClickOutside);
       document.addEventListener("touchstart", handleClickOutside);
       return () => {
@@ -171,7 +176,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
         document.removeEventListener("touchstart", handleClickOutside);
       };
     }
-  }, [contextMenu.show, showDetails]);
+  }, [contextMenu.show]);
 
   const handleContextMenu = (e) => {
     e.preventDefault();
@@ -360,159 +365,19 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
       )}
 
       {/* Details Popup - rendered via Portal to ensure it's on top of everything */}
-      {showDetails && createPortal(
-        <div 
-          ref={detailsRef}
-          className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 p-4 w-72"
-          style={{ 
-            left: Math.min(contextMenu.x, window.innerWidth - 300), 
-            top: Math.min(contextMenu.y, window.innerHeight - 350),
-            zIndex: 99999
-          }}
-        >
-          {/* Header */}
-          <div className="flex items-start gap-3 mb-4">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              node.criticality?.level === 'safety_critical' ? 'bg-red-100' :
-              node.criticality?.level === 'production_critical' ? 'bg-orange-100' :
-              node.criticality?.level === 'medium' ? 'bg-yellow-100' : 'bg-slate-100'
-            }`}>
-              <Icon className={`w-5 h-5 ${critColor || config.color}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-slate-900 text-sm leading-tight">{node.name}</h3>
-              <p className="text-xs text-slate-500 mt-0.5">{config.label}</p>
-            </div>
-            <button 
-              onClick={() => setShowDetails(false)}
-              className="p-1 hover:bg-slate-100 rounded"
-            >
-              <X className="w-4 h-4 text-slate-400" />
-            </button>
-          </div>
-
-          {/* Details Grid */}
-          <div className="space-y-3">
-            {/* Tag */}
-            {node.tag && (
-              <div>
-                <label className="text-xs text-slate-500 block mb-1">{t ? t("common.tag") : "Tag"}</label>
-                <Badge variant="outline" className="bg-slate-50 font-mono text-xs">{node.tag}</Badge>
-              </div>
-            )}
-
-            {/* Equipment Type */}
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">{t ? t("hierarchy.equipmentType") : "Equipment Type"}</label>
-              {getEquipmentTypeName() ? (
-                <Badge variant="outline" className="bg-slate-50">{getEquipmentTypeName()}</Badge>
-              ) : (
-                <span className="text-sm text-slate-400 italic">{t ? t("hierarchy.notAssigned") : "Not assigned"}</span>
-              )}
-            </div>
-
-            {/* Discipline */}
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">{t ? t("hierarchy.discipline") : "Discipline"}</label>
-              {getDisciplineDisplay() ? (
-                <Badge className={getDisciplineDisplay().color}>{getDisciplineDisplay().label}</Badge>
-              ) : (
-                <span className="text-sm text-slate-400 italic">{t ? t("hierarchy.notAssigned") : "Not assigned"}</span>
-              )}
-            </div>
-
-            {/* Criticality */}
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">{t ? t("hierarchy.criticality") : "Criticality"}</label>
-              {getCriticalityDetails() ? (
-                <div className="space-y-2">
-                  {/* 4-Dimension Bars */}
-                  <div className="grid grid-cols-4 gap-1 mt-2">
-                    <div className="text-center">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <Shield className="w-3.5 h-3.5 text-red-500" />
-                        <div className="flex gap-px">
-                          {[1,2,3,4,5].map(i => (
-                            <div key={i} className={`w-1.5 h-3 rounded-sm ${i <= getCriticalityDetails().safety ? 'bg-red-500' : 'bg-slate-200'}`} />
-                          ))}
-                        </div>
-                        <span className="text-[10px] text-slate-500">{getCriticalityDetails().safety}</span>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <Cog className="w-3.5 h-3.5 text-orange-500" />
-                        <div className="flex gap-px">
-                          {[1,2,3,4,5].map(i => (
-                            <div key={i} className={`w-1.5 h-3 rounded-sm ${i <= getCriticalityDetails().production ? 'bg-orange-500' : 'bg-slate-200'}`} />
-                          ))}
-                        </div>
-                        <span className="text-[10px] text-slate-500">{getCriticalityDetails().production}</span>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <Leaf className="w-3.5 h-3.5 text-green-500" />
-                        <div className="flex gap-px">
-                          {[1,2,3,4,5].map(i => (
-                            <div key={i} className={`w-1.5 h-3 rounded-sm ${i <= getCriticalityDetails().environmental ? 'bg-green-500' : 'bg-slate-200'}`} />
-                          ))}
-                        </div>
-                        <span className="text-[10px] text-slate-500">{getCriticalityDetails().environmental}</span>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <Star className="w-3.5 h-3.5 text-purple-500" />
-                        <div className="flex gap-px">
-                          {[1,2,3,4,5].map(i => (
-                            <div key={i} className={`w-1.5 h-3 rounded-sm ${i <= getCriticalityDetails().reputation ? 'bg-purple-500' : 'bg-slate-200'}`} />
-                          ))}
-                        </div>
-                        <span className="text-[10px] text-slate-500">{getCriticalityDetails().reputation}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <span className="text-sm text-slate-400 italic">{t ? t("equipment.noCriticality") : "No criticality assigned"}</span>
-              )}
-            </div>
-
-            {/* Tag if available */}
-            {node.tag && (
-              <div>
-                <label className="text-xs text-slate-500 block mb-1">{t ? t("equipment.tag") : "Tag"}</label>
-                <span className="text-sm font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{node.tag}</span>
-              </div>
-            )}
-
-            {/* Description if available */}
-            {node.description && (
-              <div>
-                <label className="text-xs text-slate-500 block mb-1">{t ? t("common.description") : "Description"}</label>
-                <p className="text-sm text-slate-600 line-clamp-2">{node.description}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Edit Button */}
-          <div className="mt-4 pt-3 border-t border-slate-200">
-            <Button 
-              size="sm" 
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setShowDetails(false);
-                onEditEquipment?.(node.id);
-              }}
-              data-testid="edit-equipment-btn"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              {t ? t("hierarchy.editInManager") : "Edit in Equipment Manager"}
-            </Button>
-          </div>
-        </div>,
-        document.body
+      {showDetails && (
+        <EquipmentDetailsDialog
+          open={showDetails}
+          onClose={() => setShowDetails(false)}
+          node={node}
+          config={config}
+          critColor={critColor}
+          t={t}
+          getCriticalityDetails={getCriticalityDetails}
+          getEquipmentTypeName={getEquipmentTypeName}
+          getDisciplineDisplay={getDisciplineDisplay}
+          onEditEquipment={onEditEquipment}
+        />
       )}
       
       {hasChildren && isOpen && (
@@ -523,6 +388,228 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     </div>
   );
 };
+
+
+// ---------------------------------------------------------------------------
+// Equipment Details Dialog (mobile-friendly)
+// ---------------------------------------------------------------------------
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, getCriticalityDetails, getEquipmentTypeName, getDisciplineDisplay, onEditEquipment }) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef(null);
+  const [previewFile, setPreviewFile] = useState(null);
+  const Icon = config.icon;
+
+  const { data: filesData } = useQuery({
+    queryKey: ["equipment-files", node.id],
+    queryFn: () => equipmentHierarchyAPI.getEquipmentFiles(node.id),
+    enabled: open && !!node.id,
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (file) => equipmentHierarchyAPI.uploadEquipmentFile(node.id, file),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-files", node.id] }); toast.success("File uploaded"); },
+    onError: (e) => toast.error(e.response?.data?.detail || "Upload failed"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (fileId) => equipmentHierarchyAPI.deleteEquipmentFile(fileId),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-files", node.id] }); toast.success("Deleted"); },
+    onError: () => toast.error("Delete failed"),
+  });
+
+  const handleDownload = async (fileId, filename) => {
+    try {
+      const blob = await equipmentHierarchyAPI.downloadEquipmentFile(fileId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+      window.URL.revokeObjectURL(url);
+    } catch { toast.error("Download failed"); }
+  };
+
+  const handleView = async (file) => {
+    try {
+      const blob = await equipmentHierarchyAPI.downloadEquipmentFile(file.id);
+      const url = window.URL.createObjectURL(blob);
+      setPreviewFile({ url, filename: file.filename, contentType: file.content_type });
+    } catch { toast.error("Could not load file"); }
+  };
+
+  const files = filesData?.files || [];
+
+  return (
+    <>
+    <Dialog open={open && !previewFile} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto" data-testid="equipment-details-dialog">
+        <DialogHeader className="pb-2">
+          <div className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              node.criticality?.level === "safety_critical" ? "bg-red-100" :
+              node.criticality?.level === "production_critical" ? "bg-orange-100" :
+              node.criticality?.level === "medium" ? "bg-yellow-100" : "bg-slate-100"
+            }`}>
+              <Icon className={`w-5 h-5 ${critColor || config.color}`} />
+            </div>
+            <div className="min-w-0">
+              <DialogTitle className="text-sm leading-tight">{node.name}</DialogTitle>
+              <p className="text-xs text-slate-500 mt-0.5">{config.label}</p>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {node.tag && (
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Tag</label>
+              <span className="text-sm font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{node.tag}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Equipment Type</label>
+            {getEquipmentTypeName() ? (
+              <Badge variant="outline" className="bg-slate-50">{getEquipmentTypeName()}</Badge>
+            ) : (
+              <span className="text-sm text-slate-400 italic">Not assigned</span>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Discipline</label>
+            {getDisciplineDisplay() ? (
+              <Badge className={getDisciplineDisplay().color}>{getDisciplineDisplay().label}</Badge>
+            ) : (
+              <span className="text-sm text-slate-400 italic">Not assigned</span>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Criticality</label>
+            {getCriticalityDetails() ? (
+              <div className="grid grid-cols-4 gap-1 mt-1">
+                {[
+                  { icon: Shield, color: "red", val: getCriticalityDetails().safety },
+                  { icon: Cog, color: "orange", val: getCriticalityDetails().production },
+                  { icon: Leaf, color: "green", val: getCriticalityDetails().environmental },
+                  { icon: Star, color: "purple", val: getCriticalityDetails().reputation },
+                ].map(({ icon: CIcon, color, val }) => (
+                  <div key={color} className="text-center flex flex-col items-center gap-0.5">
+                    <CIcon className={`w-3.5 h-3.5 text-${color}-500`} />
+                    <div className="flex gap-px">
+                      {[1,2,3,4,5].map(i => (
+                        <div key={i} className={`w-1.5 h-3 rounded-sm ${i <= val ? `bg-${color}-500` : "bg-slate-200"}`} />
+                      ))}
+                    </div>
+                    <span className="text-[10px] text-slate-500">{val}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className="text-sm text-slate-400 italic">No criticality assigned</span>
+            )}
+          </div>
+
+          {node.description && (
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Description</label>
+              <p className="text-sm text-slate-600">{node.description}</p>
+            </div>
+          )}
+
+          {/* Files Section */}
+          <div className="pt-3 border-t border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <Paperclip className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Files</span>
+                {files.length > 0 && (
+                  <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{files.length}</span>
+                )}
+              </div>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending} data-testid="upload-file-detail-btn">
+                <Upload className="w-3.5 h-3.5 mr-1" />{uploadMutation.isPending ? "..." : "Upload"}
+              </Button>
+              <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { uploadMutation.mutate(f); e.target.value = ""; } }} />
+            </div>
+
+            {files.length === 0 ? (
+              <p className="text-[11px] text-slate-400 text-center py-3">No files attached</p>
+            ) : (
+              <div className="space-y-1">
+                {files.map((f) => {
+                  const isImage = f.content_type?.startsWith("image/");
+                  const isPdf = f.content_type?.includes("pdf");
+                  const FIcon = isImage ? ImageIcon : isPdf ? FileText : FileIcon;
+                  return (
+                    <div key={f.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 group" data-testid={`detail-file-${f.id}`}>
+                      <FIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-slate-700 truncate">{f.filename}</p>
+                        <p className="text-[10px] text-slate-400">{formatFileSize(f.size)} &middot; {f.uploaded_by_name}</p>
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        {(isImage || isPdf) && (
+                          <button onClick={() => handleView(f)} className="p-1.5 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors" title="View" data-testid={`view-file-${f.id}`}>
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button onClick={() => handleDownload(f.id, f.filename)} className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title="Download" data-testid={`dl-file-${f.id}`}>
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => deleteMutation.mutate(f.id)} className="p-1.5 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors" title="Delete" data-testid={`rm-file-${f.id}`}>
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-slate-200 mt-2">
+          <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => { onClose(); onEditEquipment?.(node.id); }} data-testid="edit-equipment-btn">
+            <Settings className="w-4 h-4 mr-2" />
+            {t ? t("hierarchy.editInManager") : "Edit in Equipment Manager"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* File Preview Dialog */}
+    {previewFile && (
+      <Dialog open={!!previewFile} onOpenChange={() => { if (previewFile?.url) window.URL.revokeObjectURL(previewFile.url); setPreviewFile(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-hidden" data-testid="file-preview-dialog">
+          <DialogHeader className="p-4 pb-2">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-sm truncate pr-4">{previewFile.filename}</DialogTitle>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs flex-shrink-0" onClick={() => { const a = document.createElement("a"); a.href = previewFile.url; a.download = previewFile.filename; a.click(); }}>
+                <Download className="w-3.5 h-3.5 mr-1" />Download
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="px-4 pb-4 flex items-center justify-center overflow-auto" style={{ maxHeight: "calc(90vh - 80px)" }}>
+            {previewFile.contentType?.startsWith("image/") ? (
+              <img src={previewFile.url} alt={previewFile.filename} className="max-w-full max-h-[70vh] object-contain rounded-lg" />
+            ) : previewFile.contentType?.includes("pdf") ? (
+              <iframe src={previewFile.url} title={previewFile.filename} className="w-full rounded-lg border" style={{ height: "70vh" }} />
+            ) : (
+              <p className="text-sm text-slate-500 py-8">Preview not available for this file type</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
+    </>
+  );
+}
+
 
 // ISO Level Summary Item
 const LevelSummaryItem = ({ level, count, isActive, onClick }) => {
