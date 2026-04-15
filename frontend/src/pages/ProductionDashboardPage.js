@@ -966,14 +966,20 @@ export default function ProductionDashboardPage() {
               </div>
               {data?.waste_downtime_series?.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
-                  <ComposedChart data={data.waste_downtime_series}>
+                  <ComposedChart data={(data.waste_downtime_series || []).reduce((acc, item, i) => {
+                    const prev = i > 0 ? acc[i - 1].cumWaste : 0;
+                    acc.push({ ...item, cumWaste: prev + (parseFloat(item.waste) || 0) });
+                    return acc;
+                  }, [])}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10 }} stroke="#94a3b8" />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} stroke="#f59e0b" />
                     <Tooltip content={<ChartTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 10 }} />
-                    <Bar dataKey="waste" name="Waste (kg)" fill="#ef4444" radius={[3, 3, 0, 0]} barSize={14} />
-                    <Bar dataKey="downtime" name="Downtime" fill="#475569" radius={[3, 3, 0, 0]} barSize={14} />
+                    <Bar yAxisId="left" dataKey="waste" name="Waste (kg)" fill="#ef4444" radius={[3, 3, 0, 0]} barSize={14} />
+                    <Bar yAxisId="left" dataKey="downtime" name="Downtime" fill="#475569" radius={[3, 3, 0, 0]} barSize={14} />
+                    <Line yAxisId="right" type="monotone" dataKey="cumWaste" name="Cumulative Waste" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
