@@ -51,7 +51,7 @@ async def track_event(
     """Track a single user event."""
     
     result = await user_stats_service.track_event(
-        user_id=current_user.get("user_id"),
+        user_id=current_user.get("id"),
         user_name=current_user.get("name", "Unknown"),
         user_role=current_user.get("role", "user"),
         session_id=request.session_id,

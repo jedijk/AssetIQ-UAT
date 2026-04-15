@@ -169,7 +169,7 @@ class UserStatsService:
             {"$match": match_stage},
             {"$group": {
                 "_id": None,
-                "active_users": {"$addToSet": "$user_id"},
+                "active_users": {"$addToSet": "$user_name"},
                 "total_sessions": {"$addToSet": "$session_id"},
                 "total_views": {"$sum": {"$cond": [{"$eq": ["$event_type", "page_view"]}, 1, 0]}},
                 "total_duration": {"$sum": {"$ifNull": ["$duration", 0]}},
@@ -211,7 +211,7 @@ class UserStatsService:
             {"$group": {
                 "_id": "$module",
                 "views": {"$sum": 1},
-                "unique_users": {"$addToSet": "$user_id"},
+                "unique_users": {"$addToSet": "$user_name"},
                 "total_duration": {"$sum": {"$ifNull": ["$duration", 0]}},
                 "duration_count": {"$sum": {"$cond": [{"$gt": ["$duration", 0]}, 1, 0]}}
             }},
@@ -249,13 +249,18 @@ class UserStatsService:
         # Get all users first for name resolution
         all_users = await self.users.find({}, {"_id": 0, "id": 1, "name": 1, "email": 1, "role": 1}).to_list(200)
         
-        # Get tracked event data per user
+        # Get tracked event data per user — group by user_name since user_id may be null
+        # Build a name→user mapping for lookup
+        name_to_user = {}
+        for u in all_users:
+            name = u.get("name", "").strip().lower()
+            if name:
+                name_to_user[name] = u
+        
         pipeline = [
             {"$match": match_stage},
             {"$group": {
-                "_id": "$user_id",
-                "user_name": {"$first": "$user_name"},
-                "role": {"$first": "$user_role"},
+                "_id": "$user_name",
                 "last_active": {"$max": "$timestamp"},
                 "sessions": {"$addToSet": "$session_id"},
                 "module_counts": {"$push": "$module"}
@@ -264,17 +269,17 @@ class UserStatsService:
             {"$limit": 50}
         ]
         
-        tracked_users = {}
+        tracked_by_name = {}
         async for doc in self.events.aggregate(pipeline):
-            user_id = doc["_id"]
-            if not user_id:
+            uname = doc["_id"]
+            if not uname:
                 continue
             module_counts = {}
             for m in doc.get("module_counts", []):
                 if m:
                     module_counts[m] = module_counts.get(m, 0) + 1
             most_used = max(module_counts, key=module_counts.get) if module_counts else None
-            tracked_users[user_id] = {
+            tracked_by_name[uname.strip().lower()] = {
                 "last_active": doc.get("last_active"),
                 "sessions": len(doc.get("sessions", [])),
                 "most_used_module": most_used,
@@ -330,7 +335,7 @@ class UserStatsService:
                 if dt and (not last_active or dt > last_active):
                     last_active = dt
 
-            tracked = tracked_users.get(uid, {})
+            tracked = tracked_by_name.get((user.get("name") or "").strip().lower(), {})
             tracked_last = parse_dt(tracked.get("last_active"))
             if tracked_last and (not last_active or tracked_last > last_active):
                 last_active = tracked_last
@@ -371,7 +376,7 @@ class UserStatsService:
             {"$group": {
                 "_id": "$action",
                 "total_count": {"$sum": 1},
-                "unique_users": {"$addToSet": "$user_id"}
+                "unique_users": {"$addToSet": "$user_name"}
             }},
             {"$sort": {"total_count": -1}},
             {"$limit": 20}
@@ -395,7 +400,7 @@ class UserStatsService:
             {"$group": {
                 "_id": {"$ifNull": ["$device_type", "desktop"]},
                 "views": {"$sum": 1},
-                "unique_users": {"$addToSet": "$user_id"},
+                "unique_users": {"$addToSet": "$user_name"},
                 "sessions": {"$addToSet": "$session_id"}
             }},
             {"$sort": {"views": -1}}
@@ -453,7 +458,7 @@ class UserStatsService:
             {"$match": match_stage},
             {"$group": {
                 "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
-                "active_users": {"$addToSet": "$user_id"}
+                "active_users": {"$addToSet": "$user_name"}
             }},
             {"$sort": {"_id": 1}}
         ]
