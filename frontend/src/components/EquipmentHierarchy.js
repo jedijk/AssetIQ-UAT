@@ -589,16 +589,11 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
     {/* File Preview Dialog */}
     {previewFile && (
       <Dialog open={!!previewFile} onOpenChange={() => { if (previewFile?.url) window.URL.revokeObjectURL(previewFile.url); setPreviewFile(null); }}>
-        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] p-0 overflow-hidden" data-testid="file-preview-dialog">
-          <DialogHeader className="p-3 sm:p-4 pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <DialogTitle className="text-xs sm:text-sm truncate">{previewFile.filename}</DialogTitle>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs flex-shrink-0" onClick={() => { const a = document.createElement("a"); a.href = previewFile.url; a.download = previewFile.filename; a.click(); }}>
-                <Download className="w-3.5 h-3.5 mr-1" />Download
-              </Button>
-            </div>
+        <DialogContent className="w-[92vw] max-w-3xl max-h-[90vh] p-0 overflow-hidden" data-testid="file-preview-dialog">
+          <DialogHeader className="px-4 pt-4 pb-2">
+            <DialogTitle className="text-sm truncate pr-10">{previewFile.filename}</DialogTitle>
           </DialogHeader>
-          <div className="px-3 sm:px-4 pb-3 sm:pb-4 overflow-auto touch-pan-x touch-pan-y" style={{ maxHeight: "calc(90vh - 70px)", WebkitOverflowScrolling: "touch" }}>
+          <div className="px-4 pb-4 overflow-auto touch-pan-x touch-pan-y" style={{ maxHeight: "calc(90vh - 70px)", WebkitOverflowScrolling: "touch" }}>
             {previewFile.contentType?.startsWith("image/") ? (
               <img src={previewFile.url} alt={previewFile.filename} className="max-w-full object-contain rounded-lg" style={{ touchAction: "pinch-zoom", maxHeight: "75vh" }} />
             ) : previewFile.contentType?.includes("pdf") ? (
@@ -615,6 +610,11 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
             ) : (
               <p className="text-sm text-slate-500 py-8">Preview not available for this file type</p>
             )}
+          </div>
+          <div className="px-4 pb-3 border-t border-slate-100 pt-2">
+            <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => { const a = document.createElement("a"); a.href = previewFile.url; a.download = previewFile.filename; a.click(); }}>
+              <Download className="w-3.5 h-3.5 mr-1.5" />Download {previewFile.filename}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
