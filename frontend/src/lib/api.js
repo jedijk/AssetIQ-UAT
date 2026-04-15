@@ -480,6 +480,28 @@ export const equipmentHierarchyAPI = {
     const response = await api.get(`/equipment-hierarchy/nodes/${nodeId}/history`);
     return response.data;
   },
+
+  // Equipment files
+  getEquipmentFiles: async (equipmentId) => {
+    const response = await api.get(`/equipment/${equipmentId}/files`);
+    return response.data;
+  },
+  uploadEquipmentFile: async (equipmentId, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(`/equipment/${equipmentId}/files`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
+  downloadEquipmentFile: async (fileId) => {
+    const response = await api.get(`/equipment-files/${fileId}/download`, { responseType: "blob" });
+    return response.data;
+  },
+  deleteEquipmentFile: async (fileId) => {
+    const response = await api.delete(`/equipment-files/${fileId}`);
+    return response.data;
+  },
 };
 
 // Causal Investigation API

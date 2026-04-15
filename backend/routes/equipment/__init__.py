@@ -23,6 +23,7 @@ from .equipment_criticality import router as criticality_router
 from .equipment_utils import router as utils_router
 from .equipment_history import router as history_router
 from .equipment_import import router as import_router
+from .equipment_files import router as files_router
 
 # Include all sub-routers
 router.include_router(types_router)
@@ -32,3 +33,4 @@ router.include_router(criticality_router)
 router.include_router(utils_router)
 router.include_router(history_router)
 router.include_router(import_router)
+router.include_router(files_router)

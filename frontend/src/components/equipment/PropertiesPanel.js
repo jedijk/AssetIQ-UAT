@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
-import { failureModesAPI, qrCodeAPI } from "../../lib/api";
+import { failureModesAPI, qrCodeAPI, equipmentHierarchyAPI } from "../../lib/api";
 import {
   Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle, QrCode, Info,
+  Paperclip, Upload, Download, FileText, Image, File as FileIcon, X,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -13,6 +14,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { toast } from "sonner";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "../ui/command";
 import { QRCodeDialog } from "./QRCodeDialog";
 
@@ -154,6 +156,139 @@ const CriticalityDimension = ({ label, color, value, onClick, dimension }) => {
     </div>
   );
 };
+
+
+function getFileIcon(contentType) {
+  if (contentType?.startsWith("image/")) return Image;
+  if (contentType?.includes("pdf")) return FileText;
+  return FileIcon;
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function EquipmentFiles({ equipmentId }) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef(null);
+
+  const { data } = useQuery({
+    queryKey: ["equipment-files", equipmentId],
+    queryFn: () => equipmentHierarchyAPI.getEquipmentFiles(equipmentId),
+    enabled: !!equipmentId,
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (file) => equipmentHierarchyAPI.uploadEquipmentFile(equipmentId, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["equipment-files", equipmentId] });
+      toast.success("File uploaded");
+    },
+    onError: (e) => toast.error(e.response?.data?.detail || "Upload failed"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (fileId) => equipmentHierarchyAPI.deleteEquipmentFile(fileId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["equipment-files", equipmentId] });
+      toast.success("File deleted");
+    },
+    onError: () => toast.error("Delete failed"),
+  });
+
+  const handleDownload = async (fileId, filename) => {
+    try {
+      const blob = await equipmentHierarchyAPI.downloadEquipmentFile(fileId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Download failed");
+    }
+  };
+
+  const files = data?.files || [];
+  const Icon = Paperclip;
+
+  return (
+    <div className="pt-4 border-t border-slate-200">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <Icon className="w-3.5 h-3.5 text-slate-400" />
+          <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Files</span>
+          {files.length > 0 && (
+            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{files.length}</span>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadMutation.isPending}
+          data-testid="upload-equipment-file-btn"
+        >
+          <Upload className="w-3.5 h-3.5 mr-1" />
+          {uploadMutation.isPending ? "Uploading..." : "Upload"}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) { uploadMutation.mutate(f); e.target.value = ""; }
+          }}
+        />
+      </div>
+
+      {files.length === 0 ? (
+        <p className="text-[11px] text-slate-400 text-center py-3">No files attached</p>
+      ) : (
+        <div className="space-y-1">
+          {files.map((f) => {
+            const FIcon = getFileIcon(f.content_type);
+            return (
+              <div
+                key={f.id}
+                className="flex items-center gap-2 p-1.5 rounded-md hover:bg-slate-50 group"
+                data-testid={`equipment-file-${f.id}`}
+              >
+                <FIcon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-700 truncate">{f.filename}</p>
+                  <p className="text-[10px] text-slate-400">{formatFileSize(f.size)}</p>
+                </div>
+                <button
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
+                  onClick={() => handleDownload(f.id, f.filename)}
+                  title="Download"
+                  data-testid={`download-file-${f.id}`}
+                >
+                  <Download className="w-3 h-3" />
+                </button>
+                <button
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all"
+                  onClick={() => deleteMutation.mutate(f.id)}
+                  title="Delete"
+                  data-testid={`delete-file-${f.id}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCriticality, onDelete, allNodes }) {
   const { t } = useLanguage();
@@ -602,6 +737,9 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
             </Button>
           </div>
           
+          {/* Files Section */}
+          <EquipmentFiles equipmentId={node.id} />
+
           {node.level !== "installation" && (
             <div className="pt-4 border-t border-slate-200">
               <Button 
