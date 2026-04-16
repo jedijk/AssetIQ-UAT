@@ -1,6 +1,6 @@
-## Test Credentials
+# Test Credentials
 
-### Production (assetiq database)
+## Owner Account
 - Email: jedijk@gmail.com
 - Password: admin123
-- Note: password_hash field is used for auth, not password field
+- Role: owner

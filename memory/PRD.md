@@ -155,6 +155,27 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 16, 2026 - Operator Landing Page (COMPLETED)
+
+**FEATURE - Mobile-only operator landing page:**
+- Simple 4-button landing (Report, Equipment, My Tasks, Production) shown on mobile when operator mode is active
+- Owner can toggle "Operator View" ON/OFF via avatar dropdown menu
+- Toggle persists via `localStorage` key `operatorViewEnabled`
+- Reactive: toggling updates the view immediately via custom `operatorViewChanged` event
+- Designed for future role attribution (user.role === "operator" auto-triggers it)
+- Custom events `open-chat` and `open-hierarchy` communicate with Layout.js
+
+**Files Created:**
+- `/app/frontend/src/pages/OperatorLandingPage.js`
+
+**Files Modified:**
+- `/app/frontend/src/pages/DashboardPage.js` - Added operator mode detection + early return
+- `/app/frontend/src/components/Layout.js` - Added toggle UI in avatar dropdown + event listeners
+
+**Testing:** 9/9 frontend tests passed (100% - iteration 27)
+
+---
+
 ## Prioritized Backlog
 
 ### P1
