@@ -1011,22 +1011,18 @@ const Layout = () => {
                     <User className="w-4 h-4 mr-2" />
                     {t("profile.editProfile") || "Edit Profile"}
                   </DropdownMenuItem>
-                  {user?.role === "owner" && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={toggleOperatorView}
-                        className="cursor-pointer"
-                        data-testid="toggle-operator-view"
-                      >
-                        <Shield className="w-4 h-4 mr-2" />
-                        Simple Mode
-                        <span className={`ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded ${operatorViewEnabled ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
-                          {operatorViewEnabled ? "ON" : "OFF"}
-                        </span>
-                      </DropdownMenuItem>
-                    </>
-                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={toggleOperatorView}
+                    className="cursor-pointer"
+                    data-testid="toggle-operator-view"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    Simple Mode
+                    <span className={`ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded ${operatorViewEnabled ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
+                      {operatorViewEnabled ? "ON" : "OFF"}
+                    </span>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={logout}
