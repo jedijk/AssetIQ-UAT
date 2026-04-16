@@ -825,7 +825,8 @@ const Layout = () => {
               </Tooltip>
             </TooltipProvider>
 
-            {/* Language Switcher - Compact */}
+            {/* Language Switcher - Compact, hidden in simple mode */}
+            {!isOperatorActive && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -850,6 +851,7 @@ const Layout = () => {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            )}
 
             {/* Help Button */}
             <DropdownMenu>
