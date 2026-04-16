@@ -1,9 +1,12 @@
 /**
  * TaskCard Component
  * Displays a single task/action item in a card format
- * Supports quick complete, delete, and click to open task details
+ * Supports quick complete, delete, drag-and-drop sorting, and click to open task details
  */
+import { forwardRef } from "react";
 import { format, parseISO, isToday, isBefore, startOfDay } from "date-fns";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { 
   Clock, 
   Check, 
@@ -12,7 +15,8 @@ import {
   ClipboardList, 
   Wrench, 
   Target, 
-  AlertTriangle 
+  AlertTriangle,
+  GripVertical
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -34,7 +38,7 @@ const taskTypeIcons = {
   corrective: AlertTriangle,
 };
 
-const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
+const TaskCard = ({ task, onOpen, onQuickComplete, onDelete, isDragging, dragHandleProps }) => {
   const isOverdue = task.status === "overdue" || (task.due_date && isBefore(parseISO(task.due_date), startOfDay(new Date())));
   const isDueToday = task.due_date && isToday(parseISO(task.due_date));
   const isAction = task.source_type === "action";
@@ -57,12 +61,24 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
         isDueToday && !isOverdue && !isCompleted && "border-l-4 border-l-blue-500",
         task.status === "in_progress" && "border-l-4 border-l-amber-500 bg-amber-50/30",
         isAction && !isOverdue && task.status !== "in_progress" && !isCompleted && "border-l-4 border-l-indigo-400",
-        isCompleted && "border-l-4 border-l-green-500 bg-green-50/50 opacity-75"
+        isCompleted && "border-l-4 border-l-green-500 bg-green-50/50 opacity-75",
+        isDragging && "shadow-lg ring-2 ring-blue-400 opacity-90"
       )}
       onClick={() => onOpen(task)}
       data-testid={`task-card-${task.id}`}
     >
       <div className="flex items-start justify-between gap-3">
+        {/* Drag Handle */}
+        {dragHandleProps && (
+          <div 
+            {...dragHandleProps}
+            className="flex-shrink-0 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 -ml-1 mr-1 touch-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="w-5 h-5" />
+          </div>
+        )}
+        
         <div className="flex-1 min-w-0">
           {/* Title */}
           <div className="flex items-center gap-2 mb-1">
@@ -214,3 +230,38 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
 
 export default TaskCard;
 export { TaskCard, priorityColors, taskTypeIcons };
+
+/**
+ * SortableTaskCard - Wrapper for drag-and-drop sorting
+ */
+const SortableTaskCard = ({ task, onOpen, onQuickComplete, onDelete }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <TaskCard
+        task={task}
+        onOpen={onOpen}
+        onQuickComplete={onQuickComplete}
+        onDelete={onDelete}
+        isDragging={isDragging}
+        dragHandleProps={listeners}
+      />
+    </div>
+  );
+};
+
+export { SortableTaskCard };

@@ -5,6 +5,25 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { format, isToday, isBefore, startOfDay, parseISO } from "date-fns";
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import {
+  restrictToVerticalAxis,
+  restrictToParentElement,
+} from "@dnd-kit/modifiers";
+import {
   Calendar as CalendarIcon,
   ClipboardList,
   Clock,
@@ -46,6 +65,8 @@ import {
   Cloud,
   Building2,
   Download,
+  ArrowUpDown,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -87,7 +108,7 @@ import { imageAnalysisAPI } from "../lib/api";
 import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
 import { DISCIPLINES } from "../constants/disciplines";
 import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame";
-import TaskCard, { priorityColors, taskTypeIcons } from "../components/task-execution/TaskCard";
+import TaskCard, { priorityColors, taskTypeIcons, SortableTaskCard } from "../components/task-execution/TaskCard";
 
 // API functions for My Tasks
 import { myTasksAPI } from "../lib/api";
@@ -113,6 +134,49 @@ const MyTasksPage = () => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [viewMode, setViewMode] = useState("list"); // "list" or "execution"
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
+  
+  // Manual sorting state
+  const [isManualSort, setIsManualSort] = useState(() => {
+    return localStorage.getItem("myTasks_manualSort") === "true";
+  });
+  const [manualSortOrder, setManualSortOrder] = useState(() => {
+    try {
+      const saved = localStorage.getItem("myTasks_sortOrder");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  
+  // DnD sensors for both mouse and touch
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+  
+  // Save manual sort preference
+  useEffect(() => {
+    localStorage.setItem("myTasks_manualSort", isManualSort.toString());
+  }, [isManualSort]);
+  
+  // Save sort order when it changes
+  useEffect(() => {
+    if (manualSortOrder.length > 0) {
+      localStorage.setItem("myTasks_sortOrder", JSON.stringify(manualSortOrder));
+    }
+  }, [manualSortOrder]);
   
   // Closure suggestion dialog state
   const [closureSuggestion, setClosureSuggestion] = useState(null);
@@ -389,8 +453,8 @@ const MyTasksPage = () => {
     return true;
   });
   
-  // Sort tasks: Overdue -> High Priority -> Due Soon -> Others
-  const sortedTasks = [...filteredTasks].sort((a, b) => {
+  // Auto sort tasks: Overdue -> High Priority -> Due Soon -> Others
+  const autoSortedTasks = [...filteredTasks].sort((a, b) => {
     // Overdue first
     const aOverdue = a.status === "overdue" || (a.due_date && isBefore(parseISO(a.due_date), startOfDay(new Date())));
     const bOverdue = b.status === "overdue" || (b.due_date && isBefore(parseISO(b.due_date), startOfDay(new Date())));
@@ -410,6 +474,56 @@ const MyTasksPage = () => {
     
     return 0;
   });
+  
+  // Apply manual sort order if enabled
+  const sortedTasks = isManualSort && manualSortOrder.length > 0
+    ? [...filteredTasks].sort((a, b) => {
+        const aIndex = manualSortOrder.indexOf(a.id);
+        const bIndex = manualSortOrder.indexOf(b.id);
+        // If both are in the order, sort by their position
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+        // If only a is in the order, a comes first
+        if (aIndex !== -1) return -1;
+        // If only b is in the order, b comes first
+        if (bIndex !== -1) return 1;
+        // If neither is in the order, use auto sort
+        return autoSortedTasks.indexOf(a) - autoSortedTasks.indexOf(b);
+      })
+    : autoSortedTasks;
+  
+  // Handle drag end for manual sorting
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const oldIndex = sortedTasks.findIndex((t) => t.id === active.id);
+      const newIndex = sortedTasks.findIndex((t) => t.id === over.id);
+      
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(sortedTasks, oldIndex, newIndex).map((t) => t.id);
+        setManualSortOrder(newOrder);
+        
+        // Enable manual sort if not already
+        if (!isManualSort) {
+          setIsManualSort(true);
+        }
+      }
+    }
+  };
+  
+  // Toggle between manual and auto sort
+  const toggleSortMode = () => {
+    if (isManualSort) {
+      // Switching to auto sort
+      setIsManualSort(false);
+      toast.info("Auto-sorting by priority & due date");
+    } else {
+      // Switching to manual sort - capture current order
+      setManualSortOrder(sortedTasks.map((t) => t.id));
+      setIsManualSort(true);
+      toast.success("Manual sorting enabled. Drag tasks to reorder.");
+    }
+  };
   
   // Calculate stats - adjust for adhoc tab
   const adhocPlans = adhocPlansData?.plans || [];
@@ -570,6 +684,31 @@ const MyTasksPage = () => {
                 />
               </PopoverContent>
             </Popover>
+            
+            {/* Sort Mode Toggle */}
+            <Button
+              variant={isManualSort ? "default" : "outline"}
+              size="sm"
+              className={cn(
+                "h-9 px-2 sm:px-3",
+                isManualSort && "bg-blue-600 hover:bg-blue-700 text-white"
+              )}
+              onClick={toggleSortMode}
+              data-testid="sort-toggle"
+              title={isManualSort ? "Manual sorting enabled (drag to reorder)" : "Auto-sorting by priority"}
+            >
+              {isManualSort ? (
+                <>
+                  <GripVertical className="w-4 h-4 sm:mr-1" />
+                  <span className="hidden sm:inline text-xs">Manual</span>
+                </>
+              ) : (
+                <>
+                  <ArrowUpDown className="w-4 h-4 sm:mr-1" />
+                  <span className="hidden sm:inline text-xs">Auto</span>
+                </>
+              )}
+            </Button>
           </div>
           
           {/* Quick Filter Tabs */}
@@ -763,15 +902,27 @@ const MyTasksPage = () => {
               </Button>
             </div>
           ) : (
-            sortedTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onOpen={handleOpenTask}
-                onQuickComplete={handleQuickComplete}
-                onDelete={handleDeleteTask}
-              />
-            ))
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+              modifiers={[restrictToVerticalAxis]}
+            >
+              <SortableContext
+                items={sortedTasks.map((t) => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {sortedTasks.map((task) => (
+                  <SortableTaskCard
+                    key={task.id}
+                    task={task}
+                    onOpen={handleOpenTask}
+                    onQuickComplete={handleQuickComplete}
+                    onDelete={handleDeleteTask}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           )
         )}
       </div>
