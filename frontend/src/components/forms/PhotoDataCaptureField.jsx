@@ -87,6 +87,7 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
           (f) => f.key === item.key || normalize(f.key) === normalize(item.key)
         );
         const targetId = fieldCfg?.target_field_id || item.key;
+        console.log(`[PhotoCapture] AI key="${item.key}" → config match=${!!fieldCfg} → target="${targetId}" value=${item.value}`);
         fills[targetId] = {
           value: item.value,
           confidence: item.confidence,
@@ -94,6 +95,7 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
           source: "ai_extraction",
         };
       }
+      console.log("[PhotoCapture] Total fills:", Object.keys(fills).length, fills);
       onAutoFill(fills);
     } catch (err) {
       setStatus("error");

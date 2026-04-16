@@ -180,6 +180,7 @@ async def extract_from_image(
         )
 
         raw = response.choices[0].message.content.strip()
+        logger.info(f"[AI Extract] Raw response (first 500 chars): {raw[:500]}")
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
             if raw.endswith("```"):
@@ -192,17 +193,26 @@ async def extract_from_image(
         extracted = []
         schema_fields = {f.key: f for f in schema.fields}
         normalize = lambda s: ''.join(c for c in s.lower() if c.isalnum())
+        norm_schema = {normalize(k): k for k in schema_fields}
         
-        for item in results:
+        for idx, item in enumerate(results):
             ai_key = item["key"]
-            # Try to match AI key back to schema field (exact, then normalized)
-            matched_key = ai_key
-            if ai_key not in schema_fields:
+            # Try exact match
+            if ai_key in schema_fields:
+                matched_key = ai_key
+            else:
+                # Try normalized match
                 norm_ai = normalize(ai_key)
-                for sf_key in schema_fields:
-                    if normalize(sf_key) == norm_ai:
-                        matched_key = sf_key
-                        break
+                matched_key = norm_schema.get(norm_ai)
+                if not matched_key and idx < len(schema.fields):
+                    # Fallback: match by position
+                    matched_key = schema.fields[idx].key
+                    logger.info(f"[AI Extract] Positional match: AI key '{ai_key}' → schema key '{matched_key}'")
+                elif matched_key:
+                    logger.info(f"[AI Extract] Normalized match: AI key '{ai_key}' → schema key '{matched_key}'")
+                else:
+                    matched_key = ai_key
+                    logger.warning(f"[AI Extract] No match for AI key '{ai_key}'")
             
             extracted.append(ExtractedValue(
                 key=matched_key,

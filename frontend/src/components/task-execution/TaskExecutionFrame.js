@@ -230,23 +230,31 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   const [aiCorrections, setAiCorrections] = useState({});
   const [extractionImageData, setExtractionImageData] = useState(null);
   const handlePhotoAutoFill = (fills, imageBase64) => {
+    console.log("[TaskExec] handlePhotoAutoFill called with", Object.keys(fills).length, "fills:", fills);
     const newData = { ...formData };
     const filled = {};
     for (const [fieldId, info] of Object.entries(fills)) {
       let val = info.value;
       // Convert datetime strings for datetime form fields
       const formField = formFields.find(f => f.id === fieldId);
-      if (formField && (formField.field_type === "datetime" || formField.type === "datetime") && typeof val === "string") {
-        // Try to parse and format as ISO datetime-local
-        try {
-          const d = new Date(val);
-          if (!isNaN(d.getTime())) {
-            val = d.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
-          }
-        } catch {}
+      if (formField) {
+        const ft = formField.field_type || formField.type;
+        if (ft === "datetime" && typeof val === "string") {
+          try {
+            const d = new Date(val);
+            if (!isNaN(d.getTime())) {
+              val = d.toISOString().slice(0, 16);
+            }
+          } catch {}
+        } else if (ft === "numeric" && val != null) {
+          // Ensure numeric fields get a number value
+          const num = parseFloat(String(val).replace(/[^0-9.\-]/g, ""));
+          if (!isNaN(num)) val = num;
+        }
       }
       newData[fieldId] = val;
       filled[fieldId] = { ...info, value: val };
+      console.log(`[TaskExec] Fill field="${fieldId}" formField=${formField?.label || 'NOT FOUND'} val=${val}`);
     }
     setFormData(newData);
     setAiFilledFields(prev => ({ ...prev, ...filled }));
