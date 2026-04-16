@@ -295,16 +295,11 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
         >
           <Icon className={`w-4 h-4 ${critColor || config.color} flex-shrink-0`} />
           {node.tag ? (
-            <TooltipProvider delayDuration={300}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className={`text-sm font-medium truncate flex-1 cursor-default ${isSearchMatch ? 'text-yellow-800' : ''}`}>{node.name}</span>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-slate-800 text-white">
-                  <p className="font-mono text-xs">{node.tag}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <span className={`text-sm font-medium truncate flex-1 ${isSearchMatch ? 'text-yellow-800' : ''}`}>
+              <span className="font-mono text-slate-500">{node.tag}</span>
+              <span className="mx-1 text-slate-300">-</span>
+              <span>{node.name}</span>
+            </span>
           ) : (
             <span className={`text-sm font-medium truncate flex-1 ${isSearchMatch ? 'text-yellow-800' : ''}`}>{node.name}</span>
           )}

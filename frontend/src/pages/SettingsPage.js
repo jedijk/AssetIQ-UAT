@@ -236,7 +236,7 @@ export default function SettingsPage() {
               <span className="font-medium">{user?.role}</span> access level
             </div>
             <div className="text-slate-400">
-              Version 3.2.0
+              Version 3.3.0
             </div>
           </div>
         </div>

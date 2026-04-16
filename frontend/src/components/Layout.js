@@ -13,7 +13,7 @@ import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.2.0";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.3.0";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -96,6 +96,60 @@ const Layout = () => {
 
   // Track page views for user statistics
   usePageTracking();
+  
+  // Version check - compare frontend with backend and force update if mismatch
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const response = await fetch(`${getBackendUrl()}/api/health`);
+        if (response.ok) {
+          const data = await response.json();
+          const backendVersion = data.version;
+          
+          // Compare major.minor versions (ignore patch for flexibility)
+          const frontendMajorMinor = APP_VERSION.split('.').slice(0, 2).join('.');
+          const backendMajorMinor = backendVersion?.split('.').slice(0, 2).join('.');
+          
+          if (backendMajorMinor && frontendMajorMinor !== backendMajorMinor) {
+            console.log(`Version mismatch: Frontend ${APP_VERSION}, Backend ${backendVersion}`);
+            // Clear caches and force reload
+            if ('caches' in window) {
+              const cacheNames = await caches.keys();
+              await Promise.all(cacheNames.map(name => caches.delete(name)));
+            }
+            // Store flag to show update message after reload
+            sessionStorage.setItem('app_updated', 'true');
+            sessionStorage.setItem('new_version', backendVersion);
+            // Force reload from server
+            window.location.reload(true);
+          }
+        }
+      } catch (error) {
+        console.log('Version check failed:', error);
+      }
+    };
+    
+    // Check version on mount
+    checkVersion();
+    
+    // Also check periodically (every 5 minutes)
+    const interval = setInterval(checkVersion, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Show toast if app was just updated
+  useEffect(() => {
+    const wasUpdated = sessionStorage.getItem('app_updated');
+    const newVersion = sessionStorage.getItem('new_version');
+    if (wasUpdated) {
+      sessionStorage.removeItem('app_updated');
+      sessionStorage.removeItem('new_version');
+      toast.success(`App updated to version ${newVersion || APP_VERSION}`, {
+        description: 'New features and improvements are now available.',
+        duration: 5000,
+      });
+    }
+  }, []);
   
   // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {

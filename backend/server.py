@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app IMMEDIATELY - before any potentially failing imports
 app = FastAPI(
     title="AssetIQ API",
-    version="3.2.0",
+    version="3.3.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json"
@@ -40,7 +40,7 @@ app.state.ready = False  # Will be set to True after background init
 @app.get("/")
 async def root():
     """Root endpoint for basic verification."""
-    return {"message": "AssetIQ API", "status": "running", "version": "3.2.0"}
+    return {"message": "AssetIQ API", "status": "running", "version": "3.3.0"}
 
 
 @app.get("/health")
@@ -72,7 +72,7 @@ async def api_health_check():
         "database_latency_ms": db_latency,
         "uptime_seconds": uptime,
         "ready": app.state.ready,
-        "version": "3.2.0"
+        "version": "3.3.0"
     }
 
 
