@@ -97,42 +97,24 @@ const Layout = () => {
   // Track page views for user statistics
   usePageTracking();
   
-  // Version check - one-time forced refresh for users on older versions
+  // Version check - one-time notification for users after update
   useEffect(() => {
     const STORAGE_KEY = `assetiq_updated_${APP_VERSION}`;
     
-    // If user already got this update, just skip
+    // If user already saw this update notification, skip
     if (localStorage.getItem(STORAGE_KEY) === "true") return;
 
-    const checkVersion = async () => {
-      try {
-        const response = await fetch(`${getBackendUrl()}/api/health`);
-        if (!response.ok) return;
-        const data = await response.json();
-        
-        if (data.version === APP_VERSION) {
-          // Backend is on new version — force refresh once for users on old cached frontend
-          localStorage.setItem(STORAGE_KEY, "true");
-          
-          // Clear caches
-          if ('caches' in window) {
-            const names = await caches.keys();
-            await Promise.all(names.map(n => caches.delete(n)));
-          }
-          
-          // Show toast then reload
-          toast.success(`AssetIQ updated to v${APP_VERSION}`, {
-            description: "Bug fixes & improved AI scan accuracy. Refreshing...",
-            duration: 3000,
-          });
-          setTimeout(() => window.location.reload(), 3000);
-        }
-      } catch (error) {
-        console.log('Version check failed:', error);
-      }
-    };
+    // Mark as seen immediately to prevent re-triggering
+    localStorage.setItem(STORAGE_KEY, "true");
     
-    const timeout = setTimeout(checkVersion, 2000);
+    // Show toast after a short delay (let the app settle)
+    const timeout = setTimeout(() => {
+      toast.success(`AssetIQ updated to v${APP_VERSION}`, {
+        description: "Bug fixes & improved AI scan accuracy.",
+        duration: 5000,
+      });
+    }, 3000);
+    
     return () => clearTimeout(timeout);
   }, []);
   

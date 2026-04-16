@@ -32,6 +32,7 @@ import {
   Image as ImageIcon,
   File as FileIcon,
   Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -124,6 +125,25 @@ function buildTreeData(nodes, parentId = null) {
       ...node,
       children: buildTreeData(nodes, node.id)
     }));
+}
+
+// Remove hidden levels from tree, bubbling their children up
+function filterHiddenLevels(tree, hiddenLevels) {
+  if (!hiddenLevels || hiddenLevels.size === 0) return tree;
+  const result = [];
+  for (const node of tree) {
+    const normalized = normalizeLevel(node.type);
+    if (hiddenLevels.has(normalized)) {
+      // Skip this node, promote its children
+      result.push(...filterHiddenLevels(node.children || [], hiddenLevels));
+    } else {
+      result.push({
+        ...node,
+        children: filterHiddenLevels(node.children || [], hiddenLevels),
+      });
+    }
+  }
+  return result;
 }
 
 // Get threat count per equipment node - uses linked_equipment_id for accurate matching
@@ -645,7 +665,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
 
 
 // ISO Level Summary Item
-const LevelSummaryItem = ({ level, count, isActive, onClick }) => {
+const LevelSummaryItem = ({ level, count, isActive, onClick, isHidden, onToggleHidden }) => {
   const config = ISO_LEVEL_CONFIG[level] || ISO_LEVEL_CONFIG[normalizeLevel(level)] || { 
     icon: Cog, 
     label: level ? level.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Item", 
@@ -654,19 +674,30 @@ const LevelSummaryItem = ({ level, count, isActive, onClick }) => {
   const Icon = config.icon;
   
   return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors w-full text-left ${
-        isActive ? "bg-blue-50 text-blue-700" : "hover:bg-slate-100 text-slate-600"
-      }`}
-      data-testid={`iso-level-${level}`}
-    >
-      <Icon className={`w-4 h-4 ${config.color}`} />
-      <span className="text-sm font-medium flex-1">{config.label}</span>
-      <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full">
-        {count}
-      </span>
-    </button>
+    <div className="flex items-center gap-1 w-full">
+      <button
+        onClick={onClick}
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-1 text-left ${
+          isHidden ? "opacity-40" :
+          isActive ? "bg-blue-50 text-blue-700" : "hover:bg-slate-100 text-slate-600"
+        }`}
+        data-testid={`iso-level-${level}`}
+      >
+        <Icon className={`w-4 h-4 ${config.color}`} />
+        <span className="text-sm font-medium flex-1">{config.label}</span>
+        <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full">
+          {count}
+        </span>
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleHidden(level); }}
+        className={`p-1.5 rounded hover:bg-slate-100 transition-colors ${isHidden ? "text-slate-300" : "text-slate-400"}`}
+        title={isHidden ? `Show ${config.label} in tree` : `Hide ${config.label} from tree`}
+        data-testid={`toggle-level-${level}`}
+      >
+        {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+      </button>
+    </div>
   );
 };
 
@@ -701,6 +732,26 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   const [searchQuery, setSearchQuery] = useState("");
   const [preSearchExpandedNodes, setPreSearchExpandedNodes] = useState(null);
 
+  // Hidden levels - persisted to localStorage
+  const [hiddenLevels, setHiddenLevels] = useState(() => {
+    try {
+      const saved = localStorage.getItem('hierarchy-hidden-levels');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  const toggleHiddenLevel = (level) => {
+    setHiddenLevels(prev => {
+      const next = new Set(prev);
+      if (next.has(level)) next.delete(level);
+      else next.add(level);
+      localStorage.setItem('hierarchy-hidden-levels', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
   // Fetch equipment hierarchy nodes
   const { data: nodesData, isLoading: nodesLoading } = useQuery({
     queryKey: ["equipment-nodes"],
@@ -726,7 +777,10 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   const threatCountByAsset = useMemo(() => getThreatCountByAsset(threats), [threats]);
   
   // Build tree structure
-  const treeData = useMemo(() => buildTreeData(nodes), [nodes]);
+  const treeData = useMemo(() => {
+    const raw = buildTreeData(nodes);
+    return filterHiddenLevels(raw, hiddenLevels);
+  }, [nodes, hiddenLevels]);
   
   // Search matching function
   const nodeMatchesSearch = useCallback((node, query) => {
@@ -976,6 +1030,8 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
                   level={level}
                   count={levelCounts[level] || 0}
                   isActive={filterLevel === level}
+                  isHidden={hiddenLevels.has(level)}
+                  onToggleHidden={toggleHiddenLevel}
                   onClick={() => {
                     setFilterLevel(filterLevel === level ? null : level);
                     setViewMode("tree");
