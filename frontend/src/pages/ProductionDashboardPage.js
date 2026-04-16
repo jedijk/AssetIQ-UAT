@@ -782,7 +782,7 @@ export default function ProductionDashboardPage() {
 
             {/* Day-mode prev/next arrows and date picker */}
             {period === "1d" && (
-              <div className="flex items-center gap-1 sm:gap-0">
+              <div className="flex items-center gap-1 sm:gap-0 flex-1 sm:flex-none">
                 <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
                   <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-8 sm:w-8 rounded-none touch-manipulation" onClick={prevDay} data-testid="prev-day">
                     <ChevronLeft className="w-5 h-5 sm:w-4 sm:h-4" />
@@ -802,7 +802,7 @@ export default function ProductionDashboardPage() {
                       const d = new Date(v + "T12:00:00");
                       if (!isNaN(d)) { setFromDate(d); setToDate(d); }
                     }}
-                    className="h-8 w-[130px] px-2 text-xs border border-slate-200 rounded-lg bg-white ml-1"
+                    className="h-8 flex-1 px-2 text-sm border border-slate-200 rounded-lg bg-white ml-1"
                     data-testid="mobile-date-picker"
                   />
                 )}
@@ -825,8 +825,8 @@ export default function ProductionDashboardPage() {
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
 
-            {/* Date display - show on all screens */}
-            <span className="text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2 sm:px-3 h-8 flex items-center tabular-nums whitespace-nowrap" data-testid="date-display">
+            {/* Date display - desktop only */}
+            <span className="hidden sm:flex text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2 sm:px-3 h-8 items-center tabular-nums whitespace-nowrap" data-testid="date-display">
               {fromStr === toStr ? displayDate(fromDate) : `${displayDate(fromDate)} — ${displayDate(toDate)}`}
             </span>
 
