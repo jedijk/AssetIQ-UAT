@@ -447,6 +447,29 @@ const Layout = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Operator view toggle (owner testing)
+  const [operatorViewEnabled, setOperatorViewEnabled] = useState(
+    () => localStorage.getItem("operatorViewEnabled") === "true"
+  );
+  const toggleOperatorView = () => {
+    const next = !operatorViewEnabled;
+    setOperatorViewEnabled(next);
+    localStorage.setItem("operatorViewEnabled", String(next));
+    window.dispatchEvent(new CustomEvent("operatorViewChanged"));
+  };
+
+  // Listen for custom events from OperatorLandingPage
+  useEffect(() => {
+    const handleOpenChat = () => { setChatPrefillEquipment(null); setChatOpen(true); };
+    const handleOpenHierarchy = () => setHierarchyOpen(true);
+    window.addEventListener("open-chat", handleOpenChat);
+    window.addEventListener("open-hierarchy", handleOpenHierarchy);
+    return () => {
+      window.removeEventListener("open-chat", handleOpenChat);
+      window.removeEventListener("open-hierarchy", handleOpenHierarchy);
+    };
+  }, []);
+
   // Auto-collapse hierarchy on mobile, Equipment Manager page, and Settings pages
   useEffect(() => {
     if (location.pathname === "/equipment-manager" || location.pathname.startsWith("/settings") || isMobileView) {
@@ -973,6 +996,22 @@ const Layout = () => {
                     <User className="w-4 h-4 mr-2" />
                     {t("profile.editProfile") || "Edit Profile"}
                   </DropdownMenuItem>
+                  {user?.role === "owner" && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={toggleOperatorView}
+                        className="cursor-pointer"
+                        data-testid="toggle-operator-view"
+                      >
+                        <Shield className="w-4 h-4 mr-2" />
+                        Operator View
+                        <span className={`ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded ${operatorViewEnabled ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
+                          {operatorViewEnabled ? "ON" : "OFF"}
+                        </span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={logout}

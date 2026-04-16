@@ -4,11 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI } from "../lib/api";
 import { formAPI } from "../components/forms";
+import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl, getAuthHeaders } from "../lib/apiConfig";
 import { formatDate, formatDateTime } from "../lib/dateUtils";
 import { AuthenticatedImage, useAuthenticatedMedia } from "../components/AuthenticatedMedia";
 import { motion } from "framer-motion";
+import OperatorLandingPage from "./OperatorLandingPage";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -497,7 +499,29 @@ const RecentItemCard = ({ items, title, icon: Icon, emptyMessage, renderItem, on
 export default function DashboardPage({ initialTab }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState(initialTab || "operational");
+
+  // Operator view: shown on mobile when role is operator or owner has toggled it
+  const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < 768);
+  const [operatorToggle, setOperatorToggle] = useState(
+    () => localStorage.getItem("operatorViewEnabled") === "true"
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobileViewport(window.innerWidth < 768);
+    const onStorage = () => setOperatorToggle(localStorage.getItem("operatorViewEnabled") === "true");
+    window.addEventListener("resize", onResize);
+    window.addEventListener("storage", onStorage);
+    // Also listen for custom event from Layout toggle (same-tab)
+    window.addEventListener("operatorViewChanged", onStorage);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("operatorViewChanged", onStorage);
+    };
+  }, []);
+
+  const isOperatorMode = user?.role === "operator" || operatorToggle;
   
   // Redirect to operational tab on mobile if viewing hidden tabs (except production which is now mobile-enabled)
   useEffect(() => {
@@ -718,6 +742,11 @@ export default function DashboardPage({ initialTab }) {
   // Check if any filter is active
   const hasActiveFilters = disciplineFilter !== "all" || ownerFilter !== "all" || plantUnitFilter !== "all";
   
+  // Operator landing early return (after all hooks)
+  if (isMobileViewport && isOperatorMode && !initialTab) {
+    return <OperatorLandingPage />;
+  }
+
   // Clear all filters
   const clearFilters = () => {
     setDisciplineFilter("all");

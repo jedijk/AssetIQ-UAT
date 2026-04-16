@@ -780,15 +780,32 @@ export default function ProductionDashboardPage() {
               )}
             </div>
 
-            {/* Day-mode prev/next arrows */}
+            {/* Day-mode prev/next arrows and date picker */}
             {period === "1d" && (
-              <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={prevDay} data-testid="prev-day">
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={nextDay} data-testid="next-day">
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
+              <div className="flex items-center gap-1 sm:gap-0">
+                <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-8 sm:w-8 rounded-none touch-manipulation" onClick={prevDay} data-testid="prev-day">
+                    <ChevronLeft className="w-5 h-5 sm:w-4 sm:h-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-8 sm:w-8 rounded-none touch-manipulation" onClick={nextDay} data-testid="next-day">
+                    <ChevronRight className="w-5 h-5 sm:w-4 sm:h-4" />
+                  </Button>
+                </div>
+                {/* Mobile date picker */}
+                {isMobile && (
+                  <input
+                    type="date"
+                    value={fromStr}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) return;
+                      const d = new Date(v + "T12:00:00");
+                      if (!isNaN(d)) { setFromDate(d); setToDate(d); }
+                    }}
+                    className="h-8 w-[110px] px-2 text-xs border border-slate-200 rounded-lg bg-white ml-1"
+                    data-testid="mobile-date-picker"
+                  />
+                )}
               </div>
             )}
 
@@ -808,8 +825,8 @@ export default function ProductionDashboardPage() {
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
 
-            {/* Date display - shorter on mobile */}
-            <span className="text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2 sm:px-3 h-8 flex items-center tabular-nums whitespace-nowrap" data-testid="date-display">
+            {/* Date display - hide on mobile since we have date picker */}
+            <span className="hidden sm:flex text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2 sm:px-3 h-8 items-center tabular-nums whitespace-nowrap" data-testid="date-display">
               {fromStr === toStr ? displayDate(fromDate) : `${displayDate(fromDate)} — ${displayDate(toDate)}`}
             </span>
 
