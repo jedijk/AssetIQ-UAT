@@ -335,11 +335,13 @@ const ThreatDetailPage = () => {
           await threatsAPI.update(id, oldData);
           queryClient.invalidateQueries({ queryKey: ["threat", id] });
           queryClient.invalidateQueries({ queryKey: ["threats"] });
+          queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
           queryClient.invalidateQueries({ queryKey: ["stats"] });
         },
       });
       queryClient.invalidateQueries({ queryKey: ["threat", id] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       toast.success("Threat updated");
       setIsEditing(false);
@@ -369,6 +371,7 @@ const ThreatDetailPage = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["threat", id] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
       toast.success(`Linked to ${data.threat.asset}. Score recalculated: ${data.score_calculation.final_score} (${data.score_calculation.risk_level})`);
       setShowLinkEquipmentDialog(false);
     },
@@ -392,6 +395,7 @@ const ThreatDetailPage = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["threat", id] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
       toast.success(`Linked to ${data.threat.failure_mode}. Score: ${data.score_calculation.final_score} (${data.score_calculation.risk_level})`);
       setShowLinkFailureModeDialog(false);
       setSelectedFailureModeId(null);
