@@ -771,7 +771,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
       {/* Backdrop - Click anywhere outside to close */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+        className="fixed inset-0 top-[48px] bg-black/20 backdrop-blur-sm z-40"
         data-testid="chat-backdrop"
       />
 

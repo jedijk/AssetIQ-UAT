@@ -830,9 +830,9 @@ export default function ProductionDashboardPage() {
               {fromStr === toStr ? displayDate(fromDate) : `${displayDate(fromDate)} — ${displayDate(toDate)}`}
             </span>
 
-            {/* Export - icon only on mobile */}
-            <Button variant="outline" size="sm" className="h-8 gap-1" onClick={exportToExcel} disabled={!data?.production_log?.length} data-testid="export-btn">
-              <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Export</span>
+            {/* Export - hidden on mobile */}
+            <Button variant="outline" size="sm" className="h-8 gap-1 hidden sm:flex" onClick={exportToExcel} disabled={!data?.production_log?.length} data-testid="export-btn">
+              <Download className="w-3.5 h-3.5" /> <span>Export</span>
             </Button>
           </div>
 
