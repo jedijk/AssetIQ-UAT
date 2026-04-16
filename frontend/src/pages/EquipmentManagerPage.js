@@ -747,7 +747,17 @@ export default function EquipmentManagerPage() {
       
       return { previousNodes };
     },
-    onSuccess: () => { 
+    onSuccess: (data) => { 
+      // Update cache with server response if available
+      if (data?.node) {
+        queryClient.setQueryData(["equipment-nodes"], (old) => {
+          if (!old?.nodes) return old;
+          return {
+            ...old,
+            nodes: old.nodes.map(n => n.id === data.node.id ? { ...n, ...data.node } : n)
+          };
+        });
+      }
       toast.success("Node moved successfully"); 
       setMovingNode(null);
     }, 
@@ -758,10 +768,6 @@ export default function EquipmentManagerPage() {
       }
       toast.error(e.response?.data?.detail || "Failed to move node"); 
       setMovingNode(null);
-    },
-    onSettled: () => {
-      // Refetch to ensure consistency
-      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
     }
   });
   
@@ -785,6 +791,16 @@ export default function EquipmentManagerPage() {
       return { previousNodes };
     },
     onSuccess: (data) => {
+      // Update cache with server response
+      if (data?.node) {
+        queryClient.setQueryData(["equipment-nodes"], (old) => {
+          if (!old?.nodes) return old;
+          return {
+            ...old,
+            nodes: old.nodes.map(n => n.id === data.node.id ? { ...n, ...data.node } : n)
+          };
+        });
+      }
       toast.success(data.message || "Level changed");
       setSelectedNode(data.node);
     },
@@ -793,9 +809,6 @@ export default function EquipmentManagerPage() {
         queryClient.setQueryData(["equipment-nodes"], context.previousNodes);
       }
       toast.error(e.response?.data?.detail || "Failed to change level");
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
     }
   });
   
@@ -906,6 +919,16 @@ export default function EquipmentManagerPage() {
       return { previousNodes };
     },
     onSuccess: (data) => {
+      // Update cache with server response to ensure consistency
+      if (data.node) {
+        queryClient.setQueryData(["equipment-nodes"], (old) => {
+          if (!old?.nodes) return old;
+          return {
+            ...old,
+            nodes: old.nodes.map(n => n.id === data.node.id ? { ...n, ...data.node } : n)
+          };
+        });
+      }
       toast.success(data.message || "Reordered");
     },
     onError: (e, variables, context) => {
@@ -913,9 +936,6 @@ export default function EquipmentManagerPage() {
         queryClient.setQueryData(["equipment-nodes"], context.previousNodes);
       }
       toast.error(e.response?.data?.detail || "Failed to reorder");
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
     }
   });
 
@@ -934,9 +954,24 @@ export default function EquipmentManagerPage() {
         const targetNode = old.nodes.find(n => n.id === targetNodeId);
         if (!draggedNode || !targetNode) return old;
         
-        // Calculate new sort order based on position
-        const targetOrder = targetNode.sort_order || 0;
-        const newSortOrder = position === "before" ? targetOrder - 0.5 : targetOrder + 0.5;
+        // Get siblings at the new parent level
+        const siblings = old.nodes.filter(n => n.parent_id === newParentId && n.id !== nodeId);
+        const sortedSiblings = [...siblings].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        const targetIndex = sortedSiblings.findIndex(n => n.id === targetNodeId);
+        
+        // Calculate new sort order
+        let newSortOrder;
+        if (position === "before") {
+          const prevNode = sortedSiblings[targetIndex - 1];
+          const prevOrder = prevNode ? (prevNode.sort_order || 0) : 0;
+          const targetOrder = targetNode.sort_order || 0;
+          newSortOrder = (prevOrder + targetOrder) / 2;
+        } else {
+          const nextNode = sortedSiblings[targetIndex + 1];
+          const targetOrder = targetNode.sort_order || 0;
+          const nextOrder = nextNode ? (nextNode.sort_order || 0) : targetOrder + 1;
+          newSortOrder = (targetOrder + nextOrder) / 2;
+        }
         
         return {
           ...old,
@@ -951,6 +986,16 @@ export default function EquipmentManagerPage() {
       return { previousNodes };
     },
     onSuccess: (data) => {
+      // Update cache with server response
+      if (data.node) {
+        queryClient.setQueryData(["equipment-nodes"], (old) => {
+          if (!old?.nodes) return old;
+          return {
+            ...old,
+            nodes: old.nodes.map(n => n.id === data.node.id ? { ...n, ...data.node } : n)
+          };
+        });
+      }
       toast.success(data.message || "Moved");
     },
     onError: (e, variables, context) => {
@@ -958,9 +1003,6 @@ export default function EquipmentManagerPage() {
         queryClient.setQueryData(["equipment-nodes"], context.previousNodes);
       }
       toast.error(e.response?.data?.detail || "Failed to move");
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
     }
   });
 
