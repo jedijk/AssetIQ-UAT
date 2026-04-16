@@ -551,7 +551,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <Input
               type="number"
               inputMode="decimal"
-              value={value || ""}
+              value={value ?? ""}
               onChange={(e) => handleNumericChange(field.id, e.target.value, { ...field, min_threshold: minThreshold, max_threshold: maxThreshold })}
               placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
               className={cn(
@@ -602,7 +602,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             </div>
             <LinkedEquipmentBadge />
             <Textarea
-              value={value || ""}
+              value={value ?? ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
               placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}... (or use microphone)`}
               rows={3}
@@ -658,7 +658,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             </Label>
             <LinkedEquipmentBadge />
             <Select
-              value={value || ""}
+              value={value ?? ""}
               onValueChange={(v) => handleFieldChange(field.id, v)}
             >
               <SelectTrigger className={cn(mobileInputClass, hasError && "border-red-500")}>
@@ -747,7 +747,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <LinkedEquipmentBadge />
             <Input
               type="date"
-              value={value || ""}
+              value={value ?? ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
               className={cn(mobileInputClass, hasError && "border-red-500")}
             />
@@ -764,7 +764,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <LinkedEquipmentBadge />
             <Input
               type="datetime-local"
-              value={value || ""}
+              value={value ?? ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
               className={cn(mobileInputClass, hasError && "border-red-500")}
             />
@@ -978,7 +978,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </Label>
             <Input
-              value={value || ""}
+              value={value ?? ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
               placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
               className={cn(mobileInputClass)}
