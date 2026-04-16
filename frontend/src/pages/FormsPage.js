@@ -1,4 +1,5 @@
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
+import PhotoDataCaptureField from '../components/forms/PhotoDataCaptureField';
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { createPortal } from "react-dom";
@@ -1727,6 +1728,14 @@ const FormsPage = ({ embedded = false }) => {
                         
                         {/* Form Fields */}
                         <div className="p-6 space-y-5 max-h-[50vh] overflow-y-auto">
+                          {/* Photo AI Extraction */}
+                          {selectedTemplate?.photo_extraction_config?.enabled && (
+                            <PhotoDataCaptureField
+                              config={selectedTemplate.photo_extraction_config}
+                              formData={{}}
+                              onAutoFill={() => toast.info("Photo extraction is available during task execution")}
+                            />
+                          )}
                           {selectedTemplate?.fields?.map((field, idx) => (
                             <div key={idx} className="space-y-2">
                               <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
@@ -1873,6 +1882,14 @@ const FormsPage = ({ embedded = false }) => {
 
                       {/* Form Content */}
                       <div className="p-4 space-y-4 overflow-y-auto h-[480px]">
+                        {/* Photo AI Extraction */}
+                        {selectedTemplate?.photo_extraction_config?.enabled && (
+                          <PhotoDataCaptureField
+                            config={selectedTemplate.photo_extraction_config}
+                            formData={{}}
+                            onAutoFill={() => toast.info("Photo extraction is available during task execution")}
+                          />
+                        )}
                         {selectedTemplate?.fields?.map((field, idx) => (
                           <div key={idx} className="space-y-1.5">
                             <label className="text-xs font-medium text-slate-700 flex items-center gap-1">
