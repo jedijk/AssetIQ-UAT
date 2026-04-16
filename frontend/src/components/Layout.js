@@ -735,67 +735,6 @@ const Layout = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Offline Status Indicator */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <motion.div
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.92 }}
-                    transition={springPresets.snappy}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`h-7 w-7 sm:h-8 sm:w-8 relative ${
-                        isOnline 
-                          ? totalPending > 0 ? "text-amber-500 hover:text-amber-600" : "text-green-500 hover:text-green-600"
-                          : "text-red-500 hover:text-red-600"
-                      }`}
-                      onClick={isOnline && totalPending > 0 ? syncAllPending : undefined}
-                      disabled={isSyncing || !isOnline}
-                      data-testid="offline-status-button"
-                    >
-                      {isSyncing ? (
-                        <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
-                      ) : isOnline ? (
-                        totalPending > 0 ? (
-                          <Cloud className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        ) : (
-                          <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        )
-                      ) : (
-                        <WifiOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      )}
-                      {totalPending > 0 && (
-                        <motion.span 
-                          className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5"
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={springPresets.bouncy}
-                        >
-                          {totalPending > 9 ? "9+" : totalPending}
-                        </motion.span>
-                      )}
-                    </Button>
-                  </motion.div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {isSyncing ? (
-                    <p>Syncing data...</p>
-                  ) : isOnline ? (
-                    totalPending > 0 ? (
-                      <p>Click to sync {totalPending} pending items</p>
-                    ) : (
-                      <p>Online - All data synced</p>
-                    )
-                  ) : (
-                    <p>Offline - Data will sync when connected</p>
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
             {/* Language Switcher - Compact, hidden in simple mode */}
             {!isOperatorActive && (
             <TooltipProvider>
