@@ -41,6 +41,13 @@ export default function OperatorLandingPage() {
     },
   ];
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
   return (
     <div
       className="flex flex-col items-center justify-center min-h-[calc(100vh-52px)] px-6 pb-8 bg-slate-50"
@@ -49,7 +56,7 @@ export default function OperatorLandingPage() {
       <div className="mb-10 text-center">
         <img src="/logo.png" alt="AssetIQ" className="w-14 h-14 rounded-xl mx-auto mb-3" />
         <h1 className="text-xl font-semibold text-slate-900">
-          Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
+          {getGreeting()}{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
         </h1>
         <p className="text-sm text-slate-500 mt-1">What would you like to do?</p>
       </div>
