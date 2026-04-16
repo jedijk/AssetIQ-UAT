@@ -132,7 +132,7 @@ function filterHiddenLevels(tree, hiddenLevels) {
   if (!hiddenLevels || hiddenLevels.size === 0) return tree;
   const result = [];
   for (const node of tree) {
-    const normalized = normalizeLevel(node.type);
+    const normalized = normalizeLevel(node.level || node.type);
     if (hiddenLevels.has(normalized)) {
       // Skip this node, promote its children
       result.push(...filterHiddenLevels(node.children || [], hiddenLevels));
