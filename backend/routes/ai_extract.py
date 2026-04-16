@@ -175,7 +175,7 @@ async def extract_from_image(
                     ],
                 }
             ],
-            max_tokens=1000,
+            max_completion_tokens=1000,
             temperature=0.1,
         )
 
