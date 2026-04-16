@@ -242,3 +242,5 @@ class TaskExecutionSubmit(BaseModel):
     issue_severity: Optional[str] = None  # low, medium, high
     # Attachments (file URLs from object storage)
     attachments: List[dict] = Field(default_factory=list)  # [{url, name, type, size}]
+    # AI extraction traceability
+    ai_extraction: Optional[dict] = None

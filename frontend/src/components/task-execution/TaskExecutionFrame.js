@@ -227,7 +227,9 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   
   // Auto-fill handler for photo extraction
   const [aiFilledFields, setAiFilledFields] = useState({});
-  const handlePhotoAutoFill = (fills) => {
+  const [aiCorrections, setAiCorrections] = useState({});
+  const [extractionImageData, setExtractionImageData] = useState(null);
+  const handlePhotoAutoFill = (fills, imageBase64) => {
     const newData = { ...formData };
     const filled = {};
     for (const [fieldId, info] of Object.entries(fills)) {
@@ -236,6 +238,8 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
     }
     setFormData(newData);
     setAiFilledFields(prev => ({ ...prev, ...filled }));
+    setAiCorrections({});
+    if (imageBase64) setExtractionImageData(imageBase64);
     toast.success(`Auto-filled ${Object.keys(fills).length} fields from photo`);
   };
 
@@ -278,6 +282,13 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   // Handle field value change
   const handleFieldChange = (fieldId, value) => {
     setFormData(prev => ({ ...prev, [fieldId]: value }));
+    // Track correction if this was an AI-filled field
+    if (aiFilledFields[fieldId] && String(value) !== String(aiFilledFields[fieldId].value)) {
+      setAiCorrections(prev => ({
+        ...prev,
+        [fieldId]: { original_ai_value: aiFilledFields[fieldId].value, corrected_value: value },
+      }));
+    }
     if (validationErrors[fieldId]) {
       setValidationErrors(prev => {
         const updated = { ...prev };
@@ -350,10 +361,20 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
         })
       );
       
+      // Build extraction traceability data
+      const hasExtraction = Object.keys(aiFilledFields).length > 0;
+      const extractionData = hasExtraction ? {
+        extracted_fields: aiFilledFields,
+        corrections: aiCorrections,
+        has_corrections: Object.keys(aiCorrections).length > 0,
+        extraction_timestamp: new Date().toISOString(),
+      } : undefined;
+
       await onComplete({
         form_data: formData,
         completion_notes: completionNotes,
-        attachments: processedAttachments.filter(a => a.data), // Only include attachments with data
+        attachments: processedAttachments.filter(a => a.data),
+        ai_extraction: extractionData,
       });
       // Clear draft on successful submission
       if (task?.id) {
@@ -376,6 +397,25 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
     const value = formData[field.id];
     const fieldType = field.type || field.field_type;
     const aiInfo = aiFilledFields[field.id];
+    const corrected = aiCorrections[field.id];
+    const confThreshold = photoExtractionConfig?.confidence_threshold ?? 0.7;
+
+    // AI confidence badge for fields filled by photo extraction
+    const AiBadge = () => {
+      if (!aiInfo) return null;
+      const conf = aiInfo.confidence;
+      const isLow = conf < confThreshold;
+      const wasCorrected = !!corrected;
+      return (
+        <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ml-1.5 ${
+          wasCorrected ? "bg-blue-100 text-blue-700" :
+          isLow ? "bg-amber-100 text-amber-700" :
+          "bg-green-100 text-green-700"
+        }`} data-testid={`ai-badge-${field.id}`}>
+          {wasCorrected ? "Corrected" : isLow ? `AI ${Math.round(conf * 100)}%` : `AI ${Math.round(conf * 100)}%`}
+        </span>
+      );
+    };
     
     const thresholds = field.thresholds || {};
     const minThreshold = field.min_threshold ?? thresholds.critical_low ?? thresholds.warning_low;
@@ -465,6 +505,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <Label className={cn((hasError || isExceeded) && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
               {field.unit && <span className="text-slate-400 font-normal ml-1">({field.unit})</span>}
+              <AiBadge />
             </Label>
             <LinkedEquipmentBadge />
             <Input
@@ -473,7 +514,12 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
               value={value || ""}
               onChange={(e) => handleNumericChange(field.id, e.target.value, { ...field, min_threshold: minThreshold, max_threshold: maxThreshold })}
               placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
-              className={cn(isExceeded && "border-red-500 bg-red-50", mobileInputClass)}
+              className={cn(
+                isExceeded && "border-red-500 bg-red-50",
+                aiInfo && !corrected && "ring-1 ring-green-300 bg-green-50/30",
+                aiInfo && corrected && "ring-1 ring-blue-300 bg-blue-50/30",
+                mobileInputClass
+              )}
             />
             {(minThreshold != null || maxThreshold != null) && (
               <p className="text-xs text-slate-500">
@@ -500,6 +546,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <div className="flex items-center justify-between">
               <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
                 {field.label} {field.required && <span className="text-red-500">*</span>}
+                <AiBadge />
               </Label>
               <VoiceInput 
                 size="sm"
@@ -531,6 +578,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
           <div key={field.id} className="space-y-2">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
+              <AiBadge />
             </Label>
             <LinkedEquipmentBadge />
             <div className={cn("grid gap-1.5", isMobile ? "grid-cols-1" : "flex flex-wrap")}>

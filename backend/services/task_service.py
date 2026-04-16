@@ -815,6 +815,7 @@ class TaskService:
             "follow_up_required": data.get("follow_up_required", False),
             "follow_up_notes": data.get("follow_up_notes"),
             "form_data": data.get("form_data"),
+            "ai_extraction": data.get("ai_extraction"),
             "attachments": lightweight_attachments,  # Lightweight metadata only
             "updated_at": now,
         }
@@ -1026,6 +1027,11 @@ class TaskService:
             "created_at": timestamp,
         }
         
+        # Include AI extraction traceability if present
+        ai_extraction = completion_data.get("ai_extraction")
+        if ai_extraction:
+            submission_doc["ai_extraction"] = ai_extraction
+
         try:
             await self.db.form_submissions.insert_one(submission_doc)
             logger.info(f"Created form submission: {submission_doc['id']}")

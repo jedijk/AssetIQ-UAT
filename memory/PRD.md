@@ -201,6 +201,24 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 **Phase 2 (upcoming):** Confidence scoring UI, correction tracking, storage/traceability
 **Phase 3 (future):** Template library, learning from corrections, offline capture
 
+### April 16, 2026 - Universal Photo Data Capture Phase 2 (COMPLETED)
+
+**FEATURE - Confidence scoring UI, correction tracking, storage:**
+- **AI confidence badges**: Green (`AI 95%`) / Amber (`AI 40%`) / Blue (`Corrected`) badges on field labels
+- **Field highlighting**: Green ring on AI-filled fields, blue ring on corrected fields
+- **Correction tracking**: When user modifies an AI-filled value, original AI value + correction stored
+- **Traceability storage**: `ai_extraction` object included in task completion & form submission payloads
+  - Contains: extracted_fields, corrections, has_corrections flag, extraction_timestamp
+- **Backend storage**: Both task_instances and form_submissions collections store `ai_extraction` data
+
+**Files Modified:**
+- `/app/frontend/src/components/task-execution/TaskExecutionFrame.js` - AiBadge component, correction tracking in handleFieldChange, ai_extraction in submission payload, field ring highlighting
+- `/app/backend/routes/my_tasks.py` - Stores ai_extraction on action completion
+- `/app/backend/services/task_service.py` - Stores ai_extraction on task instance + form submission
+- `/app/backend/models/task_models.py` - Added ai_extraction field to TaskExecutionSubmit
+
+**Phase 3 (future):** Template library, learning from corrections, offline capture
+
 ---
 
 ## Prioritized Backlog
@@ -208,11 +226,10 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 ### P1
 - Report generation (PowerPoint/PDF) for Causal Investigations
 - Offline support with local storage for My Tasks execution
-- Photo Data Capture Phase 2: confidence UI, correction tracking
 
 ### P2
 - QR scan analytics dashboard
-- Photo Data Capture Phase 3: template library, learning
+- Photo Data Capture Phase 3: template library, learning from corrections
 
 ### P3
 - Break down large pages (FormsPage.js, SettingsUserManagementPage.js, EquipmentManagerPage.js, DashboardPage.js) into smaller modular components

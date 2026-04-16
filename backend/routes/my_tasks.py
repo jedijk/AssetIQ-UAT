@@ -824,6 +824,9 @@ async def complete_my_action(
         # Store form data if provided
         if data.get("form_data"):
             update_data["form_data"] = data["form_data"]
+        # Store AI extraction traceability data if provided
+        if data.get("ai_extraction"):
+            update_data["ai_extraction"] = data["ai_extraction"]
         # Process and store attachments if provided
         if data.get("attachments"):
             processed_attachments = await _process_attachments(data["attachments"])
