@@ -256,7 +256,7 @@ const MyTasksPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [activeFilter, setActiveFilter] = useState("open");
+  const [activeFilter, setActiveFilter] = useState("adhoc");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
