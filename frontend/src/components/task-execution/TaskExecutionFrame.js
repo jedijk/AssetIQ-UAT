@@ -550,7 +550,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
         );
         
       case "numeric":
-        const isExceeded = value && (
+        const isExceeded = value != null && value !== "" && (
           (maxThreshold != null && parseFloat(value) > maxThreshold) ||
           (minThreshold != null && parseFloat(value) < minThreshold)
         );
