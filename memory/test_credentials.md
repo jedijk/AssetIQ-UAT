@@ -2,5 +2,5 @@
 
 ## Owner Account
 - Email: jedijk@gmail.com
-- Password: admin123
+- Password: Jaap8019@
 - Role: owner
