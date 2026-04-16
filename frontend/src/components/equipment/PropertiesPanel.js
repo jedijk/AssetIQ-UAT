@@ -507,7 +507,15 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
             {isEditing ? (
               <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-8 text-sm font-semibold" autoFocus />
             ) : (
-              <h3 className="font-semibold text-slate-800 truncate">{node.name}</h3>
+              <h3 className="font-semibold text-slate-800 truncate">
+                {node.tag && (
+                  <>
+                    <span className="font-mono text-slate-500 font-normal">{node.tag}</span>
+                    <span className="mx-1 text-slate-300">-</span>
+                  </>
+                )}
+                {node.name}
+              </h3>
             )}
             <p className="text-xs text-slate-500">{config.label}</p>
           </div>
