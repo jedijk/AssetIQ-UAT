@@ -268,17 +268,19 @@ const MyTasksPage = () => {
   const orderKey = user?.id ? `myTasks_sortOrderByTab_${user.id}` : "myTasks_sortOrderByTab";
 
   // Manual sorting state - stored per user per tab
-  const [isManualSort, setIsManualSort] = useState(() => {
-    return localStorage.getItem(sortKey) === "true";
-  });
-  const [sortOrderByTab, setSortOrderByTab] = useState(() => {
+  const [isManualSort, setIsManualSort] = useState(false);
+  const [sortOrderByTab, setSortOrderByTab] = useState({});
+
+  // Re-read from localStorage when user loads
+  useEffect(() => {
+    setIsManualSort(localStorage.getItem(sortKey) === "true");
     try {
       const saved = localStorage.getItem(orderKey);
-      return saved ? JSON.parse(saved) : {};
+      setSortOrderByTab(saved ? JSON.parse(saved) : {});
     } catch {
-      return {};
+      setSortOrderByTab({});
     }
-  });
+  }, [sortKey, orderKey]);
   
   // Get current tab's sort order
   const manualSortOrder = sortOrderByTab[activeFilter] || [];
@@ -865,7 +867,7 @@ const MyTasksPage = () => {
               size="sm"
               className={cn(
                 "h-9 px-2 sm:px-3",
-                isManualSort && "bg-blue-600 hover:bg-blue-700 text-white"
+                isManualSort && "bg-slate-200 hover:bg-slate-300 text-slate-700"
               )}
               onClick={toggleSortMode}
               data-testid="sort-toggle"
