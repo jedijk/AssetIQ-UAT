@@ -148,12 +148,12 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
 
       {/* Success */}
       {status === "success" && (
-        <div className="space-y-3">
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-green-600">
               <CheckCircle className="w-4 h-4" />
               <span className="text-sm font-medium">
-                {results.filter((r) => r.value != null).length} fields extracted
+                {results.filter((r) => r.value != null).length} fields filled
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -167,29 +167,8 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
           </div>
 
           {preview && (
-            <img src={preview} alt="Captured" className="w-full max-h-40 object-contain rounded-lg border" />
+            <img src={preview} alt="Captured" className="w-full max-h-32 object-contain rounded-lg border" />
           )}
-
-          {/* Extraction results summary */}
-          <div className="grid grid-cols-2 gap-2">
-            {results.map((r) => {
-              const level = r.value == null ? "missing" : r.confidence >= threshold ? "high" : "low";
-              return (
-                <div key={r.key} className={`text-xs p-2 rounded-lg ring-1 ${CONFIDENCE_COLORS[level]}`}>
-                  <div className="text-slate-500 truncate">{r.key}</div>
-                  <div className="font-medium text-slate-800 truncate">
-                    {r.value != null ? String(r.value) : "—"}
-                  </div>
-                  {level === "low" && (
-                    <div className="flex items-center gap-1 mt-0.5 text-amber-600">
-                      <AlertTriangle className="w-3 h-3" />
-                      <span>Low confidence</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 
