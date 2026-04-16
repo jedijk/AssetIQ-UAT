@@ -390,6 +390,14 @@ export default function ProductionDashboardPage() {
   const [formExec, setFormExec] = useState(null); // { templateId, templateName }
   const [selectedTime, setSelectedTime] = useState(null); // highlighted time from chart click
 
+  // Force period to "1d" on mobile
+  useEffect(() => {
+    if (isMobile && period !== "1d") {
+      setPeriod("1d");
+      setShowCustomDate(false);
+    }
+  }, [isMobile, period]);
+
   // Template IDs (fetched once)
   const { data: formTemplates } = useQuery({
     queryKey: ["production-form-templates"],
@@ -739,13 +747,15 @@ export default function ProductionDashboardPage() {
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Period quick filters - stack on small mobile */}
+            {/* Period quick filters - only show 1D on mobile */}
             <div className="inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5 flex-wrap sm:flex-nowrap" data-testid="period-selector">
               {PERIOD_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
                   onClick={() => handlePeriod(opt.key)}
                   className={`px-2 sm:px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    opt.key !== "1d" && isMobile ? "hidden" : ""
+                  } ${
                     period === opt.key
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-500 hover:text-slate-700"
@@ -755,17 +765,19 @@ export default function ProductionDashboardPage() {
                   {opt.label}
                 </button>
               ))}
-              {/* Custom date gear toggle */}
-              <button
-                onClick={() => { setShowCustomDate(!showCustomDate); if (!showCustomDate) setPeriod("custom"); }}
-                className={`px-1.5 py-1.5 rounded-md transition-colors ${
-                  showCustomDate ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
-                }`}
-                data-testid="custom-date-toggle"
-                title="Custom date range"
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </button>
+              {/* Custom date gear toggle - hide on mobile */}
+              {!isMobile && (
+                <button
+                  onClick={() => { setShowCustomDate(!showCustomDate); if (!showCustomDate) setPeriod("custom"); }}
+                  className={`px-1.5 py-1.5 rounded-md transition-colors ${
+                    showCustomDate ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                  }`}
+                  data-testid="custom-date-toggle"
+                  title="Custom date range"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Day-mode prev/next arrows */}
@@ -807,8 +819,8 @@ export default function ProductionDashboardPage() {
             </Button>
           </div>
 
-          {/* Custom date pickers (unfold below) */}
-          {showCustomDate && (
+          {/* Custom date pickers (unfold below) - hidden on mobile */}
+          {showCustomDate && !isMobile && (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <label className="text-xs text-slate-500">From</label>
