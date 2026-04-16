@@ -19,13 +19,24 @@ logger = logging.getLogger(__name__)
 
 
 def _safe_isoformat(value):
-    """Safely convert datetime to ISO format string, handling already-stringified values."""
+    """Safely convert datetime to ISO format string with UTC timezone suffix.
+    
+    MongoDB returns naive datetimes (without timezone info), but our frontend
+    needs the UTC suffix to correctly interpret times.
+    """
     if value is None:
         return None
     if isinstance(value, str):
+        # If already a string, ensure it has UTC suffix
+        if value and not value.endswith('Z') and '+' not in value and '-' not in value[-6:]:
+            return value + '+00:00'
         return value
     if hasattr(value, 'isoformat'):
-        return value.isoformat()
+        iso_str = value.isoformat()
+        # Ensure UTC suffix is present (MongoDB returns naive datetimes)
+        if not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+            iso_str += '+00:00'
+        return iso_str
     return str(value)
 
 

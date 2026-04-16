@@ -1101,6 +1101,22 @@ class FormService:
     
     # ==================== HELPERS ====================
     
+    def _serialize_datetime(self, dt) -> str:
+        """Serialize datetime to ISO format with UTC timezone suffix.
+        
+        MongoDB returns naive datetimes (without timezone info), but our frontend
+        needs the UTC suffix to correctly interpret times.
+        """
+        if dt is None:
+            return None
+        if hasattr(dt, 'isoformat'):
+            iso_str = dt.isoformat()
+            # Ensure UTC suffix is present (MongoDB returns naive datetimes)
+            if not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+                iso_str += '+00:00'
+            return iso_str
+        return dt
+    
     def _serialize_template(self, doc: Dict) -> Dict[str, Any]:
         """Serialize template document."""
         return {
@@ -1120,8 +1136,8 @@ class FormService:
             "is_active": doc.get("is_active", True),
             "is_latest": doc.get("is_latest", True),
             "usage_count": doc.get("usage_count", 0),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") and hasattr(doc.get("created_at"), 'isoformat') else doc.get("created_at"),
-            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") and hasattr(doc.get("updated_at"), 'isoformat') else doc.get("updated_at"),
+            "created_at": self._serialize_datetime(doc.get("created_at")),
+            "updated_at": self._serialize_datetime(doc.get("updated_at")),
         }
     
     def _serialize_submission(self, doc: Dict) -> Dict[str, Any]:
@@ -1183,8 +1199,8 @@ class FormService:
             "submitted_by": doc.get("submitted_by"),
             "submitted_by_name": doc.get("submitted_by_name"),  # Add name if available
             "submitted_by_photo": doc.get("submitted_by_photo"),  # Avatar path
-            "submitted_at": doc.get("submitted_at").isoformat() if doc.get("submitted_at") and hasattr(doc.get("submitted_at"), 'isoformat') else doc.get("submitted_at"),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") and hasattr(doc.get("created_at"), 'isoformat') else doc.get("created_at"),
+            "submitted_at": self._serialize_datetime(doc.get("submitted_at")),
+            "created_at": self._serialize_datetime(doc.get("created_at")),
             "status": doc.get("status", "completed"),  # Default to completed
             "task_template_name": doc.get("task_template_name"),
             "discipline": doc.get("discipline"),

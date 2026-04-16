@@ -14,6 +14,20 @@ from auth import get_current_user
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Production Dashboard"])
 
+
+def _serialize_datetime(dt):
+    """Serialize datetime to ISO format with UTC timezone suffix."""
+    if dt is None:
+        return ""
+    if hasattr(dt, 'isoformat'):
+        iso_str = dt.isoformat()
+        # Ensure UTC suffix is present (MongoDB returns naive datetimes)
+        if not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+            iso_str += '+00:00'
+        return iso_str
+    return str(dt)
+
+
 # Form template names that contain production data
 EXTRUDER_FORM = "Extruder settings sample"
 VISCOSITY_FORM = "Mooney viscosity sample"
@@ -229,7 +243,7 @@ async def get_production_dashboard(
 
         production_log.append({
             "time": time_label,
-            "datetime": dt.isoformat() if dt else "",
+            "datetime": _serialize_datetime(dt),
             "submitted_by": sub.get("submitted_by_name", ""),
             "rpm": rpm,
             "feed": feed,
@@ -445,7 +459,7 @@ async def create_production_event(
         "equipment_name": EQUIPMENT_NAME,
         "created_by": current_user["id"],
         "created_by_name": current_user.get("name", ""),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": _serialize_datetime(datetime.now(timezone.utc)),
     }
     await db.production_events.insert_one(event)
     # Remove MongoDB _id before returning
@@ -515,7 +529,7 @@ async def update_production_submission(
 
     await db.form_submissions.update_one(
         {"id": submission_id},
-        {"$set": {"values": new_values, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {"values": new_values, "updated_at": _serialize_datetime(datetime.now(timezone.utc))}}
     )
     return {"status": "updated", "id": submission_id}
 
@@ -626,7 +640,7 @@ Format:
                 "equipment_name": EQUIPMENT_NAME,
                 "created_by": current_user["id"],
                 "created_by_name": "AI",
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": _serialize_datetime(datetime.now(timezone.utc)),
                 "_ai_generated": True,
             }
             await db.production_events.insert_one(event)

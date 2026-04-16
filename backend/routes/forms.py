@@ -300,15 +300,22 @@ async def get_form_submissions(
         
         # Transform to response format matching frontend expectations
         submissions = []
+        def serialize_datetime(dt):
+            """Serialize datetime to ISO format with UTC timezone suffix."""
+            if dt is None:
+                return None
+            if hasattr(dt, 'isoformat'):
+                iso_str = dt.isoformat()
+                # Ensure UTC suffix is present (MongoDB returns naive datetimes)
+                if not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+                    iso_str += '+00:00'
+                return iso_str
+            return dt
+        
         for doc in raw_submissions:
-            # Handle datetime serialization
-            submitted_at = doc.get("submitted_at") or doc.get("created_at")
-            if hasattr(submitted_at, 'isoformat'):
-                submitted_at = submitted_at.isoformat()
-            
-            created_at = doc.get("created_at")
-            if hasattr(created_at, 'isoformat'):
-                created_at = created_at.isoformat()
+            # Handle datetime serialization - ensure UTC suffix
+            submitted_at = serialize_datetime(doc.get("submitted_at") or doc.get("created_at"))
+            created_at = serialize_datetime(doc.get("created_at"))
             
             # Build avatar URL if user has avatar
             submitted_by = doc.get("submitted_by")
