@@ -724,92 +724,29 @@ export default function EquipmentManagerPage() {
   const deleteUnstructuredMutation = useMutation({ mutationFn: equipmentHierarchyAPI.deleteUnstructuredItem, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
   const assignToHierarchyMutation = useMutation({ mutationFn: ({ itemId, parentId, level }) => equipmentHierarchyAPI.assignUnstructuredToHierarchy(itemId, parentId, level), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); toast.success("Item added to hierarchy"); }, onError: e => toast.error(e.response?.data?.detail || "Failed to assign") });
   
-  // Move node mutation with optimistic update
+  // Move node mutation - simple approach with refetch
   const moveNodeMutation = useMutation({ 
     mutationFn: ({ nodeId, newParentId }) => equipmentHierarchyAPI.moveNode(nodeId, newParentId), 
-    onMutate: async ({ nodeId, newParentId }) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["equipment-nodes"] });
-      
-      // Snapshot the previous value
-      const previousNodes = queryClient.getQueryData(["equipment-nodes"]);
-      
-      // Optimistically update the cache
-      queryClient.setQueryData(["equipment-nodes"], (old) => {
-        if (!old?.nodes) return old;
-        return {
-          ...old,
-          nodes: old.nodes.map(node => 
-            node.id === nodeId ? { ...node, parent_id: newParentId } : node
-          )
-        };
-      });
-      
-      return { previousNodes };
-    },
-    onSuccess: (data) => { 
-      // Update cache with server response if available
-      if (data?.node) {
-        queryClient.setQueryData(["equipment-nodes"], (old) => {
-          if (!old?.nodes) return old;
-          return {
-            ...old,
-            nodes: old.nodes.map(n => n.id === data.node.id ? { ...n, ...data.node } : n)
-          };
-        });
-      }
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       toast.success("Node moved successfully"); 
       setMovingNode(null);
     }, 
-    onError: (e, variables, context) => { 
-      // Rollback to previous state
-      if (context?.previousNodes) {
-        queryClient.setQueryData(["equipment-nodes"], context.previousNodes);
-      }
+    onError: (e) => { 
       toast.error(e.response?.data?.detail || "Failed to move node"); 
       setMovingNode(null);
     }
   });
   
-  // Change level mutation (promote/demote) with optimistic update
+  // Change level mutation (promote/demote)
   const changeLevelMutation = useMutation({
     mutationFn: ({ nodeId, newLevel, newParentId }) => equipmentHierarchyAPI.changeNodeLevel(nodeId, newLevel, newParentId),
-    onMutate: async ({ nodeId, newLevel, newParentId }) => {
-      await queryClient.cancelQueries({ queryKey: ["equipment-nodes"] });
-      const previousNodes = queryClient.getQueryData(["equipment-nodes"]);
-      
-      queryClient.setQueryData(["equipment-nodes"], (old) => {
-        if (!old?.nodes) return old;
-        return {
-          ...old,
-          nodes: old.nodes.map(node => 
-            node.id === nodeId ? { ...node, level: newLevel, parent_id: newParentId } : node
-          )
-        };
-      });
-      
-      return { previousNodes };
-    },
     onSuccess: (data) => {
-      // Update cache with server response
-      if (data?.node) {
-        queryClient.setQueryData(["equipment-nodes"], (old) => {
-          if (!old?.nodes) return old;
-          return {
-            ...old,
-            nodes: old.nodes.map(n => n.id === data.node.id ? { ...n, ...data.node } : n)
-          };
-        });
-      }
+      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       toast.success(data.message || "Level changed");
       setSelectedNode(data.node);
     },
-    onError: (e, variables, context) => {
-      if (context?.previousNodes) {
-        queryClient.setQueryData(["equipment-nodes"], context.previousNodes);
-      }
-      toast.error(e.response?.data?.detail || "Failed to change level");
-    }
+    onError: (e) => toast.error(e.response?.data?.detail || "Failed to change level")
   });
   
   // State for demote dialog (need to select new parent)
@@ -881,129 +818,25 @@ export default function EquipmentManagerPage() {
     });
   };
 
-  // Reorder mutation with optimistic update
+  // Reorder mutation - simple approach
   const reorderMutation = useMutation({
     mutationFn: ({ nodeId, direction }) => equipmentHierarchyAPI.reorderNode(nodeId, direction),
-    onMutate: async ({ nodeId, direction }) => {
-      await queryClient.cancelQueries({ queryKey: ["equipment-nodes"] });
-      const previousNodes = queryClient.getQueryData(["equipment-nodes"]);
-      
-      // Optimistically update sort_order
-      queryClient.setQueryData(["equipment-nodes"], (old) => {
-        if (!old?.nodes) return old;
-        const node = old.nodes.find(n => n.id === nodeId);
-        if (!node) return old;
-        
-        // Find siblings and update sort orders
-        const siblings = old.nodes.filter(n => n.parent_id === node.parent_id);
-        const sortedSiblings = [...siblings].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-        const currentIndex = sortedSiblings.findIndex(n => n.id === nodeId);
-        const swapIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-        
-        if (swapIndex < 0 || swapIndex >= sortedSiblings.length) return old;
-        
-        const swapNode = sortedSiblings[swapIndex];
-        const nodeOrder = node.sort_order || 0;
-        const swapOrder = swapNode.sort_order || 0;
-        
-        return {
-          ...old,
-          nodes: old.nodes.map(n => {
-            if (n.id === nodeId) return { ...n, sort_order: swapOrder };
-            if (n.id === swapNode.id) return { ...n, sort_order: nodeOrder };
-            return n;
-          })
-        };
-      });
-      
-      return { previousNodes };
-    },
     onSuccess: (data) => {
-      // Update cache with server response to ensure consistency
-      if (data.node) {
-        queryClient.setQueryData(["equipment-nodes"], (old) => {
-          if (!old?.nodes) return old;
-          return {
-            ...old,
-            nodes: old.nodes.map(n => n.id === data.node.id ? { ...n, ...data.node } : n)
-          };
-        });
-      }
+      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       toast.success(data.message || "Reordered");
     },
-    onError: (e, variables, context) => {
-      if (context?.previousNodes) {
-        queryClient.setQueryData(["equipment-nodes"], context.previousNodes);
-      }
-      toast.error(e.response?.data?.detail || "Failed to reorder");
-    }
+    onError: (e) => toast.error(e.response?.data?.detail || "Failed to reorder")
   });
 
-  // Reorder to position mutation (for drag-drop) with optimistic update
+  // Reorder to position mutation (for drag-drop)
   const reorderToPositionMutation = useMutation({
     mutationFn: ({ nodeId, targetNodeId, position, newParentId }) => 
       equipmentHierarchyAPI.reorderNodeToPosition(nodeId, targetNodeId, position, newParentId),
-    onMutate: async ({ nodeId, targetNodeId, position, newParentId }) => {
-      await queryClient.cancelQueries({ queryKey: ["equipment-nodes"] });
-      const previousNodes = queryClient.getQueryData(["equipment-nodes"]);
-      
-      // Optimistically update the node's parent and sort order
-      queryClient.setQueryData(["equipment-nodes"], (old) => {
-        if (!old?.nodes) return old;
-        const draggedNode = old.nodes.find(n => n.id === nodeId);
-        const targetNode = old.nodes.find(n => n.id === targetNodeId);
-        if (!draggedNode || !targetNode) return old;
-        
-        // Get siblings at the new parent level
-        const siblings = old.nodes.filter(n => n.parent_id === newParentId && n.id !== nodeId);
-        const sortedSiblings = [...siblings].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-        const targetIndex = sortedSiblings.findIndex(n => n.id === targetNodeId);
-        
-        // Calculate new sort order
-        let newSortOrder;
-        if (position === "before") {
-          const prevNode = sortedSiblings[targetIndex - 1];
-          const prevOrder = prevNode ? (prevNode.sort_order || 0) : 0;
-          const targetOrder = targetNode.sort_order || 0;
-          newSortOrder = (prevOrder + targetOrder) / 2;
-        } else {
-          const nextNode = sortedSiblings[targetIndex + 1];
-          const targetOrder = targetNode.sort_order || 0;
-          const nextOrder = nextNode ? (nextNode.sort_order || 0) : targetOrder + 1;
-          newSortOrder = (targetOrder + nextOrder) / 2;
-        }
-        
-        return {
-          ...old,
-          nodes: old.nodes.map(n => 
-            n.id === nodeId 
-              ? { ...n, parent_id: newParentId, sort_order: newSortOrder } 
-              : n
-          )
-        };
-      });
-      
-      return { previousNodes };
-    },
     onSuccess: (data) => {
-      // Update cache with server response
-      if (data.node) {
-        queryClient.setQueryData(["equipment-nodes"], (old) => {
-          if (!old?.nodes) return old;
-          return {
-            ...old,
-            nodes: old.nodes.map(n => n.id === data.node.id ? { ...n, ...data.node } : n)
-          };
-        });
-      }
+      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       toast.success(data.message || "Moved");
     },
-    onError: (e, variables, context) => {
-      if (context?.previousNodes) {
-        queryClient.setQueryData(["equipment-nodes"], context.previousNodes);
-      }
-      toast.error(e.response?.data?.detail || "Failed to move");
-    }
+    onError: (e) => toast.error(e.response?.data?.detail || "Failed to move")
   });
 
   // Handle reorder via drag-drop
