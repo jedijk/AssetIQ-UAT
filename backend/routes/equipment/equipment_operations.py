@@ -18,11 +18,8 @@ router = APIRouter()
 
 def invalidate_equipment_cache(user_id: str = None):
     """Invalidate equipment-related caches after mutations."""
-    # Invalidate all equipment_nodes caches (they're prefixed with db name)
+    # Invalidate all equipment_nodes caches (pattern matches anywhere in key)
     query_cache.invalidate("equipment_nodes")
-    # Also invalidate any user-specific cache if provided
-    if user_id:
-        query_cache.invalidate(f"equipment_nodes:{user_id}")
 
 
 class ChangeLevelRequest(BaseModel):

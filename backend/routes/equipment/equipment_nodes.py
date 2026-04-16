@@ -21,9 +21,9 @@ router = APIRouter()
 
 def invalidate_equipment_cache(user_id: str = None):
     """Invalidate equipment-related caches after mutations."""
-    query_cache.invalidate("equipment_nodes")
-    if user_id:
-        query_cache.invalidate(f"equipment_nodes:{user_id}")
+    # Invalidate all equipment_nodes caches (pattern matches anywhere in key)
+    count = query_cache.invalidate("equipment_nodes")
+    logger.info(f"Invalidated {count} equipment cache entries")
 
 
 @router.post("/equipment-hierarchy/refresh")
@@ -85,8 +85,8 @@ async def get_equipment_nodes(
     nodes = sorted(nodes_cursor, key=sort_key)
     
     result = {"nodes": nodes}
-    # Cache for 2 minutes
-    query_cache.set(cache_key, result, ttl=120)
+    # Cache for 30 seconds (short TTL since mutations invalidate anyway)
+    query_cache.set(cache_key, result, ttl=30)
     return result
 
 

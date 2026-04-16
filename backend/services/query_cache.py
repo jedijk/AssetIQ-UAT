@@ -80,13 +80,14 @@ class QueryCache:
             "created_at": time.time(),
         }
     
-    def invalidate(self, prefix: str):
-        """Invalidate all cache entries with given prefix."""
-        keys_to_delete = [k for k in self._cache.keys() if k.startswith(prefix)]
+    def invalidate(self, pattern: str):
+        """Invalidate all cache entries containing the given pattern."""
+        keys_to_delete = [k for k in self._cache.keys() if pattern in k]
         for key in keys_to_delete:
             del self._cache[key]
         if keys_to_delete:
-            logger.debug(f"Invalidated {len(keys_to_delete)} cache entries for prefix: {prefix}")
+            logger.debug(f"Invalidated {len(keys_to_delete)} cache entries for pattern: {pattern}")
+        return len(keys_to_delete)
     
     def invalidate_all(self):
         """Clear entire cache."""
