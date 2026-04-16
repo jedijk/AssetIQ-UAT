@@ -233,8 +233,20 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
     const newData = { ...formData };
     const filled = {};
     for (const [fieldId, info] of Object.entries(fills)) {
-      newData[fieldId] = info.value;
-      filled[fieldId] = info;
+      let val = info.value;
+      // Convert datetime strings for datetime form fields
+      const formField = formFields.find(f => f.id === fieldId);
+      if (formField && (formField.field_type === "datetime" || formField.type === "datetime") && typeof val === "string") {
+        // Try to parse and format as ISO datetime-local
+        try {
+          const d = new Date(val);
+          if (!isNaN(d.getTime())) {
+            val = d.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+          }
+        } catch {}
+      }
+      newData[fieldId] = val;
+      filled[fieldId] = { ...info, value: val };
     }
     setFormData(newData);
     setAiFilledFields(prev => ({ ...prev, ...filled }));
