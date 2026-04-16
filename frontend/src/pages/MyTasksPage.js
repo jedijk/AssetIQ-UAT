@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
@@ -268,17 +268,32 @@ const MyTasksPage = () => {
   const orderKey = user?.id ? `myTasks_sortOrderByTab_${user.id}` : "myTasks_sortOrderByTab";
 
   // Manual sorting state - stored per user per tab
-  const [isManualSort, setIsManualSort] = useState(false);
-  const [sortOrderByTab, setSortOrderByTab] = useState({});
-
-  // Re-read from localStorage when user loads
-  useEffect(() => {
-    setIsManualSort(localStorage.getItem(sortKey) === "true");
+  const [isManualSort, setIsManualSort] = useState(() => {
+    const key = user?.id ? `myTasks_manualSort_${user.id}` : "myTasks_manualSort";
+    return localStorage.getItem(key) === "true";
+  });
+  const [sortOrderByTab, setSortOrderByTab] = useState(() => {
     try {
-      const saved = localStorage.getItem(orderKey);
-      setSortOrderByTab(saved ? JSON.parse(saved) : {});
+      const key = user?.id ? `myTasks_sortOrderByTab_${user.id}` : "myTasks_sortOrderByTab";
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : {};
     } catch {
-      setSortOrderByTab({});
+      return {};
+    }
+  });
+
+  // Re-sync if user changes (login switch)
+  const prevSortKeyRef = useRef(sortKey);
+  useEffect(() => {
+    if (prevSortKeyRef.current !== sortKey) {
+      prevSortKeyRef.current = sortKey;
+      setIsManualSort(localStorage.getItem(sortKey) === "true");
+      try {
+        const saved = localStorage.getItem(orderKey);
+        setSortOrderByTab(saved ? JSON.parse(saved) : {});
+      } catch {
+        setSortOrderByTab({});
+      }
     }
   }, [sortKey, orderKey]);
   
