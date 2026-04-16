@@ -239,11 +239,25 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
       const formField = formFields.find(f => f.id === fieldId);
       if (formField) {
         const ft = formField.field_type || formField.type;
-        if (ft === "datetime" && typeof val === "string") {
+        if (ft === "datetime" && val != null) {
+          // Convert various date formats to YYYY-MM-DDTHH:MM for datetime-local input
+          const str = String(val);
           try {
-            const d = new Date(val);
+            // Try direct ISO parse first
+            let d = new Date(str);
+            // If that fails, try common formats: "DD-MM-YYYY HH:MM", "DD/MM/YYYY HH:MM"
+            if (isNaN(d.getTime())) {
+              const m = str.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})\s*(\d{1,2}):(\d{2})/);
+              if (m) d = new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]), parseInt(m[4]), parseInt(m[5]));
+            }
+            // Also try "YYYY-MM-DD HH:MM" (space instead of T)
+            if (isNaN(d.getTime())) {
+              const m2 = str.match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\s+(\d{1,2}):(\d{2})/);
+              if (m2) d = new Date(parseInt(m2[1]), parseInt(m2[2])-1, parseInt(m2[3]), parseInt(m2[4]), parseInt(m2[5]));
+            }
             if (!isNaN(d.getTime())) {
-              val = d.toISOString().slice(0, 16);
+              const pad = (n) => String(n).padStart(2, '0');
+              val = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
             }
           } catch {}
         } else if (ft === "numeric" && val != null) {
@@ -760,6 +774,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
           <div key={field.id} className="space-y-1.5">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
+              <AiBadge />
             </Label>
             <LinkedEquipmentBadge />
             <Input
