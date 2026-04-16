@@ -611,7 +611,7 @@ const Layout = () => {
                 alt="AssetIQ" 
                 className="w-8 h-8 rounded-lg"
               />
-              <span className="text-base font-semibold text-slate-900 dark:text-white hidden sm:block" data-testid="app-logo">
+              <span className="text-base font-semibold text-slate-900 dark:text-white" data-testid="app-logo">
                 AssetIQ
               </span>
             </div>
