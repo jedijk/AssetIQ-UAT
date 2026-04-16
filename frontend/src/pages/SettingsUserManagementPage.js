@@ -46,6 +46,7 @@ import {
   KeyRound,
   PlayCircle,
   ArrowLeft,
+  Smartphone,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -697,6 +698,19 @@ const SettingsUserManagementPage = () => {
                           disabled={resetIntroMutation.isPending}
                         >
                           <PlayCircle className="w-4 h-4 mr-2" /> Reset Intro Tour
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => {
+                            const newVal = !user.default_simple_mode;
+                            updateProfileMutation.mutate({ userId: user.id, data: { default_simple_mode: newVal } });
+                            toast.success(`Simple Mode default ${newVal ? "enabled" : "disabled"} for ${user.name}`);
+                          }}
+                        >
+                          <Smartphone className="w-4 h-4 mr-2" /> 
+                          Default Simple Mode
+                          <span className={`ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded ${user.default_simple_mode ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
+                            {user.default_simple_mode ? "ON" : "OFF"}
+                          </span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {user.is_active ? (
@@ -1363,6 +1377,19 @@ const SettingsUserManagementPage = () => {
                               disabled={resetIntroMutation.isPending}
                             >
                               <PlayCircle className="w-4 h-4 mr-2" /> Reset Intro Tour
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                const newVal = !user.default_simple_mode;
+                                updateProfileMutation.mutate({ userId: user.id, data: { default_simple_mode: newVal } });
+                                toast.success(`Simple Mode default ${newVal ? "enabled" : "disabled"} for ${user.name}`);
+                              }}
+                            >
+                              <Smartphone className="w-4 h-4 mr-2" /> 
+                              Default Simple Mode
+                              <span className={`ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded ${user.default_simple_mode ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
+                                {user.default_simple_mode ? "ON" : "OFF"}
+                              </span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {user.is_active ? (

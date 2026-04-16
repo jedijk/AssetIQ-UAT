@@ -28,6 +28,7 @@ class UserResponse(BaseModel):
     must_change_password: Optional[bool] = False
     has_seen_intro: Optional[bool] = True
     avatar_url: Optional[str] = None  # URL to fetch user's avatar image
+    default_simple_mode: Optional[bool] = False
 
 
 class TokenResponse(BaseModel):

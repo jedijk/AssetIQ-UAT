@@ -93,6 +93,11 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("assetiq_intro_seen", "true");
     }
     
+    // Apply default simple mode on first login if set by admin
+    if (userData.default_simple_mode && !localStorage.getItem("operatorViewEnabled")) {
+      localStorage.setItem("operatorViewEnabled", "true");
+    }
+
     return { ...userData, must_change_password: must_change_password || userData.must_change_password };
     } catch (error) {
       // Log detailed error for debugging

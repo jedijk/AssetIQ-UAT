@@ -263,7 +263,7 @@ class RBACService:
         data: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
         """Update user profile (name, department, position)."""
-        allowed_fields = ["name", "department", "position", "phone"]
+        allowed_fields = ["name", "department", "position", "phone", "default_simple_mode"]
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
         update_data["updated_at"] = datetime.now(timezone.utc)
         
