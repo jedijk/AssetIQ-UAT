@@ -69,10 +69,20 @@ async def get_equipment_nodes(
         return result
     
     # Get all nodes that belong to assigned installations (no created_by filter)
-    nodes = await db.equipment_nodes.find(
+    nodes_cursor = await db.equipment_nodes.find(
         {"id": {"$in": list(equipment_ids)}},
         {"_id": 0}
-    ).sort("sort_order", 1).to_list(5000)
+    ).to_list(5000)
+    
+    # Sort nodes: those with sort_order first (by sort_order), then by tag, then by name
+    def sort_key(node):
+        has_sort = node.get("sort_order") is not None
+        sort_val = node.get("sort_order", 0) if has_sort else float('inf')
+        tag = node.get("tag") or ""
+        name = node.get("name") or ""
+        return (0 if has_sort else 1, sort_val, tag.lower(), name.lower())
+    
+    nodes = sorted(nodes_cursor, key=sort_key)
     
     result = {"nodes": nodes}
     # Cache for 2 minutes

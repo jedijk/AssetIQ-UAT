@@ -107,11 +107,25 @@ function buildTreeData(nodes, parentId = null, depth = 0) {
   return nodes
     .filter(n => n.parent_id === parentId)
     .sort((a, b) => {
-      // Handle null/undefined sort_order - treat as Infinity so they appear last
-      const aSort = a.sort_order ?? Infinity;
-      const bSort = b.sort_order ?? Infinity;
-      if (aSort !== bSort) return aSort - bSort;
-      return a.name.localeCompare(b.name);
+      // If both have sort_order set (manually ordered), use that
+      const aHasSort = a.sort_order !== null && a.sort_order !== undefined;
+      const bHasSort = b.sort_order !== null && b.sort_order !== undefined;
+      
+      if (aHasSort && bHasSort) {
+        return a.sort_order - b.sort_order;
+      }
+      
+      // If only one has sort_order, it comes first
+      if (aHasSort && !bHasSort) return -1;
+      if (!aHasSort && bHasSort) return 1;
+      
+      // Default: sort by tag alphabetically, then by name
+      const aTag = a.tag || '';
+      const bTag = b.tag || '';
+      const tagCompare = aTag.localeCompare(bTag);
+      if (tagCompare !== 0) return tagCompare;
+      
+      return (a.name || '').localeCompare(b.name || '');
     })
     .map(node => ({ ...node, children: buildTreeData(nodes, node.id, depth + 1) }));
 }

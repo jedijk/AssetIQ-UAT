@@ -95,11 +95,31 @@ const CRIT_COLORS = {
   low: "text-green-500"
 };
 
-// Build tree from flat nodes (sorted by sort_order, then name)
+// Build tree from flat nodes (sorted by tag alphabetically, then name)
 function buildTreeData(nodes, parentId = null) {
   return nodes
     .filter(n => n.parent_id === parentId)
-    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name))
+    .sort((a, b) => {
+      // If both have sort_order set (manually ordered), use that
+      const aHasSort = a.sort_order !== null && a.sort_order !== undefined;
+      const bHasSort = b.sort_order !== null && b.sort_order !== undefined;
+      
+      if (aHasSort && bHasSort) {
+        return a.sort_order - b.sort_order;
+      }
+      
+      // If only one has sort_order, it comes first
+      if (aHasSort && !bHasSort) return -1;
+      if (!aHasSort && bHasSort) return 1;
+      
+      // Default: sort by tag alphabetically, then by name
+      const aTag = a.tag || '';
+      const bTag = b.tag || '';
+      const tagCompare = aTag.localeCompare(bTag);
+      if (tagCompare !== 0) return tagCompare;
+      
+      return (a.name || '').localeCompare(b.name || '');
+    })
     .map(node => ({
       ...node,
       children: buildTreeData(nodes, node.id)
