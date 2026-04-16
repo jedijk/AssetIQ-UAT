@@ -802,7 +802,7 @@ export default function ProductionDashboardPage() {
                       const d = new Date(v + "T12:00:00");
                       if (!isNaN(d)) { setFromDate(d); setToDate(d); }
                     }}
-                    className="h-8 w-[110px] px-2 text-xs border border-slate-200 rounded-lg bg-white ml-1"
+                    className="h-8 w-[130px] px-2 text-xs border border-slate-200 rounded-lg bg-white ml-1"
                     data-testid="mobile-date-picker"
                   />
                 )}
@@ -825,8 +825,8 @@ export default function ProductionDashboardPage() {
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
 
-            {/* Date display - hide on mobile since we have date picker */}
-            <span className="hidden sm:flex text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2 sm:px-3 h-8 items-center tabular-nums whitespace-nowrap" data-testid="date-display">
+            {/* Date display - show on all screens */}
+            <span className="text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2 sm:px-3 h-8 flex items-center tabular-nums whitespace-nowrap" data-testid="date-display">
               {fromStr === toStr ? displayDate(fromDate) : `${displayDate(fromDate)} — ${displayDate(toDate)}`}
             </span>
 
