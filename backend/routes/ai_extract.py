@@ -190,15 +190,29 @@ async def extract_from_image(
         results = parsed.get("results", [])
 
         extracted = []
+        schema_fields = {f.key: f for f in schema.fields}
+        normalize = lambda s: ''.join(c for c in s.lower() if c.isalnum())
+        
         for item in results:
+            ai_key = item["key"]
+            # Try to match AI key back to schema field (exact, then normalized)
+            matched_key = ai_key
+            if ai_key not in schema_fields:
+                norm_ai = normalize(ai_key)
+                for sf_key in schema_fields:
+                    if normalize(sf_key) == norm_ai:
+                        matched_key = sf_key
+                        break
+            
             extracted.append(ExtractedValue(
-                key=item["key"],
+                key=matched_key,
                 value=item.get("value"),
                 confidence=float(item.get("confidence", 0)),
                 raw_text=item.get("raw_text"),
             ))
 
         logger.info(f"[AI Extract] success - {len(extracted)} fields extracted")
+        logger.info(f"[AI Extract] keys returned: {[e.key for e in extracted]}")
         return ExtractionResponse(success=True, extracted=extracted)
 
     except json.JSONDecodeError:
