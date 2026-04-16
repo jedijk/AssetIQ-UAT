@@ -352,7 +352,12 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
             <div className="flex-1 min-w-0 flex items-center gap-2">
               {node.tag ? (
                 <span className={`text-sm font-medium truncate ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>
-                  <span className="font-mono text-slate-500">{node.tag}</span>
+                  <span className="font-mono text-slate-500">
+                    {/* For maintainable items, show only the last part of the tag */}
+                    {node.level === 'maintainable_item' && node.tag.includes('-') 
+                      ? node.tag.split('-').pop() 
+                      : node.tag}
+                  </span>
                   <span className="mx-1 text-slate-300">-</span>
                   <span>{node.name}</span>
                 </span>

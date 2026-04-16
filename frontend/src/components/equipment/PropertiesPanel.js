@@ -510,7 +510,11 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
               <h3 className="font-semibold text-slate-800 truncate">
                 {node.tag && (
                   <>
-                    <span className="font-mono text-slate-500 font-normal">{node.tag}</span>
+                    <span className="font-mono text-slate-500 font-normal">
+                      {node.level === 'maintainable_item' && node.tag.includes('-') 
+                        ? node.tag.split('-').pop() 
+                        : node.tag}
+                    </span>
                     <span className="mx-1 text-slate-300">-</span>
                   </>
                 )}

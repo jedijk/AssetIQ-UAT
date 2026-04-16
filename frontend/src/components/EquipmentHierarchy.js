@@ -296,7 +296,12 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           <Icon className={`w-4 h-4 ${critColor || config.color} flex-shrink-0`} />
           {node.tag ? (
             <span className={`text-sm font-medium truncate flex-1 ${isSearchMatch ? 'text-yellow-800' : ''}`}>
-              <span className="font-mono text-slate-500">{node.tag}</span>
+              <span className="font-mono text-slate-500">
+                {/* For maintainable items, show only the last part of the tag (after last dash/separator) */}
+                {node.level === 'maintainable_item' && node.tag.includes('-') 
+                  ? node.tag.split('-').pop() 
+                  : node.tag}
+              </span>
               <span className="mx-1 text-slate-300">-</span>
               <span>{node.name}</span>
             </span>

@@ -165,7 +165,12 @@ const MobileHierarchy = () => {
               <span className="node-name">
                 {node.tag ? (
                   <>
-                    <span style={{ fontFamily: 'monospace', color: '#64748b' }}>{node.tag}</span>
+                    <span style={{ fontFamily: 'monospace', color: '#64748b' }}>
+                      {/* For maintainable items, show only the last part of the tag */}
+                      {node.level === 'maintainable_item' && node.tag.includes('-') 
+                        ? node.tag.split('-').pop() 
+                        : node.tag}
+                    </span>
                     <span style={{ margin: '0 4px', color: '#cbd5e1' }}>-</span>
                     <span>{node.name}</span>
                   </>
@@ -248,7 +253,11 @@ const MobileHierarchy = () => {
                     <span className="node-name">
                       {node.tag ? (
                         <>
-                          <span style={{ fontFamily: 'monospace', color: '#64748b' }}>{node.tag}</span>
+                          <span style={{ fontFamily: 'monospace', color: '#64748b' }}>
+                            {node.level === 'maintainable_item' && node.tag.includes('-') 
+                              ? node.tag.split('-').pop() 
+                              : node.tag}
+                          </span>
                           <span style={{ margin: '0 4px', color: '#cbd5e1' }}>-</span>
                           <span>{node.name}</span>
                         </>
@@ -287,7 +296,11 @@ const MobileHierarchy = () => {
                   <h3>
                     {node.tag ? (
                       <>
-                        <span style={{ fontFamily: 'monospace', color: '#64748b', fontSize: '0.85em' }}>{node.tag}</span>
+                        <span style={{ fontFamily: 'monospace', color: '#64748b', fontSize: '0.85em' }}>
+                          {node.level === 'maintainable_item' && node.tag.includes('-') 
+                            ? node.tag.split('-').pop() 
+                            : node.tag}
+                        </span>
                         <span style={{ margin: '0 6px', color: '#cbd5e1' }}>-</span>
                         <span>{node.name}</span>
                       </>
