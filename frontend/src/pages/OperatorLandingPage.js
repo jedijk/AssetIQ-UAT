@@ -2,6 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
+const haptic = () => {
+  if (navigator.vibrate) navigator.vibrate(15);
+};
+
 export default function OperatorLandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -12,6 +16,8 @@ export default function OperatorLandingPage() {
     if (hour < 18) return "Good afternoon";
     return "Good evening";
   };
+
+  const handleClick = (fn) => () => { haptic(); fn(); };
 
   return (
     <div
@@ -28,8 +34,8 @@ export default function OperatorLandingPage() {
 
       <div className="flex flex-col gap-4 w-full max-w-xs">
         <button
-          onClick={() => navigate("/my-tasks")}
-          className="flex items-center justify-center gap-3 rounded-2xl p-6 bg-emerald-600 shadow-lg shadow-emerald-200 text-white active:scale-95 transition-transform w-full"
+          onClick={handleClick(() => navigate("/my-tasks"))}
+          className="flex items-center justify-center gap-3 rounded-2xl p-6 bg-emerald-600 text-white w-full shadow-xl shadow-emerald-300/50 active:scale-[0.97] active:shadow-md transition-all duration-150"
           data-testid="operator-btn-my-tasks"
         >
           <ClipboardCheck className="w-8 h-8" strokeWidth={2} />
@@ -38,8 +44,8 @@ export default function OperatorLandingPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <button
-            onClick={() => window.dispatchEvent(new CustomEvent("open-hierarchy"))}
-            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-blue-600 shadow-lg shadow-blue-200 text-white active:scale-95 transition-transform"
+            onClick={handleClick(() => window.dispatchEvent(new CustomEvent("open-hierarchy")))}
+            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-blue-600 text-white shadow-xl shadow-blue-300/50 active:scale-[0.97] active:shadow-md transition-all duration-150"
             data-testid="operator-btn-equipment"
           >
             <Building2 className="w-8 h-8" strokeWidth={2} />
@@ -47,8 +53,8 @@ export default function OperatorLandingPage() {
           </button>
 
           <button
-            onClick={() => navigate("/production")}
-            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-violet-600 shadow-lg shadow-violet-200 text-white active:scale-95 transition-transform"
+            onClick={handleClick(() => navigate("/production"))}
+            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-violet-600 text-white shadow-xl shadow-violet-300/50 active:scale-[0.97] active:shadow-md transition-all duration-150"
             data-testid="operator-btn-production"
           >
             <Activity className="w-8 h-8" strokeWidth={2} />
