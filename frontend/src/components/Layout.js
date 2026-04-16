@@ -13,7 +13,7 @@ import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.3.0";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.4.0";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -97,53 +97,43 @@ const Layout = () => {
   // Track page views for user statistics
   usePageTracking();
   
-  // Version check - non-intrusive notification only (no auto-reload)
+  // Version check - one-time forced refresh for users on older versions
   useEffect(() => {
+    const CURRENT_VERSION = "3.4.0";
+    const STORAGE_KEY = `assetiq_updated_${CURRENT_VERSION}`;
+    
+    // If user already got this update, just skip
+    if (localStorage.getItem(STORAGE_KEY) === "true") return;
+
     const checkVersion = async () => {
       try {
-        // Skip if we've already shown the update notification this session
-        if (sessionStorage.getItem('version_notified')) return;
-        
         const response = await fetch(`${getBackendUrl()}/api/health`);
-        if (response.ok) {
-          const data = await response.json();
-          const backendVersion = data.version;
+        if (!response.ok) return;
+        const data = await response.json();
+        
+        if (data.version === CURRENT_VERSION) {
+          // Backend is on new version — force refresh once for users on old cached frontend
+          localStorage.setItem(STORAGE_KEY, "true");
           
-          // Compare major.minor versions (ignore patch for flexibility)
-          const frontendMajorMinor = APP_VERSION.split('.').slice(0, 2).join('.');
-          const backendMajorMinor = backendVersion?.split('.').slice(0, 2).join('.');
-          
-          if (backendMajorMinor && frontendMajorMinor !== backendMajorMinor) {
-            console.log(`Version mismatch: Frontend ${APP_VERSION}, Backend ${backendVersion}`);
-            sessionStorage.setItem('version_notified', 'true');
-            
-            // Show a toast with manual refresh option instead of auto-reload
-            toast.info(`New version ${backendVersion} available`, {
-              description: 'Refresh the page to get the latest updates.',
-              duration: 10000,
-              action: {
-                label: 'Refresh Now',
-                onClick: () => {
-                  // Clear caches before refresh
-                  if ('caches' in window) {
-                    caches.keys().then(names => {
-                      names.forEach(name => caches.delete(name));
-                    });
-                  }
-                  window.location.reload();
-                }
-              }
-            });
+          // Clear caches
+          if ('caches' in window) {
+            const names = await caches.keys();
+            await Promise.all(names.map(n => caches.delete(n)));
           }
+          
+          // Show toast then reload
+          toast.success("AssetIQ updated to v3.4.0", {
+            description: "AI Photo Extraction, Simple Mode & more. Refreshing...",
+            duration: 3000,
+          });
+          setTimeout(() => window.location.reload(), 3000);
         }
       } catch (error) {
         console.log('Version check failed:', error);
       }
     };
     
-    // Check version after a delay
-    const timeout = setTimeout(checkVersion, 5000);
-    
+    const timeout = setTimeout(checkVersion, 2000);
     return () => clearTimeout(timeout);
   }, []);
   
