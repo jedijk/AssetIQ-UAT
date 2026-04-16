@@ -13,7 +13,7 @@ import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.4.2";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.4.3";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -97,26 +97,43 @@ const Layout = () => {
   // Track page views for user statistics
   usePageTracking();
   
-  // Version check - one-time notification for users after update
+  // Version check - one-time forced refresh for users on older versions
   useEffect(() => {
     const STORAGE_KEY = `assetiq_updated_${APP_VERSION}`;
-    
-    // If user already saw this update notification, skip
     if (localStorage.getItem(STORAGE_KEY) === "true") return;
+    
+    // Only run when user is authenticated
+    if (!user) return;
 
-    // Mark as seen immediately to prevent re-triggering
-    localStorage.setItem(STORAGE_KEY, "true");
+    const checkVersion = async () => {
+      try {
+        const response = await fetch(`${getBackendUrl()}/api/health`);
+        if (!response.ok) return;
+        const data = await response.json();
+        
+        if (data.version === APP_VERSION) {
+          localStorage.setItem(STORAGE_KEY, "true");
+          
+          // Clear caches
+          if ('caches' in window) {
+            const names = await caches.keys();
+            await Promise.all(names.map(n => caches.delete(n)));
+          }
+          
+          toast.success(`AssetIQ updated to v${APP_VERSION}`, {
+            description: "UI improvements & bug fixes. Refreshing...",
+            duration: 2000,
+          });
+          setTimeout(() => window.location.reload(), 2000);
+        }
+      } catch (error) {
+        console.log('Version check failed:', error);
+      }
+    };
     
-    // Show toast after a short delay (let the app settle)
-    const timeout = setTimeout(() => {
-      toast.success(`AssetIQ updated to v${APP_VERSION}`, {
-        description: "Hierarchy level filtering, Simple Mode defaults & fixes.",
-        duration: 5000,
-      });
-    }, 3000);
-    
+    const timeout = setTimeout(checkVersion, 3000);
     return () => clearTimeout(timeout);
-  }, []);
+  }, [user]);
   
   // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {
