@@ -98,6 +98,11 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("operatorViewEnabled", "true");
     }
 
+    // Set default hidden hierarchy levels for new users
+    if (!localStorage.getItem("hierarchy-hidden-levels")) {
+      localStorage.setItem("hierarchy-hidden-levels", JSON.stringify(["installation", "plant_unit"]));
+    }
+
     return { ...userData, must_change_password: must_change_password || userData.must_change_password };
     } catch (error) {
       // Log detailed error for debugging
