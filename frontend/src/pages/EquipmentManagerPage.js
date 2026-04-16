@@ -106,7 +106,13 @@ function buildTreeData(nodes, parentId = null, depth = 0) {
   if (depth > 10) return [];
   return nodes
     .filter(n => n.parent_id === parentId)
-    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name))
+    .sort((a, b) => {
+      // Handle null/undefined sort_order - treat as Infinity so they appear last
+      const aSort = a.sort_order ?? Infinity;
+      const bSort = b.sort_order ?? Infinity;
+      if (aSort !== bSort) return aSort - bSort;
+      return a.name.localeCompare(b.name);
+    })
     .map(node => ({ ...node, children: buildTreeData(nodes, node.id, depth + 1) }));
 }
 

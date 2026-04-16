@@ -132,12 +132,17 @@ async def reorder_equipment_node(
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
-    current_sort = node.get("sort_order", 0)
-    
-    siblings = await db.equipment_nodes.find(
+    # Get all siblings and sort properly (nulls at end)
+    siblings_cursor = await db.equipment_nodes.find(
         {"parent_id": node["parent_id"]},
         {"_id": 0}
-    ).sort("sort_order", 1).to_list(1000)
+    ).to_list(1000)
+    
+    siblings = sorted(siblings_cursor, key=lambda x: (
+        0 if x.get("sort_order") is not None else 1,
+        x.get("sort_order") if x.get("sort_order") is not None else 0,
+        x.get("name", "")
+    ))
     
     if len(siblings) <= 1:
         raise HTTPException(status_code=400, detail="No siblings to reorder with")
@@ -155,19 +160,20 @@ async def reorder_equipment_node(
             raise HTTPException(status_code=400, detail="Already at the bottom")
         target_idx = current_idx + 1
     
+    # Ensure both nodes have proper sort_order values after swap
     target_node = siblings[target_idx]
-    target_sort = target_node.get("sort_order", target_idx)
     
+    # Use the index as the sort_order to ensure proper ordering
     await db.equipment_nodes.update_one(
         {"id": node_id},
-        {"$set": {"sort_order": target_sort, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {"sort_order": target_idx, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     await db.equipment_nodes.update_one(
         {"id": target_node["id"]},
-        {"$set": {"sort_order": current_sort, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {"sort_order": current_idx, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
-    return {"message": f"Node moved {request.direction}", "new_sort_order": target_sort}
+    return {"message": f"Node moved {request.direction}", "new_sort_order": target_idx}
 
 
 @router.post("/equipment-hierarchy/nodes/{node_id}/reorder-to")
@@ -208,12 +214,22 @@ async def reorder_node_to_position(
             if node["level"] != "installation":
                 raise HTTPException(status_code=400, detail="Only installations can be at root level")
     
-    siblings = await db.equipment_nodes.find(
+    # Get all siblings (excluding the node being moved) and sort properly
+    # Nodes without sort_order should appear at the end
+    siblings_cursor = await db.equipment_nodes.find(
         {"parent_id": new_parent_id},
         {"_id": 0}
-    ).sort("sort_order", 1).to_list(1000)
+    ).to_list(1000)
     
-    siblings = [s for s in siblings if s["id"] != node_id]
+    # Filter out the node being moved and sort:
+    # - Nodes with sort_order come first, sorted by sort_order
+    # - Nodes without sort_order come last, sorted by name
+    siblings = [s for s in siblings_cursor if s["id"] != node_id]
+    siblings.sort(key=lambda x: (
+        0 if x.get("sort_order") is not None else 1,  # Has sort_order first
+        x.get("sort_order") if x.get("sort_order") is not None else 0,
+        x.get("name", "")
+    ))
     
     target_idx = next((i for i, s in enumerate(siblings) if s["id"] == request.target_node_id), -1)
     
@@ -224,13 +240,14 @@ async def reorder_node_to_position(
     else:
         insert_idx = target_idx + 1
     
+    # Update all siblings to have sequential sort_order values
     for i, sibling in enumerate(siblings):
         new_sort = i if i < insert_idx else i + 1
-        if sibling.get("sort_order", 0) != new_sort:
-            await db.equipment_nodes.update_one(
-                {"id": sibling["id"]},
-                {"$set": {"sort_order": new_sort, "updated_at": datetime.now(timezone.utc).isoformat()}}
-            )
+        # Always update to ensure all siblings have proper sort_order
+        await db.equipment_nodes.update_one(
+            {"id": sibling["id"]},
+            {"$set": {"sort_order": new_sort, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
     
     await db.equipment_nodes.update_one(
         {"id": node_id},
