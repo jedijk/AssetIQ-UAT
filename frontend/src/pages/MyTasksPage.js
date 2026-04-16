@@ -109,6 +109,8 @@ import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
 import { DISCIPLINES } from "../constants/disciplines";
 import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame";
 import TaskCard, { priorityColors, taskTypeIcons, SortableTaskCard } from "../components/task-execution/TaskCard";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // API functions for My Tasks
 import { myTasksAPI } from "../lib/api";
@@ -123,6 +125,130 @@ const sourceBadges = {
   recurring: { label: "Recurring", color: "bg-emerald-100 text-emerald-700" },
 };
 
+// Sortable Ad-hoc Plan Card Component
+const SortableAdhocPlanCard = ({ plan, tasksData, setSelectedTask, setViewMode, executeAdhocMutation }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: plan.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <div
+        className={cn(
+          "bg-white rounded-lg border border-amber-200 p-4 hover:shadow-md transition-all",
+          isDragging && "shadow-lg ring-2 ring-amber-400 opacity-90"
+        )}
+        data-testid={`adhoc-plan-${plan.id}`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          {/* Drag Handle */}
+          <div 
+            {...listeners}
+            className="flex-shrink-0 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 -ml-1 mr-1 mt-1 touch-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="w-5 h-5" />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            {/* Title */}
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="w-4 h-4 flex-shrink-0 text-amber-500" />
+              <h3 className="font-medium text-slate-900 truncate">{plan.title}</h3>
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                Ad-hoc
+              </Badge>
+            </div>
+            
+            {/* Equipment */}
+            <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-2">
+              <MapPin className="w-3.5 h-3.5" />
+              <span className="truncate">{plan.equipment_name}</span>
+            </div>
+            
+            {/* Tags Row */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {plan.discipline && (
+                <Badge variant="outline" className="text-xs bg-slate-50">
+                  {plan.discipline}
+                </Badge>
+              )}
+              {plan.has_form && (
+                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                  <FileText className="w-3 h-3 mr-1" />
+                  Form
+                </Badge>
+              )}
+              {plan.execution_count > 0 && (
+                <span className="text-xs text-slate-400">
+                  Executed {plan.execution_count}x
+                </span>
+              )}
+            </div>
+          </div>
+          
+          {/* Right Side - Execute/Continue Button */}
+          <div className="flex flex-col items-end gap-2">
+            {plan.has_in_progress_task ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-500 text-amber-600 hover:bg-amber-50"
+                onClick={() => {
+                  const task = tasksData?.tasks?.find(t => t.id === plan.in_progress_task_id);
+                  if (task) {
+                    setSelectedTask(task);
+                    setViewMode("execution");
+                  } else {
+                    executeAdhocMutation.mutate(plan.id);
+                  }
+                }}
+                data-testid={`continue-adhoc-${plan.id}`}
+              >
+                <Play className="w-4 h-4 mr-1" />
+                Continue
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+                onClick={() => executeAdhocMutation.mutate(plan.id)}
+                disabled={executeAdhocMutation.isPending}
+                data-testid={`execute-adhoc-${plan.id}`}
+              >
+                {executeAdhocMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-1" />
+                    Execute
+                  </>
+                )}
+              </Button>
+            )}
+            {plan.last_executed_at && (
+              <span className="text-xs text-slate-400">
+                Last: {format(parseISO(plan.last_executed_at), "MMM d")}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Main My Tasks Page Component
 const MyTasksPage = () => {
   const { t } = useLanguage();
@@ -135,18 +261,29 @@ const MyTasksPage = () => {
   const [viewMode, setViewMode] = useState("list"); // "list" or "execution"
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
   
-  // Manual sorting state
+  // Manual sorting state - stored per tab
   const [isManualSort, setIsManualSort] = useState(() => {
     return localStorage.getItem("myTasks_manualSort") === "true";
   });
-  const [manualSortOrder, setManualSortOrder] = useState(() => {
+  const [sortOrderByTab, setSortOrderByTab] = useState(() => {
     try {
-      const saved = localStorage.getItem("myTasks_sortOrder");
-      return saved ? JSON.parse(saved) : [];
+      const saved = localStorage.getItem("myTasks_sortOrderByTab");
+      return saved ? JSON.parse(saved) : {};
     } catch {
-      return [];
+      return {};
     }
   });
+  
+  // Get current tab's sort order
+  const manualSortOrder = sortOrderByTab[activeFilter] || [];
+  
+  // Update sort order for current tab
+  const setManualSortOrder = (newOrder) => {
+    setSortOrderByTab(prev => ({
+      ...prev,
+      [activeFilter]: newOrder
+    }));
+  };
   
   // DnD sensors for both mouse and touch
   const sensors = useSensors(
@@ -171,12 +308,12 @@ const MyTasksPage = () => {
     localStorage.setItem("myTasks_manualSort", isManualSort.toString());
   }, [isManualSort]);
   
-  // Save sort order when it changes
+  // Save sort orders when they change
   useEffect(() => {
-    if (manualSortOrder.length > 0) {
-      localStorage.setItem("myTasks_sortOrder", JSON.stringify(manualSortOrder));
+    if (Object.keys(sortOrderByTab).length > 0) {
+      localStorage.setItem("myTasks_sortOrderByTab", JSON.stringify(sortOrderByTab));
     }
-  }, [manualSortOrder]);
+  }, [sortOrderByTab]);
   
   // Closure suggestion dialog state
   const [closureSuggestion, setClosureSuggestion] = useState(null);
@@ -491,16 +628,18 @@ const MyTasksPage = () => {
       })
     : autoSortedTasks;
   
-  // Handle drag end for manual sorting
+  // Handle drag end for manual sorting - works for both tasks and adhoc plans
   const handleDragEnd = (event) => {
     const { active, over } = event;
     
     if (over && active.id !== over.id) {
-      const oldIndex = sortedTasks.findIndex((t) => t.id === active.id);
-      const newIndex = sortedTasks.findIndex((t) => t.id === over.id);
+      // Determine which list we're sorting
+      const currentList = activeFilter === "adhoc" ? sortedAdhocPlans : sortedTasks;
+      const oldIndex = currentList.findIndex((item) => item.id === active.id);
+      const newIndex = currentList.findIndex((item) => item.id === over.id);
       
       if (oldIndex !== -1 && newIndex !== -1) {
-        const newOrder = arrayMove(sortedTasks, oldIndex, newIndex).map((t) => t.id);
+        const newOrder = arrayMove(currentList, oldIndex, newIndex).map((item) => item.id);
         setManualSortOrder(newOrder);
         
         // Enable manual sort if not already
@@ -518,16 +657,37 @@ const MyTasksPage = () => {
       setIsManualSort(false);
       toast.info("Auto-sorting by priority & due date");
     } else {
-      // Switching to manual sort - capture current order
-      setManualSortOrder(sortedTasks.map((t) => t.id));
+      // Switching to manual sort - capture current order for the active tab
+      const currentList = activeFilter === "adhoc" ? sortedAdhocPlans : sortedTasks;
+      setManualSortOrder(currentList.map((item) => item.id));
       setIsManualSort(true);
-      toast.success("Manual sorting enabled. Drag tasks to reorder.");
+      toast.success("Manual sorting enabled. Drag items to reorder.");
     }
   };
   
   // Calculate stats - adjust for adhoc tab
   const adhocPlans = adhocPlansData?.plans || [];
   const isAdhocTab = activeFilter === "adhoc";
+  
+  // Sort adhoc plans - manual or default (by last executed, then by title)
+  const sortedAdhocPlans = isManualSort && manualSortOrder.length > 0
+    ? [...adhocPlans].sort((a, b) => {
+        const aIndex = manualSortOrder.indexOf(a.id);
+        const bIndex = manualSortOrder.indexOf(b.id);
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
+        // Default sort: in-progress first, then by last executed
+        if (a.has_in_progress_task && !b.has_in_progress_task) return -1;
+        if (!a.has_in_progress_task && b.has_in_progress_task) return 1;
+        return (a.title || "").localeCompare(b.title || "");
+      })
+    : [...adhocPlans].sort((a, b) => {
+        // Default: in-progress tasks first, then alphabetically
+        if (a.has_in_progress_task && !b.has_in_progress_task) return -1;
+        if (!a.has_in_progress_task && b.has_in_progress_task) return 1;
+        return (a.title || "").localeCompare(b.title || "");
+      });
   
   const stats = {
     total: isAdhocTab ? adhocPlans.length : tasks.length,
@@ -785,100 +945,28 @@ const MyTasksPage = () => {
               </Button>
             </div>
           ) : (
-            (adhocPlansData?.plans || []).map((plan) => (
-              <div
-                key={plan.id}
-                className="bg-white rounded-lg border border-amber-200 p-4 hover:shadow-md transition-all"
-                data-testid={`adhoc-plan-${plan.id}`}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+              modifiers={[restrictToVerticalAxis]}
+            >
+              <SortableContext
+                items={sortedAdhocPlans.map((p) => p.id)}
+                strategy={verticalListSortingStrategy}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    {/* Title */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <Zap className="w-4 h-4 flex-shrink-0 text-amber-500" />
-                      <h3 className="font-medium text-slate-900 truncate">{plan.title}</h3>
-                      <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
-                        Ad-hoc
-                      </Badge>
-                    </div>
-                    
-                    {/* Equipment */}
-                    <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-2">
-                      <MapPin className="w-3.5 h-3.5" />
-                      <span className="truncate">{plan.equipment_name}</span>
-                    </div>
-                    
-                    {/* Tags Row */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {plan.discipline && (
-                        <Badge variant="outline" className="text-xs bg-slate-50">
-                          {plan.discipline}
-                        </Badge>
-                      )}
-                      {plan.has_form && (
-                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                          <FileText className="w-3 h-3 mr-1" />
-                          Form
-                        </Badge>
-                      )}
-                      {plan.execution_count > 0 && (
-                        <span className="text-xs text-slate-400">
-                          Executed {plan.execution_count}x
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Right Side - Execute/Continue Button */}
-                  <div className="flex flex-col items-end gap-2">
-                    {plan.has_in_progress_task ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-amber-500 text-amber-600 hover:bg-amber-50"
-                        onClick={() => {
-                          // Load the in-progress task and open execution view
-                          const task = tasksData?.tasks?.find(t => t.id === plan.in_progress_task_id);
-                          if (task) {
-                            setSelectedTask(task);
-                            setViewMode("execution");
-                          } else {
-                            // Fetch and start the task
-                            executeAdhocMutation.mutate(plan.id);
-                          }
-                        }}
-                        data-testid={`continue-adhoc-${plan.id}`}
-                      >
-                        <Play className="w-4 h-4 mr-1" />
-                        Continue
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="bg-amber-500 hover:bg-amber-600 text-white"
-                        onClick={() => executeAdhocMutation.mutate(plan.id)}
-                        disabled={executeAdhocMutation.isPending}
-                        data-testid={`execute-adhoc-${plan.id}`}
-                      >
-                        {executeAdhocMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Play className="w-4 h-4 mr-1" />
-                            Execute
-                          </>
-                        )}
-                      </Button>
-                    )}
-                    {plan.last_executed_at && (
-                      <span className="text-xs text-slate-400">
-                        Last: {format(parseISO(plan.last_executed_at), "MMM d")}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))
+                {sortedAdhocPlans.map((plan) => (
+                  <SortableAdhocPlanCard
+                    key={plan.id}
+                    plan={plan}
+                    tasksData={tasksData}
+                    setSelectedTask={setSelectedTask}
+                    setViewMode={setViewMode}
+                    executeAdhocMutation={executeAdhocMutation}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           )
         ) : (
           // Regular Tasks View
