@@ -9,7 +9,7 @@ const CONFIDENCE_COLORS = {
   missing: "ring-red-300 bg-red-50",
 };
 
-export default function PhotoDataCaptureField({ config, formData, onAutoFill }) {
+export default function PhotoDataCaptureField({ config, formData, onAutoFill, formTemplateId }) {
   const [status, setStatus] = useState("idle"); // idle, processing, success, error
   const [preview, setPreview] = useState(null);
   const [results, setResults] = useState([]);
@@ -51,6 +51,7 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill }) 
     const fd = new FormData();
     fd.append("image", file);
     fd.append("schema_json", JSON.stringify(schema));
+    if (formTemplateId) fd.append("form_template_id", formTemplateId);
 
     try {
       const token = localStorage.getItem("token");

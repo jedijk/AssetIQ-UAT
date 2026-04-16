@@ -376,6 +376,26 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
         attachments: processedAttachments.filter(a => a.data),
         ai_extraction: extractionData,
       });
+
+      // Send corrections to backend for learning (fire-and-forget)
+      if (hasExtraction && Object.keys(aiCorrections).length > 0 && task?.form_template_id) {
+        try {
+          const token = localStorage.getItem("token");
+          const corrections = Object.entries(aiCorrections).map(([fieldId, c]) => ({
+            field_key: fieldId,
+            ai_value: c.original_ai_value,
+            corrected_value: c.corrected_value,
+          }));
+          fetch(`${API_BASE_URL}/api/ai/extract/corrections`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ form_template_id: task.form_template_id, corrections }),
+          });
+        } catch (e) {
+          // Non-critical, don't block submission
+        }
+      }
+
       // Clear draft on successful submission
       if (task?.id) {
         clearDraft(task.id);
@@ -1050,6 +1070,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
           config={photoExtractionConfig}
           formData={formData}
           onAutoFill={handlePhotoAutoFill}
+          formTemplateId={task?.form_template_id}
         />
       )}
 

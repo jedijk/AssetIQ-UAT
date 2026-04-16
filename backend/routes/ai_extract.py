@@ -2,15 +2,18 @@
 AI Photo Data Extraction API
 Universal photo data capture with configurable AI extraction.
 Uses OpenAI GPT-4o Vision to extract structured data from images.
+Includes learning from past user corrections.
 """
 import os
 import json
 import base64
 import logging
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from auth import get_current_user
+from database import db
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
@@ -22,7 +25,7 @@ VISION_KEY = os.environ.get("OPENAI_VISION_KEY", "")
 class ExtractionField(BaseModel):
     key: str
     description: str
-    type: str = "string"  # string, number, enum
+    type: str = "string"
     unit: Optional[str] = None
     required: bool = False
     enum_values: Optional[List[str]] = None
@@ -30,7 +33,7 @@ class ExtractionField(BaseModel):
 
 class ExtractionSchema(BaseModel):
     fields: List[ExtractionField]
-    mode: str = "hybrid"  # structured, text, classification, hybrid
+    mode: str = "hybrid"
     prompt_template: Optional[str] = None
     confidence_threshold: float = 0.7
 
@@ -48,9 +51,51 @@ class ExtractionResponse(BaseModel):
     message: Optional[str] = None
 
 
-def _build_prompt(schema: ExtractionSchema) -> str:
+async def _get_learned_hints(form_template_id: Optional[str]) -> List[str]:
+    """Fetch past corrections to enhance the prompt."""
+    if not form_template_id:
+        return []
+
+    try:
+        # Aggregate corrections: group by field key, find most common correction patterns
+        pipeline = [
+            {"$match": {"form_template_id": form_template_id}},
+            {"$sort": {"created_at": -1}},
+            {"$limit": 50},  # Last 50 corrections
+            {"$group": {
+                "_id": "$field_key",
+                "corrections": {"$push": {
+                    "ai_value": "$ai_value",
+                    "corrected_value": "$corrected_value",
+                }},
+                "count": {"$sum": 1},
+            }},
+            {"$match": {"count": {"$gte": 2}}},  # Only fields corrected 2+ times
+        ]
+        results = await db.ai_extraction_corrections.aggregate(pipeline).to_list(20)
+
+        hints = []
+        for r in results:
+            key = r["_id"]
+            # Find the most recent correction pattern
+            latest = r["corrections"][0]
+            hints.append(
+                f'Note for "{key}": Users have corrected this field {r["count"]} times. '
+                f'AI often reads "{latest["ai_value"]}" but correct value tends to be "{latest["corrected_value"]}". '
+                f'Please be extra careful with this field.'
+            )
+        return hints
+    except Exception as e:
+        logger.warning(f"[AI Extract] Failed to fetch correction hints: {e}")
+        return []
+
+
+def _build_prompt(schema: ExtractionSchema, hints: List[str] = None) -> str:
     if schema.prompt_template:
-        return schema.prompt_template
+        prompt = schema.prompt_template
+        if hints:
+            prompt += "\n\nLearned corrections from past usage:\n" + "\n".join(hints)
+        return prompt
 
     lines = [
         "Analyze this image and extract the following data fields.",
@@ -67,6 +112,13 @@ def _build_prompt(schema: ExtractionSchema) -> str:
             desc += f" (must be one of: {', '.join(f.enum_values)})"
         required = " [REQUIRED]" if f.required else ""
         lines.append(f'  - "{f.key}": {desc}{required} (type: {f.type})')
+
+    # Append learned corrections
+    if hints:
+        lines.append("")
+        lines.append("IMPORTANT - Learned corrections from past usage:")
+        for h in hints:
+            lines.append(f"  {h}")
 
     lines.append("")
     lines.append("Return ONLY valid JSON in this exact format:")
@@ -85,6 +137,7 @@ def _build_prompt(schema: ExtractionSchema) -> str:
 async def extract_from_image(
     image: UploadFile = File(...),
     schema_json: str = Form(...),
+    form_template_id: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
     if not VISION_KEY:
@@ -101,8 +154,13 @@ async def extract_from_image(
     mime = image.content_type or "image/jpeg"
     data_uri = f"data:{mime};base64,{b64}"
 
-    prompt = _build_prompt(schema)
-    logger.info(f"[AI Extract] user={current_user.get('id')} fields={len(schema.fields)} mode={schema.mode}")
+    # Fetch learned hints from past corrections
+    hints = await _get_learned_hints(form_template_id)
+    if hints:
+        logger.info(f"[AI Extract] Applying {len(hints)} learned correction hints")
+
+    prompt = _build_prompt(schema, hints)
+    logger.info(f"[AI Extract] user={current_user.get('id')} fields={len(schema.fields)} mode={schema.mode} hints={len(hints)}")
 
     try:
         client = OpenAI(api_key=VISION_KEY)
@@ -122,7 +180,6 @@ async def extract_from_image(
         )
 
         raw = response.choices[0].message.content.strip()
-        # Strip markdown code fences if present
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
             if raw.endswith("```"):
@@ -150,3 +207,39 @@ async def extract_from_image(
     except Exception as e:
         logger.error(f"[AI Extract] Error: {e}")
         raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
+
+
+class CorrectionEntry(BaseModel):
+    field_key: str
+    ai_value: Any
+    corrected_value: Any
+
+
+class CorrectionsBatch(BaseModel):
+    form_template_id: str
+    corrections: List[CorrectionEntry]
+
+
+@router.post("/extract/corrections")
+async def store_corrections(
+    data: CorrectionsBatch,
+    current_user: dict = Depends(get_current_user),
+):
+    """Store user corrections to improve future extraction accuracy."""
+    now = datetime.now(timezone.utc)
+    docs = []
+    for c in data.corrections:
+        docs.append({
+            "form_template_id": data.form_template_id,
+            "field_key": c.field_key,
+            "ai_value": c.ai_value,
+            "corrected_value": c.corrected_value,
+            "corrected_by": current_user.get("id"),
+            "created_at": now,
+        })
+
+    if docs:
+        await db.ai_extraction_corrections.insert_many(docs)
+        logger.info(f"[AI Extract] Stored {len(docs)} corrections for form {data.form_template_id}")
+
+    return {"stored": len(docs)}

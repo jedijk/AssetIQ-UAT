@@ -219,6 +219,11 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 **Phase 3 (future):** Template library, learning from corrections, offline capture
 
+### April 16, 2026 - Universal Photo Data Capture Phase 3 (COMPLETED)
+
+**Template Library:** 4 pre-built templates (Digital Display, Nameplate, Gauge, Inspection) via dropdown.
+**Learning from Corrections:** Stores user corrections, appends learned hints to GPT-4o prompt for future extractions.
+
 ---
 
 ## Prioritized Backlog
@@ -229,7 +234,6 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ### P2
 - QR scan analytics dashboard
-- Photo Data Capture Phase 3: template library, learning from corrections
 
 ### P3
-- Break down large pages (FormsPage.js, SettingsUserManagementPage.js, EquipmentManagerPage.js, DashboardPage.js) into smaller modular components
+- Break down large pages into smaller modular components

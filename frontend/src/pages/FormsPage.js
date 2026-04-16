@@ -1,5 +1,6 @@
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import PhotoDataCaptureField from '../components/forms/PhotoDataCaptureField';
+import { EXTRACTION_TEMPLATES } from '../components/forms/extractionTemplates';
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { createPortal } from "react-dom";
@@ -695,7 +696,40 @@ const FormsPage = ({ embedded = false }) => {
             {/* Photo Extraction Config - shown when enabled */}
             {newTemplate.photo_extraction_config?.enabled && (
               <div className="space-y-3 p-4 border border-blue-200 rounded-lg bg-blue-50/30">
-                <Label className="text-sm font-medium text-blue-800">Photo Extraction Settings</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-blue-800">Photo Extraction Settings</Label>
+                  <Select
+                    value=""
+                    onValueChange={(templateId) => {
+                      const tpl = EXTRACTION_TEMPLATES.find(t => t.id === templateId);
+                      if (!tpl) return;
+                      setNewTemplate(prev => ({
+                        ...prev,
+                        photo_extraction_config: {
+                          ...prev.photo_extraction_config,
+                          label: tpl.label,
+                          mode: tpl.mode,
+                          extraction_fields: tpl.fields.map(f => ({ ...f, target_field_id: "" })),
+                        }
+                      }));
+                      toast.success(`Loaded "${tpl.name}" template with ${tpl.fields.length} fields`);
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px] h-7 text-xs" data-testid="load-extraction-template">
+                      <SelectValue placeholder="Load template..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXTRACTION_TEMPLATES.map(tpl => (
+                        <SelectItem key={tpl.id} value={tpl.id}>
+                          <div>
+                            <div className="font-medium">{tpl.name}</div>
+                            <div className="text-[10px] text-slate-400">{tpl.fields.length} fields</div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Button Label</Label>
