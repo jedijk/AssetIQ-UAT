@@ -97,10 +97,18 @@ const Layout = () => {
   // Track page views for user statistics
   usePageTracking();
   
-  // Version check - compare frontend with backend and force update if mismatch
+  // Version check - compare frontend with backend and prompt for update if mismatch
   useEffect(() => {
     const checkVersion = async () => {
       try {
+        // Check if we recently attempted an update (prevent loops)
+        const lastUpdateAttempt = sessionStorage.getItem('version_update_attempt');
+        const now = Date.now();
+        if (lastUpdateAttempt && (now - parseInt(lastUpdateAttempt)) < 60000) {
+          // Already tried to update in the last 60 seconds, skip
+          return;
+        }
+        
         const response = await fetch(`${getBackendUrl()}/api/health`);
         if (response.ok) {
           const data = await response.json();
@@ -112,16 +120,22 @@ const Layout = () => {
           
           if (backendMajorMinor && frontendMajorMinor !== backendMajorMinor) {
             console.log(`Version mismatch: Frontend ${APP_VERSION}, Backend ${backendVersion}`);
-            // Clear caches and force reload
+            
+            // Mark that we're attempting an update
+            sessionStorage.setItem('version_update_attempt', now.toString());
+            
+            // Clear caches
             if ('caches' in window) {
               const cacheNames = await caches.keys();
               await Promise.all(cacheNames.map(name => caches.delete(name)));
             }
+            
             // Store flag to show update message after reload
             sessionStorage.setItem('app_updated', 'true');
             sessionStorage.setItem('new_version', backendVersion);
-            // Force reload from server
-            window.location.reload(true);
+            
+            // Force reload from server (bypass cache)
+            window.location.href = window.location.href.split('?')[0] + '?v=' + backendVersion;
           }
         }
       } catch (error) {
@@ -129,12 +143,15 @@ const Layout = () => {
       }
     };
     
-    // Check version on mount
-    checkVersion();
+    // Check version on mount (with small delay to let app stabilize)
+    const timeout = setTimeout(checkVersion, 2000);
     
     // Also check periodically (every 5 minutes)
     const interval = setInterval(checkVersion, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, []);
   
   // Show toast if app was just updated
@@ -144,6 +161,8 @@ const Layout = () => {
     if (wasUpdated) {
       sessionStorage.removeItem('app_updated');
       sessionStorage.removeItem('new_version');
+      // Clear the update attempt flag on successful load
+      sessionStorage.removeItem('version_update_attempt');
       toast.success(`App updated to version ${newVersion || APP_VERSION}`, {
         description: 'New features and improvements are now available.',
         duration: 5000,
