@@ -14,7 +14,7 @@ import {
   ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
   Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, Move, ArrowRight, ArrowUp, ArrowDown,
-  Download, MoreVertical, Copy, Scissors,
+  Download, MoreVertical, Copy, Scissors, RefreshCw,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -581,11 +581,19 @@ export default function EquipmentManagerPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchQuery]);
 
-  const { data: nodesData, isLoading } = useQuery({ queryKey: ["equipment-nodes"], queryFn: equipmentHierarchyAPI.getNodes });
+  const { data: nodesData, isLoading, isFetching } = useQuery({ queryKey: ["equipment-nodes"], queryFn: equipmentHierarchyAPI.getNodes });
   const { data: typesData } = useQuery({ queryKey: ["equipment-types"], queryFn: equipmentHierarchyAPI.getEquipmentTypes });
   const { data: profilesData } = useQuery({ queryKey: ["criticality-profiles"], queryFn: equipmentHierarchyAPI.getCriticalityProfiles });
   const { data: disciplinesData } = useQuery({ queryKey: ["disciplines"], queryFn: equipmentHierarchyAPI.getDisciplines });
   const { data: unstructuredData } = useQuery({ queryKey: ["unstructured-items"], queryFn: equipmentHierarchyAPI.getUnstructuredItems });
+
+  // Full refresh handler - clears cache and refetches
+  const handleFullRefresh = async () => {
+    toast.info("Refreshing equipment data...");
+    await queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
+    await queryClient.refetchQueries({ queryKey: ["equipment-nodes"] });
+    toast.success("Equipment data refreshed");
+  };
 
   const nodes = nodesData?.nodes || [];
   const equipmentTypes = typesData?.equipment_types || [];
@@ -1111,6 +1119,18 @@ export default function EquipmentManagerPage() {
         
         {/* Toolbar */}
         <div className="px-4 py-2 border-b border-slate-200 bg-white flex items-center gap-2 flex-wrap">
+          <Button 
+            onClick={handleFullRefresh} 
+            size="sm" 
+            variant="outline" 
+            disabled={isFetching}
+            data-testid="refresh-btn"
+            title="Refresh equipment data"
+          >
+            <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? "Refreshing..." : "Refresh"}
+          </Button>
+          <div className="w-px h-6 bg-slate-200" />
           <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
           {(isOwner || user?.role === "admin") && installations.length > 0 && (
             <Button onClick={() => setIsExcelImportOpen(true)} size="sm" variant="outline" data-testid="import-excel-btn">
