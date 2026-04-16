@@ -113,6 +113,12 @@ async def record_login_attempt(email: str, success: bool, ip_address: str = None
         # Clear failed attempts on successful login
         await db.login_attempts.delete_one({"email": email_lower})
         
+        # Update last_login on user
+        await db.users.update_one(
+            {"email": email_lower},
+            {"$set": {"last_login": now.isoformat()}}
+        )
+        
         # Log successful login for audit
         await db.security_audit_log.insert_one({
             "event": "login_success",
