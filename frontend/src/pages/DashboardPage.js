@@ -499,11 +499,12 @@ export default function DashboardPage({ initialTab }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(initialTab || "operational");
   
-  // Redirect to operational tab on mobile if viewing hidden tabs
+  // Redirect to operational tab on mobile if viewing hidden tabs (except production which is now mobile-enabled)
   useEffect(() => {
     const handleResize = () => {
       // sm breakpoint is 640px
-      if (window.innerWidth < 640 && (activeTab === "reliability" || activeTab === "production")) {
+      // Only redirect reliability tab on mobile, production is now mobile-friendly
+      if (window.innerWidth < 640 && activeTab === "reliability") {
         setActiveTab("operational");
       }
     };
@@ -790,7 +791,8 @@ export default function DashboardPage({ initialTab }) {
               data-testid="operational-tab"
             >
               <Activity className="w-4 h-4 flex-shrink-0" />
-              <span>{t("dashboard.operational") || "Operational"}</span>
+              <span className="hidden xs:inline">{t("dashboard.operational") || "Operational"}</span>
+              <span className="xs:hidden">Ops</span>
             </button>
             <button 
               onClick={() => setActiveTab("reliability")}
@@ -803,11 +805,12 @@ export default function DashboardPage({ initialTab }) {
             </button>
             <button 
               onClick={() => setActiveTab("production")}
-              className={`hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "production" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+              className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "production" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
               data-testid="production-tab"
             >
               <Gauge className="w-4 h-4 flex-shrink-0" />
-              <span>Production</span>
+              <span className="hidden xs:inline">Production</span>
+              <span className="xs:hidden">Prod</span>
             </button>
           </div>
           

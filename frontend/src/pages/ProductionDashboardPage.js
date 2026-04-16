@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionAPI } from "../lib/api";
 import api from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { formatDateTime } from "../lib/dateUtils";
 import {
   ChevronLeft,
@@ -374,6 +375,7 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
 export default function ProductionDashboardPage() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   // State
   const [period, setPeriod] = useState("1d");
@@ -997,72 +999,92 @@ export default function ProductionDashboardPage() {
                   {data?.big_bag_entries?.length > 0 && (
                     <Badge variant="secondary" className="text-xs">{data.big_bag_entries.length}</Badge>
                   )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" data-testid="big-bag-add-btn">
-                        <Plus className="w-3 h-3" /> Add
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => {
-                        if (formTemplates?.bigBag) setFormExec({ templateId: formTemplates.bigBag.id, templateName: "Big Bag Loading", equipmentId: line90Equipment?.id });
-                        else toast.error("Big Bag Loading template not found");
-                      }} data-testid="add-bigbag-option">
-                        Big Bag Loading
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {/* Hide Add button on mobile (view only) */}
+                  {!isMobile && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" data-testid="big-bag-add-btn">
+                          <Plus className="w-3 h-3" /> Add
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => {
+                          if (formTemplates?.bigBag) setFormExec({ templateId: formTemplates.bigBag.id, templateName: "Big Bag Loading", equipmentId: line90Equipment?.id });
+                          else toast.error("Big Bag Loading template not found");
+                        }} data-testid="add-bigbag-option">
+                          Big Bag Loading
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </div>
               <div className="max-h-[200px] overflow-y-auto">
                 {data?.big_bag_entries?.length > 0 ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200">
-                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Material</th>
-                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Supplier</th>
-                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Bag No.</th>
-                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Lot No.</th>
-                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Prod. Date</th>
-                        <th className="w-14"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  isMobile ? (
+                    /* Mobile Card View for Big Bag */
+                    <div className="space-y-2">
                       {data.big_bag_entries.map((bag, i) => (
-                        <tr key={bag.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 group">
-                          <td className="py-1.5 px-1 text-slate-700">{bag.material}</td>
-                          <td className="py-1.5 px-1 text-slate-700">{bag.supplier}</td>
-                          <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.bag_no}</td>
-                          <td className="py-1.5 px-1 text-slate-700">{bag.lot_no}</td>
-                          <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.production_date || ""}</td>
-                          <td className="py-1 px-1">
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => setEditBigBag({ ...bag, _index: i })}
-                                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
-                                title="Edit"
-                                data-testid={`edit-bag-${i}`}
-                              >
-                                <Pencil className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (bag.submission_id) {
-                                    setDeleteConfirm({ ids: [bag.submission_id], label: `big bag entry (${bag.material || bag.lot_no || "item"})` });
-                                  }
-                                }}
-                                className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
-                                title="Delete"
-                                data-testid={`delete-bag-${i}`}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                        <div key={bag.submission_id || i} className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                          <div className="font-medium text-slate-900">{bag.material || "—"}</div>
+                          <div className="flex flex-wrap gap-x-3 text-slate-600 mt-1">
+                            <span>Supplier: {bag.supplier || "—"}</span>
+                            <span>Bag: {bag.bag_no || "—"}</span>
+                            <span>Lot: {bag.lot_no || "—"}</span>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  ) : (
+                    /* Desktop Table View for Big Bag */
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Material</th>
+                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Supplier</th>
+                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Bag No.</th>
+                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Lot No.</th>
+                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Prod. Date</th>
+                          <th className="w-14"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.big_bag_entries.map((bag, i) => (
+                          <tr key={bag.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 group">
+                            <td className="py-1.5 px-1 text-slate-700">{bag.material}</td>
+                            <td className="py-1.5 px-1 text-slate-700">{bag.supplier}</td>
+                            <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.bag_no}</td>
+                            <td className="py-1.5 px-1 text-slate-700">{bag.lot_no}</td>
+                            <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.production_date || ""}</td>
+                            <td className="py-1 px-1">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => setEditBigBag({ ...bag, _index: i })}
+                                  className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                  title="Edit"
+                                  data-testid={`edit-bag-${i}`}
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (bag.submission_id) {
+                                      setDeleteConfirm({ ids: [bag.submission_id], label: `big bag entry (${bag.material || bag.lot_no || "item"})` });
+                                    }
+                                  }}
+                                  className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                                  title="Delete"
+                                  data-testid={`delete-bag-${i}`}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )
                 ) : (
                   <p className="text-xs text-slate-400 py-4 text-center">No input material data</p>
                 )}
@@ -1077,17 +1099,20 @@ export default function ProductionDashboardPage() {
                   {data?.insights?.length > 0 && (
                     <Badge variant="secondary" className="text-xs">{data.insights.length}</Badge>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1 text-xs"
-                    disabled={aiInsightsMutation.isPending || !data?.production_log?.length}
-                    onClick={() => aiInsightsMutation.mutate()}
-                    data-testid="ai-insights-btn"
-                  >
-                    <Sparkles className={`w-3 h-3 ${aiInsightsMutation.isPending ? "animate-spin" : ""}`} />
-                    {aiInsightsMutation.isPending ? "Analyzing..." : "AI Refresh"}
-                  </Button>
+                  {/* Hide AI Refresh button on mobile (view only) */}
+                  {!isMobile && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1 text-xs"
+                      disabled={aiInsightsMutation.isPending || !data?.production_log?.length}
+                      onClick={() => aiInsightsMutation.mutate()}
+                      data-testid="ai-insights-btn"
+                    >
+                      <Sparkles className={`w-3 h-3 ${aiInsightsMutation.isPending ? "animate-spin" : ""}`} />
+                      {aiInsightsMutation.isPending ? "Analyzing..." : "AI Refresh"}
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="max-h-[200px] overflow-y-auto">
@@ -1115,47 +1140,104 @@ export default function ProductionDashboardPage() {
                     data-testid="log-search"
                   />
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" data-testid="log-add-btn">
-                      <Plus className="w-3 h-3" /> <span className="hidden xs:inline">Add</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        if (formTemplates?.extruder) setFormExec({ templateId: formTemplates.extruder.id, templateName: "Extruder Settings", equipmentId: line90Equipment?.id });
-                        else toast.error("Extruder template not found");
-                      }}
-                      data-testid="add-extruder-option"
-                    >
-                      Extruder Settings
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        if (formTemplates?.viscosity) setFormExec({ templateId: formTemplates.viscosity.id, templateName: "Viscosity Sample", equipmentId: line90Equipment?.id });
-                        else toast.error("Viscosity template not found");
-                      }}
-                      data-testid="add-viscosity-option"
-                    >
-                      Viscosity Sample
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {/* Hide Add button on mobile (view only) */}
+                {!isMobile && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" data-testid="log-add-btn">
+                        <Plus className="w-3 h-3" /> <span className="hidden xs:inline">Add</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (formTemplates?.extruder) setFormExec({ templateId: formTemplates.extruder.id, templateName: "Extruder Settings", equipmentId: line90Equipment?.id });
+                          else toast.error("Extruder template not found");
+                        }}
+                        data-testid="add-extruder-option"
+                      >
+                        Extruder Settings
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (formTemplates?.viscosity) setFormExec({ templateId: formTemplates.viscosity.id, templateName: "Viscosity Sample", equipmentId: line90Equipment?.id });
+                          else toast.error("Viscosity template not found");
+                        }}
+                        data-testid="add-viscosity-option"
+                      >
+                        Viscosity Sample
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm" data-testid="production-log-table">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    {["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By", ""].map((h) => (
-                      <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
+            {/* Mobile Card View */}
+            {isMobile ? (
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                {filteredLog.length > 0 ? (
+                  filteredLog.map((entry, i) => {
+                    const anomaly = isAnomalyRow(entry);
+                    const isViscOnly = entry._viscosity_only;
+                    const viscValue = isViscOnly
+                      ? entry._viscosity_value
+                      : viscosityByTime[entry.time]?.value;
+                    return (
+                      <div
+                        key={`${entry.time}-${i}`}
+                        className={`p-3 rounded-lg border ${isViscOnly ? "bg-blue-50/40 border-blue-100" : anomaly ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-100"}`}
+                        data-testid={`mobile-log-${entry.time}`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-slate-900">{entry.time}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {entry.submitted_by || "—"}
+                          </Badge>
+                        </div>
+                        {isViscOnly ? (
+                          <div className="text-sm text-slate-600">
+                            <span className="font-medium">Viscosity:</span> {viscValue ?? "—"}
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
+                            <div><span className="text-slate-500">RPM:</span> <span className="font-medium">{entry.rpm}</span></div>
+                            <div><span className="text-slate-500">Feed:</span> <span className="font-medium">{entry.feed}</span></div>
+                            <div><span className="text-slate-500">M%:</span> <span className="font-medium">{entry.moisture}</span></div>
+                            <div><span className="text-slate-500">Energy:</span> <span className="font-medium">{entry.energy}</span></div>
+                            <div><span className="text-slate-500">MP4:</span> <span className="font-medium">{entry.mp4}</span></div>
+                            <div><span className="text-slate-500">Visc:</span> <span className="font-medium">{viscValue ?? <span className="text-amber-500">TBD</span>}</span></div>
+                          </div>
+                        )}
+                        {entry.remarks && !isViscOnly && (
+                          <p className="mt-2 text-xs text-slate-500 truncate" title={entry.remarks}>
+                            {entry.remarks}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-8 text-center text-slate-400 text-sm">
+                    {data?.production_log?.length === 0
+                      ? "No production data for this date/shift."
+                      : "No matching results"}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Desktop Table View */
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="production-log-table">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      {["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By", ""].map((h) => (
+                        <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
                 <tbody>
                   {filteredLog.length > 0 ? (
                     filteredLog.map((entry, i) => {
@@ -1240,7 +1322,8 @@ export default function ProductionDashboardPage() {
                   )}
                 </tbody>
               </table>
-            </div>
+              </div>
+            )}
 
             {filteredLog.length > 0 && (
               <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
