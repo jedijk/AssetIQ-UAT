@@ -540,6 +540,10 @@ const Layout = () => {
   
   // Filter settings items based on device, role, and permissions
   const settingsMenuItems = allSettingsMenuItems.filter(item => {
+    // In simple mode on mobile, only show Definitions
+    if (isMobileView && (user?.role === "operator" || operatorViewEnabled)) {
+      return item.path === "/definitions";
+    }
     // Filter desktop-only items for mobile
     if (isMobileView && item.desktopOnly) return false;
     // Filter owner-only items for non-owners
