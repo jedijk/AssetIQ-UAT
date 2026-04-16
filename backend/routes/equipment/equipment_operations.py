@@ -104,11 +104,25 @@ async def change_node_level(
             detail=f"A node with name '{node['name']}' already exists at the target location"
         )
     
+    # Get the max sort_order of siblings at the new location and assign next value
+    siblings_cursor = await db.equipment_nodes.find(
+        {"parent_id": new_parent_id, "id": {"$ne": node_id}},
+        {"sort_order": 1}
+    ).to_list(1000)
+    
+    max_sort_order = -1
+    for s in siblings_cursor:
+        if s.get("sort_order") is not None and s.get("sort_order") > max_sort_order:
+            max_sort_order = s.get("sort_order")
+    
+    new_sort_order = max_sort_order + 1
+    
     await db.equipment_nodes.update_one(
         {"id": node_id},
         {"$set": {
             "level": new_level.value,
             "parent_id": new_parent_id,
+            "sort_order": new_sort_order,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
@@ -299,10 +313,24 @@ async def move_equipment_node(
             detail=f"Cannot move {child_level.value} under {parent_level.value}. Valid children: {[c.value for c in valid_children]}"
         )
     
+    # Get the max sort_order of siblings at the new location and assign next value
+    siblings_cursor = await db.equipment_nodes.find(
+        {"parent_id": move_request.new_parent_id, "id": {"$ne": node_id}},
+        {"sort_order": 1}
+    ).to_list(1000)
+    
+    max_sort_order = -1
+    for s in siblings_cursor:
+        if s.get("sort_order") is not None and s.get("sort_order") > max_sort_order:
+            max_sort_order = s.get("sort_order")
+    
+    new_sort_order = max_sort_order + 1
+    
     await db.equipment_nodes.update_one(
         {"id": node_id},
         {"$set": {
             "parent_id": move_request.new_parent_id,
+            "sort_order": new_sort_order,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
