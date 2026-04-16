@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { format, isToday, isBefore, startOfDay, parseISO } from "date-fns";
@@ -252,6 +253,7 @@ const SortableAdhocPlanCard = ({ plan, tasksData, setSelectedTask, setViewMode, 
 // Main My Tasks Page Component
 const MyTasksPage = () => {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState("open");
@@ -261,13 +263,17 @@ const MyTasksPage = () => {
   const [viewMode, setViewMode] = useState("list"); // "list" or "execution"
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
   
-  // Manual sorting state - stored per tab
+  // User-scoped localStorage keys for manual sorting
+  const sortKey = user?.id ? `myTasks_manualSort_${user.id}` : "myTasks_manualSort";
+  const orderKey = user?.id ? `myTasks_sortOrderByTab_${user.id}` : "myTasks_sortOrderByTab";
+
+  // Manual sorting state - stored per user per tab
   const [isManualSort, setIsManualSort] = useState(() => {
-    return localStorage.getItem("myTasks_manualSort") === "true";
+    return localStorage.getItem(sortKey) === "true";
   });
   const [sortOrderByTab, setSortOrderByTab] = useState(() => {
     try {
-      const saved = localStorage.getItem("myTasks_sortOrderByTab");
+      const saved = localStorage.getItem(orderKey);
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -303,17 +309,17 @@ const MyTasksPage = () => {
     })
   );
   
-  // Save manual sort preference
+  // Save manual sort preference per user
   useEffect(() => {
-    localStorage.setItem("myTasks_manualSort", isManualSort.toString());
-  }, [isManualSort]);
+    localStorage.setItem(sortKey, isManualSort.toString());
+  }, [isManualSort, sortKey]);
   
-  // Save sort orders when they change
+  // Save sort orders per user when they change
   useEffect(() => {
     if (Object.keys(sortOrderByTab).length > 0) {
-      localStorage.setItem("myTasks_sortOrderByTab", JSON.stringify(sortOrderByTab));
+      localStorage.setItem(orderKey, JSON.stringify(sortOrderByTab));
     }
-  }, [sortOrderByTab]);
+  }, [sortOrderByTab, orderKey]);
   
   // Closure suggestion dialog state
   const [closureSuggestion, setClosureSuggestion] = useState(null);
