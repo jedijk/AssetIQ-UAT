@@ -110,7 +110,7 @@ const Layout = () => {
     // Show toast after a short delay (let the app settle)
     const timeout = setTimeout(() => {
       toast.success(`AssetIQ updated to v${APP_VERSION}`, {
-        description: "Bug fixes & improved AI scan accuracy.",
+        description: "Hierarchy level filtering, Simple Mode defaults & fixes.",
         duration: 5000,
       });
     }, 3000);
