@@ -87,7 +87,7 @@ const StatusBadge = ({ status, type }) => {
     review: { bg: "bg-indigo-100", text: "text-indigo-700", label: "Review" },
   };
   
-  const config = statusConfig[status] || statusConfig.open;
+  const config = statusConfig[status?.toLowerCase()] || statusConfig.open;
   
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
