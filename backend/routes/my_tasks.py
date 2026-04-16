@@ -135,6 +135,7 @@ def serialize_task(task: dict) -> dict:
         "risk_score": task.get("risk_score"),
         "rpn": task.get("rpn"),
         "equipment_tag": task.get("equipment_tag"),
+        "photo_extraction_config": task.get("photo_extraction_config"),
     }
     
     return result
@@ -1128,8 +1129,11 @@ async def execute_adhoc_plan(
     })
     
     if existing_task:
-        # Return the existing task instead of creating a new one
-        # Use serialize_task for proper datetime handling
+        # Enrich with photo_extraction_config from form template if missing
+        if not existing_task.get("photo_extraction_config") and plan.get("form_template_id"):
+            ft = await db.form_templates.find_one({"_id": ObjectId(plan["form_template_id"])}) if ObjectId.is_valid(str(plan["form_template_id"])) else None
+            if ft:
+                existing_task["photo_extraction_config"] = ft.get("photo_extraction_config")
         return serialize_task(existing_task)
     
     # Get template details - try by string id first, then ObjectId
@@ -1178,6 +1182,7 @@ async def execute_adhoc_plan(
         "form_template_name": plan.get("form_template_name") or (form_template.get("name") if form_template else None),
         "form_fields": form_fields,
         "form_documents": form_documents,
+        "photo_extraction_config": form_template.get("photo_extraction_config") if form_template else None,
         "status": "in_progress",  # Start immediately
         "priority": template.get("priority", "medium") if template else "medium",
         "due_date": now,  # Due immediately
