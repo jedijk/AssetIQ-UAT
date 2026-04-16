@@ -99,8 +99,7 @@ const Layout = () => {
   
   // Version check - one-time forced refresh for users on older versions
   useEffect(() => {
-    const CURRENT_VERSION = "3.4.0";
-    const STORAGE_KEY = `assetiq_updated_${CURRENT_VERSION}`;
+    const STORAGE_KEY = `assetiq_updated_${APP_VERSION}`;
     
     // If user already got this update, just skip
     if (localStorage.getItem(STORAGE_KEY) === "true") return;
@@ -111,7 +110,7 @@ const Layout = () => {
         if (!response.ok) return;
         const data = await response.json();
         
-        if (data.version === CURRENT_VERSION) {
+        if (data.version === APP_VERSION) {
           // Backend is on new version — force refresh once for users on old cached frontend
           localStorage.setItem(STORAGE_KEY, "true");
           
@@ -122,7 +121,7 @@ const Layout = () => {
           }
           
           // Show toast then reload
-          toast.success("AssetIQ updated to v3.4.0", {
+          toast.success(`AssetIQ updated to v${APP_VERSION}`, {
             description: "AI Photo Extraction, Simple Mode & more. Refreshing...",
             duration: 3000,
           });
