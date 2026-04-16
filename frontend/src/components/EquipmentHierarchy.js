@@ -1112,7 +1112,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   if (isMobile) {
     if (!isOpen) return null;
     return (
-      <div className="fixed inset-0 top-[48px] z-50 bg-white flex flex-col" style={{ height: 'calc(100dvh - 48px)' }}>
+      <div className="fixed inset-0 top-[49px] z-50 bg-white flex flex-col" style={{ height: 'calc(100dvh - 49px)' }}>
         {contentJSX}
       </div>
     );
