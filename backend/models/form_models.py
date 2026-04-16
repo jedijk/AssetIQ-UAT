@@ -135,6 +135,27 @@ class FormFieldUpdate(BaseModel):
 
 # ============= FORM TEMPLATE MODELS =============
 
+class PhotoExtractionField(BaseModel):
+    """A single field to extract from a photo."""
+    key: str
+    description: str
+    type: str = "string"  # string, number, enum
+    unit: Optional[str] = None
+    required: bool = False
+    enum_values: Optional[List[str]] = None
+    target_field_id: Optional[str] = None  # Maps to a form field ID
+
+
+class PhotoExtractionConfig(BaseModel):
+    """Form-level photo extraction configuration."""
+    enabled: bool = False
+    label: str = "Capture Photo"
+    mode: str = "hybrid"  # structured, text, classification, hybrid
+    prompt_template: Optional[str] = None
+    confidence_threshold: float = 0.7
+    extraction_fields: List[PhotoExtractionField] = Field(default_factory=list)
+
+
 class FormTemplateCreate(BaseModel):
     """Create a new form template."""
     name: str = Field(..., min_length=1, max_length=200)
@@ -157,6 +178,9 @@ class FormTemplateCreate(BaseModel):
     
     # Tagging
     tags: List[str] = Field(default_factory=list)
+    
+    # Photo AI Extraction
+    photo_extraction_config: Optional[PhotoExtractionConfig] = None
 
 
 class FormTemplateUpdate(BaseModel):
@@ -172,6 +196,7 @@ class FormTemplateUpdate(BaseModel):
     require_signature: Optional[bool] = None
     tags: Optional[List[str]] = None
     is_active: Optional[bool] = None
+    photo_extraction_config: Optional[PhotoExtractionConfig] = None
 
 
 # ============= FORM SUBMISSION MODELS =============

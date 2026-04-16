@@ -176,14 +176,43 @@ Full-stack platform for AI-powered reliability intelligence featuring causal ana
 
 ---
 
+### April 16, 2026 - Universal Photo Data Capture Phase 1 (COMPLETED)
+
+**FEATURE - AI-powered photo extraction for forms:**
+- Backend `POST /api/ai/extract` endpoint using OpenAI GPT-4o Vision (user's own key)
+- Accepts image + configurable extraction schema, returns structured data with confidence scores
+- `PhotoExtractionConfig` model added to form templates (form-level setting)
+- `PhotoDataCaptureField` frontend component with camera-first capture on mobile
+- States: idle → processing → success/error with auto-fill and confidence indicators
+- Form Designer UI: toggle + config panel (label, mode, prompt, extraction fields with field mapping)
+- Integration into TaskExecutionFrame: auto-fills mapped form fields from AI response
+
+**Files Created:**
+- `/app/backend/routes/ai_extract.py`
+- `/app/frontend/src/components/forms/PhotoDataCaptureField.jsx`
+
+**Files Modified:**
+- `/app/backend/models/form_models.py` - Added PhotoExtractionConfig, PhotoExtractionField
+- `/app/backend/routes/__init__.py` - Registered ai_extract router
+- `/app/backend/.env` - Added OPENAI_VISION_KEY
+- `/app/frontend/src/components/task-execution/TaskExecutionFrame.js` - Integrated PhotoDataCaptureField
+- `/app/frontend/src/pages/FormsPage.js` - Added extraction config UI in form designer
+
+**Phase 2 (upcoming):** Confidence scoring UI, correction tracking, storage/traceability
+**Phase 3 (future):** Template library, learning from corrections, offline capture
+
+---
+
 ## Prioritized Backlog
 
 ### P1
 - Report generation (PowerPoint/PDF) for Causal Investigations
 - Offline support with local storage for My Tasks execution
+- Photo Data Capture Phase 2: confidence UI, correction tracking
 
 ### P2
 - QR scan analytics dashboard
+- Photo Data Capture Phase 3: template library, learning
 
 ### P3
 - Break down large pages (FormsPage.js, SettingsUserManagementPage.js, EquipmentManagerPage.js, DashboardPage.js) into smaller modular components

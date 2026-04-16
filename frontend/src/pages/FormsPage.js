@@ -673,9 +673,181 @@ const FormsPage = ({ embedded = false }) => {
                     />
                     <Label htmlFor="allow-partial" className="cursor-pointer">{t("forms.allowPartialSubmit")}</Label>
                   </div>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="photo-extraction-enabled"
+                      checked={newTemplate.photo_extraction_config?.enabled || false}
+                      onCheckedChange={(v) => setNewTemplate(prev => ({
+                        ...prev,
+                        photo_extraction_config: {
+                          ...(prev.photo_extraction_config || { label: "Capture Photo", mode: "hybrid", confidence_threshold: 0.7, extraction_fields: [] }),
+                          enabled: v,
+                        }
+                      }))}
+                    />
+                    <Label htmlFor="photo-extraction-enabled" className="cursor-pointer">Photo AI Extraction</Label>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Photo Extraction Config - shown when enabled */}
+            {newTemplate.photo_extraction_config?.enabled && (
+              <div className="space-y-3 p-4 border border-blue-200 rounded-lg bg-blue-50/30">
+                <Label className="text-sm font-medium text-blue-800">Photo Extraction Settings</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Button Label</Label>
+                    <Input
+                      value={newTemplate.photo_extraction_config?.label || "Capture Photo"}
+                      onChange={(e) => setNewTemplate(prev => ({
+                        ...prev,
+                        photo_extraction_config: { ...prev.photo_extraction_config, label: e.target.value }
+                      }))}
+                      placeholder="Capture Photo"
+                      className="h-8 text-sm"
+                      data-testid="photo-extraction-label"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Mode</Label>
+                    <Select
+                      value={newTemplate.photo_extraction_config?.mode || "hybrid"}
+                      onValueChange={(v) => setNewTemplate(prev => ({
+                        ...prev,
+                        photo_extraction_config: { ...prev.photo_extraction_config, mode: v }
+                      }))}
+                    >
+                      <SelectTrigger className="h-8 text-sm" data-testid="photo-extraction-mode">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hybrid">Hybrid (recommended)</SelectItem>
+                        <SelectItem value="structured">Structured (readings)</SelectItem>
+                        <SelectItem value="text">Text (serial numbers)</SelectItem>
+                        <SelectItem value="classification">Classification</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Custom Prompt (optional)</Label>
+                  <Textarea
+                    value={newTemplate.photo_extraction_config?.prompt_template || ""}
+                    onChange={(e) => setNewTemplate(prev => ({
+                      ...prev,
+                      photo_extraction_config: { ...prev.photo_extraction_config, prompt_template: e.target.value || null }
+                    }))}
+                    placeholder="Leave empty for auto-generated prompt based on fields..."
+                    className="text-sm min-h-[60px]"
+                    data-testid="photo-extraction-prompt"
+                  />
+                </div>
+
+                {/* Extraction Fields */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium">Extraction Fields</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={() => {
+                        const fields = [...(newTemplate.photo_extraction_config?.extraction_fields || [])];
+                        fields.push({ key: "", description: "", type: "string", target_field_id: "" });
+                        setNewTemplate(prev => ({
+                          ...prev,
+                          photo_extraction_config: { ...prev.photo_extraction_config, extraction_fields: fields }
+                        }));
+                      }}
+                      data-testid="add-extraction-field-btn"
+                    >
+                      + Add Field
+                    </Button>
+                  </div>
+                  {(newTemplate.photo_extraction_config?.extraction_fields || []).map((ef, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-end bg-white p-2 rounded border">
+                      <div className="col-span-3 space-y-1">
+                        <Label className="text-[10px]">Key</Label>
+                        <Input
+                          value={ef.key}
+                          onChange={(e) => {
+                            const fields = [...(newTemplate.photo_extraction_config?.extraction_fields || [])];
+                            fields[idx] = { ...fields[idx], key: e.target.value };
+                            setNewTemplate(prev => ({ ...prev, photo_extraction_config: { ...prev.photo_extraction_config, extraction_fields: fields } }));
+                          }}
+                          placeholder="pressure"
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      <div className="col-span-4 space-y-1">
+                        <Label className="text-[10px]">Description</Label>
+                        <Input
+                          value={ef.description}
+                          onChange={(e) => {
+                            const fields = [...(newTemplate.photo_extraction_config?.extraction_fields || [])];
+                            fields[idx] = { ...fields[idx], description: e.target.value };
+                            setNewTemplate(prev => ({ ...prev, photo_extraction_config: { ...prev.photo_extraction_config, extraction_fields: fields } }));
+                          }}
+                          placeholder="Pressure reading from gauge"
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <Label className="text-[10px]">Map to Field</Label>
+                        <Select
+                          value={ef.target_field_id || ""}
+                          onValueChange={(v) => {
+                            const fields = [...(newTemplate.photo_extraction_config?.extraction_fields || [])];
+                            fields[idx] = { ...fields[idx], target_field_id: v };
+                            setNewTemplate(prev => ({ ...prev, photo_extraction_config: { ...prev.photo_extraction_config, extraction_fields: fields } }));
+                          }}
+                        >
+                          <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Field" /></SelectTrigger>
+                          <SelectContent>
+                            {(newTemplate.fields || []).map(f => (
+                              <SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <Label className="text-[10px]">Type</Label>
+                        <Select
+                          value={ef.type || "string"}
+                          onValueChange={(v) => {
+                            const fields = [...(newTemplate.photo_extraction_config?.extraction_fields || [])];
+                            fields[idx] = { ...fields[idx], type: v };
+                            setNewTemplate(prev => ({ ...prev, photo_extraction_config: { ...prev.photo_extraction_config, extraction_fields: fields } }));
+                          }}
+                        >
+                          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="string">Text</SelectItem>
+                            <SelectItem value="number">Number</SelectItem>
+                            <SelectItem value="enum">Enum</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
+                          onClick={() => {
+                            const fields = [...(newTemplate.photo_extraction_config?.extraction_fields || [])];
+                            fields.splice(idx, 1);
+                            setNewTemplate(prev => ({ ...prev, photo_extraction_config: { ...prev.photo_extraction_config, extraction_fields: fields } }));
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Fields Section */}
             <div className="space-y-3">

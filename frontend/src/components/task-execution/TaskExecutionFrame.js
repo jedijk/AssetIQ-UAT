@@ -5,6 +5,7 @@
  */
 import { getBackendUrl } from '../../lib/apiConfig';
 import { compressImage, formatFileSize, getCompressionPercent } from '../../lib/imageCompression';
+import PhotoDataCaptureField from '../forms/PhotoDataCaptureField';
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -221,6 +222,23 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   // Build form fields from task template
   const formFields = task?.form_fields || task?.template?.form_fields || [];
   
+  // Photo extraction config from form template
+  const photoExtractionConfig = task?.photo_extraction_config || task?.template?.photo_extraction_config || null;
+  
+  // Auto-fill handler for photo extraction
+  const [aiFilledFields, setAiFilledFields] = useState({});
+  const handlePhotoAutoFill = (fills) => {
+    const newData = { ...formData };
+    const filled = {};
+    for (const [fieldId, info] of Object.entries(fills)) {
+      newData[fieldId] = info.value;
+      filled[fieldId] = info;
+    }
+    setFormData(newData);
+    setAiFilledFields(prev => ({ ...prev, ...filled }));
+    toast.success(`Auto-filled ${Object.keys(fills).length} fields from photo`);
+  };
+
   // Search equipment by name
   const searchEquipment = async (fieldId, query) => {
     if (!query || query.length < 2) {
@@ -357,6 +375,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
     const hasError = validationErrors[field.id];
     const value = formData[field.id];
     const fieldType = field.type || field.field_type;
+    const aiInfo = aiFilledFields[field.id];
     
     const thresholds = field.thresholds || {};
     const minThreshold = field.min_threshold ?? thresholds.critical_low ?? thresholds.warning_low;
@@ -977,6 +996,15 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   // Form content
   const TaskFormContent = (
     <div className="p-4 space-y-4">
+      {/* Photo Data Capture */}
+      {photoExtractionConfig?.enabled && (
+        <PhotoDataCaptureField
+          config={photoExtractionConfig}
+          formData={formData}
+          onAutoFill={handlePhotoAutoFill}
+        />
+      )}
+
       {/* Form Fields */}
       {formFields.length > 0 ? (
         <div className="space-y-4">
