@@ -324,7 +324,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
             )}
           </button>
         ) : (
-          <span className={`flex-shrink-0 ${isMobile ? 'w-7' : 'w-5'}`} />
+          <div className={`flex-shrink-0 ${isMobile ? 'w-7 h-7' : 'w-5 h-5'}`} />
         )}
         
         {/* Equipment info - clickable area for context menu on mobile */}
