@@ -732,13 +732,17 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   const [searchQuery, setSearchQuery] = useState("");
   const [preSearchExpandedNodes, setPreSearchExpandedNodes] = useState(null);
 
-  // Hidden levels - persisted to localStorage
+  // Hidden levels - persisted to localStorage, default: hide first 2 levels
   const [hiddenLevels, setHiddenLevels] = useState(() => {
     try {
       const saved = localStorage.getItem('hierarchy-hidden-levels');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
+      if (saved) return new Set(JSON.parse(saved));
+      // Default: hide installation and plant_unit
+      const defaults = ["installation", "plant_unit"];
+      localStorage.setItem('hierarchy-hidden-levels', JSON.stringify(defaults));
+      return new Set(defaults);
     } catch {
-      return new Set();
+      return new Set(["installation", "plant_unit"]);
     }
   });
 
