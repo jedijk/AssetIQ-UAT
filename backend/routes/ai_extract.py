@@ -165,7 +165,7 @@ async def extract_from_image(
     try:
         client = OpenAI(api_key=VISION_KEY)
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5.2",
             messages=[
                 {
                     "role": "user",
