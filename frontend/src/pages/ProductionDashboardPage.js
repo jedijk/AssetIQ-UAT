@@ -747,8 +747,8 @@ export default function ProductionDashboardPage() {
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Period quick filters - only show 1D on mobile */}
-            <div className="inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5 flex-wrap sm:flex-nowrap" data-testid="period-selector">
+            {/* Period quick filters - hide entirely on mobile (forced to 1D) */}
+            <div className={`inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5 flex-wrap sm:flex-nowrap ${isMobile ? "hidden" : ""}`} data-testid="period-selector">
               {PERIOD_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
@@ -809,9 +809,9 @@ export default function ProductionDashboardPage() {
               </div>
             )}
 
-            {/* Shift selector - hide label on mobile */}
+            {/* Shift selector - hide on mobile */}
             <Select value={shift} onValueChange={setShift}>
-              <SelectTrigger className="w-[140px] sm:w-[180px] h-8 text-xs sm:text-sm bg-white" data-testid="shift-selector">
+              <SelectTrigger className={`w-[140px] sm:w-[180px] h-8 text-xs sm:text-sm bg-white ${isMobile ? "hidden" : ""}`} data-testid="shift-selector">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
