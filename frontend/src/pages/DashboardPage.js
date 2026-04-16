@@ -809,6 +809,15 @@ export default function DashboardPage({ initialTab }) {
             <h1 className="text-xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
             <p className="text-sm text-slate-500">{t("dashboard.subtitle") || "Overview of your risk management status"}</p>
           </div>
+          {isMobileViewport && (
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              data-testid="dashboard-close-btn"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
         
         {/* Dashboard Tab Buttons - Mobile Optimized */}
