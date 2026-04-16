@@ -97,17 +97,12 @@ const Layout = () => {
   // Track page views for user statistics
   usePageTracking();
   
-  // Version check - compare frontend with backend and prompt for update if mismatch
+  // Version check - non-intrusive notification only (no auto-reload)
   useEffect(() => {
     const checkVersion = async () => {
       try {
-        // Check if we recently attempted an update (prevent loops)
-        const lastUpdateAttempt = sessionStorage.getItem('version_update_attempt');
-        const now = Date.now();
-        if (lastUpdateAttempt && (now - parseInt(lastUpdateAttempt)) < 60000) {
-          // Already tried to update in the last 60 seconds, skip
-          return;
-        }
+        // Skip if we've already shown the update notification this session
+        if (sessionStorage.getItem('version_notified')) return;
         
         const response = await fetch(`${getBackendUrl()}/api/health`);
         if (response.ok) {
@@ -120,22 +115,25 @@ const Layout = () => {
           
           if (backendMajorMinor && frontendMajorMinor !== backendMajorMinor) {
             console.log(`Version mismatch: Frontend ${APP_VERSION}, Backend ${backendVersion}`);
+            sessionStorage.setItem('version_notified', 'true');
             
-            // Mark that we're attempting an update
-            sessionStorage.setItem('version_update_attempt', now.toString());
-            
-            // Clear caches
-            if ('caches' in window) {
-              const cacheNames = await caches.keys();
-              await Promise.all(cacheNames.map(name => caches.delete(name)));
-            }
-            
-            // Store flag to show update message after reload
-            sessionStorage.setItem('app_updated', 'true');
-            sessionStorage.setItem('new_version', backendVersion);
-            
-            // Force reload from server (bypass cache)
-            window.location.href = window.location.href.split('?')[0] + '?v=' + backendVersion;
+            // Show a toast with manual refresh option instead of auto-reload
+            toast.info(`New version ${backendVersion} available`, {
+              description: 'Refresh the page to get the latest updates.',
+              duration: 10000,
+              action: {
+                label: 'Refresh Now',
+                onClick: () => {
+                  // Clear caches before refresh
+                  if ('caches' in window) {
+                    caches.keys().then(names => {
+                      names.forEach(name => caches.delete(name));
+                    });
+                  }
+                  window.location.reload();
+                }
+              }
+            });
           }
         }
       } catch (error) {
@@ -143,31 +141,10 @@ const Layout = () => {
       }
     };
     
-    // Check version on mount (with small delay to let app stabilize)
-    const timeout = setTimeout(checkVersion, 2000);
+    // Check version after a delay
+    const timeout = setTimeout(checkVersion, 5000);
     
-    // Also check periodically (every 5 minutes)
-    const interval = setInterval(checkVersion, 5 * 60 * 1000);
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, []);
-  
-  // Show toast if app was just updated
-  useEffect(() => {
-    const wasUpdated = sessionStorage.getItem('app_updated');
-    const newVersion = sessionStorage.getItem('new_version');
-    if (wasUpdated) {
-      sessionStorage.removeItem('app_updated');
-      sessionStorage.removeItem('new_version');
-      // Clear the update attempt flag on successful load
-      sessionStorage.removeItem('version_update_attempt');
-      toast.success(`App updated to version ${newVersion || APP_VERSION}`, {
-        description: 'New features and improvements are now available.',
-        duration: 5000,
-      });
-    }
+    return () => clearTimeout(timeout);
   }, []);
   
   // Pull-to-refresh handler
