@@ -79,10 +79,13 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
 
       // Auto-fill form fields
       const fills = {};
+      const normalize = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
       for (const item of data.extracted) {
         if (item.value == null) continue;
-        // Find the extraction field config to get target_field_id
-        const fieldCfg = (config.extraction_fields || []).find((f) => f.key === item.key);
+        // Find matching extraction field config — try exact match first, then normalized
+        const fieldCfg = (config.extraction_fields || []).find(
+          (f) => f.key === item.key || normalize(f.key) === normalize(item.key)
+        );
         const targetId = fieldCfg?.target_field_id || item.key;
         fills[targetId] = {
           value: item.value,

@@ -99,7 +99,7 @@ def _build_prompt(schema: ExtractionSchema, hints: List[str] = None) -> str:
 
     lines = [
         "Analyze this image and extract the following data fields.",
-        "Return a JSON object with exactly the keys listed below.",
+        "CRITICAL: The 'key' in your response MUST be EXACTLY the same string as listed below. Do not rename, abbreviate, or modify the keys.",
         "For each key, also provide a confidence score (0.0 to 1.0).",
         "",
         "Fields to extract:",
