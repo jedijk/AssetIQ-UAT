@@ -1,45 +1,10 @@
 import { useNavigate } from "react-router-dom";
-import { Plus, Building2, ClipboardCheck, Activity } from "lucide-react";
+import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function OperatorLandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-
-  const actions = [
-    {
-      id: "report",
-      label: "Report",
-      icon: Plus,
-      color: "bg-amber-500",
-      shadow: "shadow-amber-200",
-      onClick: () => window.dispatchEvent(new CustomEvent("open-chat")),
-    },
-    {
-      id: "equipment",
-      label: "Equipment",
-      icon: Building2,
-      color: "bg-blue-600",
-      shadow: "shadow-blue-200",
-      onClick: () => window.dispatchEvent(new CustomEvent("open-hierarchy")),
-    },
-    {
-      id: "my-tasks",
-      label: "My Tasks",
-      icon: ClipboardCheck,
-      color: "bg-emerald-600",
-      shadow: "shadow-emerald-200",
-      onClick: () => navigate("/my-tasks"),
-    },
-    {
-      id: "production",
-      label: "Production",
-      icon: Activity,
-      color: "bg-violet-600",
-      shadow: "shadow-violet-200",
-      onClick: () => navigate("/production"),
-    },
-  ];
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -61,21 +26,35 @@ export default function OperatorLandingPage() {
         <p className="text-sm text-slate-500 mt-1">What would you like to do?</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
-        {actions.map((action) => {
-          const Icon = action.icon;
-          return (
-            <button
-              key={action.id}
-              onClick={action.onClick}
-              className={`flex flex-col items-center justify-center gap-3 rounded-2xl p-6 ${action.color} ${action.shadow} shadow-lg text-white active:scale-95 transition-transform`}
-              data-testid={`operator-btn-${action.id}`}
-            >
-              <Icon className="w-8 h-8" strokeWidth={2} />
-              <span className="text-sm font-semibold tracking-wide">{action.label}</span>
-            </button>
-          );
-        })}
+      <div className="flex flex-col gap-4 w-full max-w-xs">
+        <button
+          onClick={() => navigate("/my-tasks")}
+          className="flex items-center justify-center gap-3 rounded-2xl p-6 bg-emerald-600 shadow-lg shadow-emerald-200 text-white active:scale-95 transition-transform w-full"
+          data-testid="operator-btn-my-tasks"
+        >
+          <ClipboardCheck className="w-8 h-8" strokeWidth={2} />
+          <span className="text-sm font-semibold tracking-wide">My Tasks</span>
+        </button>
+
+        <div className="grid grid-cols-2 gap-4">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("open-hierarchy"))}
+            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-blue-600 shadow-lg shadow-blue-200 text-white active:scale-95 transition-transform"
+            data-testid="operator-btn-equipment"
+          >
+            <Building2 className="w-8 h-8" strokeWidth={2} />
+            <span className="text-sm font-semibold tracking-wide">Equipment</span>
+          </button>
+
+          <button
+            onClick={() => navigate("/production")}
+            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-violet-600 shadow-lg shadow-violet-200 text-white active:scale-95 transition-transform"
+            data-testid="operator-btn-production"
+          >
+            <Activity className="w-8 h-8" strokeWidth={2} />
+            <span className="text-sm font-semibold tracking-wide">Production</span>
+          </button>
+        </div>
       </div>
     </div>
   );
