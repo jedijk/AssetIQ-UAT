@@ -587,12 +587,22 @@ export default function EquipmentManagerPage() {
   const { data: disciplinesData } = useQuery({ queryKey: ["disciplines"], queryFn: equipmentHierarchyAPI.getDisciplines });
   const { data: unstructuredData } = useQuery({ queryKey: ["unstructured-items"], queryFn: equipmentHierarchyAPI.getUnstructuredItems });
 
-  // Full refresh handler - clears cache and refetches
+  // Full refresh handler - clears both backend and frontend cache
   const handleFullRefresh = async () => {
     toast.info("Refreshing equipment data...");
-    await queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
-    await queryClient.refetchQueries({ queryKey: ["equipment-nodes"] });
-    toast.success("Equipment data refreshed");
+    try {
+      // Clear backend cache first
+      await equipmentHierarchyAPI.refreshCache();
+      // Then clear frontend cache and refetch
+      await queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
+      await queryClient.refetchQueries({ queryKey: ["equipment-nodes"] });
+      toast.success("Equipment data refreshed");
+    } catch (error) {
+      console.error("Refresh failed:", error);
+      // Still try to refetch even if backend cache clear fails
+      await queryClient.refetchQueries({ queryKey: ["equipment-nodes"] });
+      toast.success("Equipment data refreshed");
+    }
   };
 
   const nodes = nodesData?.nodes || [];

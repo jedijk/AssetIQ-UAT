@@ -343,6 +343,11 @@ export const equipmentHierarchyAPI = {
     return response.data;
   },
   
+  refreshCache: async () => {
+    const response = await api.post("/equipment-hierarchy/refresh");
+    return response.data;
+  },
+  
   getNode: async (nodeId) => {
     const response = await api.get(`/equipment-hierarchy/nodes/${nodeId}`);
     return response.data;

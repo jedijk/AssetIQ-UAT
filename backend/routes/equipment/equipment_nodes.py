@@ -13,9 +13,26 @@ from iso14224_models import (
     ISOLevel, ISO_LEVEL_ORDER, EQUIPMENT_TYPES, ISO_LEVEL_LABELS,
     get_valid_child_levels, is_valid_parent_child, EquipmentNodeCreate, EquipmentNodeUpdate
 )
+from services.query_cache import query_cache
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def invalidate_equipment_cache(user_id: str = None):
+    """Invalidate equipment-related caches after mutations."""
+    query_cache.invalidate("equipment_nodes")
+    if user_id:
+        query_cache.invalidate(f"equipment_nodes:{user_id}")
+
+
+@router.post("/equipment-hierarchy/refresh")
+async def refresh_equipment_cache(
+    current_user: dict = Depends(get_current_user)
+):
+    """Force refresh equipment cache for current user."""
+    invalidate_equipment_cache(current_user["id"])
+    return {"message": "Equipment cache cleared", "status": "refreshed"}
 
 
 @router.get("/equipment-hierarchy/nodes")
@@ -403,6 +420,9 @@ async def create_equipment_node(
         except Exception as e:
             logger.error(f"Failed to generate EFMs for {node_id}: {e}")
     
+    # Invalidate cache after create
+    invalidate_equipment_cache(current_user["id"])
+    
     node_doc.pop("_id", None)
     return node_doc
 
@@ -473,6 +493,9 @@ async def update_equipment_node(
                     logger.info(f"Synced EFMs for {node_id}: {sync_result}")
                 except Exception as e:
                     logger.error(f"Failed to sync EFMs for {node_id}: {e}")
+    
+    # Invalidate cache after update
+    invalidate_equipment_cache(current_user["id"])
     
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
     return updated
@@ -589,6 +612,9 @@ async def delete_equipment_node(
     )
     
     result = await db.equipment_nodes.delete_many({"id": {"$in": all_ids}})
+    
+    # Invalidate cache after delete
+    invalidate_equipment_cache(current_user["id"])
     
     logger.info(f"Deleted equipment node {node_id} and {len(children_ids)} children")
     

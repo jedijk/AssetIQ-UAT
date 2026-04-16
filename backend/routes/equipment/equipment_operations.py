@@ -11,8 +11,18 @@ from iso14224_models import (
     ISOLevel, ISO_LEVEL_ORDER, MoveNodeRequest,
     get_valid_child_levels, is_valid_parent_child, normalize_level
 )
+from services.query_cache import query_cache
 
 router = APIRouter()
+
+
+def invalidate_equipment_cache(user_id: str = None):
+    """Invalidate equipment-related caches after mutations."""
+    # Invalidate all equipment_nodes caches (they're prefixed with db name)
+    query_cache.invalidate("equipment_nodes")
+    # Also invalidate any user-specific cache if provided
+    if user_id:
+        query_cache.invalidate(f"equipment_nodes:{user_id}")
 
 
 class ChangeLevelRequest(BaseModel):
@@ -127,6 +137,9 @@ async def change_node_level(
         }}
     )
     
+    # Invalidate cache after mutation
+    invalidate_equipment_cache(current_user["id"])
+    
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
     action = "promoted" if is_promoting else "demoted"
     return {"message": f"Node {action} to {new_level.value}", "node": updated}
@@ -186,6 +199,9 @@ async def reorder_equipment_node(
         {"id": target_node["id"]},
         {"$set": {"sort_order": current_idx, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
+    
+    # Invalidate cache after mutation
+    invalidate_equipment_cache(current_user["id"])
     
     return {"message": f"Node moved {request.direction}", "new_sort_order": target_idx}
 
@@ -272,6 +288,9 @@ async def reorder_node_to_position(
         }}
     )
     
+    # Invalidate cache after mutation
+    invalidate_equipment_cache(current_user["id"])
+    
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
     return {"message": f"Node moved {request.position} target", "node": updated}
 
@@ -334,6 +353,9 @@ async def move_equipment_node(
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
+    
+    # Invalidate cache after mutation
+    invalidate_equipment_cache(current_user["id"])
     
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
     return updated
