@@ -551,6 +551,9 @@ const Layout = () => {
     return true;
   });
 
+  // True when operator landing is active (mobile + operator mode)
+  const isOperatorActive = isMobileView && (user?.role === "operator" || operatorViewEnabled);
+
   return (
     <div className="app-container">
       {/* Header */}
@@ -559,6 +562,7 @@ const Layout = () => {
           {/* Left Section - Logo & Nav */}
           <div className="flex items-center gap-3 lg:gap-6">
             {/* Mobile Menu Toggle - LEFT side on mobile */}
+            {!isOperatorActive && (
             <motion.button
               className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 -ml-1"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -574,6 +578,7 @@ const Layout = () => {
                 <Menu className="w-5 h-5 text-slate-600" />
               )}
             </motion.button>
+            )}
 
             {/* Hierarchy Toggle - Desktop */}
             <Button
@@ -859,6 +864,7 @@ const Layout = () => {
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuLabel className="text-xs">Help</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {!isOperatorActive && (
                 <DropdownMenuItem 
                   onClick={resetIntro}
                   className="cursor-pointer text-sm"
@@ -867,6 +873,7 @@ const Layout = () => {
                   <Info className="w-3.5 h-3.5 mr-2" />
                   Replay Tour
                 </DropdownMenuItem>
+                )}
                 <DropdownMenuItem 
                   onClick={() => navigate("/settings/feedback")}
                   className="cursor-pointer text-sm"
@@ -1435,7 +1442,7 @@ const Layout = () => {
       />
 
       {/* Introduction Overlay - only show after password change is complete */}
-      {showIntro && !mustChangePassword && (
+      {showIntro && !mustChangePassword && !isOperatorActive && (
         <IntroOverlay 
           onComplete={dismissIntro}
           onSkip={dismissIntro}
