@@ -597,7 +597,11 @@ const Layout = () => {
             </Button>
 
             {/* Logo */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div
+              className="flex items-center gap-2 flex-shrink-0 cursor-pointer"
+              onClick={() => navigate("/dashboard")}
+              data-testid="app-logo-link"
+            >
               <img 
                 src="/logo.png" 
                 alt="AssetIQ" 
