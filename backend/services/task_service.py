@@ -587,6 +587,7 @@ class TaskService:
             "estimated_duration_minutes": template.get("estimated_duration_minutes"),
             "form_fields": form_fields,
             "form_template_name": form_template_name,
+            "photo_extraction_config": form_template.get("photo_extraction_config") if form_template else None,
             "started_at": None,
             "completed_at": None,
             "actual_duration_minutes": None,

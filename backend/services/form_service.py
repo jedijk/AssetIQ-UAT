@@ -191,6 +191,7 @@ class FormService:
                 "allow_partial_submission": data.get("allow_partial_submission", existing.get("allow_partial_submission", False)),
                 "require_signature": data.get("require_signature", existing.get("require_signature", False)),
                 "tags": data.get("tags", existing.get("tags", [])),
+                "photo_extraction_config": data.get("photo_extraction_config", existing.get("photo_extraction_config")),
                 "version": existing.get("version", 1) + 1,
                 "is_active": True,
                 "is_latest": True,
@@ -220,7 +221,7 @@ class FormService:
             allowed_fields = [
                 "name", "description", "discipline", "failure_mode_ids",
                 "equipment_type_ids", "fields", "documents", "allow_partial_submission",
-                "require_signature", "tags", "is_active"
+                "require_signature", "tags", "is_active", "photo_extraction_config"
             ]
             
             for field in allowed_fields:
@@ -1132,6 +1133,7 @@ class FormService:
             "allow_partial_submission": doc.get("allow_partial_submission", False),
             "require_signature": doc.get("require_signature", False),
             "tags": doc.get("tags", []),
+            "photo_extraction_config": doc.get("photo_extraction_config"),
             "version": doc.get("version", 1),
             "is_active": doc.get("is_active", True),
             "is_latest": doc.get("is_latest", True),
