@@ -326,14 +326,18 @@ const MyTasksPage = () => {
     })
   );
   
-  // Save manual sort preference per user
+  // Save manual sort preference per user (skip initial sync)
+  const hasMountedRef = useRef(false);
   useEffect(() => {
-    localStorage.setItem(sortKey, isManualSort.toString());
+    if (hasMountedRef.current) {
+      localStorage.setItem(sortKey, isManualSort.toString());
+    }
+    hasMountedRef.current = true;
   }, [isManualSort, sortKey]);
   
   // Save sort orders per user when they change
   useEffect(() => {
-    if (Object.keys(sortOrderByTab).length > 0) {
+    if (hasMountedRef.current && Object.keys(sortOrderByTab).length > 0) {
       localStorage.setItem(orderKey, JSON.stringify(sortOrderByTab));
     }
   }, [sortOrderByTab, orderKey]);
