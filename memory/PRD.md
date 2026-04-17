@@ -1,239 +1,64 @@
-# AssetIQ / ThreatBase - Product Requirements Document
+# AssetIQ - Product Requirements Document
 
 ## Original Problem Statement
-Full-stack platform for AI-powered reliability intelligence featuring causal analysis, FMEA libraries, task scheduling, and user management. Robust full-stack platform optimized for multi-environment execution with dynamic database switching and accurate hierarchical equipment mapping.
+Robust full-stack platform (React + FastAPI + MongoDB) optimized for multi-environment execution with dynamic database switching, advanced form capabilities, and seamless AI integrations. Features include AI chat assistant, Task Scheduler, Equipment Hierarchy, Form Builder with Universal Photo Data Capture (GPT-5.2 Vision), Cloudflare R2 file storage, and a mobile-friendly 'Simple Mode' for operators.
 
-## Tech Stack
-- Frontend: React with React Query, Tailwind CSS, Shadcn/UI, Framer Motion, Recharts
-- Backend: FastAPI with Motor (async MongoDB driver)
-- Database: MongoDB Atlas
-- Storage: MongoDB file storage (migrated from Emergent Object Storage)
-- AI: OpenAI GPT-5.2, OpenAI Whisper via Emergent LLM Key
-
-## Core Requirements
-- Authentication with JWT
-- Role-based access control (Owner, Admin, User, Custom roles)
-- Equipment hierarchy management (ISO 14224)
-- Threat/observation tracking with risk scoring
-- Causal investigation engine
-- Task planning and scheduling
-- Form builder and submissions
-- AI-powered risk analysis & chat assistant
-- Production Dashboard for Line 90
-
----
+## Core Architecture
+- **Frontend**: React (CRA) + TailwindCSS + Shadcn/UI
+- **Backend**: FastAPI + MongoDB (Motor async driver)
+- **File Storage**: Cloudflare R2 (primary) + MongoDB base64 (legacy fallback)
+- **AI**: GPT-4o/Whisper (Emergent LLM Key), GPT-5.2 Vision (user OPENAI_VISION_KEY)
+- **Email**: Resend
+- **Version**: 3.4.4
 
 ## What's Been Implemented
 
-### April 13, 2026 - Production Dashboard for Line 90 (COMPLETED)
-**FEATURE - Full production analytics dashboard for Line 90 equipment:**
+### Core Platform
+- Multi-environment database switching (Production/UAT)
+- JWT auth with bcrypt, brute-force protection, password reset
+- Role-based access (owner, admin, user)
+- Forced version reload mechanism
 
-**Backend (`/app/backend/routes/production.py`):**
-- `GET /api/production/dashboard` - Aggregates form submission data (Extruder settings, Mooney Viscosity, Big Bag Loading) into KPIs, time series, scatter data, and production log
-- `GET /api/production/events` - Lists production actions/insights by date and type
-- `POST /api/production/events` - Creates new production action or insight event
-- `DELETE /api/production/events/{id}` - Deletes a production event
-- `DELETE /api/production/seed-data` - Clears all seeded demo data (marked with `_seeded: True`)
-- Data is queried from `form_submissions` collection filtered by template name and equipment name
-- Events stored in `production_events` collection
+### Features
+- AI Chat Assistant (GPT-4o)
+- Task Scheduler with recurring tasks
+- Equipment Hierarchy with ISO 14224 levels
+- Form Builder with dynamic field types
+- Observations/Actions/Causal Investigations
+- Production Dashboard
+- QR Code system for equipment
+- My Tasks with persistent sort ordering
 
-**Frontend (`/app/frontend/src/pages/ProductionDashboardPage.js`):**
-- Header with date selector (prev/next navigation), shift selector (Day/Night), refresh and Add Log buttons
-- 6 KPI cards: Total Input, Waste, Yield, Avg Mooney Viscosity, RSD, Runtime
-- Waste & Downtime Over Time composed chart (bars + line)
-- Feed vs RPM vs Viscosity scatter chart
-- Viscosity Trend line chart
-- Actions panel with severity icons (critical/warning/success/info)
-- Daily Insights panel
-- Production Log table with search, anomaly row highlighting (amber)
-- Add Event dialog (type, severity, title, description)
+### Recent Additions (v3.4.4)
+- Operator Landing Page / Simple Mode (mobile-optimized)
+- Universal Photo Data Capture (GPT-5.2 Vision)
+- Cloudflare R2 file storage migration
+- File Storage metrics in Server Performance dashboard
+- User Management: default_simple_mode toggle, last_login tracking
+- Equipment Hierarchy: hide specific levels, leaf node alignment fix
 
-**Navigation:**
-- Dashboard nav item converted to dropdown with "Overview" and "Production Line 90" sub-items
-- Route: `/production`
+## Key API Endpoints
+- `POST /api/ai/extract` - GPT-5.2 Vision processing
+- `POST /api/ai/corrections` - Store user corrections
+- `GET /api/system/file-storage` - File storage stats (R2 + MongoDB)
+- `GET /api/system/metrics` - CPU/RAM/Disk/Uptime
+- `GET /api/system/database` - MongoDB storage stats
+- `GET /api/system/security` - Security checks
+- `PATCH /api/users/me/profile` - User profile updates
 
-**Seed Script (`/app/backend/scripts/seed_production_data.py`):**
-- Seeds realistic Extruder, Viscosity, and Big Bag data for a given date
-- Includes anomaly data point at 16:30 (sheet breaking, viscosity drop)
-- Seeded data for 2026-04-12 and 2026-04-13
-- Clear command: `curl -X DELETE "$API_URL/api/production/seed-data" -H "Authorization: Bearer $TOKEN"`
-
-**Testing:** 19/19 backend, 17/17 frontend (100% pass rate - iteration 25)
-
-**Files Created:**
-- `/app/backend/routes/production.py`
-- `/app/backend/scripts/seed_production_data.py`
-- `/app/frontend/src/pages/ProductionDashboardPage.js`
-- `/app/backend/tests/test_production_dashboard.py`
-
-**Files Modified:**
-- `/app/backend/routes/__init__.py` - Registered production router
-- `/app/frontend/src/lib/api.js` - Added productionAPI methods
-- `/app/frontend/src/components/Layout.js` - Dashboard dropdown with sub-items
-- `/app/frontend/src/App.js` - Added /production route
-
----
-
-### Previous Completed Work (Summary)
-- Structural Code Audit & Refactor (unified API layer, fixed race conditions)
-- Criticality quick info tooltips
-- Risk score/RPN propagation (Equipment → Threats → Actions)
-- AI Chat with language detection, voice-to-text, equipment tag matching
-- Dynamic DB Environment Switching (Production vs UAT)
-- MongoDB File Storage Migration
-- QR Code Management Module
-- Equipment Hierarchy Search Enhancement
-- ISO 14224 Equipment Types and Failure Modes expansion
-- Timezone Settings & Date Formatting
-- Introduction Overlay / Onboarding Tour
-- Server Performance & Security monitoring
-- Excel Import for Equipment Hierarchy
-
-### April 14, 2026 - Bug Fixes (COMPLETED)
-
-### April 14, 2026 - Production Dashboard Data Fix (COMPLETED)
-
-**BUG FIX - Form submissions from child equipment not appearing on Production Dashboard:**
-- **Root Cause**: Dashboard query only included Line-90 + ancestors (parent plant, grandparent installation). Submissions assigned to child equipment (EXU - Extrusion Unit, etc.) were excluded.
-- **Fix**: Extended equipment query to include all descendants (children + grandchildren) of Line-90.
-- Files: `/app/backend/routes/production.py`
-
-**BUG FIX - Production Log edits not persisting for multi-word fields:**
-- **Root Cause**: The PATCH endpoint's field matching compared `"co2 feed/p"` (frontend label, lowercased) against `"co2_feed/p"` (DB label). Space vs underscore mismatch caused `CO2 Feed/P` and `T Product IR` fields to silently fail to update.
-- **Fix**: Added space/underscore normalization to PATCH matching logic — both the sent key and the DB label are normalized before comparison.
-- Files: `/app/backend/routes/production.py`
-
-### April 14, 2026 - Chat System V2 Rewrite (COMPLETED)
-
-**REWRITE - Chat Backend with Single Source of Truth State Machine:**
-- **Problem**: Chat state was split between `chat_conversations` (for AWAITING_CONTEXT) and `chat_messages` (for AWAITING_EQUIPMENT/FAILURE_MODE). When either source was stale, bugs appeared: double equipment prompts, context messages treated as new searches, race conditions on fast clicks.
-- **Solution**: Complete rewrite of `routes/chat.py` (778→380 lines) and `chat_handler_v2.py` (894→430 lines):
-  1. **Single source of truth**: All conversation state lives in `chat_conversations` collection (one document per user)
-  2. **Atomic state writes**: State written to `chat_conversations` BEFORE response returns — eliminates race conditions
-  3. **Pure business logic**: `chat_handler_v2.py` receives state as parameters, returns new state — no DB state queries
-  4. **Shared core**: `_core_chat_process()` function shared by both text and voice endpoints (voice-send no longer has separate weaker observation logic)
-  5. **Migration fallback**: If `chat_conversations` is empty but `chat_messages` has state (old system), auto-migrates on first read
-  6. **Race-condition guard**: Equipment format regex detection + direct tag lookup still works when state is stale
-- **Testing**: 16 tests, 10 passed, 6 skipped (N/A), 0 failed. All 8 critical flows verified.
-- **Files rewritten**: `/app/backend/routes/chat.py`, `/app/backend/chat_handler_v2.py`
-- **Files created**: `/app/backend/tests/test_chat_system_v2.py`
-
-**Previous bug fixes (now superseded by rewrite):**
-- Double Equipment Prompt (Phase 1 - Tag Matching)
-- Double Equipment Prompt Race Condition (Phase 2 - State Sync / forced_state)
-- Context Message Treated as New Search (Phase 3 - AWAITING_CONTEXT Fallback)
-
-**FEATURE - Auto-Skip Context Prompt:**
-- Added 60-second countdown timer for "add context" prompt after observation creation
-- Visual countdown on Skip button: "Skip (55s)"
-- Helper text: "Auto-skip in 55s"
-- Auto-sends "skip" after 60 seconds of inactivity
-- Timer clears when user manually sends message or clicks Skip
-- Files: `/app/frontend/src/components/ChatSidebar.js`
-
-**BUG FIX - Database Environment Mismatch in Chat:**
-- **Root Cause**: When user switched database environments (UAT ↔ Production), chat history was cached from previous environment. Backend couldn't find chat state in new database, causing "double equipment" prompts.
-- **Fix**:
-  1. Clear chat history cache when switching database environments
-  2. Force refetch chat history when chat sidebar opens
-  3. Detect and warn user when state mismatch occurs (equipment selection returns equipment options again)
-- Files: `/app/frontend/src/pages/SettingsDatabasePage.js`, `/app/frontend/src/components/ChatSidebar.js`
-
-**FEATURE - Production Dashboard Mobile Compatibility:**
-- Made period selector wrap on small screens
-- Reduced chart height on mobile (250px vs 300px desktop)
-- Made chart toggles smaller and wrap-friendly on mobile
-- Reduced padding on panels (p-3 mobile, p-4 desktop)
-- Export button shows icon-only on mobile
-- Grid layouts adjusted for tablet breakpoint (md:grid-cols-2)
-- Files: `/app/frontend/src/pages/ProductionDashboardPage.js`
-
-**FEATURE - Hide Reliability & Production Tabs on Mobile:**
-- Added `hidden sm:flex` to hide these tabs on screens < 640px
-- Auto-redirect to "Operational" tab if user is on hidden tab when screen resizes
-- Files: `/app/frontend/src/pages/DashboardPage.js`
-
----
-
-### April 16, 2026 - Operator Landing Page (COMPLETED)
-
-**FEATURE - Mobile-only operator landing page:**
-- Simple 4-button landing (Report, Equipment, My Tasks, Production) shown on mobile when operator mode is active
-- Owner can toggle "Operator View" ON/OFF via avatar dropdown menu
-- Toggle persists via `localStorage` key `operatorViewEnabled`
-- Reactive: toggling updates the view immediately via custom `operatorViewChanged` event
-- Designed for future role attribution (user.role === "operator" auto-triggers it)
-- Custom events `open-chat` and `open-hierarchy` communicate with Layout.js
-
-**Files Created:**
-- `/app/frontend/src/pages/OperatorLandingPage.js`
-
-**Files Modified:**
-- `/app/frontend/src/pages/DashboardPage.js` - Added operator mode detection + early return
-- `/app/frontend/src/components/Layout.js` - Added toggle UI in avatar dropdown + event listeners
-
-**Testing:** 9/9 frontend tests passed (100% - iteration 27)
-
----
-
-### April 16, 2026 - Universal Photo Data Capture Phase 1 (COMPLETED)
-
-**FEATURE - AI-powered photo extraction for forms:**
-- Backend `POST /api/ai/extract` endpoint using OpenAI GPT-4o Vision (user's own key)
-- Accepts image + configurable extraction schema, returns structured data with confidence scores
-- `PhotoExtractionConfig` model added to form templates (form-level setting)
-- `PhotoDataCaptureField` frontend component with camera-first capture on mobile
-- States: idle → processing → success/error with auto-fill and confidence indicators
-- Form Designer UI: toggle + config panel (label, mode, prompt, extraction fields with field mapping)
-- Integration into TaskExecutionFrame: auto-fills mapped form fields from AI response
-
-**Files Created:**
-- `/app/backend/routes/ai_extract.py`
-- `/app/frontend/src/components/forms/PhotoDataCaptureField.jsx`
-
-**Files Modified:**
-- `/app/backend/models/form_models.py` - Added PhotoExtractionConfig, PhotoExtractionField
-- `/app/backend/routes/__init__.py` - Registered ai_extract router
-- `/app/backend/.env` - Added OPENAI_VISION_KEY
-- `/app/frontend/src/components/task-execution/TaskExecutionFrame.js` - Integrated PhotoDataCaptureField
-- `/app/frontend/src/pages/FormsPage.js` - Added extraction config UI in form designer
-
-**Phase 2 (upcoming):** Confidence scoring UI, correction tracking, storage/traceability
-**Phase 3 (future):** Template library, learning from corrections, offline capture
-
-### April 16, 2026 - Universal Photo Data Capture Phase 2 (COMPLETED)
-
-**FEATURE - Confidence scoring UI, correction tracking, storage:**
-- **AI confidence badges**: Green (`AI 95%`) / Amber (`AI 40%`) / Blue (`Corrected`) badges on field labels
-- **Field highlighting**: Green ring on AI-filled fields, blue ring on corrected fields
-- **Correction tracking**: When user modifies an AI-filled value, original AI value + correction stored
-- **Traceability storage**: `ai_extraction` object included in task completion & form submission payloads
-  - Contains: extracted_fields, corrections, has_corrections flag, extraction_timestamp
-- **Backend storage**: Both task_instances and form_submissions collections store `ai_extraction` data
-
-**Files Modified:**
-- `/app/frontend/src/components/task-execution/TaskExecutionFrame.js` - AiBadge component, correction tracking in handleFieldChange, ai_extraction in submission payload, field ring highlighting
-- `/app/backend/routes/my_tasks.py` - Stores ai_extraction on action completion
-- `/app/backend/services/task_service.py` - Stores ai_extraction on task instance + form submission
-- `/app/backend/models/task_models.py` - Added ai_extraction field to TaskExecutionSubmit
-
-**Phase 3 (future):** Template library, learning from corrections, offline capture
-
-### April 16, 2026 - Universal Photo Data Capture Phase 3 (COMPLETED)
-
-**Template Library:** 4 pre-built templates (Digital Display, Nameplate, Gauge, Inspection) via dropdown.
-**Learning from Corrections:** Stores user corrections, appends learned hints to GPT-4o prompt for future extractions.
-
----
+## Key DB Collections
+- `file_storage`: `{path, url, size, content_type, storage_type, created_at}`
+- `form_templates`: includes `photo_extraction_config`
+- `users`: includes `default_simple_mode`, `last_login`
 
 ## Prioritized Backlog
 
-### P1
+### P1 (Next Up)
 - Report generation (PowerPoint/PDF) for Causal Investigations
 - Offline support with local storage for My Tasks execution
 
 ### P2
 - QR scan analytics dashboard
 
-### P3
-- Break down large pages into smaller modular components
+### P3 (Refactoring)
+- Break down large pages: FormsPage.js (2100+ lines), SettingsUserManagementPage.js, EquipmentManagerPage.js, DashboardPage.js, ProductionDashboardPage.js
