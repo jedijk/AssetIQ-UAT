@@ -492,7 +492,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
   return (
     <>
     <Dialog open={open && !previewFile} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="w-[95vw] max-w-sm sm:max-w-md max-h-[85vh] overflow-y-auto p-4 sm:p-6" data-testid="equipment-details-dialog">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-sm sm:max-w-md max-h-[85vh] overflow-y-auto p-4 sm:p-6" data-testid="equipment-details-dialog">
         <DialogHeader className="pb-2">
           <div className="flex items-start gap-3">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
