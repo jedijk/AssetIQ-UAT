@@ -39,6 +39,8 @@ import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { DocumentViewer } from "./DocumentViewer";
+import { getBackendUrl } from "../lib/apiConfig";
 
 // ISO 14224 Level Configuration
 const ISO_LEVEL_CONFIG = {
@@ -476,12 +478,13 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
     } catch { toast.error("Download failed"); }
   };
 
-  const handleView = async (file) => {
-    try {
-      const blob = await equipmentHierarchyAPI.downloadEquipmentFile(file.id);
-      const url = window.URL.createObjectURL(blob);
-      setPreviewFile({ url, filename: file.filename, contentType: file.content_type, fileId: file.id });
-    } catch { toast.error("Could not load file"); }
+  const handleView = (file) => {
+    const ext = file.filename.split('.').pop()?.toLowerCase() || '';
+    setPreviewFile({ 
+      name: file.filename, 
+      url: `${getBackendUrl()}/api/equipment-files/${file.id}/download`,
+      type: ext 
+    });
   };
 
   const files = filesData?.files || [];
@@ -630,38 +633,13 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
       </DialogContent>
     </Dialog>
 
-    {/* File Preview Dialog */}
+    {/* File Preview - Full screen DocumentViewer */}
     {previewFile && (
-      <Dialog open={!!previewFile} onOpenChange={() => { if (previewFile?.url) window.URL.revokeObjectURL(previewFile.url); setPreviewFile(null); }}>
-        <DialogContent className="w-[92vw] max-w-3xl max-h-[90vh] p-0 overflow-hidden" data-testid="file-preview-dialog">
-          <DialogHeader className="px-4 pt-4 pb-2">
-            <DialogTitle className="text-sm truncate pr-10">{previewFile.filename}</DialogTitle>
-          </DialogHeader>
-          <div className="px-4 pb-4 overflow-auto touch-pan-x touch-pan-y" style={{ maxHeight: "calc(90vh - 70px)", WebkitOverflowScrolling: "touch" }}>
-            {previewFile.contentType?.startsWith("image/") ? (
-              <img src={previewFile.url} alt={previewFile.filename} className="max-w-full object-contain rounded-lg" style={{ touchAction: "pinch-zoom", maxHeight: "75vh" }} />
-            ) : previewFile.contentType?.includes("pdf") ? (
-              <iframe src={previewFile.url} title={previewFile.filename} className="w-full rounded-lg border" style={{ height: "75vh", minHeight: "300px" }} />
-            ) : (previewFile.contentType?.includes("presentation") || previewFile.contentType?.includes("powerpoint") || previewFile.contentType?.includes("ppt")
-              || previewFile.contentType?.includes("spreadsheet") || previewFile.contentType?.includes("excel")
-              || previewFile.contentType?.includes("msword") || previewFile.contentType?.includes("wordprocessing")) ? (
-              <iframe
-                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(window.location.origin + "/api/equipment-files/" + previewFile.fileId + "/view")}`}
-                title={previewFile.filename}
-                className="w-full rounded-lg border"
-                style={{ height: "75vh", minHeight: "300px" }}
-              />
-            ) : (
-              <p className="text-sm text-slate-500 py-8">Preview not available for this file type</p>
-            )}
-          </div>
-          <div className="px-4 pb-3 border-t border-slate-100 pt-2">
-            <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => { const a = document.createElement("a"); a.href = previewFile.url; a.download = previewFile.filename; a.click(); }}>
-              <Download className="w-3.5 h-3.5 mr-1.5" />Download {previewFile.filename}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DocumentViewer
+        document={previewFile}
+        onClose={() => setPreviewFile(null)}
+        onBack={() => setPreviewFile(null)}
+      />
     )}
     </>
   );

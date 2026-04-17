@@ -60,7 +60,7 @@ const Layout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
-  const [hierarchyOpen, setHierarchyOpen] = useState(true);
+  const [hierarchyOpen, setHierarchyOpen] = useState(typeof window !== 'undefined' && window.innerWidth >= 1024);
   const [hierarchyWidth, setHierarchyWidth] = useState(288); // 288px = w-72 default
   const [isResizing, setIsResizing] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -458,12 +458,12 @@ const Layout = () => {
     };
   }, []);
 
-  // Auto-collapse hierarchy on mobile, Equipment Manager page, and Settings pages
+  // Auto-collapse hierarchy on Equipment Manager page and Settings pages
   useEffect(() => {
-    if (location.pathname === "/equipment-manager" || location.pathname.startsWith("/settings") || isMobileView) {
+    if (location.pathname === "/equipment-manager" || location.pathname.startsWith("/settings")) {
       setHierarchyOpen(false);
     }
-  }, [location.pathname, isMobileView]);
+  }, [location.pathname]);
 
   // Handle hierarchy panel resize
   const handleResizeMouseDown = useCallback((e) => {

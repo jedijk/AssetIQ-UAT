@@ -1015,7 +1015,13 @@ export default function DashboardPage({ initialTab }) {
           bg="bg-green-50"
           subtitle={t("dashboard.totalAssets") || "total assets"}
           clickable={true}
-          onClick={() => navigate("/equipment-manager", { state: navState })}
+          onClick={() => {
+            if (window.innerWidth < 1024) {
+              window.dispatchEvent(new CustomEvent("open-hierarchy"));
+            } else {
+              navigate("/equipment-manager", { state: navState });
+            }
+          }}
         />
       </div>
 
