@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Upload, FileText, Loader2, CheckCircle2, XCircle, AlertCircle,
   Trash2, ChevronRight, Database, Settings, RefreshCw, Play, Eye, X,
-  FileSpreadsheet, Clock, Activity, FolderOpen, BarChart3, Sparkles, TrendingUp
+  FileSpreadsheet, Clock, Activity, FolderOpen, BarChart3, Sparkles, TrendingUp,
+  CheckSquare, Square
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -556,6 +557,206 @@ function PreviewStep({ jobId, previewData, onIngest, onBack }) {
   );
 }
 
+// ======================== Batch Configure Step ========================
+
+function BatchConfigureStep({ jobIds, jobs, onDone, onBack }) {
+  const [loading, setLoading] = useState(true);
+  const [columns, setColumns] = useState([]);
+  const [sampleRows, setSampleRows] = useState([]);
+  const [suggestions, setSuggestions] = useState({});
+  const [delimiter, setDelimiter] = useState(",");
+  const [hasHeader, setHasHeader] = useState(true);
+  const [skipRows, setSkipRows] = useState(0);
+  const [mapping, setMapping] = useState({ timestamp: "", asset_id: "", status: "", metric_columns: [] });
+  const [ingesting, setIngesting] = useState(false);
+
+  // Detect columns from the first job's first file
+  useEffect(() => {
+    const detect = async () => {
+      setLoading(true);
+      try {
+        const fd = new FormData();
+        fd.append("job_id", jobIds[0]);
+        fd.append("delimiter", delimiter);
+        fd.append("has_header", hasHeader);
+        fd.append("skip_rows", skipRows);
+        const res = await fetch(`${API}/api/production-logs/detect-columns`, {
+          method: "POST", headers: getHeaders(), body: fd,
+        });
+        if (!res.ok) throw new Error("Detection failed");
+        const data = await res.json();
+        setColumns(data.columns);
+        setSampleRows(data.sample_rows);
+        setSuggestions(data.suggestions);
+        setMapping({
+          timestamp: data.suggestions.timestamp || "",
+          asset_id: data.suggestions.asset_id || "",
+          status: data.suggestions.status || "",
+          metric_columns: data.suggestions.metrics || [],
+        });
+      } catch (err) {
+        toast.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    detect();
+  }, [jobIds, delimiter, hasHeader, skipRows]);
+
+  const toggleMetric = (col) => {
+    setMapping(prev => ({
+      ...prev,
+      metric_columns: prev.metric_columns.includes(col)
+        ? prev.metric_columns.filter(c => c !== col)
+        : [...prev.metric_columns, col],
+    }));
+  };
+
+  const handleBatchIngest = async () => {
+    setIngesting(true);
+    try {
+      const template = { delimiter, has_header: hasHeader, skip_rows: skipRows, column_mapping: mapping };
+      const res = await fetch(`${API}/api/production-logs/batch-ingest`, {
+        method: "POST",
+        headers: { ...getHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ job_ids: jobIds, template }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Batch ingest failed"); }
+      const data = await res.json();
+      toast.success(`${data.started} job(s) started`);
+      onDone();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIngesting(false);
+    }
+  };
+
+  const unmappedCols = columns.filter(c => c !== mapping.timestamp && c !== mapping.asset_id && c !== mapping.status);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400 mr-2" />
+        <span className="text-sm text-slate-500">Detecting columns from first file...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+        <p className="text-sm font-medium text-indigo-800">Batch Processing — {jobIds.length} jobs selected</p>
+        <p className="text-xs text-indigo-600 mt-0.5">
+          Configure the template once below. All {jobs.reduce((s, j) => s + (j.total_files || 0), 0)} files across {jobIds.length} jobs will be parsed and ingested using the same settings.
+        </p>
+      </div>
+
+      {/* Parser settings (same as ConfigureStep) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div>
+          <Label className="text-xs">Delimiter</Label>
+          <Select value={delimiter} onValueChange={setDelimiter}>
+            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value=",">Comma (,)</SelectItem>
+              <SelectItem value=";">Semicolon (;)</SelectItem>
+              <SelectItem value="\t">Tab</SelectItem>
+              <SelectItem value="|">Pipe (|)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">Skip Rows</Label>
+          <Input type="number" min={0} value={skipRows} onChange={e => setSkipRows(parseInt(e.target.value) || 0)} className="h-9 text-sm" />
+        </div>
+        <div className="flex items-end gap-2 pb-1">
+          <Switch checked={hasHeader} onCheckedChange={setHasHeader} id="batch-has-header" />
+          <Label htmlFor="batch-has-header" className="text-xs">Has Header Row</Label>
+        </div>
+      </div>
+
+      {/* Column mapping */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm">Column Mapping</CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <Label className="text-xs text-slate-500">Timestamp Column *</Label>
+              <Select value={mapping.timestamp} onValueChange={v => setMapping(p => ({ ...p, timestamp: v }))}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
+                <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-slate-500">Asset/Equipment ID *</Label>
+              <Select value={mapping.asset_id} onValueChange={v => setMapping(p => ({ ...p, asset_id: v }))}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
+                <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-slate-500">Status Column</Label>
+              <Select value={mapping.status || "__none__"} onValueChange={v => setMapping(p => ({ ...p, status: v === "__none__" ? "" : v }))}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs text-slate-500 mb-2 block">Metric Columns</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {unmappedCols.map(col => (
+                <button key={col} onClick={() => toggleMetric(col)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    mapping.metric_columns.includes(col) ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}>
+                  {col}
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sample preview */}
+      {sampleRows.length > 0 && (
+        <div className="overflow-x-auto border rounded-lg">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-50">
+              <tr>{columns.map(c => <th key={c} className="px-3 py-2 text-left font-medium text-slate-600 whitespace-nowrap">{c}</th>)}</tr>
+            </thead>
+            <tbody>
+              {sampleRows.slice(0, 3).map((row, i) => (
+                <tr key={i} className="border-t">
+                  {columns.map(c => <td key={c} className="px-3 py-1.5 text-slate-700 whitespace-nowrap">{row[c] || ""}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-2">
+        <Button variant="outline" size="sm" onClick={onBack}><ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back</Button>
+        <Button size="sm" onClick={handleBatchIngest}
+          disabled={!mapping.timestamp || !mapping.asset_id || ingesting}
+          className="bg-green-600 hover:bg-green-700" data-testid="batch-confirm-btn">
+          {ingesting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Play className="w-3.5 h-3.5 mr-1" />}
+          Ingest All {jobIds.length} Jobs
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+
 // ======================== Dashboard Component ========================
 
 function LogDashboard() {
@@ -854,9 +1055,10 @@ export default function SettingsLogIngestionPage() {
   const [stats, setStats] = useState(null);
 
   // Wizard state
-  const [step, setStep] = useState("list"); // list, upload, configure, preview
+  const [step, setStep] = useState("list"); // list, upload, configure, preview, batch-configure
   const [activeJobId, setActiveJobId] = useState(null);
   const [previewData, setPreviewData] = useState(null);
+  const [selectedJobs, setSelectedJobs] = useState(new Set());
 
   const isOwner = user?.role === "owner";
 
@@ -956,9 +1158,17 @@ export default function SettingsLogIngestionPage() {
       {/* Step: List / Job History */}
       {step === "list" && (
         <div className="space-y-4">
-          <Button onClick={() => setStep("upload")} className="bg-indigo-600 hover:bg-indigo-700" data-testid="new-ingestion-btn">
-            <Upload className="w-4 h-4 mr-2" /> New Log Ingestion
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button onClick={() => setStep("upload")} className="bg-indigo-600 hover:bg-indigo-700" data-testid="new-ingestion-btn">
+              <Upload className="w-4 h-4 mr-2" /> New Log Ingestion
+            </Button>
+            {selectedJobs.size > 0 && (
+              <Button onClick={() => setStep("batch-configure")}
+                className="bg-green-600 hover:bg-green-700" data-testid="batch-ingest-btn">
+                <Play className="w-4 h-4 mr-2" /> Batch Parse & Ingest ({selectedJobs.size} jobs)
+              </Button>
+            )}
+          </div>
 
           {jobsLoading ? (
             <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>
@@ -972,11 +1182,45 @@ export default function SettingsLogIngestionPage() {
             </Card>
           ) : (
             <div className="space-y-2">
+              {/* Select all uploaded */}
+              {jobs.some(j => j.status === "uploaded" || j.status === "previewed") && (
+                <div className="flex items-center gap-2 px-1">
+                  <button
+                    className="text-xs text-blue-600 hover:underline"
+                    onClick={() => {
+                      const uploadedIds = jobs.filter(j => j.status === "uploaded" || j.status === "previewed").map(j => j.id);
+                      setSelectedJobs(prev => {
+                        const allSelected = uploadedIds.every(id => prev.has(id));
+                        if (allSelected) return new Set();
+                        return new Set(uploadedIds);
+                      });
+                    }}>
+                    {jobs.filter(j => j.status === "uploaded" || j.status === "previewed").every(j => selectedJobs.has(j.id))
+                      ? "Deselect All" : "Select All Pending"}
+                  </button>
+                </div>
+              )}
               {jobs.map(job => {
                 const st = STATUS_STYLES[job.status] || STATUS_STYLES.uploaded;
+                const canSelect = job.status === "uploaded" || job.status === "previewed";
+                const isSelected = selectedJobs.has(job.id);
                 return (
-                  <Card key={job.id} className="hover:shadow-sm transition-shadow">
-                    <CardContent className="p-4 flex items-center gap-4">
+                  <Card key={job.id} className={`hover:shadow-sm transition-shadow ${isSelected ? "ring-2 ring-blue-300" : ""}`}>
+                    <CardContent className="p-4 flex items-center gap-3">
+                      {/* Checkbox */}
+                      {canSelect ? (
+                        <button className="flex-shrink-0" onClick={() => {
+                          setSelectedJobs(prev => {
+                            const next = new Set(prev);
+                            if (next.has(job.id)) next.delete(job.id); else next.add(job.id);
+                            return next;
+                          });
+                        }} data-testid={`select-job-${job.id}`}>
+                          {isSelected
+                            ? <CheckSquare className="w-5 h-5 text-blue-600" />
+                            : <Square className="w-5 h-5 text-slate-300" />}
+                        </button>
+                      ) : <div className="w-5" />}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-slate-700 truncate">
@@ -1034,6 +1278,16 @@ export default function SettingsLogIngestionPage() {
           previewData={previewData}
           onIngest={() => { setStep("list"); setActiveJobId(null); setPreviewData(null); fetchJobs(); fetchStats(); }}
           onBack={() => setStep("configure")}
+        />
+      )}
+
+      {/* Step: Batch Configure */}
+      {step === "batch-configure" && selectedJobs.size > 0 && (
+        <BatchConfigureStep
+          jobIds={[...selectedJobs]}
+          jobs={jobs.filter(j => selectedJobs.has(j.id))}
+          onDone={() => { setStep("list"); setSelectedJobs(new Set()); fetchJobs(); fetchStats(); }}
+          onBack={() => setStep("list")}
         />
       )}
         </TabsContent>

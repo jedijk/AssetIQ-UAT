@@ -49,6 +49,10 @@ class IngestRequest(BaseModel):
     job_id: str
     confirm: bool = True
 
+class BatchIngestRequest(BaseModel):
+    job_ids: List[str]
+    template: dict
+
 
 # ======================== Helpers ========================
 
@@ -641,6 +645,53 @@ async def ingest_logs(
     background_tasks.add_task(_run_ingestion, request.job_id, job)
 
     return {"job_id": request.job_id, "status": "processing", "message": "Ingestion started"}
+
+
+@router.post("/batch-ingest")
+async def batch_ingest_logs(
+    request: BatchIngestRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
+    """Parse and ingest multiple jobs at once using the same template."""
+    _owner_only(current_user)
+
+    if not request.job_ids:
+        raise HTTPException(status_code=400, detail="No jobs selected")
+
+    try:
+        template = ParseTemplate(**request.template)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid template: {e}")
+
+    template_dict = request.template
+    started = []
+
+    for job_id in request.job_ids:
+        job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
+        if not job:
+            continue
+        if job.get("status") == "completed":
+            continue
+
+        # Set template and mark as processing
+        await db.log_ingestion_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "parse_template": template_dict,
+                "status": "processing",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }}
+        )
+        job["parse_template"] = template_dict
+        background_tasks.add_task(_run_ingestion, job_id, job)
+        started.append(job_id)
+
+    return {
+        "started": len(started),
+        "job_ids": started,
+        "message": f"Batch ingestion started for {len(started)} job(s)",
+    }
 
 
 async def _run_ingestion(job_id: str, job: dict):
