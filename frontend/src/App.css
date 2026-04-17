@@ -1457,6 +1457,7 @@ html.theme-transitioning * {
 
 /* ==================== MOBILE LANDSCAPE BLOCK ==================== */
 /* Block landscape orientation on mobile devices */
+/* But NOT when the document viewer is open (users need landscape for files) */
 @media screen and (max-width: 896px) and (orientation: landscape) {
   .landscape-blocker {
     display: flex !important;
@@ -1464,6 +1465,15 @@ html.theme-transitioning * {
   
   .app-content {
     display: none !important;
+  }
+  
+  /* Hide blocker when document viewer is active */
+  body:has([data-testid="document-viewer"]) .landscape-blocker {
+    display: none !important;
+  }
+  
+  body:has([data-testid="document-viewer"]) .app-content {
+    display: block !important;
   }
 }
 
