@@ -48,7 +48,7 @@ function UploadStep({ onUploaded }) {
   const inputRef = useRef(null);
   const folderInputRef = useRef(null);
 
-  const VALID_EXT = ["csv", "txt", "log", "zip"];
+  const VALID_EXT = ["csv", "txt", "log", "zip", "xlsx", "xls"];
 
   const filterValid = (fileList) => {
     const valid = [];
@@ -153,7 +153,7 @@ function UploadStep({ onUploaded }) {
         }`}
         data-testid="log-upload-dropzone"
       >
-        <input ref={inputRef} type="file" multiple accept=".csv,.txt,.log,.zip" className="hidden"
+        <input ref={inputRef} type="file" multiple accept=".csv,.txt,.log,.zip,.xlsx,.xls" className="hidden"
           onChange={(e) => { handleFiles(Array.from(e.target.files)); e.target.value = ""; }} />
         <input ref={folderInputRef} type="file" className="hidden"
           onChange={(e) => { handleFiles(Array.from(e.target.files), true); e.target.value = ""; }}
@@ -168,7 +168,7 @@ function UploadStep({ onUploaded }) {
             <Upload className="w-10 h-10 text-slate-400" />
             <div>
               <p className="text-sm font-medium text-slate-700">Drag & drop files or folders here</p>
-              <p className="text-xs text-slate-400 mt-1">CSV, TXT, LOG, ZIP — supports folder structures</p>
+              <p className="text-xs text-slate-400 mt-1">CSV, TXT, LOG, XLSX, XLS, ZIP — supports folder structures</p>
             </div>
             <div className="flex items-center gap-2 mt-2">
               <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>Browse Files</Button>

@@ -24,7 +24,7 @@ from services.storage_service import put_object_async
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/production-logs", tags=["Production Logs"])
 
-ALLOWED_EXTENSIONS = {"csv", "txt", "log", "zip"}
+ALLOWED_EXTENSIONS = {"csv", "txt", "log", "zip", "xlsx", "xls"}
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 
 
@@ -202,6 +202,92 @@ def _parse_csv_content(content: str, template: ParseTemplate) -> List[dict]:
     return records
 
 
+def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -> List[dict]:
+    """Parse XLSX/XLS content using openpyxl or xlrd."""
+    import openpyxl
+
+    if ext == "xls":
+        import xlrd
+        wb = xlrd.open_workbook(file_contents=file_bytes)
+        ws = wb.sheet_by_index(0)
+        rows = []
+        for r in range(ws.nrows):
+            rows.append([str(ws.cell_value(r, c)) for c in range(ws.ncols)])
+    else:
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+        ws = wb.active
+        rows = []
+        for row in ws.iter_rows(values_only=True):
+            rows.append([str(c) if c is not None else "" for c in row])
+        wb.close()
+
+    if not rows:
+        return []
+
+    # Skip rows
+    if template.skip_rows > 0:
+        rows = rows[template.skip_rows:]
+    if not rows:
+        return []
+
+    mapping = template.column_mapping
+    headers = None
+    data_start = 0
+    if template.has_header:
+        headers = [h.strip() for h in rows[0]]
+        data_start = 1
+    else:
+        headers = [f"col_{i}" for i in range(len(rows[0]))]
+
+    records = []
+    for row_idx, row in enumerate(rows[data_start:], start=data_start + 1):
+        if all(not cell.strip() for cell in row):
+            continue
+
+        row_dict = {}
+        for i, val in enumerate(row):
+            if i < len(headers):
+                row_dict[headers[i]] = val.strip()
+
+        record = {"_row": row_idx}
+
+        ts_val = row_dict.get(mapping.timestamp) if mapping.timestamp else None
+        if ts_val:
+            parsed_ts = _parse_timestamp(ts_val, template.timestamp_format)
+            record["timestamp"] = parsed_ts
+            if not parsed_ts:
+                record["_errors"] = record.get("_errors", []) + [f"Invalid timestamp: {ts_val}"]
+        else:
+            record["timestamp"] = None
+            if mapping.timestamp:
+                record["_errors"] = record.get("_errors", []) + ["Missing timestamp"]
+
+        record["asset_id"] = row_dict.get(mapping.asset_id, "").strip() if mapping.asset_id else None
+        record["status"] = row_dict.get(mapping.status, "").strip() if mapping.status else None
+
+        if mapping.event_type and row_dict.get(mapping.event_type):
+            record["event_type"] = row_dict[mapping.event_type].strip().lower()
+        else:
+            record["event_type"] = _classify_event(record.get("status"), {})
+
+        metrics = {}
+        for col in mapping.metric_columns:
+            val = row_dict.get(col, "").strip()
+            if val:
+                try:
+                    metrics[col] = float(val.replace(",", "."))
+                except ValueError:
+                    metrics[col] = val
+        record["metrics"] = metrics
+
+        if record["event_type"] == "normal":
+            record["event_type"] = _classify_event(record.get("status"), metrics)
+
+        records.append(record)
+
+    return records
+
+
 # ======================== Endpoints ========================
 
 @router.post("/upload")
@@ -230,7 +316,7 @@ async def upload_log_files(
                 with zipfile.ZipFile(io.BytesIO(content)) as zf:
                     for name in zf.namelist():
                         inner_ext = _get_ext(name)
-                        if inner_ext not in ("csv", "txt", "log"):
+                        if inner_ext not in ("csv", "txt", "log", "xlsx", "xls"):
                             continue
                         inner_content = zf.read(name)
                         file_id = str(uuid.uuid4())
@@ -248,7 +334,7 @@ async def upload_log_files(
         else:
             file_id = str(uuid.uuid4())
             storage_path = f"production-logs/{job_id}/{file_id}.{ext}"
-            mime = "text/csv" if ext == "csv" else "text/plain"
+            mime = {"csv": "text/csv", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xls": "application/vnd.ms-excel"}.get(ext, "text/plain")
             await put_object_async(storage_path, content, mime)
             uploaded_files.append({
                 "file_id": file_id,
@@ -312,22 +398,50 @@ async def detect_columns(
     from services.storage_service import get_object_async
     try:
         data, _ = await get_object_async(target["storage_path"])
-        content = data.decode("utf-8", errors="replace")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
 
-    lines = content.splitlines()
-    if skip_rows > 0:
-        lines = lines[skip_rows:]
-    if not lines:
-        return {"columns": [], "sample_rows": [], "total_lines": 0}
+    file_ext = target.get("extension", "").lower()
+    is_excel = file_ext in ("xlsx", "xls")
 
-    delim = delimiter
-    if delim == "\\t":
-        delim = "\t"
+    if is_excel:
+        # Parse Excel to rows
+        import openpyxl
+        if file_ext == "xls":
+            import xlrd
+            wb = xlrd.open_workbook(file_contents=data)
+            ws = wb.sheet_by_index(0)
+            all_rows = []
+            for r in range(ws.nrows):
+                all_rows.append([str(ws.cell_value(r, c)) for c in range(ws.ncols)])
+        else:
+            wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+            ws = wb.active
+            all_rows = []
+            for row in ws.iter_rows(values_only=True):
+                all_rows.append([str(c) if c is not None else "" for c in row])
+            wb.close()
 
-    reader = csv.reader(lines[:51], delimiter=delim)
-    rows = list(reader)
+        if skip_rows > 0:
+            all_rows = all_rows[skip_rows:]
+
+        rows = all_rows[:51]
+        total_data_lines = len(all_rows) - (1 if has_header else 0)
+    else:
+        content = data.decode("utf-8", errors="replace")
+        lines = content.splitlines()
+        if skip_rows > 0:
+            lines = lines[skip_rows:]
+        if not lines:
+            return {"columns": [], "sample_rows": [], "total_lines": 0}
+
+        delim = delimiter
+        if delim == "\\t":
+            delim = "\t"
+
+        reader = csv.reader(lines[:51], delimiter=delim)
+        rows = list(reader)
+        total_data_lines = len(lines) - (1 if has_header else 0)
 
     columns = []
     sample_rows = []
@@ -368,9 +482,9 @@ async def detect_columns(
     return {
         "columns": columns,
         "sample_rows": [dict(zip(columns, row)) for row in sample_rows],
-        "total_lines": len(content.splitlines()) - (skip_rows + (1 if has_header else 0)),
+        "total_lines": total_data_lines,
         "suggestions": suggestions,
-        "detected_delimiter": _detect_delimiter(lines[0]) if lines else ",",
+        "detected_delimiter": _detect_delimiter(rows[0][0] if rows else "") if not is_excel else ",",
     }
 
 
@@ -400,8 +514,12 @@ async def parse_preview(
     for f in job["files"]:
         try:
             data, _ = await get_object_async(f["storage_path"])
-            content = data.decode("utf-8", errors="replace")
-            records = _parse_csv_content(content, template)
+            file_ext = f.get("extension", "").lower()
+            if file_ext in ("xlsx", "xls"):
+                records = _parse_excel_content(data, file_ext, template)
+            else:
+                content = data.decode("utf-8", errors="replace")
+                records = _parse_csv_content(content, template)
             file_stats.append({
                 "filename": f["filename"],
                 "total_rows": len(records),
@@ -498,8 +616,12 @@ async def _run_ingestion(job_id: str, job: dict):
         for f in job["files"]:
             try:
                 data, _ = await get_object_async(f["storage_path"])
-                content = data.decode("utf-8", errors="replace")
-                records = _parse_csv_content(content, template)
+                file_ext = f.get("extension", "").lower()
+                if file_ext in ("xlsx", "xls"):
+                    records = _parse_excel_content(data, file_ext, template)
+                else:
+                    content = data.decode("utf-8", errors="replace")
+                    records = _parse_csv_content(content, template)
 
                 docs = []
                 for r in records:
