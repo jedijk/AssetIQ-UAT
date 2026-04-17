@@ -371,14 +371,14 @@ function ConfigureStep({ jobId, onPreview, onBack }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <Label className="text-xs text-slate-500">Timestamp Column *</Label>
-              <Select value={mapping.timestamp} onValueChange={v => setMapping(p => ({ ...p, timestamp: v }))}>
+              <Select value={mapping.timestamp || undefined} onValueChange={v => setMapping(p => ({ ...p, timestamp: v }))}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
                 <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs text-slate-500">Asset/Equipment ID *</Label>
-              <Select value={mapping.asset_id} onValueChange={v => setMapping(p => ({ ...p, asset_id: v }))}>
+              <Select value={mapping.asset_id || undefined} onValueChange={v => setMapping(p => ({ ...p, asset_id: v }))}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
                 <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
@@ -685,14 +685,14 @@ function BatchConfigureStep({ jobIds, jobs, onDone, onBack }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <Label className="text-xs text-slate-500">Timestamp Column *</Label>
-              <Select value={mapping.timestamp} onValueChange={v => setMapping(p => ({ ...p, timestamp: v }))}>
+              <Select value={mapping.timestamp || undefined} onValueChange={v => setMapping(p => ({ ...p, timestamp: v }))}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
                 <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs text-slate-500">Asset/Equipment ID *</Label>
-              <Select value={mapping.asset_id} onValueChange={v => setMapping(p => ({ ...p, asset_id: v }))}>
+              <Select value={mapping.asset_id || undefined} onValueChange={v => setMapping(p => ({ ...p, asset_id: v }))}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
                 <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
