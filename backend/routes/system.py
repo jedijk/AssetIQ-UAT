@@ -298,6 +298,33 @@ async def get_system_metrics(
         )
 
 
+@router.get("/system/file-storage")
+async def get_file_storage_stats(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get file storage statistics (R2 + MongoDB legacy).
+    Only accessible by owner users.
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only owners can access file storage metrics"
+        )
+
+    try:
+        from services.storage_service import get_storage_stats
+        stats = await get_storage_stats()
+        stats["timestamp"] = datetime.now(timezone.utc).isoformat()
+        return stats
+    except Exception as e:
+        logger.error(f"Failed to get file storage stats: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve file storage stats: {str(e)}"
+        )
+
+
 @router.get("/system/health")
 async def get_system_health():
     """

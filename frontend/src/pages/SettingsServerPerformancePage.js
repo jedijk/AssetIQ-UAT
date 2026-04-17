@@ -27,7 +27,9 @@ import {
   Trash2,
   Check,
   Bug,
-  Filter
+  Filter,
+  Cloud,
+  FolderOpen
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -215,6 +217,11 @@ const SettingsServerPerformancePage = () => {
   const [dbStorageLoading, setDbStorageLoading] = useState(true);
   const [dbStorageError, setDbStorageError] = useState(null);
   
+  // File storage state
+  const [fileStorage, setFileStorage] = useState(null);
+  const [fileStorageLoading, setFileStorageLoading] = useState(true);
+  const [fileStorageError, setFileStorageError] = useState(null);
+  
   // Security check state
   const [security, setSecurity] = useState(null);
   const [securityLoading, setSecurityLoading] = useState(true);
@@ -283,6 +290,30 @@ const SettingsServerPerformancePage = () => {
       setDbStorageError(err.message);
     } finally {
       setDbStorageLoading(false);
+    }
+  }, [isOwner]);
+  
+  // Fetch file storage stats
+  const fetchFileStorage = useCallback(async () => {
+    if (!isOwner) return;
+    
+    try {
+      const response = await fetch(`${getApiUrl()}/api/system/file-storage`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch file storage stats");
+      }
+      
+      const data = await response.json();
+      setFileStorage(data);
+      setFileStorageError(null);
+    } catch (err) {
+      console.error("Failed to fetch file storage stats:", err);
+      setFileStorageError(err.message);
+    } finally {
+      setFileStorageLoading(false);
     }
   }, [isOwner]);
   
@@ -438,6 +469,7 @@ const SettingsServerPerformancePage = () => {
     if (!isOwner) {
       setLoading(false);
       setDbStorageLoading(false);
+      setFileStorageLoading(false);
       setSecurityLoading(false);
       setErrorLogsLoading(false);
       return;
@@ -445,24 +477,28 @@ const SettingsServerPerformancePage = () => {
     
     fetchMetrics();
     fetchDbStorage();
+    fetchFileStorage();
     fetchSecurity();
     fetchErrorLogs();
     
     let interval;
     let dbInterval;
+    let fileInterval;
     let errorInterval;
     if (autoRefresh) {
       interval = setInterval(() => fetchMetrics(), 5000); // Refresh every 5 seconds
       dbInterval = setInterval(() => fetchDbStorage(), 30000); // Refresh DB storage every 30 seconds
+      fileInterval = setInterval(() => fetchFileStorage(), 30000); // Refresh file storage every 30 seconds
       errorInterval = setInterval(() => fetchErrorLogs(), 30000); // Refresh errors every 30 seconds
     }
     
     return () => {
       if (interval) clearInterval(interval);
       if (dbInterval) clearInterval(dbInterval);
+      if (fileInterval) clearInterval(fileInterval);
       if (errorInterval) clearInterval(errorInterval);
     };
-  }, [fetchMetrics, fetchDbStorage, fetchSecurity, fetchErrorLogs, autoRefresh, isOwner]);
+  }, [fetchMetrics, fetchDbStorage, fetchFileStorage, fetchSecurity, fetchErrorLogs, autoRefresh, isOwner]);
   
   // Show access denied for non-owners
   if (!isOwner) {
@@ -814,6 +850,103 @@ const SettingsServerPerformancePage = () => {
                   </div>
                 );
               })()}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* File Storage Card */}
+        <div className="mb-4 sm:mb-6">
+          <Card>
+            <CardHeader className="py-2 sm:py-4 px-3 sm:px-6">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center justify-between">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-slate-600">
+                  <Cloud className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>File Storage</span>
+                </div>
+                {fileStorage && !fileStorageLoading && !fileStorageError && (
+                  <Badge className={`${fileStorage.r2_configured ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"} border-0 text-[9px] sm:text-xs px-1.5 sm:px-2 py-0`}>
+                    {fileStorage.r2_configured ? "R2 Active" : "MongoDB Only"}
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6 pt-0">
+              {fileStorageLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-xs sm:text-sm text-slate-400">Loading...</span>
+                </div>
+              ) : fileStorageError ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-xs sm:text-sm text-red-500">Unable to load file storage stats</span>
+                </div>
+              ) : !fileStorage ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-xs sm:text-sm text-slate-400">No file storage data available</span>
+                </div>
+              ) : (
+                <div className="space-y-3 sm:space-y-4">
+                  {/* Summary row */}
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    <div className="bg-slate-50 rounded-lg p-2.5 sm:p-3 text-center">
+                      <div className="text-lg sm:text-xl font-bold text-slate-700">{fileStorage.total_files}</div>
+                      <div className="text-[10px] sm:text-xs text-slate-500">Total Files</div>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-2.5 sm:p-3 text-center">
+                      <div className="text-lg sm:text-xl font-bold text-slate-700">
+                        {fileStorage.total_size_mb >= 1024
+                          ? `${(fileStorage.total_size_mb / 1024).toFixed(2)} GB`
+                          : `${fileStorage.total_size_mb} MB`}
+                      </div>
+                      <div className="text-[10px] sm:text-xs text-slate-500">Total Size</div>
+                    </div>
+                  </div>
+
+                  {/* By storage type */}
+                  {fileStorage.by_storage_type && Object.keys(fileStorage.by_storage_type).length > 0 && (
+                    <div>
+                      <p className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">By Storage Type</p>
+                      <div className="space-y-1.5">
+                        {Object.entries(fileStorage.by_storage_type).map(([type, info]) => (
+                          <div key={type} className="flex items-center justify-between py-1 sm:py-1.5 border-b border-slate-100 last:border-0">
+                            <div className="flex items-center gap-1.5">
+                              {type === "r2" ? (
+                                <Cloud className="w-3 h-3 text-blue-500" />
+                              ) : (
+                                <Database className="w-3 h-3 text-amber-500" />
+                              )}
+                              <span className="text-xs sm:text-sm text-slate-600 capitalize">{type === "r2" ? "Cloudflare R2" : "MongoDB (Legacy)"}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs sm:text-sm font-medium text-slate-700">{info.count} files</span>
+                              <span className="text-[10px] sm:text-xs text-slate-400 ml-1.5">
+                                ({info.size_mb >= 1024 ? `${(info.size_mb / 1024).toFixed(1)} GB` : `${info.size_mb} MB`})
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* By category */}
+                  {fileStorage.by_category && Object.keys(fileStorage.by_category).length > 0 && (
+                    <div>
+                      <p className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">By Category</p>
+                      <div className="space-y-1.5">
+                        {Object.entries(fileStorage.by_category).map(([cat, count]) => (
+                          <div key={cat} className="flex items-center justify-between py-1 sm:py-1.5 border-b border-slate-100 last:border-0">
+                            <div className="flex items-center gap-1.5">
+                              <FolderOpen className="w-3 h-3 text-slate-400" />
+                              <span className="text-xs sm:text-sm text-slate-600 capitalize">{cat}</span>
+                            </div>
+                            <span className="text-xs sm:text-sm font-medium text-slate-700">{count} files</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
