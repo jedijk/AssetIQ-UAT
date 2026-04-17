@@ -34,6 +34,7 @@ import SettingsPage from "./pages/SettingsPage";
 import SettingsGeneralPage from "./pages/SettingsGeneralPage";
 import SettingsQRPage from "./pages/SettingsQRPage";
 import SettingsNotificationsPage from "./pages/SettingsNotificationsPage";
+import SettingsLogIngestionPage from "./pages/SettingsLogIngestionPage";
 import InsightsPage from "./pages/InsightsPage";
 import FormsPage from "./pages/FormsPage";
 import FormSubmissionsPage from "./pages/FormSubmissionsPage";
@@ -274,6 +275,7 @@ function App() {
                   <Route path="statistics" element={<UserStatisticsPage />} />
                   <Route path="criticality-definitions" element={<DefinitionsPage />} />
                   <Route path="feedback" element={<FeedbackPage />} />
+                  <Route path="log-ingestion" element={<SettingsLogIngestionPage />} />
                 </Route>
                 
                 <Route path="user-statistics" element={<UserStatisticsPage />} />

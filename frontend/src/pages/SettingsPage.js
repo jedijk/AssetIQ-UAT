@@ -13,7 +13,8 @@ import {
   Database,
   BarChart3,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  FileText
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -84,6 +85,14 @@ const SETTINGS_SECTIONS = [
     description: "Switch between Production and UAT",
     icon: Database,
     path: "/settings/database",
+    roles: ["owner"]
+  },
+  {
+    id: "log-ingestion",
+    label: "Log Ingestion",
+    description: "Upload & parse production logs",
+    icon: FileText,
+    path: "/settings/log-ingestion",
     roles: ["owner"]
   },
   {
