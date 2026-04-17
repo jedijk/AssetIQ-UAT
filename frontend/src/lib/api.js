@@ -494,7 +494,7 @@ export const equipmentHierarchyAPI = {
   uploadEquipmentFile: async (equipmentId, file) => {
     const formData = new FormData();
     formData.append("file", file);
-    const response = await api.post(`/equipment/${equipmentId}/files`, formData, {
+    const response = await api.post(`/equipment-files/${equipmentId}/upload`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
