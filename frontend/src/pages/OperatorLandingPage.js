@@ -67,7 +67,7 @@ export default function OperatorLandingPage() {
       <div className="flex flex-col gap-4 w-full max-w-xs">
         <button
           onClick={handleClick(() => navigate("/my-tasks"))}
-          className="relative flex items-center justify-center gap-3 rounded-2xl p-6 bg-amber-500 text-white w-full shadow-lg shadow-amber-500/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
+          className="relative flex items-center justify-center gap-3 rounded-2xl p-6 bg-amber-400 text-white w-full shadow-lg shadow-amber-400/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
           data-testid="operator-btn-my-tasks"
         >
           <ClipboardCheck className="w-8 h-8" strokeWidth={2} />
@@ -82,7 +82,7 @@ export default function OperatorLandingPage() {
         <div className="grid grid-cols-2 gap-4">
           <button
             onClick={handleClick(() => window.dispatchEvent(new CustomEvent("open-hierarchy")))}
-            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-purple-500 text-white shadow-lg shadow-purple-500/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
+            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-blue-600 text-white shadow-lg shadow-blue-600/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
             data-testid="operator-btn-equipment"
           >
             <Building2 className="w-8 h-8" strokeWidth={2} />
@@ -91,7 +91,7 @@ export default function OperatorLandingPage() {
 
           <button
             onClick={handleClick(() => navigate("/production"))}
-            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-green-500 text-white shadow-lg shadow-green-500/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
+            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-violet-600 text-white shadow-lg shadow-violet-600/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
             data-testid="operator-btn-production"
           >
             <Activity className="w-8 h-8" strokeWidth={2} />
