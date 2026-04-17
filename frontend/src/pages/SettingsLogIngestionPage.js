@@ -373,14 +373,14 @@ function ConfigureStep({ jobId, onPreview, onBack }) {
               <Label className="text-xs text-slate-500">Timestamp Column *</Label>
               <Select value={mapping.timestamp || undefined} onValueChange={v => setMapping(p => ({ ...p, timestamp: v }))}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
-                <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                <SelectContent>{columns.filter(c => c).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs text-slate-500">Asset/Equipment ID *</Label>
               <Select value={mapping.asset_id || undefined} onValueChange={v => setMapping(p => ({ ...p, asset_id: v }))}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
-                <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                <SelectContent>{columns.filter(c => c).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
@@ -389,7 +389,7 @@ function ConfigureStep({ jobId, onPreview, onBack }) {
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">None</SelectItem>
-                  {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {columns.filter(c => c).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -687,14 +687,14 @@ function BatchConfigureStep({ jobIds, jobs, onDone, onBack }) {
               <Label className="text-xs text-slate-500">Timestamp Column *</Label>
               <Select value={mapping.timestamp || undefined} onValueChange={v => setMapping(p => ({ ...p, timestamp: v }))}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
-                <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                <SelectContent>{columns.filter(c => c).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs text-slate-500">Asset/Equipment ID *</Label>
               <Select value={mapping.asset_id || undefined} onValueChange={v => setMapping(p => ({ ...p, asset_id: v }))}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
-                <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                <SelectContent>{columns.filter(c => c).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
@@ -703,7 +703,7 @@ function BatchConfigureStep({ jobIds, jobs, onDone, onBack }) {
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">None</SelectItem>
-                  {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {columns.filter(c => c).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -964,7 +964,7 @@ function LogDashboard() {
       {/* Controls */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <Select value={selectedAsset} onValueChange={setSelectedAsset}>
+          <Select value={selectedAsset || undefined} onValueChange={setSelectedAsset}>
             <SelectTrigger className="w-[200px] h-9 text-sm" data-testid="asset-selector">
               <SelectValue placeholder="Select Asset" />
             </SelectTrigger>
