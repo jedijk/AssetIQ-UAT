@@ -940,6 +940,8 @@ const Layout = () => {
                     <User className="w-4 h-4 mr-2" />
                     {t("profile.editProfile") || "Edit Profile"}
                   </DropdownMenuItem>
+                  {isMobileView && (
+                  <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={toggleOperatorView}
@@ -952,6 +954,8 @@ const Layout = () => {
                       {operatorViewEnabled ? "ON" : "OFF"}
                     </span>
                   </DropdownMenuItem>
+                  </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={logout}
