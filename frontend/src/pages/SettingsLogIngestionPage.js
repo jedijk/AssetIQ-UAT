@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Upload, FileText, Loader2, CheckCircle2, XCircle, AlertCircle,
   Trash2, ChevronRight, Database, Settings, RefreshCw, Play, Eye, X,
-  FileSpreadsheet, Clock, Activity, FolderOpen
+  FileSpreadsheet, Clock, Activity, FolderOpen, BarChart3, Sparkles, TrendingUp
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -12,6 +12,7 @@ import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "../lib/apiConfig";
@@ -279,6 +280,40 @@ function ConfigureStep({ jobId, onPreview, onBack }) {
     }));
   };
 
+  const [aiParsing, setAiParsing] = useState(false);
+  const runAiParse = async () => {
+    setAiParsing(true);
+    try {
+      const fd = new FormData();
+      fd.append("job_id", jobId);
+      const res = await fetch(`${API}/api/production-logs/ai-parse`, { method: "POST", headers: getHeaders(), body: fd });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "AI analysis failed"); }
+      const data = await res.json();
+      if (data.success && data.analysis) {
+        const a = data.analysis;
+        if (a.delimiter) setDelimiter(a.delimiter === "tab" ? "\\t" : a.delimiter);
+        if (a.has_header !== undefined) setHasHeader(a.has_header);
+        if (a.skip_rows) setSkipRows(a.skip_rows);
+        if (a.column_mapping) {
+          setMapping({
+            timestamp: a.column_mapping.timestamp || "",
+            asset_id: a.column_mapping.asset_id || "",
+            status: a.column_mapping.status || "",
+            metric_columns: a.column_mapping.metric_columns || [],
+          });
+        }
+        toast.success(a.notes || "AI detected structure");
+        detectColumns();
+      } else {
+        toast.error(data.error || "AI could not parse structure");
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setAiParsing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -314,9 +349,14 @@ function ConfigureStep({ jobId, onPreview, onBack }) {
           <Switch checked={hasHeader} onCheckedChange={setHasHeader} id="has-header" />
           <Label htmlFor="has-header" className="text-xs">Has Header Row</Label>
         </div>
-        <div className="flex items-end">
-          <Button variant="outline" size="sm" onClick={detectColumns} className="w-full h-9 text-xs">
+        <div className="flex items-end gap-2">
+          <Button variant="outline" size="sm" onClick={detectColumns} className="h-9 text-xs">
             <RefreshCw className="w-3 h-3 mr-1" /> Re-detect
+          </Button>
+          <Button variant="outline" size="sm" onClick={runAiParse} disabled={aiParsing}
+            className="h-9 text-xs text-purple-600 border-purple-200 hover:bg-purple-50" data-testid="ai-parse-btn">
+            {aiParsing ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+            AI Detect
           </Button>
         </div>
       </div>
@@ -516,6 +556,294 @@ function PreviewStep({ jobId, previewData, onIngest, onBack }) {
   );
 }
 
+// ======================== Dashboard Component ========================
+
+function LogDashboard() {
+  const [assets, setAssets] = useState([]);
+  const [selectedAsset, setSelectedAsset] = useState("");
+  const [timeseries, setTimeseries] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [aggregating, setAggregating] = useState(false);
+  const canvasRef = useRef(null);
+
+  const fetchAssets = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/production-logs/assets`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setAssets(data.assets || []);
+        if (data.assets?.length && !selectedAsset) setSelectedAsset(data.assets[0].asset_id);
+      }
+    } catch {}
+  }, [selectedAsset]);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/production-logs/stats`, { headers: getHeaders() });
+      if (res.ok) setStats(await res.json());
+    } catch {}
+  }, []);
+
+  const fetchTimeseries = useCallback(async () => {
+    if (!selectedAsset) return;
+    try {
+      const res = await fetch(`${API}/api/production-logs/timeseries?asset_id=${encodeURIComponent(selectedAsset)}`, { headers: getHeaders() });
+      if (res.ok) setTimeseries(await res.json());
+    } catch {}
+  }, [selectedAsset]);
+
+  useEffect(() => { fetchAssets(); fetchStats(); }, [fetchAssets, fetchStats]);
+  useEffect(() => { if (selectedAsset) fetchTimeseries(); }, [selectedAsset, fetchTimeseries]);
+  useEffect(() => { setLoading(false); }, []);
+
+  const runAggregation = async () => {
+    setAggregating(true);
+    try {
+      const res = await fetch(`${API}/api/production-logs/aggregate`, { method: "POST", headers: getHeaders() });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Failed"); }
+      toast.success("Aggregation started");
+      setTimeout(() => { fetchTimeseries(); fetchStats(); setAggregating(false); }, 3000);
+    } catch (err) {
+      toast.error(err.message);
+      setAggregating(false);
+    }
+  };
+
+  // Simple canvas chart renderer
+  useEffect(() => {
+    if (!canvasRef.current || !timeseries?.timestamps?.length) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.parentElement.offsetWidth;
+    const h = 280;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx.scale(dpr, dpr);
+
+    ctx.clearRect(0, 0, w, h);
+    const ts = timeseries.timestamps;
+    const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+    const chartW = w - padding.left - padding.right;
+    const chartH = h - padding.top - padding.bottom;
+
+    // Draw grid
+    ctx.strokeStyle = "#f1f5f9";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padding.top + (chartH / 4) * i;
+      ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
+    }
+
+    // Draw metrics
+    const colors = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#06b6d4"];
+    const metricKeys = Object.keys(timeseries.metrics || {});
+
+    if (metricKeys.length > 0) {
+      // Find global min/max
+      let globalMin = Infinity, globalMax = -Infinity;
+      for (const mk of metricKeys) {
+        const vals = timeseries.metrics[mk].avg;
+        for (const v of vals) { if (v != null) { globalMin = Math.min(globalMin, v); globalMax = Math.max(globalMax, v); } }
+      }
+      if (globalMin === globalMax) { globalMin -= 1; globalMax += 1; }
+      const range = globalMax - globalMin || 1;
+
+      // Draw Y axis labels
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "right";
+      for (let i = 0; i <= 4; i++) {
+        const val = globalMax - (range / 4) * i;
+        const y = padding.top + (chartH / 4) * i;
+        ctx.fillText(val.toFixed(1), padding.left - 5, y + 4);
+      }
+
+      // Draw lines
+      metricKeys.forEach((mk, mi) => {
+        const vals = timeseries.metrics[mk].avg;
+        ctx.beginPath();
+        ctx.strokeStyle = colors[mi % colors.length];
+        ctx.lineWidth = 2;
+        let started = false;
+        for (let i = 0; i < vals.length; i++) {
+          if (vals[i] == null) continue;
+          const x = padding.left + (i / Math.max(vals.length - 1, 1)) * chartW;
+          const y = padding.top + chartH - ((vals[i] - globalMin) / range) * chartH;
+          if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+        }
+        ctx.stroke();
+      });
+
+      // Legend
+      ctx.font = "11px sans-serif";
+      ctx.textAlign = "left";
+      metricKeys.forEach((mk, mi) => {
+        const lx = padding.left + mi * 100;
+        ctx.fillStyle = colors[mi % colors.length];
+        ctx.fillRect(lx, h - 15, 12, 3);
+        ctx.fillStyle = "#475569";
+        ctx.fillText(mk, lx + 16, h - 10);
+      });
+    }
+
+    // X axis labels (show a few timestamps)
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "9px sans-serif";
+    ctx.textAlign = "center";
+    const step = Math.max(1, Math.floor(ts.length / 6));
+    for (let i = 0; i < ts.length; i += step) {
+      const x = padding.left + (i / Math.max(ts.length - 1, 1)) * chartW;
+      const label = ts[i]?.substring(5, 16).replace("T", " ");
+      ctx.fillText(label, x, h - padding.bottom + 15);
+    }
+  }, [timeseries]);
+
+  // Event bar chart
+  const eventBarRef = useRef(null);
+  useEffect(() => {
+    if (!eventBarRef.current || !timeseries?.timestamps?.length) return;
+    const canvas = eventBarRef.current;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.parentElement.offsetWidth;
+    const h = 160;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    const ts = timeseries.timestamps;
+    const padding = { top: 15, right: 20, bottom: 30, left: 40 };
+    const chartW = w - padding.left - padding.right;
+    const chartH = h - padding.top - padding.bottom;
+    const barW = Math.max(2, chartW / ts.length - 1);
+
+    const eventColors = { normal: "#22c55e", downtime: "#ef4444", waste: "#f97316", alarm: "#eab308" };
+    let maxEvents = 1;
+    for (let i = 0; i < ts.length; i++) {
+      let sum = 0;
+      for (const et of ["normal", "downtime", "waste", "alarm"]) sum += (timeseries.events[et]?.[i] || 0);
+      maxEvents = Math.max(maxEvents, sum);
+    }
+
+    for (let i = 0; i < ts.length; i++) {
+      const x = padding.left + (i / Math.max(ts.length - 1, 1)) * chartW - barW / 2;
+      let yOffset = 0;
+      for (const et of ["normal", "downtime", "waste", "alarm"]) {
+        const val = timeseries.events[et]?.[i] || 0;
+        if (val === 0) continue;
+        const barH = (val / maxEvents) * chartH;
+        ctx.fillStyle = eventColors[et];
+        ctx.fillRect(x, padding.top + chartH - yOffset - barH, barW, barH);
+        yOffset += barH;
+      }
+    }
+
+    // Legend
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "left";
+    let lx = padding.left;
+    for (const [et, color] of Object.entries(eventColors)) {
+      ctx.fillStyle = color;
+      ctx.fillRect(lx, h - 12, 10, 3);
+      ctx.fillStyle = "#475569";
+      ctx.fillText(et, lx + 14, h - 7);
+      lx += 70;
+    }
+  }, [timeseries]);
+
+  return (
+    <div className="space-y-5">
+      {/* Controls */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <Select value={selectedAsset} onValueChange={setSelectedAsset}>
+            <SelectTrigger className="w-[200px] h-9 text-sm" data-testid="asset-selector">
+              <SelectValue placeholder="Select Asset" />
+            </SelectTrigger>
+            <SelectContent>
+              {assets.map(a => (
+                <SelectItem key={a.asset_id} value={a.asset_id}>{a.asset_id} ({a.count})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button variant="outline" size="sm" onClick={runAggregation} disabled={aggregating} data-testid="run-aggregation-btn">
+          {aggregating ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+          {aggregating ? "Aggregating..." : "Rebuild Aggregations"}
+        </Button>
+      </div>
+
+      {/* Stats summary */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white border rounded-lg p-3 text-center">
+            <div className="text-lg font-bold text-slate-700">{stats.total_entries?.toLocaleString()}</div>
+            <div className="text-[10px] text-slate-500">Log Entries</div>
+          </div>
+          <div className="bg-white border rounded-lg p-3 text-center">
+            <div className="text-lg font-bold text-blue-600">{stats.unique_assets}</div>
+            <div className="text-[10px] text-slate-500">Assets</div>
+          </div>
+          <div className="bg-white border rounded-lg p-3 text-center">
+            <div className="text-lg font-bold text-red-600">{stats.events?.downtime || 0}</div>
+            <div className="text-[10px] text-slate-500">Downtime Events</div>
+          </div>
+          <div className="bg-white border rounded-lg p-3 text-center">
+            <div className="text-lg font-bold text-amber-600">{stats.events?.alarm || 0}</div>
+            <div className="text-[10px] text-slate-500">Alarms</div>
+          </div>
+        </div>
+      )}
+
+      {/* Metrics Chart */}
+      {timeseries?.total_points > 0 ? (
+        <>
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-blue-600" />
+                Metrics — {selectedAsset}
+                <span className="text-xs text-slate-400 font-normal ml-auto">{timeseries.total_points} data points</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <canvas ref={canvasRef} data-testid="metrics-chart" />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Activity className="w-4 h-4 text-red-600" />
+                Events Timeline — {selectedAsset}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <canvas ref={eventBarRef} data-testid="events-chart" />
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <BarChart3 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-500">No aggregated data yet</p>
+            <p className="text-xs text-slate-400 mt-1">Ingest logs and click "Rebuild Aggregations" to generate charts</p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+
 // ======================== Main Page ========================
 
 export default function SettingsLogIngestionPage() {
@@ -573,20 +901,31 @@ export default function SettingsLogIngestionPage() {
   return (
     <div className="max-w-5xl mx-auto" data-testid="log-ingestion-page">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
             <Database className="w-5 h-5 text-indigo-600" />
             Production Log Ingestion
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">Upload and parse historical production logs</p>
+          <p className="text-sm text-slate-500 mt-0.5">Upload, parse, and analyze production logs</p>
         </div>
-        {step !== "list" && (
-          <Button variant="outline" size="sm" onClick={() => { setStep("list"); setActiveJobId(null); setPreviewData(null); fetchJobs(); fetchStats(); }}>
-            <X className="w-3.5 h-3.5 mr-1" /> Cancel
-          </Button>
-        )}
       </div>
+
+      <Tabs defaultValue="ingestion" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="ingestion" className="text-xs"><Upload className="w-3.5 h-3.5 mr-1" /> Ingestion</TabsTrigger>
+          <TabsTrigger value="dashboard" className="text-xs"><BarChart3 className="w-3.5 h-3.5 mr-1" /> Dashboard</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ingestion">
+          {/* Cancel button when in wizard */}
+          {step !== "list" && (
+            <div className="flex justify-end mb-3">
+              <Button variant="outline" size="sm" onClick={() => { setStep("list"); setActiveJobId(null); setPreviewData(null); fetchJobs(); fetchStats(); }}>
+                <X className="w-3.5 h-3.5 mr-1" /> Cancel
+              </Button>
+            </div>
+          )}
 
       {/* Stats bar */}
       {stats && step === "list" && (
@@ -697,6 +1036,12 @@ export default function SettingsLogIngestionPage() {
           onBack={() => setStep("configure")}
         />
       )}
+        </TabsContent>
+
+        <TabsContent value="dashboard">
+          <LogDashboard />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

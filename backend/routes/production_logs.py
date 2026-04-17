@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, B
 from pydantic import BaseModel
 from auth import get_current_user
 from database import db
+from openai import OpenAI
 from services.storage_service import put_object_async
 
 logger = logging.getLogger(__name__)
@@ -837,3 +838,303 @@ async def get_log_stats(
         "jobs_total": jobs_total,
         "jobs_completed": jobs_completed,
     }
+
+
+# ======================== Aggregation Layer ========================
+
+@router.post("/aggregate")
+async def run_aggregation(
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
+    """Build/rebuild asset_history aggregations from production_logs."""
+    _owner_only(current_user)
+
+    total = await db.production_logs.count_documents({})
+    if total == 0:
+        raise HTTPException(status_code=400, detail="No production logs to aggregate")
+
+    background_tasks.add_task(_run_aggregation)
+    return {"message": "Aggregation started", "total_source_records": total}
+
+
+async def _run_aggregation():
+    """Background: aggregate production_logs into asset_history (hourly buckets)."""
+    try:
+        pipeline = [
+            {"$addFields": {
+                "ts_parsed": {
+                    "$cond": {
+                        "if": {"$eq": [{"$type": "$timestamp"}, "string"]},
+                        "then": {"$dateFromString": {"dateString": "$timestamp", "onError": None}},
+                        "else": "$timestamp"
+                    }
+                }
+            }},
+            {"$match": {"ts_parsed": {"$ne": None}}},
+            {"$group": {
+                "_id": {
+                    "asset_id": "$asset_id",
+                    "hour": {"$dateToString": {"format": "%Y-%m-%dT%H:00:00", "date": "$ts_parsed"}},
+                },
+                "records": {"$sum": 1},
+                "events": {"$push": "$event_type"},
+                "statuses": {"$push": "$status"},
+                "all_metrics": {"$push": "$metrics"},
+            }},
+            {"$sort": {"_id.hour": 1}},
+        ]
+
+        results = await db.production_logs.aggregate(pipeline).to_list(100000)
+
+        if not results:
+            logger.info("[Aggregation] No valid records to aggregate")
+            return
+
+        # Clear old aggregations
+        await db.asset_history.delete_many({})
+
+        docs = []
+        for r in results:
+            asset_id = r["_id"]["asset_id"]
+            hour = r["_id"]["hour"]
+
+            # Aggregate metrics
+            metric_agg = {}
+            for m in r["all_metrics"]:
+                if not m:
+                    continue
+                for k, v in m.items():
+                    if isinstance(v, (int, float)):
+                        if k not in metric_agg:
+                            metric_agg[k] = {"values": []}
+                        metric_agg[k]["values"].append(v)
+
+            metrics_summary = {}
+            for k, data in metric_agg.items():
+                vals = data["values"]
+                if vals:
+                    metrics_summary[k] = {
+                        "avg": round(sum(vals) / len(vals), 2),
+                        "min": round(min(vals), 2),
+                        "max": round(max(vals), 2),
+                        "count": len(vals),
+                    }
+
+            # Count events
+            event_counts = {}
+            for e in r["events"]:
+                event_counts[e] = event_counts.get(e, 0) + 1
+
+            docs.append({
+                "id": str(uuid.uuid4()),
+                "asset_id": asset_id,
+                "hour": hour,
+                "records": r["records"],
+                "metrics": metrics_summary,
+                "events": event_counts,
+                "downtime_count": event_counts.get("downtime", 0),
+                "alarm_count": event_counts.get("alarm", 0),
+                "waste_count": event_counts.get("waste", 0),
+                "aggregated_at": datetime.now(timezone.utc).isoformat(),
+            })
+
+        if docs:
+            await db.asset_history.insert_many(docs)
+            logger.info(f"[Aggregation] Created {len(docs)} hourly buckets")
+
+    except Exception as e:
+        logger.error(f"[Aggregation] Failed: {e}")
+
+
+@router.get("/history")
+async def get_asset_history(
+    asset_id: Optional[str] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    limit: int = 500,
+    current_user: dict = Depends(get_current_user),
+):
+    """Query aggregated asset history."""
+    _owner_only(current_user)
+
+    query = {}
+    if asset_id:
+        query["asset_id"] = asset_id
+    if start or end:
+        hour_filter = {}
+        if start:
+            hour_filter["$gte"] = start
+        if end:
+            hour_filter["$lte"] = end
+        query["hour"] = hour_filter
+
+    docs = await db.asset_history.find(query, {"_id": 0}).sort("hour", 1).limit(limit).to_list(limit)
+    return {"history": docs, "total": len(docs)}
+
+
+@router.get("/assets")
+async def list_log_assets(
+    current_user: dict = Depends(get_current_user),
+):
+    """List all unique asset_ids in production logs."""
+    _owner_only(current_user)
+
+    pipeline = [
+        {"$group": {"_id": "$asset_id", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    results = await db.production_logs.aggregate(pipeline).to_list(1000)
+    return {"assets": [{"asset_id": r["_id"], "count": r["count"]} for r in results if r["_id"]]}
+
+
+@router.get("/timeseries")
+async def get_timeseries(
+    asset_id: str,
+    metric: Optional[str] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get time series data for charts — from asset_history aggregation."""
+    _owner_only(current_user)
+
+    query = {"asset_id": asset_id}
+    if start or end:
+        hour_filter = {}
+        if start:
+            hour_filter["$gte"] = start
+        if end:
+            hour_filter["$lte"] = end
+        query["hour"] = hour_filter
+
+    docs = await db.asset_history.find(query, {"_id": 0}).sort("hour", 1).limit(2000).to_list(2000)
+
+    # Build time series
+    timestamps = []
+    metrics_data = {}
+    events_data = {"downtime": [], "alarm": [], "waste": [], "normal": []}
+
+    for d in docs:
+        timestamps.append(d["hour"])
+        for et in ["downtime", "alarm", "waste", "normal"]:
+            events_data[et].append(d.get("events", {}).get(et, 0))
+        for mk, mv in d.get("metrics", {}).items():
+            if metric and mk != metric:
+                continue
+            if mk not in metrics_data:
+                metrics_data[mk] = {"avg": [], "min": [], "max": []}
+            metrics_data[mk]["avg"].append(mv.get("avg"))
+            metrics_data[mk]["min"].append(mv.get("min"))
+            metrics_data[mk]["max"].append(mv.get("max"))
+
+    return {
+        "asset_id": asset_id,
+        "timestamps": timestamps,
+        "metrics": metrics_data,
+        "events": events_data,
+        "total_points": len(timestamps),
+    }
+
+
+# ======================== AI-Assisted Parsing ========================
+
+@router.post("/ai-parse")
+async def ai_parse_file(
+    job_id: str = Form(...),
+    file_id: Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Use AI to analyze an unstructured log file and suggest column mappings."""
+    _owner_only(current_user)
+
+    vision_key = os.environ.get("OPENAI_VISION_KEY")
+    if not vision_key:
+        raise HTTPException(status_code=400, detail="OPENAI_VISION_KEY not configured")
+
+    job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    target = None
+    if file_id:
+        target = next((f for f in job["files"] if f["file_id"] == file_id), None)
+    if not target:
+        target = job["files"][0]
+
+    from services.storage_service import get_object_async
+    try:
+        data, _ = await get_object_async(target["storage_path"])
+        file_ext = target.get("extension", "").lower()
+        if file_ext in ("xlsx", "xls"):
+            # Convert Excel to text for AI
+            import openpyxl
+            if file_ext == "xls":
+                import xlrd
+                wb = xlrd.open_workbook(file_contents=data)
+                ws = wb.sheet_by_index(0)
+                lines = []
+                for r in range(min(ws.nrows, 30)):
+                    lines.append(",".join(str(ws.cell_value(r, c)) for c in range(ws.ncols)))
+                sample_text = "\n".join(lines)
+            else:
+                wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+                ws = wb.active
+                lines = []
+                for i, row in enumerate(ws.iter_rows(values_only=True)):
+                    if i >= 30:
+                        break
+                    lines.append(",".join(str(c) if c is not None else "" for c in row))
+                sample_text = "\n".join(lines)
+                wb.close()
+        else:
+            content = data.decode("utf-8", errors="replace")
+            lines = content.splitlines()[:30]
+            sample_text = "\n".join(lines)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
+
+    # Call OpenAI to analyze the log structure
+    try:
+        client = OpenAI(api_key=vision_key)
+        response = client.chat.completions.create(
+            model="gpt-5.2",
+            messages=[
+                {"role": "system", "content": """You are a production log analyst. Analyze the sample data and return a JSON object with:
+{
+  "delimiter": "detected delimiter character (comma, semicolon, tab, pipe, or space)",
+  "has_header": true/false,
+  "skip_rows": number of rows to skip before data starts,
+  "columns": ["list of column names"],
+  "column_mapping": {
+    "timestamp": "name of timestamp column or null",
+    "asset_id": "name of asset/equipment ID column or null",
+    "status": "name of status column or null",
+    "metric_columns": ["names of numeric metric columns"]
+  },
+  "timestamp_format": "detected format like %Y-%m-%d %H:%M:%S or null",
+  "notes": "brief description of the data structure"
+}
+Return ONLY valid JSON, no markdown."""},
+                {"role": "user", "content": f"Analyze this production log file sample:\n\n{sample_text}"}
+            ],
+            max_completion_tokens=1000,
+            temperature=0.1,
+        )
+
+        raw = response.choices[0].message.content.strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+
+        result = json.loads(raw)
+        return {"success": True, "analysis": result, "sample_lines": len(sample_text.splitlines())}
+
+    except json.JSONDecodeError:
+        return {"success": False, "error": "AI returned invalid format", "raw": raw[:500]}
+    except Exception as e:
+        logger.error(f"[AI Parse] Failed: {e}")
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
