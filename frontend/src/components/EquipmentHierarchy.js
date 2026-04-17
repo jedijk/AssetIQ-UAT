@@ -492,8 +492,8 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
   return (
     <>
     <Dialog open={open && !previewFile} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-sm sm:max-w-md max-h-[85vh] overflow-y-auto p-4 sm:p-6" data-testid="equipment-details-dialog">
-        <DialogHeader className="pb-2">
+      <DialogContent className="!left-0 !right-0 !translate-x-0 mx-auto w-[calc(100%-2rem)] max-w-sm sm:max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden" data-testid="equipment-details-dialog">
+        <DialogHeader className="px-4 pt-4 sm:px-6 sm:pt-6 pb-2">
           <div className="flex items-start gap-3">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
               node.criticality?.level === "safety_critical" ? "bg-red-100" :
@@ -509,6 +509,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
           </div>
         </DialogHeader>
 
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-2">
         <div className="space-y-3">
           {node.tag && (
             <div>
@@ -623,8 +624,9 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
             )}
           </div>
         </div>
+        </div>
 
-        <div className="pt-3 border-t border-slate-200 mt-2">
+        <div className="px-4 sm:px-6 py-3 border-t border-slate-200 flex-shrink-0">
           <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => { onClose(); onEditEquipment?.(node.id); }} data-testid="edit-equipment-btn">
             <Settings className="w-4 h-4 mr-2" />
             {t ? t("hierarchy.editInManager") : "Edit in Equipment Manager"}
