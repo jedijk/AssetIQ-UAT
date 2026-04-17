@@ -13,7 +13,7 @@ import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.4.5";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.4.6";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -121,7 +121,7 @@ const Layout = () => {
           }
           
           toast.success(`AssetIQ updated to v${APP_VERSION}`, {
-            description: "Mobile file viewer, pinch zoom & UI improvements. Refreshing...",
+            description: "PDF rotation, file viewer improvements & bug fixes. Refreshing...",
             duration: 2000,
           });
           setTimeout(() => window.location.reload(), 2000);
