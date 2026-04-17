@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Camera, Loader2, CheckCircle, AlertTriangle, RotateCcw, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { getBackendUrl } from "../../lib/apiConfig";
+import { compressImage } from "../../lib/imageCompression";
 
 const CONFIDENCE_COLORS = {
   high: "ring-green-400 bg-green-50",
@@ -33,6 +34,18 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
     setError(null);
     setResults([]);
 
+    // Compress image before sending to AI
+    let fileToSend = file;
+    if (file.type.startsWith("image/")) {
+      try {
+        const compressed = await compressImage(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1920 });
+        fileToSend = compressed;
+        console.log(`[PhotoCapture] Compressed: ${(file.size/1024).toFixed(0)}KB → ${(compressed.size/1024).toFixed(0)}KB`);
+      } catch (e) {
+        console.warn("[PhotoCapture] Compression failed, using original:", e);
+      }
+    }
+
     // Build schema for the API
     const schema = {
       fields: (config.extraction_fields || []).map((f) => ({
@@ -49,7 +62,7 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
     };
 
     const fd = new FormData();
-    fd.append("image", file);
+    fd.append("image", fileToSend);
     fd.append("schema_json", JSON.stringify(schema));
     if (formTemplateId) fd.append("form_template_id", formTemplateId);
 
