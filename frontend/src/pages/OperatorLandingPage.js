@@ -67,7 +67,7 @@ export default function OperatorLandingPage() {
       <div className="flex flex-col gap-4 w-full max-w-xs">
         <button
           onClick={handleClick(() => navigate("/my-tasks"))}
-          className="relative flex items-center justify-center gap-3 rounded-2xl p-6 bg-amber-400 text-white w-full shadow-lg shadow-amber-400/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
+          className="relative flex items-center justify-center gap-3 rounded-2xl p-6 bg-orange-400 text-white w-full shadow-lg shadow-orange-400/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
           data-testid="operator-btn-my-tasks"
         >
           <ClipboardCheck className="w-8 h-8" strokeWidth={2} />
