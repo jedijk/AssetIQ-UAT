@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { failureModesAPI, qrCodeAPI, equipmentHierarchyAPI } from "../../lib/api";
@@ -327,12 +328,13 @@ function EquipmentFiles({ equipmentId }) {
       )}
     </div>
 
-    {previewFile && (
+    {previewFile && createPortal(
       <DocumentViewer
         document={previewFile}
         onClose={() => setPreviewFile(null)}
         onBack={() => setPreviewFile(null)}
-      />
+      />,
+      document.body
     )}
     </>
   );

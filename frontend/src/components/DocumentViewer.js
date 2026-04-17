@@ -41,6 +41,7 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState(null);
   const [zoom, setZoom] = useState(100);
+  const [rotation, setRotation] = useState(0);
   const canvasRef = React.useRef(null);
   const renderTaskRef = React.useRef(null);
   const containerRef = React.useRef(null);
@@ -99,10 +100,10 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
         
         // Calculate scale based on zoom level
         const baseWidth = isMobile ? 350 : 700;
-        const viewport = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: 1, rotation });
         const baseScale = baseWidth / viewport.width;
         const scale = baseScale * (zoom / 100);
-        const scaledViewport = page.getViewport({ scale });
+        const scaledViewport = page.getViewport({ scale, rotation });
         
         // Set canvas dimensions
         canvas.height = scaledViewport.height;
@@ -130,11 +131,13 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
         renderTaskRef.current.cancel();
       }
     };
-  }, [pdfDoc, pageNumber, isMobile, zoom]);
+  }, [pdfDoc, pageNumber, isMobile, zoom, rotation]);
   
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 200));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 50));
   const handleZoomReset = () => setZoom(100);
+  const handleRotateCW = () => setRotation(prev => (prev + 90) % 360);
+  const handleRotateCCW = () => setRotation(prev => (prev + 270) % 360);
   
   if (pdfLoading) {
     return (
@@ -211,6 +214,31 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
             className="text-white hover:bg-slate-600 h-8 w-8"
           >
             <ZoomIn className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {/* Divider */}
+        <div className="w-px h-6 bg-slate-500 mx-1" />
+        
+        {/* Rotation Controls */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRotateCCW}
+            className="text-white hover:bg-slate-600 h-8 w-8"
+            title="Rotate left"
+          >
+            <RotateCw className="w-4 h-4 -scale-x-100" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRotateCW}
+            className="text-white hover:bg-slate-600 h-8 w-8"
+            title="Rotate right"
+          >
+            <RotateCw className="w-4 h-4" />
           </Button>
         </div>
       </div>

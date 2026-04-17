@@ -635,13 +635,14 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
       </DialogContent>
     </Dialog>
 
-    {/* File Preview - Full screen DocumentViewer */}
-    {previewFile && (
+    {/* File Preview - Full screen DocumentViewer via Portal to escape stacking contexts */}
+    {previewFile && createPortal(
       <DocumentViewer
         document={previewFile}
         onClose={() => setPreviewFile(null)}
         onBack={() => setPreviewFile(null)}
-      />
+      />,
+      document.body
     )}
     </>
   );
