@@ -91,7 +91,7 @@ export default function OperatorLandingPage() {
 
           <button
             onClick={handleClick(() => navigate("/production"))}
-            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-purple-600 text-white shadow-lg shadow-purple-600/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
+            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-green-600 text-white shadow-lg shadow-green-600/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
             data-testid="operator-btn-production"
           >
             <Activity className="w-8 h-8" strokeWidth={2} />
