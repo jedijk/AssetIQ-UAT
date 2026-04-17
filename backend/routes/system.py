@@ -316,6 +316,20 @@ async def get_file_storage_stats(
         from services.storage_service import get_storage_stats
         stats = await get_storage_stats()
         stats["timestamp"] = datetime.now(timezone.utc).isoformat()
+
+        # Add capacity info (configurable via env, default 10 GB)
+        capacity_gb = float(os.environ.get("FILE_STORAGE_CAPACITY_GB", "10"))
+        total_size_gb = stats["total_size_bytes"] / (1024 ** 3)
+
+        if total_size_gb < 1 and capacity_gb <= 10:
+            stats["used"] = stats["total_size_mb"]
+            stats["capacity"] = round(capacity_gb * 1024, 0)
+            stats["unit"] = "MB"
+        else:
+            stats["used"] = round(total_size_gb, 2)
+            stats["capacity"] = round(capacity_gb, 1)
+            stats["unit"] = "GB"
+
         return stats
     except Exception as e:
         logger.error(f"Failed to get file storage stats: {e}")

@@ -864,9 +864,20 @@ const SettingsServerPerformancePage = () => {
                   <span>File Storage</span>
                 </div>
                 {fileStorage && !fileStorageLoading && !fileStorageError && (
-                  <Badge className={`${fileStorage.r2_configured ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"} border-0 text-[9px] sm:text-xs px-1.5 sm:px-2 py-0`}>
-                    {fileStorage.r2_configured ? "R2 Active" : "MongoDB Only"}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    {fileStorage.capacity && (() => {
+                      const usagePercent = Math.round((fileStorage.used / fileStorage.capacity) * 100);
+                      const color = getStatusColor(usagePercent);
+                      return (
+                        <Badge className={`${color.light} ${color.text} border-0 text-[9px] sm:text-xs px-1 sm:px-1.5 py-0`}>
+                          {color.status === "critical" ? "!" : color.status === "warning" ? "⚠" : "✓"}
+                        </Badge>
+                      );
+                    })()}
+                    <Badge className={`${fileStorage.r2_configured ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"} border-0 text-[9px] sm:text-xs px-1.5 sm:px-2 py-0`}>
+                      {fileStorage.r2_configured ? "R2 Active" : "MongoDB Only"}
+                    </Badge>
+                  </div>
                 )}
               </CardTitle>
             </CardHeader>
@@ -885,21 +896,31 @@ const SettingsServerPerformancePage = () => {
                 </div>
               ) : (
                 <div className="space-y-3 sm:space-y-4">
-                  {/* Summary row */}
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    <div className="bg-slate-50 rounded-lg p-2.5 sm:p-3 text-center">
-                      <div className="text-lg sm:text-xl font-bold text-slate-700">{fileStorage.total_files}</div>
-                      <div className="text-[10px] sm:text-xs text-slate-500">Total Files</div>
-                    </div>
-                    <div className="bg-slate-50 rounded-lg p-2.5 sm:p-3 text-center">
-                      <div className="text-lg sm:text-xl font-bold text-slate-700">
-                        {fileStorage.total_size_mb >= 1024
-                          ? `${(fileStorage.total_size_mb / 1024).toFixed(2)} GB`
-                          : `${fileStorage.total_size_mb} MB`}
+                  {/* Capacity progress bar */}
+                  {fileStorage.capacity && (() => {
+                    const usagePercent = Math.min(Math.round((fileStorage.used / fileStorage.capacity) * 100), 100);
+                    const color = getStatusColor(usagePercent);
+                    return (
+                      <div className="space-y-2 sm:space-y-3">
+                        <div className="relative">
+                          <Progress 
+                            value={usagePercent} 
+                            className="h-5 sm:h-6"
+                            indicatorClassName={color.bg}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-xs sm:text-sm font-semibold text-white drop-shadow-sm">
+                              {usagePercent}%
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-xs sm:text-sm text-slate-500 text-center">
+                          {fileStorage.used} {fileStorage.unit} of {fileStorage.capacity} {fileStorage.unit} used
+                          <span className="text-slate-400 ml-1">({fileStorage.total_files} files)</span>
+                        </p>
                       </div>
-                      <div className="text-[10px] sm:text-xs text-slate-500">Total Size</div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* By storage type */}
                   {fileStorage.by_storage_type && Object.keys(fileStorage.by_storage_type).length > 0 && (
