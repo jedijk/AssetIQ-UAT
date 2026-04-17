@@ -244,6 +244,7 @@ export const DocumentViewer = ({
 }) => {
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -257,6 +258,11 @@ export const DocumentViewer = ({
   // Blob URL for PDF/Image (needed for authenticated fetching)
   const [blobUrl, setBlobUrl] = useState(null);
   const blobUrlRef = React.useRef(null);
+  const isExternalBlob = React.useRef(false);
+  
+  // Touch gesture refs for pinch-zoom and pan
+  const touchRef = React.useRef({ lastDist: 0, lastX: 0, lastY: 0, isPinching: false, isDragging: false });
+  const lastTapRef = React.useRef(0);
   
   // Detect mobile
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
@@ -266,8 +272,8 @@ export const DocumentViewer = ({
   // Construct proper URL - if it's a storage path (not full URL), proxy through API
   const url = useMemo(() => {
     if (!rawUrl) return null;
-    // If already a full URL, use as-is
-    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+    // If already a full URL or blob URL, use as-is
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('blob:')) {
       return rawUrl;
     }
     // Otherwise, proxy through the form-documents endpoint
@@ -355,23 +361,33 @@ export const DocumentViewer = ({
 
   // Load document on mount
   useEffect(() => {
-    // Cleanup previous blob URL
-    if (blobUrlRef.current) {
+    // Cleanup previous blob URL (only if we created it)
+    if (blobUrlRef.current && !isExternalBlob.current) {
       URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = null;
     }
+    blobUrlRef.current = null;
+    isExternalBlob.current = false;
     
     // Reset states on document change
     setBlobUrl(null);
     setError(null);
     setDocxHtml(null);
     setExcelData(null);
+    setZoom(100);
+    setTranslate({ x: 0, y: 0 });
+    setRotation(0);
     
     if (isDocx) {
       loadDocx();
     } else if (isExcel) {
       loadExcel();
     } else if ((isPdf || isImage) && url) {
+      // If already a blob URL, use directly without re-fetching
+      if (url.startsWith('blob:')) {
+        isExternalBlob.current = true;
+        setBlobUrl(url);
+        return;
+      }
       // Load PDF/Image as blob for authenticated access
       setLoading(true);
       const token = localStorage.getItem("token");
@@ -397,12 +413,61 @@ export const DocumentViewer = ({
     
     // Cleanup on unmount
     return () => {
-      if (blobUrlRef.current) {
+      if (blobUrlRef.current && !isExternalBlob.current) {
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
       }
     };
   }, [isDocx, isExcel, isPdf, isImage, loadDocx, loadExcel, url]);
+
+  // Touch gesture handlers for image pinch-zoom and pan (must be before early returns)
+  const handleImageTouchStart = useCallback((e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      touchRef.current.lastDist = Math.hypot(dx, dy);
+      touchRef.current.isPinching = true;
+    } else if (e.touches.length === 1 && zoom > 100) {
+      touchRef.current.lastX = e.touches[0].clientX;
+      touchRef.current.lastY = e.touches[0].clientY;
+      touchRef.current.isDragging = true;
+    }
+  }, [zoom]);
+
+  const handleImageTouchMove = useCallback((e) => {
+    if (touchRef.current.isPinching && e.touches.length === 2) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const ratio = dist / touchRef.current.lastDist;
+      touchRef.current.lastDist = dist;
+      setZoom(prev => Math.min(Math.max(Math.round(prev * ratio), 50), 400));
+    } else if (touchRef.current.isDragging && e.touches.length === 1) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - touchRef.current.lastX;
+      const dy = e.touches[0].clientY - touchRef.current.lastY;
+      touchRef.current.lastX = e.touches[0].clientX;
+      touchRef.current.lastY = e.touches[0].clientY;
+      setTranslate(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+    }
+  }, []);
+
+  const handleImageTouchEnd = useCallback(() => {
+    touchRef.current.isPinching = false;
+    touchRef.current.isDragging = false;
+  }, []);
+
+  const handleImageDoubleTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      setZoom(100);
+      setTranslate({ x: 0, y: 0 });
+      setRotation(0);
+    }
+    lastTapRef.current = now;
+  }, []);
 
   if (!document) {
     return (
@@ -433,9 +498,13 @@ export const DocumentViewer = ({
     );
   }
 
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 200));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 50));
-  const handleRotate = () => setRotation(prev => (prev + 90) % 360);
+  const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 400));
+  const handleZoomOut = () => { 
+    setZoom(prev => Math.max(prev - 25, 50)); 
+    setTranslate(prev => zoom <= 125 ? { x: 0, y: 0 } : prev);
+  };
+  const handleRotate = () => { setRotation(prev => (prev + 90) % 360); setTranslate({ x: 0, y: 0 }); };
+  const handleZoomReset = () => { setZoom(100); setTranslate({ x: 0, y: 0 }); setRotation(0); };
 
   // Get icon based on file type
   const getFileIcon = () => {
@@ -456,67 +525,51 @@ export const DocumentViewer = ({
         style={{ pointerEvents: 'auto' }}
         data-testid="document-viewer"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-slate-700">
-          <div className="flex items-center gap-3">
+        {/* Header - Mobile responsive */}
+        <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 bg-slate-800 border-b border-slate-700 gap-1">
+          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
             {showBackButton && (
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   if (onBack) onBack();
                   else if (onClose) onClose();
                 }}
-                className="text-white hover:bg-slate-700"
+                className="text-white hover:bg-slate-700 flex-shrink-0 h-8 w-8 sm:h-9 sm:w-9"
                 data-testid="doc-viewer-back"
               >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back
+                <ArrowLeft className="w-5 h-5" />
               </Button>
             )}
-            <div className="flex items-center gap-2 text-white">
-              {getFileIcon()}
-              <span className="font-medium truncate max-w-[300px]">{name}</span>
-              <span className="text-xs text-slate-400 uppercase">{type}</span>
+            <div className="flex items-center gap-1.5 text-white min-w-0">
+              <span className="flex-shrink-0">{getFileIcon()}</span>
+              <span className="font-medium truncate text-sm sm:text-base max-w-[140px] sm:max-w-[300px]">{name}</span>
+              <span className="text-[10px] sm:text-xs text-slate-400 uppercase flex-shrink-0 hidden sm:inline">{type}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Zoom controls for images */}
+          <div className="flex items-center gap-0.5 sm:gap-2 flex-shrink-0">
+            {/* Image zoom controls - desktop only, mobile uses pinch */}
             {isImage && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleZoomOut}
-                  className="text-white hover:bg-slate-700"
-                  disabled={zoom <= 50}
-                >
+              <div className="hidden sm:flex items-center gap-1">
+                <Button variant="ghost" size="icon" onClick={handleZoomOut} className="text-white hover:bg-slate-700" disabled={zoom <= 50}>
                   <ZoomOut className="w-4 h-4" />
                 </Button>
-                <span className="text-white text-sm w-12 text-center">{zoom}%</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleZoomIn}
-                  className="text-white hover:bg-slate-700"
-                  disabled={zoom >= 200}
-                >
+                <button onClick={handleZoomReset} className="text-white text-sm w-12 text-center hover:bg-slate-700 px-1 py-1 rounded">
+                  {zoom}%
+                </button>
+                <Button variant="ghost" size="icon" onClick={handleZoomIn} className="text-white hover:bg-slate-700" disabled={zoom >= 400}>
                   <ZoomIn className="w-4 h-4" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleRotate}
-                  className="text-white hover:bg-slate-700"
-                >
+                <Button variant="ghost" size="icon" onClick={handleRotate} className="text-white hover:bg-slate-700">
                   <RotateCw className="w-4 h-4" />
                 </Button>
-                <div className="w-px h-6 bg-slate-600 mx-2" />
-              </>
+                <div className="w-px h-6 bg-slate-600 mx-1" />
+              </div>
             )}
 
             {/* Sheet selector for Excel */}
@@ -532,7 +585,7 @@ export const DocumentViewer = ({
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
-                  <span className="text-white text-sm px-2">
+                  <span className="text-white text-xs sm:text-sm px-1 sm:px-2">
                     {excelData[activeSheet]?.name} ({activeSheet + 1}/{excelData.length})
                   </span>
                   <Button
@@ -545,17 +598,27 @@ export const DocumentViewer = ({
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
-                <div className="w-px h-6 bg-slate-600 mx-2" />
+                <div className="w-px h-6 bg-slate-600 mx-1 hidden sm:block" />
               </>
             )}
 
             {/* Download button */}
             <Button 
               variant="ghost" 
-              size="sm" 
-              className="text-white hover:bg-slate-700"
+              size="icon"
+              className="text-white hover:bg-slate-700 h-8 w-8 sm:h-9 sm:w-9"
+              data-testid="doc-viewer-download"
               onClick={async () => {
                 try {
+                  if (blobUrl) {
+                    const a = window.document.createElement("a");
+                    a.href = blobUrl;
+                    a.download = name || "document";
+                    window.document.body.appendChild(a);
+                    a.click();
+                    window.document.body.removeChild(a);
+                    return;
+                  }
                   const token = localStorage.getItem("token");
                   const response = await fetch(url, { 
                     headers: token ? { Authorization: `Bearer ${token}` } : {} 
@@ -563,46 +626,40 @@ export const DocumentViewer = ({
                   if (!response.ok) throw new Error("Download failed");
                   const blob = await response.blob();
                   const downloadUrl = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
+                  const a = window.document.createElement("a");
                   a.href = downloadUrl;
                   a.download = name || "document";
-                  document.body.appendChild(a);
+                  window.document.body.appendChild(a);
                   a.click();
-                  document.body.removeChild(a);
+                  window.document.body.removeChild(a);
                   URL.revokeObjectURL(downloadUrl);
                 } catch (err) {
                   console.error("Download error:", err);
                 }
               }}
             >
-              <Download className="w-4 h-4 mr-2" />
-              Download
+              <Download className="w-4 h-4" />
             </Button>
 
-            {/* Open in new tab - use blob URL if available, otherwise direct link */}
+            {/* Open in new tab - desktop only */}
             <Button 
               variant="ghost" 
-              size="sm" 
-              className="text-white hover:bg-slate-700"
+              size="icon"
+              className="text-white hover:bg-slate-700 hidden sm:flex h-9 w-9"
               onClick={() => {
-                if (blobUrl) {
-                  window.open(blobUrl, "_blank");
-                } else {
-                  // For non-blob content, open the raw URL (works for public files)
-                  window.open(url, "_blank");
-                }
+                if (blobUrl) window.open(blobUrl, "_blank");
+                else window.open(url, "_blank");
               }}
             >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Open
+              <ExternalLink className="w-4 h-4" />
             </Button>
 
             {/* Close button */}
             <Button
               variant="ghost"
               size="icon"
-              onClick={onClose}
-              className="text-white hover:bg-slate-700"
+              onClick={onClose || onBack}
+              className="text-white hover:bg-slate-700 h-8 w-8 sm:h-9 sm:w-9"
               data-testid="doc-viewer-close"
             >
               <X className="w-5 h-5" />
@@ -611,7 +668,7 @@ export const DocumentViewer = ({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto p-4 flex flex-col items-start w-full">
+        <div className="flex-1 overflow-auto p-2 sm:p-4 flex flex-col items-start w-full relative" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Loading State */}
           {loading && (
             <div className="flex-1 w-full flex items-center justify-center">
@@ -641,19 +698,35 @@ export const DocumentViewer = ({
             </div>
           )}
 
-          {/* Image Viewer */}
+          {/* Image Viewer - with touch pinch-zoom and pan */}
           {isImage && !loading && !error && blobUrl && (
-            <div className="flex-1 w-full flex items-center justify-center">
-              <motion.img
+            <div 
+              className="flex-1 w-full flex items-center justify-center overflow-hidden"
+              onTouchStart={handleImageTouchStart}
+              onTouchMove={handleImageTouchMove}
+              onTouchEnd={handleImageTouchEnd}
+              onClick={handleImageDoubleTap}
+              style={{ touchAction: 'none', userSelect: 'none' }}
+              data-testid="image-viewer-container"
+            >
+              <img
                 src={blobUrl}
                 alt={name}
                 className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
                 style={{
-                  transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
-                  transition: "transform 0.2s ease"
+                  transform: `translate(${translate.x}px, ${translate.y}px) scale(${zoom / 100}) rotate(${rotation}deg)`,
+                  transition: touchRef.current.isPinching || touchRef.current.isDragging ? 'none' : 'transform 0.2s ease',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
                 }}
                 draggable={false}
               />
+              {/* Mobile zoom hint - shown briefly */}
+              {isMobile && zoom === 100 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none animate-pulse">
+                  Pinch to zoom · Double-tap to reset
+                </div>
+              )}
             </div>
           )}
 

@@ -14,10 +14,11 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { toast } from "sonner";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "../ui/command";
 import { QRCodeDialog } from "./QRCodeDialog";
+import { DocumentViewer } from "../DocumentViewer";
+import { getBackendUrl } from "../../lib/apiConfig";
 
 const LEVEL_CONFIG = { 
   installation: { icon: Settings, label: "Installation" }, 
@@ -230,14 +231,13 @@ function EquipmentFiles({ equipmentId }) {
     }
   };
 
-  const handleView = async (file) => {
-    try {
-      const blob = await equipmentHierarchyAPI.downloadEquipmentFile(file.id);
-      const url = window.URL.createObjectURL(blob);
-      setPreviewFile({ url, filename: file.filename, contentType: file.content_type, fileId: file.id });
-    } catch {
-      toast.error("Could not load file");
-    }
+  const handleView = (file) => {
+    const ext = file.filename.split('.').pop()?.toLowerCase() || '';
+    setPreviewFile({ 
+      name: file.filename, 
+      url: `${getBackendUrl()}/api/equipment-files/${file.id}/download`,
+      type: ext 
+    });
   };
 
   const files = data?.files || [];
@@ -296,29 +296,29 @@ function EquipmentFiles({ equipmentId }) {
                 </div>
                 {canView && (
                   <button
-                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all"
+                    className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                     onClick={() => handleView(f)}
                     title="View"
                     data-testid={`view-file-${f.id}`}
                   >
-                    <Eye className="w-3 h-3" />
+                    <Eye className="w-3.5 h-3.5" />
                   </button>
                 )}
                 <button
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
+                  className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                   onClick={() => handleDownload(f.id, f.filename)}
                   title="Download"
                   data-testid={`download-file-${f.id}`}
                 >
-                  <Download className="w-3 h-3" />
+                  <Download className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all"
+                  className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                   onClick={() => deleteMutation.mutate(f.id)}
                   title="Delete"
                   data-testid={`delete-file-${f.id}`}
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             );
@@ -328,34 +328,11 @@ function EquipmentFiles({ equipmentId }) {
     </div>
 
     {previewFile && (
-      <Dialog open={!!previewFile} onOpenChange={() => { if (previewFile?.url) window.URL.revokeObjectURL(previewFile.url); setPreviewFile(null); }}>
-        <DialogContent className="w-[92vw] max-w-3xl max-h-[90vh] p-0 overflow-hidden" data-testid="file-preview-dialog">
-          <DialogHeader className="px-4 pt-4 pb-2">
-            <DialogTitle className="text-sm truncate pr-10">{previewFile.filename}</DialogTitle>
-          </DialogHeader>
-          <div className="px-4 pb-2 overflow-auto touch-pan-x touch-pan-y" style={{ maxHeight: "calc(90vh - 110px)", WebkitOverflowScrolling: "touch" }}>
-            {previewFile.contentType?.startsWith("image/") ? (
-              <img src={previewFile.url} alt={previewFile.filename} className="max-w-full object-contain rounded-lg" style={{ touchAction: "pinch-zoom", maxHeight: "75vh" }} />
-            ) : previewFile.contentType?.includes("pdf") ? (
-              <iframe src={previewFile.url} title={previewFile.filename} className="w-full rounded-lg border" style={{ height: "75vh", minHeight: "300px" }} />
-            ) : isOfficeFile(previewFile.contentType) ? (
-              <iframe
-                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(window.location.origin + "/api/equipment-files/" + previewFile.fileId + "/view")}`}
-                title={previewFile.filename}
-                className="w-full rounded-lg border"
-                style={{ height: "75vh", minHeight: "300px" }}
-              />
-            ) : (
-              <p className="text-sm text-slate-500 py-8">Preview not available</p>
-            )}
-          </div>
-          <div className="px-4 pb-3 border-t border-slate-100 pt-2">
-            <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => { const a = document.createElement("a"); a.href = previewFile.url; a.download = previewFile.filename; a.click(); }}>
-              <Download className="w-3.5 h-3.5 mr-1.5" />Download {previewFile.filename}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DocumentViewer
+        document={previewFile}
+        onClose={() => setPreviewFile(null)}
+        onBack={() => setPreviewFile(null)}
+      />
     )}
     </>
   );

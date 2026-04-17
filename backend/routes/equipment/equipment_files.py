@@ -16,6 +16,24 @@ router = APIRouter(tags=["Equipment Files"])
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
+@router.get("/equipment/{equipment_id}/files")
+async def get_equipment_files(
+    equipment_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get all files attached to an equipment node."""
+    eq = await db.equipment_nodes.find_one({"id": equipment_id}, {"_id": 0, "id": 1})
+    if not eq:
+        raise HTTPException(status_code=404, detail="Equipment not found")
+
+    files = await db.equipment_files.find(
+        {"equipment_id": equipment_id},
+        {"_id": 0}
+    ).sort("uploaded_at", -1).to_list(100)
+
+    return {"files": files}
+
+
 @router.post("/equipment-files/{equipment_id}/upload")
 async def upload_equipment_file(
     equipment_id: str,
