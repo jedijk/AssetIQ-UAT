@@ -299,7 +299,9 @@ async def upload_log_files(
     _owner_only(current_user)
 
     job_id = str(uuid.uuid4())
-    uploaded_files = []
+
+    # First pass: read all files into memory and prepare upload tasks
+    pending_uploads = []  # (file_id, filename, storage_path, content, mime, ext)
 
     for file in files:
         ext = _get_ext(file.filename or "")
@@ -310,7 +312,6 @@ async def upload_log_files(
         if len(content) > MAX_FILE_SIZE:
             raise HTTPException(status_code=400, detail=f"File too large: {file.filename} ({len(content)} bytes). Max: 100MB")
 
-        # Handle ZIP files — extract and store each inner file
         if ext == "zip":
             try:
                 with zipfile.ZipFile(io.BytesIO(content)) as zf:
@@ -321,24 +322,30 @@ async def upload_log_files(
                         inner_content = zf.read(name)
                         file_id = str(uuid.uuid4())
                         storage_path = f"production-logs/{job_id}/{file_id}.{inner_ext}"
-                        await put_object_async(storage_path, inner_content, "text/plain")
-                        uploaded_files.append({
-                            "file_id": file_id,
-                            "filename": name,
-                            "storage_path": storage_path,
-                            "size": len(inner_content),
-                            "extension": inner_ext,
-                        })
+                        mime = {"csv": "text/csv", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xls": "application/vnd.ms-excel"}.get(inner_ext, "text/plain")
+                        pending_uploads.append((file_id, name, storage_path, inner_content, mime, inner_ext))
             except zipfile.BadZipFile:
                 raise HTTPException(status_code=400, detail=f"Invalid ZIP file: {file.filename}")
         else:
             file_id = str(uuid.uuid4())
             storage_path = f"production-logs/{job_id}/{file_id}.{ext}"
             mime = {"csv": "text/csv", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xls": "application/vnd.ms-excel"}.get(ext, "text/plain")
-            await put_object_async(storage_path, content, mime)
+            pending_uploads.append((file_id, file.filename, storage_path, content, mime, ext))
+
+    if not pending_uploads:
+        raise HTTPException(status_code=400, detail="No valid files found")
+
+    # Upload all files to R2 in parallel (batches of 10)
+    uploaded_files = []
+    BATCH_SIZE = 10
+    for i in range(0, len(pending_uploads), BATCH_SIZE):
+        batch = pending_uploads[i:i + BATCH_SIZE]
+        tasks = [put_object_async(p[2], p[3], p[4]) for p in batch]
+        await asyncio.gather(*tasks)
+        for file_id, filename, storage_path, content, mime, ext in batch:
             uploaded_files.append({
                 "file_id": file_id,
-                "filename": file.filename,
+                "filename": filename,
                 "storage_path": storage_path,
                 "size": len(content),
                 "extension": ext,
