@@ -15,10 +15,10 @@
  */
 export async function compressImage(file, options = {}) {
   const {
-    maxWidth = 1920,
-    maxHeight = 1920,
-    quality = 0.8,
-    maxSizeMB = 1,
+    maxWidth = 2560,
+    maxHeight = 2560,
+    quality = 0.92,
+    maxSizeMB = 1.5,
   } = options;
 
   // Only compress image files
