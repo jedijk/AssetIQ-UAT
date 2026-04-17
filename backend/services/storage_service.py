@@ -1,17 +1,14 @@
 """
-MongoDB-based File Storage Service.
-Stores all files directly in MongoDB for full portability.
+Dual Storage Service: Cloudflare R2 (primary) + MongoDB (legacy fallback).
 
-This replaces Emergent Object Storage dependency, allowing the app
-to work on any deployment (Railway, Vercel, self-hosted) without
-external storage dependencies.
+NEW uploads → R2 (stores file in R2, metadata-only in MongoDB)
+EXISTING files → MongoDB base64 (backward compatible, no migration needed)
 
-Files are stored in the 'file_storage' collection with:
-- path: unique identifier/path
-- data: base64 encoded content
-- content_type: MIME type
-- size: file size in bytes
-- created_at: timestamp
+Environment variables for R2:
+- R2_ACCESS_KEY
+- R2_SECRET_KEY
+- R2_BUCKET
+- R2_ENDPOINT
 """
 import os
 import uuid
@@ -23,10 +20,49 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 logger = logging.getLogger(__name__)
 
-# App name for storage paths (kept for backward compatibility)
 APP_NAME = "assetiq"
 
-# Dedicated client for file storage with longer timeouts
+# ==================== R2 CLIENT (lazy init) ====================
+
+_r2_client = None
+
+def _get_r2_client():
+    """Lazy-init boto3 S3 client for Cloudflare R2."""
+    global _r2_client
+    if _r2_client is not None:
+        return _r2_client
+
+    access_key = os.environ.get("R2_ACCESS_KEY")
+    secret_key = os.environ.get("R2_SECRET_KEY")
+    endpoint = os.environ.get("R2_ENDPOINT")
+
+    if not all([access_key, secret_key, endpoint]):
+        logger.warning("R2 credentials not configured — falling back to MongoDB storage")
+        return None
+
+    import boto3
+    _r2_client = boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name="auto",
+    )
+    logger.info("R2 storage client initialized")
+    return _r2_client
+
+
+def _r2_bucket() -> str:
+    return os.environ.get("R2_BUCKET", "assetiq-files")
+
+
+def _r2_available() -> bool:
+    """Check if R2 is configured and reachable."""
+    return _get_r2_client() is not None
+
+
+# ==================== MONGODB CONNECTION (legacy) ====================
+
 _storage_client: Optional[AsyncIOMotorClient] = None
 _storage_db = None
 
@@ -34,22 +70,21 @@ _storage_db = None
 async def _get_storage_db():
     """Get database with extended timeouts for large file operations."""
     global _storage_client, _storage_db
-    
+
     if _storage_db is not None:
         return _storage_db
-    
+
     mongo_url = os.environ.get('MONGO_URL')
     db_name = os.environ.get('DB_NAME', 'test_database').strip('"')
-    
+
     if not mongo_url:
         raise RuntimeError("MONGO_URL not configured")
-    
-    # Create client with reasonable timeouts
+
     _storage_client = AsyncIOMotorClient(
         mongo_url,
-        serverSelectionTimeoutMS=10000,  # 10 seconds
+        serverSelectionTimeoutMS=10000,
         connectTimeoutMS=10000,
-        socketTimeoutMS=30000,  # 30 seconds for file reads
+        socketTimeoutMS=30000,
         maxPoolSize=5,
         retryReads=True,
         retryWrites=True,
@@ -60,292 +95,252 @@ async def _get_storage_db():
 
 
 def _get_db():
-    """Get database reference from the database module (for backward compatibility)."""
     from database import db
     return db
 
-# MIME type helpers
+
+# ==================== MIME TYPES ====================
+
 MIME_TYPES = {
-    "jpg": "image/jpeg",
-    "jpeg": "image/jpeg",
-    "png": "image/png",
-    "gif": "image/gif",
-    "webp": "image/webp",
-    "heic": "image/heic",
-    "pdf": "application/pdf",
-    "json": "application/json",
-    "csv": "text/csv",
-    "txt": "text/plain",
+    "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+    "gif": "image/gif", "webp": "image/webp", "heic": "image/heic",
+    "pdf": "application/pdf", "json": "application/json",
+    "csv": "text/csv", "txt": "text/plain",
     "doc": "application/msword",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "xls": "application/vnd.ms-excel",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "mp4": "video/mp4",
-    "mp3": "audio/mpeg",
-    "wav": "audio/wav",
+    "mp4": "video/mp4", "mp3": "audio/mpeg", "wav": "audio/wav",
 }
 
 
 def init_mongo_storage(db=None):
-    """Initialize the MongoDB storage - kept for backward compatibility."""
     logger.info("MongoDB file storage initialized")
 
 
 def get_mime_type(filename: str) -> str:
-    """Get MIME type from filename extension."""
     ext = filename.split(".")[-1].lower() if "." in filename else "bin"
     return MIME_TYPES.get(ext, "application/octet-stream")
 
 
 def is_storage_available() -> bool:
-    """Check if storage is available - always True since we use MongoDB."""
-    # Storage uses the same MongoDB as the app, just with longer timeouts
-    # The _get_storage_db() function will create the connection lazily
     return True
 
 
-# ==================== ASYNC FUNCTIONS (Primary API) ====================
+# ==================== ASYNC PRIMARY API ====================
 
 async def put_object_async(path: str, data: bytes, content_type: str) -> Dict[str, Any]:
     """
-    Store a file in MongoDB.
-    
-    Args:
-        path: Storage path/identifier (e.g., "attachments/uuid.jpg")
-        data: File content as bytes
-        content_type: MIME type
-    
-    Returns:
-        dict with path, size, created_at
+    Store a file. Uses R2 if available, otherwise falls back to MongoDB base64.
+
+    R2 path: uploads file to R2, stores metadata-only in MongoDB.
+    MongoDB path: stores base64-encoded data (legacy).
     """
-    db = await _get_storage_db()
-    
-    collection = db["file_storage"]
-    
-    # Encode to base64 for storage
-    base64_data = base64.b64encode(data).decode('utf-8')
-    
     now = datetime.now(timezone.utc)
+    db = await _get_storage_db()
+    collection = db["file_storage"]
+
+    # --- R2 PRIMARY PATH ---
+    if _r2_available():
+        try:
+            client = _get_r2_client()
+            bucket = _r2_bucket()
+
+            client.put_object(
+                Bucket=bucket,
+                Key=path,
+                Body=data,
+                ContentType=content_type,
+            )
+
+            # Store metadata-only in MongoDB (NO base64 data)
+            doc = {
+                "path": path,
+                "storage_type": "r2",
+                "content_type": content_type,
+                "size": len(data),
+                "created_at": now,
+                # No "data" field — file is in R2
+            }
+            await collection.update_one({"path": path}, {"$set": doc}, upsert=True)
+
+            logger.info(f"[R2] Stored: {path} ({len(data)} bytes)")
+            return {"path": path, "size": len(data), "content_type": content_type,
+                    "storage_type": "r2", "created_at": now.isoformat()}
+
+        except Exception as e:
+            logger.error(f"[R2] Upload failed for {path}, falling back to MongoDB: {e}")
+            # Fall through to MongoDB
+
+    # --- MONGODB FALLBACK ---
+    base64_data = base64.b64encode(data).decode('utf-8')
     doc = {
         "path": path,
         "data": base64_data,
+        "storage_type": "mongodb",
         "content_type": content_type,
         "size": len(data),
         "created_at": now,
     }
-    
-    # Upsert - update if exists, insert if not
-    await collection.update_one(
-        {"path": path},
-        {"$set": doc},
-        upsert=True
-    )
-    
-    logger.info(f"Stored file: {path} ({len(data)} bytes, {content_type})")
-    
-    return {
-        "path": path,
-        "size": len(data),
-        "content_type": content_type,
-        "created_at": now.isoformat()
-    }
+    await collection.update_one({"path": path}, {"$set": doc}, upsert=True)
+
+    logger.info(f"[MongoDB] Stored: {path} ({len(data)} bytes)")
+    return {"path": path, "size": len(data), "content_type": content_type,
+            "storage_type": "mongodb", "created_at": now.isoformat()}
 
 
 async def get_object_async(path: str) -> Tuple[bytes, str]:
     """
-    Retrieve a file from MongoDB.
-    
-    Args:
-        path: Storage path/identifier
-    
-    Returns:
-        Tuple of (content bytes, content_type)
-    
-    Raises:
-        FileNotFoundError if file doesn't exist
+    Retrieve a file. Checks storage_type to decide R2 vs MongoDB.
+
+    R2 files: fetched directly from R2.
+    Legacy files: decoded from base64 in MongoDB.
     """
     import asyncio
-    
+
     try:
-        # Add timeout for slow queries
         db = await asyncio.wait_for(_get_storage_db(), timeout=10.0)
         collection = db["file_storage"]
-        
-        # Timeout for the actual query
-        doc = await asyncio.wait_for(
-            collection.find_one({"path": path}),
-            timeout=15.0
-        )
+        doc = await asyncio.wait_for(collection.find_one({"path": path}), timeout=15.0)
     except asyncio.TimeoutError:
-        logger.error(f"Timeout fetching file: {path}")
+        logger.error(f"Timeout fetching file metadata: {path}")
         raise FileNotFoundError(f"Timeout fetching file: {path}")
     except Exception as e:
         logger.error(f"Error fetching file {path}: {e}")
         raise FileNotFoundError(f"Error fetching file: {path}")
-    
+
     if not doc:
-        logger.warning(f"File not found: {path}")
         raise FileNotFoundError(f"File not found: {path}")
-    
-    # Decode from base64
-    data = base64.b64decode(doc["data"])
+
     content_type = doc.get("content_type", "application/octet-stream")
-    
+    storage_type = doc.get("storage_type", "mongodb")
+
+    # --- R2 PATH ---
+    if storage_type == "r2" and _r2_available():
+        try:
+            client = _get_r2_client()
+            resp = client.get_object(Bucket=_r2_bucket(), Key=path)
+            data = resp["Body"].read()
+            logger.info(f"[R2] Retrieved: {path} ({len(data)} bytes)")
+            return data, content_type
+        except Exception as e:
+            logger.error(f"[R2] Retrieval failed for {path}: {e}")
+            # If the doc also has base64 data (shouldn't for R2), try that
+            if doc.get("data"):
+                logger.info(f"[R2→MongoDB fallback] Using base64 data for {path}")
+                return base64.b64decode(doc["data"]), content_type
+            raise FileNotFoundError(f"R2 retrieval failed: {path}")
+
+    # --- MONGODB LEGACY PATH ---
+    if not doc.get("data"):
+        raise FileNotFoundError(f"No file data for: {path}")
+
+    data = base64.b64decode(doc["data"])
     return data, content_type
 
 
 async def delete_object_async(path: str) -> bool:
     """
-    Delete a file from MongoDB.
-    
-    Args:
-        path: Storage path/identifier
-    
-    Returns:
-        True if deleted, False if not found
+    Delete a file. Removes from R2 if applicable, always removes MongoDB record.
     """
     db = await _get_storage_db()
-    
     collection = db["file_storage"]
+
+    doc = await collection.find_one({"path": path}, {"storage_type": 1})
+
+    # --- R2 deletion ---
+    if doc and doc.get("storage_type") == "r2" and _r2_available():
+        try:
+            client = _get_r2_client()
+            client.delete_object(Bucket=_r2_bucket(), Key=path)
+            logger.info(f"[R2] Deleted: {path}")
+        except Exception as e:
+            logger.error(f"[R2] Delete failed for {path}: {e}")
+
+    # --- Always remove MongoDB record ---
     result = await collection.delete_one({"path": path})
-    
     if result.deleted_count > 0:
-        logger.info(f"Deleted file: {path}")
+        logger.info(f"[MongoDB] Deleted record: {path}")
         return True
     return False
 
 
 async def list_objects_async(prefix: str = "", limit: int = 100) -> list:
-    """
-    List files with optional prefix filter.
-    
-    Args:
-        prefix: Path prefix to filter by
-        limit: Maximum number of results
-    
-    Returns:
-        List of file metadata dicts
-    """
     db = await _get_storage_db()
-    
     collection = db["file_storage"]
-    
+
     query = {}
     if prefix:
         query["path"] = {"$regex": f"^{prefix}"}
-    
+
     cursor = collection.find(
         query,
-        {"path": 1, "content_type": 1, "size": 1, "created_at": 1, "_id": 0}
+        {"path": 1, "content_type": 1, "size": 1, "created_at": 1, "storage_type": 1, "_id": 0}
     ).limit(limit)
-    
+
     files = []
     async for doc in cursor:
         files.append({
             "path": doc["path"],
             "content_type": doc.get("content_type"),
             "size": doc.get("size"),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+            "storage_type": doc.get("storage_type", "mongodb"),
+            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
         })
-    
     return files
 
 
-# ==================== SYNC WRAPPERS (For backward compatibility) ====================
+# ==================== SYNC WRAPPERS (backward compatibility) ====================
 
 def put_object(path: str, data: bytes, content_type: str) -> Dict[str, Any]:
-    """
-    Synchronous wrapper for put_object_async.
-    Works from both sync and async contexts.
-    """
     import asyncio
-    
     async def _put():
         return await put_object_async(path, data, content_type)
-    
     try:
-        # Check if we're in an async context
         asyncio.get_running_loop()
-        # We're in async context - create a new thread to run the coroutine
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(asyncio.run, _put())
             return future.result(timeout=120)
     except RuntimeError:
-        # No running loop - we can use asyncio.run directly
         return asyncio.run(_put())
 
 
 def get_object(path: str) -> Tuple[bytes, str]:
-    """
-    Synchronous wrapper for get_object_async.
-    Works from both sync and async contexts.
-    """
     import asyncio
-    
     async def _get():
         return await get_object_async(path)
-    
     try:
         asyncio.get_running_loop()
-        # We're in async context - create a new thread
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(asyncio.run, _get())
             return future.result(timeout=120)
     except RuntimeError:
-        # No running loop
         return asyncio.run(_get())
 
 
-# ==================== HELPER FUNCTIONS ====================
+# ==================== HELPERS ====================
 
 def generate_storage_path(category: str, filename: str, user_id: str = None) -> str:
-    """
-    Generate a unique storage path for a file.
-    
-    Args:
-        category: File category (e.g., "attachments", "avatars")
-        filename: Original filename
-        user_id: Optional user ID for user-specific files
-    
-    Returns:
-        Unique storage path
-    """
     ext = filename.split(".")[-1].lower() if "." in filename else "bin"
     unique_id = str(uuid.uuid4())
-    
     if user_id:
         return f"{category}/{user_id}/{unique_id}.{ext}"
     return f"{category}/{unique_id}.{ext}"
 
 
 def generate_avatar_path(user_id: str, filename: str) -> str:
-    """Generate a unique storage path for a user avatar."""
     return generate_storage_path("avatars", filename, user_id)
 
 
 async def upload_avatar_async(user_id: str, file_data: bytes, filename: str, content_type: str) -> str:
-    """
-    Upload a user avatar and return the storage path.
-    
-    Args:
-        user_id: User's ID
-        file_data: Image bytes
-        filename: Original filename
-        content_type: MIME type
-    
-    Returns:
-        Storage path to use for retrieval
-    """
     path = generate_avatar_path(user_id, filename)
     await put_object_async(path, file_data, content_type)
     return path
 
 
-# Legacy sync wrapper
 def upload_avatar(user_id: str, file_data: bytes, filename: str, content_type: str) -> str:
-    """Sync wrapper for upload_avatar_async."""
     import asyncio
     loop = asyncio.new_event_loop()
     try:
@@ -354,39 +349,37 @@ def upload_avatar(user_id: str, file_data: bytes, filename: str, content_type: s
         loop.close()
 
 
-# ==================== MIGRATION UTILITIES ====================
+# ==================== STORAGE STATS ====================
 
 async def get_storage_stats() -> Dict[str, Any]:
-    """Get storage statistics."""
     try:
         db = await _get_storage_db()
     except Exception as e:
         return {"error": f"Storage not initialized: {e}"}
-    
+
     collection = db["file_storage"]
-    
-    # Count files
     total_files = await collection.count_documents({})
-    
-    # Get total size using aggregation
-    pipeline = [
-        {"$group": {"_id": None, "total_size": {"$sum": "$size"}}}
-    ]
+
+    pipeline = [{"$group": {"_id": None, "total_size": {"$sum": "$size"}}}]
     result = await collection.aggregate(pipeline).to_list(length=1)
     total_size = result[0]["total_size"] if result else 0
-    
-    # Count by category
+
+    type_pipeline = [
+        {"$group": {"_id": {"$ifNull": ["$storage_type", "mongodb"]}, "count": {"$sum": 1}, "size": {"$sum": "$size"}}}
+    ]
+    types = await collection.aggregate(type_pipeline).to_list(length=10)
+
     category_pipeline = [
-        {"$project": {
-            "category": {"$arrayElemAt": [{"$split": ["$path", "/"]}, 0]}
-        }},
+        {"$project": {"category": {"$arrayElemAt": [{"$split": ["$path", "/"]}, 0]}}},
         {"$group": {"_id": "$category", "count": {"$sum": 1}}}
     ]
     categories = await collection.aggregate(category_pipeline).to_list(length=100)
-    
+
     return {
         "total_files": total_files,
         "total_size_bytes": total_size,
         "total_size_mb": round(total_size / (1024 * 1024), 2),
-        "categories": {cat["_id"]: cat["count"] for cat in categories if cat["_id"]}
+        "by_storage_type": {t["_id"]: {"count": t["count"], "size_mb": round(t["size"] / (1024*1024), 2)} for t in types},
+        "by_category": {cat["_id"]: cat["count"] for cat in categories if cat["_id"]},
+        "r2_configured": _r2_available(),
     }
