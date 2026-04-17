@@ -92,25 +92,40 @@ function UploadStep({ onUploaded }) {
   const handleFiles = async (fileList, fromFolder = false) => {
     const valid = filterValid(fileList);
     if (!valid.length) {
-      toast.error("No valid log files found (CSV, TXT, LOG, ZIP)");
+      toast.error("No valid log files found (CSV, TXT, LOG, XLSX, XLS, ZIP)");
       return;
     }
     setUploading(true);
     setFileCount(valid.length);
+
+    const CHUNK_SIZE = 5;
+    let jobId = null;
+
     try {
-      const fd = new FormData();
-      for (const f of valid) {
-        // Use relative path as filename if from folder upload
-        const path = f.relativePath || f.webkitRelativePath || f.name;
-        fd.append("files", f, path);
+      for (let i = 0; i < valid.length; i += CHUNK_SIZE) {
+        const chunk = valid.slice(i, i + CHUNK_SIZE);
+        setFileCount(valid.length - i);
+
+        const fd = new FormData();
+        if (jobId) fd.append("job_id", jobId);
+        for (const f of chunk) {
+          const path = f.relativePath || f.webkitRelativePath || f.name;
+          fd.append("files", f, path);
+        }
+
+        const res = await fetch(`${API}/api/production-logs/upload`, {
+          method: "POST", headers: getHeaders(), body: fd,
+        });
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e.detail || "Upload failed");
+        }
+        const data = await res.json();
+        if (!jobId) jobId = data.job_id;
       }
-      const res = await fetch(`${API}/api/production-logs/upload`, {
-        method: "POST", headers: getHeaders(), body: fd,
-      });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Upload failed"); }
-      const data = await res.json();
-      toast.success(`${data.files_uploaded} file(s) uploaded`);
-      onUploaded(data.job_id);
+
+      toast.success(`${valid.length} file(s) uploaded`);
+      onUploaded(jobId);
     } catch (err) {
       toast.error(err.message);
     } finally {

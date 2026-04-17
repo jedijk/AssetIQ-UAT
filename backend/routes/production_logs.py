@@ -293,24 +293,25 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
 @router.post("/upload")
 async def upload_log_files(
     files: List[UploadFile] = File(...),
+    job_id: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
-    """Upload one or more log files. Creates an ingestion job."""
+    """Upload one or more log files. Creates or appends to an ingestion job."""
     _owner_only(current_user)
 
-    job_id = str(uuid.uuid4())
+    is_new = job_id is None
+    if is_new:
+        job_id = str(uuid.uuid4())
 
-    # First pass: read all files into memory and prepare upload tasks
-    pending_uploads = []  # (file_id, filename, storage_path, content, mime, ext)
-
+    # Read all files into memory first (fast)
+    pending_uploads = []
     for file in files:
         ext = _get_ext(file.filename or "")
         if ext not in ALLOWED_EXTENSIONS:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: .{ext}. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
-
+            continue  # Skip invalid silently in chunked mode
         content = await file.read()
         if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"File too large: {file.filename} ({len(content)} bytes). Max: 100MB")
+            continue
 
         if ext == "zip":
             try:
@@ -325,7 +326,7 @@ async def upload_log_files(
                         mime = {"csv": "text/csv", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xls": "application/vnd.ms-excel"}.get(inner_ext, "text/plain")
                         pending_uploads.append((file_id, name, storage_path, inner_content, mime, inner_ext))
             except zipfile.BadZipFile:
-                raise HTTPException(status_code=400, detail=f"Invalid ZIP file: {file.filename}")
+                continue
         else:
             file_id = str(uuid.uuid4())
             storage_path = f"production-logs/{job_id}/{file_id}.{ext}"
@@ -333,9 +334,11 @@ async def upload_log_files(
             pending_uploads.append((file_id, file.filename, storage_path, content, mime, ext))
 
     if not pending_uploads:
-        raise HTTPException(status_code=400, detail="No valid files found")
+        if is_new:
+            raise HTTPException(status_code=400, detail="No valid files found")
+        return {"job_id": job_id, "files_uploaded": 0, "files": []}
 
-    # Upload all files to R2 in parallel (batches of 10)
+    # Upload to R2 in parallel batches of 10
     uploaded_files = []
     BATCH_SIZE = 10
     for i in range(0, len(pending_uploads), BATCH_SIZE):
@@ -350,6 +353,34 @@ async def upload_log_files(
                 "size": len(content),
                 "extension": ext,
             })
+
+    if is_new:
+        # Create new job
+        job = {
+            "id": job_id,
+            "status": "uploaded",
+            "files": uploaded_files,
+            "total_files": len(uploaded_files),
+            "records_parsed": 0,
+            "records_ingested": 0,
+            "records_failed": 0,
+            "parse_template": None,
+            "created_by": current_user.get("id"),
+            "created_by_name": current_user.get("name", "Unknown"),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.log_ingestion_jobs.insert_one(job)
+    else:
+        # Append files to existing job
+        await db.log_ingestion_jobs.update_one(
+            {"id": job_id},
+            {
+                "$push": {"files": {"$each": uploaded_files}},
+                "$inc": {"total_files": len(uploaded_files)},
+                "$set": {"updated_at": datetime.now(timezone.utc).isoformat()},
+            }
+        )
 
     if not uploaded_files:
         raise HTTPException(status_code=400, detail="No valid files found")
