@@ -108,6 +108,13 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
           source: "ai_extraction",
         };
       }
+      // Include stored photo path
+      if (data.photo_path) {
+        fills["__ai_scan_photo"] = {
+          value: data.photo_path,
+          source: "ai_extraction_photo",
+        };
+      }
       console.log("[PhotoCapture] Total fills:", Object.keys(fills).length, fills);
       onAutoFill(fills);
     } catch (err) {

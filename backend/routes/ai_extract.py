@@ -8,6 +8,7 @@ import os
 import json
 import base64
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
@@ -15,6 +16,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user
 from database import db
 from openai import OpenAI
+from services.storage_service import put_object_async
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["AI Extraction"])
@@ -49,6 +51,7 @@ class ExtractionResponse(BaseModel):
     success: bool
     extracted: List[ExtractedValue]
     message: Optional[str] = None
+    photo_path: Optional[str] = None
 
 
 async def _get_learned_hints(form_template_id: Optional[str]) -> List[str]:
@@ -154,6 +157,19 @@ async def extract_from_image(
     mime = image.content_type or "image/jpeg"
     data_uri = f"data:{mime};base64,{b64}"
 
+    # Store the compressed photo immediately
+    photo_path = None
+    try:
+        ext = (image.filename or "photo.jpg").rsplit(".", 1)[-1].lower()
+        if ext not in ("jpg", "jpeg", "png", "webp", "heic"):
+            ext = "jpg"
+        photo_path = f"ai-scans/{current_user.get('id')}/{uuid.uuid4()}.{ext}"
+        await put_object_async(photo_path, image_bytes, mime)
+        logger.info(f"[AI Extract] Stored photo: {photo_path} ({len(image_bytes)} bytes)")
+    except Exception as store_err:
+        logger.warning(f"[AI Extract] Failed to store photo: {store_err}")
+        photo_path = None
+
     # Fetch learned hints from past corrections
     hints = await _get_learned_hints(form_template_id)
     if hints:
@@ -223,11 +239,12 @@ async def extract_from_image(
 
         logger.info(f"[AI Extract] success - {len(extracted)} fields extracted")
         logger.info(f"[AI Extract] keys returned: {[e.key for e in extracted]}")
-        return ExtractionResponse(success=True, extracted=extracted)
+
+        return ExtractionResponse(success=True, extracted=extracted, photo_path=photo_path)
 
     except json.JSONDecodeError:
         logger.error(f"[AI Extract] Failed to parse response: {raw[:200]}")
-        return ExtractionResponse(success=False, extracted=[], message="AI returned invalid format. Please retry.")
+        return ExtractionResponse(success=False, extracted=[], message="AI returned invalid format. Please retry.", photo_path=photo_path)
     except Exception as e:
         logger.error(f"[AI Extract] Error: {e}")
         raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
