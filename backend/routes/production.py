@@ -558,7 +558,7 @@ async def generate_ai_insights(
 ):
     """Generate AI-powered daily insights by analyzing the current production data."""
     import os
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from services.openai_service import chat_completion
 
     date = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     production_log = data.get("production_log", [])
@@ -601,15 +601,16 @@ Format:
 [{{"title": "...", "description": "...", "severity": "critical|warning|success|info", "time": "HH:MM"}}]"""
 
     try:
-        api_key = os.environ.get("EMERGENT_LLM_KEY")
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"production-insights-{date}-{uuid.uuid4().hex[:8]}",
-            system_message="You are a production engineer AI assistant analyzing extruder and rubber compound production data. Return only valid JSON."
+        messages = [
+            {"role": "system", "content": "You are a production engineer AI assistant analyzing extruder and rubber compound production data. Return only valid JSON."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response = await chat_completion(
+            messages=messages,
+            model="gpt-4o",
+            temperature=0.7
         )
-        chat.with_model("openai", "gpt-4o")
-
-        response = await chat.send_message(UserMessage(text=prompt))
 
         # Parse JSON response
         import json as json_module

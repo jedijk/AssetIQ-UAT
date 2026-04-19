@@ -21,7 +21,7 @@ from services.storage_service import put_object_async
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["AI Extraction"])
 
-VISION_KEY = os.environ.get("OPENAI_VISION_KEY", "")
+VISION_KEY = os.environ.get("OPENAI_VISION_KEY") or os.environ.get("OPENAI_API_KEY", "")
 
 
 class ExtractionField(BaseModel):
@@ -181,7 +181,7 @@ async def extract_from_image(
     try:
         client = OpenAI(api_key=VISION_KEY)
         response = client.chat.completions.create(
-            model="gpt-5.2",
+            model="gpt-4o",
             messages=[
                 {
                     "role": "user",

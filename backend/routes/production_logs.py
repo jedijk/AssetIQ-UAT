@@ -1099,9 +1099,9 @@ async def ai_parse_file(
     """Use AI to analyze an unstructured log file and suggest column mappings."""
     _owner_only(current_user)
 
-    vision_key = os.environ.get("OPENAI_VISION_KEY")
+    vision_key = os.environ.get("OPENAI_VISION_KEY") or os.environ.get("OPENAI_API_KEY")
     if not vision_key:
-        raise HTTPException(status_code=400, detail="OPENAI_VISION_KEY not configured")
+        raise HTTPException(status_code=400, detail="OPENAI_API_KEY not configured")
 
     job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
@@ -1149,7 +1149,7 @@ async def ai_parse_file(
     try:
         client = OpenAI(api_key=vision_key)
         response = client.chat.completions.create(
-            model="gpt-5.2",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": """You are a production log analyst. Analyze the sample data and return a JSON object with:
 {
