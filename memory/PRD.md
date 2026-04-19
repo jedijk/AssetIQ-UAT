@@ -1,69 +1,101 @@
 # AssetIQ - Product Requirements Document
 
 ## Original Problem Statement
-Robust full-stack platform (React + FastAPI + MongoDB) for multi-environment execution with dynamic database switching, advanced form capabilities, AI integrations, and production log analysis.
+Create a comprehensive asset management platform with:
+- Mobile landing page for field use
+- Universal Photo Data Capture with AI extraction
+- Cloudflare R2 file storage
+- Production Log Ingestion & History Builder
+- Equipment hierarchy management
+- Task scheduler and forms
 
-## Core Architecture
-- **Frontend**: React (CRA) + TailwindCSS + Shadcn/UI
-- **Backend**: FastAPI + MongoDB (Motor async driver)
-- **File Storage**: Cloudflare R2 (primary) + MongoDB base64 (legacy)
-- **AI**: GPT-4o/Whisper (Emergent LLM Key), GPT-5.2 Vision (user OPENAI_VISION_KEY)
-- **Version**: 3.4.6
+## Current Stack
+- **Frontend**: React + Shadcn/UI + Tailwind CSS
+- **Backend**: FastAPI (Python)
+- **Database**: MongoDB
+- **Storage**: Cloudflare R2
+- **AI**: OpenAI GPT-4o (direct SDK - migrated from emergentintegrations)
 
-## What's Been Implemented
+## Completed Features
 
-### Core Platform
-- Multi-environment database switching, JWT auth, role-based access, forced version reload
+### Core Platform (Completed)
+- [x] User authentication with JWT
+- [x] Role-based access control (owner, admin, user)
+- [x] Equipment hierarchy management
+- [x] Form builder with custom fields
+- [x] Task scheduler
+- [x] Mobile-friendly "Simple Mode"
 
-### Features
-- AI Chat, Task Scheduler, Equipment Hierarchy, Form Builder
-- Observations/Actions/Causal Investigations, Production Dashboard
-- QR Codes, My Tasks, Operator Landing Page / Simple Mode
-- Universal Photo Data Capture (GPT-5.2 Vision)
-- Cloudflare R2 file storage, File Storage metrics in Server Performance
+### AI Integration (Completed - Dec 2025)
+- [x] AI Chat Assistant
+- [x] Universal Photo Data Capture with GPT-4o Vision
+- [x] AI-assisted log parsing
+- [x] Learning from user corrections
 
-### Production Log Ingestion & History Builder (Latest)
-- **Upload**: CSV, TXT, LOG, XLSX, XLS, ZIP + folder structure upload (chunked, parallel R2)
-- **Parsing**: Template-based (delimiter, column mapping) + AI-assisted (GPT-5.2)
-- **Preview**: First 100 records with validation stats, error highlighting, event summary
-- **Ingestion**: Async background processing into `production_logs` collection
-- **Event Detection**: Auto-classify normal/downtime/waste/alarm from status keywords
-- **Aggregation**: Hourly buckets in `asset_history` (avg/min/max metrics, event counts)
-- **Dashboard**: Asset selector, time series charts (canvas-based), events timeline, stats summary
-- **AI Detect**: GPT-5.2 analyzes unstructured logs and suggests column mappings
+### File Storage (Completed)
+- [x] Cloudflare R2 integration
+- [x] Chunked file uploads (5 files per request)
+- [x] Folder/directory upload support
 
-### Mobile Improvements
-- Full-screen DocumentViewer with canvas PDF rendering, page navigation
-- Touch pinch-zoom/pan for images, double-tap reset
-- Equipment Details dialog centered on mobile
-- Landscape blocker hidden during file viewing
+### Production Log Ingestion (Completed)
+- [x] CSV/Excel/TXT file support
+- [x] Batch folder uploads
+- [x] Template-based parsing
+- [x] AI-assisted column mapping
+- [x] Asset history aggregation
+
+### OpenAI Migration (Completed - April 2026)
+- [x] Migrated from emergentintegrations to official OpenAI SDK
+- [x] Configured OPENAI_API_KEY and OPENAI_VISION_KEY
+- [x] Verified all AI endpoints working
+
+## Pending Tasks
+
+### P1 - High Priority
+1. **Report Generation** - PowerPoint/PDF reports for Causal Investigations
+2. **Offline Support** - Local storage for My Tasks execution
+
+### P2 - Medium Priority
+1. QR scan analytics dashboard
+
+### P3 - Low Priority / Refactoring
+1. Break down large components:
+   - `FormsPage.js`
+   - `SettingsUserManagementPage.js`
+   - `EquipmentManagerPage.js`
+   - `DashboardPage.js`
+   - `SettingsLogIngestionPage.js`
+2. Advanced event detection rule engine
 
 ## Key API Endpoints
-- `POST /api/production-logs/upload` - Upload files (chunked, supports job_id append)
-- `POST /api/production-logs/detect-columns` - Auto-detect columns
-- `POST /api/production-logs/parse-preview` - Parse & preview
-- `POST /api/production-logs/ingest` - Async ingestion
-- `POST /api/production-logs/aggregate` - Build hourly aggregations
-- `POST /api/production-logs/ai-parse` - AI-assisted structure detection
-- `GET /api/production-logs/timeseries` - Time series data for charts
-- `GET /api/production-logs/history` - Query aggregated data
-- `GET /api/production-logs/assets` - List unique assets
-- `GET /api/production-logs/stats` - Overall statistics
 
-## Key DB Collections
-- `production_logs`: Parsed log entries (timestamp, asset_id, metrics, status, event_type)
-- `log_ingestion_jobs`: Upload/ingestion job tracking
-- `asset_history`: Hourly aggregated metrics and event counts
+### AI Endpoints
+- `POST /api/ai/extract` - Photo data extraction with GPT-4o Vision
+- `POST /api/ai/extract/corrections` - Store user corrections
+- `POST /api/production/ai-insights` - AI-powered insights
 
-## Prioritized Backlog
+### Production Logs
+- `POST /api/production-logs/upload` - Upload log files
+- `POST /api/production-logs/batch-ingest` - Batch process logs
+- `POST /api/production-logs/ai-parse` - AI-assisted parsing
 
-### P1 (Next Up)
-- Report generation (PowerPoint/PDF) for Causal Investigations
-- Offline support with local storage for My Tasks execution
+## Environment Variables
 
-### P2
-- QR scan analytics dashboard
-- Advanced event detection rule engine
+### Backend (.env)
+- `MONGO_URL` - MongoDB connection string
+- `DB_NAME` - Database name (assetiq)
+- `OPENAI_API_KEY` - OpenAI API key for chat
+- `OPENAI_VISION_KEY` - OpenAI API key for vision
+- `R2_ACCESS_KEY` - Cloudflare R2 access key
+- `R2_SECRET_KEY` - Cloudflare R2 secret key
+- `R2_ENDPOINT` - Cloudflare R2 endpoint
 
-### P3 (Refactoring)
-- Break down large pages (FormsPage.js 2100+ lines, etc.)
+### Frontend (.env)
+- `REACT_APP_BACKEND_URL` - Backend API URL
+
+## Test Credentials
+- Email: jedijk@gmail.com
+- Password: Jaap8019@
+
+---
+*Last Updated: April 2026*

@@ -19,7 +19,7 @@ if _frontend_env.exists():
             key, val = line.split('=', 1)
             os.environ.setdefault(key.strip(), val.strip())
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://production-insights-3.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://log-ingest-ai.preview.emergentagent.com').rstrip('/')
 
 
 class TestDefinitionsAPI:

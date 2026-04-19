@@ -13,7 +13,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://production-insights-3.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://log-ingest-ai.preview.emergentagent.com')
 
 
 class TestPasswordResetAPI:

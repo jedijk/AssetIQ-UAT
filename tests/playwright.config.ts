@@ -11,7 +11,7 @@ export default defineConfig({
     ['json', { outputFile: './test-results/results.json' }],
   ],
   use: {
-    baseURL: process.env.REACT_APP_BACKEND_URL || 'https://production-insights-3.preview.emergentagent.com',
+    baseURL: process.env.REACT_APP_BACKEND_URL || 'https://log-ingest-ai.preview.emergentagent.com',
     screenshot: 'on',
     trace: 'on-first-retry',
     headless: true,
