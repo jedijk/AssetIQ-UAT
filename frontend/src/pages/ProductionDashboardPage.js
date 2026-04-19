@@ -706,17 +706,39 @@ export default function ProductionDashboardPage() {
   }, [data?.production_log, data?.viscosity_series, logSearch]);
 
   // Combined time series for Mooney Viscosity chart (merges viscosity + production log data)
+  const isMultiDay = period !== "1d";
+
   const combinedSeries = useMemo(() => {
     const log = data?.production_log || [];
     const viscSeries = data?.viscosity_series || [];
     const viscVals = data?.viscosity_values || [];
     const screenChanges = chartSeries.screenChange ? new Set((data?.screen_changes || []).map(s => s.time)) : new Set();
     const magnetCleanings = chartSeries.magnetCleaning ? new Set((data?.magnet_cleanings || []).map(s => s.time)) : new Set();
-    // Build a time-indexed map from production log
+
+    // For multi-day views, use datetime as key; for single day, use time
+    const getKey = (entry) => {
+      if (isMultiDay && entry.datetime) return entry.datetime;
+      return entry.time;
+    };
+
+    const formatLabel = (key) => {
+      if (!isMultiDay) return key; // HH:MM for single day
+      // Multi-day: show date
+      try {
+        const d = new Date(key);
+        if (isNaN(d)) return key;
+        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        return `${d.getDate()} ${months[d.getMonth()]}`;
+      } catch { return key; }
+    };
+
+    // Build a key-indexed map from production log
     const timeMap = {};
     log.forEach((entry, i) => {
-      timeMap[entry.time] = {
-        time: entry.time,
+      const key = getKey(entry);
+      timeMap[key] = {
+        time: formatLabel(key),
+        _sortKey: isMultiDay ? (entry.datetime || key) : key,
         rpm: entry.rpm,
         feed: entry.feed,
         mp4: entry.mp4,
@@ -728,34 +750,33 @@ export default function ProductionDashboardPage() {
     });
     // Also add any viscosity entries not already covered
     viscSeries.forEach((v) => {
-      if (!timeMap[v.time]) {
-        timeMap[v.time] = { time: v.time, viscosity: v.viscosity, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null };
-      } else if (timeMap[v.time].viscosity == null) {
-        timeMap[v.time].viscosity = v.viscosity;
+      const key = isMultiDay && v.submission_id ? v.time : v.time;
+      if (!timeMap[key]) {
+        timeMap[key] = { time: formatLabel(key), _sortKey: key, viscosity: v.viscosity, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null };
+      } else if (timeMap[key].viscosity == null) {
+        timeMap[key].viscosity = v.viscosity;
       }
     });
-    // Add screen change and magnet cleaning events as reference points
-    // We place them at the nearest time slot, or create a new one
+    // Add screen change and magnet cleaning events
     const addEvent = (timeSet, fieldName) => {
       timeSet.forEach((t) => {
         if (timeMap[t]) {
           timeMap[t][fieldName] = timeMap[t].viscosity || 0;
         } else {
-          timeMap[t] = { time: t, viscosity: null, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null, [fieldName]: 0 };
+          timeMap[t] = { time: formatLabel(t), _sortKey: t, viscosity: null, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null, [fieldName]: 0 };
         }
       });
     };
     addEvent(screenChanges, "screenChange");
     addEvent(magnetCleanings, "magnetCleaning");
-    // For event markers, use the viscosity value at that point so the marker sits on the line
-    const sorted = Object.values(timeMap).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-    // Fill event marker values to match viscosity for visual alignment
+    const sorted = Object.values(timeMap).sort((a, b) => (a._sortKey || "").localeCompare(b._sortKey || ""));
     sorted.forEach((p) => {
       if (p.screenChange !== null) p.screenChange = p.viscosity || p.screenChange;
       if (p.magnetCleaning !== null) p.magnetCleaning = p.viscosity || p.magnetCleaning;
+      delete p._sortKey;
     });
     return sorted;
-  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings, chartSeries.screenChange, chartSeries.magnetCleaning]);
+  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings, chartSeries.screenChange, chartSeries.magnetCleaning, isMultiDay]);
 
   const kpis = data?.kpis || {};
 
@@ -1060,11 +1081,19 @@ export default function ProductionDashboardPage() {
                 <ResponsiveContainer width="100%" height={200}>
                   <ComposedChart data={(data.waste_downtime_series || []).reduce((acc, item, i) => {
                     const prev = i > 0 ? acc[i - 1].cumWaste : 0;
-                    acc.push({ ...item, cumWaste: prev + (parseFloat(item.waste) || 0) });
+                    let label = item.time;
+                    if (isMultiDay && item.datetime) {
+                      try {
+                        const d = new Date(item.datetime);
+                        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                        label = `${d.getDate()} ${months[d.getMonth()]}`;
+                      } catch {}
+                    }
+                    acc.push({ ...item, label, cumWaste: prev + (parseFloat(item.waste) || 0) });
                     return acc;
                   }, [])}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
+                    <XAxis dataKey={isMultiDay ? "label" : "time"} tick={{ fontSize: 10 }} stroke="#94a3b8" />
                     <YAxis yAxisId="left" tick={{ fontSize: 10 }} stroke="#94a3b8" />
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} stroke="#f59e0b" />
                     <Tooltip content={<ChartTooltip />} />
