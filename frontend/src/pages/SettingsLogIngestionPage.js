@@ -1554,7 +1554,7 @@ function LogDashboard() {
                     <table className="w-full text-sm" data-testid="production-log-table">
                       <thead>
                         <tr className="border-b border-slate-200">
-                          {["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks"].map((h) => (
+                          {["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "Input Material", "Supplier", "Bag No.", "Lot No."].map((h) => (
                             <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap">
                               {h}
                             </th>
@@ -1594,6 +1594,10 @@ function LogDashboard() {
                               <td className="py-2 px-2 tabular-nums">{formatVal(m['T Product IR'])}</td>
                               <td className="py-2 px-2 tabular-nums">{e.mooney_viscosity ? e.mooney_viscosity : <span className="text-amber-500 font-medium">TBD</span>}</td>
                               <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]" title={e.status || ""}>{e.status || ""}</td>
+                              <td className="py-2 px-2 text-slate-700">{e.input_material || <span className="text-slate-300">—</span>}</td>
+                              <td className="py-2 px-2 text-slate-700">{e.supplier || <span className="text-slate-300">—</span>}</td>
+                              <td className="py-2 px-2 text-slate-700 tabular-nums">{e.bag_no || <span className="text-slate-300">—</span>}</td>
+                              <td className="py-2 px-2 text-slate-700">{e.lot_no || <span className="text-slate-300">—</span>}</td>
                             </tr>
                           );
                         })}
