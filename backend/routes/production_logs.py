@@ -1073,12 +1073,34 @@ async def _run_ingestion(job_id: str, job: dict):
 async def list_jobs(
     current_user: dict = Depends(get_current_user),
 ):
-    """List all ingestion jobs."""
+    """List all ingestion jobs. Auto-reconciles uploaded jobs whose files are already ingested."""
     _owner_only(current_user)
+
+    # Auto-reconcile: check if any "uploaded" jobs have files already in production_logs
+    uploaded_jobs = await db.log_ingestion_jobs.find(
+        {"status": "uploaded"}, {"_id": 1, "id": 1, "files": 1}
+    ).to_list(200)
+
+    if uploaded_jobs:
+        # Get all ingested filenames in one query
+        ingested_filenames = set(await db.production_logs.distinct("source.filename"))
+
+        for job in uploaded_jobs:
+            fnames = [f.get("filename", "") for f in job.get("files", [])]
+            matched = sum(1 for f in fnames if f in ingested_filenames)
+            if matched > 0:
+                # Count actual ingested records for this job's files
+                count = await db.production_logs.count_documents(
+                    {"source.filename": {"$in": fnames}}
+                )
+                await db.log_ingestion_jobs.update_one(
+                    {"_id": job["_id"]},
+                    {"$set": {"status": "completed", "records_ingested": count}},
+                )
 
     jobs = await db.log_ingestion_jobs.find(
         {}, {"_id": 0}
-    ).sort("created_at", -1).to_list(50)
+    ).sort("created_at", -1).to_list(200)
 
     return {"jobs": jobs}
 
