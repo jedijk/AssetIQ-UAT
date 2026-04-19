@@ -538,8 +538,45 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
             if base_date:
                 break
 
+    # Fallback: scan ALL rows for any date-like cell
+    if not base_date:
+        for row in all_rows:
+            for cell in row:
+                if cell:
+                    cell_str = str(cell).strip()
+                    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y"]:
+                        try:
+                            dt = datetime.strptime(cell_str.split()[0] if ' ' in cell_str else cell_str, fmt.split()[0])
+                            if 2019 <= dt.year <= 2030:
+                                base_date = dt.strftime("%Y-%m-%d")
+                                logger.info(f"[Excel Parse] Found base date in row scan: {base_date}")
+                                break
+                        except ValueError:
+                            continue
+                    if base_date:
+                        break
+            if base_date:
+                break
+
     # Skip rows to get to data
     rows = all_rows[template.skip_rows:] if template.skip_rows > 0 else all_rows
+
+    mapping = template.column_mapping
+
+    # Fallback: if skip_rows lands on empty/wrong rows, auto-detect header row by looking for TIME column
+    if rows and template.has_header:
+        first_row_vals = [h.strip().upper() for h in rows[0] if h.strip()]
+        time_col_name = (mapping.timestamp or "TIME").upper()
+        if time_col_name not in [v.upper() for v in first_row_vals]:
+            # Header not found at skip_rows — scan all rows for the header
+            logger.info(f"[Excel Parse] Header '{time_col_name}' not found at skip_rows={template.skip_rows}, scanning...")
+            for scan_idx, scan_row in enumerate(all_rows):
+                scan_vals = [h.strip() for h in scan_row if h.strip()]
+                if any(v.upper() == time_col_name for v in scan_vals):
+                    logger.info(f"[Excel Parse] Found header at row {scan_idx + 1} (original skip_rows={template.skip_rows})")
+                    rows = all_rows[scan_idx:]
+                    break
+
     if not rows:
         return []
 
@@ -559,7 +596,6 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
             except Exception as e:
                 logger.warning(f"[Excel Parse] Failed to extract header metadata {meta}: {e}")
 
-    mapping = template.column_mapping
     headers = None
     data_start = 0
     if template.has_header:
