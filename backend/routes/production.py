@@ -356,6 +356,7 @@ async def get_production_dashboard(
     for entry in viscosity_entries:
         viscosity_series.append({
             "time": entry["time"],
+            "datetime": entry.get("datetime", ""),
             "viscosity": entry["value"],
             "sample": entry.get("sample_no", ""),
             "submission_id": entry.get("submission_id", ""),
@@ -485,6 +486,7 @@ async def get_production_dashboard(
                         viscosity_values.append(visc_val)
                         viscosity_series.append({
                             "time": time_label,
+                            "datetime": ts,
                             "viscosity": visc_val,
                             "sample": entry.get("sample_id", ""),
                             "submission_id": entry.get("id", ""),
@@ -495,6 +497,7 @@ async def get_production_dashboard(
                 # Waste/downtime series
                 waste_downtime_series.append({
                     "time": time_label,
+                    "datetime": ts,
                     "waste": 0, "downtime": 0,
                     "feed": feed_val, "rpm": rpm,
                 })
@@ -604,8 +607,8 @@ async def get_production_dashboard(
         "viscosity_series": viscosity_series,
         "viscosity_values": viscosity_values,
         "big_bag_entries": big_bag_entries,
-        "screen_changes": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else ""} for s in screen_change_subs],
-        "magnet_cleanings": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else ""} for s in magnet_subs],
+        "screen_changes": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else "", "datetime": s.get("_parsed_time").isoformat() if s.get("_parsed_time") else ""} for s in screen_change_subs],
+        "magnet_cleanings": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else "", "datetime": s.get("_parsed_time").isoformat() if s.get("_parsed_time") else ""} for s in magnet_subs],
         "actions": actions,
         "insights": insights,
         "submissions_count": len(submissions),
@@ -844,15 +847,27 @@ Format:
 
 @router.post("/production/machine-analysis")
 async def generate_machine_analysis(
+    data: dict = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """AI-powered analysis of all historical production data to determine optimal machine settings."""
+    """AI-powered analysis of production data to determine optimal machine settings. Accepts optional date range."""
     import statistics
     from services.openai_service import chat_completion
 
-    # Aggregate all entries with viscosity data (deduplicated)
+    data = data or {}
+    start = data.get("start")
+    end = data.get("end")
+
+    # Build match filter
+    match_filter = {"mooney_viscosity": {"$exists": True, "$ne": None, "$ne": ""}}
+    if start and end:
+        match_filter["timestamp"] = {"$gte": f"{start}T00:00:00", "$lte": f"{end}T23:59:59"}
+    elif start:
+        match_filter["timestamp"] = {"$gte": f"{start}T00:00:00"}
+
+    # Aggregate entries with viscosity data (deduplicated)
     pipeline = [
-        {"$match": {"mooney_viscosity": {"$exists": True, "$ne": None, "$ne": ""}}},
+        {"$match": match_filter},
         {"$sort": {"timestamp": 1}},
         {"$group": {"_id": {"timestamp": "$timestamp", "asset_id": "$asset_id"}, "doc": {"$first": "$$ROOT"}}},
         {"$replaceRoot": {"newRoot": "$doc"}},
@@ -861,8 +876,10 @@ async def generate_machine_analysis(
     ]
     entries = await db.production_logs.aggregate(pipeline).to_list(5000)
 
-    if len(entries) < 10:
-        return {"status": "error", "error": "Not enough historical data for analysis (need at least 10 entries with viscosity)"}
+    if len(entries) < 3:
+        return {"status": "error", "error": f"Not enough data for analysis in this period (found {len(entries)} entries, need at least 3)"}
+
+    date_range = {"start": start or "all", "end": end or "all"}
 
     # Compute per-day aggregates
     days = {}
@@ -969,9 +986,10 @@ async def generate_machine_analysis(
         for d in bad_days[:20]
     ])
 
-    prompt = f"""You are analyzing historical production data for a Line-90 rubber compound extruder to determine OPTIMAL MACHINE SETTINGS.
+    range_desc = f"from {start} to {end}" if start and end else "all historical data"
+    prompt = f"""You are analyzing production data for a Line-90 rubber compound extruder ({range_desc}) to determine OPTIMAL MACHINE SETTINGS.
 
-OVERALL STATISTICS ({len(all_visc)} samples across {len(daily_summaries)} production days):
+OVERALL STATISTICS ({len(all_visc)} samples across {len(daily_summaries)} production days, period: {range_desc}):
 - Mean Viscosity: {overall_avg:.2f} MU (target: 50-60 MU)
 - Std Dev: {overall_std:.2f} MU
 - In Target Range: {in_target_pct:.1f}%
@@ -1046,6 +1064,7 @@ Return ONLY valid JSON with this structure:
             "type": "machine_analysis",
             "equipment": EQUIPMENT_NAME,
             "analysis": analysis,
+            "date_range": date_range,
             "stats": {
                 "total_samples": len(all_visc),
                 "total_days": len(daily_summaries),
@@ -1061,7 +1080,7 @@ Return ONLY valid JSON with this structure:
         await db.production_analyses.insert_one(analysis_doc)
         analysis_doc.pop("_id", None)
 
-        return {"status": "ok", "analysis": analysis, "stats": analysis_doc["stats"]}
+        return {"status": "ok", "analysis": analysis, "stats": analysis_doc["stats"], "date_range": date_range}
 
     except Exception as e:
         logger.error(f"Machine analysis failed: {e}")
@@ -1070,14 +1089,21 @@ Return ONLY valid JSON with this structure:
 
 @router.get("/production/machine-analysis")
 async def get_latest_analysis(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Get the most recent machine analysis."""
+    """Get the most recent machine analysis, optionally filtered by date range."""
+    query = {"type": "machine_analysis"}
+    if start and end:
+        query["date_range.start"] = start
+        query["date_range.end"] = end
+
     doc = await db.production_analyses.find_one(
-        {"type": "machine_analysis"},
+        query,
         {"_id": 0},
         sort=[("created_at", -1)]
     )
     if not doc:
         return {"status": "empty", "analysis": None}
-    return {"status": "ok", "analysis": doc.get("analysis"), "stats": doc.get("stats"), "created_at": doc.get("created_at")}
+    return {"status": "ok", "analysis": doc.get("analysis"), "stats": doc.get("stats"), "created_at": doc.get("created_at"), "date_range": doc.get("date_range")}

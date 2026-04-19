@@ -108,35 +108,40 @@ const PERIOD_OPTIONS = [
 // ──────────────────────────────────────────
 // Machine Analysis Panel
 // ──────────────────────────────────────────
-function MachineAnalysisPanel() {
+function MachineAnalysisPanel({ fromDate, toDate, period }) {
   const [analysis, setAnalysis] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [createdAt, setCreatedAt] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const [analysisRange, setAnalysisRange] = useState(null);
+
+  const periodLabel = { "1d": "day", "1w": "week", "1m": "month", "3m": "3 months", "6m": "6 months", "1y": "year", "ytd": "YTD" }[period] || period;
 
   const fetchAnalysis = async () => {
     try {
-      const res = await api.get("/production/machine-analysis");
+      const res = await api.get(`/production/machine-analysis?start=${fromDate}&end=${toDate}`);
       if (res.data?.status === "ok") {
         setAnalysis(res.data.analysis);
         setStats(res.data.stats);
         setCreatedAt(res.data.created_at);
+        setAnalysisRange(res.data.date_range);
       }
     } catch {}
   };
 
-  useEffect(() => { fetchAnalysis(); }, []);
+  useEffect(() => { fetchAnalysis(); }, [fromDate, toDate]);
 
   const runAnalysis = async () => {
     setGenerating(true);
     try {
-      const res = await api.post("/production/machine-analysis");
+      const res = await api.post("/production/machine-analysis", { start: fromDate, end: toDate });
       if (res.data?.status === "ok") {
         setAnalysis(res.data.analysis);
         setStats(res.data.stats);
         setCreatedAt(new Date().toISOString());
+        setAnalysisRange({ start: fromDate, end: toDate });
       }
     } catch (err) {
       console.error(err);
@@ -144,6 +149,7 @@ function MachineAnalysisPanel() {
   };
 
   const opt = analysis?.optimal_settings || {};
+  const rangeLabel = analysisRange ? `${analysisRange.start} — ${analysisRange.end}` : (fromDate === toDate ? fromDate : `${fromDate} — ${toDate}`);
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5" data-testid="machine-analysis">
@@ -151,6 +157,7 @@ function MachineAnalysisPanel() {
         <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
           <Brain className="w-4 h-4 text-indigo-600" />
           AI Machine Settings Analysis
+          {analysis && <Badge variant="secondary" className="text-[10px] font-normal">{periodLabel}</Badge>}
         </h3>
         <div className="flex items-center gap-2">
           {createdAt && (
@@ -160,7 +167,7 @@ function MachineAnalysisPanel() {
           )}
           <Button variant="outline" size="sm" onClick={runAnalysis} disabled={generating} data-testid="run-analysis-btn">
             {generating ? <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />}
-            {generating ? "Analyzing..." : analysis ? "Re-analyze" : "Analyze"}
+            {generating ? "Analyzing..." : analysis ? "Re-analyze" : `Analyze ${periodLabel}`}
           </Button>
         </div>
       </div>
@@ -915,68 +922,120 @@ export default function ProductionDashboardPage() {
     const screenChanges = chartSeries.screenChange ? new Set((data?.screen_changes || []).map(s => s.time)) : new Set();
     const magnetCleanings = chartSeries.magnetCleaning ? new Set((data?.magnet_cleanings || []).map(s => s.time)) : new Set();
 
-    // For multi-day views, use datetime as key; for single day, use time
-    const getKey = (entry) => {
-      if (isMultiDay && entry.datetime) return entry.datetime;
-      return entry.time;
-    };
-
-    const formatLabel = (key) => {
-      if (!isMultiDay) return key; // HH:MM for single day
-      // Multi-day: show date
-      try {
-        const d = new Date(key);
-        if (isNaN(d)) return key;
-        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        return `${d.getDate()} ${months[d.getMonth()]}`;
-      } catch { return key; }
-    };
-
-    // Build a key-indexed map from production log
-    const timeMap = {};
-    log.forEach((entry, i) => {
-      const key = getKey(entry);
-      timeMap[key] = {
-        time: formatLabel(key),
-        _sortKey: isMultiDay ? (entry.datetime || key) : key,
-        rpm: entry.rpm,
-        feed: entry.feed,
-        mp4: entry.mp4,
-        t_product_ir: entry.t_product_ir,
-        viscosity: i < viscVals.length ? viscVals[i] : null,
-        screenChange: null,
-        magnetCleaning: null,
-      };
-    });
-    // Also add any viscosity entries not already covered
-    viscSeries.forEach((v) => {
-      const key = isMultiDay && v.submission_id ? v.time : v.time;
-      if (!timeMap[key]) {
-        timeMap[key] = { time: formatLabel(key), _sortKey: key, viscosity: v.viscosity, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null };
-      } else if (timeMap[key].viscosity == null) {
-        timeMap[key].viscosity = v.viscosity;
-      }
-    });
-    // Add screen change and magnet cleaning events
-    const addEvent = (timeSet, fieldName) => {
-      timeSet.forEach((t) => {
-        if (timeMap[t]) {
-          timeMap[t][fieldName] = timeMap[t].viscosity || 0;
-        } else {
-          timeMap[t] = { time: formatLabel(t), _sortKey: t, viscosity: null, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null, [fieldName]: 0 };
+    if (!isMultiDay) {
+      // Single day: use time (HH:MM) as key — original behavior
+      const timeMap = {};
+      log.forEach((entry, i) => {
+        timeMap[entry.time] = {
+          time: entry.time,
+          rpm: entry.rpm, feed: entry.feed, mp4: entry.mp4, t_product_ir: entry.t_product_ir,
+          viscosity: i < viscVals.length ? viscVals[i] : null,
+          screenChange: null, magnetCleaning: null,
+        };
+      });
+      viscSeries.forEach((v) => {
+        if (!timeMap[v.time]) {
+          timeMap[v.time] = { time: v.time, viscosity: v.viscosity, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null };
+        } else if (timeMap[v.time].viscosity == null) {
+          timeMap[v.time].viscosity = v.viscosity;
         }
       });
+      const addEvent = (timeSet, fieldName) => {
+        timeSet.forEach((t) => {
+          if (timeMap[t]) timeMap[t][fieldName] = timeMap[t].viscosity || 0;
+          else timeMap[t] = { time: t, viscosity: null, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null, [fieldName]: 0 };
+        });
+      };
+      addEvent(screenChanges, "screenChange");
+      addEvent(magnetCleanings, "magnetCleaning");
+      const sorted = Object.values(timeMap).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+      sorted.forEach((p) => {
+        if (p.screenChange !== null) p.screenChange = p.viscosity || p.screenChange;
+        if (p.magnetCleaning !== null) p.magnetCleaning = p.viscosity || p.magnetCleaning;
+      });
+      return sorted;
+    }
+
+    // Multi-day: aggregate per day (1W, 1M, 3M) or per month (6M, 1Y, YTD)
+    const useMonthBucket = ["6m", "1y", "ytd"].includes(period);
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+    const getBucket = (dt) => {
+      if (!dt) return null;
+      const dateStr = dt.substring(0, 10); // YYYY-MM-DD
+      if (useMonthBucket) return dateStr.substring(0, 7); // YYYY-MM
+      return dateStr; // YYYY-MM-DD
     };
-    addEvent(screenChanges, "screenChange");
-    addEvent(magnetCleanings, "magnetCleaning");
-    const sorted = Object.values(timeMap).sort((a, b) => (a._sortKey || "").localeCompare(b._sortKey || ""));
-    sorted.forEach((p) => {
-      if (p.screenChange !== null) p.screenChange = p.viscosity || p.screenChange;
-      if (p.magnetCleaning !== null) p.magnetCleaning = p.viscosity || p.magnetCleaning;
-      delete p._sortKey;
+
+    const formatBucket = (bucket) => {
+      if (useMonthBucket) {
+        // YYYY-MM → "Jan 2025"
+        const [y, m] = bucket.split("-");
+        return `${months[parseInt(m, 10) - 1]} ${y}`;
+      }
+      // YYYY-MM-DD → "5 Jan"
+      try {
+        const d = new Date(bucket + "T12:00:00");
+        return `${d.getDate()} ${months[d.getMonth()]}`;
+      } catch { return bucket; }
+    };
+
+    // Aggregate into buckets
+    const buckets = {};
+    log.forEach((entry, i) => {
+      const dt = entry.datetime || "";
+      const bucket = getBucket(dt);
+      if (!bucket) return;
+      if (!buckets[bucket]) {
+        buckets[bucket] = { rpms: [], feeds: [], mp4s: [], t_irs: [], viscosities: [], hasScreen: false, hasMagnet: false };
+      }
+      if (entry.rpm) buckets[bucket].rpms.push(entry.rpm);
+      if (entry.feed) buckets[bucket].feeds.push(entry.feed);
+      if (entry.mp4) buckets[bucket].mp4s.push(entry.mp4);
+      if (entry.t_product_ir) buckets[bucket].t_irs.push(entry.t_product_ir);
+      const visc = i < viscVals.length ? viscVals[i] : null;
+      if (visc != null) buckets[bucket].viscosities.push(visc);
     });
+    // Add viscosity from series not in log
+    viscSeries.forEach((v) => {
+      const dt = v.datetime || "";
+      const bucket = getBucket(dt) || getBucket(v.time);
+      if (!bucket || !v.viscosity) return;
+      if (!buckets[bucket]) {
+        buckets[bucket] = { rpms: [], feeds: [], mp4s: [], t_irs: [], viscosities: [], hasScreen: false, hasMagnet: false };
+      }
+      buckets[bucket].viscosities.push(v.viscosity);
+    });
+    // Mark screen change and magnet events
+    (data?.screen_changes || []).forEach((s) => {
+      const dt = s.datetime || "";
+      const bucket = getBucket(dt) || getBucket(s.time);
+      if (bucket && buckets[bucket]) buckets[bucket].hasScreen = true;
+    });
+    (data?.magnet_cleanings || []).forEach((s) => {
+      const dt = s.datetime || "";
+      const bucket = getBucket(dt) || getBucket(s.time);
+      if (bucket && buckets[bucket]) buckets[bucket].hasMagnet = true;
+    });
+
+    const avg = (arr) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
+    const sorted = Object.entries(buckets)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([bucket, b]) => {
+        const avgVisc = avg(b.viscosities);
+        return {
+          time: formatBucket(bucket),
+          rpm: avg(b.rpms),
+          feed: avg(b.feeds),
+          mp4: avg(b.mp4s),
+          t_product_ir: avg(b.t_irs),
+          viscosity: avgVisc != null ? Math.round(avgVisc * 100) / 100 : null,
+          screenChange: (chartSeries.screenChange && b.hasScreen) ? avgVisc : null,
+          magnetCleaning: (chartSeries.magnetCleaning && b.hasMagnet) ? avgVisc : null,
+        };
+      });
     return sorted;
-  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings, chartSeries.screenChange, chartSeries.magnetCleaning, isMultiDay]);
+  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings, chartSeries.screenChange, chartSeries.magnetCleaning, isMultiDay, period]);
 
   const kpis = data?.kpis || {};
 
@@ -1286,7 +1345,8 @@ export default function ProductionDashboardPage() {
                       try {
                         const d = new Date(item.datetime);
                         const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-                        label = `${d.getDate()} ${months[d.getMonth()]}`;
+                        const useMonth = ["6m", "1y", "ytd"].includes(period);
+                        label = useMonth ? `${months[d.getMonth()]} ${d.getFullYear()}` : `${d.getDate()} ${months[d.getMonth()]}`;
                       } catch {}
                     }
                     acc.push({ ...item, label, cumWaste: prev + (parseFloat(item.waste) || 0) });
@@ -1659,7 +1719,7 @@ export default function ProductionDashboardPage() {
       )}
 
       {/* ── Machine Settings Analysis ── */}
-      <MachineAnalysisPanel />
+      <MachineAnalysisPanel fromDate={fromStr} toDate={toStr} period={period} />
 
       {/* ── Add Event Dialog ── */}
       <Dialog open={showAddEvent} onOpenChange={setShowAddEvent}>
