@@ -39,8 +39,8 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
     if (file.type.startsWith("image/")) {
       try {
         const compressed = await compressImage(file, { maxSizeMB: 1.5, maxWidthOrHeight: 2560, quality: 0.92 });
-        fileToSend = compressed;
-        console.log(`[PhotoCapture] Compressed: ${(file.size/1024).toFixed(0)}KB → ${(compressed.size/1024).toFixed(0)}KB`);
+        fileToSend = compressed.file;
+        console.log(`[PhotoCapture] Compressed: ${(file.size/1024).toFixed(0)}KB → ${(compressed.compressedSize/1024).toFixed(0)}KB`);
       } catch (e) {
         console.warn("[PhotoCapture] Compression failed, using original:", e);
       }
