@@ -2147,16 +2147,19 @@ export default function SettingsLogIngestionPage() {
       {stats && step === "list" && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <div className="bg-white border rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-slate-700">{stats.total_entries}</div>
+            <div className="text-lg font-bold text-slate-700">{stats.total_entries?.toLocaleString()}</div>
             <div className="text-[10px] text-slate-500">Total Log Entries</div>
           </div>
           <div className="bg-white border rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-blue-600">{stats.unique_assets}</div>
-            <div className="text-[10px] text-slate-500">Unique Assets</div>
+            <div className="text-lg font-bold text-blue-600">{stats.total_files?.toLocaleString() || 0}</div>
+            <div className="text-[10px] text-slate-500">Total Files</div>
           </div>
           <div className="bg-white border rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-green-600">{stats.jobs_completed}</div>
+            <div className="text-lg font-bold text-green-600">{stats.jobs_completed || 0}</div>
             <div className="text-[10px] text-slate-500">Jobs Completed</div>
+            {stats.jobs_pending > 0 && (
+              <div className="text-[10px] text-amber-600 mt-0.5">{stats.jobs_pending} pending</div>
+            )}
           </div>
           <div className="bg-white border rounded-lg p-3 text-center">
             <div className="flex justify-center gap-2 text-xs">

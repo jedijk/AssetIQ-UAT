@@ -1141,10 +1141,11 @@ async def list_jobs(
                 count = await db.production_logs.count_documents(
                     {"source.filename": {"$in": fnames}}
                 )
-                await db.log_ingestion_jobs.update_one(
-                    {"_id": job["_id"]},
-                    {"$set": {"status": "completed", "records_ingested": count}},
-                )
+                if count > 0:
+                    await db.log_ingestion_jobs.update_one(
+                        {"_id": job["_id"]},
+                        {"$set": {"status": "completed", "records_ingested": count}},
+                    )
 
     jobs = await db.log_ingestion_jobs.find(
         {}, {"_id": 0}
@@ -1685,6 +1686,10 @@ async def get_log_stats(
     # Jobs summary
     jobs_total = await db.log_ingestion_jobs.count_documents({})
     jobs_completed = await db.log_ingestion_jobs.count_documents({"status": "completed"})
+    jobs_pending = await db.log_ingestion_jobs.count_documents({"status": {"$in": ["uploaded", "previewed", "processing"]}})
+    total_files = 0
+    async for j in db.log_ingestion_jobs.find({}, {"total_files": 1, "_id": 0}):
+        total_files += j.get("total_files", 0)
 
     return {
         "total_entries": total,
@@ -1692,6 +1697,8 @@ async def get_log_stats(
         "events": {e["_id"]: e["count"] for e in events if e["_id"]},
         "jobs_total": jobs_total,
         "jobs_completed": jobs_completed,
+        "jobs_pending": jobs_pending,
+        "total_files": total_files,
     }
 
 
