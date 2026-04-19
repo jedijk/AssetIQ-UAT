@@ -109,22 +109,41 @@ def _normalize_column_name(name: str) -> str:
     return normalized
 
 
+def _tokenize_column(name: str) -> set:
+    """Split column name into lowercase word tokens for overlap matching."""
+    return set(re.findall(r'[a-z0-9]+', name.lower()))
+
+
+def _similarity_ratio(a: str, b: str) -> float:
+    """Simple character-level similarity ratio (0-1)."""
+    if not a or not b:
+        return 0.0
+    a_lower, b_lower = a.lower(), b.lower()
+    if a_lower == b_lower:
+        return 1.0
+    # Longest common subsequence ratio
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, a_lower, b_lower).ratio()
+
+
 def _fuzzy_match_columns(
     file_columns: List[str], 
     template_mapping: ColumnMapping,
     column_aliases: Dict[str, List[str]] = None
 ) -> Dict[str, str]:
     """
-    Match file columns to template columns using fuzzy matching.
+    Match file columns to template columns using relaxed fuzzy matching.
     Returns a mapping of {template_column: matched_file_column}.
     """
     column_aliases = column_aliases or {}
     
-    # Build a lookup of normalized names -> original file column names
-    file_col_lookup = {}
+    # Build lookups
+    file_col_lookup = {}       # normalized -> original
+    file_col_tokens = {}       # original -> token set
     for col in file_columns:
         norm = _normalize_column_name(col)
         file_col_lookup[norm] = col
+        file_col_tokens[col] = _tokenize_column(col)
         # Also try without common prefixes/suffixes
         for prefix in ['col_', 'field_', 'column_']:
             if norm.startswith(prefix):
@@ -153,10 +172,39 @@ def _fuzzy_match_columns(
             if norm_alias in file_col_lookup:
                 return file_col_lookup[norm_alias]
         
-        # 4. Fuzzy substring match (template col contains or is contained in file col)
+        # 4. Substring match (template col contains or is contained in file col)
         for norm_file, orig_file in file_col_lookup.items():
-            if norm_template in norm_file or norm_file in norm_template:
-                return orig_file
+            if len(norm_template) >= 2 and len(norm_file) >= 2:
+                if norm_template in norm_file or norm_file in norm_template:
+                    return orig_file
+
+        # 5. Token overlap — if most words match (e.g. "T Product IR" vs "T Prod IR")
+        template_tokens = _tokenize_column(template_col)
+        if template_tokens:
+            best_overlap = 0
+            best_col = None
+            for col in file_columns:
+                col_tokens = file_col_tokens.get(col, set())
+                if not col_tokens:
+                    continue
+                overlap = len(template_tokens & col_tokens)
+                min_len = min(len(template_tokens), len(col_tokens))
+                if min_len > 0 and overlap / min_len >= 0.5 and overlap > best_overlap:
+                    best_overlap = overlap
+                    best_col = col
+            if best_col and best_overlap >= 1:
+                return best_col
+
+        # 6. Similarity ratio — catch typos and minor variations (threshold 0.6)
+        best_ratio = 0
+        best_col = None
+        for norm_file, orig_file in file_col_lookup.items():
+            ratio = _similarity_ratio(norm_template, norm_file)
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_col = orig_file
+        if best_ratio >= 0.6 and best_col:
+            return best_col
                 
         return None
     
