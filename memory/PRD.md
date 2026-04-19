@@ -1,120 +1,82 @@
 # AssetIQ - Product Requirements Document
 
 ## Original Problem Statement
-Create a comprehensive asset management platform with:
-- Mobile landing page for field use
-- Universal Photo Data Capture with AI extraction
+Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset management with:
+- Mobile landing page, Universal Photo Data Capture
 - Cloudflare R2 file storage
-- Production Log Ingestion & History Builder
-- Equipment hierarchy management
-- Task scheduler and forms
+- Production Log Ingestion & History Builder (Bulk upload, parsing, MongoDB structured storage, asset history aggregation, dashboard)
+- Template Training Workflow for complex Excel parsing
+- Direct OpenAI SDK integration (user's own API keys)
 
-## Current Stack
-- **Frontend**: React + Shadcn/UI + Tailwind CSS
-- **Backend**: FastAPI (Python)
-- **Database**: MongoDB
+## Architecture
+- **Frontend**: React (Vite) + Shadcn/UI + Recharts + TailwindCSS
+- **Backend**: FastAPI + Motor (async MongoDB)
+- **Database**: MongoDB (collections: production_logs, log_parse_templates, form_submissions, equipment_nodes, production_events, etc.)
 - **Storage**: Cloudflare R2
-- **AI**: OpenAI GPT-4o (direct SDK - user's API keys)
+- **AI**: OpenAI GPT-4o / Whisper / Vision (user API keys)
+- **Email**: Resend
 
-## Completed Features
+## Core Features Implemented
 
-### Core Platform
-- [x] User authentication with JWT
-- [x] Role-based access control (owner, admin, user)
-- [x] Equipment hierarchy management
-- [x] Form builder with custom fields
-- [x] Task scheduler
-- [x] Mobile-friendly "Simple Mode"
+### Production Log Ingestion System (DONE)
+- Upload CSV/XLSX/ZIP files with drag-and-drop
+- Template Training System: save reusable parse templates with fuzzy column matching, skip_rows, header_metadata extraction, secondary_sheet merging
+- Complex Excel parsing: static asset IDs, specific cell metadata (row/col), secondary sheet joins (Mooney Viscosity from Sample List)
+- Batch ingest with template selection
+- CRUD endpoints: POST/GET/DELETE /api/production-logs/templates, POST /api/production-logs/batch-ingest
 
-### AI Integration
-- [x] AI Chat Assistant
-- [x] Universal Photo Data Capture with GPT-4o Vision
-- [x] AI-assisted log parsing
-- [x] Learning from user corrections
+### Log Ingestion Dashboard (DONE - Apr 19, 2026)
+- KPI Cards matching Production Dashboard: Total Input, Waste, Yield, Avg Mooney, RSD, Runtime
+- Merged Mooney Viscosity chart with toggleable overlays (RPM, Feed, MP4, T Product IR, Magnet Cleaning)
+- Separate Input Material card showing all entries
+- Production Log table (deduplicated, viscosity-preferred)
+- Date + shift time display at top
 
-### File Storage
-- [x] Cloudflare R2 integration
-- [x] Chunked file uploads (5 files per request)
-- [x] Folder/directory upload support
+### Production Dashboard Integration (DONE - Apr 19, 2026)
+- Ingested production_logs data automatically surfaces in the main AssetIQ Production Dashboard
+- When no form_submissions exist for a date, the dashboard falls back to production_logs collection
+- Full KPIs, viscosity chart, production log table, input material, magnet cleanings all render from ingested data
+- Backend deduplication: entries with mooney_viscosity preferred over duplicates without
 
-### Production Log Ingestion
-- [x] CSV/Excel/TXT file support
-- [x] Batch folder uploads
-- [x] Template-based parsing
-- [x] AI-assisted column mapping
-- [x] Asset history aggregation
-- [x] **Template Training System** (April 2026)
-  - Save column mappings as reusable templates
-  - Column aliases for fuzzy matching
-  - "Train once, apply to many" bulk workflow
-  - Match preview before processing
-- [x] **Time-only timestamp support** (April 2026)
-  - Parses time-only values (HH:MM:SS)
-  - Extracts base date from Excel header sections
-  - Combines date + time for full timestamps
+### Backend Deduplication (DONE - Apr 19, 2026)
+- GET /api/production-logs/entries aggregation pipeline groups by timestamp+asset_id
+- Entries with mooney_viscosity data are preferred ($addFields + $sort + $group)
+- Deduplicated count returned for pagination
 
-### Default Templates
-- [x] **Production Log - Daily Format**: For files like "Production Log 05-01-2026.xlsx"
-  - Skips 18 header rows
-  - Maps TIME, RPM, FEED, M%, ENERGY, MT1-3, MP1-4, CO2, IR
-  - 15 column aliases for flexibility
-
-### OpenAI Migration (April 2026)
-- [x] Migrated from emergentintegrations to official OpenAI SDK
-- [x] Configured OPENAI_API_KEY and OPENAI_VISION_KEY
-- [x] All AI endpoints verified working
-
-## Pending Tasks
-
-### P1 - High Priority
-1. **Report Generation** - PowerPoint/PDF reports for Causal Investigations
-2. **Offline Support** - Local storage for My Tasks execution
-
-### P2 - Medium Priority
-1. QR scan analytics dashboard
-
-### P3 - Low Priority / Refactoring
-1. Break down large components
-2. Advanced event detection rule engine
+### AI Features (DONE)
+- AI-powered column detection for log parsing
+- AI insights generation for production dashboard
+- Direct OpenAI SDK (no Emergent LLM key dependency)
 
 ## Key API Endpoints
+- POST /api/production-logs/templates (Create template)
+- GET /api/production-logs/templates (List templates)
+- DELETE /api/production-logs/templates/{template_id}
+- POST /api/production-logs/batch-ingest
+- POST /api/production-logs/batch-ingest-with-template
+- GET /api/production-logs/entries (deduplicated)
+- GET /api/production-logs/assets
+- GET /api/production-logs/stats
+- GET /api/production/dashboard (now includes ingested log fallback)
 
-### Template Management
-- `POST /api/production-logs/templates` - Save template
-- `GET /api/production-logs/templates` - List templates
-- `PUT/DELETE /api/production-logs/templates/{id}` - Update/delete
-- `POST /api/production-logs/batch-ingest-with-template` - Bulk ingest with template
-- `POST /api/production-logs/preview-template-match` - Preview column matching
+## Key DB Schema
+- `log_parse_templates`: {name, file_type, delimiter, skip_rows, base_date_location, header_metadata, secondary_sheet, column_mapping}
+- `production_logs`: {timestamp, asset_id, metrics, status, mooney_viscosity, input_material, supplier, lot_no, bag_no, total_waste, clean_magnet_status, clean_magnet_time, production_start_time, production_stop_time, sample_id}
 
-## Database Collections
+## Key Files
+- /app/backend/routes/production_logs.py (Template CRUD, Excel parsing, entries API)
+- /app/backend/routes/production.py (Production Dashboard with ingested data fallback)
+- /app/frontend/src/pages/SettingsLogIngestionPage.js (Full ingestion UI + dashboard)
+- /app/frontend/src/pages/ProductionDashboardPage.js (Main production dashboard)
 
-### log_parse_templates
-```json
-{
-  "id": "uuid",
-  "name": "Production Log - Daily Format",
-  "description": "For daily production log Excel files...",
-  "template": {
-    "delimiter": ",",
-    "has_header": true,
-    "skip_rows": 18,
-    "timestamp_format": "%H:%M:%S",
-    "column_mapping": {
-      "timestamp": "TIME",
-      "asset_id": null,
-      "status": "REMARKS",
-      "metric_columns": ["RPM", "FEED", "M%", "ENERGY", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR"]
-    }
-  },
-  "column_aliases": {
-    "TIME": ["Time", "TIMESTAMP", "DateTime"],
-    "RPM": ["rpm", "Speed", "Rotation"],
-    ...
-  },
-  "usage_count": 0,
-  "created_at": "ISO datetime"
-}
-```
+## Backlog (Prioritized)
+### P1
+- Report generation (PowerPoint/PDF) for Causal Investigations
+- Offline support with local storage for My Tasks execution
 
----
-*Last Updated: April 2026*
+### P2
+- QR scan analytics dashboard
+
+### P3
+- Break down large pages into modular components (SettingsLogIngestionPage.js ~2000 lines)
+- Advanced event detection rule engine for log ingestion
