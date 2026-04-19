@@ -960,7 +960,7 @@ export default function ProductionDashboardPage() {
     }
 
     // Multi-day: aggregate per day (1W, 1M, 3M) or per month (6M, 1Y, YTD)
-    const useMonthBucket = ["6m", "1y", "ytd"].includes(period);
+    const useMonthBucket = false; // Always show per-day data points
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
     const getBucket = (dt) => {
@@ -971,14 +971,12 @@ export default function ProductionDashboardPage() {
     };
 
     const formatBucket = (bucket) => {
-      if (useMonthBucket) {
-        // YYYY-MM → "Jan 2025"
-        const [y, m] = bucket.split("-");
-        return `${months[parseInt(m, 10) - 1]} ${y}`;
-      }
-      // YYYY-MM-DD → "5 Jan"
+      // YYYY-MM-DD → compact label based on period
       try {
         const d = new Date(bucket + "T12:00:00");
+        if (["6m", "1y", "ytd"].includes(period)) {
+          return `${d.getDate()} ${months[d.getMonth()].substring(0,3)}`;
+        }
         return `${d.getDate()} ${months[d.getMonth()]}`;
       } catch { return bucket; }
     };
