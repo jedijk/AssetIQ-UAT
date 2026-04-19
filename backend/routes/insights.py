@@ -273,6 +273,14 @@ async def get_data_quality_metrics(
                 total_task, crit_task, type_task, fmea_task
             )
             
+            # Calculate FMEA coverage: nodes that have equipment_type_id linked to at least one failure mode
+            fmea_linked_types = set(await db.failure_modes.distinct("equipment_type_ids"))
+            fmea_linked_types.discard(None)
+            fmea_linked_types.discard("")
+            assets_with_fmea = await db.equipment_nodes.count_documents({
+                "equipment_type_id": {"$in": list(fmea_linked_types)}
+            }) if fmea_linked_types else 0
+            
             if total == 0:
                 return {
                     "metrics": {"criticality_coverage": 0, "fmea_coverage": 0, "equipment_type_coverage": 0},
@@ -282,7 +290,7 @@ async def get_data_quality_metrics(
                 }
             
             crit_coverage = round((with_crit / total * 100), 1)
-            fmea_coverage = min(round((fmea_count / total * 100), 1), 100)
+            fmea_coverage = round((assets_with_fmea / total * 100), 1)
             type_coverage = round((with_type / total * 100), 1)
             overall_score = round((crit_coverage + fmea_coverage + type_coverage) / 3, 1)
             
@@ -302,8 +310,9 @@ async def get_data_quality_metrics(
                 "details": {
                     "total_assets": total,
                     "assets_with_criticality": with_crit,
-                    "assets_with_fmea": fmea_count,
-                    "assets_with_type": with_type
+                    "assets_with_fmea": assets_with_fmea,
+                    "assets_with_type": with_type,
+                    "total_failure_modes": fmea_count
                 },
                 "overall_score": overall_score,
                 "status": status
@@ -658,7 +667,14 @@ async def get_insights_summary(
             # Data completeness score
             if total_equipment > 0:
                 crit_pct = (equipment_with_criticality / total_equipment * 100)
-                fmea_pct = min((fmea_count / total_equipment * 100), 100)  # Cap at 100%
+                # FMEA coverage: nodes linked to at least one failure mode via equipment_type_ids
+                fmea_linked_types = set(await db.failure_modes.distinct("equipment_type_ids"))
+                fmea_linked_types.discard(None)
+                fmea_linked_types.discard("")
+                assets_with_fmea = await db.equipment_nodes.count_documents(
+                    {"equipment_type_id": {"$in": list(fmea_linked_types)}}
+                ) if fmea_linked_types else 0
+                fmea_pct = (assets_with_fmea / total_equipment * 100)
                 type_pct = (equipment_with_type / total_equipment * 100)
                 completeness_score = round((crit_pct + fmea_pct + type_pct) / 3, 1)
             else:
@@ -677,7 +693,7 @@ async def get_insights_summary(
             obs_without_actions_estimate = max(0, threats_count - actions_with_obs)
             
             # Count critical equipment without FMEA (simplified)
-            critical_equipment = await db.equipment.count_documents({
+            critical_equipment = await db.equipment_nodes.count_documents({
                 "$or": [
                     {"criticality": {"$in": ["high", "High", "critical", "Critical", "a", "A", "1"]}},
                     {"criticality_score": {"$gte": 8}}
