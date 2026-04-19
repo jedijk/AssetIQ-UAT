@@ -412,7 +412,8 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
                             logger.debug(f"[Excel Parse] Secondary sheet time {time_key}: {row_data}")
     else:
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
-        ws = wb.active
+        # Use first sheet by index (not active, which may be different)
+        ws = wb.worksheets[0]
         for row in ws.iter_rows(values_only=True):
             all_rows.append([str(c) if c is not None else "" for c in row])
         
@@ -1313,9 +1314,12 @@ async def batch_ingest_with_saved_template(
             "has_header": base_template.has_header,
             "skip_rows": base_template.skip_rows,
             "timestamp_format": base_template.timestamp_format,
+            "base_date_location": base_template.base_date_location,
+            "header_metadata": base_template.header_metadata,
+            "secondary_sheet": base_template.secondary_sheet,
             "column_mapping": {
                 "timestamp": matched_columns.get("timestamp"),
-                "asset_id": matched_columns.get("asset_id"),
+                "asset_id": base_template.column_mapping.asset_id,  # Keep original (may be static)
                 "status": matched_columns.get("status"),
                 "event_type": matched_columns.get("event_type"),
                 "metric_columns": matched_columns.get("metric_columns", []),
