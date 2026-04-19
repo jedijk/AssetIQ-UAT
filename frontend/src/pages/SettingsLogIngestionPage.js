@@ -19,7 +19,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "../lib/apiConfig";
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  Line, ComposedChart, ReferenceLine,
+  Line, ComposedChart, ReferenceLine, ReferenceArea,
 } from "recharts";
 
 const API = getBackendUrl();
@@ -1247,6 +1247,123 @@ function TemplatesPanel() {
 }
 
 
+// ======================== Merged Viscosity + Metrics Chart ========================
+
+const CHART_SERIES = [
+  { key: "rpm", label: "RPM", color: "#3b82f6" },
+  { key: "feed", label: "Feed", color: "#f97316" },
+  { key: "mp4", label: "MP4", color: "#14b8a6" },
+  { key: "t_product_ir", label: "T Product IR", color: "#ef4444" },
+  { key: "magnetCleaning", label: "Magnet Cleaning", color: "#ec4899" },
+];
+
+function MergedViscosityChart({ entries, selectedAsset }) {
+  const [activeSeries, setActiveSeries] = useState({ rpm: false, feed: false, mp4: false, t_product_ir: false, magnetCleaning: false });
+
+  const chartData = useMemo(() => {
+    return entries
+      .slice()
+      .sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''))
+      .map(e => {
+        const m = e.metrics || {};
+        const time = new Date(e.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const visc = e.mooney_viscosity ? parseFloat(e.mooney_viscosity) : null;
+        const hasMagnet = e.clean_magnet_status === 'DONE';
+        return {
+          time,
+          viscosity: visc,
+          rpm: typeof m['RPM'] === 'number' ? m['RPM'] : (parseFloat(m['RPM']) || null),
+          feed: typeof m['FEED'] === 'number' ? m['FEED'] : (parseFloat(m['FEED']) || null),
+          mp4: typeof m['MP4'] === 'number' ? m['MP4'] : (parseFloat(m['MP4']) || null),
+          t_product_ir: typeof m['T Product IR'] === 'number' ? m['T Product IR'] : (parseFloat(m['T Product IR']) || null),
+          magnetCleaning: hasMagnet ? visc : null,
+        };
+      });
+  }, [entries]);
+
+  const hasRightAxis = activeSeries.rpm || activeSeries.feed || activeSeries.mp4 || activeSeries.t_product_ir;
+
+  const viscValues = chartData.map(d => d.viscosity).filter(v => v != null);
+  const avgVisc = viscValues.length > 0 ? (viscValues.reduce((s, v) => s + v, 0) / viscValues.length).toFixed(1) : '0';
+
+  if (chartData.length === 0) return null;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="viscosity-chart">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+        <h3 className="text-sm font-semibold text-slate-700">Mooney Viscosity</h3>
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap" data-testid="chart-toggles">
+          {CHART_SERIES.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setActiveSeries(prev => ({ ...prev, [s.key]: !prev[s.key] }))}
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border transition-colors ${
+                activeSeries[s.key]
+                  ? "border-transparent text-white"
+                  : "border-slate-200 text-slate-500 bg-white hover:bg-slate-50"
+              }`}
+              style={activeSeries[s.key] ? { backgroundColor: s.color } : undefined}
+              data-testid={`toggle-${s.key}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: activeSeries[s.key] ? "#fff" : s.color }} />
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={300}>
+        <ComposedChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <ReferenceArea yAxisId="left" y1={50} y2={60} fill="#22c55e" fillOpacity={0.1} />
+          <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" interval="preserveStartEnd" />
+          <YAxis yAxisId="left" tick={{ fontSize: 10 }} stroke="#94a3b8" domain={[48, 62]} label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 10 }} />
+          {hasRightAxis && (
+            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} stroke="#94a3b8" />
+          )}
+          <Tooltip
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const d = payload[0]?.payload;
+              if (!d) return null;
+              return (
+                <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs min-w-[150px]">
+                  <p className="font-semibold text-slate-700 mb-1.5">{label}</p>
+                  {d.viscosity != null && (
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#8b5cf6]" /><span className="text-slate-600">Viscosity:</span><span className="font-medium text-slate-800">{d.viscosity} MU</span></div>
+                  )}
+                  {d.rpm != null && (
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#3b82f6]" /><span className="text-slate-600">RPM:</span><span className="font-medium text-slate-800">{d.rpm}</span></div>
+                  )}
+                  {d.feed != null && (
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#f97316]" /><span className="text-slate-600">Feed:</span><span className="font-medium text-slate-800">{d.feed} kg</span></div>
+                  )}
+                  {d.mp4 != null && (
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#14b8a6]" /><span className="text-slate-600">MP4:</span><span className="font-medium text-slate-800">{d.mp4}</span></div>
+                  )}
+                  {d.t_product_ir != null && (
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#ef4444]" /><span className="text-slate-600">T Product IR:</span><span className="font-medium text-slate-800">{d.t_product_ir}</span></div>
+                  )}
+                  {d.magnetCleaning != null && (
+                    <div className="flex items-center gap-2 mt-1"><span className="w-2 h-2 rounded-full bg-[#ec4899]" /><span className="text-ec4899 font-medium">Magnet Cleaned</span></div>
+                  )}
+                </div>
+              );
+            }}
+          />
+          <Legend wrapperStyle={{ fontSize: 10 }} />
+          <Line yAxisId="left" type="monotone" dataKey="viscosity" name="Viscosity (MU)" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 4, fill: "#8b5cf6" }} connectNulls activeDot={{ r: 6, stroke: "#7c3aed", strokeWidth: 2, fill: "#fff" }} />
+          {activeSeries.rpm && <Line yAxisId="right" type="monotone" dataKey="rpm" name="RPM" stroke="#3b82f6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+          {activeSeries.feed && <Line yAxisId="right" type="monotone" dataKey="feed" name="Feed (kg)" stroke="#f97316" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+          {activeSeries.mp4 && <Line yAxisId="right" type="monotone" dataKey="mp4" name="MP4" stroke="#14b8a6" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+          {activeSeries.t_product_ir && <Line yAxisId="right" type="monotone" dataKey="t_product_ir" name="T Product IR" stroke="#ef4444" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" connectNulls />}
+          {activeSeries.magnetCleaning && <Line yAxisId="left" type="monotone" dataKey="magnetCleaning" name="Magnet Cleaning" stroke="#ec4899" strokeWidth={0} dot={{ r: 6, fill: "#ec4899", strokeWidth: 2, stroke: "#fff" }} connectNulls={false} legendType="diamond" />}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+
 // ======================== Dashboard Component ========================
 
 function LogDashboard() {
@@ -1479,6 +1596,23 @@ function LogDashboard() {
               ))}
             </SelectContent>
           </Select>
+          {entries.length > 0 && (() => {
+            const timestamps = entries.map(e => e.timestamp).filter(Boolean).sort();
+            if (timestamps.length === 0) return null;
+            const d = new Date(timestamps[0]);
+            const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+            const dateStr = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+            const startTime = entries[0]?.production_start_time || '';
+            const stopTime = entries[0]?.production_stop_time || '';
+            const shift = startTime && stopTime ? `${startTime.slice(0,5)} – ${stopTime.slice(0,5)}` : '';
+            return (
+              <span className="text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-3 h-9 flex items-center tabular-nums whitespace-nowrap gap-2" data-testid="date-display">
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                {dateStr}
+                {shift && <span className="text-xs text-slate-400 ml-1">({shift})</span>}
+              </span>
+            );
+          })()}
         </div>
         <Button variant="outline" size="sm" onClick={runAggregation} disabled={aggregating} data-testid="run-aggregation-btn">
           {aggregating ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
@@ -1508,131 +1642,10 @@ function LogDashboard() {
         </div>
       )}
 
-      {/* Metrics Chart */}
-      {timeseries?.total_points > 0 ? (
+      {/* Merged Mooney Viscosity + Metrics Chart — matching Production Dashboard */}
+      {entries.length > 0 ? (
         <>
-          <Card>
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-blue-600" />
-                Metrics — {selectedAsset}
-                <span className="text-xs text-slate-400 font-normal ml-auto">{timeseries.total_points} data points</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <canvas ref={canvasRef} data-testid="metrics-chart" />
-            </CardContent>
-          </Card>
-
-          {/* Mooney Viscosity Chart — matching Production Dashboard style */}
-          {(() => {
-            const viscData = entries
-              .filter(e => e.mooney_viscosity)
-              .map(e => {
-                const time = new Date(e.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-                return {
-                  time,
-                  timestamp: e.timestamp,
-                  viscosity: parseFloat(e.mooney_viscosity),
-                  hasMagnetClean: e.clean_magnet_status === 'DONE',
-                };
-              })
-              .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-
-            // Extract unique magnet clean times from entries
-            const magnetCleanTimes = [...new Set(
-              entries
-                .filter(e => e.clean_magnet_status === 'DONE')
-                .map(e => new Date(e.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }))
-            )];
-
-            if (viscData.length === 0) return null;
-
-            const viscValues = viscData.map(d => d.viscosity);
-            const avgVisc = (viscValues.reduce((s, v) => s + v, 0) / viscValues.length).toFixed(1);
-            const minVisc = Math.min(...viscValues);
-            const maxVisc = Math.max(...viscValues);
-            const domainMin = Math.floor(minVisc - 2);
-            const domainMax = Math.ceil(maxVisc + 2);
-
-            return (
-              <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="viscosity-chart">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <FlaskConical className="w-4 h-4 text-purple-600" />
-                    Mooney Viscosity
-                  </h3>
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
-                    <span>Avg: <span className="font-semibold text-slate-700">{avgVisc} MU</span></span>
-                    <span>Range: <span className="font-semibold text-slate-700">{minVisc}–{maxVisc}</span></span>
-                    {magnetCleanTimes.length > 0 && (
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        Magnet Clean
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={viscData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                    <YAxis
-                      tick={{ fontSize: 11 }}
-                      stroke="#94a3b8"
-                      domain={[domainMin, domainMax]}
-                      label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 10 }}
-                    />
-                    <Tooltip
-                      content={({ active, payload, label }) => {
-                        if (!active || !payload?.length) return null;
-                        const d = payload[0]?.payload;
-                        return (
-                          <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs min-w-[140px]">
-                            <p className="font-semibold text-slate-700 mb-1">{label}</p>
-                            <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-[#8b5cf6]" />
-                              <span className="text-slate-600">Viscosity:</span>
-                              <span className="font-medium text-slate-800">{d.viscosity} MU</span>
-                            </div>
-                            {d.hasMagnetClean && (
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                <span className="text-emerald-700 font-medium">Magnet Cleaned</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    {/* Target range band 50-60 MU */}
-                    <Line
-                      type="monotone"
-                      dataKey="viscosity"
-                      name="Viscosity (MU)"
-                      stroke="#8b5cf6"
-                      strokeWidth={2.5}
-                      dot={(props) => {
-                        const d = props.payload;
-                        if (d.hasMagnetClean) {
-                          return (
-                            <g key={props.key}>
-                              <circle cx={props.cx} cy={props.cy} r={6} fill="#8b5cf6" stroke="#fff" strokeWidth={2} />
-                              <circle cx={props.cx} cy={props.cy - 14} r={5} fill="#10b981" stroke="#fff" strokeWidth={1.5} />
-                              <text x={props.cx} y={props.cy - 11} textAnchor="middle" fontSize={7} fill="#fff" fontWeight="bold">M</text>
-                            </g>
-                          );
-                        }
-                        return <circle key={props.key} cx={props.cx} cy={props.cy} r={4} fill="#8b5cf6" />;
-                      }}
-                      activeDot={{ r: 6, stroke: "#7c3aed", strokeWidth: 2, fill: "#fff" }}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            );
-          })()}
+          <MergedViscosityChart entries={entries} selectedAsset={selectedAsset} />
 
           {/* Input Material card — separate from production log, matching Production Dashboard */}
           {(() => {
