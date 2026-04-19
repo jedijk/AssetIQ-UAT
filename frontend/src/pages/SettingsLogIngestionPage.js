@@ -1520,18 +1520,6 @@ function LogDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Activity className="w-4 h-4 text-red-600" />
-                Events Timeline — {selectedAsset}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <canvas ref={eventBarRef} data-testid="events-chart" />
-            </CardContent>
-          </Card>
-
           {/* Data Table Toggle */}
           <Card>
             <CardHeader className="py-3 px-4">
@@ -1567,8 +1555,7 @@ function LogDashboard() {
                       <thead className="bg-slate-50 sticky top-0">
                         <tr>
                           <th className="px-3 py-2 text-left font-medium text-slate-600">Timestamp</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Status</th>
-                          {entries[0]?.metrics && Object.keys(entries[0].metrics).slice(0, 8).map(k => (
+                          {entries[0]?.metrics && Object.keys(entries[0].metrics).slice(0, 10).map(k => (
                             <th key={k} className="px-3 py-2 text-left font-medium text-slate-600 whitespace-nowrap">{k}</th>
                           ))}
                         </tr>
@@ -1579,21 +1566,20 @@ function LogDashboard() {
                             <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
                               {new Date(e.timestamp).toLocaleString()}
                             </td>
-                            <td className="px-3 py-2">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                e.event_type === 'downtime' ? 'bg-red-100 text-red-700' :
-                                e.event_type === 'alarm' ? 'bg-amber-100 text-amber-700' :
-                                e.event_type === 'waste' ? 'bg-orange-100 text-orange-700' :
-                                'bg-green-100 text-green-700'
-                              }`}>
-                                {e.event_type || 'normal'}
-                              </span>
-                            </td>
-                            {e.metrics && Object.keys(entries[0].metrics).slice(0, 8).map(k => (
-                              <td key={k} className="px-3 py-2 text-slate-600 whitespace-nowrap">
-                                {typeof e.metrics[k] === 'number' ? e.metrics[k].toFixed(2) : e.metrics[k] || '-'}
-                              </td>
-                            ))}
+                            {e.metrics && Object.keys(entries[0].metrics).slice(0, 10).map(k => {
+                              let val = e.metrics[k];
+                              // Convert M% from decimal to percentage
+                              if (k === 'M%' && typeof val === 'number') {
+                                val = (val * 100).toFixed(1) + '%';
+                              } else if (typeof val === 'number') {
+                                val = val.toFixed(2);
+                              }
+                              return (
+                                <td key={k} className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                  {val || '-'}
+                                </td>
+                              );
+                            })}
                           </tr>
                         ))}
                       </tbody>
