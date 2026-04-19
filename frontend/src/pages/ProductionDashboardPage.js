@@ -745,13 +745,14 @@ export default function ProductionDashboardPage() {
         XLSX.utils.book_append_sheet(wb, wsKpi, "KPIs");
 
         // Sheet 2: Production Log
-        const logHeader = ["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By"];
+        const logHeader = ["#", "Date", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By"];
         const logRows = [logHeader];
         const viscMap = {};
         (data.viscosity_series || []).forEach((v) => { if (v.time) viscMap[v.time] = v.viscosity; });
         (data.production_log || []).forEach((e, i) => {
+          const dateStr = e.datetime ? new Date(e.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : '';
           logRows.push([
-            i + 1, e.time, e.rpm, e.feed, e.moisture, e.energy,
+            i + 1, dateStr, e.time, e.rpm, e.feed, e.moisture, e.energy,
             e.mt1, e.mt2, e.mt3, e.mp1, e.mp2, e.mp3, e.mp4,
             e.co2_feed_p, e.t_product_ir,
             viscMap[e.time] !== undefined ? viscMap[e.time] : "TBD",
@@ -1620,7 +1621,7 @@ export default function ProductionDashboardPage() {
                 <table className="w-full text-sm" data-testid="production-log-table">
                   <thead>
                     <tr className="border-b border-slate-200">
-                      {["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By", ""].map((h) => (
+                      {["#", "Date", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By", ""].map((h) => (
                         <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap">
                           {h}
                         </th>
@@ -1648,6 +1649,7 @@ export default function ProductionDashboardPage() {
                           ref={isHighlighted ? (el) => el?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined}
                         >
                           <td className="py-2 px-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
+                          <td className="py-2 px-2 text-slate-500 text-xs tabular-nums whitespace-nowrap">{entry.datetime ? new Date(entry.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'}) : ''}</td>
                           <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{entry.time}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.rpm}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.feed}</td>
