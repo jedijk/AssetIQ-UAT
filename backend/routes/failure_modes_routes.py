@@ -358,8 +358,8 @@ class FailureModeCreate(BaseModel):
     failure_mode_type: Optional[str] = None  # "generic" or "customer_specific"
     # New fields
     process: Optional[str] = None  # Process area
-    potential_effects: Optional[str] = None  # Potential effects of failure mode
-    potential_causes: Optional[str] = None  # Potential cause of failure mode
+    potential_effects: Optional[Any] = None  # Potential effects of failure mode (string or list)
+    potential_causes: Optional[Any] = None  # Potential cause of failure mode (string or list)
     iso14224_mechanism: Optional[str] = None  # ISO 14224 failure mechanism
 
     model_config = {"extra": "ignore"}
