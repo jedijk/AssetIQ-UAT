@@ -149,16 +149,36 @@ function MachineAnalysisPanel({ fromDate, toDate, period }) {
   };
 
   const opt = analysis?.optimal_settings || {};
-  const rangeLabel = analysisRange ? `${analysisRange.start} — ${analysisRange.end}` : (fromDate === toDate ? fromDate : `${fromDate} — ${toDate}`);
+
+  const fmtDate = (d) => {
+    if (!d || d === 'all') return '';
+    try { return new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+    catch { return d; }
+  };
+  const rangeBadge = (() => {
+    const r = analysisRange || (fromDate && toDate ? { start: fromDate, end: toDate } : null);
+    if (!r) return null;
+    const s = fmtDate(r.start);
+    const e = fmtDate(r.end);
+    if (s && e && s !== e) return `${s} — ${e}`;
+    if (s) return s;
+    return null;
+  })();
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5" data-testid="machine-analysis">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-          <Brain className="w-4 h-4 text-indigo-600" />
-          AI Machine Settings Analysis
-          {analysis && <Badge variant="secondary" className="text-[10px] font-normal">{periodLabel}</Badge>}
-        </h3>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+            <Brain className="w-4 h-4 text-indigo-600" />
+            AI Machine Settings Analysis
+          </h3>
+          {analysis && rangeBadge && (
+            <Badge className="bg-indigo-100 text-indigo-700 text-[10px] font-medium border-0" data-testid="analysis-date-range">
+              {rangeBadge}
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {createdAt && (
             <span className="text-[10px] text-slate-400">
