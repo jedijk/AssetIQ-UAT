@@ -48,7 +48,7 @@ import { useEffect } from "react";
 import "./App.css";
 
 // Current frontend version - update with each release
-const APP_VERSION = "3.4.6";
+const APP_VERSION = "3.5.0";
 
 // Version check hook - compares frontend version with backend
 const useVersionCheck = () => {
