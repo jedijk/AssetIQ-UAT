@@ -496,9 +496,21 @@ async def get_production_dashboard(
                     "feed": feed_val, "rpm": rpm,
                 })
 
-                # Magnet cleaning
-                if entry.get("clean_magnet_status") == "DONE":
+                # Magnet cleaning — detect from clean_magnet_status or clean_magnet_time
+                magnet_status = str(entry.get("clean_magnet_status") or "").strip().lower()
+                magnet_time_val = entry.get("clean_magnet_time")
+                has_magnet = (
+                    magnet_status in ("done", "ok", "yes")
+                    or (magnet_status and ":" in magnet_status)  # time value like "06:30:00"
+                    or (magnet_time_val and str(magnet_time_val).strip())
+                )
+                if has_magnet:
                     magnet_subs.append({"_parsed_time": datetime.fromisoformat(ts) if ts else None})
+
+                # Screen changes — detect from status/remarks text
+                status_text = str(entry.get("status") or "").lower()
+                if "screen" in status_text and "change" in status_text:
+                    screen_change_subs.append({"_parsed_time": datetime.fromisoformat(ts) if ts else None})
 
                 # Input material → big bag entries
                 if entry.get("input_material"):
