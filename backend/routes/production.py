@@ -429,7 +429,10 @@ async def get_production_dashboard(
                 try: rpm = float(m.get("RPM", 0) or 0)
                 except: pass
                 moisture = 0
-                try: moisture = float(m.get("M%", 0) or 0)
+                try:
+                    moisture = float(m.get("M%", 0) or 0)
+                    if 0 < moisture < 1:
+                        moisture = round(moisture * 100, 1)
                 except: pass
                 energy = 0
                 try: energy = float(m.get("ENERGY", 0) or 0)

@@ -1998,7 +1998,9 @@ function LogDashboard() {
                           };
                           const formatPercent = (val) => {
                             if (val === null || val === undefined || val === '') return <span className="text-slate-300">—</span>;
-                            if (typeof val === 'number') return (val * 100).toFixed(1);
+                            if (typeof val === 'number') return val < 1 ? (val * 100).toFixed(1) : val.toFixed(1);
+                            const num = parseFloat(val);
+                            if (!isNaN(num)) return num < 1 ? (num * 100).toFixed(1) : num.toFixed(1);
                             return val;
                           };
                           const time = new Date(e.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
