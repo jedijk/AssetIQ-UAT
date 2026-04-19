@@ -4,7 +4,7 @@ import {
   ArrowLeft, Upload, FileText, Loader2, CheckCircle2, XCircle, AlertCircle,
   Trash2, ChevronRight, Database, Settings, RefreshCw, Play, Eye, X,
   FileSpreadsheet, Clock, Activity, FolderOpen, BarChart3, Sparkles, TrendingUp,
-  CheckSquare, Square, Save, BookOpen, Copy, Check, AlertTriangle, FlaskConical
+  CheckSquare, Square, Save, BookOpen, Copy, Check, AlertTriangle, FlaskConical, Package, Sigma
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -1620,27 +1620,102 @@ function LogDashboard() {
         </Button>
       </div>
 
-      {/* Stats summary */}
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white border rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-slate-700">{stats.total_entries?.toLocaleString()}</div>
-            <div className="text-[10px] text-slate-500">Log Entries</div>
+      {/* KPI Cards — matching Production Dashboard */}
+      {entries.length > 0 && (() => {
+        const viscValues = entries.map(e => parseFloat(e.mooney_viscosity)).filter(v => !isNaN(v));
+        const feedValues = entries.map(e => parseFloat(e.metrics?.['FEED'])).filter(v => !isNaN(v));
+        const totalInput = feedValues.reduce((s, v) => s + v, 0);
+        const wasteVal = parseFloat(entries[0]?.total_waste) || 0;
+        const wastePct = totalInput > 0 ? ((wasteVal / totalInput) * 100).toFixed(1) : 0;
+        const yieldPct = totalInput > 0 ? (((totalInput - wasteVal) / totalInput) * 100).toFixed(1) : 0;
+        const avgVisc = viscValues.length > 0 ? (viscValues.reduce((s, v) => s + v, 0) / viscValues.length).toFixed(1) : '0';
+        const minVisc = viscValues.length > 0 ? Math.min(...viscValues).toFixed(1) : '0';
+        const maxVisc = viscValues.length > 0 ? Math.max(...viscValues).toFixed(1) : '0';
+        const mean = viscValues.length > 0 ? viscValues.reduce((s, v) => s + v, 0) / viscValues.length : 0;
+        const stdDev = viscValues.length > 1 ? Math.sqrt(viscValues.reduce((s, v) => s + (v - mean) ** 2, 0) / (viscValues.length - 1)) : 0;
+        const rsd = mean > 0 ? ((stdDev / mean) * 100).toFixed(1) : '0';
+        const startTime = entries[0]?.production_start_time || '';
+        const stopTime = entries[0]?.production_stop_time || '';
+        let runtimeHours = '0';
+        if (startTime && stopTime) {
+          const [sh, sm] = startTime.split(':').map(Number);
+          const [eh, em] = stopTime.split(':').map(Number);
+          runtimeHours = ((eh * 60 + em - sh * 60 - sm) / 60).toFixed(0);
+        }
+        const lotInfo = entries[0]?.lot_no ? `Lot: ${entries[0].lot_no}` : '';
+
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" data-testid="kpi-grid">
+            <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-1.5 min-w-0" data-testid="kpi-total-input">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-50 text-blue-600"><Package className="w-4 h-4" /></div>
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Input</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">{totalInput.toLocaleString()}</span>
+                <span className="text-sm text-slate-500">kg</span>
+              </div>
+              {lotInfo && <p className="text-xs text-slate-500 truncate">{lotInfo}</p>}
+              <p className="text-xs text-slate-400 truncate">{entries.length} samples</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-1.5 min-w-0" data-testid="kpi-waste">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-50 text-red-500"><Trash2 className="w-4 h-4" /></div>
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Waste</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">{wasteVal.toLocaleString()}</span>
+                <span className="text-sm text-slate-500">kg</span>
+              </div>
+              <p className="text-xs text-slate-500 truncate">{wastePct}% of input</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-1.5 min-w-0" data-testid="kpi-yield">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-50 text-emerald-600"><TrendingUp className="w-4 h-4" /></div>
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Yield</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">{yieldPct}</span>
+                <span className="text-sm text-slate-500">%</span>
+              </div>
+              <p className="text-xs text-slate-500 truncate">Target: 92%</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-1.5 min-w-0" data-testid="kpi-avg-mooney">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-50 text-purple-600"><FlaskConical className="w-4 h-4" /></div>
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Avg Mooney</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">{avgVisc}</span>
+                <span className="text-sm text-slate-500">MU</span>
+              </div>
+              <p className="text-xs text-slate-500 truncate">Range: {minVisc}–{maxVisc}</p>
+              <p className="text-xs text-slate-400 truncate">{viscValues.length} samples</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-1.5 min-w-0" data-testid="kpi-rsd">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-50 text-amber-600"><Sigma className="w-4 h-4" /></div>
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">RSD</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">{rsd}</span>
+                <span className="text-sm text-slate-500">%</span>
+              </div>
+              <p className="text-xs text-slate-500 truncate">Target: &lt; 7</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-1.5 min-w-0" data-testid="kpi-runtime">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 text-slate-600"><Clock className="w-4 h-4" /></div>
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Runtime</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">{runtimeHours}</span>
+                <span className="text-sm text-slate-500">hours</span>
+              </div>
+            </div>
           </div>
-          <div className="bg-white border rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-blue-600">{stats.unique_assets}</div>
-            <div className="text-[10px] text-slate-500">Assets</div>
-          </div>
-          <div className="bg-white border rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-red-600">{stats.events?.downtime || 0}</div>
-            <div className="text-[10px] text-slate-500">Downtime Events</div>
-          </div>
-          <div className="bg-white border rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-amber-600">{stats.events?.alarm || 0}</div>
-            <div className="text-[10px] text-slate-500">Alarms</div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Merged Mooney Viscosity + Metrics Chart — matching Production Dashboard */}
       {entries.length > 0 ? (
