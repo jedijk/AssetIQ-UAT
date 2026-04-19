@@ -205,7 +205,7 @@ function UploadStep({ onUploaded }) {
   );
 }
 
-function ConfigureStep({ jobId, onPreview, onBack }) {
+function ConfigureStep({ jobId, onPreview, onBack, onIngestDone }) {
   const [loading, setLoading] = useState(true);
   const [columns, setColumns] = useState([]);
   const [sampleRows, setSampleRows] = useState([]);
@@ -216,6 +216,27 @@ function ConfigureStep({ jobId, onPreview, onBack }) {
   const [skipRows, setSkipRows] = useState(0);
   const [mapping, setMapping] = useState({ timestamp: "", asset_id: "", status: "", metric_columns: [] });
   const [previewing, setPreviewing] = useState(false);
+
+  // Template selection
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  const [ingestingWithTemplate, setIngestingWithTemplate] = useState(false);
+  const [matchPreview, setMatchPreview] = useState(null);
+  const [previewingMatch, setPreviewingMatch] = useState(false);
+
+  // Fetch templates on mount
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const res = await fetch(`${API}/api/production-logs/templates`, { headers: getHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          setTemplates(data.templates || []);
+        }
+      } catch {}
+    };
+    fetchTemplates();
+  }, []);
 
   const detectColumns = useCallback(async () => {
     setLoading(true);
@@ -332,8 +353,108 @@ function ConfigureStep({ jobId, onPreview, onBack }) {
 
   const unmappedCols = columns.filter(c => c !== mapping.timestamp && c !== mapping.asset_id && c !== mapping.status);
 
+  const handleIngestWithTemplate = async () => {
+    if (!selectedTemplateId) { toast.error("Select a template"); return; }
+    setIngestingWithTemplate(true);
+    try {
+      const res = await fetch(`${API}/api/production-logs/batch-ingest-with-template`, {
+        method: "POST",
+        headers: { ...getHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ job_ids: [jobId], template_id: selectedTemplateId }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Ingest failed"); }
+      const data = await res.json();
+      toast.success(`Ingestion started with template "${data.template_name}"`);
+      onIngestDone?.();
+    } catch (err) { toast.error(err.message); }
+    finally { setIngestingWithTemplate(false); }
+  };
+
+  const handlePreviewMatch = async () => {
+    if (!selectedTemplateId) return;
+    setPreviewingMatch(true);
+    try {
+      const fd = new FormData();
+      fd.append("job_id", jobId);
+      fd.append("template_id", selectedTemplateId);
+      const res = await fetch(`${API}/api/production-logs/preview-template-match`, {
+        method: "POST", headers: getHeaders(), body: fd,
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Preview failed"); }
+      setMatchPreview(await res.json());
+    } catch (err) { toast.error(err.message); }
+    finally { setPreviewingMatch(false); }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Template Quick Ingest */}
+      {templates.length > 0 && (
+        <Card className="border-green-200 bg-green-50/30">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-green-600" />
+              Quick Ingest with Template
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 space-y-3">
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <Label className="text-xs text-slate-500">Select Template</Label>
+                <Select value={selectedTemplateId || undefined} onValueChange={(v) => { setSelectedTemplateId(v); setMatchPreview(null); }}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="template-select">
+                    <SelectValue placeholder="Choose a saved template..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name} {t.usage_count > 0 && <span className="text-slate-400 ml-1">(used {t.usage_count}x)</span>}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedTemplateId && (
+                <Button variant="outline" size="sm" onClick={handlePreviewMatch} disabled={previewingMatch} className="h-9 text-xs">
+                  {previewingMatch ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Eye className="w-3 h-3 mr-1" />}
+                  Preview
+                </Button>
+              )}
+              <Button size="sm" onClick={handleIngestWithTemplate} disabled={!selectedTemplateId || ingestingWithTemplate}
+                className="h-9 bg-green-600 hover:bg-green-700" data-testid="template-ingest-btn">
+                {ingestingWithTemplate ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Play className="w-3.5 h-3.5 mr-1" />}
+                Ingest with Template
+              </Button>
+            </div>
+            {matchPreview && (
+              <div className="border rounded-lg p-3 bg-white space-y-2">
+                <div className="flex items-center gap-2">
+                  {matchPreview.all_matched ? (
+                    <Badge className="bg-green-100 text-green-700 text-xs"><Check className="w-3 h-3 mr-1" /> All columns matched</Badge>
+                  ) : (
+                    <Badge className="bg-amber-100 text-amber-700 text-xs"><AlertTriangle className="w-3 h-3 mr-1" /> Some columns may not match</Badge>
+                  )}
+                </div>
+                <div className="text-xs space-y-1">
+                  {matchPreview.match_details?.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${d.success ? "bg-green-500" : "bg-red-500"}`} />
+                      <span className="text-slate-600">{d.field}:</span>
+                      <span className="font-mono text-slate-800">{d.template_column}</span>
+                      <ChevronRight className="w-3 h-3 text-slate-400" />
+                      <span className={`font-mono ${d.success ? "text-green-700" : "text-red-600"}`}>
+                        {d.matched_to || "NOT FOUND"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-slate-400">Or configure manually below</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Parser settings */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div>
@@ -2193,6 +2314,7 @@ export default function SettingsLogIngestionPage() {
           jobId={activeJobId}
           onPreview={(data) => { setPreviewData(data); setStep("preview"); }}
           onBack={() => setStep("list")}
+          onIngestDone={() => { setStep("list"); setActiveJobId(null); setShowCompleted(false); fetchJobs(); fetchStats(); }}
         />
       )}
 
