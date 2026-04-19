@@ -324,8 +324,14 @@ def _parse_csv_content(content: str, template: ParseTemplate) -> List[dict]:
             if mapping.timestamp:
                 record["_errors"] = record.get("_errors", []) + ["Missing timestamp"]
 
-        # Map asset_id
-        record["asset_id"] = row_dict.get(mapping.asset_id, "").strip() if mapping.asset_id else None
+        # Map asset_id - support static values with "__static:" prefix
+        if mapping.asset_id:
+            if mapping.asset_id.startswith("__static:"):
+                record["asset_id"] = mapping.asset_id.replace("__static:", "")
+            else:
+                record["asset_id"] = row_dict.get(mapping.asset_id, "").strip()
+        else:
+            record["asset_id"] = None
 
         # Map status
         record["status"] = row_dict.get(mapping.status, "").strip() if mapping.status else None
@@ -439,7 +445,17 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
             if mapping.timestamp:
                 record["_errors"] = record.get("_errors", []) + ["Missing timestamp"]
 
-        record["asset_id"] = row_dict.get(mapping.asset_id, "").strip() if mapping.asset_id else None
+        # Handle asset_id - support static values with "__static:" prefix
+        if mapping.asset_id:
+            if mapping.asset_id.startswith("__static:"):
+                # Static asset ID for all records
+                record["asset_id"] = mapping.asset_id.replace("__static:", "")
+            else:
+                # Dynamic asset ID from column
+                record["asset_id"] = row_dict.get(mapping.asset_id, "").strip()
+        else:
+            record["asset_id"] = None
+            
         record["status"] = row_dict.get(mapping.status, "").strip() if mapping.status else None
 
         if mapping.event_type and row_dict.get(mapping.event_type):
