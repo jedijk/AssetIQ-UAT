@@ -1953,6 +1953,17 @@ export default function SettingsLogIngestionPage() {
 
   useEffect(() => { if (isOwner) { fetchJobs(); fetchStats(); } else { setJobsLoading(false); } }, [isOwner, fetchJobs, fetchStats]);
 
+  // Auto-refresh while any jobs are processing
+  useEffect(() => {
+    const hasProcessing = jobs.some(j => j.status === "processing");
+    if (!hasProcessing) return;
+    const interval = setInterval(() => {
+      fetchJobs();
+      fetchStats();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [jobs, fetchJobs, fetchStats]);
+
   const deleteJob = async (jobId) => {
     if (!window.confirm("Delete this job and all its ingested data?")) return;
     try {
@@ -2040,6 +2051,12 @@ export default function SettingsLogIngestionPage() {
                 className="bg-green-600 hover:bg-green-700" data-testid="batch-ingest-btn">
                 <Play className="w-4 h-4 mr-2" /> Batch Parse & Ingest ({selectedJobs.size} jobs)
               </Button>
+            )}
+            {jobs.some(j => j.status === "processing") && (
+              <span className="flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full" data-testid="processing-indicator">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Processing... auto-refreshing
+              </span>
             )}
           </div>
 
@@ -2184,7 +2201,7 @@ export default function SettingsLogIngestionPage() {
         <PreviewStep
           jobId={activeJobId}
           previewData={previewData}
-          onIngest={() => { setStep("list"); setActiveJobId(null); setPreviewData(null); fetchJobs(); fetchStats(); }}
+          onIngest={() => { setStep("list"); setActiveJobId(null); setPreviewData(null); setShowCompleted(false); fetchJobs(); fetchStats(); }}
           onBack={() => setStep("configure")}
         />
       )}
@@ -2194,7 +2211,7 @@ export default function SettingsLogIngestionPage() {
         <BatchConfigureStep
           jobIds={[...selectedJobs]}
           jobs={jobs.filter(j => selectedJobs.has(j.id))}
-          onDone={() => { setStep("list"); setSelectedJobs(new Set()); fetchJobs(); fetchStats(); }}
+          onDone={() => { setStep("list"); setSelectedJobs(new Set()); setShowCompleted(false); fetchJobs(); fetchStats(); }}
           onBack={() => setStep("list")}
         />
       )}
