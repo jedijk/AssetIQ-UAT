@@ -368,6 +368,8 @@ const EventCard = ({ event }) => (
 // ──────────────────────────────────────────
 // Custom chart tooltip
 // ──────────────────────────────────────────
+const fmt1 = (v) => (typeof v === 'number' ? v.toFixed(1) : v);
+
 const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -377,7 +379,7 @@ const ChartTooltip = ({ active, payload, label }) => {
         <div key={i} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
           <span className="text-slate-600">{entry.name}:</span>
-          <span className="font-medium text-slate-800">{entry.value}</span>
+          <span className="font-medium text-slate-800">{fmt1(entry.value)}</span>
         </div>
       ))}
     </div>
@@ -393,19 +395,19 @@ const ViscosityTooltip = ({ active, payload, label }) => {
     <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs min-w-[150px]">
       <p className="font-semibold text-slate-700 mb-1.5">{label}</p>
       {d.viscosity != null && (
-        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#8b5cf6]" /><span className="text-slate-600">Viscosity:</span><span className="font-medium text-slate-800">{d.viscosity} MU</span></div>
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#8b5cf6]" /><span className="text-slate-600">Viscosity:</span><span className="font-medium text-slate-800">{fmt1(d.viscosity)} MU</span></div>
       )}
       {d.rpm != null && (
-        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#3b82f6]" /><span className="text-slate-600">RPM:</span><span className="font-medium text-slate-800">{d.rpm}</span></div>
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#3b82f6]" /><span className="text-slate-600">RPM:</span><span className="font-medium text-slate-800">{fmt1(d.rpm)}</span></div>
       )}
       {d.feed != null && (
-        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#f97316]" /><span className="text-slate-600">Feed:</span><span className="font-medium text-slate-800">{d.feed} kg</span></div>
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#f97316]" /><span className="text-slate-600">Feed:</span><span className="font-medium text-slate-800">{fmt1(d.feed)} kg</span></div>
       )}
       {d.mp4 != null && (
-        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#14b8a6]" /><span className="text-slate-600">MP4:</span><span className="font-medium text-slate-800">{d.mp4}</span></div>
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#14b8a6]" /><span className="text-slate-600">MP4:</span><span className="font-medium text-slate-800">{fmt1(d.mp4)}</span></div>
       )}
       {d.t_product_ir != null && (
-        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#ef4444]" /><span className="text-slate-600">T Product IR:</span><span className="font-medium text-slate-800">{d.t_product_ir}</span></div>
+        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#ef4444]" /><span className="text-slate-600">T Product IR:</span><span className="font-medium text-slate-800">{fmt1(d.t_product_ir)}</span></div>
       )}
     </div>
   );
