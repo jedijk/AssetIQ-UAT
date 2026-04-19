@@ -1930,6 +1930,7 @@ export default function SettingsLogIngestionPage() {
   const [activeJobId, setActiveJobId] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const [selectedJobs, setSelectedJobs] = useState(new Set());
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const isOwner = user?.role === "owner";
 
@@ -2052,27 +2053,60 @@ export default function SettingsLogIngestionPage() {
                 <p className="text-xs text-slate-400 mt-1">Upload production logs to get started</p>
               </CardContent>
             </Card>
-          ) : (
+          ) : (() => {
+            const pendingJobs = jobs.filter(j => j.status !== "completed");
+            const completedJobs = jobs.filter(j => j.status === "completed");
+            const visibleJobs = showCompleted ? jobs : pendingJobs;
+            return (
             <div className="space-y-2">
-              {/* Select all uploaded */}
-              {jobs.some(j => j.status === "uploaded" || j.status === "previewed") && (
-                <div className="flex items-center gap-2 px-1">
-                  <button
-                    className="text-xs text-blue-600 hover:underline"
-                    onClick={() => {
-                      const uploadedIds = jobs.filter(j => j.status === "uploaded" || j.status === "previewed").map(j => j.id);
-                      setSelectedJobs(prev => {
-                        const allSelected = uploadedIds.every(id => prev.has(id));
-                        if (allSelected) return new Set();
-                        return new Set(uploadedIds);
-                      });
-                    }}>
-                    {jobs.filter(j => j.status === "uploaded" || j.status === "previewed").every(j => selectedJobs.has(j.id))
-                      ? "Deselect All" : "Select All Pending"}
-                  </button>
+              {/* Filter bar */}
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  {/* Select all uploaded */}
+                  {visibleJobs.some(j => j.status === "uploaded" || j.status === "previewed") && (
+                    <button
+                      className="text-xs text-blue-600 hover:underline"
+                      onClick={() => {
+                        const uploadedIds = visibleJobs.filter(j => j.status === "uploaded" || j.status === "previewed").map(j => j.id);
+                        setSelectedJobs(prev => {
+                          const allSelected = uploadedIds.every(id => prev.has(id));
+                          if (allSelected) return new Set();
+                          return new Set(uploadedIds);
+                        });
+                      }}>
+                      {visibleJobs.filter(j => j.status === "uploaded" || j.status === "previewed").every(j => selectedJobs.has(j.id))
+                        ? "Deselect All" : "Select All Pending"}
+                    </button>
+                  )}
                 </div>
-              )}
-              {jobs.map(job => {
+                <div className="flex items-center gap-3">
+                  {pendingJobs.length > 0 && (
+                    <span className="text-xs text-slate-500">{pendingJobs.length} pending</span>
+                  )}
+                  {completedJobs.length > 0 && (
+                    <button
+                      className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
+                      onClick={() => setShowCompleted(!showCompleted)}
+                      data-testid="toggle-completed-jobs"
+                    >
+                      {showCompleted ? <Eye className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      {showCompleted ? `Hide ${completedJobs.length} completed` : `Show ${completedJobs.length} completed`}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {visibleJobs.length === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <CheckCircle2 className="w-10 h-10 text-green-300 mx-auto mb-2" />
+                    <p className="text-sm text-slate-500">All files have been imported</p>
+                    <button className="text-xs text-blue-600 hover:underline mt-2" onClick={() => setShowCompleted(true)}>
+                      Show {completedJobs.length} completed job(s)
+                    </button>
+                  </CardContent>
+                </Card>
+              ) : (
+              visibleJobs.map(job => {
                 const st = STATUS_STYLES[job.status] || STATUS_STYLES.uploaded;
                 const canSelect = job.status === "uploaded" || job.status === "previewed";
                 const isSelected = selectedJobs.has(job.id);
@@ -2123,9 +2157,11 @@ export default function SettingsLogIngestionPage() {
                     </CardContent>
                   </Card>
                 );
-              })}
+              })
+              )}
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
