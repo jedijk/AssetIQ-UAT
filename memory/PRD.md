@@ -14,11 +14,11 @@ Create a comprehensive asset management platform with:
 - **Backend**: FastAPI (Python)
 - **Database**: MongoDB
 - **Storage**: Cloudflare R2
-- **AI**: OpenAI GPT-4o (direct SDK - migrated from emergentintegrations)
+- **AI**: OpenAI GPT-4o (direct SDK - user's API keys)
 
 ## Completed Features
 
-### Core Platform (Completed)
+### Core Platform
 - [x] User authentication with JWT
 - [x] Role-based access control (owner, admin, user)
 - [x] Equipment hierarchy management
@@ -26,28 +26,33 @@ Create a comprehensive asset management platform with:
 - [x] Task scheduler
 - [x] Mobile-friendly "Simple Mode"
 
-### AI Integration (Completed - Dec 2025)
+### AI Integration
 - [x] AI Chat Assistant
 - [x] Universal Photo Data Capture with GPT-4o Vision
 - [x] AI-assisted log parsing
 - [x] Learning from user corrections
 
-### File Storage (Completed)
+### File Storage
 - [x] Cloudflare R2 integration
 - [x] Chunked file uploads (5 files per request)
 - [x] Folder/directory upload support
 
-### Production Log Ingestion (Completed)
+### Production Log Ingestion
 - [x] CSV/Excel/TXT file support
 - [x] Batch folder uploads
 - [x] Template-based parsing
 - [x] AI-assisted column mapping
 - [x] Asset history aggregation
+- [x] **Template Training System** (April 2026)
+  - Save column mappings as reusable templates
+  - Column aliases for fuzzy matching
+  - "Train once, apply to many" bulk workflow
+  - Match preview before processing
 
-### OpenAI Migration (Completed - April 2026)
+### OpenAI Migration (April 2026)
 - [x] Migrated from emergentintegrations to official OpenAI SDK
 - [x] Configured OPENAI_API_KEY and OPENAI_VISION_KEY
-- [x] Verified all AI endpoints working
+- [x] All AI endpoints verified working
 
 ## Pending Tasks
 
@@ -79,6 +84,13 @@ Create a comprehensive asset management platform with:
 - `POST /api/production-logs/batch-ingest` - Batch process logs
 - `POST /api/production-logs/ai-parse` - AI-assisted parsing
 
+### Template Management (NEW)
+- `POST /api/production-logs/templates` - Save template
+- `GET /api/production-logs/templates` - List templates
+- `PUT/DELETE /api/production-logs/templates/{id}` - Update/delete
+- `POST /api/production-logs/batch-ingest-with-template` - Bulk ingest with template
+- `POST /api/production-logs/preview-template-match` - Preview column matching
+
 ## Environment Variables
 
 ### Backend (.env)
@@ -93,9 +105,34 @@ Create a comprehensive asset management platform with:
 ### Frontend (.env)
 - `REACT_APP_BACKEND_URL` - Backend API URL
 
-## Test Credentials
-- Email: jedijk@gmail.com
-- Password: Jaap8019@
+## Database Collections
+
+### log_parse_templates (NEW)
+```json
+{
+  "id": "uuid",
+  "name": "Template Name",
+  "description": "Optional description",
+  "template": {
+    "delimiter": ",",
+    "has_header": true,
+    "skip_rows": 0,
+    "column_mapping": {
+      "timestamp": "Date",
+      "asset_id": "Equipment_ID",
+      "status": "Status",
+      "metric_columns": ["Temp", "Pressure"]
+    }
+  },
+  "column_aliases": {
+    "Date": ["Timestamp", "DateTime"],
+    "Equipment_ID": ["Asset", "Machine_ID"]
+  },
+  "usage_count": 0,
+  "created_at": "ISO datetime",
+  "created_by": "user_id"
+}
+```
 
 ---
 *Last Updated: April 2026*
