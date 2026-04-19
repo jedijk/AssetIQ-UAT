@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Upload, FileText, Loader2, CheckCircle2, XCircle, AlertCircle,
-  Trash2, ChevronRight, Database, Settings, RefreshCw, Play, Eye, X,
+  Trash2, ChevronLeft, ChevronRight, Database, Settings, RefreshCw, Play, Eye, X,
   FileSpreadsheet, Clock, Activity, FolderOpen, BarChart3, Sparkles, TrendingUp,
   CheckSquare, Square, Save, BookOpen, Copy, Check, AlertTriangle, FlaskConical, Package, Sigma
 } from "lucide-react";
@@ -1378,6 +1378,10 @@ function LogDashboard() {
   const [loadingEntries, setLoadingEntries] = useState(false);
   const canvasRef = useRef(null);
 
+  // Date navigation
+  const [availableDates, setAvailableDates] = useState([]); // sorted desc
+  const [selectedDate, setSelectedDate] = useState(""); // YYYY-MM-DD
+
   const fetchAssets = useCallback(async () => {
     try {
       const res = await fetch(`${API}/api/production-logs/assets`, { headers: getHeaders() });
@@ -1388,6 +1392,21 @@ function LogDashboard() {
       }
     } catch {}
   }, [selectedAsset]);
+
+  // Fetch available dates for the selected asset
+  const fetchDates = useCallback(async () => {
+    if (!selectedAsset) return;
+    try {
+      const res = await fetch(`${API}/api/production-logs/available-dates?asset_id=${encodeURIComponent(selectedAsset)}`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const dates = data.dates || [];
+        setAvailableDates(dates);
+        // Auto-select latest date if none selected
+        if (dates.length > 0 && !selectedDate) setSelectedDate(dates[0]);
+      }
+    } catch {}
+  }, [selectedAsset, selectedDate]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -1405,20 +1424,40 @@ function LogDashboard() {
   }, [selectedAsset]);
 
   const fetchEntries = useCallback(async () => {
-    if (!selectedAsset) return;
+    if (!selectedAsset || !selectedDate) return;
     setLoadingEntries(true);
     try {
-      const res = await fetch(`${API}/api/production-logs/entries?asset_id=${encodeURIComponent(selectedAsset)}&limit=50`, { headers: getHeaders() });
+      const startTs = `${selectedDate}T00:00:00`;
+      const endTs = `${selectedDate}T23:59:59`;
+      const res = await fetch(`${API}/api/production-logs/entries?asset_id=${encodeURIComponent(selectedAsset)}&start=${startTs}&end=${endTs}&limit=100`, { headers: getHeaders() });
       if (res.ok) {
         const data = await res.json();
         setEntries(data.entries || []);
       }
     } catch {} finally { setLoadingEntries(false); }
-  }, [selectedAsset]);
+  }, [selectedAsset, selectedDate]);
 
   useEffect(() => { fetchAssets(); fetchStats(); }, [fetchAssets, fetchStats]);
-  useEffect(() => { if (selectedAsset) { fetchTimeseries(); fetchEntries(); } }, [selectedAsset, fetchTimeseries, fetchEntries]);
+  useEffect(() => { if (selectedAsset) { fetchDates(); fetchTimeseries(); } }, [selectedAsset, fetchDates, fetchTimeseries]);
+  useEffect(() => { if (selectedAsset && selectedDate) { fetchEntries(); } }, [selectedAsset, selectedDate, fetchEntries]);
   useEffect(() => { setLoading(false); }, []);
+
+  // Reset date when asset changes
+  useEffect(() => { setSelectedDate(""); }, [selectedAsset]);
+
+  // Date navigation helpers
+  const currentDateIndex = availableDates.indexOf(selectedDate);
+  const hasPrevDay = currentDateIndex >= 0 && currentDateIndex < availableDates.length - 1;
+  const hasNextDay = currentDateIndex > 0;
+  const prevDay = () => { if (hasPrevDay) setSelectedDate(availableDates[currentDateIndex + 1]); };
+  const nextDay = () => { if (hasNextDay) setSelectedDate(availableDates[currentDateIndex - 1]); };
+
+  const displayDate = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T12:00:00');
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  };
 
   const runAggregation = async () => {
     setAggregating(true);
@@ -1583,7 +1622,7 @@ function LogDashboard() {
 
   return (
     <div className="space-y-5">
-      {/* Controls */}
+      {/* Controls — Day Navigation matching Production Dashboard */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Select value={selectedAsset || undefined} onValueChange={setSelectedAsset}>
@@ -1596,23 +1635,44 @@ function LogDashboard() {
               ))}
             </SelectContent>
           </Select>
-          {entries.length > 0 && (() => {
-            const timestamps = entries.map(e => e.timestamp).filter(Boolean).sort();
-            if (timestamps.length === 0) return null;
-            const d = new Date(timestamps[0]);
-            const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-            const dateStr = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-            const startTime = entries[0]?.production_start_time || '';
-            const stopTime = entries[0]?.production_stop_time || '';
-            const shift = startTime && stopTime ? `${startTime.slice(0,5)} – ${stopTime.slice(0,5)}` : '';
-            return (
-              <span className="text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-3 h-9 flex items-center tabular-nums whitespace-nowrap gap-2" data-testid="date-display">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                {dateStr}
-                {shift && <span className="text-xs text-slate-400 ml-1">({shift})</span>}
-              </span>
-            );
-          })()}
+
+          {/* Day navigation arrows */}
+          <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none" onClick={prevDay} disabled={!hasPrevDay} data-testid="prev-day">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none" onClick={nextDay} disabled={!hasNextDay} data-testid="next-day">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {/* Date picker */}
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) setSelectedDate(v);
+            }}
+            className="h-9 px-2 text-sm border border-slate-200 rounded-lg bg-white"
+            data-testid="date-picker"
+          />
+
+          {/* Display date label */}
+          {selectedDate && (
+            <span className="text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-3 h-9 flex items-center tabular-nums whitespace-nowrap gap-2" data-testid="date-display">
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              {displayDate(selectedDate)}
+              {entries.length > 0 && (() => {
+                const startTime = entries[0]?.production_start_time || '';
+                const stopTime = entries[0]?.production_stop_time || '';
+                const shift = startTime && stopTime ? `${startTime.slice(0,5)} – ${stopTime.slice(0,5)}` : '';
+                return shift ? <span className="text-xs text-slate-400 ml-1">({shift})</span> : null;
+              })()}
+            </span>
+          )}
+
+          {loadingEntries && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
         </div>
         <Button variant="outline" size="sm" onClick={runAggregation} disabled={aggregating} data-testid="run-aggregation-btn">
           {aggregating ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}

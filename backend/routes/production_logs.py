@@ -1568,6 +1568,28 @@ async def query_entries(
     return {"entries": entries, "total": total, "limit": limit, "skip": skip}
 
 
+@router.get("/available-dates")
+async def get_available_dates(
+    asset_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get sorted list of unique production dates for an asset."""
+    _owner_only(current_user)
+    match = {}
+    if asset_id:
+        match["asset_id"] = asset_id
+    pipeline = [
+        {"$match": match} if match else {"$match": {}},
+        {"$addFields": {"_date": {"$substr": ["$timestamp", 0, 10]}}},
+        {"$group": {"_id": "$_date"}},
+        {"$sort": {"_id": -1}},
+    ]
+    results = await db.production_logs.aggregate(pipeline).to_list(500)
+    dates = [r["_id"] for r in results if r["_id"]]
+    return {"dates": dates}
+
+
+
 @router.get("/stats")
 async def get_log_stats(
     current_user: dict = Depends(get_current_user),
