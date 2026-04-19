@@ -1252,6 +1252,9 @@ function LogDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [aggregating, setAggregating] = useState(false);
+  const [showDataTable, setShowDataTable] = useState(false);
+  const [entries, setEntries] = useState([]);
+  const [loadingEntries, setLoadingEntries] = useState(false);
   const canvasRef = useRef(null);
 
   const fetchAssets = useCallback(async () => {
@@ -1280,8 +1283,20 @@ function LogDashboard() {
     } catch {}
   }, [selectedAsset]);
 
+  const fetchEntries = useCallback(async () => {
+    if (!selectedAsset) return;
+    setLoadingEntries(true);
+    try {
+      const res = await fetch(`${API}/api/production-logs/entries?asset_id=${encodeURIComponent(selectedAsset)}&limit=50`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setEntries(data.entries || []);
+      }
+    } catch {} finally { setLoadingEntries(false); }
+  }, [selectedAsset]);
+
   useEffect(() => { fetchAssets(); fetchStats(); }, [fetchAssets, fetchStats]);
-  useEffect(() => { if (selectedAsset) fetchTimeseries(); }, [selectedAsset, fetchTimeseries]);
+  useEffect(() => { if (selectedAsset) { fetchTimeseries(); fetchEntries(); } }, [selectedAsset, fetchTimeseries, fetchEntries]);
   useEffect(() => { setLoading(false); }, []);
 
   const runAggregation = async () => {
@@ -1515,6 +1530,78 @@ function LogDashboard() {
             <CardContent className="px-4 pb-4">
               <canvas ref={eventBarRef} data-testid="events-chart" />
             </CardContent>
+          </Card>
+
+          {/* Data Table Toggle */}
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Database className="w-4 h-4 text-indigo-600" />
+                  Raw Data — {selectedAsset}
+                </CardTitle>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => { 
+                    if (!showDataTable) fetchEntries();
+                    setShowDataTable(!showDataTable); 
+                  }}
+                  data-testid="toggle-data-table-btn"
+                >
+                  {showDataTable ? "Hide Data" : "View Data"}
+                </Button>
+              </div>
+            </CardHeader>
+            {showDataTable && (
+              <CardContent className="px-4 pb-4">
+                {loadingEntries ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                  </div>
+                ) : entries.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-4">No data entries found</p>
+                ) : (
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600">Timestamp</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600">Status</th>
+                          {entries[0]?.metrics && Object.keys(entries[0].metrics).slice(0, 8).map(k => (
+                            <th key={k} className="px-3 py-2 text-left font-medium text-slate-600 whitespace-nowrap">{k}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entries.map((e, i) => (
+                          <tr key={e.id || i} className="border-t hover:bg-slate-50">
+                            <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                              {new Date(e.timestamp).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                e.event_type === 'downtime' ? 'bg-red-100 text-red-700' :
+                                e.event_type === 'alarm' ? 'bg-amber-100 text-amber-700' :
+                                e.event_type === 'waste' ? 'bg-orange-100 text-orange-700' :
+                                'bg-green-100 text-green-700'
+                              }`}>
+                                {e.event_type || 'normal'}
+                              </span>
+                            </td>
+                            {e.metrics && Object.keys(entries[0].metrics).slice(0, 8).map(k => (
+                              <td key={k} className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                {typeof e.metrics[k] === 'number' ? e.metrics[k].toFixed(2) : e.metrics[k] || '-'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            )}
           </Card>
         </>
       ) : (
