@@ -405,7 +405,7 @@ async def get_production_dashboard(
             {"$sort": {"timestamp": 1}},
             {"$project": {"_id": 0, "_has_visc": 0}},
         ]
-        ingested = await db.production_logs.aggregate(pipeline).to_list(200)
+        ingested = await db.production_logs.aggregate(pipeline).to_list(5000)
 
         if ingested:
             total_feed = 0.0
