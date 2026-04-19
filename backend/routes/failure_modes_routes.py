@@ -382,9 +382,12 @@ class FailureModeUpdate(BaseModel):
     validated_at: Optional[str] = None
     # New fields
     process: Optional[str] = None
-    potential_effects: Optional[str] = None
-    potential_causes: Optional[str] = None
+    potential_effects: Optional[Any] = None
+    potential_causes: Optional[Any] = None
     iso14224_mechanism: Optional[str] = None
+    failure_mode_type: Optional[str] = None
+
+    model_config = {"extra": "ignore"}
 
 
 class FailureModeValidation(BaseModel):
