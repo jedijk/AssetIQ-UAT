@@ -1028,6 +1028,10 @@ async def _run_ingestion(job_id: str, job: dict):
                         },
                         "ingested_at": datetime.now(timezone.utc).isoformat(),
                     }
+                    # Add header metadata and secondary sheet data
+                    for key in r:
+                        if key not in ["_row", "_errors", "timestamp", "asset_id", "metrics", "status", "event_type"]:
+                            doc[key] = r[key]
                     docs.append(doc)
 
                 if docs:

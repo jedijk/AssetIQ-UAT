@@ -1555,6 +1555,8 @@ function LogDashboard() {
                       <thead className="bg-slate-50 sticky top-0">
                         <tr>
                           <th className="px-3 py-2 text-left font-medium text-slate-600">Timestamp</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600">Mooney Viscosity</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600">Sample ID</th>
                           {entries[0]?.metrics && Object.keys(entries[0].metrics).map(k => (
                             <th key={k} className="px-3 py-2 text-left font-medium text-slate-600 whitespace-nowrap">{k}</th>
                           ))}
@@ -1565,6 +1567,12 @@ function LogDashboard() {
                           <tr key={e.id || i} className="border-t hover:bg-slate-50">
                             <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
                               {new Date(e.timestamp).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 text-slate-700 font-medium whitespace-nowrap">
+                              {e.mooney_viscosity || '-'}
+                            </td>
+                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                              {e.sample_id || '-'}
                             </td>
                             {e.metrics && Object.keys(entries[0].metrics).map(k => {
                               let val = e.metrics[k];
