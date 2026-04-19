@@ -195,11 +195,38 @@ def _detect_delimiter(sample: str) -> str:
     return ","
 
 
-def _parse_timestamp(val: str, fmt: Optional[str] = None) -> Optional[str]:
-    """Try to parse a timestamp string into ISO format."""
+def _parse_timestamp(val: str, fmt: Optional[str] = None, base_date: Optional[str] = None) -> Optional[str]:
+    """Try to parse a timestamp string into ISO format.
+    
+    Args:
+        val: The timestamp string to parse
+        fmt: Optional format string
+        base_date: Optional base date (YYYY-MM-DD) to combine with time-only values
+    """
     if not val or not val.strip():
         return None
-    val = val.strip()
+    val = str(val).strip()
+    
+    # Handle time-only values (HH:MM:SS or HH:MM)
+    time_only_formats = ["%H:%M:%S", "%H:%M"]
+    for tf in time_only_formats:
+        try:
+            time_obj = datetime.strptime(val, tf)
+            # If we have a base date, combine them
+            if base_date:
+                try:
+                    date_obj = datetime.strptime(base_date, "%Y-%m-%d")
+                    combined = datetime.combine(date_obj.date(), time_obj.time())
+                    return combined.isoformat()
+                except:
+                    pass
+            # Otherwise, use today's date as fallback
+            today = datetime.now().date()
+            combined = datetime.combine(today, time_obj.time())
+            return combined.isoformat()
+        except ValueError:
+            continue
+    
     formats = []
     if fmt:
         formats.append(fmt)
@@ -333,27 +360,49 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
     """Parse XLSX/XLS content using openpyxl or xlrd."""
     import openpyxl
 
+    all_rows = []  # Keep all rows including header section for date extraction
+    
     if ext == "xls":
         import xlrd
         wb = xlrd.open_workbook(file_contents=file_bytes)
         ws = wb.sheet_by_index(0)
-        rows = []
         for r in range(ws.nrows):
-            rows.append([str(ws.cell_value(r, c)) for c in range(ws.ncols)])
+            all_rows.append([str(ws.cell_value(r, c)) for c in range(ws.ncols)])
     else:
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
         ws = wb.active
-        rows = []
         for row in ws.iter_rows(values_only=True):
-            rows.append([str(c) if c is not None else "" for c in row])
+            all_rows.append([str(c) if c is not None else "" for c in row])
         wb.close()
 
-    if not rows:
+    if not all_rows:
         return []
 
-    # Skip rows
+    # Try to extract base date from header section (before skip_rows)
+    base_date = None
     if template.skip_rows > 0:
-        rows = rows[template.skip_rows:]
+        header_section = all_rows[:template.skip_rows]
+        for row in header_section:
+            for cell in row:
+                if cell:
+                    # Look for date patterns in header cells
+                    cell_str = str(cell).strip()
+                    # Try common date formats
+                    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y"]:
+                        try:
+                            dt = datetime.strptime(cell_str.split()[0] if ' ' in cell_str else cell_str, fmt.split()[0])
+                            base_date = dt.strftime("%Y-%m-%d")
+                            logger.debug(f"[Excel Parse] Found base date in header: {base_date}")
+                            break
+                        except ValueError:
+                            continue
+                    if base_date:
+                        break
+            if base_date:
+                break
+
+    # Skip rows to get to data
+    rows = all_rows[template.skip_rows:] if template.skip_rows > 0 else all_rows
     if not rows:
         return []
 
@@ -380,7 +429,8 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
 
         ts_val = row_dict.get(mapping.timestamp) if mapping.timestamp else None
         if ts_val:
-            parsed_ts = _parse_timestamp(ts_val, template.timestamp_format)
+            # Pass base_date for time-only values
+            parsed_ts = _parse_timestamp(ts_val, template.timestamp_format, base_date)
             record["timestamp"] = parsed_ts
             if not parsed_ts:
                 record["_errors"] = record.get("_errors", []) + [f"Invalid timestamp: {ts_val}"]

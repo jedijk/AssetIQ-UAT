@@ -48,6 +48,16 @@ Create a comprehensive asset management platform with:
   - Column aliases for fuzzy matching
   - "Train once, apply to many" bulk workflow
   - Match preview before processing
+- [x] **Time-only timestamp support** (April 2026)
+  - Parses time-only values (HH:MM:SS)
+  - Extracts base date from Excel header sections
+  - Combines date + time for full timestamps
+
+### Default Templates
+- [x] **Production Log - Daily Format**: For files like "Production Log 05-01-2026.xlsx"
+  - Skips 18 header rows
+  - Maps TIME, RPM, FEED, M%, ENERGY, MT1-3, MP1-4, CO2, IR
+  - 15 column aliases for flexibility
 
 ### OpenAI Migration (April 2026)
 - [x] Migrated from emergentintegrations to official OpenAI SDK
@@ -64,73 +74,45 @@ Create a comprehensive asset management platform with:
 1. QR scan analytics dashboard
 
 ### P3 - Low Priority / Refactoring
-1. Break down large components:
-   - `FormsPage.js`
-   - `SettingsUserManagementPage.js`
-   - `EquipmentManagerPage.js`
-   - `DashboardPage.js`
-   - `SettingsLogIngestionPage.js`
+1. Break down large components
 2. Advanced event detection rule engine
 
 ## Key API Endpoints
 
-### AI Endpoints
-- `POST /api/ai/extract` - Photo data extraction with GPT-4o Vision
-- `POST /api/ai/extract/corrections` - Store user corrections
-- `POST /api/production/ai-insights` - AI-powered insights
-
-### Production Logs
-- `POST /api/production-logs/upload` - Upload log files
-- `POST /api/production-logs/batch-ingest` - Batch process logs
-- `POST /api/production-logs/ai-parse` - AI-assisted parsing
-
-### Template Management (NEW)
+### Template Management
 - `POST /api/production-logs/templates` - Save template
 - `GET /api/production-logs/templates` - List templates
 - `PUT/DELETE /api/production-logs/templates/{id}` - Update/delete
 - `POST /api/production-logs/batch-ingest-with-template` - Bulk ingest with template
 - `POST /api/production-logs/preview-template-match` - Preview column matching
 
-## Environment Variables
-
-### Backend (.env)
-- `MONGO_URL` - MongoDB connection string
-- `DB_NAME` - Database name (assetiq)
-- `OPENAI_API_KEY` - OpenAI API key for chat
-- `OPENAI_VISION_KEY` - OpenAI API key for vision
-- `R2_ACCESS_KEY` - Cloudflare R2 access key
-- `R2_SECRET_KEY` - Cloudflare R2 secret key
-- `R2_ENDPOINT` - Cloudflare R2 endpoint
-
-### Frontend (.env)
-- `REACT_APP_BACKEND_URL` - Backend API URL
-
 ## Database Collections
 
-### log_parse_templates (NEW)
+### log_parse_templates
 ```json
 {
   "id": "uuid",
-  "name": "Template Name",
-  "description": "Optional description",
+  "name": "Production Log - Daily Format",
+  "description": "For daily production log Excel files...",
   "template": {
     "delimiter": ",",
     "has_header": true,
-    "skip_rows": 0,
+    "skip_rows": 18,
+    "timestamp_format": "%H:%M:%S",
     "column_mapping": {
-      "timestamp": "Date",
-      "asset_id": "Equipment_ID",
-      "status": "Status",
-      "metric_columns": ["Temp", "Pressure"]
+      "timestamp": "TIME",
+      "asset_id": null,
+      "status": "REMARKS",
+      "metric_columns": ["RPM", "FEED", "M%", "ENERGY", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR"]
     }
   },
   "column_aliases": {
-    "Date": ["Timestamp", "DateTime"],
-    "Equipment_ID": ["Asset", "Machine_ID"]
+    "TIME": ["Time", "TIMESTAMP", "DateTime"],
+    "RPM": ["rpm", "Speed", "Rotation"],
+    ...
   },
   "usage_count": 0,
-  "created_at": "ISO datetime",
-  "created_by": "user_id"
+  "created_at": "ISO datetime"
 }
 ```
 
