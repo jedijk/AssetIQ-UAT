@@ -840,3 +840,244 @@ Format:
     except Exception as e:
         logger.error(f"AI insights generation failed: {e}")
         return {"status": "error", "error": str(e), "insights": []}
+
+
+@router.post("/production/machine-analysis")
+async def generate_machine_analysis(
+    current_user: dict = Depends(get_current_user),
+):
+    """AI-powered analysis of all historical production data to determine optimal machine settings."""
+    import statistics
+    from services.openai_service import chat_completion
+
+    # Aggregate all entries with viscosity data (deduplicated)
+    pipeline = [
+        {"$match": {"mooney_viscosity": {"$exists": True, "$ne": None, "$ne": ""}}},
+        {"$sort": {"timestamp": 1}},
+        {"$group": {"_id": {"timestamp": "$timestamp", "asset_id": "$asset_id"}, "doc": {"$first": "$$ROOT"}}},
+        {"$replaceRoot": {"newRoot": "$doc"}},
+        {"$sort": {"timestamp": 1}},
+        {"$project": {"_id": 0}},
+    ]
+    entries = await db.production_logs.aggregate(pipeline).to_list(5000)
+
+    if len(entries) < 10:
+        return {"status": "error", "error": "Not enough historical data for analysis (need at least 10 entries with viscosity)"}
+
+    # Compute per-day aggregates
+    days = {}
+    for e in entries:
+        m = e.get("metrics", {})
+        try:
+            visc = float(e["mooney_viscosity"])
+        except (ValueError, TypeError):
+            continue
+
+        date = e.get("timestamp", "")[:10]
+        if date not in days:
+            days[date] = {"viscosities": [], "rpms": [], "feeds": [], "moistures": [],
+                          "mt1s": [], "mt2s": [], "mt3s": [], "energies": [],
+                          "mp1s": [], "mp4s": [], "waste": 0, "material": ""}
+
+        days[date]["viscosities"].append(visc)
+        try: days[date]["rpms"].append(float(m.get("RPM", 0) or 0))
+        except: pass
+        try: days[date]["feeds"].append(float(m.get("FEED", 0) or 0))
+        except: pass
+        try:
+            moist = float(m.get("M%", 0) or 0)
+            if moist > 0:
+                days[date]["moistures"].append(moist)
+        except: pass
+        try: days[date]["energies"].append(float(m.get("ENERGY", 0) or 0))
+        except: pass
+        try: days[date]["mt1s"].append(float(m.get("MT1", 0) or 0))
+        except: pass
+        try: days[date]["mt2s"].append(float(m.get("MT2", 0) or 0))
+        except: pass
+        try: days[date]["mt3s"].append(float(m.get("MT3", 0) or 0))
+        except: pass
+        try: days[date]["mp1s"].append(float(m.get("MP1", 0) or 0))
+        except: pass
+        try: days[date]["mp4s"].append(float(m.get("MP4", 0) or 0))
+        except: pass
+
+        waste = e.get("total_waste")
+        if waste:
+            try: days[date]["waste"] = float(waste)
+            except: pass
+        mat = e.get("input_material")
+        if mat:
+            days[date]["material"] = mat
+
+    # Build daily summaries
+    daily_summaries = []
+    all_visc = []
+    good_days = []  # days where avg viscosity is 50-60 and RSD < 5
+    bad_days = []
+
+    for date, d in sorted(days.items()):
+        if not d["viscosities"]:
+            continue
+        avg_visc = statistics.mean(d["viscosities"])
+        visc_std = statistics.stdev(d["viscosities"]) if len(d["viscosities"]) > 1 else 0
+        rsd = (visc_std / avg_visc * 100) if avg_visc > 0 else 0
+        avg_rpm = statistics.mean(d["rpms"]) if d["rpms"] else 0
+        avg_feed = statistics.mean(d["feeds"]) if d["feeds"] else 0
+        avg_moist = statistics.mean(d["moistures"]) if d["moistures"] else 0
+        avg_mt1 = statistics.mean(d["mt1s"]) if d["mt1s"] else 0
+        avg_mt2 = statistics.mean(d["mt2s"]) if d["mt2s"] else 0
+        avg_mt3 = statistics.mean(d["mt3s"]) if d["mt3s"] else 0
+        avg_energy = statistics.mean(d["energies"]) if d["energies"] else 0
+
+        in_range = 50 <= avg_visc <= 60
+        low_rsd = rsd < 5
+
+        summary = {
+            "date": date, "samples": len(d["viscosities"]),
+            "avg_visc": round(avg_visc, 2), "rsd": round(rsd, 2),
+            "avg_rpm": round(avg_rpm, 1), "avg_feed": round(avg_feed, 1),
+            "avg_moisture": round(avg_moist, 3), "avg_energy": round(avg_energy, 2),
+            "avg_mt1": round(avg_mt1, 1), "avg_mt2": round(avg_mt2, 1), "avg_mt3": round(avg_mt3, 1),
+            "waste": d["waste"], "material": d["material"],
+            "in_target": in_range, "low_rsd": low_rsd,
+        }
+        daily_summaries.append(summary)
+        all_visc.extend(d["viscosities"])
+
+        if in_range and low_rsd:
+            good_days.append(summary)
+        elif not in_range or rsd > 7:
+            bad_days.append(summary)
+
+    # Compute overall stats
+    overall_avg = statistics.mean(all_visc) if all_visc else 0
+    overall_std = statistics.stdev(all_visc) if len(all_visc) > 1 else 0
+    in_target_pct = sum(1 for v in all_visc if 50 <= v <= 60) / len(all_visc) * 100 if all_visc else 0
+
+    # Sort good days by RSD (best first)
+    good_days.sort(key=lambda x: x["rsd"])
+    bad_days.sort(key=lambda x: abs(x["avg_visc"] - 55), reverse=True)
+
+    # Build GPT prompt
+    good_text = "\n".join([
+        f"  {d['date']}: Visc={d['avg_visc']}MU RSD={d['rsd']}% RPM={d['avg_rpm']} Feed={d['avg_feed']} M%={d['avg_moisture']} MT1={d['avg_mt1']} MT2={d['avg_mt2']} MT3={d['avg_mt3']} Waste={d['waste']}kg"
+        for d in good_days[:30]
+    ])
+    bad_text = "\n".join([
+        f"  {d['date']}: Visc={d['avg_visc']}MU RSD={d['rsd']}% RPM={d['avg_rpm']} Feed={d['avg_feed']} M%={d['avg_moisture']} MT1={d['avg_mt1']} MT2={d['avg_mt2']} MT3={d['avg_mt3']} Waste={d['waste']}kg"
+        for d in bad_days[:20]
+    ])
+
+    prompt = f"""You are analyzing historical production data for a Line-90 rubber compound extruder to determine OPTIMAL MACHINE SETTINGS.
+
+OVERALL STATISTICS ({len(all_visc)} samples across {len(daily_summaries)} production days):
+- Mean Viscosity: {overall_avg:.2f} MU (target: 50-60 MU)
+- Std Dev: {overall_std:.2f} MU
+- In Target Range: {in_target_pct:.1f}%
+- Total production days analyzed: {len(daily_summaries)}
+- Good days (visc 50-60 & RSD<5%): {len(good_days)}
+- Problematic days: {len(bad_days)}
+
+BEST PERFORMING DAYS (viscosity in range, low variation):
+{good_text}
+
+WORST PERFORMING DAYS (out of range or high variation):
+{bad_text}
+
+CONTROLLABLE INPUTS: RPM, Feed rate (kg/h), M% (moisture % of feed product), MT1/MT2/MT3 (temperatures)
+QUALITY OUTCOMES: Mooney Viscosity (target 50-60 MU), RSD (target <5%), Waste (minimize)
+
+Analyze the data and provide:
+
+1. **optimal_settings**: The recommended settings for each controllable input (RPM, Feed, M%, MT1, MT2, MT3) with specific values and acceptable ranges.
+
+2. **key_findings**: 3-5 key statistical findings about what drives good vs bad days. Be specific with numbers.
+
+3. **correlations**: What input parameters most strongly correlate with viscosity being in/out of target range?
+
+4. **risk_factors**: Settings combinations that tend to produce out-of-spec results.
+
+5. **improvement_recommendations**: 3-5 specific, actionable recommendations to improve the {100-in_target_pct:.1f}% of samples currently out of target.
+
+Return ONLY valid JSON with this structure:
+{{
+  "optimal_settings": {{
+    "RPM": {{"recommended": 165, "range": [160, 170], "unit": "rpm"}},
+    "Feed": {{"recommended": 520, "range": [500, 540], "unit": "kg/h"}},
+    "Moisture": {{"recommended": 0.85, "range": [0.80, 0.90], "unit": "%"}},
+    "MT1": {{"recommended": 210, "range": [200, 220], "unit": "°C"}},
+    "MT2": {{"recommended": 168, "range": [160, 175], "unit": "°C"}},
+    "MT3": {{"recommended": 155, "range": [145, 165], "unit": "°C"}}
+  }},
+  "key_findings": ["finding1", "finding2", ...],
+  "correlations": ["correlation1", "correlation2", ...],
+  "risk_factors": ["risk1", "risk2", ...],
+  "improvement_recommendations": ["rec1", "rec2", ...],
+  "summary": "2-3 sentence executive summary"
+}}"""
+
+    try:
+        messages = [
+            {"role": "system", "content": "You are an expert production engineer and data scientist specializing in rubber compound extrusion and Mooney viscosity optimization. Analyze the data rigorously and provide specific, actionable recommendations. Return only valid JSON."},
+            {"role": "user", "content": prompt}
+        ]
+
+        response = await chat_completion(
+            messages=messages,
+            model="gpt-4o",
+            temperature=0.3
+        )
+
+        # Parse JSON response
+        import json as json_module
+        clean = response.strip()
+        if clean.startswith("```"):
+            clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
+        if clean.endswith("```"):
+            clean = clean[:-3]
+        clean = clean.strip()
+
+        analysis = json_module.loads(clean)
+
+        # Save analysis to DB
+        analysis_doc = {
+            "id": str(uuid.uuid4()),
+            "type": "machine_analysis",
+            "equipment": EQUIPMENT_NAME,
+            "analysis": analysis,
+            "stats": {
+                "total_samples": len(all_visc),
+                "total_days": len(daily_summaries),
+                "good_days": len(good_days),
+                "bad_days": len(bad_days),
+                "in_target_pct": round(in_target_pct, 1),
+                "avg_viscosity": round(overall_avg, 2),
+                "std_viscosity": round(overall_std, 2),
+            },
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_by": current_user["id"],
+        }
+        await db.production_analyses.insert_one(analysis_doc)
+        analysis_doc.pop("_id", None)
+
+        return {"status": "ok", "analysis": analysis, "stats": analysis_doc["stats"]}
+
+    except Exception as e:
+        logger.error(f"Machine analysis failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@router.get("/production/machine-analysis")
+async def get_latest_analysis(
+    current_user: dict = Depends(get_current_user),
+):
+    """Get the most recent machine analysis."""
+    doc = await db.production_analyses.find_one(
+        {"type": "machine_analysis"},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+    if not doc:
+        return {"status": "empty", "analysis": None}
+    return {"status": "ok", "analysis": doc.get("analysis"), "stats": doc.get("stats"), "created_at": doc.get("created_at")}
