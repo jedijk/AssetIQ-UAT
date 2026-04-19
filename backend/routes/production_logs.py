@@ -45,6 +45,12 @@ class ParseTemplate(BaseModel):
     skip_rows: int = 0
     timestamp_format: Optional[str] = None
     column_mapping: ColumnMapping = ColumnMapping()
+    # Location of base date in header section (for time-only timestamp values)
+    # Format: {"row": 8, "col": 2} means row 8, column C (0-indexed: A=0, B=1, C=2)
+    base_date_location: Optional[dict] = None
+    # Header metadata to extract and attach to all records
+    # Format: [{"name": "input_material", "row": 9, "col": 5}, {"name": "supplier", "row": 9, "col": 8}]
+    header_metadata: Optional[List[dict]] = None
 
 class IngestRequest(BaseModel):
     job_id: str
@@ -384,21 +390,40 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
     if not all_rows:
         return []
 
-    # Try to extract base date from header section (before skip_rows)
+    # Extract base date from specific location or auto-detect from header section
     base_date = None
-    if template.skip_rows > 0:
+    
+    # First try specific location if provided
+    if template.base_date_location:
+        try:
+            row_idx = template.base_date_location.get("row", 1) - 1  # Convert to 0-indexed
+            col_idx = template.base_date_location.get("col", 0)
+            if row_idx < len(all_rows) and col_idx < len(all_rows[row_idx]):
+                cell_str = str(all_rows[row_idx][col_idx]).strip()
+                # Try common date formats
+                for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y"]:
+                    try:
+                        dt = datetime.strptime(cell_str.split()[0] if ' ' in cell_str else cell_str, fmt.split()[0])
+                        base_date = dt.strftime("%Y-%m-%d")
+                        logger.info(f"[Excel Parse] Extracted base date from row {row_idx+1}, col {col_idx}: {base_date}")
+                        break
+                    except ValueError:
+                        continue
+        except Exception as e:
+            logger.warning(f"[Excel Parse] Failed to extract date from specified location: {e}")
+    
+    # Fallback: auto-detect from header section
+    if not base_date and template.skip_rows > 0:
         header_section = all_rows[:template.skip_rows]
         for row in header_section:
             for cell in row:
                 if cell:
-                    # Look for date patterns in header cells
                     cell_str = str(cell).strip()
-                    # Try common date formats
                     for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y"]:
                         try:
                             dt = datetime.strptime(cell_str.split()[0] if ' ' in cell_str else cell_str, fmt.split()[0])
                             base_date = dt.strftime("%Y-%m-%d")
-                            logger.debug(f"[Excel Parse] Found base date in header: {base_date}")
+                            logger.debug(f"[Excel Parse] Auto-detected base date in header: {base_date}")
                             break
                         except ValueError:
                             continue
@@ -411,6 +436,22 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
     rows = all_rows[template.skip_rows:] if template.skip_rows > 0 else all_rows
     if not rows:
         return []
+
+    # Extract header metadata if specified
+    header_metadata = {}
+    if template.header_metadata:
+        for meta in template.header_metadata:
+            try:
+                name = meta.get("name", "")
+                row_idx = meta.get("row", 1) - 1  # Convert to 0-indexed
+                col_idx = meta.get("col", 0)
+                if name and row_idx < len(all_rows) and col_idx < len(all_rows[row_idx]):
+                    value = str(all_rows[row_idx][col_idx]).strip()
+                    if value and value.lower() != "none":
+                        header_metadata[name] = value
+                        logger.debug(f"[Excel Parse] Extracted header metadata: {name} = {value}")
+            except Exception as e:
+                logger.warning(f"[Excel Parse] Failed to extract header metadata {meta}: {e}")
 
     mapping = template.column_mapping
     headers = None
@@ -431,7 +472,8 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
             if i < len(headers):
                 row_dict[headers[i]] = val.strip()
 
-        record = {"_row": row_idx}
+        # Start with header metadata attached to every record
+        record = {"_row": row_idx, **header_metadata}
 
         ts_val = row_dict.get(mapping.timestamp) if mapping.timestamp else None
         if ts_val:
