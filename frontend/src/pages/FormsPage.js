@@ -608,7 +608,7 @@ const FormsPage = ({ embedded = false }) => {
 
       {/* Create/Edit Template Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {newTemplate.id ? t("common.edit") + " " + t("forms.templates") : t("forms.title")}
