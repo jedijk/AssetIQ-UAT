@@ -417,7 +417,7 @@ class FailureModesService:
         return versions
     
     async def rollback_to_version(self, mode_id: str, version_id: str, rolled_back_by: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Rollback a failure mode to a specific version."""
+        """Rollback a failure mode to a specific version without creating a new version entry."""
         
         # Find the version
         if not ObjectId.is_valid(version_id):
@@ -440,14 +440,9 @@ class FailureModesService:
         if not existing:
             return None
         
-        # Save current state before rollback
-        await self._save_version(
-            existing, 
-            rolled_back_by, 
-            f"Before rollback to version {version_doc.get('version', '?')}"
-        )
+        target_version = version_doc.get("version", 1)
         
-        # Build rollback update
+        # Build rollback update — restore to the target version's state
         rollback_fields = {
             "category": snapshot.get("category"),
             "equipment": snapshot.get("equipment"),
@@ -460,12 +455,29 @@ class FailureModesService:
             "recommended_actions": snapshot.get("recommended_actions", []),
             "equipment_type_ids": snapshot.get("equipment_type_ids", []),
             "mechanism": snapshot.get("mechanism"),
+            "failure_mode_type": snapshot.get("failure_mode_type", "generic"),
+            "process": snapshot.get("process"),
+            "potential_effects": snapshot.get("potential_effects"),
+            "potential_causes": snapshot.get("potential_causes"),
+            "iso14224_mechanism": snapshot.get("iso14224_mechanism"),
+            "is_validated": snapshot.get("is_validated", False),
+            "validated_by_name": snapshot.get("validated_by_name"),
+            "validated_by_position": snapshot.get("validated_by_position"),
+            "validated_at": snapshot.get("validated_at"),
             "updated_at": datetime.now(timezone.utc),
-            "version": existing.get("version", 1) + 1,
-            "rolled_back_from_version": version_doc.get("version"),
+            "version": target_version,
+            "rolled_back_from_version": target_version,
+            "rolled_back_by": rolled_back_by,
+            "rolled_back_at": datetime.now(timezone.utc).isoformat(),
         }
         
-        # Perform rollback
+        # Delete all version entries NEWER than the target version
+        await self.versions_collection.delete_many({
+            "failure_mode_id": mode_id,
+            "version": {"$gt": target_version}
+        })
+        
+        # Perform rollback — set version to the target version
         result = await self.collection.find_one_and_update(
             query,
             {"$set": rollback_fields},
