@@ -1551,45 +1551,52 @@ function LogDashboard() {
                   <p className="text-sm text-slate-500 text-center py-4">No data entries found</p>
                 ) : (
                   <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-slate-50 sticky top-0">
-                        <tr>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Timestamp</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Mooney Viscosity</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Sample ID</th>
-                          {entries[0]?.metrics && Object.keys(entries[0].metrics).map(k => (
-                            <th key={k} className="px-3 py-2 text-left font-medium text-slate-600 whitespace-nowrap">{k}</th>
+                    <table className="w-full text-sm" data-testid="production-log-table">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          {["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks"].map((h) => (
+                            <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap">
+                              {h}
+                            </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {entries.map((e, i) => (
-                          <tr key={e.id || i} className="border-t hover:bg-slate-50">
-                            <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                              {new Date(e.timestamp).toLocaleString()}
-                            </td>
-                            <td className="px-3 py-2 text-slate-700 font-medium whitespace-nowrap">
-                              {e.mooney_viscosity || '-'}
-                            </td>
-                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
-                              {e.sample_id || '-'}
-                            </td>
-                            {e.metrics && Object.keys(entries[0].metrics).map(k => {
-                              let val = e.metrics[k];
-                              // Convert M% from decimal to percentage
-                              if (k === 'M%' && typeof val === 'number') {
-                                val = (val * 100).toFixed(1) + '%';
-                              } else if (typeof val === 'number') {
-                                val = val.toFixed(2);
-                              }
-                              return (
-                                <td key={k} className="px-3 py-2 text-slate-600 whitespace-nowrap">
-                                  {val || '-'}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
+                        {entries.map((e, i) => {
+                          const m = e.metrics || {};
+                          const formatVal = (val) => {
+                            if (val === null || val === undefined || val === '' || val === '-') return <span className="text-slate-300">—</span>;
+                            if (typeof val === 'number') return val.toFixed(val % 1 === 0 ? 0 : 2);
+                            return val;
+                          };
+                          const formatPercent = (val) => {
+                            if (val === null || val === undefined || val === '') return <span className="text-slate-300">—</span>;
+                            if (typeof val === 'number') return (val * 100).toFixed(1);
+                            return val;
+                          };
+                          const time = new Date(e.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                          return (
+                            <tr key={e.id || i} className="border-b border-slate-50 hover:bg-slate-50">
+                              <td className="py-2 px-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
+                              <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{time}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['RPM'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['FEED'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatPercent(m['M%'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['ENERGY'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['MT1'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['MT2'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['MT3'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['MP1'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['MP2'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['MP3'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['MP4'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{m['CO2 Feed/P'] || <span className="text-slate-300">—</span>}</td>
+                              <td className="py-2 px-2 tabular-nums">{formatVal(m['T Product IR'])}</td>
+                              <td className="py-2 px-2 tabular-nums">{e.mooney_viscosity ? e.mooney_viscosity : <span className="text-amber-500 font-medium">TBD</span>}</td>
+                              <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]" title={e.status || ""}>{e.status || ""}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
