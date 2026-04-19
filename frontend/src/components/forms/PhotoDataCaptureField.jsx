@@ -75,8 +75,14 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
       });
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.detail || `HTTP ${resp.status}`);
+        const errBody = await resp.json().catch(() => ({}));
+        let detail = errBody.detail;
+        if (Array.isArray(detail)) {
+          detail = detail.map(d => d.msg || d.message || JSON.stringify(d)).join(", ");
+        } else if (typeof detail === 'object' && detail !== null) {
+          detail = detail.msg || detail.message || JSON.stringify(detail);
+        }
+        throw new Error(detail || `HTTP ${resp.status}`);
       }
 
       const data = await resp.json();
@@ -119,7 +125,8 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
       onAutoFill(fills);
     } catch (err) {
       setStatus("error");
-      setError(err.message || "Failed to extract data");
+      const msg = typeof err === 'string' ? err : (err?.message || JSON.stringify(err) || "Failed to extract data");
+      setError(msg);
     }
 
     // Reset input
