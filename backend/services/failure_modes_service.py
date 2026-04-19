@@ -253,6 +253,7 @@ class FailureModesService:
             "recommended_actions": data.get("recommended_actions", []),
             "equipment_type_ids": data.get("equipment_type_ids", []),
             "mechanism": data.get("mechanism", "UNK - Unknown"),
+            "failure_mode_type": data.get("failure_mode_type", "generic"),
             # New fields for failure mode enhancements
             "process": data.get("process"),
             "potential_effects": data.get("potential_effects"),
@@ -612,6 +613,7 @@ class FailureModesService:
             "validated_at": safe_isoformat(doc.get("validated_at")),
             "is_custom": doc.get("is_custom", False),
             "is_builtin": doc.get("is_builtin", True),
+            "failure_mode_type": doc.get("failure_mode_type", "generic"),
             "version": doc.get("version", 1),
             "rolled_back_from_version": doc.get("rolled_back_from_version"),
             "created_at": safe_isoformat(doc.get("created_at")),

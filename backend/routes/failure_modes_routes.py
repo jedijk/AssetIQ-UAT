@@ -355,11 +355,14 @@ class FailureModeCreate(BaseModel):
     description: Optional[str] = None
     source: Optional[str] = None  # e.g., "observation", "manual", "import"
     linked_threat_id: Optional[str] = None
+    failure_mode_type: Optional[str] = None  # "generic" or "customer_specific"
     # New fields
     process: Optional[str] = None  # Process area
     potential_effects: Optional[str] = None  # Potential effects of failure mode
     potential_causes: Optional[str] = None  # Potential cause of failure mode
     iso14224_mechanism: Optional[str] = None  # ISO 14224 failure mechanism
+
+    model_config = {"extra": "ignore"}
 
 
 class FailureModeUpdate(BaseModel):
@@ -477,6 +480,7 @@ async def create_failure_mode(
                 "description": data.description,
                 "source": data.source,
                 "linked_threat_id": data.linked_threat_id,
+                "failure_mode_type": data.failure_mode_type or "generic",
                 "process": data.process,
                 "potential_effects": data.potential_effects,
                 "potential_causes": data.potential_causes,

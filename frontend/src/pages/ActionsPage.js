@@ -1507,6 +1507,10 @@ export default function ActionsPage() {
                 const sourceType = closureSuggestion?.source_type;
                 const sourceId = closureSuggestion?.source_id;
                 setClosureSuggestion(null);
+                if (!sourceId) {
+                  toast.error("Source ID missing, cannot navigate");
+                  return;
+                }
                 // Navigate to the source to close it
                 if (sourceType === 'threat') {
                   navigate(`/threats/${sourceId}`);
