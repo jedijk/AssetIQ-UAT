@@ -1803,25 +1803,34 @@ function LogDashboard() {
 
       {/* KPI Cards — matching Production Dashboard */}
       {entries.length > 0 && (() => {
-        const viscValues = entries.map(e => parseFloat(e.mooney_viscosity)).filter(v => !isNaN(v));
+        // Total Input = sum of FEED values (FEED is kg/h rate, each entry ~ 1 hour interval)
         const feedValues = entries.map(e => parseFloat(e.metrics?.['FEED'])).filter(v => !isNaN(v));
         const totalInput = feedValues.reduce((s, v) => s + v, 0);
-        const wasteVal = parseFloat(entries[0]?.total_waste) || 0;
-        const wastePct = totalInput > 0 ? ((wasteVal / totalInput) * 100).toFixed(1) : 0;
-        const yieldPct = totalInput > 0 ? (((totalInput - wasteVal) / totalInput) * 100).toFixed(1) : 0;
+
+        // Waste is a per-day value from the header, take from first entry that has it
+        const wasteEntry = entries.find(e => e.total_waste && parseFloat(e.total_waste) > 0);
+        const wasteVal = wasteEntry ? parseFloat(wasteEntry.total_waste) : 0;
+        const wastePct = totalInput > 0 ? ((wasteVal / totalInput) * 100).toFixed(1) : '0';
+        const yieldPct = totalInput > 0 ? (((totalInput - wasteVal) / totalInput) * 100).toFixed(1) : '0';
+
+        // Viscosity stats
+        const viscValues = entries.map(e => parseFloat(e.mooney_viscosity)).filter(v => !isNaN(v));
         const avgVisc = viscValues.length > 0 ? (viscValues.reduce((s, v) => s + v, 0) / viscValues.length).toFixed(1) : '0';
         const minVisc = viscValues.length > 0 ? Math.min(...viscValues).toFixed(1) : '0';
         const maxVisc = viscValues.length > 0 ? Math.max(...viscValues).toFixed(1) : '0';
         const mean = viscValues.length > 0 ? viscValues.reduce((s, v) => s + v, 0) / viscValues.length : 0;
         const stdDev = viscValues.length > 1 ? Math.sqrt(viscValues.reduce((s, v) => s + (v - mean) ** 2, 0) / (viscValues.length - 1)) : 0;
         const rsd = mean > 0 ? ((stdDev / mean) * 100).toFixed(1) : '0';
-        const startTime = entries[0]?.production_start_time || '';
-        const stopTime = entries[0]?.production_stop_time || '';
+
+        // Runtime = difference between first and last actual data timestamp
+        const timestamps = entries.map(e => e.timestamp).filter(Boolean).sort();
         let runtimeHours = '0';
-        if (startTime && stopTime) {
-          const [sh, sm] = startTime.split(':').map(Number);
-          const [eh, em] = stopTime.split(':').map(Number);
-          runtimeHours = ((eh * 60 + em - sh * 60 - sm) / 60).toFixed(0);
+        if (timestamps.length >= 2) {
+          const t1 = new Date(timestamps[0]);
+          const t2 = new Date(timestamps[timestamps.length - 1]);
+          runtimeHours = ((t2 - t1) / 3600000).toFixed(1);
+        } else if (timestamps.length === 1) {
+          runtimeHours = '0';
         }
         const lotInfo = entries[0]?.lot_no ? `Lot: ${entries[0].lot_no}` : '';
 
