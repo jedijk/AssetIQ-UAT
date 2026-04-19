@@ -1395,6 +1395,9 @@ const FailureModesPage = () => {
                       if (curr.category !== prev.category) {
                         changes.push({ field: 'Category', from: prev.category, to: curr.category });
                       }
+                      if ((curr.failure_mode_type || 'generic') !== (prev.failure_mode_type || 'generic')) {
+                        changes.push({ field: 'Type', from: prev.failure_mode_type || 'generic', to: curr.failure_mode_type || 'generic' });
+                      }
                       if (curr.severity !== prev.severity) {
                         changes.push({ field: 'Severity', from: prev.severity, to: curr.severity });
                       }
@@ -1491,6 +1494,9 @@ const FailureModesPage = () => {
                     }
                     if (thisVersion.category !== newer.category) {
                       changes.push({ field: 'Category', from: thisVersion.category, to: newer.category });
+                    }
+                    if ((thisVersion.failure_mode_type || 'generic') !== (newer.failure_mode_type || 'generic')) {
+                      changes.push({ field: 'Type', from: thisVersion.failure_mode_type || 'generic', to: newer.failure_mode_type || 'generic' });
                     }
                     if (thisVersion.severity !== newer.severity) {
                       changes.push({ field: 'Severity', from: thisVersion.severity, to: newer.severity });
