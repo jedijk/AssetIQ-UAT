@@ -51,6 +51,9 @@ class ParseTemplate(BaseModel):
     # Header metadata to extract and attach to all records
     # Format: [{"name": "input_material", "row": 9, "col": 5}, {"name": "supplier", "row": 9, "col": 8}]
     header_metadata: Optional[List[dict]] = None
+    # Secondary sheet data to join by time
+    # Format: {"sheet": "Sample List", "start_row": 16, "time_col": 1, "data_cols": [{"col": 3, "name": "mooney_viscosity"}]}
+    secondary_sheet: Optional[dict] = None
 
 class IngestRequest(BaseModel):
     job_id: str
@@ -373,6 +376,7 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
     import openpyxl
 
     all_rows = []  # Keep all rows including header section for date extraction
+    secondary_data = {}  # Data from secondary sheet keyed by time
     
     if ext == "xls":
         import xlrd
@@ -380,11 +384,64 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
         ws = wb.sheet_by_index(0)
         for r in range(ws.nrows):
             all_rows.append([str(ws.cell_value(r, c)) for c in range(ws.ncols)])
+        
+        # Handle secondary sheet for xls
+        if template.secondary_sheet and len(wb.sheet_names()) > 1:
+            sheet_name = template.secondary_sheet.get("sheet", "")
+            if sheet_name in wb.sheet_names():
+                ws2 = wb.sheet_by_name(sheet_name)
+                start_row = template.secondary_sheet.get("start_row", 1) - 1
+                time_col = template.secondary_sheet.get("time_col", 0)
+                data_cols = template.secondary_sheet.get("data_cols", [])
+                
+                for r in range(start_row, ws2.nrows):
+                    time_val = str(ws2.cell_value(r, time_col)).strip()
+                    if time_val and time_val != "None":
+                        row_data = {}
+                        for dc in data_cols:
+                            col_idx = dc.get("col", 0)
+                            col_name = dc.get("name", f"col_{col_idx}")
+                            if col_idx < ws2.ncols:
+                                val = str(ws2.cell_value(r, col_idx)).strip()
+                                if val and val != "None":
+                                    row_data[col_name] = val
+                        if row_data:
+                            # Normalize time for matching (handle both HH:MM:SS and datetime formats)
+                            time_key = time_val.split()[-1] if " " in time_val else time_val
+                            secondary_data[time_key] = row_data
+                            logger.debug(f"[Excel Parse] Secondary sheet time {time_key}: {row_data}")
     else:
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
         ws = wb.active
         for row in ws.iter_rows(values_only=True):
             all_rows.append([str(c) if c is not None else "" for c in row])
+        
+        # Handle secondary sheet for xlsx
+        if template.secondary_sheet:
+            sheet_name = template.secondary_sheet.get("sheet", "")
+            if sheet_name in wb.sheetnames:
+                ws2 = wb[sheet_name]
+                start_row = template.secondary_sheet.get("start_row", 1)
+                time_col = template.secondary_sheet.get("time_col", 0)
+                data_cols = template.secondary_sheet.get("data_cols", [])
+                
+                for i, row in enumerate(ws2.iter_rows(min_row=start_row, values_only=True), start=start_row):
+                    time_val = str(row[time_col]).strip() if time_col < len(row) and row[time_col] else ""
+                    if time_val and time_val != "None":
+                        row_data = {}
+                        for dc in data_cols:
+                            col_idx = dc.get("col", 0)
+                            col_name = dc.get("name", f"col_{col_idx}")
+                            if col_idx < len(row) and row[col_idx]:
+                                val = str(row[col_idx]).strip()
+                                if val and val != "None":
+                                    row_data[col_name] = val
+                        if row_data:
+                            # Normalize time for matching
+                            time_key = time_val.split()[-1] if " " in time_val else time_val
+                            secondary_data[time_key] = row_data
+                            logger.debug(f"[Excel Parse] Secondary sheet time {time_key}: {row_data}")
+        
         wb.close()
 
     if not all_rows:
@@ -482,6 +539,13 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
             record["timestamp"] = parsed_ts
             if not parsed_ts:
                 record["_errors"] = record.get("_errors", []) + [f"Invalid timestamp: {ts_val}"]
+            
+            # Join secondary sheet data by time
+            if secondary_data and ts_val:
+                time_key = ts_val.split()[-1] if " " in ts_val else ts_val
+                if time_key in secondary_data:
+                    record.update(secondary_data[time_key])
+                    logger.debug(f"[Excel Parse] Joined secondary data for time {time_key}")
         else:
             record["timestamp"] = None
             if mapping.timestamp:
