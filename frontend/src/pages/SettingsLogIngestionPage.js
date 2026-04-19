@@ -1521,12 +1521,54 @@ function LogDashboard() {
           </Card>
 
           {/* Data Table Toggle */}
+          {/* Input Material card — separate from production log, matching Production Dashboard */}
+          {(() => {
+            const materials = entries.reduce((acc, e) => {
+              if (e.input_material || e.supplier || e.lot_no) {
+                const key = `${e.input_material || ''}-${e.supplier || ''}-${e.lot_no || ''}`;
+                if (!acc.some(m => `${m.material}-${m.supplier}-${m.lot_no}` === key)) {
+                  acc.push({ material: e.input_material || '', supplier: e.supplier || '', bag_no: e.bag_no || '', lot_no: e.lot_no || '' });
+                }
+              }
+              return acc;
+            }, []);
+            return materials.length > 0 ? (
+              <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="input-material-panel">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-slate-700">Input Material</h3>
+                  <Badge variant="secondary" className="text-xs">{materials.length}</Badge>
+                </div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Material</th>
+                      <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Supplier</th>
+                      <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Bag No.</th>
+                      <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Lot No.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {materials.map((m, i) => (
+                      <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
+                        <td className="py-1.5 px-1 text-slate-700">{m.material || "—"}</td>
+                        <td className="py-1.5 px-1 text-slate-700">{m.supplier || "—"}</td>
+                        <td className="py-1.5 px-1 text-slate-700 tabular-nums">{m.bag_no || "—"}</td>
+                        <td className="py-1.5 px-1 text-slate-700">{m.lot_no || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null;
+          })()}
+
+          {/* Production Log table — matching Production Dashboard format */}
           <Card>
             <CardHeader className="py-3 px-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Database className="w-4 h-4 text-indigo-600" />
-                  Raw Data — {selectedAsset}
+                  Production Log — {selectedAsset}
                 </CardTitle>
                 <Button 
                   variant="outline" 
@@ -1554,7 +1596,7 @@ function LogDashboard() {
                     <table className="w-full text-sm" data-testid="production-log-table">
                       <thead>
                         <tr className="border-b border-slate-200">
-                          {["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "Input Material", "Supplier", "Bag No.", "Lot No."].map((h) => (
+                          {["#", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks"].map((h) => (
                             <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap">
                               {h}
                             </th>
@@ -1594,10 +1636,6 @@ function LogDashboard() {
                               <td className="py-2 px-2 tabular-nums">{formatVal(m['T Product IR'])}</td>
                               <td className="py-2 px-2 tabular-nums">{e.mooney_viscosity ? e.mooney_viscosity : <span className="text-amber-500 font-medium">TBD</span>}</td>
                               <td className="py-2 px-2 text-slate-500 text-xs truncate max-w-[120px]" title={e.status || ""}>{e.status || ""}</td>
-                              <td className="py-2 px-2 text-slate-700">{e.input_material || <span className="text-slate-300">—</span>}</td>
-                              <td className="py-2 px-2 text-slate-700">{e.supplier || <span className="text-slate-300">—</span>}</td>
-                              <td className="py-2 px-2 text-slate-700 tabular-nums">{e.bag_no || <span className="text-slate-300">—</span>}</td>
-                              <td className="py-2 px-2 text-slate-700">{e.lot_no || <span className="text-slate-300">—</span>}</td>
                             </tr>
                           );
                         })}

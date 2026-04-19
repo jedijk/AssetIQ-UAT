@@ -1515,27 +1515,55 @@ async def query_entries(
     skip: int = 0,
     current_user: dict = Depends(get_current_user),
 ):
-    """Query production log entries with filters."""
+    """Query production log entries with filters, deduplicating by timestamp+asset_id.
+    When duplicate timestamps exist, prefer the entry with mooney_viscosity data."""
     _owner_only(current_user)
 
-    query = {}
+    match_stage = {}
     if asset_id:
-        query["asset_id"] = asset_id
+        match_stage["asset_id"] = asset_id
     if event_type:
-        query["event_type"] = event_type
+        match_stage["event_type"] = event_type
     if start or end:
         ts_filter = {}
         if start:
             ts_filter["$gte"] = start
         if end:
             ts_filter["$lte"] = end
-        query["timestamp"] = ts_filter
+        match_stage["timestamp"] = ts_filter
 
-    entries = await db.production_logs.find(
-        query, {"_id": 0}
-    ).sort("timestamp", -1).skip(skip).limit(limit).to_list(limit)
+    pipeline = [
+        {"$match": match_stage} if match_stage else {"$match": {}},
+        # Sort so entries WITH mooney_viscosity come first (non-empty string > empty)
+        {"$addFields": {
+            "_has_visc": {"$cond": [
+                {"$gt": [{"$ifNull": ["$mooney_viscosity", ""]}, ""]},
+                1, 0
+            ]}
+        }},
+        {"$sort": {"timestamp": -1, "_has_visc": -1}},
+        # Group by timestamp+asset_id, keep the first (which has viscosity if available)
+        {"$group": {
+            "_id": {"timestamp": "$timestamp", "asset_id": "$asset_id"},
+            "doc": {"$first": "$$ROOT"}
+        }},
+        {"$replaceRoot": {"newRoot": "$doc"}},
+        {"$project": {"_id": 0, "_has_visc": 0}},
+        {"$sort": {"timestamp": -1}},
+        {"$skip": skip},
+        {"$limit": limit},
+    ]
 
-    total = await db.production_logs.count_documents(query)
+    entries = await db.production_logs.aggregate(pipeline).to_list(limit)
+
+    # Count deduplicated total
+    count_pipeline = [
+        {"$match": match_stage} if match_stage else {"$match": {}},
+        {"$group": {"_id": {"timestamp": "$timestamp", "asset_id": "$asset_id"}}},
+        {"$count": "total"},
+    ]
+    count_result = await db.production_logs.aggregate(count_pipeline).to_list(1)
+    total = count_result[0]["total"] if count_result else 0
 
     return {"entries": entries, "total": total, "limit": limit, "skip": skip}
 
