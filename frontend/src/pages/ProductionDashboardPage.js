@@ -1717,12 +1717,19 @@ export default function ProductionDashboardPage() {
             )}
 
             {filteredLog.length > 0 && (
-              <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
-                <span className="text-xs text-slate-500">{filteredLog.length} entries</span>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <span>Screen changes: {data?.screen_changes?.length || 0}</span>
-                  <span className="text-slate-300">|</span>
-                  <span>Magnet cleanings: {data?.magnet_cleanings?.length || 0}</span>
+              <div className="mt-3 pt-2 border-t border-slate-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500">{filteredLog.length} entries</span>
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <span>Screen changes: {data?.screen_changes?.length || 0}</span>
+                    <span className="text-slate-300">|</span>
+                    <span>Magnet cleanings: {data?.magnet_cleanings?.length || 0}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 text-[10px]">
+                  <div className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm bg-amber-50 border border-amber-200" /><span className="text-slate-500">Viscosity anomaly (&gt;4 MU from avg)</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm bg-purple-50 border border-purple-300" /><span className="text-slate-500">Selected point</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm bg-blue-50 border border-blue-100" /><span className="text-slate-500">Viscosity-only sample</span></div>
                 </div>
               </div>
             )}
