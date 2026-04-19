@@ -977,7 +977,7 @@ export default function ProductionDashboardPage() {
       try {
         const d = new Date(bucket + "T12:00:00");
         if (["6m", "1y", "ytd"].includes(period)) {
-          return `${d.getDate()} ${months[d.getMonth()].substring(0,3)}`;
+          return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
         }
         return `${d.getDate()} ${months[d.getMonth()]}`;
       } catch { return bucket; }
