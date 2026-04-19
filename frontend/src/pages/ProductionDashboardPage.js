@@ -618,6 +618,55 @@ export default function ProductionDashboardPage() {
   const prevDay = () => { const d = new Date(fromDate.getTime() - 86400000); setFromDate(d); setToDate(d); };
   const nextDay = () => { const d = new Date(fromDate.getTime() + 86400000); setFromDate(d); setToDate(d); };
 
+  // Period-aware navigation (month/year stepping)
+  const stepPeriod = (direction) => {
+    const dir = direction; // -1 or +1
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+
+    switch (period) {
+      case "1w": {
+        from.setDate(from.getDate() + dir * 7);
+        to.setDate(to.getDate() + dir * 7);
+        break;
+      }
+      case "1m": {
+        from.setMonth(from.getMonth() + dir);
+        to.setMonth(to.getMonth() + dir);
+        break;
+      }
+      case "3m": {
+        from.setMonth(from.getMonth() + dir * 3);
+        to.setMonth(to.getMonth() + dir * 3);
+        break;
+      }
+      case "6m": {
+        from.setMonth(from.getMonth() + dir * 6);
+        to.setMonth(to.getMonth() + dir * 6);
+        break;
+      }
+      case "1y": {
+        from.setFullYear(from.getFullYear() + dir);
+        to.setFullYear(to.getFullYear() + dir);
+        break;
+      }
+      case "ytd": {
+        // Step by year
+        from.setFullYear(from.getFullYear() + dir);
+        to.setFullYear(to.getFullYear() + dir);
+        from.setMonth(0, 1); // Jan 1
+        break;
+      }
+      default:
+        // custom or unknown — step by the current range size
+        const rangeMs = to.getTime() - from.getTime();
+        from.setTime(from.getTime() + dir * rangeMs);
+        to.setTime(to.getTime() + dir * rangeMs);
+    }
+    setFromDate(from);
+    setToDate(to);
+  };
+
   // Filtered production log
   const filteredLog = useMemo(() => {
     if (!data?.production_log) return [];
@@ -806,6 +855,18 @@ export default function ProductionDashboardPage() {
                     data-testid="mobile-date-picker"
                   />
                 )}
+              </div>
+            )}
+
+            {/* Period navigation arrows for non-day modes */}
+            {period !== "1d" && !showCustomDate && (
+              <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={() => stepPeriod(-1)} data-testid="prev-period">
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={() => stepPeriod(1)} data-testid="next-period">
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
               </div>
             )}
 
