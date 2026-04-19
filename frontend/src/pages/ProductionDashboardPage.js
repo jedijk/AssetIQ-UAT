@@ -923,21 +923,23 @@ export default function ProductionDashboardPage() {
     const magnetCleanings = chartSeries.magnetCleaning ? new Set((data?.magnet_cleanings || []).map(s => s.time)) : new Set();
 
     if (!isMultiDay) {
-      // Single day: use time (HH:MM) as key — original behavior
+      // Single day: use time (HH:MM) as key
+      // Build viscosity lookup by time
+      const viscByTime = {};
+      viscSeries.forEach((v) => { if (v.time) viscByTime[v.time] = v.viscosity; });
+
       const timeMap = {};
-      log.forEach((entry, i) => {
+      log.forEach((entry) => {
         timeMap[entry.time] = {
           time: entry.time,
           rpm: entry.rpm, feed: entry.feed, mp4: entry.mp4, t_product_ir: entry.t_product_ir,
-          viscosity: i < viscVals.length ? viscVals[i] : null,
+          viscosity: viscByTime[entry.time] ?? null,
           screenChange: null, magnetCleaning: null,
         };
       });
       viscSeries.forEach((v) => {
         if (!timeMap[v.time]) {
           timeMap[v.time] = { time: v.time, viscosity: v.viscosity, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null };
-        } else if (timeMap[v.time].viscosity == null) {
-          timeMap[v.time].viscosity = v.viscosity;
         }
       });
       const addEvent = (timeSet, fieldName) => {
@@ -980,9 +982,16 @@ export default function ProductionDashboardPage() {
       } catch { return bucket; }
     };
 
+    // Build viscosity lookup by datetime for multi-day
+    const viscByDatetime = {};
+    viscSeries.forEach((v) => {
+      if (v.datetime) viscByDatetime[v.datetime] = v.viscosity;
+      else if (v.time) viscByDatetime[v.time] = v.viscosity;
+    });
+
     // Aggregate into buckets
     const buckets = {};
-    log.forEach((entry, i) => {
+    log.forEach((entry) => {
       const dt = entry.datetime || "";
       const bucket = getBucket(dt);
       if (!bucket) return;
@@ -993,7 +1002,8 @@ export default function ProductionDashboardPage() {
       if (entry.feed) buckets[bucket].feeds.push(entry.feed);
       if (entry.mp4) buckets[bucket].mp4s.push(entry.mp4);
       if (entry.t_product_ir) buckets[bucket].t_irs.push(entry.t_product_ir);
-      const visc = i < viscVals.length ? viscVals[i] : null;
+      // Match viscosity by datetime
+      const visc = viscByDatetime[dt] ?? null;
       if (visc != null) buckets[bucket].viscosities.push(visc);
     });
     // Add viscosity from series not in log
