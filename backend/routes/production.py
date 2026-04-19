@@ -903,6 +903,8 @@ async def generate_machine_analysis(
         except: pass
         try:
             moist = float(m.get("M%", 0) or 0)
+            if 0 < moist < 1:
+                moist = round(moist * 100, 1)
             if moist > 0:
                 days[date]["moistures"].append(moist)
         except: pass
@@ -1003,7 +1005,7 @@ BEST PERFORMING DAYS (viscosity in range, low variation):
 WORST PERFORMING DAYS (out of range or high variation):
 {bad_text}
 
-CONTROLLABLE INPUTS: RPM, Feed rate (kg/h), M% (moisture % of feed product), MT1/MT2/MT3 (temperatures)
+CONTROLLABLE INPUTS: RPM, Feed rate (kg/h), M% (moisture percentage of feed product, shown as 80-90 not 0.80-0.90), MT1/MT2/MT3 (temperatures)
 QUALITY OUTCOMES: Mooney Viscosity (target 50-60 MU), RSD (target <5%), Waste (minimize)
 
 Analyze the data and provide:
@@ -1023,7 +1025,7 @@ Return ONLY valid JSON with this structure:
   "optimal_settings": {{
     "RPM": {{"recommended": 165, "range": [160, 170], "unit": "rpm"}},
     "Feed": {{"recommended": 520, "range": [500, 540], "unit": "kg/h"}},
-    "Moisture": {{"recommended": 0.85, "range": [0.80, 0.90], "unit": "%"}},
+    "Moisture": {{"recommended": 85, "range": [80, 90], "unit": "%"}},
     "MT1": {{"recommended": 210, "range": [200, 220], "unit": "°C"}},
     "MT2": {{"recommended": 168, "range": [160, 175], "unit": "°C"}},
     "MT3": {{"recommended": 155, "range": [145, 165], "unit": "°C"}}
