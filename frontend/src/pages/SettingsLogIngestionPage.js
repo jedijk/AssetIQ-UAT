@@ -1555,7 +1555,7 @@ function LogDashboard() {
                       <thead className="bg-slate-50 sticky top-0">
                         <tr>
                           <th className="px-3 py-2 text-left font-medium text-slate-600">Timestamp</th>
-                          {entries[0]?.metrics && Object.keys(entries[0].metrics).slice(0, 10).map(k => (
+                          {entries[0]?.metrics && Object.keys(entries[0].metrics).map(k => (
                             <th key={k} className="px-3 py-2 text-left font-medium text-slate-600 whitespace-nowrap">{k}</th>
                           ))}
                         </tr>
@@ -1566,7 +1566,7 @@ function LogDashboard() {
                             <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
                               {new Date(e.timestamp).toLocaleString()}
                             </td>
-                            {e.metrics && Object.keys(entries[0].metrics).slice(0, 10).map(k => {
+                            {e.metrics && Object.keys(entries[0].metrics).map(k => {
                               let val = e.metrics[k];
                               // Convert M% from decimal to percentage
                               if (k === 'M%' && typeof val === 'number') {
