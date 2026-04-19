@@ -1649,7 +1649,7 @@ export default function ProductionDashboardPage() {
                           ref={isHighlighted ? (el) => el?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined}
                         >
                           <td className="py-2 px-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
-                          <td className="py-2 px-2 text-slate-500 text-xs tabular-nums whitespace-nowrap">{entry.datetime ? new Date(entry.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'}) : ''}</td>
+                          <td className="py-2 px-2 text-slate-500 text-xs tabular-nums whitespace-nowrap">{entry.datetime ? new Date(entry.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : ''}</td>
                           <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{entry.time}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.rpm}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.feed}</td>
