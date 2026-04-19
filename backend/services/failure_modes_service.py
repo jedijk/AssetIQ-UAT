@@ -305,6 +305,7 @@ class FailureModesService:
             "category", "equipment", "failure_mode", "keywords",
             "severity", "occurrence", "detectability",
             "recommended_actions", "equipment_type_ids", "mechanism",
+            "failure_mode_type",
             # New fields for failure mode enhancements
             "process", "potential_effects", "potential_causes", "iso14224_mechanism"
         ]
@@ -365,6 +366,11 @@ class FailureModesService:
                 "recommended_actions": doc.get("recommended_actions", []),
                 "equipment_type_ids": doc.get("equipment_type_ids", []),
                 "mechanism": doc.get("mechanism"),
+                "failure_mode_type": doc.get("failure_mode_type", "generic"),
+                "process": doc.get("process"),
+                "potential_effects": doc.get("potential_effects"),
+                "potential_causes": doc.get("potential_causes"),
+                "iso14224_mechanism": doc.get("iso14224_mechanism"),
                 "is_validated": doc.get("is_validated", False),
                 "validated_by_name": doc.get("validated_by_name"),
                 "validated_by_position": doc.get("validated_by_position"),

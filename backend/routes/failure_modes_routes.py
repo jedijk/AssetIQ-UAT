@@ -386,6 +386,7 @@ class FailureModeUpdate(BaseModel):
     potential_causes: Optional[Any] = None
     iso14224_mechanism: Optional[str] = None
     failure_mode_type: Optional[str] = None
+    change_reason: Optional[str] = None
 
     model_config = {"extra": "ignore"}
 
@@ -565,11 +566,14 @@ async def update_failure_mode(
             update_data["potential_causes"] = data.potential_causes
         if data.iso14224_mechanism is not None:
             update_data["iso14224_mechanism"] = data.iso14224_mechanism
+        if data.failure_mode_type is not None:
+            update_data["failure_mode_type"] = data.failure_mode_type
         
         result = await failure_modes_service.update(
             mode_id, 
             update_data,
-            updated_by=current_user.get("name", current_user.get("email", "Unknown"))
+            updated_by=current_user.get("name", current_user.get("email", "Unknown")),
+            change_reason=data.change_reason
         )
         
         if result:

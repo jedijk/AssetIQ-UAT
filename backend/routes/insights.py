@@ -253,21 +253,21 @@ async def get_data_quality_metrics(
     
     try:
         async def fetch_metrics():
-            # Parallel count queries
-            total_task = db.equipment.count_documents({})
-            crit_task = db.equipment.count_documents({
+            # Parallel count queries - use correct collections
+            total_task = db.equipment_nodes.count_documents({})
+            crit_task = db.equipment_nodes.count_documents({
                 "$or": [
                     {"criticality": {"$exists": True, "$nin": [None, ""]}},
                     {"criticality_score": {"$exists": True, "$ne": None}}
                 ]
             })
-            type_task = db.equipment.count_documents({
+            type_task = db.equipment_nodes.count_documents({
                 "$or": [
-                    {"type": {"$exists": True, "$nin": [None, ""]}},
-                    {"equipment_type": {"$exists": True, "$nin": [None, ""]}}
+                    {"equipment_type_id": {"$exists": True, "$nin": [None, ""]}},
+                    {"type": {"$exists": True, "$nin": [None, ""]}}
                 ]
             })
-            fmea_task = db.equipment_fmea.count_documents({})
+            fmea_task = db.failure_modes.count_documents({})
             
             total, with_crit, with_type, fmea_count = await asyncio.gather(
                 total_task, crit_task, type_task, fmea_task
@@ -373,13 +373,13 @@ async def get_reliability_gaps(
                 })
             
             # 3. Critical assets without FMEA - simplified
-            critical_equipment = await db.equipment.count_documents({
+            critical_equipment = await db.equipment_nodes.count_documents({
                 "$or": [
                     {"criticality": {"$in": ["high", "High", "critical", "Critical", "a", "A", "1"]}},
                     {"criticality_score": {"$gte": 8}}
                 ]
             })
-            fmea_count = await db.equipment_fmea.count_documents({})
+            fmea_count = await db.failure_modes.count_documents({})
             
             # Estimate critical without FMEA (simplified - may have duplicates)
             critical_without_fmea_est = max(0, critical_equipment - fmea_count)
@@ -600,30 +600,37 @@ async def get_insights_summary(
         # Use asyncio.wait_for for timeout protection
         async def fetch_summary():
             # Parallel count queries for performance
+            # Use correct collections: equipment_nodes for equipment, failure_modes for FMEA
             total_actions_task = db.central_actions.count_documents({})
+            actions_alt_task = db.actions.count_documents({})
             completed_actions_task = db.central_actions.count_documents({
                 "status": {"$in": ["completed", "Completed", "done", "Done", "closed", "Closed"]}
             })
-            total_equipment_task = db.equipment.count_documents({})
-            equipment_with_criticality_task = db.equipment.count_documents({
+            completed_actions_alt_task = db.actions.count_documents({
+                "status": {"$in": ["completed", "Completed", "done", "Done", "closed", "Closed"]}
+            })
+            total_equipment_task = db.equipment_nodes.count_documents({})
+            equipment_with_criticality_task = db.equipment_nodes.count_documents({
                 "$or": [
                     {"criticality": {"$exists": True, "$nin": [None, ""]}},
                     {"criticality_score": {"$exists": True, "$ne": None}}
                 ]
             })
-            equipment_with_type_task = db.equipment.count_documents({
+            equipment_with_type_task = db.equipment_nodes.count_documents({
                 "$or": [
-                    {"type": {"$exists": True, "$nin": [None, ""]}},
-                    {"equipment_type": {"$exists": True, "$nin": [None, ""]}}
+                    {"equipment_type_id": {"$exists": True, "$nin": [None, ""]}},
+                    {"type": {"$exists": True, "$nin": [None, ""]}}
                 ]
             })
-            fmea_count_task = db.equipment_fmea.count_documents({})
+            fmea_count_task = db.failure_modes.count_documents({})
             threats_count_task = db.threats.count_documents({})
             
             # Execute all count queries in parallel
             (
                 total_actions,
+                total_actions_alt,
                 completed_actions,
+                completed_actions_alt,
                 total_equipment,
                 equipment_with_criticality,
                 equipment_with_type,
@@ -631,13 +638,19 @@ async def get_insights_summary(
                 threats_count
             ) = await asyncio.gather(
                 total_actions_task,
+                actions_alt_task,
                 completed_actions_task,
+                completed_actions_alt_task,
                 total_equipment_task,
                 equipment_with_criticality_task,
                 equipment_with_type_task,
                 fmea_count_task,
                 threats_count_task
             )
+            
+            # Combine action counts from both collections
+            total_actions = total_actions + total_actions_alt
+            completed_actions = completed_actions + completed_actions_alt
             
             # Calculate metrics
             success_rate = round((completed_actions / total_actions * 100), 1) if total_actions > 0 else 0
