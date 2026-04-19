@@ -899,7 +899,7 @@ export default function ProductionDashboardPage() {
       }));
 
     const merged = [...data.production_log, ...standaloneVisc].sort((a, b) =>
-      (a.time || "").localeCompare(b.time || "")
+      (a.datetime || a.time || "").localeCompare(b.datetime || b.time || "")
     );
 
     if (!logSearch) return merged;
