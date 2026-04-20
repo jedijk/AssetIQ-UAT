@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { getApiUrl } from "../lib/apiConfig";
 import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtils";
@@ -32,6 +32,12 @@ export const AuthProvider = ({ children }) => {
 
   // Track if we're in the middle of a login/auth operation to avoid duplicate fetches
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  
+  // Use a ref to check user state without adding it as a dependency
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     if (token) {
@@ -39,7 +45,7 @@ export const AuthProvider = ({ children }) => {
       // Only fetch user if:
       // 1. We're not in the middle of a login operation (login sets user directly)
       // 2. User is not already loaded (prevents double-fetch after login)
-      if (!isAuthenticating && !user) {
+      if (!isAuthenticating && !userRef.current) {
         fetchUser();
       } else {
         // Token exists, either authenticating or user already loaded
@@ -48,9 +54,6 @@ export const AuthProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
-    // Note: We intentionally only depend on token and isAuthenticating.
-    // We don't want to re-run when user changes (that would cause infinite loops).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, isAuthenticating]);
 
   const fetchUser = async () => {
