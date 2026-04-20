@@ -303,7 +303,8 @@ const SettingsUserManagementPage = () => {
       setDeleteConfirmUser(null);
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to delete user");
+      const errorMessage = error.response?.data?.detail || error.message || "Failed to delete user";
+      toast.error(errorMessage);
       setDeleteConfirmUser(null);
     }
   });
@@ -730,10 +731,12 @@ const SettingsUserManagementPage = () => {
                         )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
-                          className="text-red-600"
-                          onClick={() => setDeleteConfirmUser(user)}
+                          className={user.id === currentUser?.id ? "text-gray-400 cursor-not-allowed" : "text-red-600"}
+                          onClick={() => user.id !== currentUser?.id && setDeleteConfirmUser(user)}
+                          disabled={user.id === currentUser?.id}
                         >
-                          <Trash2 className="w-4 h-4 mr-2" /> Delete
+                          <Trash2 className="w-4 h-4 mr-2" /> 
+                          {user.id === currentUser?.id ? "Cannot delete yourself" : "Delete"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -1409,11 +1412,13 @@ const SettingsUserManagementPage = () => {
                             )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
-                              className="text-red-600"
-                              onClick={() => setDeleteConfirmUser(user)}
+                              className={user.id === currentUser?.id ? "text-gray-400 cursor-not-allowed" : "text-red-600"}
+                              onClick={() => user.id !== currentUser?.id && setDeleteConfirmUser(user)}
                               data-testid={`delete-user-${user.id}`}
+                              disabled={user.id === currentUser?.id}
                             >
-                              <Trash2 className="w-4 h-4 mr-2" /> Delete User
+                              <Trash2 className="w-4 h-4 mr-2" /> 
+                              {user.id === currentUser?.id ? "Cannot delete yourself" : "Delete User"}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
