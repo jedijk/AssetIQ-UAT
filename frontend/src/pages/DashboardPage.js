@@ -1537,9 +1537,51 @@ export default function DashboardPage({ initialTab }) {
                 )}
               </div>
               
+              {/* AI Vision Photo - shown when submission contains __ai_scan_photo */}
+              {(() => {
+                const allResponses = quickViewSubmission?.values || quickViewSubmission?.responses || [];
+                const aiPhotoEntry = allResponses.find(r => r.field_id === "__ai_scan_photo" && r.value);
+                const aiPhotoPath = aiPhotoEntry?.value
+                  || quickViewSubmission?.ai_extraction?.extracted_fields?.__ai_scan_photo?.value;
+                if (!aiPhotoPath || typeof aiPhotoPath !== "string") return null;
+                const apiPath = aiPhotoPath.startsWith("http") || aiPhotoPath.startsWith("data:")
+                  ? aiPhotoPath
+                  : `/api/storage/${aiPhotoPath}`;
+                return (
+                  <div data-testid="quickview-ai-vision-photo">
+                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-blue-500" />
+                      AI Vision Photo
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setViewingImage({ url: apiPath, name: "AI Vision Photo" })}
+                      className="group relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 hover:border-blue-300 hover:shadow-md transition-all"
+                      data-testid="quickview-ai-vision-photo-thumbnail"
+                    >
+                      <AuthenticatedImage
+                        src={apiPath}
+                        alt="AI Vision Source Photo"
+                        className="w-full max-h-72 object-contain bg-slate-100"
+                        fallback={
+                          <div className="w-full h-40 flex flex-col items-center justify-center text-slate-400 gap-2">
+                            <AlertTriangle className="w-8 h-8" />
+                            <span className="text-xs">Photo unavailable</span>
+                          </div>
+                        }
+                      />
+                    </button>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Source image used by AI to auto-fill the fields below. Tap to enlarge.
+                    </p>
+                  </div>
+                );
+              })()}
+
               {/* Checklist Section */}
               {(() => {
-                const responses = quickViewSubmission?.values || quickViewSubmission?.responses || [];
+                const responsesAll = quickViewSubmission?.values || quickViewSubmission?.responses || [];
+                const responses = responsesAll.filter(r => r.field_id !== "__ai_scan_photo");
                 if (responses.length === 0) return null;
                 
                 return (
@@ -1655,7 +1697,7 @@ export default function DashboardPage({ initialTab }) {
                   </h3>
                   <div className="bg-slate-50 rounded-lg p-4 space-y-2">
                     {(() => {
-                      const responses = quickViewSubmission?.values || [];
+                      const responses = (quickViewSubmission?.values || []).filter(r => r.field_id !== "__ai_scan_photo");
                       const totalItems = responses.length;
                       const passedItems = responses.filter(r => {
                         const isBoolean = typeof r.value === "boolean";
@@ -1707,7 +1749,7 @@ export default function DashboardPage({ initialTab }) {
                     </h4>
                     <p className="text-sm text-slate-600">
                       {(() => {
-                        const responses = quickViewSubmission?.values || [];
+                        const responses = (quickViewSubmission?.values || []).filter(r => r.field_id !== "__ai_scan_photo");
                         const criticalItems = responses.filter(r => r.threshold_status === "critical").length;
                         const warningItems = responses.filter(r => r.threshold_status === "warning").length;
                         
