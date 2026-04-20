@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useLanguage } from "../contexts/LanguageContext";
-import { AuthenticatedImage } from "../components/AuthenticatedMedia";
+import { AuthenticatedImage, useAuthenticatedMedia } from "../components/AuthenticatedMedia";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -1320,77 +1320,92 @@ export default function FormSubmissionsPage() {
 
       {/* Image Lightbox - Using Portal to render above all dialogs */}
       {viewingImage && createPortal(
-        <div 
-          data-testid="image-lightbox"
-          className="fixed inset-0 z-[9999] bg-black flex items-center justify-center p-2 sm:p-4"
-          onClick={() => setViewingImage(null)}
-        >
-          {/* Close button - Fixed position in top right corner, larger on mobile */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-2 right-2 sm:top-4 sm:right-4 text-white hover:bg-white/20 active:bg-white/30 z-10 w-12 h-12 sm:w-10 sm:h-10 rounded-full bg-black/40"
-            onClick={(e) => {
-              e.stopPropagation();
-              setViewingImage(null);
-            }}
-          >
-            <X className="w-7 h-7 sm:w-6 sm:h-6" />
-          </Button>
-          
-          {/* Download button - Fixed position in top left corner, icon-only on mobile */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 left-2 sm:top-4 sm:left-4 text-white hover:bg-white/20 active:bg-white/30 z-10 h-12 sm:h-auto px-3 sm:px-4 rounded-full sm:rounded-md bg-black/40"
-            onClick={(e) => {
-              e.stopPropagation();
-              const link = document.createElement('a');
-              link.href = viewingImage.url;
-              link.download = viewingImage.name;
-              link.click();
-            }}
-          >
-            <Download className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Download</span>
-          </Button>
-          
-          <div className="relative max-w-full max-h-full flex items-center justify-center">
-            {/* Loading spinner - shown while image loads - matching statistics page style */}
-            <div id="lightbox-loading-forms" className="absolute inset-0 flex items-center justify-center">
-              <div className="animate-spin h-10 w-10 border-3 border-amber-500 border-t-transparent rounded-full" />
-            </div>
-            {/* Image - Tap anywhere outside to close */}
-            <img
-              src={viewingImage.url}
-              alt={viewingImage.name}
-              className="max-w-full max-h-[80vh] sm:max-h-[85vh] object-contain rounded-lg shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-              onLoad={(e) => {
-                // Hide loading spinner when image loads
-                const spinner = document.getElementById('lightbox-loading-forms');
-                if (spinner) spinner.style.display = 'none';
-              }}
-              onError={(e) => {
-                // Hide spinner and show error on failure
-                const spinner = document.getElementById('lightbox-loading-forms');
-                if (spinner) spinner.innerHTML = '<div class="text-white/70 text-center"><p class="text-lg mb-2">Failed to load image</p><p class="text-sm">Click anywhere to close</p></div>';
-              }}
-            />
-            
-            {/* File name - Positioned below image */}
-            <div className="absolute -bottom-8 sm:-bottom-10 left-0 right-0 text-center px-4">
-              <p className="text-white/80 text-xs sm:text-sm truncate">{viewingImage.name}</p>
-            </div>
-          </div>
-          
-          {/* Tap to close hint on mobile */}
-          <p className="absolute bottom-4 left-0 right-0 text-center text-white/50 text-xs sm:hidden">
-            Tap outside image to close
-          </p>
-        </div>,
+        <LightboxPortal viewingImage={viewingImage} onClose={() => setViewingImage(null)} />,
         document.body
       )}
     </div>
   );
 }
+
+// Inline lightbox rendered inside a portal. Uses authenticated blob URL so that
+// images served from /api/storage/... (which require Bearer auth) load correctly.
+const LightboxPortal = ({ viewingImage, onClose }) => {
+  const isDataOrBlob = typeof viewingImage.url === "string" &&
+    (viewingImage.url.startsWith("data:") || viewingImage.url.startsWith("blob:") || viewingImage.url.startsWith("http"));
+
+  const { blobUrl, isLoading, error } = useAuthenticatedMedia(isDataOrBlob ? null : viewingImage.url);
+  const displayUrl = isDataOrBlob ? viewingImage.url : blobUrl;
+  const loading = !isDataOrBlob && isLoading;
+  const failed = !isDataOrBlob && error;
+
+  const handleDownload = (e) => {
+    e.stopPropagation();
+    if (!displayUrl) return;
+    const link = document.createElement('a');
+    link.href = displayUrl;
+    link.download = viewingImage.name || 'image';
+    link.click();
+  };
+
+  return (
+    <div
+      data-testid="image-lightbox"
+      className="fixed inset-0 z-[9999] bg-black flex items-center justify-center p-2 sm:p-4"
+      onClick={onClose}
+    >
+      {/* Close button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-2 right-2 sm:top-4 sm:right-4 text-white hover:bg-white/20 active:bg-white/30 z-10 w-12 h-12 sm:w-10 sm:h-10 rounded-full bg-black/40"
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+      >
+        <X className="w-7 h-7 sm:w-6 sm:h-6" />
+      </Button>
+
+      {/* Download button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="absolute top-2 left-2 sm:top-4 sm:left-4 text-white hover:bg-white/20 active:bg-white/30 z-10 h-12 sm:h-auto px-3 sm:px-4 rounded-full sm:rounded-md bg-black/40"
+        onClick={handleDownload}
+        disabled={!displayUrl}
+      >
+        <Download className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+        <span className="hidden sm:inline">Download</span>
+      </Button>
+
+      <div className="relative max-w-full max-h-full flex items-center justify-center">
+        {loading && (
+          <div className="flex items-center justify-center">
+            <div className="animate-spin h-10 w-10 border-3 border-amber-500 border-t-transparent rounded-full" />
+          </div>
+        )}
+        {failed && (
+          <div className="text-white/70 text-center">
+            <p className="text-lg mb-2">Failed to load image</p>
+            <p className="text-sm">Click anywhere to close</p>
+          </div>
+        )}
+        {displayUrl && !loading && !failed && (
+          <img
+            src={displayUrl}
+            alt={viewingImage.name}
+            className="max-w-full max-h-[80vh] sm:max-h-[85vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+
+        {viewingImage.name && (
+          <div className="absolute -bottom-8 sm:-bottom-10 left-0 right-0 text-center px-4">
+            <p className="text-white/80 text-xs sm:text-sm truncate">{viewingImage.name}</p>
+          </div>
+        )}
+      </div>
+
+      <p className="absolute bottom-4 left-0 right-0 text-center text-white/50 text-xs sm:hidden">
+        Tap outside image to close
+      </p>
+    </div>
+  );
+};
