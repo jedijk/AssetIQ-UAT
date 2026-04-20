@@ -411,8 +411,7 @@ export default function FormSubmissionsPage() {
       // Clear the state so we don't re-open on back navigation
       window.history.replaceState({}, document.title);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state?.submissionId]);
+  }, [location.state?.submissionId]); // eslint-disable-line
 
   // Close image lightbox with Escape key
   const closeImageLightbox = useCallback(() => {
