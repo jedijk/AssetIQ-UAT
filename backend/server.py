@@ -20,10 +20,15 @@ import time
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Single source of truth for the application version.
+# Bump this with each release; the frontend polls /api/health and will force a
+# hard refresh whenever it sees a newer version than the one baked into its bundle.
+APP_VERSION = "3.5.1"
+
 # Create FastAPI app IMMEDIATELY - before any potentially failing imports
 app = FastAPI(
     title="AssetIQ API",
-    version="3.4.6",
+    version=APP_VERSION,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json"
@@ -40,7 +45,7 @@ app.state.ready = False  # Will be set to True after background init
 @app.get("/")
 async def root():
     """Root endpoint for basic verification."""
-    return {"message": "AssetIQ API", "status": "running", "version": "3.4.6"}
+    return {"message": "AssetIQ API", "status": "running", "version": APP_VERSION}
 
 
 @app.get("/health")
@@ -72,7 +77,7 @@ async def api_health_check():
         "database_latency_ms": db_latency,
         "uptime_seconds": uptime,
         "ready": app.state.ready,
-        "version": "3.4.6"
+        "version": APP_VERSION
     }
 
 

@@ -53,51 +53,124 @@ import { useEffect } from "react";
 import "./App.css";
 
 // Current frontend version - update with each release
-const APP_VERSION = "3.5.0";
+const APP_VERSION = "3.5.1";
 
-// Version check hook - compares frontend version with backend
+// Parse a semver string "A.B.C" into comparable tuple [A, B, C]
+const parseVersion = (v) => {
+  if (!v || typeof v !== "string") return [0, 0, 0];
+  const parts = v.split(".").map((p) => parseInt(p, 10) || 0);
+  while (parts.length < 3) parts.push(0);
+  return parts;
+};
+
+// Returns true if remote > local
+const isRemoteNewer = (remote, local) => {
+  const r = parseVersion(remote);
+  const l = parseVersion(local);
+  for (let i = 0; i < 3; i += 1) {
+    if (r[i] > l[i]) return true;
+    if (r[i] < l[i]) return false;
+  }
+  return false;
+};
+
+// Hard reload: unregister service workers, clear caches, reload with cache-busting query
+const forceReload = async (remoteVersion) => {
+  try {
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+  } catch (e) {
+    console.warn("[VersionCheck] SW unregister failed:", e);
+  }
+  try {
+    if ("caches" in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map((name) => caches.delete(name)));
+    }
+  } catch (e) {
+    console.warn("[VersionCheck] Cache clear failed:", e);
+  }
+  localStorage.setItem("app_version", remoteVersion || APP_VERSION);
+  // Cache-busting reload. Keep pathname + hash, replace query with version marker.
+  const url = new URL(window.location.href);
+  url.searchParams.set("v", remoteVersion || APP_VERSION);
+  window.location.replace(url.toString());
+};
+
+// Version check hook - polls backend and forces refresh when a newer version is deployed
 const useVersionCheck = () => {
   useEffect(() => {
+    const backendUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
+    let cancelled = false;
+    let promptedFor = null;
+
     const checkVersion = async () => {
+      if (cancelled) return;
       try {
-        // Remove trailing slash from backend URL if present
-        const backendUrl = (process.env.REACT_APP_BACKEND_URL || '').replace(/\/$/, '');
-        const response = await fetch(`${backendUrl}/api/health`);
+        const response = await fetch(`${backendUrl}/api/health`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (!response.ok) return;
         const data = await response.json();
-        const backendVersion = data.version;
-        
-        // Store the last known version
-        const storedVersion = localStorage.getItem('app_version');
-        
-        if (storedVersion && storedVersion !== APP_VERSION) {
-          // Version changed - clear caches and reload
-          console.log(`Version changed: ${storedVersion} → ${APP_VERSION}`);
-          
-          // Clear service worker caches
-          if ('caches' in window) {
-            const cacheNames = await caches.keys();
-            await Promise.all(cacheNames.map(name => caches.delete(name)));
-          }
-          
-          // Update stored version
-          localStorage.setItem('app_version', APP_VERSION);
-          
-          // Force reload to get fresh assets
-          window.location.reload(true);
+        const backendVersion = data?.version;
+
+        if (backendVersion && isRemoteNewer(backendVersion, APP_VERSION)) {
+          if (promptedFor === backendVersion) return; // already prompted in this tab
+          promptedFor = backendVersion;
+          console.log(`[VersionCheck] Newer version available: ${APP_VERSION} → ${backendVersion}. Forcing refresh.`);
+          // Inline banner + auto-reload after a short delay so the user sees what happened
+          try {
+            const existing = document.getElementById("app-update-banner");
+            if (!existing) {
+              const banner = document.createElement("div");
+              banner.id = "app-update-banner";
+              banner.setAttribute("data-testid", "app-update-banner");
+              banner.style.cssText = [
+                "position:fixed",
+                "top:0",
+                "left:0",
+                "right:0",
+                "z-index:2147483647",
+                "background:linear-gradient(90deg,#2563eb,#1d4ed8)",
+                "color:#fff",
+                "padding:10px 16px",
+                "font:500 13px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+                "text-align:center",
+                "box-shadow:0 2px 8px rgba(0,0,0,0.15)",
+              ].join(";");
+              banner.textContent = `A new version (${backendVersion}) is available. Refreshing…`;
+              document.body.appendChild(banner);
+            }
+          } catch (_) {}
+          setTimeout(() => forceReload(backendVersion), 1200);
           return;
         }
-        
-        // Store current version
-        localStorage.setItem('app_version', APP_VERSION);
-        
-        // Log version info
-        console.log(`App Version: ${APP_VERSION}, API Version: ${backendVersion}`);
+
+        localStorage.setItem("app_version", APP_VERSION);
       } catch (error) {
-        console.log('Version check failed:', error);
+        console.log("[VersionCheck] failed:", error);
       }
     };
-    
-    checkVersion();
+
+    // First check shortly after mount so auth/init aren't disturbed
+    const initialId = setTimeout(checkVersion, 1500);
+    // Poll every 60 seconds
+    const intervalId = setInterval(checkVersion, 60_000);
+    // Re-check when the tab regains focus (common case for long-idle tabs)
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") checkVersion();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(initialId);
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 };
 
