@@ -30,14 +30,28 @@ export const AuthProvider = ({ children }) => {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [mustAcceptTerms, setMustAcceptTerms] = useState(false);
 
+  // Track if we're in the middle of a login/auth operation to avoid duplicate fetches
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      fetchUser();
+      // Only fetch user if:
+      // 1. We're not in the middle of a login operation (login sets user directly)
+      // 2. User is not already loaded (prevents double-fetch after login)
+      if (!isAuthenticating && !user) {
+        fetchUser();
+      } else {
+        // Token exists, either authenticating or user already loaded
+        setLoading(false);
+      }
     } else {
       setLoading(false);
     }
-  }, [token]);
+    // Note: We intentionally only depend on token and isAuthenticating.
+    // We don't want to re-run when user changes (that would cause infinite loops).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, isAuthenticating]);
 
   const fetchUser = async () => {
     try {
@@ -78,6 +92,9 @@ export const AuthProvider = ({ children }) => {
     console.log("[Auth] Login URL:", loginUrl);
     console.log("[Auth] ========================");
     
+    // Mark that we're authenticating to prevent the useEffect from calling fetchUser
+    setIsAuthenticating(true);
+    
     try {
       const response = await axios.post(loginUrl, { email, password });
       const { token: newToken, user: userData, must_change_password } = response.data;
@@ -86,6 +103,7 @@ export const AuthProvider = ({ children }) => {
     axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
     setToken(newToken);
     setUser(userData);
+    setLoading(false);
     setMustChangePassword(must_change_password || userData.must_change_password || false);
     
     // Check if user needs to accept terms (after password change if applicable)
@@ -119,8 +137,14 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("hierarchy-hidden-levels", JSON.stringify(["installation", "plant_unit"]));
     }
 
+    // Clear the authenticating flag now that login is complete
+    setIsAuthenticating(false);
+    
     return { ...userData, must_change_password: must_change_password || userData.must_change_password };
     } catch (error) {
+      // Clear authenticating flag on error
+      setIsAuthenticating(false);
+      
       // Log detailed error for debugging
       console.error("[Auth] Login failed:", error.response?.status, error.response?.data || error.message);
       

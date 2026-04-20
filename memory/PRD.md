@@ -131,3 +131,11 @@ Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset ma
 - Click-to-enlarge via existing lightbox flow
 - File: `/app/frontend/src/pages/FormSubmissionsPage.js` (section ~line 909)
 
+## GDPR Consent Popup Fix (DONE - Apr 20, 2026)
+- Fixed race condition in `AuthContext.js` where `fetchUser()` was being called twice after login
+- Issue: After `login()` completed, the `useEffect` with `[token]` dependency would fire and call `fetchUser()` again, potentially resetting `mustAcceptTerms` state
+- Fix: Added `isAuthenticating` flag to prevent duplicate `fetchUser()` calls during login process
+- The flag is set `true` at login start, `false` after login completes or fails
+- `useEffect` now checks both `isAuthenticating` and `user` state before calling `fetchUser()`
+- File: `/app/frontend/src/contexts/AuthContext.js`
+
