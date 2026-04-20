@@ -330,6 +330,20 @@ const SettingsUserManagementPage = () => {
     }
   });
 
+  // GDPR consent reset — forces user to re-accept Terms & Privacy at next login
+  const resetConsentMutation = useMutation({
+    mutationFn: ({ userId, resetPrivacyConsent }) =>
+      rbacAPI.resetConsent(userId, { reset_terms: true, reset_privacy_consent: !!resetPrivacyConsent }),
+    onSuccess: (data) => {
+      toast.success(data.message || "User will be prompted to re-accept Terms & Privacy at next login");
+      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+    },
+    onError: (error) => {
+      const msg = error?.response?.data?.detail || error.message || "Failed to reset consent";
+      toast.error(msg);
+    }
+  });
+
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: rbacAPI.createUser,
@@ -701,6 +715,15 @@ const SettingsUserManagementPage = () => {
                         >
                           <PlayCircle className="w-4 h-4 mr-2" /> Reset Intro Tour
                         </DropdownMenuItem>
+                        {isOwner && (
+                          <DropdownMenuItem
+                            onClick={() => resetConsentMutation.mutate({ userId: user.id })}
+                            disabled={resetConsentMutation.isPending}
+                            data-testid={`reset-consent-${user.id}`}
+                          >
+                            <ShieldCheck className="w-4 h-4 mr-2" /> Reset GDPR Consent
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem 
                           onClick={() => {
                             const newVal = !user.default_simple_mode;
@@ -1382,6 +1405,15 @@ const SettingsUserManagementPage = () => {
                             >
                               <PlayCircle className="w-4 h-4 mr-2" /> Reset Intro Tour
                             </DropdownMenuItem>
+                            {isOwner && (
+                              <DropdownMenuItem
+                                onClick={() => resetConsentMutation.mutate({ userId: user.id })}
+                                disabled={resetConsentMutation.isPending}
+                                data-testid={`desktop-reset-consent-${user.id}`}
+                              >
+                                <ShieldCheck className="w-4 h-4 mr-2" /> Reset GDPR Consent
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem 
                               onClick={() => {
                                 const newVal = !user.default_simple_mode;

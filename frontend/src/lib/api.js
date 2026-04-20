@@ -1472,6 +1472,15 @@ export const rbacAPI = {
     const response = await api.post(`/rbac/users/${userId}/reset-intro`);
     return response.data;
   },
+  resetConsent: async (userId, options = {}) => {
+    const response = await api.post("/gdpr/reset-consent", {
+      user_ids: [userId],
+      reset_terms: options.reset_terms !== false,
+      reset_privacy_consent: options.reset_privacy_consent === true,
+      reason: options.reason || "Reset from User Management",
+    });
+    return response.data;
+  },
   createUser: async (userData) => {
     const response = await api.post("/users/create", userData);
     return response.data;
