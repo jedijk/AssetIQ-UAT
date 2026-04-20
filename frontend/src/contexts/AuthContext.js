@@ -169,24 +169,40 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.post(`${API_URL}/gdpr/accept-terms`, {
         terms_version: CURRENT_TERMS_VERSION
       });
-      
-      // Update local user state
-      if (user) {
-        const updatedUser = { 
-          ...user, 
-          terms_accepted_version: CURRENT_TERMS_VERSION,
-          terms_accepted_at: new Date().toISOString()
-        };
-        setUser(updatedUser);
+
+      // CRITICAL: re-fetch the canonical user state from backend so the
+      // terms version we just persisted is reflected in the UI. Previously we
+      // only updated local state optimistically, which could drift out of sync
+      // if /auth/me was called again by another effect.
+      try {
+        const meResponse = await axios.get(`${API_URL}/auth/me`);
+        setUser(meResponse.data);
+        const serverVersion = meResponse.data?.terms_accepted_version;
+        // Only close the dialog if backend actually confirms the acceptance
+        if (serverVersion === CURRENT_TERMS_VERSION) {
+          setMustAcceptTerms(false);
+        } else {
+          console.warn("[acceptTerms] backend did not persist terms version; keeping dialog open");
+        }
+      } catch (meErr) {
+        // Fallback to optimistic local update if /auth/me fails
+        console.warn("[acceptTerms] /auth/me refresh failed, applying optimistic state:", meErr);
+        if (user) {
+          const updatedUser = {
+            ...user,
+            terms_accepted_version: CURRENT_TERMS_VERSION,
+            terms_accepted_at: new Date().toISOString()
+          };
+          setUser(updatedUser);
+        }
+        setMustAcceptTerms(false);
       }
-      
-      setMustAcceptTerms(false);
-      
+
       // Now show intro if user hasn't seen it
       if (user && user.has_seen_intro === false) {
         localStorage.removeItem("assetiq_intro_seen");
       }
-      
+
       return response.data;
     } catch (error) {
       console.error("Failed to accept terms:", error);
