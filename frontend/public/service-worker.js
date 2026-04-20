@@ -1,6 +1,13 @@
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = 'reliabilityos-v2.7.9';  // Update with each release
+// IMPORTANT: CACHE_NAME must match APP_VERSION in:
+//   - /app/frontend/src/App.js
+//   - /app/backend/server.py
+// Bumping this string forces the browser to re-install the service worker,
+// which in turn triggers the "activate" handler below to delete old caches.
+// The frontend version-check (useVersionCheck in App.js) also force-reloads
+// when the backend reports a newer version, wiping all caches as a safety net.
+const CACHE_NAME = 'assetiq-v3.5.1';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache on install
