@@ -331,7 +331,8 @@ async def login(request: Request, credentials: UserLogin):
             phone=user.get("phone"),
             must_change_password=must_change_password,
             has_seen_intro=has_seen_intro,
-            default_simple_mode=user.get("default_simple_mode", False)
+            default_simple_mode=user.get("default_simple_mode", False),
+            terms_accepted_version=user.get("terms_accepted_version")
         )
     )
 
@@ -362,7 +363,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         must_change_password=current_user.get("must_change_password", False),
         has_seen_intro=current_user.get("has_seen_intro", True),
         avatar_url=avatar_url,
-        default_simple_mode=current_user.get("default_simple_mode", False)
+        default_simple_mode=current_user.get("default_simple_mode", False),
+        terms_accepted_version=current_user.get("terms_accepted_version")
     )
 
 

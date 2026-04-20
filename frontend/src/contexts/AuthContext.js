@@ -5,6 +5,9 @@ import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtil
 
 const AuthContext = createContext(null);
 
+// Current terms/privacy version - increment when terms change
+const CURRENT_TERMS_VERSION = "1.0";
+
 // Fetch user preferences and cache them for date formatting
 const fetchAndCachePreferences = async (API_URL) => {
   try {
@@ -25,6 +28,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [mustAcceptTerms, setMustAcceptTerms] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -41,6 +45,12 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.get(`${API_URL}/auth/me`);
       setUser(response.data);
       setMustChangePassword(response.data.must_change_password || false);
+      
+      // Check if user needs to accept terms (new or updated terms)
+      const userTermsVersion = response.data.terms_accepted_version;
+      const needsTermsAcceptance = !userTermsVersion || userTermsVersion !== CURRENT_TERMS_VERSION;
+      // Only show terms dialog if password change is not required
+      setMustAcceptTerms(needsTermsAcceptance && !response.data.must_change_password);
       
       // Fetch and cache user preferences for date/time formatting
       await fetchAndCachePreferences(API_URL);
@@ -78,12 +88,18 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
     setMustChangePassword(must_change_password || userData.must_change_password || false);
     
+    // Check if user needs to accept terms (after password change if applicable)
+    const userTermsVersion = userData.terms_accepted_version;
+    const needsTermsAcceptance = !userTermsVersion || userTermsVersion !== CURRENT_TERMS_VERSION;
+    // Only show terms if password change is not required first
+    setMustAcceptTerms(needsTermsAcceptance && !(must_change_password || userData.must_change_password));
+    
     // Fetch and cache user preferences for date/time formatting
     await fetchAndCachePreferences(API_URL);
     
     // Sync intro seen status with localStorage
-    // If user must change password, don't show intro yet (will show after password change)
-    if (must_change_password || userData.must_change_password) {
+    // If user must change password or accept terms, don't show intro yet
+    if (must_change_password || userData.must_change_password || needsTermsAcceptance) {
       localStorage.setItem("assetiq_intro_seen", "true");
     } else if (userData.has_seen_intro === false) {
       // User doesn't need to change password and hasn't seen intro - show it
@@ -132,13 +148,50 @@ export const AuthProvider = ({ children }) => {
     // Clear the must_change_password flag after successful change
     setMustChangePassword(false);
     if (user) {
-      setUser({ ...user, must_change_password: false, has_seen_intro: false });
+      const updatedUser = { ...user, must_change_password: false, has_seen_intro: false };
+      setUser(updatedUser);
+      
+      // Now check if terms acceptance is needed
+      const userTermsVersion = user.terms_accepted_version;
+      const needsTermsAcceptance = !userTermsVersion || userTermsVersion !== CURRENT_TERMS_VERSION;
+      setMustAcceptTerms(needsTermsAcceptance);
     }
     
-    // Clear intro flag so the tour shows after password change
+    // Clear intro flag so the tour shows after password change (and terms acceptance)
     localStorage.removeItem("assetiq_intro_seen");
     
     return response.data;
+  };
+
+  const acceptTerms = async () => {
+    const API_URL = getApiUrl();
+    try {
+      const response = await axios.post(`${API_URL}/gdpr/accept-terms`, {
+        terms_version: CURRENT_TERMS_VERSION
+      });
+      
+      // Update local user state
+      if (user) {
+        const updatedUser = { 
+          ...user, 
+          terms_accepted_version: CURRENT_TERMS_VERSION,
+          terms_accepted_at: new Date().toISOString()
+        };
+        setUser(updatedUser);
+      }
+      
+      setMustAcceptTerms(false);
+      
+      // Now show intro if user hasn't seen it
+      if (user && user.has_seen_intro === false) {
+        localStorage.removeItem("assetiq_intro_seen");
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error("Failed to accept terms:", error);
+      throw error;
+    }
   };
 
   const register = async (name, email, password) => {
@@ -168,12 +221,24 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     setMustChangePassword(false);
+    setMustAcceptTerms(false);
     // Clear cached preferences on logout
     clearCachedPreferences();
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, mustChangePassword, changePassword }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      token, 
+      loading, 
+      login, 
+      register, 
+      logout, 
+      mustChangePassword, 
+      changePassword,
+      mustAcceptTerms,
+      acceptTerms
+    }}>
       {children}
     </AuthContext.Provider>
   );

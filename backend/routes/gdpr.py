@@ -26,12 +26,85 @@ class AccountDeletionRequest(BaseModel):
     reason: str = ""
 
 
+class TermsAcceptanceRequest(BaseModel):
+    """Request body for terms/privacy acceptance."""
+    terms_version: str
+
+
 class DataExportRequest(BaseModel):
     """Request body for data export options."""
     format: str = "json"  # json or csv
     include_activity: bool = True
     include_submissions: bool = True
     include_audit_logs: bool = True
+
+
+# =============================================================================
+# Terms and Privacy Acceptance (First Login)
+# =============================================================================
+
+@router.post("/gdpr/accept-terms")
+async def accept_terms(
+    request: TermsAcceptanceRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Accept terms of service and privacy policy.
+    Called on first login or when terms are updated.
+    """
+    user_id = current_user["id"]
+    user_email = current_user.get("email", "")
+    
+    logger.info(f"Terms acceptance by user {user_id} - version {request.terms_version}")
+    
+    acceptance_timestamp = datetime.now(timezone.utc).isoformat()
+    
+    # Update user record with terms acceptance
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "terms_accepted_version": request.terms_version,
+            "terms_accepted_at": acceptance_timestamp,
+            "privacy_accepted_version": request.terms_version,
+            "privacy_accepted_at": acceptance_timestamp
+        }}
+    )
+    
+    # Log the acceptance for compliance audit trail
+    await db.gdpr_consent_log.insert_one({
+        "event": "terms_accepted",
+        "user_id": user_id,
+        "email": user_email,
+        "terms_version": request.terms_version,
+        "timestamp": acceptance_timestamp,
+        "ip_address": "recorded_separately"  # Don't store IP directly
+    })
+    
+    return {
+        "message": "Terms and privacy policy accepted",
+        "terms_version": request.terms_version,
+        "accepted_at": acceptance_timestamp
+    }
+
+
+@router.get("/gdpr/terms-status")
+async def get_terms_status(current_user: dict = Depends(get_current_user)):
+    """
+    Check if user has accepted current terms version.
+    """
+    user_id = current_user["id"]
+    
+    user = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "terms_accepted_version": 1, "terms_accepted_at": 1}
+    )
+    
+    return {
+        "user_id": user_id,
+        "terms_accepted_version": user.get("terms_accepted_version") if user else None,
+        "terms_accepted_at": user.get("terms_accepted_at") if user else None,
+        "current_terms_version": "1.0"  # Should match frontend CURRENT_TERMS_VERSION
+    }
 
 
 # =============================================================================

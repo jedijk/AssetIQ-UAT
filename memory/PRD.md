@@ -92,6 +92,8 @@ Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset ma
 - `GET /api/gdpr/privacy-policy` - Returns full privacy policy content
 - `GET /api/gdpr/consent-status` - Get user consent preferences
 - `POST /api/gdpr/consent` - Update consent preferences
+- `POST /api/gdpr/accept-terms` - First-login terms acceptance
+- `GET /api/gdpr/terms-status` - Check terms acceptance status
 
 ### Frontend
 - Privacy & Data settings page at `/settings/privacy`
@@ -100,4 +102,12 @@ Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset ma
 - Privacy Policy accordion (9 sections)
 - Account deletion with email confirmation dialog
 - Owner protection: Owners cannot delete their own account
+
+### First-Login Terms Acceptance
+- `TermsAcceptanceDialog` component shows on first login
+- Flow order: Password Change → Terms Acceptance → Intro Tour
+- User must check both "Terms of Service" and "Privacy Policy" checkboxes
+- "Decline & Logout" option available
+- Terms version tracked in user record (`terms_accepted_version`)
+- Consent audit trail in `gdpr_consent_log` collection
 

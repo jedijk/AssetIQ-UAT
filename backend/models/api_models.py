@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     has_seen_intro: Optional[bool] = True
     avatar_url: Optional[str] = None  # URL to fetch user's avatar image
     default_simple_mode: Optional[bool] = False
+    terms_accepted_version: Optional[str] = None  # GDPR terms version accepted
 
 
 class TokenResponse(BaseModel):

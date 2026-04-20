@@ -49,7 +49,7 @@ import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
 
 const Layout = () => {
-  const { user, logout, mustChangePassword } = useAuth();
+  const { user, logout, mustChangePassword, mustAcceptTerms } = useAuth();
   const { hasPermission, canSeeNavItem } = usePermissions();
   const { canUndo, undo, isUndoing, getLastAction, undoCount } = useUndo();
   const { language, toggleLanguage, t } = useLanguage();
@@ -1378,8 +1378,8 @@ const Layout = () => {
         title={t("profile.editPhoto") || "Edit Photo"}
       />
 
-      {/* Introduction Overlay - only show after password change is complete */}
-      {showIntro && !mustChangePassword && !isOperatorActive && (
+      {/* Introduction Overlay - only show after password change and terms acceptance is complete */}
+      {showIntro && !mustChangePassword && !mustAcceptTerms && !isOperatorActive && (
         <IntroOverlay 
           onComplete={dismissIntro}
           onSkip={dismissIntro}

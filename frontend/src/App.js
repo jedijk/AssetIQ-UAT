@@ -8,6 +8,8 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Layout from "./components/Layout";
 import ChangePasswordDialog from "./components/ChangePasswordDialog";
+import TermsAcceptanceDialog from "./components/TermsAcceptanceDialog";
+import FirstLoginFlow from "./components/FirstLoginFlow";
 import LandscapeBlocker from "./components/LandscapeBlocker";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -238,8 +240,9 @@ function App() {
               <Route path="/qr/:qrId" element={<QRScanPage />} />
               <Route path="/" element={
                 <ProtectedRoute>
-                  <ChangePasswordDialog />
-                  <Layout />
+                  <FirstLoginFlow>
+                    <Layout />
+                  </FirstLoginFlow>
                 </ProtectedRoute>
               }>
                 <Route index element={<DashboardPage />} />
