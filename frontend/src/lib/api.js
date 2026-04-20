@@ -1605,6 +1605,31 @@ export const gdprAPI = {
     });
     return response.data;
   },
+  // Owner-only: Reset consent status for users
+  resetConsentStatus: async (userIds = [], resetTerms = true, resetPrivacyConsent = false, reason = "") => {
+    const response = await api.post("/gdpr/reset-consent", {
+      user_ids: userIds,
+      reset_terms: resetTerms,
+      reset_privacy_consent: resetPrivacyConsent,
+      reason: reason
+    });
+    return response.data;
+  },
+  // Owner-only: Get consent reset history
+  getConsentResetHistory: async () => {
+    const response = await api.get("/gdpr/consent-reset-history");
+    return response.data;
+  },
+  // Owner-only: Get all users' consent status
+  getUsersConsentStatus: async () => {
+    const response = await api.get("/gdpr/users-consent-status");
+    return response.data;
+  },
+  // Owner-only: Get detailed consent info for a specific user
+  getUserConsentDetails: async (userId) => {
+    const response = await api.get(`/gdpr/user-consent/${userId}`);
+    return response.data;
+  },
   // Legacy alias for backwards compatibility
   deleteAccount: async (data) => {
     const response = await api.post("/gdpr/delete-account", data);

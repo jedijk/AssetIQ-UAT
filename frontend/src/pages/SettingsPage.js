@@ -120,6 +120,14 @@ const SETTINGS_SECTIONS = [
     icon: Trash2,
     path: "/settings/deletion-requests",
     roles: ["owner"]
+  },
+  {
+    id: "consent-management",
+    label: "Consent Management",
+    description: "Track and reset user consent status",
+    icon: Shield,
+    path: "/settings/consent-management",
+    roles: ["owner"]
   }
 ];
 

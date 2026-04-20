@@ -131,6 +131,299 @@ async def get_terms_status(current_user: dict = Depends(get_current_user)):
 
 
 # =============================================================================
+# Reset Consent Status (Owner-only)
+# =============================================================================
+
+class ResetConsentRequest(BaseModel):
+    """Request body for resetting consent status."""
+    user_ids: list = []  # Empty list means all users
+    reset_terms: bool = True
+    reset_privacy_consent: bool = False
+    reason: str = ""
+
+
+@router.post("/gdpr/reset-consent")
+async def reset_consent_status(
+    request: ResetConsentRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Reset consent/terms acceptance status for users (owner-only).
+    
+    Users will be prompted to re-accept terms at their next login.
+    Use this when terms of service or privacy policy have been updated.
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only owners can reset consent status"
+        )
+    
+    reset_timestamp = datetime.now(timezone.utc).isoformat()
+    update_fields = {}
+    
+    if request.reset_terms:
+        update_fields["terms_accepted_version"] = None
+        update_fields["terms_accepted_at"] = None
+        update_fields["privacy_accepted_version"] = None
+        update_fields["privacy_accepted_at"] = None
+    
+    if request.reset_privacy_consent:
+        # Reset the consent preferences (analytics, marketing, etc.)
+        update_fields["consent_reset_at"] = reset_timestamp
+    
+    if not update_fields:
+        raise HTTPException(
+            status_code=400,
+            detail="No consent types selected for reset"
+        )
+    
+    # Build query - either specific users or all users
+    if request.user_ids and len(request.user_ids) > 0:
+        query = {"id": {"$in": request.user_ids}}
+        scope = f"{len(request.user_ids)} specific user(s)"
+    else:
+        # Reset all users except the current owner performing the action
+        query = {"id": {"$ne": current_user["id"]}}
+        scope = "all users"
+    
+    # Perform the reset
+    result = await db.users.update_many(query, {"$set": update_fields})
+    
+    # If resetting privacy consent preferences, also clear the user_consents collection
+    if request.reset_privacy_consent:
+        if request.user_ids and len(request.user_ids) > 0:
+            await db.user_consents.delete_many({"user_id": {"$in": request.user_ids}})
+        else:
+            await db.user_consents.delete_many({"user_id": {"$ne": current_user["id"]}})
+    
+    # Log the action for audit trail
+    await db.security_audit_log.insert_one({
+        "event": "consent_reset",
+        "performed_by": current_user["id"],
+        "performed_by_name": current_user.get("name", ""),
+        "timestamp": reset_timestamp,
+        "scope": scope,
+        "user_ids": request.user_ids if request.user_ids else "all",
+        "reset_terms": request.reset_terms,
+        "reset_privacy_consent": request.reset_privacy_consent,
+        "reason": request.reason,
+        "users_affected": result.modified_count
+    })
+    
+    logger.info(f"Consent reset by {current_user['id']}: {result.modified_count} users affected")
+    
+    return {
+        "message": f"Consent status reset for {result.modified_count} user(s)",
+        "details": {
+            "users_affected": result.modified_count,
+            "scope": scope,
+            "reset_terms": request.reset_terms,
+            "reset_privacy_consent": request.reset_privacy_consent,
+            "performed_at": reset_timestamp
+        }
+    }
+
+
+@router.get("/gdpr/consent-reset-history")
+async def get_consent_reset_history(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get history of consent resets (owner-only).
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only owners can view consent reset history"
+        )
+    
+    cursor = db.security_audit_log.find(
+        {"event": "consent_reset"},
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(50)
+    
+    history = await cursor.to_list(length=50)
+    
+    return {"history": history}
+
+
+@router.get("/gdpr/user-consent/{user_id}")
+async def get_user_consent_details(
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get detailed consent information for a specific user (owner-only).
+    Includes terms acceptance, consent preferences, and consent history.
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only owners can view user consent details"
+        )
+    
+    # Get user data
+    user = await db.users.find_one(
+        {"id": user_id},
+        {
+            "_id": 0,
+            "id": 1,
+            "email": 1,
+            "name": 1,
+            "role": 1,
+            "created_at": 1,
+            "last_login": 1,
+            "terms_accepted_version": 1,
+            "terms_accepted_at": 1,
+            "privacy_accepted_version": 1,
+            "privacy_accepted_at": 1
+        }
+    )
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get user's consent preferences
+    consent_prefs = await db.user_consents.find_one(
+        {"user_id": user_id},
+        {"_id": 0}
+    )
+    
+    # Get consent history for this user
+    consent_history_cursor = db.gdpr_consent_log.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(20)
+    consent_history = await consent_history_cursor.to_list(length=20)
+    
+    # Get security audit events related to consent for this user
+    audit_cursor = db.security_audit_log.find(
+        {
+            "user_id": user_id,
+            "event": {"$in": ["terms_accepted", "consent_updated", "gdpr_data_export"]}
+        },
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(20)
+    audit_history = await audit_cursor.to_list(length=20)
+    
+    current_version = "1.0"
+    
+    return {
+        "user": {
+            "id": user["id"],
+            "email": user.get("email"),
+            "name": user.get("name"),
+            "role": user.get("role"),
+            "created_at": user.get("created_at"),
+            "last_login": user.get("last_login")
+        },
+        "terms_acceptance": {
+            "current_version": current_version,
+            "accepted_version": user.get("terms_accepted_version"),
+            "accepted_at": user.get("terms_accepted_at"),
+            "is_current": user.get("terms_accepted_version") == current_version,
+            "privacy_accepted_version": user.get("privacy_accepted_version"),
+            "privacy_accepted_at": user.get("privacy_accepted_at")
+        },
+        "consent_preferences": consent_prefs.get("consents", {
+            "essential_cookies": True,
+            "analytics": False,
+            "marketing_emails": False,
+            "ai_processing": True
+        }) if consent_prefs else {
+            "essential_cookies": True,
+            "analytics": False,
+            "marketing_emails": False,
+            "ai_processing": True
+        },
+        "consent_preferences_updated_at": consent_prefs.get("last_updated") if consent_prefs else None,
+        "consent_history": consent_history,
+        "audit_history": audit_history
+    }
+
+
+@router.get("/gdpr/users-consent-status")
+async def get_users_consent_status(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get consent status for all users (owner-only).
+    Shows which users have accepted terms and which haven't.
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only owners can view users consent status"
+        )
+    
+    cursor = db.users.find(
+        {},
+        {
+            "_id": 0,
+            "id": 1,
+            "email": 1,
+            "name": 1,
+            "role": 1,
+            "terms_accepted_version": 1,
+            "terms_accepted_at": 1,
+            "last_login": 1,
+            "created_at": 1
+        }
+    ).sort("name", 1)
+    
+    users = await cursor.to_list(length=500)
+    
+    # Get all user consent preferences
+    consent_cursor = db.user_consents.find({}, {"_id": 0})
+    all_consents = await consent_cursor.to_list(length=500)
+    consent_map = {c["user_id"]: c for c in all_consents}
+    
+    current_version = "1.0"
+    
+    # Categorize users with full consent info
+    accepted = []
+    pending = []
+    
+    for user in users:
+        user_consent = consent_map.get(user["id"], {})
+        consents = user_consent.get("consents", {})
+        
+        user_data = {
+            "id": user["id"],
+            "email": user.get("email"),
+            "name": user.get("name"),
+            "role": user.get("role"),
+            "created_at": user.get("created_at"),
+            "last_login": user.get("last_login"),
+            "terms_accepted_version": user.get("terms_accepted_version"),
+            "terms_accepted_at": user.get("terms_accepted_at"),
+            "consent_preferences": {
+                "analytics": consents.get("analytics", False),
+                "marketing_emails": consents.get("marketing_emails", False),
+                "ai_processing": consents.get("ai_processing", True)
+            },
+            "consent_updated_at": user_consent.get("last_updated")
+        }
+        
+        if user.get("terms_accepted_version") == current_version:
+            accepted.append(user_data)
+        else:
+            pending.append(user_data)
+    
+    return {
+        "current_terms_version": current_version,
+        "summary": {
+            "total_users": len(users),
+            "accepted": len(accepted),
+            "pending": len(pending)
+        },
+        "accepted_users": accepted,
+        "pending_users": pending
+    }
+
+
+# =============================================================================
 # Article 15: Right to Access - Data Export
 # =============================================================================
 
