@@ -71,10 +71,10 @@ export default function SettingsConsentManagementPage() {
     enabled: user?.role === "owner",
   });
 
-  // Query reset history
+  // Query full consent history (acceptances + resets)
   const { data: historyData, isLoading: historyLoading } = useQuery({
-    queryKey: ["consent-reset-history"],
-    queryFn: gdprAPI.getConsentResetHistory,
+    queryKey: ["consent-history"],
+    queryFn: gdprAPI.getConsentAcceptanceHistory,
     enabled: user?.role === "owner",
   });
 
@@ -95,7 +95,7 @@ export default function SettingsConsentManagementPage() {
     ),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["users-consent-status"] });
-      queryClient.invalidateQueries({ queryKey: ["consent-reset-history"] });
+      queryClient.invalidateQueries({ queryKey: ["consent-history"] });
       toast.success(`Consent reset for ${data.details.users_affected} user(s). They will be prompted at next login.`);
       setShowResetDialog(false);
       setResetReason("");
@@ -404,8 +404,11 @@ export default function SettingsConsentManagementPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <History className="w-5 h-5" />
-                Consent Reset History
+                Full Consent History
               </CardTitle>
+              <CardDescription>
+                Every terms acceptance and owner-initiated reset across all users
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {historyLoading ? (
@@ -414,37 +417,63 @@ export default function SettingsConsentManagementPage() {
                 </div>
               ) : historyData?.history?.length === 0 ? (
                 <div className="text-center py-8 text-slate-500">
-                  No reset history found
+                  No consent events yet
                 </div>
               ) : (
-                <Table>
+                <Table data-testid="consent-history-table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Performed By</TableHead>
-                      <TableHead>Scope</TableHead>
-                      <TableHead>Users Affected</TableHead>
-                      <TableHead>Reason</TableHead>
+                      <TableHead>Event</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Details</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {historyData?.history?.map((entry, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="text-sm">
-                          {new Date(entry.timestamp).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {entry.performed_by_name}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{entry.scope}</Badge>
-                        </TableCell>
-                        <TableCell>{entry.users_affected}</TableCell>
-                        <TableCell className="text-sm text-slate-500 max-w-[200px] truncate">
-                          {entry.reason || "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {historyData?.history?.map((entry, index) => {
+                      const isReset = entry.event === "consent_reset";
+                      return (
+                        <TableRow key={index}>
+                          <TableCell className="text-sm whitespace-nowrap">
+                            {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {isReset ? (
+                              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                <RefreshCw className="w-3 h-3 mr-1" /> Reset
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                <Check className="w-3 h-3 mr-1" /> Accepted
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-sm">{entry.user_name || "Unknown"}</p>
+                              {entry.user_email && (
+                                <p className="text-xs text-slate-500">{entry.user_email}</p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {entry.terms_version ? `v${entry.terms_version}` : "-"}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-500 max-w-[240px]">
+                            {isReset && entry.details ? (
+                              <div className="truncate" title={entry.details.reason || ""}>
+                                <Badge variant="outline" className="mr-1 text-xs">{entry.details.scope}</Badge>
+                                <span className="text-xs">{entry.details.users_affected} user(s)</span>
+                                {entry.details.reason && <div className="truncate text-xs mt-0.5">"{entry.details.reason}"</div>}
+                              </div>
+                            ) : (
+                              <span className="text-xs">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}

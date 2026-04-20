@@ -1575,6 +1575,10 @@ export const gdprAPI = {
     const response = await api.get("/gdpr/consent-status");
     return response.data;
   },
+  getTermsStatus: async () => {
+    const response = await api.get("/gdpr/terms-status");
+    return response.data;
+  },
   updateConsent: async (consents) => {
     const response = await api.post("/gdpr/consent", consents);
     return response.data;
@@ -1627,6 +1631,11 @@ export const gdprAPI = {
   // Owner-only: Get consent reset history
   getConsentResetHistory: async () => {
     const response = await api.get("/gdpr/consent-reset-history");
+    return response.data;
+  },
+  // Owner-only: Full consent history (acceptances + resets)
+  getConsentAcceptanceHistory: async () => {
+    const response = await api.get("/gdpr/consent-acceptance-history");
     return response.data;
   },
   // Owner-only: Get all users' consent status

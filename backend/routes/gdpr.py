@@ -248,6 +248,81 @@ async def get_consent_reset_history(
     return {"history": history}
 
 
+@router.get("/gdpr/consent-acceptance-history")
+async def get_consent_acceptance_history(
+    current_user: dict = Depends(get_current_user),
+    limit: int = 100
+):
+    """
+    Get history of every consent acceptance across all users (owner-only).
+    Combines terms acceptance events from gdpr_consent_log with owner-initiated
+    resets so owners have a full compliance trail in one place.
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only owners can view consent acceptance history"
+        )
+
+    # Terms acceptance events logged when users accept the Terms dialog
+    accept_cursor = db.gdpr_consent_log.find(
+        {},
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(limit)
+    accepts = await accept_cursor.to_list(length=limit)
+
+    # Owner-initiated resets
+    reset_cursor = db.security_audit_log.find(
+        {"event": "consent_reset"},
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(limit)
+    resets = await reset_cursor.to_list(length=limit)
+
+    # Enrich with user names where possible
+    user_ids = {e.get("user_id") for e in accepts + resets if e.get("user_id")}
+    user_ids.discard(None)
+    name_map = {}
+    if user_ids:
+        u_cursor = db.users.find(
+            {"id": {"$in": list(user_ids)}},
+            {"_id": 0, "id": 1, "name": 1, "email": 1}
+        )
+        async for u in u_cursor:
+            name_map[u["id"]] = {"name": u.get("name"), "email": u.get("email")}
+
+    combined = []
+    for e in accepts:
+        uid = e.get("user_id")
+        combined.append({
+            "timestamp": e.get("timestamp"),
+            "event": e.get("event", "terms_accepted"),
+            "user_id": uid,
+            "user_name": (name_map.get(uid) or {}).get("name") or e.get("email") or "Unknown",
+            "user_email": (name_map.get(uid) or {}).get("email") or e.get("email"),
+            "terms_version": e.get("terms_version"),
+            "details": None,
+        })
+    for e in resets:
+        uid = e.get("user_id")
+        combined.append({
+            "timestamp": e.get("timestamp"),
+            "event": "consent_reset",
+            "user_id": uid,
+            "user_name": e.get("performed_by_name") or "Owner",
+            "user_email": e.get("performed_by_email"),
+            "terms_version": None,
+            "details": {
+                "scope": e.get("scope"),
+                "users_affected": e.get("users_affected"),
+                "reason": e.get("reason"),
+            },
+        })
+
+    # Sort merged list by timestamp descending
+    combined.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+    return {"history": combined[:limit]}
+
+
 @router.get("/gdpr/user-consent/{user_id}")
 async def get_user_consent_details(
     user_id: str,

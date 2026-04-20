@@ -76,6 +76,12 @@ export default function SettingsPrivacyPage() {
     queryFn: gdprAPI.getConsentStatus,
   });
 
+  // Current user's terms & privacy acceptance status
+  const { data: termsStatus } = useQuery({
+    queryKey: ["terms-status"],
+    queryFn: gdprAPI.getTermsStatus,
+  });
+
   // Query for pending deletion request
   const { data: myDeletionRequest, isLoading: requestLoading } = useQuery({
     queryKey: ["my-deletion-request"],
@@ -223,7 +229,68 @@ export default function SettingsPrivacyPage() {
         </CardContent>
       </Card>
 
-      {/* Data Export Card */}
+      {/* Terms & Privacy Acceptance Status */}
+      <Card data-testid="acceptance-status-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-500" />
+            Your Acceptance Status
+          </CardTitle>
+          <CardDescription>
+            Record of your acceptance of our Terms of Service and Privacy Policy
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg border bg-slate-50">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="w-4 h-4 text-blue-500" />
+                <span className="font-medium">Terms of Service</span>
+              </div>
+              {termsStatus?.terms_accepted_version ? (
+                <>
+                  <Badge className={termsStatus.terms_accepted_version === termsStatus.current_terms_version
+                    ? "bg-green-100 text-green-700 hover:bg-green-100"
+                    : "bg-amber-100 text-amber-700 hover:bg-amber-100"}>
+                    {termsStatus.terms_accepted_version === termsStatus.current_terms_version ? (
+                      <><CheckCircle className="w-3 h-3 mr-1" /> v{termsStatus.terms_accepted_version} (current)</>
+                    ) : (
+                      <><Clock className="w-3 h-3 mr-1" /> v{termsStatus.terms_accepted_version} (outdated — v{termsStatus.current_terms_version} is current)</>
+                    )}
+                  </Badge>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Accepted on {termsStatus.terms_accepted_at ? new Date(termsStatus.terms_accepted_at).toLocaleString() : "-"}
+                  </p>
+                </>
+              ) : (
+                <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
+                  <X className="w-3 h-3 mr-1" /> Not accepted
+                </Badge>
+              )}
+            </div>
+            <div className="p-4 rounded-lg border bg-slate-50">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-4 h-4 text-blue-500" />
+                <span className="font-medium">Privacy Policy</span>
+              </div>
+              {termsStatus?.terms_accepted_version ? (
+                <>
+                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                    <CheckCircle className="w-3 h-3 mr-1" /> v{termsStatus.terms_accepted_version} accepted
+                  </Badge>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Accepted on {termsStatus.terms_accepted_at ? new Date(termsStatus.terms_accepted_at).toLocaleString() : "-"}
+                  </p>
+                </>
+              ) : (
+                <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
+                  <X className="w-3 h-3 mr-1" /> Not accepted
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
