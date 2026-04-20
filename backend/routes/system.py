@@ -126,23 +126,39 @@ async def switch_database(
             detail=f"Failed to connect to {target_db['label']} database"
         )
     
-    # Check if user exists in the target database
-    target_user = await target_db_ref.users.find_one(
-        {"id": current_user.get("user_id")},
-        {"_id": 0, "id": 1, "email": 1}
-    )
-    
+    # Check if user exists in the target database (lookup by id OR email so
+    # admins who migrated emails between environments still work). The
+    # current_user dict returned by get_current_user stores the Mongo field
+    # as "id" (not "user_id"), so prefer that.
+    lookup_id = current_user.get("id") or current_user.get("user_id")
+    lookup_email = (current_user.get("email") or "").lower()
+
+    target_user = None
+    if lookup_id:
+        target_user = await target_db_ref.users.find_one(
+            {"id": lookup_id},
+            {"_id": 0, "id": 1, "email": 1}
+        )
+    if not target_user and lookup_email:
+        target_user = await target_db_ref.users.find_one(
+            {"email": lookup_email},
+            {"_id": 0, "id": 1, "email": 1}
+        )
+
     if not target_user:
-        # User doesn't exist in target database - warn them
-        logger.warning(f"User {current_user.get('user_id')} not found in {target_db['name']}")
+        logger.warning(
+            f"User id={lookup_id} email={lookup_email} not found in {target_db['name']}"
+        )
         raise HTTPException(
             status_code=400,
             detail=f"Your account does not exist in the {target_db['label']} environment. Please contact an administrator to set up your account there, or continue using your current environment."
         )
-    
-    # Store the user's database preference
+
+    # Store the user's database preference (on the primary/AUTH_DB so the
+    # preference survives a subsequent switch). Use id if available, email otherwise.
+    update_filter = {"id": lookup_id} if lookup_id else {"email": lookup_email}
     await db.users.update_one(
-        {"id": current_user.get("user_id")},
+        update_filter,
         {"$set": {"database_preference": request.environment}}
     )
     
