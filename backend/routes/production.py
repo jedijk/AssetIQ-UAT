@@ -980,11 +980,11 @@ async def generate_machine_analysis(
 
     # Build GPT prompt
     good_text = "\n".join([
-        f"  {d['date']}: Visc={d['avg_visc']}MU RSD={d['rsd']}% RPM={d['avg_rpm']} Feed={d['avg_feed']} M%={d['avg_moisture']} MT1={d['avg_mt1']} MT2={d['avg_mt2']} MT3={d['avg_mt3']} Waste={d['waste']}kg"
+        f"  {d['date']}: Visc={d['avg_visc']}MU RSD={d['rsd']}% RPM={d['avg_rpm']} Feed={d['avg_feed']} M%(MotorTorque)={d['avg_moisture']} MT1={d['avg_mt1']} MT2={d['avg_mt2']} MT3={d['avg_mt3']} Waste={d['waste']}kg"
         for d in good_days[:30]
     ])
     bad_text = "\n".join([
-        f"  {d['date']}: Visc={d['avg_visc']}MU RSD={d['rsd']}% RPM={d['avg_rpm']} Feed={d['avg_feed']} M%={d['avg_moisture']} MT1={d['avg_mt1']} MT2={d['avg_mt2']} MT3={d['avg_mt3']} Waste={d['waste']}kg"
+        f"  {d['date']}: Visc={d['avg_visc']}MU RSD={d['rsd']}% RPM={d['avg_rpm']} Feed={d['avg_feed']} M%(MotorTorque)={d['avg_moisture']} MT1={d['avg_mt1']} MT2={d['avg_mt2']} MT3={d['avg_mt3']} Waste={d['waste']}kg"
         for d in bad_days[:20]
     ])
 
@@ -1005,12 +1005,12 @@ BEST PERFORMING DAYS (viscosity in range, low variation):
 WORST PERFORMING DAYS (out of range or high variation):
 {bad_text}
 
-CONTROLLABLE INPUTS: RPM, Feed rate (kg/h), M% (moisture percentage of feed product, shown as 80-90 not 0.80-0.90), MT1/MT2/MT3 (temperatures)
+CONTROLLABLE INPUTS: RPM, Feed rate (kg/h), M% (Motor Torque percentage, shown as 80-90 not 0.80-0.90), MT1/MT2/MT3 (temperatures)
 QUALITY OUTCOMES: Mooney Viscosity (target 50-60 MU), RSD (target <5%), Waste (minimize)
 
 Analyze the data and provide:
 
-1. **optimal_settings**: The recommended settings for each controllable input (RPM, Feed, M%, MT1, MT2, MT3) with specific values and acceptable ranges.
+1. **optimal_settings**: The recommended settings for each controllable input (RPM, Feed, M% (Motor Torque), MT1, MT2, MT3) with specific values and acceptable ranges.
 
 2. **key_findings**: 3-5 key statistical findings about what drives good vs bad days. Be specific with numbers.
 
@@ -1025,7 +1025,7 @@ Return ONLY valid JSON with this structure:
   "optimal_settings": {{
     "RPM": {{"recommended": 165, "range": [160, 170], "unit": "rpm"}},
     "Feed": {{"recommended": 520, "range": [500, 540], "unit": "kg/h"}},
-    "Moisture": {{"recommended": 85, "range": [80, 90], "unit": "%"}},
+    "Motor_Torque": {{"recommended": 85, "range": [80, 90], "unit": "%"}},
     "MT1": {{"recommended": 210, "range": [200, 220], "unit": "°C"}},
     "MT2": {{"recommended": 168, "range": [160, 175], "unit": "°C"}},
     "MT3": {{"recommended": 155, "range": [145, 165], "unit": "°C"}}
