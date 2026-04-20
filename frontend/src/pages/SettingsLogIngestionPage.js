@@ -1839,7 +1839,7 @@ function LogDashboard() {
             <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-1.5 min-w-0" data-testid="kpi-total-input">
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-50 text-blue-600"><Package className="w-4 h-4" /></div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Input</span>
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Throughput</span>
               </div>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-2xl font-bold text-slate-900 tabular-nums">{totalInput.toLocaleString()}</span>
