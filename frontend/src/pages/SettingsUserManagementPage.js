@@ -352,7 +352,8 @@ const SettingsUserManagementPage = () => {
       });
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to create user");
+      const errorMessage = error.response?.data?.detail || error.message || "Failed to create user";
+      toast.error(errorMessage);
     }
   });
 
