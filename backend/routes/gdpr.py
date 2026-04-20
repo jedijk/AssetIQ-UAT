@@ -2,11 +2,13 @@
 GDPR Compliance Routes
 Implements:
 - Article 15: Right to Access (data export)
-- Article 17: Right to Erasure (account deletion)
+- Article 17: Right to Erasure (account deletion with owner approval)
 - Article 20: Data Portability (machine-readable export)
 """
 
 import logging
+import os
+import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import JSONResponse
@@ -16,14 +18,35 @@ import json
 from database import db
 from auth import get_current_user
 
+# Try to import resend for email functionality
+try:
+    import resend
+    RESEND_AVAILABLE = True
+except ImportError:
+    RESEND_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["GDPR"])
+
+# Email configuration
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://assetiq.tech")
+
+if RESEND_AVAILABLE and RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 
 
 class AccountDeletionRequest(BaseModel):
     """Request body for account deletion confirmation."""
     confirm_email: str
     reason: str = ""
+
+
+class DeletionRequestAction(BaseModel):
+    """Request body for approving/rejecting deletion requests."""
+    action: str  # "approve" or "reject"
+    rejection_reason: str = ""
 
 
 class TermsAcceptanceRequest(BaseModel):
@@ -253,8 +276,119 @@ async def export_user_data(
 
 
 # =============================================================================
-# Article 17: Right to Erasure (Right to be Forgotten)
+# Article 17: Right to Erasure (Right to be Forgotten) - WITH OWNER APPROVAL
 # =============================================================================
+
+async def send_deletion_request_email(owner_email: str, owner_name: str, requester_name: str, requester_email: str, request_id: str, reason: str):
+    """Send email to owner notifying them of a deletion request."""
+    if not RESEND_AVAILABLE or not RESEND_API_KEY:
+        logger.warning("Resend not configured - skipping deletion request email")
+        return False
+    
+    try:
+        approval_url = f"{FRONTEND_URL}/settings/deletion-requests"
+        
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); padding: 30px; border-radius: 12px 12px 0 0;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">Account Deletion Request</h1>
+            </div>
+            <div style="background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+                <p style="color: #334155; font-size: 16px; margin-bottom: 20px;">
+                    Hello {owner_name},
+                </p>
+                <p style="color: #334155; font-size: 16px; margin-bottom: 20px;">
+                    A user has requested to delete their account and requires your approval:
+                </p>
+                <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                    <p style="margin: 5px 0;"><strong>User:</strong> {requester_name}</p>
+                    <p style="margin: 5px 0;"><strong>Email:</strong> {requester_email}</p>
+                    <p style="margin: 5px 0;"><strong>Reason:</strong> {reason or 'No reason provided'}</p>
+                    <p style="margin: 5px 0;"><strong>Request ID:</strong> {request_id[:8]}...</p>
+                </div>
+                <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">
+                    Under GDPR Article 17, users have the right to request deletion of their personal data.
+                    Please review this request and take appropriate action.
+                </p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{approval_url}" style="background: #3b82f6; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                        Review Request
+                    </a>
+                </div>
+                <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+                    This is an automated message from AssetIQ. Please do not reply to this email.
+                </p>
+            </div>
+        </div>
+        """
+        
+        resend.Emails.send({
+            "from": SENDER_EMAIL,
+            "to": owner_email,
+            "subject": f"[Action Required] Account Deletion Request - {requester_name}",
+            "html": html_content
+        })
+        
+        logger.info(f"Deletion request email sent to owner {owner_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send deletion request email: {e}")
+        return False
+
+
+async def send_deletion_result_email(user_email: str, user_name: str, approved: bool, rejection_reason: str = ""):
+    """Send email to user notifying them of the deletion request result."""
+    if not RESEND_AVAILABLE or not RESEND_API_KEY:
+        logger.warning("Resend not configured - skipping deletion result email")
+        return False
+    
+    try:
+        if approved:
+            subject = "Your Account Deletion Request Has Been Approved"
+            message = "Your account and personal data have been permanently deleted as requested."
+            color = "#22c55e"
+        else:
+            subject = "Your Account Deletion Request Has Been Declined"
+            message = f"Your account deletion request has been declined."
+            if rejection_reason:
+                message += f"<br><br><strong>Reason:</strong> {rejection_reason}"
+            color = "#ef4444"
+        
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: {color}; padding: 30px; border-radius: 12px 12px 0 0;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">{'Request Approved' if approved else 'Request Declined'}</h1>
+            </div>
+            <div style="background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+                <p style="color: #334155; font-size: 16px; margin-bottom: 20px;">
+                    Hello {user_name},
+                </p>
+                <p style="color: #334155; font-size: 16px; margin-bottom: 20px;">
+                    {message}
+                </p>
+                <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">
+                    If you have any questions, please contact your system administrator.
+                </p>
+                <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+                    This is an automated message from AssetIQ.
+                </p>
+            </div>
+        </div>
+        """
+        
+        resend.Emails.send({
+            "from": SENDER_EMAIL,
+            "to": user_email,
+            "subject": subject,
+            "html": html_content
+        })
+        
+        logger.info(f"Deletion result email sent to {user_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send deletion result email: {e}")
+        return False
+
 
 @router.post("/gdpr/delete-account")
 async def request_account_deletion(
@@ -264,12 +398,8 @@ async def request_account_deletion(
     """
     Request deletion of own account (GDPR Article 17 - Right to Erasure).
     
-    This will:
-    1. Anonymize user data in related records (for audit trail integrity)
-    2. Delete personal profile data
-    3. Log the deletion request for compliance
-    
-    Note: Some data may be retained in anonymized form for legal/audit requirements.
+    This creates a deletion request that must be approved by an owner.
+    The user will be notified via email once the request is processed.
     """
     user_id = current_user["id"]
     user_email = current_user.get("email", "")
@@ -289,127 +419,335 @@ async def request_account_deletion(
             detail="Account owners cannot delete their own account. Please transfer ownership first or contact an administrator."
         )
     
+    # Check for existing pending request
+    existing_request = await db.deletion_requests.find_one({
+        "user_id": user_id,
+        "status": "pending"
+    })
+    
+    if existing_request:
+        raise HTTPException(
+            status_code=400,
+            detail="You already have a pending deletion request. Please wait for it to be processed."
+        )
+    
     logger.info(f"GDPR account deletion requested by user {user_id} ({user_email})")
     
-    anonymized_name = "Deleted User"
-    anonymized_email = f"deleted_{user_id[:8]}@anonymized.local"
-    deletion_timestamp = datetime.now(timezone.utc).isoformat()
+    request_id = str(uuid.uuid4())
+    request_timestamp = datetime.now(timezone.utc).isoformat()
     
-    try:
-        # 1. Anonymize form submissions (keep data, remove PII)
-        await db.form_submissions.update_many(
-            {"submitted_by": user_id},
+    # Create deletion request
+    deletion_request = {
+        "id": request_id,
+        "user_id": user_id,
+        "user_email": user_email,
+        "user_name": user_name,
+        "reason": request.reason,
+        "status": "pending",  # pending, approved, rejected
+        "created_at": request_timestamp,
+        "updated_at": request_timestamp,
+        "processed_by": None,
+        "processed_at": None,
+        "rejection_reason": None
+    }
+    
+    await db.deletion_requests.insert_one(deletion_request)
+    
+    # Log the request for compliance
+    await db.security_audit_log.insert_one({
+        "event": "deletion_request_created",
+        "user_id": user_id,
+        "email": user_email,
+        "request_id": request_id,
+        "timestamp": request_timestamp,
+        "reason": request.reason
+    })
+    
+    # Find all owners and send them emails
+    owners_cursor = db.users.find(
+        {"role": "owner"},
+        {"_id": 0, "id": 1, "email": 1, "name": 1}
+    )
+    owners = await owners_cursor.to_list(length=100)
+    
+    emails_sent = 0
+    for owner in owners:
+        success = await send_deletion_request_email(
+            owner_email=owner["email"],
+            owner_name=owner.get("name", "Administrator"),
+            requester_name=user_name,
+            requester_email=user_email,
+            request_id=request_id,
+            reason=request.reason
+        )
+        if success:
+            emails_sent += 1
+    
+    logger.info(f"Deletion request {request_id} created. Notified {emails_sent} owner(s).")
+    
+    return {
+        "message": "Your deletion request has been submitted for approval",
+        "details": {
+            "request_id": request_id,
+            "status": "pending",
+            "created_at": request_timestamp,
+            "owners_notified": emails_sent,
+            "gdpr_article": "Article 17 - Right to Erasure",
+            "note": "You will receive an email once your request has been processed."
+        }
+    }
+
+
+@router.get("/gdpr/my-deletion-request")
+async def get_my_deletion_request(current_user: dict = Depends(get_current_user)):
+    """
+    Get the current user's pending deletion request status.
+    """
+    user_id = current_user["id"]
+    
+    request = await db.deletion_requests.find_one(
+        {"user_id": user_id},
+        {"_id": 0},
+        sort=[("created_at", -1)]  # Get most recent
+    )
+    
+    if not request:
+        return {"has_pending_request": False, "request": None}
+    
+    return {
+        "has_pending_request": request["status"] == "pending",
+        "request": request
+    }
+
+
+@router.delete("/gdpr/cancel-deletion-request")
+async def cancel_deletion_request(current_user: dict = Depends(get_current_user)):
+    """
+    Cancel a pending deletion request.
+    """
+    user_id = current_user["id"]
+    
+    result = await db.deletion_requests.delete_one({
+        "user_id": user_id,
+        "status": "pending"
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="No pending deletion request found"
+        )
+    
+    await db.security_audit_log.insert_one({
+        "event": "deletion_request_cancelled",
+        "user_id": user_id,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"message": "Your deletion request has been cancelled"}
+
+
+# =============================================================================
+# Owner-only endpoints for managing deletion requests
+# =============================================================================
+
+@router.get("/gdpr/deletion-requests")
+async def get_deletion_requests(
+    status: str = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all deletion requests (owners only).
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only owners can view deletion requests"
+        )
+    
+    query = {}
+    if status:
+        query["status"] = status
+    
+    cursor = db.deletion_requests.find(query, {"_id": 0}).sort("created_at", -1)
+    requests = await cursor.to_list(length=100)
+    
+    return {"requests": requests, "total": len(requests)}
+
+
+@router.post("/gdpr/deletion-requests/{request_id}/action")
+async def process_deletion_request(
+    request_id: str,
+    action_request: DeletionRequestAction,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Approve or reject a deletion request (owners only).
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only owners can process deletion requests"
+        )
+    
+    if action_request.action not in ["approve", "reject"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Action must be 'approve' or 'reject'"
+        )
+    
+    # Get the deletion request
+    deletion_request = await db.deletion_requests.find_one({"id": request_id})
+    
+    if not deletion_request:
+        raise HTTPException(status_code=404, detail="Deletion request not found")
+    
+    if deletion_request["status"] != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Request has already been {deletion_request['status']}"
+        )
+    
+    user_id = deletion_request["user_id"]
+    user_email = deletion_request["user_email"]
+    user_name = deletion_request["user_name"]
+    process_timestamp = datetime.now(timezone.utc).isoformat()
+    
+    if action_request.action == "approve":
+        # Execute the actual deletion
+        anonymized_name = "Deleted User"
+        anonymized_email = f"deleted_{user_id[:8]}@anonymized.local"
+        
+        try:
+            # 1. Anonymize form submissions
+            await db.form_submissions.update_many(
+                {"submitted_by": user_id},
+                {"$set": {
+                    "submitted_by_name": anonymized_name,
+                    "submitted_by_anonymized": True,
+                    "anonymized_at": process_timestamp
+                }}
+            )
+            
+            # 2. Anonymize observations
+            await db.threats.update_many(
+                {"created_by": user_id},
+                {"$set": {
+                    "creator_name": anonymized_name,
+                    "anonymized": True,
+                    "anonymized_at": process_timestamp
+                }}
+            )
+            
+            # 3. Anonymize actions
+            await db.central_actions.update_many(
+                {"created_by": user_id},
+                {"$set": {"creator_name": anonymized_name, "anonymized": True}}
+            )
+            await db.central_actions.update_many(
+                {"assigned_to": user_id},
+                {"$set": {"assigned_to": None, "assigned_to_name": "Unassigned (User Deleted)"}}
+            )
+            
+            # 4. Anonymize investigations
+            await db.investigations.update_many(
+                {"$or": [{"created_by": user_id}, {"lead_id": user_id}]},
+                {"$set": {"lead_name": anonymized_name, "anonymized": True}}
+            )
+            
+            # 5. Delete user data
+            await db.chat_messages.delete_many({"user_id": user_id})
+            await db.chat_conversations.delete_many({"user_id": user_id})
+            await db.user_stats.delete_many({"user_id": user_id})
+            await db.password_resets.delete_many({"email": user_email})
+            await db.login_attempts.delete_many({"email": user_email.lower()})
+            await db.user_preferences.delete_many({"user_id": user_id})
+            
+            # 6. Log the deletion
+            await db.gdpr_deletion_log.insert_one({
+                "event": "account_deletion_approved",
+                "original_user_id": user_id,
+                "original_email": user_email,
+                "anonymized_email": anonymized_email,
+                "deletion_reason": deletion_request.get("reason", ""),
+                "approved_by": current_user["id"],
+                "approved_by_name": current_user.get("name", ""),
+                "timestamp": process_timestamp,
+                "data_anonymized": True
+            })
+            
+            # 7. Delete the user record
+            await db.users.delete_one({"id": user_id})
+            
+            # 8. Update request status
+            await db.deletion_requests.update_one(
+                {"id": request_id},
+                {"$set": {
+                    "status": "approved",
+                    "processed_by": current_user["id"],
+                    "processed_by_name": current_user.get("name", ""),
+                    "processed_at": process_timestamp,
+                    "updated_at": process_timestamp
+                }}
+            )
+            
+            # 9. Send confirmation email to user (they're deleted but email is still valid temporarily)
+            await send_deletion_result_email(user_email, user_name, approved=True)
+            
+            logger.info(f"Deletion request {request_id} approved by {current_user['id']}")
+            
+            return {
+                "message": f"Account for {user_name} has been deleted",
+                "request_id": request_id,
+                "status": "approved",
+                "processed_at": process_timestamp
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to execute deletion for request {request_id}: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to delete account. Please try again."
+            )
+    
+    else:  # reject
+        await db.deletion_requests.update_one(
+            {"id": request_id},
             {"$set": {
-                "submitted_by_name": anonymized_name,
-                "submitted_by_anonymized": True,
-                "anonymized_at": deletion_timestamp
+                "status": "rejected",
+                "processed_by": current_user["id"],
+                "processed_by_name": current_user.get("name", ""),
+                "processed_at": process_timestamp,
+                "updated_at": process_timestamp,
+                "rejection_reason": action_request.rejection_reason
             }}
         )
         
-        # 2. Anonymize observations
-        await db.threats.update_many(
-            {"created_by": user_id},
-            {"$set": {
-                "creator_name": anonymized_name,
-                "anonymized": True,
-                "anonymized_at": deletion_timestamp
-            }}
+        # Send rejection email to user
+        await send_deletion_result_email(
+            user_email, 
+            user_name, 
+            approved=False, 
+            rejection_reason=action_request.rejection_reason
         )
         
-        # 3. Anonymize actions (reassign to system)
-        await db.central_actions.update_many(
-            {"created_by": user_id},
-            {"$set": {
-                "creator_name": anonymized_name,
-                "anonymized": True
-            }}
-        )
-        await db.central_actions.update_many(
-            {"assigned_to": user_id},
-            {"$set": {
-                "assigned_to": None,
-                "assigned_to_name": "Unassigned (User Deleted)"
-            }}
-        )
-        
-        # 4. Anonymize investigations
-        await db.investigations.update_many(
-            {"$or": [{"created_by": user_id}, {"lead_id": user_id}]},
-            {"$set": {
-                "lead_name": anonymized_name,
-                "anonymized": True
-            }}
-        )
-        
-        # 5. Delete user chat history
-        await db.chat_messages.delete_many({"user_id": user_id})
-        await db.chat_conversations.delete_many({"user_id": user_id})
-        
-        # 6. Delete user statistics
-        await db.user_stats.delete_many({"user_id": user_id})
-        
-        # 7. Delete password reset tokens
-        await db.password_resets.delete_many({"email": user_email})
-        
-        # 8. Delete login attempts
-        await db.login_attempts.delete_many({"email": user_email.lower()})
-        
-        # 9. Delete user preferences
-        await db.user_preferences.delete_many({"user_id": user_id})
-        
-        # 10. Delete avatar data
-        await db.users.update_one(
-            {"id": user_id},
-            {"$unset": {"avatar_data": "", "avatar_path": "", "avatar_content_type": ""}}
-        )
-        
-        # 11. Log the deletion for compliance BEFORE deleting the user
-        await db.gdpr_deletion_log.insert_one({
-            "event": "account_deletion",
-            "original_user_id": user_id,
-            "anonymized_email": anonymized_email,
-            "deletion_reason": request.reason,
-            "timestamp": deletion_timestamp,
-            "data_anonymized": True,
-            "collections_affected": [
-                "form_submissions",
-                "threats",
-                "central_actions",
-                "investigations",
-                "chat_messages",
-                "chat_conversations",
-                "user_stats",
-                "password_resets",
-                "login_attempts"
-            ]
+        await db.security_audit_log.insert_one({
+            "event": "deletion_request_rejected",
+            "request_id": request_id,
+            "user_id": user_id,
+            "rejected_by": current_user["id"],
+            "rejection_reason": action_request.rejection_reason,
+            "timestamp": process_timestamp
         })
         
-        # 12. Finally, delete the user record
-        result = await db.users.delete_one({"id": user_id})
-        
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=500, detail="Failed to delete user account")
-        
-        logger.info(f"GDPR account deletion completed for user {user_id}")
+        logger.info(f"Deletion request {request_id} rejected by {current_user['id']}")
         
         return {
-            "message": "Your account has been successfully deleted",
-            "details": {
-                "account_deleted": True,
-                "data_anonymized": True,
-                "deletion_timestamp": deletion_timestamp,
-                "gdpr_article": "Article 17 - Right to Erasure"
-            }
+            "message": f"Deletion request for {user_name} has been rejected",
+            "request_id": request_id,
+            "status": "rejected",
+            "processed_at": process_timestamp
         }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"GDPR account deletion failed for user {user_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Account deletion failed. Please contact support."
-        )
 
 
 @router.get("/gdpr/deletion-status")
@@ -462,6 +800,171 @@ async def get_deletion_status(current_user: dict = Depends(get_current_user)):
         )
     
     return status
+
+
+# =============================================================================
+# Terms of Service Endpoint
+# =============================================================================
+
+@router.get("/gdpr/terms-of-service")
+async def get_terms_of_service():
+    """
+    Returns the application's Terms of Service content.
+    """
+    return {
+        "title": "Terms of Service",
+        "last_updated": "2026-04-20",
+        "version": "1.0",
+        "effective_date": "2026-04-20",
+        "sections": [
+            {
+                "title": "1. Acceptance of Terms",
+                "content": "By accessing or using AssetIQ (the 'Service'), you agree to be bound by these Terms of Service ('Terms'). If you do not agree to these Terms, you may not access or use the Service.",
+                "items": [
+                    "These Terms constitute a legally binding agreement between you and AssetIQ",
+                    "You must be at least 18 years old to use the Service",
+                    "If you are using the Service on behalf of an organization, you represent that you have the authority to bind that organization to these Terms"
+                ]
+            },
+            {
+                "title": "2. Description of Service",
+                "content": "AssetIQ is an industrial asset management platform that provides:",
+                "items": [
+                    "Equipment hierarchy management and tracking",
+                    "Risk assessment and reliability analysis tools",
+                    "Form creation, submission, and workflow management",
+                    "Observation and action tracking capabilities",
+                    "AI-powered insights and analysis features",
+                    "Reporting and data visualization tools",
+                    "QR code-based asset identification",
+                    "Production log ingestion and analysis"
+                ]
+            },
+            {
+                "title": "3. User Accounts",
+                "content": "To use the Service, you must create an account. You agree to:",
+                "items": [
+                    "Provide accurate, current, and complete information during registration",
+                    "Maintain and promptly update your account information",
+                    "Maintain the security of your password and accept responsibility for all activities under your account",
+                    "Notify us immediately of any unauthorized use of your account",
+                    "Not share your account credentials with others",
+                    "Not create accounts for the purpose of violating these Terms"
+                ]
+            },
+            {
+                "title": "4. Acceptable Use",
+                "content": "You agree to use the Service only for lawful purposes and in accordance with these Terms. You agree NOT to:",
+                "items": [
+                    "Use the Service in any way that violates any applicable law or regulation",
+                    "Attempt to gain unauthorized access to any part of the Service",
+                    "Interfere with or disrupt the integrity or performance of the Service",
+                    "Transmit any viruses, malware, or other malicious code",
+                    "Collect or harvest any information from the Service without authorization",
+                    "Use the Service to store or transmit infringing, libelous, or unlawful material",
+                    "Use the Service to store or transmit material that violates third-party privacy rights",
+                    "Impersonate any person or entity or misrepresent your affiliation"
+                ]
+            },
+            {
+                "title": "5. Intellectual Property",
+                "content": "The Service and its original content, features, and functionality are owned by AssetIQ and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.",
+                "items": [
+                    "You retain ownership of any data you input into the Service",
+                    "You grant us a license to use, store, and process your data to provide the Service",
+                    "You may not copy, modify, distribute, sell, or lease any part of the Service",
+                    "You may not reverse engineer or attempt to extract the source code of the Service",
+                    "Feedback and suggestions you provide may be used by us without any obligation to you"
+                ]
+            },
+            {
+                "title": "6. Data and Content",
+                "content": "You are responsible for all data and content you upload to the Service.",
+                "items": [
+                    "You represent that you have all necessary rights to upload your content",
+                    "You are responsible for maintaining backups of your data",
+                    "We may remove content that violates these Terms or applicable laws",
+                    "We are not responsible for the accuracy or reliability of user-generated content",
+                    "Data processing is subject to our Privacy Policy"
+                ]
+            },
+            {
+                "title": "7. Service Availability",
+                "content": "We strive to maintain high availability of the Service, but we do not guarantee uninterrupted access.",
+                "items": [
+                    "The Service is provided on an 'as is' and 'as available' basis",
+                    "We may perform scheduled maintenance with advance notice when possible",
+                    "We may suspend or terminate the Service for security, legal, or operational reasons",
+                    "We are not liable for any downtime, data loss, or service interruptions",
+                    "Target uptime is 99.9% but is not guaranteed"
+                ]
+            },
+            {
+                "title": "8. Fees and Payment",
+                "content": "Access to the Service may require payment of fees.",
+                "items": [
+                    "Fees are set by your organization's subscription agreement",
+                    "All fees are non-refundable unless otherwise specified",
+                    "We reserve the right to change fees with 30 days notice",
+                    "Failure to pay may result in suspension or termination of access"
+                ]
+            },
+            {
+                "title": "9. Limitation of Liability",
+                "content": "To the maximum extent permitted by law:",
+                "items": [
+                    "AssetIQ shall not be liable for any indirect, incidental, special, consequential, or punitive damages",
+                    "Our total liability shall not exceed the amount paid by you in the 12 months preceding the claim",
+                    "We are not liable for any loss of data, profits, or business opportunities",
+                    "We are not liable for actions taken based on AI-generated insights or recommendations",
+                    "These limitations apply regardless of the theory of liability"
+                ]
+            },
+            {
+                "title": "10. Indemnification",
+                "content": "You agree to indemnify and hold harmless AssetIQ and its officers, directors, employees, and agents from any claims, damages, losses, liabilities, and expenses arising out of:",
+                "items": [
+                    "Your use of the Service",
+                    "Your violation of these Terms",
+                    "Your violation of any third-party rights",
+                    "Any content you upload or share through the Service"
+                ]
+            },
+            {
+                "title": "11. Termination",
+                "content": "Either party may terminate the use of the Service:",
+                "items": [
+                    "You may request account deletion through the Privacy & Data settings",
+                    "Account deletion requests require owner approval for compliance purposes",
+                    "We may terminate or suspend your account for violation of these Terms",
+                    "Upon termination, your right to use the Service ceases immediately",
+                    "Data retention after termination is governed by our Privacy Policy and applicable laws"
+                ]
+            },
+            {
+                "title": "12. Changes to Terms",
+                "content": "We may modify these Terms at any time.",
+                "items": [
+                    "We will notify you of material changes via email or in-app notification",
+                    "Continued use of the Service after changes constitutes acceptance",
+                    "If you do not agree to the modified Terms, you must stop using the Service",
+                    "The 'Last Updated' date at the top indicates the most recent revision"
+                ]
+            },
+            {
+                "title": "13. Governing Law",
+                "content": "These Terms shall be governed by and construed in accordance with the laws of the European Union and the applicable member state, without regard to conflict of law principles. Any disputes shall be resolved through binding arbitration or in the courts of competent jurisdiction."
+            },
+            {
+                "title": "14. Severability",
+                "content": "If any provision of these Terms is found to be unenforceable or invalid, that provision shall be limited or eliminated to the minimum extent necessary, and the remaining provisions shall remain in full force and effect."
+            },
+            {
+                "title": "15. Contact Information",
+                "content": "For questions about these Terms, please contact your system administrator or reach out through the in-app feedback system."
+            }
+        ]
+    }
 
 
 # =============================================================================

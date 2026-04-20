@@ -1,16 +1,16 @@
 import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { 
   Shield, 
   FileText, 
   Check, 
   X, 
-  ChevronDown, 
-  ChevronUp,
   Lock,
   Eye,
   Trash2,
   Download,
-  ExternalLink
+  Loader2,
+  ScrollText
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
@@ -29,10 +29,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "./ui/accordion";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "./ui/tabs";
+import { gdprAPI } from "../lib/api";
 
 /**
  * First-time login consent dialog for GDPR compliance.
- * Shows privacy policy summary and requires user acceptance.
+ * Shows Terms of Service and Privacy Policy, requires user acceptance.
  * 
  * Order of dialogs:
  * 1. Password Change (if must_change_password)
@@ -47,7 +54,21 @@ export default function TermsAcceptanceDialog({
 }) {
   const [hasReadTerms, setHasReadTerms] = useState(false);
   const [hasReadPrivacy, setHasReadPrivacy] = useState(false);
-  const [expandedSection, setExpandedSection] = useState(null);
+  const [activeTab, setActiveTab] = useState("summary");
+
+  // Fetch Terms of Service
+  const { data: termsData, isLoading: termsLoading } = useQuery({
+    queryKey: ["terms-of-service"],
+    queryFn: gdprAPI.getTermsOfService,
+    enabled: open,
+  });
+
+  // Fetch Privacy Policy
+  const { data: privacyData, isLoading: privacyLoading } = useQuery({
+    queryKey: ["privacy-policy"],
+    queryFn: gdprAPI.getPrivacyPolicy,
+    enabled: open,
+  });
 
   const canAccept = hasReadTerms && hasReadPrivacy;
 
@@ -57,9 +78,27 @@ export default function TermsAcceptanceDialog({
     }
   };
 
+  const renderSection = (section, index) => (
+    <AccordionItem key={index} value={`section-${index}`} className="border-b last:border-b-0">
+      <AccordionTrigger className="text-left text-sm hover:no-underline py-3">
+        {section.title}
+      </AccordionTrigger>
+      <AccordionContent className="text-sm text-slate-600 pb-3">
+        <p className="mb-2">{section.content}</p>
+        {section.items && (
+          <ul className="list-disc list-inside space-y-1 text-slate-500 ml-2">
+            {section.items.map((item, i) => (
+              <li key={i} className="text-xs">{item}</li>
+            ))}
+          </ul>
+        )}
+      </AccordionContent>
+    </AccordionItem>
+  );
+
   return (
     <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden" data-testid="terms-acceptance-dialog">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden" data-testid="terms-acceptance-dialog">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -74,132 +113,188 @@ export default function TermsAcceptanceDialog({
           </div>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[50vh] pr-4">
-          <div className="space-y-4 py-4">
-            {/* GDPR Rights Summary */}
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-              <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Your Data Rights (GDPR)
-              </h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="flex items-start gap-2">
-                  <Eye className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <span className="font-medium">Access</span>
-                    <p className="text-slate-600 text-xs">Request your data anytime</p>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="summary" className="text-xs sm:text-sm">
+              <Eye className="w-4 h-4 mr-1 hidden sm:inline" />
+              Summary
+            </TabsTrigger>
+            <TabsTrigger value="terms" className="text-xs sm:text-sm">
+              <ScrollText className="w-4 h-4 mr-1 hidden sm:inline" />
+              Terms of Service
+            </TabsTrigger>
+            <TabsTrigger value="privacy" className="text-xs sm:text-sm">
+              <Shield className="w-4 h-4 mr-1 hidden sm:inline" />
+              Privacy Policy
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Summary Tab */}
+          <TabsContent value="summary" className="mt-4">
+            <ScrollArea className="h-[40vh] pr-4">
+              <div className="space-y-4">
+                {/* GDPR Rights Summary */}
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                  <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Your Data Rights (GDPR)
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex items-start gap-2">
+                      <Eye className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">Access</span>
+                        <p className="text-slate-600 text-xs">Request your data anytime</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Download className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">Portability</span>
+                        <p className="text-slate-600 text-xs">Export in JSON format</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Trash2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">Erasure</span>
+                        <p className="text-slate-600 text-xs">Delete your account</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Lock className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">Control</span>
+                        <p className="text-slate-600 text-xs">Manage consent settings</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-start gap-2">
-                  <Download className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <span className="font-medium">Portability</span>
-                    <p className="text-slate-600 text-xs">Export in JSON format</p>
-                  </div>
+
+                {/* Key Terms Summary */}
+                <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                    <ScrollText className="w-4 h-4" />
+                    Key Terms Summary
+                  </h3>
+                  <ul className="space-y-2 text-sm text-slate-600">
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>You retain ownership of all data you input into AssetIQ</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>We use industry-standard encryption to protect your data</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>You can export or delete your data at any time</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Account deletion requires owner approval for compliance</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>AI features process data per our privacy policy</span>
+                    </li>
+                  </ul>
                 </div>
-                <div className="flex items-start gap-2">
-                  <Trash2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <span className="font-medium">Erasure</span>
-                    <p className="text-slate-600 text-xs">Delete your account</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Lock className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <span className="font-medium">Control</span>
-                    <p className="text-slate-600 text-xs">Manage consent settings</p>
-                  </div>
+
+                {/* Data Collection Summary */}
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <h3 className="font-semibold text-amber-900 mb-3 flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Data We Collect
+                  </h3>
+                  <ul className="space-y-1 text-sm text-amber-800">
+                    <li>• Account info (name, email, position)</li>
+                    <li>• Activity data (submissions, observations, actions)</li>
+                    <li>• Technical data (login times, security logs)</li>
+                  </ul>
                 </div>
               </div>
-            </div>
+            </ScrollArea>
+          </TabsContent>
 
-            {/* Terms of Service Summary */}
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="terms" className="border rounded-lg px-4">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-slate-600" />
-                    <span>Terms of Service</span>
+          {/* Terms of Service Tab */}
+          <TabsContent value="terms" className="mt-4">
+            <ScrollArea className="h-[40vh] pr-4">
+              {termsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-slate-900">{termsData?.title}</h3>
+                    <span className="text-xs text-slate-500">
+                      v{termsData?.version} • Updated {termsData?.last_updated}
+                    </span>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="text-sm text-slate-600 space-y-2 pb-2">
-                    <p><strong>1. Acceptance:</strong> By using AssetIQ, you agree to these terms.</p>
-                    <p><strong>2. Account:</strong> You are responsible for maintaining the security of your account credentials.</p>
-                    <p><strong>3. Usage:</strong> Use the platform only for its intended industrial asset management purposes.</p>
-                    <p><strong>4. Data:</strong> You retain ownership of data you input. We process it to provide services.</p>
-                    <p><strong>5. Availability:</strong> We strive for 99.9% uptime but cannot guarantee uninterrupted service.</p>
-                    <p><strong>6. Updates:</strong> Terms may be updated. Continued use implies acceptance of changes.</p>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
+                  <Accordion type="single" collapsible className="w-full">
+                    {termsData?.sections?.map((section, index) => renderSection(section, index))}
+                  </Accordion>
+                </div>
+              )}
+            </ScrollArea>
+          </TabsContent>
 
-              <AccordionItem value="privacy" className="border rounded-lg px-4 mt-2">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-slate-600" />
-                    <span>Privacy Policy</span>
+          {/* Privacy Policy Tab */}
+          <TabsContent value="privacy" className="mt-4">
+            <ScrollArea className="h-[40vh] pr-4">
+              {privacyLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-slate-900">{privacyData?.title}</h3>
+                    <span className="text-xs text-slate-500">
+                      v{privacyData?.version} • Updated {privacyData?.last_updated}
+                    </span>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="text-sm text-slate-600 space-y-2 pb-2">
-                    <p><strong>Data We Collect:</strong></p>
-                    <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li>Account info (name, email, phone)</li>
-                      <li>Activity data (submissions, observations, actions)</li>
-                      <li>Technical data (login times, IP addresses for security)</li>
-                    </ul>
-                    <p className="mt-2"><strong>How We Use It:</strong></p>
-                    <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li>Provide asset management services</li>
-                      <li>Security monitoring and fraud prevention</li>
-                      <li>Service improvement (with consent)</li>
-                    </ul>
-                    <p className="mt-2"><strong>Data Retention:</strong></p>
-                    <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li>Account data: Until deletion or 2 years inactive</li>
-                      <li>Audit logs: 5 years (compliance requirement)</li>
-                    </ul>
-                    <p className="mt-2"><strong>Your Rights:</strong> Access, export, delete your data via Settings → Privacy & Data</p>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+                  <Accordion type="single" collapsible className="w-full">
+                    {privacyData?.sections?.map((section, index) => renderSection(section, index))}
+                  </Accordion>
+                </div>
+              )}
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
 
-            {/* Consent Checkboxes */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                <Checkbox 
-                  id="terms" 
-                  checked={hasReadTerms}
-                  onCheckedChange={setHasReadTerms}
-                  data-testid="accept-terms-checkbox"
-                />
-                <label htmlFor="terms" className="text-sm cursor-pointer">
-                  I have read and agree to the <strong>Terms of Service</strong>
-                </label>
-              </div>
-              
-              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                <Checkbox 
-                  id="privacy" 
-                  checked={hasReadPrivacy}
-                  onCheckedChange={setHasReadPrivacy}
-                  data-testid="accept-privacy-checkbox"
-                />
-                <label htmlFor="privacy" className="text-sm cursor-pointer">
-                  I have read and agree to the <strong>Privacy Policy</strong> and understand how my data will be processed
-                </label>
-              </div>
-            </div>
-
-            {/* Info Note */}
-            <p className="text-xs text-slate-500 mt-2">
-              You can review the full Privacy Policy and manage your data preferences anytime in Settings → Privacy & Data.
-            </p>
+        {/* Consent Checkboxes */}
+        <div className="space-y-3 pt-4 border-t">
+          <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+            <Checkbox 
+              id="terms" 
+              checked={hasReadTerms}
+              onCheckedChange={setHasReadTerms}
+              data-testid="accept-terms-checkbox"
+            />
+            <label htmlFor="terms" className="text-sm cursor-pointer">
+              I have read and agree to the <strong>Terms of Service</strong>
+            </label>
           </div>
-        </ScrollArea>
+          
+          <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+            <Checkbox 
+              id="privacy" 
+              checked={hasReadPrivacy}
+              onCheckedChange={setHasReadPrivacy}
+              data-testid="accept-privacy-checkbox"
+            />
+            <label htmlFor="privacy" className="text-sm cursor-pointer">
+              I have read and agree to the <strong>Privacy Policy</strong> and understand how my data will be processed
+            </label>
+          </div>
+        </div>
+
+        {/* Info Note */}
+        <p className="text-xs text-slate-500">
+          You can review these documents anytime in Settings → Privacy & Data.
+        </p>
 
         <DialogFooter className="flex gap-2 sm:gap-2">
           <Button

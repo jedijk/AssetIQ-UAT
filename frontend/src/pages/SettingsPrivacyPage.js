@@ -16,7 +16,8 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  Loader2
+  Loader2,
+  X
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -60,6 +61,11 @@ export default function SettingsPrivacyPage() {
     queryFn: gdprAPI.getPrivacyPolicy,
   });
 
+  const { data: termsOfService, isLoading: termsLoading } = useQuery({
+    queryKey: ["terms-of-service"],
+    queryFn: gdprAPI.getTermsOfService,
+  });
+
   const { data: deletionStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["deletion-status"],
     queryFn: gdprAPI.getDeletionStatus,
@@ -68,6 +74,12 @@ export default function SettingsPrivacyPage() {
   const { data: consentStatus, isLoading: consentLoading } = useQuery({
     queryKey: ["consent-status"],
     queryFn: gdprAPI.getConsentStatus,
+  });
+
+  // Query for pending deletion request
+  const { data: myDeletionRequest, isLoading: requestLoading } = useQuery({
+    queryKey: ["my-deletion-request"],
+    queryFn: gdprAPI.getMyDeletionRequest,
   });
 
   // Mutations
@@ -102,17 +114,27 @@ export default function SettingsPrivacyPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: gdprAPI.deleteAccount,
-    onSuccess: () => {
-      toast.success("Your account has been deleted");
+    mutationFn: gdprAPI.requestAccountDeletion,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["my-deletion-request"] });
+      toast.success("Your deletion request has been submitted for approval");
       setShowDeleteDialog(false);
-      // Log out user after account deletion
-      setTimeout(() => {
-        logout();
-      }, 2000);
+      setDeleteConfirmEmail("");
+      setDeleteReason("");
     },
     onError: (error) => {
-      toast.error(error.response?.data?.detail || "Failed to delete account");
+      toast.error(error.response?.data?.detail || "Failed to submit deletion request");
+    },
+  });
+
+  const cancelRequestMutation = useMutation({
+    mutationFn: gdprAPI.cancelDeletionRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-deletion-request"] });
+      toast.success("Your deletion request has been cancelled");
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.detail || "Failed to cancel request");
     },
   });
 
@@ -314,6 +336,46 @@ export default function SettingsPrivacyPage() {
         </CardContent>
       </Card>
 
+      {/* Terms of Service Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-blue-500" />
+            Terms of Service
+          </CardTitle>
+          <CardDescription>
+            {termsOfService?.last_updated && `Last updated: ${termsOfService.last_updated} • v${termsOfService.version}`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {termsLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            </div>
+          ) : (
+            <Accordion type="single" collapsible className="w-full">
+              {termsOfService?.sections?.map((section, index) => (
+                <AccordionItem key={index} value={`tos-section-${index}`}>
+                  <AccordionTrigger className="text-left">
+                    {section.title}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <p className="text-slate-600 mb-2">{section.content}</p>
+                    {section.items && (
+                      <ul className="list-disc list-inside space-y-1 text-sm text-slate-500">
+                        {section.items.map((item, i) => (
+                          <li key={i}>{item}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Privacy Policy Card */}
       <Card>
         <CardHeader>
@@ -362,13 +424,77 @@ export default function SettingsPrivacyPage() {
             Delete Account
           </CardTitle>
           <CardDescription>
-            Permanently delete your account and all associated data (Article 17)
+            Request deletion of your account (requires owner approval)
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {statusLoading ? (
+          {statusLoading || requestLoading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            </div>
+          ) : myDeletionRequest?.has_pending_request ? (
+            /* Show pending request status */
+            <div className="space-y-4">
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-center gap-2 text-amber-700 mb-2">
+                  <Clock className="w-4 h-4" />
+                  <span className="font-medium">Deletion Request Pending</span>
+                </div>
+                <p className="text-sm text-amber-600 mb-2">
+                  Your account deletion request is awaiting owner approval.
+                </p>
+                <div className="text-xs text-amber-500 space-y-1">
+                  <p>Submitted: {new Date(myDeletionRequest.request?.created_at).toLocaleString()}</p>
+                  {myDeletionRequest.request?.reason && (
+                    <p>Reason: {myDeletionRequest.request.reason}</p>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => cancelRequestMutation.mutate()}
+                disabled={cancelRequestMutation.isPending}
+                data-testid="cancel-deletion-request-btn"
+              >
+                {cancelRequestMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  <>
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel Request
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : myDeletionRequest?.request?.status === "rejected" ? (
+            /* Show rejected request info */
+            <div className="space-y-4">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2 text-red-700 mb-2">
+                  <X className="w-4 h-4" />
+                  <span className="font-medium">Previous Request Rejected</span>
+                </div>
+                <p className="text-sm text-red-600 mb-2">
+                  Your deletion request was rejected on {new Date(myDeletionRequest.request?.processed_at).toLocaleDateString()}.
+                </p>
+                {myDeletionRequest.request?.rejection_reason && (
+                  <p className="text-xs text-red-500">
+                    Reason: {myDeletionRequest.request.rejection_reason}
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                disabled={!deletionStatus?.can_delete}
+                data-testid="delete-account-btn"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Submit New Request
+              </Button>
             </div>
           ) : (
             <>
@@ -393,6 +519,13 @@ export default function SettingsPrivacyPage() {
                     <Badge variant="outline">{deletionStatus?.data_summary?.investigations || 0}</Badge>
                   </div>
                 </div>
+              </div>
+
+              {/* Info about approval workflow */}
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Note:</strong> Deletion requests require owner approval. You will be notified via email once your request is processed.
+                </p>
               </div>
 
               {/* Warnings */}

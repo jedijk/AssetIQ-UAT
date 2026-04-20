@@ -87,24 +87,35 @@ Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset ma
 ## GDPR Compliance (Implemented Apr 20, 2026)
 ### Backend APIs
 - `GET /api/gdpr/export` - Export all user personal data (Article 15 & 20)
-- `POST /api/gdpr/delete-account` - Self-delete account with data anonymization (Article 17)
+- `POST /api/gdpr/delete-account` - Request account deletion (requires owner approval)
 - `GET /api/gdpr/deletion-status` - Check deletion eligibility and data summary
-- `GET /api/gdpr/privacy-policy` - Returns full privacy policy content
+- `GET /api/gdpr/my-deletion-request` - Get user's pending deletion request
+- `DELETE /api/gdpr/cancel-deletion-request` - Cancel pending deletion request
+- `GET /api/gdpr/deletion-requests` - Owner-only: List all deletion requests
+- `POST /api/gdpr/deletion-requests/{id}/action` - Owner-only: Approve/reject requests
+- `GET /api/gdpr/terms-of-service` - Returns full Terms of Service (15 sections)
+- `GET /api/gdpr/privacy-policy` - Returns full Privacy Policy (9 sections)
 - `GET /api/gdpr/consent-status` - Get user consent preferences
 - `POST /api/gdpr/consent` - Update consent preferences
 - `POST /api/gdpr/accept-terms` - First-login terms acceptance
 - `GET /api/gdpr/terms-status` - Check terms acceptance status
 
-### Frontend
-- Privacy & Data settings page at `/settings/privacy`
+### Frontend Pages
+- Privacy & Data settings: `/settings/privacy`
+- Deletion Requests (owner-only): `/settings/deletion-requests`
+
+### Features
 - Data export button (downloads JSON)
 - Consent toggles (Essential, Analytics, Marketing, AI Processing)
+- Terms of Service accordion (15 sections)
 - Privacy Policy accordion (9 sections)
-- Account deletion with email confirmation dialog
-- Owner protection: Owners cannot delete their own account
+- Account deletion with owner approval workflow
+- Email notifications to owners for deletion requests
+- Email notifications to users for approval/rejection
+- Owner can view, approve, or reject deletion requests with reason
 
 ### First-Login Terms Acceptance
-- `TermsAcceptanceDialog` component shows on first login
+- `TermsAcceptanceDialog` with 3 tabs: Summary, Terms of Service, Privacy Policy
 - Flow order: Password Change → Terms Acceptance → Intro Tour
 - User must check both "Terms of Service" and "Privacy Policy" checkboxes
 - "Decline & Logout" option available

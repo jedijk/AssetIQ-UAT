@@ -38,6 +38,7 @@ import SettingsQRPage from "./pages/SettingsQRPage";
 import SettingsNotificationsPage from "./pages/SettingsNotificationsPage";
 import SettingsLogIngestionPage from "./pages/SettingsLogIngestionPage";
 import SettingsPrivacyPage from "./pages/SettingsPrivacyPage";
+import SettingsDeletionRequestsPage from "./pages/SettingsDeletionRequestsPage";
 import InsightsPage from "./pages/InsightsPage";
 import FormsPage from "./pages/FormsPage";
 import FormSubmissionsPage from "./pages/FormSubmissionsPage";
@@ -281,6 +282,7 @@ function App() {
                   <Route path="feedback" element={<FeedbackPage />} />
                   <Route path="log-ingestion" element={<SettingsLogIngestionPage />} />
                   <Route path="privacy" element={<SettingsPrivacyPage />} />
+                  <Route path="deletion-requests" element={<SettingsDeletionRequestsPage />} />
                 </Route>
                 
                 <Route path="user-statistics" element={<UserStatisticsPage />} />

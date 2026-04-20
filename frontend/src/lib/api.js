@@ -1554,6 +1554,10 @@ export const gdprAPI = {
     const response = await api.get("/gdpr/privacy-policy");
     return response.data;
   },
+  getTermsOfService: async () => {
+    const response = await api.get("/gdpr/terms-of-service");
+    return response.data;
+  },
   getDeletionStatus: async () => {
     const response = await api.get("/gdpr/deletion-status");
     return response.data;
@@ -1572,6 +1576,36 @@ export const gdprAPI = {
     });
     return response.data;
   },
+  // Account deletion request (now requires owner approval)
+  requestAccountDeletion: async (data) => {
+    const response = await api.post("/gdpr/delete-account", data);
+    return response.data;
+  },
+  // Get my pending deletion request
+  getMyDeletionRequest: async () => {
+    const response = await api.get("/gdpr/my-deletion-request");
+    return response.data;
+  },
+  // Cancel pending deletion request
+  cancelDeletionRequest: async () => {
+    const response = await api.delete("/gdpr/cancel-deletion-request");
+    return response.data;
+  },
+  // Owner-only: Get all deletion requests
+  getDeletionRequests: async (status = null) => {
+    const params = status ? `?status=${status}` : "";
+    const response = await api.get(`/gdpr/deletion-requests${params}`);
+    return response.data;
+  },
+  // Owner-only: Approve or reject deletion request
+  processDeletionRequest: async (requestId, action, rejectionReason = "") => {
+    const response = await api.post(`/gdpr/deletion-requests/${requestId}/action`, {
+      action,
+      rejection_reason: rejectionReason
+    });
+    return response.data;
+  },
+  // Legacy alias for backwards compatibility
   deleteAccount: async (data) => {
     const response = await api.post("/gdpr/delete-account", data);
     return response.data;

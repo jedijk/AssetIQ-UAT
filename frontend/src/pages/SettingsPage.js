@@ -15,7 +15,8 @@ import {
   ChevronRight,
   ArrowLeft,
   FileText,
-  Shield
+  Shield,
+  Trash2
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -111,6 +112,14 @@ const SETTINGS_SECTIONS = [
     icon: Shield,
     path: "/settings/privacy",
     roles: ["owner", "admin", "engineer", "technician", "viewer"]
+  },
+  {
+    id: "deletion-requests",
+    label: "Deletion Requests",
+    description: "Review account deletion requests",
+    icon: Trash2,
+    path: "/settings/deletion-requests",
+    roles: ["owner"]
   }
 ];
 
