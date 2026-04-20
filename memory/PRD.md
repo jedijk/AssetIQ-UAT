@@ -68,11 +68,14 @@ Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset ma
 - /app/backend/routes/production.py (Production Dashboard with ingested data fallback)
 - /app/frontend/src/pages/SettingsLogIngestionPage.js (Full ingestion UI + dashboard)
 - /app/frontend/src/pages/ProductionDashboardPage.js (Main production dashboard)
+- /app/backend/routes/gdpr.py (GDPR compliance endpoints)
+- /app/frontend/src/pages/SettingsPrivacyPage.js (Privacy & Data settings UI)
 
 ## Backlog (Prioritized)
 ### P1
 - Report generation (PowerPoint/PDF) for Causal Investigations
 - Offline support with local storage for My Tasks execution
+- Migrate AI models from OpenAI GPT-4o to Anthropic Claude 4.5 (awaiting user key preference)
 
 ### P2
 - QR scan analytics dashboard
@@ -80,3 +83,21 @@ Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset ma
 ### P3
 - Break down large pages into modular components (SettingsLogIngestionPage.js ~2000 lines)
 - Advanced event detection rule engine for log ingestion
+
+## GDPR Compliance (Implemented Apr 20, 2026)
+### Backend APIs
+- `GET /api/gdpr/export` - Export all user personal data (Article 15 & 20)
+- `POST /api/gdpr/delete-account` - Self-delete account with data anonymization (Article 17)
+- `GET /api/gdpr/deletion-status` - Check deletion eligibility and data summary
+- `GET /api/gdpr/privacy-policy` - Returns full privacy policy content
+- `GET /api/gdpr/consent-status` - Get user consent preferences
+- `POST /api/gdpr/consent` - Update consent preferences
+
+### Frontend
+- Privacy & Data settings page at `/settings/privacy`
+- Data export button (downloads JSON)
+- Consent toggles (Essential, Analytics, Marketing, AI Processing)
+- Privacy Policy accordion (9 sections)
+- Account deletion with email confirmation dialog
+- Owner protection: Owners cannot delete their own account
+

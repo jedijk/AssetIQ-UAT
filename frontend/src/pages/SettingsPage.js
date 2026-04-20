@@ -14,7 +14,8 @@ import {
   BarChart3,
   ChevronRight,
   ArrowLeft,
-  FileText
+  FileText,
+  Shield
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -102,6 +103,14 @@ const SETTINGS_SECTIONS = [
     icon: BarChart3,
     path: "/settings/statistics",
     roles: ["owner", "admin", "engineer", "technician"]
+  },
+  {
+    id: "privacy",
+    label: "Privacy & Data",
+    description: "GDPR compliance and data export",
+    icon: Shield,
+    path: "/settings/privacy",
+    roles: ["owner", "admin", "engineer", "technician", "viewer"]
   }
 ];
 

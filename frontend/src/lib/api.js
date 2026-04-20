@@ -1548,5 +1548,35 @@ export const getErrorMessage = (error, fallback = "An error occurred") => {
   return fallback;
 };
 
+// GDPR Compliance API
+export const gdprAPI = {
+  getPrivacyPolicy: async () => {
+    const response = await api.get("/gdpr/privacy-policy");
+    return response.data;
+  },
+  getDeletionStatus: async () => {
+    const response = await api.get("/gdpr/deletion-status");
+    return response.data;
+  },
+  getConsentStatus: async () => {
+    const response = await api.get("/gdpr/consent-status");
+    return response.data;
+  },
+  updateConsent: async (consents) => {
+    const response = await api.post("/gdpr/consent", consents);
+    return response.data;
+  },
+  exportData: async () => {
+    const response = await api.get("/gdpr/export", {
+      responseType: "blob",
+    });
+    return response.data;
+  },
+  deleteAccount: async (data) => {
+    const response = await api.post("/gdpr/delete-account", data);
+    return response.data;
+  },
+};
+
 
 export default api;
