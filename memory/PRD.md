@@ -122,3 +122,12 @@ Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset ma
 - Terms version tracked in user record (`terms_accepted_version`)
 - Consent audit trail in `gdpr_consent_log` collection
 
+## AI Vision Photo Viewer (DONE - Feb 2026)
+- Form Submissions detail modal now renders the original AI-captured source photo
+- Photo path stored as `__ai_scan_photo` entry inside submission `values[]` (value = R2 path `ai-scans/{user_id}/{uuid}.{ext}`)
+- Served through authenticated `/api/storage/{path}` endpoint via `AuthenticatedImage`
+- Dedicated "AI Vision Photo" section (with `Sparkles` icon) shown above Checklist
+- Internal `__ai_scan_photo` field filtered out of Checklist / Insights / Recommendation tallies
+- Click-to-enlarge via existing lightbox flow
+- File: `/app/frontend/src/pages/FormSubmissionsPage.js` (section ~line 909)
+
