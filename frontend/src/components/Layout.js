@@ -894,12 +894,12 @@ const Layout = () => {
                       src={avatarUrl}
                       alt={user?.name}
                       className="h-full w-full object-cover"
+                      onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                     />
-                  ) : (
-                    <div className="h-full w-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm">
-                      {user?.name?.charAt(0)?.toUpperCase() || "U"}
-                    </div>
-                  )}
+                  ) : null}
+                  <div className={`h-full w-full bg-gradient-to-br from-blue-500 to-indigo-600 items-center justify-center text-white font-semibold text-sm ${avatarUrl ? 'hidden' : 'flex'}`}>
+                    {user?.name?.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) || "U"}
+                  </div>
                 </motion.button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
@@ -911,12 +911,12 @@ const Layout = () => {
                           src={avatarUrl}
                           alt={user?.name}
                           className="h-full w-full object-cover"
+                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                         />
-                      ) : (
-                        <div className="h-full w-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
-                          {user?.name?.charAt(0)?.toUpperCase() || "U"}
-                        </div>
-                      )}
+                      ) : null}
+                      <div className={`h-full w-full bg-gradient-to-br from-blue-500 to-indigo-600 items-center justify-center text-white font-bold text-lg ${avatarUrl ? 'hidden' : 'flex'}`}>
+                        {user?.name?.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) || "U"}
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <p className="font-semibold text-slate-900 truncate" data-testid="user-name">
@@ -1273,7 +1273,7 @@ const Layout = () => {
                 <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
                   {avatarUrl && <AvatarImage src={avatarUrl} alt={user?.name} className="object-cover" />}
                   <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-2xl font-bold">
-                    {user?.name?.charAt(0)?.toUpperCase() || "U"}
+                    {user?.name?.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <button
