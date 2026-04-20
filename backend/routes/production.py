@@ -310,9 +310,9 @@ async def get_production_dashboard(
     else:
         rsd = 0
 
-    # Waste calculation
-    waste_kg = total_waste if total_waste > 0 else round(total_feed * 0.08, 1)
-    waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 else 0
+    # Waste calculation - only show reported waste; do not fabricate an estimate
+    waste_kg = total_waste
+    waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 and waste_kg > 0 else 0
     yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
 
     # Runtime estimation

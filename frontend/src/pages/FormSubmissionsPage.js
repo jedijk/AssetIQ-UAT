@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { useLanguage } from "../contexts/LanguageContext";
 import { AuthenticatedImage, useAuthenticatedMedia } from "../components/AuthenticatedMedia";
@@ -386,6 +386,7 @@ export default function FormSubmissionsPage() {
   const [viewingDocument, setViewingDocument] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const location = useLocation();
 
   // Function to handle clicking on a submission - fetches full details
   const handleSubmissionClick = async (submission) => {
@@ -401,6 +402,17 @@ export default function FormSubmissionsPage() {
       setLoadingSubmission(false);
     }
   };
+
+  // Auto-open a submission if navigated here with { state: { submissionId } }
+  useEffect(() => {
+    const sid = location.state?.submissionId;
+    if (sid) {
+      handleSubmissionClick({ id: sid });
+      // Clear the state so we don't re-open on back navigation
+      window.history.replaceState({}, document.title);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state?.submissionId]);
 
   // Close image lightbox with Escape key
   const closeImageLightbox = useCallback(() => {
