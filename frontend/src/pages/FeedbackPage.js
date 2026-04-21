@@ -439,6 +439,12 @@ const FeedbackPage = () => {
     }
   };
 
+  // Quick status change from dropdown menu
+  const handleQuickStatusChange = (itemId, status, e) => {
+    if (e) e.stopPropagation();
+    updateStatusMutation.mutate({ id: itemId, status });
+  };
+
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -1261,6 +1267,26 @@ const FeedbackPage = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {/* Quick status changes for owner/admin/manager */}
+                          {canViewAll && (
+                            <>
+                              <DropdownMenuItem 
+                                onClick={(e) => handleQuickStatusChange(item.id, 'in_review', e)}
+                                className="text-amber-600"
+                              >
+                                <Clock className="w-4 h-4 mr-2" />
+                                Mark In Review
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={(e) => handleQuickStatusChange(item.id, 'implemented', e)}
+                                className="text-emerald-600"
+                              >
+                                <CheckCircle2 className="w-4 h-4 mr-2" />
+                                Mark Implemented
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
                           {canWrite && (
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(item, e); }}>
                             <Pencil className="w-4 h-4 mr-2" />
@@ -1365,7 +1391,7 @@ const FeedbackPage = () => {
                             </div>
                           </div>
                           
-                          {!isSelectionMode && (canWrite || canDelete) && (
+                          {!isSelectionMode && (canWrite || canDelete || canViewAll) && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-600 flex-shrink-0">
@@ -1373,6 +1399,26 @@ const FeedbackPage = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                {/* Quick status changes for owner/admin/manager */}
+                                {canViewAll && (
+                                  <>
+                                    <DropdownMenuItem 
+                                      onClick={(e) => handleQuickStatusChange(item.id, 'in_review', e)}
+                                      className="text-amber-600"
+                                    >
+                                      <Clock className="w-4 h-4 mr-2" />
+                                      Mark In Review
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={(e) => handleQuickStatusChange(item.id, 'implemented', e)}
+                                      className="text-emerald-600"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                                      Mark Implemented
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                  </>
+                                )}
                                 {canWrite && (
                                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(item, e); }}>
                                   <Pencil className="w-4 h-4 mr-2" />Edit
