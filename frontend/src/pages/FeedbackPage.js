@@ -288,8 +288,8 @@ const FeedbackPage = () => {
 
   // Mutation: Delete feedback (use admin endpoint for owner/admin/manager)
   const deleteMutation = useMutation({
-    mutationFn: (id) => {
-      if (canViewAll) {
+    mutationFn: ({ id, useAdmin }) => {
+      if (useAdmin) {
         return feedbackAPI.adminDelete(id);
       }
       return feedbackAPI.delete(id);
@@ -434,7 +434,7 @@ const FeedbackPage = () => {
 
   const confirmDelete = () => {
     if (deleteConfirmId) {
-      deleteMutation.mutate(deleteConfirmId);
+      deleteMutation.mutate({ id: deleteConfirmId, useAdmin: canViewAll });
     }
   };
 
