@@ -257,7 +257,7 @@ async def admin_get_all_feedback(
 ):
     """Admin: Get all feedback, optionally filtered by status."""
     # Check admin role (simple check - extend as needed)
-    if current_user.get("role") not in ["admin", "manager"]:
+    if current_user.get("role") not in ["admin", "manager", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     items = await get_all_feedback(status_filter=status)
@@ -271,7 +271,7 @@ async def admin_update_feedback(
     current_user: dict = Depends(get_current_user)
 ):
     """Admin: Update feedback status or add a response."""
-    if current_user.get("role") not in ["admin", "manager"]:
+    if current_user.get("role") not in ["admin", "manager", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     result = await update_feedback_status(
@@ -290,7 +290,7 @@ async def admin_delete_feedback(
     current_user: dict = Depends(get_current_user)
 ):
     """Admin: Delete a feedback item."""
-    if current_user.get("role") not in ["admin", "manager"]:
+    if current_user.get("role") not in ["admin", "manager", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     success = await delete_feedback(feedback_id)
