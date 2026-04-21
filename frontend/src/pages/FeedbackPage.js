@@ -1689,7 +1689,7 @@ const FeedbackPage = () => {
                 )}
 
                 {/* Owner Response Section */}
-                {canViewAll && viewMode === 'all' ? (
+                {canViewAll ? (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h4 className="text-sm font-medium text-blue-800 mb-2">
                       {t("feedback.ownerResponse") || "Owner Response"}
@@ -1697,7 +1697,7 @@ const FeedbackPage = () => {
                     <textarea
                       value={ownerResponse}
                       onChange={(e) => setOwnerResponse(e.target.value)}
-                      placeholder="Add a response to this feedback..."
+                      placeholder="Add a response to let the user know what was done about their feedback..."
                       className="w-full min-h-[80px] p-2 text-sm border border-blue-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
                       data-testid="owner-response-input"
                     />
@@ -1721,7 +1721,7 @@ const FeedbackPage = () => {
                   </div>
                 ) : selectedFeedback.user_visible_response ? (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-blue-800 mb-2">{t("feedback.response") || "Response"}</h4>
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">{t("feedback.response") || "Response from Team"}</h4>
                     <p className="text-blue-700 text-sm leading-relaxed">
                       {selectedFeedback.user_visible_response}
                     </p>
