@@ -23,6 +23,8 @@ from services.feedback_service import (
     update_user_feedback,
     delete_user_feedback,
     bulk_update_status,
+    get_unread_feedback_count,
+    mark_feedback_as_read,
 )
 from services.storage_service import put_object, MIME_TYPES
 
@@ -250,6 +252,30 @@ async def bulk_update_feedback_status(
 
 # ===== Admin Endpoints =====
 
+@router.get("/admin/unread-count")
+async def admin_get_unread_count(
+    current_user: dict = Depends(get_current_user)
+):
+    """Admin: Get count of unread feedback items."""
+    if current_user.get("role") not in ["admin", "manager", "owner"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    count = await get_unread_feedback_count()
+    return {"unread_count": count}
+
+
+@router.post("/admin/mark-read")
+async def admin_mark_all_read(
+    current_user: dict = Depends(get_current_user)
+):
+    """Admin: Mark all feedback as read."""
+    if current_user.get("role") not in ["admin", "manager", "owner"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    count = await mark_feedback_as_read()
+    return {"marked_count": count}
+
+
 @router.get("/admin/all", response_model=FeedbackListResponse)
 async def admin_get_all_feedback(
     status: Optional[str] = None,
@@ -259,6 +285,9 @@ async def admin_get_all_feedback(
     # Check admin role (simple check - extend as needed)
     if current_user.get("role") not in ["admin", "manager", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Mark feedback as read when owner views all feedback
+    await mark_feedback_as_read()
     
     items = await get_all_feedback(status_filter=status)
     return {"items": items, "total": len(items)}

@@ -1047,6 +1047,18 @@ export const feedbackAPI = {
     return response.data;
   },
   
+  // Get unread feedback count (admin/owner)
+  getUnreadCount: async () => {
+    const response = await api.get('/feedback/admin/unread-count');
+    return response.data;
+  },
+  
+  // Mark all feedback as read (admin/owner)
+  markAllRead: async () => {
+    const response = await api.post('/feedback/admin/mark-read');
+    return response.data;
+  },
+  
   // Bulk update status for multiple feedback items
   bulkUpdateStatus: async (feedbackIds, status) => {
     const response = await api.post('/feedback/bulk-status', { feedback_ids: feedbackIds, status });

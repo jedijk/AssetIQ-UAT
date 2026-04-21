@@ -199,3 +199,19 @@ async def bulk_update_status(
         "status": status,
         "feedback_ids": feedback_ids[:updated_count] if updated_count > 0 else []
     }
+
+
+
+async def get_unread_feedback_count() -> int:
+    """Get count of feedback not yet read by owner/admin."""
+    count = await db.feedback.count_documents({"read_by_owner": {"$ne": True}})
+    return count
+
+
+async def mark_feedback_as_read() -> int:
+    """Mark all feedback as read by owner/admin."""
+    result = await db.feedback.update_many(
+        {"read_by_owner": {"$ne": True}},
+        {"$set": {"read_by_owner": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return result.modified_count

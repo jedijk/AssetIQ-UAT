@@ -44,7 +44,7 @@ import { toast } from "sonner";
 import ChatSidebar from "./ChatSidebar";
 import ImageEditor from "./ImageEditor";
 import EquipmentHierarchy from "./EquipmentHierarchy";
-import { actionsAPI } from "../lib/api";
+import { actionsAPI, feedbackAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
 
@@ -402,6 +402,19 @@ const Layout = () => {
   const overdueActions = overdueData?.overdue_actions || [];
   const overdueCount = overdueData?.count || 0;
 
+  // Query unread feedback count for owner/admin/manager
+  const canViewAllFeedback = ["owner", "admin", "manager"].includes(user?.role);
+  const { data: unreadFeedbackData } = useQuery({
+    queryKey: ["unread-feedback-count"],
+    queryFn: feedbackAPI.getUnreadCount,
+    refetchInterval: 60000, // Refresh every minute
+    staleTime: 30000,
+    enabled: canViewAllFeedback, // Only fetch for authorized users
+  });
+
+  const unreadFeedbackCount = unreadFeedbackData?.unread_count || 0;
+  const totalNotificationCount = overdueCount + (canViewAllFeedback ? unreadFeedbackCount : 0);
+
   // Format how overdue an action is
   const formatOverdue = (dueDate) => {
     if (!dueDate) return "";
@@ -656,20 +669,48 @@ const Layout = () => {
                     data-testid="notifications-button"
                   >
                     <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    {overdueCount > 0 && !dismissedNotifications && (
+                    {totalNotificationCount > 0 && !dismissedNotifications && (
                       <motion.span 
                         className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5"
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={springPresets.bouncy}
                       >
-                        {overdueCount > 9 ? "9+" : overdueCount}
+                        {totalNotificationCount > 9 ? "9+" : totalNotificationCount}
                       </motion.span>
                     )}
                   </Button>
                 </motion.div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
+                {/* New Feedback Section - Only for owner/admin/manager */}
+                {canViewAllFeedback && unreadFeedbackCount > 0 && !dismissedNotifications && (
+                  <>
+                    <DropdownMenuLabel className="flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-blue-500" />
+                        New Feedback
+                      </span>
+                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                        {unreadFeedbackCount}
+                      </span>
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      className="cursor-pointer py-2"
+                      onClick={() => navigate("/feedback")}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-sm text-slate-700">
+                          {unreadFeedbackCount} new feedback {unreadFeedbackCount === 1 ? 'item' : 'items'}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                
+                {/* Overdue Actions Section */}
                 <DropdownMenuLabel className="flex items-center justify-between">
                   <span>{t("notifications.overdueActions")}</span>
                   <div className="flex items-center gap-2">
@@ -678,7 +719,7 @@ const Layout = () => {
                         {overdueCount}
                       </span>
                     )}
-                    {overdueCount > 0 && (
+                    {totalNotificationCount > 0 && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -693,11 +734,11 @@ const Layout = () => {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {overdueCount === 0 || dismissedNotifications ? (
+                {(overdueCount === 0 && (!canViewAllFeedback || unreadFeedbackCount === 0)) || dismissedNotifications ? (
                   <div className="px-3 py-6 text-center text-slate-400 text-sm">
                     <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     {dismissedNotifications ? (t("notifications.cleared") || "Notifications cleared") : t("notifications.noOverdueActions")}
-                    {dismissedNotifications && overdueCount > 0 && (
+                    {dismissedNotifications && totalNotificationCount > 0 && (
                       <button
                         onClick={() => setDismissedNotifications(false)}
                         className="block mx-auto mt-2 text-xs text-blue-600 hover:text-blue-700 underline"
@@ -706,7 +747,7 @@ const Layout = () => {
                       </button>
                     )}
                   </div>
-                ) : (
+                ) : overdueCount > 0 ? (
                   <>
                     <div className="max-h-64 overflow-y-auto">
                       {overdueActions.slice(0, 5).map((action) => (
@@ -748,7 +789,7 @@ const Layout = () => {
                       </>
                     )}
                   </>
-                )}
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
 
