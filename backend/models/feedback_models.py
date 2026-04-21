@@ -19,7 +19,7 @@ class FeedbackCreate(BaseModel):
 
 class FeedbackUpdate(BaseModel):
     """Request model for admin to update feedback status/response."""
-    status: Optional[Literal["new", "in_review", "resolved", "planned", "wont_fix"]] = None
+    status: Optional[Literal["new", "in_review", "resolved", "planned", "wont_fix", "implemented", "parked", "rejected"]] = None
     user_visible_response: Optional[str] = None
 
 
