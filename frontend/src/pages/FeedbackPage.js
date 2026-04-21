@@ -146,6 +146,8 @@ const FeedbackPage = () => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [viewMode, setViewMode] = useState('my'); // 'my' or 'all' (for admins)
+  const [ownerResponse, setOwnerResponse] = useState(''); // Owner's response to feedback
+  const [isSavingResponse, setIsSavingResponse] = useState(false);
   
   // Timeline view mode: 'list' | 'snowflake'
   const [timelineView, setTimelineView] = useState(() => {
@@ -299,9 +301,15 @@ const FeedbackPage = () => {
     },
   });
 
-  // Mutation: Update status
+  // Mutation: Update status (use admin endpoint when viewing all feedback)
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }) => feedbackAPI.update(id, { status }),
+    mutationFn: ({ id, status }) => {
+      // Use admin endpoint when owner/admin/manager is viewing all feedback
+      if (viewMode === 'all' && canViewAll) {
+        return feedbackAPI.adminUpdate(id, { status });
+      }
+      return feedbackAPI.update(id, { status });
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["feedback"] });
       setSelectedFeedback(data);
@@ -311,6 +319,28 @@ const FeedbackPage = () => {
       toast.error("Failed to update status");
     },
   });
+
+  // Mutation: Save owner response
+  const saveResponseMutation = useMutation({
+    mutationFn: ({ id, response }) => feedbackAPI.adminUpdate(id, { user_visible_response: response }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["feedback"] });
+      setSelectedFeedback(data);
+      setIsSavingResponse(false);
+      toast.success("Response saved");
+    },
+    onError: () => {
+      setIsSavingResponse(false);
+      toast.error("Failed to save response");
+    },
+  });
+
+  // Handler to save owner response
+  const handleSaveResponse = () => {
+    if (!selectedFeedback) return;
+    setIsSavingResponse(true);
+    saveResponseMutation.mutate({ id: selectedFeedback.id, response: ownerResponse });
+  };
 
   // Mutation: Bulk update status
   const bulkUpdateStatusMutation = useMutation({
@@ -437,6 +467,7 @@ const FeedbackPage = () => {
 
   const openFeedbackDetail = (feedback) => {
     setSelectedFeedback(feedback);
+    setOwnerResponse(feedback.user_visible_response || '');
     setIsSheetOpen(true);
   };
 
@@ -1606,15 +1637,45 @@ const FeedbackPage = () => {
                   </div>
                 )}
 
-                {/* System Response */}
-                {selectedFeedback.user_visible_response && (
+                {/* Owner Response Section */}
+                {canViewAll && viewMode === 'all' ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">
+                      {t("feedback.ownerResponse") || "Owner Response"}
+                    </h4>
+                    <textarea
+                      value={ownerResponse}
+                      onChange={(e) => setOwnerResponse(e.target.value)}
+                      placeholder="Add a response to this feedback..."
+                      className="w-full min-h-[80px] p-2 text-sm border border-blue-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                      data-testid="owner-response-input"
+                    />
+                    <div className="flex justify-end mt-2">
+                      <Button
+                        size="sm"
+                        onClick={handleSaveResponse}
+                        disabled={isSavingResponse || ownerResponse === (selectedFeedback.user_visible_response || '')}
+                        data-testid="save-response-btn"
+                      >
+                        {isSavingResponse ? (
+                          <>
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Response"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ) : selectedFeedback.user_visible_response ? (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h4 className="text-sm font-medium text-blue-800 mb-2">{t("feedback.response") || "Response"}</h4>
                     <p className="text-blue-700 text-sm leading-relaxed">
                       {selectedFeedback.user_visible_response}
                     </p>
                   </div>
-                )}
+                ) : null}
               </div>
             </>
           )}

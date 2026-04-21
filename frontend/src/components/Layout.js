@@ -415,6 +415,17 @@ const Layout = () => {
   const unreadFeedbackCount = unreadFeedbackData?.unread_count || 0;
   const totalNotificationCount = overdueCount + (canViewAllFeedback ? unreadFeedbackCount : 0);
 
+  // Handler to mark feedback as read
+  const handleMarkFeedbackRead = async (e) => {
+    e.stopPropagation();
+    try {
+      await feedbackAPI.markAllRead();
+      queryClient.invalidateQueries({ queryKey: ["unread-feedback-count"] });
+    } catch (error) {
+      console.error("Failed to mark feedback as read:", error);
+    }
+  };
+
   // Format how overdue an action is
   const formatOverdue = (dueDate) => {
     if (!dueDate) return "";
@@ -691,9 +702,18 @@ const Layout = () => {
                         <MessageSquare className="w-4 h-4 text-blue-500" />
                         New Feedback
                       </span>
-                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium">
-                        {unreadFeedbackCount}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                          {unreadFeedbackCount}
+                        </span>
+                        <button
+                          onClick={handleMarkFeedbackRead}
+                          className="text-xs text-slate-500 hover:text-slate-700 underline"
+                          data-testid="clear-feedback-notifications-btn"
+                        >
+                          Clear
+                        </button>
+                      </div>
                     </DropdownMenuLabel>
                     <DropdownMenuItem
                       className="cursor-pointer py-2"
