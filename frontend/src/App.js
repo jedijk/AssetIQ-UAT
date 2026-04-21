@@ -336,6 +336,7 @@ function App() {
                 <Route path="forms" element={<Navigate to="/tasks?tab=forms" replace />} />
                 <Route path="form-submissions" element={<FormSubmissionsPage />} />
                 <Route path="decision-engine" element={<UnderDevelopmentPage />} />
+                <Route path="feedback" element={<FeedbackPage />} />
                 
                 {/* Settings Layout with nested routes */}
                 <Route path="settings" element={<SettingsPage />}>
