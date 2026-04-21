@@ -1010,6 +1010,18 @@ export const feedbackAPI = {
     return response.data;
   },
   
+  // Get unread responses count for current user
+  getUnreadResponsesCount: async () => {
+    const response = await api.get('/feedback/my/unread-responses-count');
+    return response.data;
+  },
+  
+  // Mark responses as seen by user
+  markResponsesSeen: async () => {
+    const response = await api.post('/feedback/my/mark-responses-seen');
+    return response.data;
+  },
+  
   // Get all feedback (admin/manager/owner only)
   getAllFeedback: async (status = null) => {
     const params = status ? `?status=${status}` : '';

@@ -412,10 +412,21 @@ const Layout = () => {
     enabled: canViewAllFeedback, // Only fetch for authorized users
   });
 
-  const unreadFeedbackCount = unreadFeedbackData?.unread_count || 0;
-  const totalNotificationCount = overdueCount + (canViewAllFeedback ? unreadFeedbackCount : 0);
+  // Query unread responses count for regular users
+  const { data: unreadResponsesData } = useQuery({
+    queryKey: ["unread-responses-count"],
+    queryFn: feedbackAPI.getUnreadResponsesCount,
+    refetchInterval: 60000, // Refresh every minute
+    staleTime: 30000,
+    enabled: !canViewAllFeedback && !!user, // Only for non-admin users
+  });
 
-  // Handler to mark feedback as read
+  const unreadFeedbackCount = unreadFeedbackData?.unread_count || 0;
+  const unreadResponsesCount = unreadResponsesData?.unread_count || 0;
+  const totalNotificationCount = overdueCount + 
+    (canViewAllFeedback ? unreadFeedbackCount : unreadResponsesCount);
+
+  // Handler to mark feedback as read (for owners)
   const handleMarkFeedbackRead = async (e) => {
     e.stopPropagation();
     try {
@@ -423,6 +434,17 @@ const Layout = () => {
       queryClient.invalidateQueries({ queryKey: ["unread-feedback-count"] });
     } catch (error) {
       console.error("Failed to mark feedback as read:", error);
+    }
+  };
+
+  // Handler to mark responses as seen (for regular users)
+  const handleMarkResponsesSeen = async (e) => {
+    e.stopPropagation();
+    try {
+      await feedbackAPI.markResponsesSeen();
+      queryClient.invalidateQueries({ queryKey: ["unread-responses-count"] });
+    } catch (error) {
+      console.error("Failed to mark responses as seen:", error);
     }
   };
 
@@ -729,6 +751,42 @@ const Layout = () => {
                     <DropdownMenuSeparator />
                   </>
                 )}
+
+                {/* Feedback Responses Section - for regular users */}
+                {!canViewAllFeedback && unreadResponsesCount > 0 && !dismissedNotifications && (
+                  <>
+                    <DropdownMenuLabel className="flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-green-500" />
+                        Feedback Responses
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                          {unreadResponsesCount}
+                        </span>
+                        <button
+                          onClick={handleMarkResponsesSeen}
+                          className="text-xs text-slate-500 hover:text-slate-700 underline"
+                          data-testid="clear-responses-notifications-btn"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      className="cursor-pointer py-2"
+                      onClick={() => navigate("/feedback")}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-sm text-slate-700">
+                          {unreadResponsesCount} new {unreadResponsesCount === 1 ? 'response' : 'responses'} to your feedback
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 
                 {/* Overdue Actions Section */}
                 <DropdownMenuLabel className="flex items-center justify-between">
@@ -754,7 +812,9 @@ const Layout = () => {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {(overdueCount === 0 && (!canViewAllFeedback || unreadFeedbackCount === 0)) || dismissedNotifications ? (
+                {(overdueCount === 0 && 
+                  (!canViewAllFeedback || unreadFeedbackCount === 0) && 
+                  (canViewAllFeedback || unreadResponsesCount === 0)) || dismissedNotifications ? (
                   <div className="px-3 py-6 text-center text-slate-400 text-sm">
                     <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     {dismissedNotifications ? (t("notifications.cleared") || "Notifications cleared") : t("notifications.noOverdueActions")}

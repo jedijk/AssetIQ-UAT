@@ -215,3 +215,27 @@ async def mark_feedback_as_read() -> int:
         {"$set": {"read_by_owner": True, "read_at": datetime.now(timezone.utc).isoformat()}}
     )
     return result.modified_count
+
+
+
+async def get_unread_responses_count(user_id: str) -> int:
+    """Get count of feedback with responses not yet seen by the user."""
+    count = await db.feedback.count_documents({
+        "user_id": user_id,
+        "user_visible_response": {"$exists": True, "$nin": [None, ""]},
+        "response_seen_by_user": {"$ne": True}
+    })
+    return count
+
+
+async def mark_responses_as_seen(user_id: str) -> int:
+    """Mark all feedback responses as seen by the user."""
+    result = await db.feedback.update_many(
+        {
+            "user_id": user_id,
+            "user_visible_response": {"$exists": True, "$nin": [None, ""]},
+            "response_seen_by_user": {"$ne": True}
+        },
+        {"$set": {"response_seen_by_user": True, "response_seen_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return result.modified_count

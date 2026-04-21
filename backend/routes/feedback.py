@@ -25,6 +25,8 @@ from services.feedback_service import (
     bulk_update_status,
     get_unread_feedback_count,
     mark_feedback_as_read,
+    get_unread_responses_count,
+    mark_responses_as_seen,
 )
 from services.storage_service import put_object, MIME_TYPES
 
@@ -248,6 +250,26 @@ async def bulk_update_feedback_status(
     
     result = await bulk_update_status(feedback_ids, status, current_user["id"])
     return result
+
+
+# ===== User Response Notification Endpoints =====
+
+@router.get("/my/unread-responses-count")
+async def get_my_unread_responses_count(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get count of feedback responses not yet seen by the user."""
+    count = await get_unread_responses_count(current_user["id"])
+    return {"unread_count": count}
+
+
+@router.post("/my/mark-responses-seen")
+async def mark_my_responses_seen(
+    current_user: dict = Depends(get_current_user)
+):
+    """Mark all feedback responses as seen by the user."""
+    count = await mark_responses_as_seen(current_user["id"])
+    return {"marked_count": count}
 
 
 # ===== Admin Endpoints =====
