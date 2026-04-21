@@ -1461,8 +1461,8 @@ const FeedbackPage = () => {
           }
           setIsModalOpen(open);
         }}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>
                 {isEditMode 
                   ? (t("feedback.editFeedback") || "Edit Feedback")
@@ -1477,9 +1477,11 @@ const FeedbackPage = () => {
               </DialogDescription>
             </DialogHeader>
 
-            {renderFormContent(false)}
+            <div className="flex-1 overflow-y-auto py-2">
+              {renderFormContent(false)}
+            </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-shrink-0 pt-4 border-t">
               <Button
                 variant="outline"
                 onClick={() => {
