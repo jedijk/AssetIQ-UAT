@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useLanguage } from "../contexts/LanguageContext";
 import { usePermissions } from "../contexts/PermissionsContext";
+import { useAuth } from "../contexts/AuthContext";
 import { feedbackAPI, getErrorMessage } from "../lib/api";
 import { formatDateRelative } from "../lib/dateUtils";
 import { Button } from "../components/ui/button";
@@ -125,12 +126,15 @@ const severityColors = {
 const FeedbackPage = () => {
   const { t } = useLanguage();
   const { hasPermission } = usePermissions();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
 
   // Permission checks
   const canWrite = hasPermission("feedback", "write");
   const canDelete = hasPermission("feedback", "delete");
+  // Owners, admins, and managers can view all feedback
+  const canViewAll = ["owner", "admin", "manager"].includes(user?.role);
 
   const isMobile = useIsMobile();
 
@@ -141,6 +145,7 @@ const FeedbackPage = () => {
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [viewMode, setViewMode] = useState('my'); // 'my' or 'all' (for admins)
   
   // Timeline view mode: 'list' | 'snowflake'
   const [timelineView, setTimelineView] = useState(() => {
@@ -182,10 +187,10 @@ const FeedbackPage = () => {
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
 
-  // Query: Get user's feedback
+  // Query: Get feedback based on view mode
   const { data: feedbackData, isLoading } = useQuery({
-    queryKey: ["my-feedback"],
-    queryFn: feedbackAPI.getMyFeedback,
+    queryKey: ["feedback", viewMode],
+    queryFn: () => viewMode === 'all' && canViewAll ? feedbackAPI.getAllFeedback() : feedbackAPI.getMyFeedback(),
   });
 
   // Mutation: Submit feedback
@@ -220,7 +225,7 @@ const FeedbackPage = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["feedback"] });
       toast.success(t("feedback.submitted") || "Feedback submitted successfully");
       resetForm();
       setIsModalOpen(false);
@@ -265,7 +270,7 @@ const FeedbackPage = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["feedback"] });
       toast.success(t("feedback.updated") || "Feedback updated successfully");
       resetForm();
       setIsModalOpen(false);
@@ -283,7 +288,7 @@ const FeedbackPage = () => {
   const deleteMutation = useMutation({
     mutationFn: (id) => feedbackAPI.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["feedback"] });
       toast.success(t("feedback.deleted") || "Feedback deleted");
       setDeleteConfirmId(null);
       setIsSheetOpen(false);
@@ -298,7 +303,7 @@ const FeedbackPage = () => {
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }) => feedbackAPI.update(id, { status }),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["my-feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["feedback"] });
       setSelectedFeedback(data);
       toast.success(t("feedback.statusUpdated") || "Status updated");
     },
@@ -311,7 +316,7 @@ const FeedbackPage = () => {
   const bulkUpdateStatusMutation = useMutation({
     mutationFn: ({ feedbackIds, status }) => feedbackAPI.bulkUpdateStatus(feedbackIds, status),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["my-feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["feedback"] });
       toast.success(t("feedback.bulkStatusUpdated")?.replace("{count}", data.updated_count) || `Updated ${data.updated_count} items`);
       cancelSelection();
     },
@@ -867,9 +872,33 @@ const FeedbackPage = () => {
                 {t("feedback.title") || "Feedback"}
               </h1>
               <p className="text-sm text-slate-500 mt-0.5">
-                {t("feedback.subtitle") || "Your submissions"}
+                {viewMode === 'all' ? "All user submissions" : (t("feedback.subtitle") || "Your submissions")}
               </p>
             </div>
+            
+            {/* View Mode Toggle for admins/owners */}
+            {canViewAll && (
+              <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+                <Button
+                  variant={viewMode === 'my' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('my')}
+                  className={`text-xs ${viewMode === 'my' ? 'bg-white shadow-sm' : ''}`}
+                  data-testid="view-my-feedback-btn"
+                >
+                  My Feedback
+                </Button>
+                <Button
+                  variant={viewMode === 'all' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('all')}
+                  className={`text-xs ${viewMode === 'all' ? 'bg-white shadow-sm' : ''}`}
+                  data-testid="view-all-feedback-btn"
+                >
+                  All Feedback
+                </Button>
+              </div>
+            )}
             
             {/* Action buttons - responsive layout */}
             {allFeedbackItems.length > 0 && (
@@ -1173,11 +1202,13 @@ const FeedbackPage = () => {
                           <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${statusCfg.color}`} />
                           <span className="text-[10px] sm:text-xs text-slate-500">{statusCfg.label}</span>
                         </div>
-                        {/* Submitted by */}
-                        <div className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-400">
-                          <User className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                          <span className="truncate max-w-[60px] sm:max-w-none">{item.user_name || "Unknown"}</span>
-                        </div>
+                        {/* Submitted by - only show in All Feedback view */}
+                        {viewMode === 'all' && (
+                          <div className="flex items-center gap-1 text-[10px] sm:text-xs text-blue-600 font-medium">
+                            <User className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                            <span className="truncate max-w-[100px] sm:max-w-none">{item.user_name || "Unknown"}</span>
+                          </div>
+                        )}
                         {/* Timestamp */}
                         <span className="text-[10px] sm:text-xs text-slate-400">
                           {formatRelativeTime(item.timestamp)}
@@ -1293,8 +1324,12 @@ const FeedbackPage = () => {
                           <div className="flex-1 min-w-0">
                             <p className="text-xs sm:text-sm text-slate-800 line-clamp-2">{item.message}</p>
                             <div className="flex items-center gap-2 mt-1 text-[10px] sm:text-xs text-slate-400">
-                              <span>{item.user_name || "Unknown"}</span>
-                              <span>•</span>
+                              {viewMode === 'all' && (
+                                <>
+                                  <span className="text-blue-600 font-medium">{item.user_name || "Unknown"}</span>
+                                  <span>•</span>
+                                </>
+                              )}
                               <span>{formatRelativeTime(item.timestamp)}</span>
                             </div>
                           </div>

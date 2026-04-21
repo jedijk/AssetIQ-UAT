@@ -1010,6 +1010,13 @@ export const feedbackAPI = {
     return response.data;
   },
   
+  // Get all feedback (admin/manager/owner only)
+  getAllFeedback: async (status = null) => {
+    const params = status ? `?status=${status}` : '';
+    const response = await api.get(`/feedback/admin/all${params}`);
+    return response.data;
+  },
+  
   // Get single feedback detail
   getById: async (feedbackId) => {
     const response = await api.get(`/feedback/${feedbackId}`);
@@ -1022,9 +1029,21 @@ export const feedbackAPI = {
     return response.data;
   },
   
+  // Admin update feedback (status, response)
+  adminUpdate: async (feedbackId, data) => {
+    const response = await api.put(`/feedback/admin/${feedbackId}`, data);
+    return response.data;
+  },
+  
   // Delete feedback
   delete: async (feedbackId) => {
     const response = await api.delete(`/feedback/${feedbackId}`);
+    return response.data;
+  },
+  
+  // Admin delete feedback
+  adminDelete: async (feedbackId) => {
+    const response = await api.delete(`/feedback/admin/${feedbackId}`);
     return response.data;
   },
   
