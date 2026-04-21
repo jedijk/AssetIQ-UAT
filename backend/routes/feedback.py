@@ -28,7 +28,7 @@ from services.feedback_service import (
     get_unread_responses_count,
     mark_responses_as_seen,
 )
-from services.storage_service import put_object, MIME_TYPES
+from services.storage_service import MIME_TYPES
 
 router = APIRouter(prefix="/feedback", tags=["Feedback"])
 
@@ -39,6 +39,8 @@ async def submit_feedback(
     current_user: dict = Depends(get_current_user)
 ):
     """Submit new feedback."""
+    from services.storage_service import put_object_async
+    
     audio_url = None
     
     # Handle audio data if provided
@@ -54,7 +56,7 @@ async def submit_feedback(
             file_id = str(uuid.uuid4())
             path = f"feedback/audio/{current_user['id']}/{file_id}.webm"
             
-            result = put_object(path, audio_bytes, "audio/webm")
+            result = await put_object_async(path, audio_bytes, "audio/webm")
             audio_url = result.get("url", path)
         except Exception as e:
             import logging
@@ -80,6 +82,8 @@ async def upload_screenshot(
     current_user: dict = Depends(get_current_user)
 ):
     """Upload a screenshot for feedback. Returns the URL to use when submitting feedback."""
+    from services.storage_service import put_object_async
+    
     # Validate file type
     ext = file.filename.split(".")[-1].lower() if file.filename else "png"
     if ext not in ["jpg", "jpeg", "png", "gif", "webp"]:
@@ -92,7 +96,7 @@ async def upload_screenshot(
     file_id = str(uuid.uuid4())
     path = f"feedback/screenshots/{current_user['id']}/{file_id}.{ext}"
     
-    result = put_object(path, file_content, content_type)
+    result = await put_object_async(path, file_content, content_type)
     return {"url": result.get("url", path), "path": path}
 
 
