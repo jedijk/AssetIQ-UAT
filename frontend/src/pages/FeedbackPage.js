@@ -878,21 +878,21 @@ const FeedbackPage = () => {
             
             {/* View Mode Toggle for admins/owners */}
             {canViewAll && (
-              <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-slate-200 rounded-lg p-1">
                 <Button
-                  variant={viewMode === 'my' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setViewMode('my')}
-                  className={`text-xs ${viewMode === 'my' ? 'bg-white shadow-sm' : ''}`}
+                  className={`text-xs h-7 px-3 ${viewMode === 'my' ? 'bg-white shadow-sm text-slate-900 hover:bg-white' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
                   data-testid="view-my-feedback-btn"
                 >
                   My Feedback
                 </Button>
                 <Button
-                  variant={viewMode === 'all' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setViewMode('all')}
-                  className={`text-xs ${viewMode === 'all' ? 'bg-white shadow-sm' : ''}`}
+                  className={`text-xs h-7 px-3 ${viewMode === 'all' ? 'bg-white shadow-sm text-slate-900 hover:bg-white' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
                   data-testid="view-all-feedback-btn"
                 >
                   All Feedback
