@@ -1539,10 +1539,10 @@ const FeedbackPage = () => {
 
       {/* Feedback Detail Sheet (Bottom Sheet) */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="bottom" className="h-auto max-h-[85vh] rounded-t-2xl">
+        <SheetContent side="bottom" className="h-auto max-h-[85vh] rounded-t-2xl flex flex-col">
           {selectedFeedback && (
             <>
-              <SheetHeader className="pb-4 border-b border-slate-200">
+              <SheetHeader className="pb-4 border-b border-slate-200 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {/* Type Icon */}
@@ -1588,7 +1588,7 @@ const FeedbackPage = () => {
                 </div>
               </SheetHeader>
 
-              <div className="py-6 space-y-6 overflow-y-auto">
+              <div className="py-6 space-y-6 flex-1 overflow-y-auto min-h-0">
                 {/* Submitted by */}
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium text-slate-600">{t("feedback.submittedBy") || "Submitted by"}:</span>
