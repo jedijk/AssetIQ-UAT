@@ -1561,19 +1561,19 @@ const FeedbackPage = () => {
         <SheetContent side="bottom" className="h-auto max-h-[85vh] rounded-t-2xl flex flex-col">
           {selectedFeedback && (
             <>
-              <SheetHeader className="pb-4 border-b border-slate-200 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+              <SheetHeader className="pb-4 border-b border-slate-200 flex-shrink-0 pr-10">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
                     {/* Type Icon */}
                     {(() => {
                       const TypeIcon = typeIcons[selectedFeedback.type] || MessageCircle;
                       return (
-                        <div className={`${typeColors[selectedFeedback.type]} p-2 bg-slate-100 rounded-lg`}>
+                        <div className={`${typeColors[selectedFeedback.type]} p-2 bg-slate-100 rounded-lg flex-shrink-0`}>
                           <TypeIcon className="w-5 h-5" />
                         </div>
                       );
                     })()}
-                    <div>
+                    <div className="min-w-0">
                       <SheetTitle className="text-left capitalize">
                         {selectedFeedback.type} Feedback
                       </SheetTitle>
@@ -1582,26 +1582,27 @@ const FeedbackPage = () => {
                       </SheetDescription>
                     </div>
                   </div>
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-2">
+                  {/* Action buttons - wrap on mobile */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleEdit(selectedFeedback)}
                       data-testid="sheet-edit-btn"
+                      className="h-8 px-2 sm:px-3"
                     >
-                      <Pencil className="w-4 h-4 mr-1" />
-                      {t("common.edit") || "Edit"}
+                      <Pencil className="w-4 h-4 sm:mr-1" />
+                      <span className="hidden sm:inline">{t("common.edit") || "Edit"}</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleDelete(selectedFeedback.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 px-2 sm:px-3"
                       data-testid="sheet-delete-btn"
                     >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      {t("common.delete") || "Delete"}
+                      <Trash2 className="w-4 h-4 sm:mr-1" />
+                      <span className="hidden sm:inline">{t("common.delete") || "Delete"}</span>
                     </Button>
                   </div>
                 </div>
