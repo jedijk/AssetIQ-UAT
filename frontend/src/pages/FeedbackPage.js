@@ -286,9 +286,14 @@ const FeedbackPage = () => {
     },
   });
 
-  // Mutation: Delete feedback
+  // Mutation: Delete feedback (use admin endpoint for owner/admin/manager)
   const deleteMutation = useMutation({
-    mutationFn: (id) => feedbackAPI.delete(id),
+    mutationFn: (id) => {
+      if (canViewAll) {
+        return feedbackAPI.adminDelete(id);
+      }
+      return feedbackAPI.delete(id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["feedback"] });
       toast.success(t("feedback.deleted") || "Feedback deleted");
@@ -1293,7 +1298,7 @@ const FeedbackPage = () => {
                             {t("common.edit") || "Edit"}
                           </DropdownMenuItem>
                           )}
-                          {canDelete && (
+                          {(canDelete || canViewAll) && (
                           <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
@@ -1424,7 +1429,7 @@ const FeedbackPage = () => {
                                   <Pencil className="w-4 h-4 mr-2" />Edit
                                 </DropdownMenuItem>
                                 )}
-                                {canDelete && (
+                                {(canDelete || canViewAll) && (
                                 <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(item.id, e); }} className="text-red-600">
