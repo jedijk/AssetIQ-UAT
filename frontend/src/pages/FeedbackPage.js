@@ -196,6 +196,21 @@ const FeedbackPage = () => {
     queryFn: () => viewMode === 'all' && canViewAll ? feedbackAPI.getAllFeedback() : feedbackAPI.getMyFeedback(),
   });
 
+  // Mark responses as seen when user views their feedback (not for admins viewing all)
+  useEffect(() => {
+    if (viewMode === 'my' && !canViewAll && feedbackData?.items?.length > 0) {
+      // Check if any feedback has unread responses
+      const hasUnreadResponses = feedbackData.items.some(
+        item => item.user_visible_response && !item.response_seen_by_user
+      );
+      if (hasUnreadResponses) {
+        feedbackAPI.markResponsesSeen().then(() => {
+          queryClient.invalidateQueries({ queryKey: ["unread-responses-count"] });
+        }).catch(err => console.error("Failed to mark responses as seen:", err));
+      }
+    }
+  }, [feedbackData, viewMode, canViewAll, queryClient]);
+
   // Mutation: Submit feedback
   const submitMutation = useMutation({
     mutationFn: async (data) => {
@@ -229,6 +244,8 @@ const FeedbackPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["feedback"] });
+      // Notify owners about new feedback
+      queryClient.invalidateQueries({ queryKey: ["unread-feedback-count"] });
       toast.success(t("feedback.submitted") || "Feedback submitted successfully");
       resetForm();
       setIsModalOpen(false);
@@ -331,6 +348,8 @@ const FeedbackPage = () => {
     mutationFn: ({ id, response }) => feedbackAPI.adminUpdate(id, { user_visible_response: response }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["feedback"] });
+      // Invalidate notification counts so users see the new response
+      queryClient.invalidateQueries({ queryKey: ["unread-responses-count"] });
       setSelectedFeedback(data);
       setIsSavingResponse(false);
       toast.success("Response saved");
