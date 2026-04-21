@@ -7,6 +7,7 @@ import { usePermissions } from "../contexts/PermissionsContext";
 import { useAuth } from "../contexts/AuthContext";
 import { feedbackAPI, getErrorMessage } from "../lib/api";
 import { formatDateRelative } from "../lib/dateUtils";
+import { AuthenticatedImage } from "../components/AuthenticatedMedia";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import {
@@ -1682,8 +1683,10 @@ const FeedbackPage = () => {
                 {selectedFeedback.screenshot_url && (
                   <div>
                     <h4 className="text-sm font-medium text-slate-600 mb-2">{t("feedback.screenshot") || "Screenshot"}</h4>
-                    <img
-                      src={selectedFeedback.screenshot_url}
+                    <AuthenticatedImage
+                      src={selectedFeedback.screenshot_url.startsWith('/api/') 
+                        ? selectedFeedback.screenshot_url 
+                        : `/api/storage/${selectedFeedback.screenshot_url}`}
                       alt="Feedback screenshot"
                       className="max-w-full rounded-lg border border-slate-200"
                     />
