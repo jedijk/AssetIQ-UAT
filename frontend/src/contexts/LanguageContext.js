@@ -1232,6 +1232,11 @@ const en = {
     statusResolved: "Resolved",
     statusPlanned: "Planned",
     statusWontFix: "Won't Fix",
+    statusImplemented: "Implemented",
+    statusParked: "Parked",
+    statusRejected: "Rejected",
+    ownerResponse: "Response to User",
+    responseFromTeam: "Response from Team",
   },
 };
 
@@ -2466,6 +2471,11 @@ const nl = {
     statusResolved: "Opgelost",
     statusPlanned: "Gepland",
     statusWontFix: "Wordt niet opgelost",
+    statusImplemented: "Geïmplementeerd",
+    statusParked: "Geparkeerd",
+    statusRejected: "Afgewezen",
+    ownerResponse: "Reactie aan gebruiker",
+    responseFromTeam: "Reactie van het team",
   },
 };
 

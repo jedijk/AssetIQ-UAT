@@ -1692,7 +1692,7 @@ const FeedbackPage = () => {
                 {canViewAll ? (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h4 className="text-sm font-medium text-blue-800 mb-2">
-                      {t("feedback.ownerResponse") || "Owner Response"}
+                      {t("feedback.ownerResponse") || "Response to User"}
                     </h4>
                     <textarea
                       value={ownerResponse}
@@ -1721,7 +1721,7 @@ const FeedbackPage = () => {
                   </div>
                 ) : selectedFeedback.user_visible_response ? (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-blue-800 mb-2">{t("feedback.response") || "Response from Team"}</h4>
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">{t("feedback.responseFromTeam") || "Response from Team"}</h4>
                     <p className="text-blue-700 text-sm leading-relaxed">
                       {selectedFeedback.user_visible_response}
                     </p>
