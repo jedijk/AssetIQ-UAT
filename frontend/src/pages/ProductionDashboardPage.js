@@ -655,6 +655,7 @@ export default function ProductionDashboardPage() {
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", description: "", type: "action", severity: "info" });
   const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mp4: false, t_product_ir: false, screenChange: false, magnetCleaning: false });
+  const [expandedEosNotes, setExpandedEosNotes] = useState(null); // Track which EOS row has notes expanded (for mobile)
   const [showCustomDate, setShowCustomDate] = useState(false);
   const [formExec, setFormExec] = useState(null); // { templateId, templateName }
   const [selectedTime, setSelectedTime] = useState(null); // highlighted time from chart click
@@ -1461,71 +1462,97 @@ export default function ProductionDashboardPage() {
                           }
                         }
                         const hasNotes = eos.notes && eos.notes.trim().length > 0;
+                        const isExpanded = expandedEosNotes === (eos.submission_id || i);
                         return (
-                          <TooltipProvider key={eos.submission_id || i} delayDuration={200}>
-                            <RadixTooltip>
-                              <TooltipTrigger asChild>
-                                <tr className={`border-b border-slate-50 hover:bg-slate-50 group cursor-default ${hasNotes ? "bg-amber-50/30" : ""}`} data-testid={`eos-row-${i}`}>
-                                  <td className="py-1.5 px-1 text-slate-700 whitespace-nowrap">
-                                    <div className="flex items-center gap-1.5">
-                                      {displayDT || "—"}
-                                      {hasNotes && (
-                                        <MessageCircle className="w-3 h-3 text-amber-500 flex-shrink-0" />
-                                      )}
+                          <React.Fragment key={eos.submission_id || i}>
+                            <TooltipProvider delayDuration={200}>
+                              <RadixTooltip>
+                                <TooltipTrigger asChild>
+                                  <tr 
+                                    className={`border-b border-slate-50 hover:bg-slate-50 group cursor-default ${hasNotes ? "bg-amber-50/30" : ""} ${isExpanded ? "bg-amber-100/50" : ""}`} 
+                                    data-testid={`eos-row-${i}`}
+                                    onClick={() => {
+                                      // Toggle notes expansion on mobile (click)
+                                      if (hasNotes) {
+                                        setExpandedEosNotes(isExpanded ? null : (eos.submission_id || i));
+                                      }
+                                    }}
+                                  >
+                                    <td className="py-1.5 px-1 text-slate-700 whitespace-nowrap">
+                                      <div className="flex items-center gap-1.5">
+                                        {displayDT || "—"}
+                                        {hasNotes && (
+                                          <MessageCircle className={`w-3 h-3 flex-shrink-0 ${isExpanded ? "text-amber-600" : "text-amber-500"}`} />
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="py-1.5 px-1 text-right tabular-nums text-slate-700">{Number(eos.total_input || 0).toLocaleString()}</td>
+                                    <td className="py-1.5 px-1 text-right tabular-nums text-red-600 font-medium">{Number(eos.total_waste || 0).toLocaleString()}</td>
+                                    <td className="py-1 px-1">
+                                      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (formTemplates?.endOfShift && eos.submission_id) {
+                                              setFormExec({
+                                                templateId: formTemplates.endOfShift.id,
+                                                templateName: "End of Shift",
+                                                equipmentId: line90Equipment?.id,
+                                                submissionId: eos.submission_id,
+                                                initialValues: {
+                                                  "date_&_time": eos.date_time_raw || "",
+                                                  "total_input": eos.total_input ?? "",
+                                                  "total_wast": eos.total_waste ?? "",
+                                                },
+                                              });
+                                            }
+                                          }}
+                                          className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                          title="Edit"
+                                          data-testid={`edit-eos-${i}`}
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (eos.submission_id) {
+                                              setDeleteConfirm({ ids: [eos.submission_id], label: `end of shift entry (${displayDT || "item"})` });
+                                            }
+                                          }}
+                                          className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                                          title="Delete"
+                                          data-testid={`delete-eos-${i}`}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                </TooltipTrigger>
+                                {/* Desktop hover tooltip */}
+                                {hasNotes && (
+                                  <TooltipContent side="top" className="max-w-xs bg-slate-800 text-white px-3 py-2 rounded-lg shadow-lg hidden sm:block">
+                                    <div className="text-xs">
+                                      <span className="font-semibold text-amber-300">Completion Comments:</span>
+                                      <p className="mt-1 whitespace-pre-wrap">{eos.notes}</p>
                                     </div>
-                                  </td>
-                                  <td className="py-1.5 px-1 text-right tabular-nums text-slate-700">{Number(eos.total_input || 0).toLocaleString()}</td>
-                                  <td className="py-1.5 px-1 text-right tabular-nums text-red-600 font-medium">{Number(eos.total_waste || 0).toLocaleString()}</td>
-                                  <td className="py-1 px-1">
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button
-                                        onClick={() => {
-                                          if (formTemplates?.endOfShift && eos.submission_id) {
-                                            setFormExec({
-                                              templateId: formTemplates.endOfShift.id,
-                                              templateName: "End of Shift",
-                                              equipmentId: line90Equipment?.id,
-                                              submissionId: eos.submission_id,
-                                              initialValues: {
-                                                "date_&_time": eos.date_time_raw || "",
-                                                "total_input": eos.total_input ?? "",
-                                                "total_wast": eos.total_waste ?? "",
-                                              },
-                                            });
-                                          }
-                                        }}
-                                        className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
-                                        title="Edit"
-                                        data-testid={`edit-eos-${i}`}
-                                      >
-                                        <Pencil className="w-3 h-3" />
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          if (eos.submission_id) {
-                                            setDeleteConfirm({ ids: [eos.submission_id], label: `end of shift entry (${displayDT || "item"})` });
-                                          }
-                                        }}
-                                        className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
-                                        title="Delete"
-                                        data-testid={`delete-eos-${i}`}
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              </TooltipTrigger>
-                              {hasNotes && (
-                                <TooltipContent side="top" className="max-w-xs bg-slate-800 text-white px-3 py-2 rounded-lg shadow-lg">
+                                  </TooltipContent>
+                                )}
+                              </RadixTooltip>
+                            </TooltipProvider>
+                            {/* Mobile expanded notes row */}
+                            {hasNotes && isExpanded && (
+                              <tr className="bg-amber-50 border-b border-amber-100">
+                                <td colSpan={4} className="px-2 py-2">
                                   <div className="text-xs">
-                                    <span className="font-semibold text-amber-300">Completion Comments:</span>
-                                    <p className="mt-1 whitespace-pre-wrap">{eos.notes}</p>
+                                    <span className="font-semibold text-amber-700">Completion Comments:</span>
+                                    <p className="mt-1 text-slate-600 whitespace-pre-wrap">{eos.notes}</p>
                                   </div>
-                                </TooltipContent>
-                              )}
-                            </RadixTooltip>
-                          </TooltipProvider>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         );
                       })}
                     </tbody>
