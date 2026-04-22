@@ -722,6 +722,12 @@ const FailureModesPage = () => {
                     Customer Specific
                   </span>
                 </SelectItem>
+                <SelectItem value="recently_added">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Recently Added (30 days)
+                  </span>
+                </SelectItem>
               </SelectContent>
             </Select>
             <Button 
