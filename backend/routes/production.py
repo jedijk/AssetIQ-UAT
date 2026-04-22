@@ -594,6 +594,15 @@ async def get_production_dashboard(
             visc_min = min(viscosity_values) if viscosity_values else 55
             visc_max = max(viscosity_values) if viscosity_values else 60
 
+    # Override Total Input and Total Waste with End of Shift sums when available
+    # (This runs AFTER any ingested-data fallback so End of Shift always wins.)
+    if end_of_shift_entries:
+        total_feed = sum(float(e.get("total_input") or 0) for e in end_of_shift_entries)
+        total_waste = sum(float(e.get("total_waste") or 0) for e in end_of_shift_entries)
+        waste_kg = total_waste
+        waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 and waste_kg > 0 else 0
+        yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
+
     # Viscosity range string
     visc_range_str = "55-60"
     if viscosity_values:

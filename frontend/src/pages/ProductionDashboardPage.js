@@ -769,7 +769,7 @@ export default function ProductionDashboardPage() {
         // Sheet 1: KPIs
         const kpiRows = [
           ["KPI", "Value", "Unit", "Detail"],
-          ["Throughput", kpis.total_input, "kg", kpis.lot_info || ""],
+          ["Total Input", kpis.total_input, "kg", kpis.lot_info || ""],
           ["Waste", kpis.waste, "kg", `${kpis.waste_pct}% of input`],
           ["Yield", kpis.yield_pct, "%", `Target: ${kpis.yield_target}%`],
           ["Avg Mooney Viscosity", kpis.avg_viscosity, "MU", `Range: ${kpis.viscosity_range}`],
@@ -1275,7 +1275,7 @@ export default function ProductionDashboardPage() {
             <KPICard
               icon={Package}
               iconColor="bg-blue-50 text-blue-600"
-              label="Throughput"
+              label="Total Input"
               value={kpis.total_input?.toLocaleString() || "0"}
               unit="kg"
               detail={kpis.lot_info || ""}
