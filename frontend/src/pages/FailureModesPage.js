@@ -116,6 +116,7 @@ const FailureModesPage = () => {
     { value: "all", label: "All Types" },
     { value: "generic", label: "Generic (Industry Standard)", color: "bg-blue-100 text-blue-700", icon: "globe" },
     { value: "customer_specific", label: "Customer Specific", color: "bg-purple-100 text-purple-700", icon: "building" },
+    { value: "recently_added", label: "Recently Added (30 days)", color: "bg-green-100 text-green-700", icon: "clock" },
   ];
   
   // Handle URL parameter changes (e.g., from Maintenance Strategy FMEA links)

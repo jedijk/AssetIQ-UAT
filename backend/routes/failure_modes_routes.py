@@ -46,7 +46,8 @@ async def get_failure_modes(
     equipment_type_id: Optional[str] = None,
     mechanism: Optional[str] = None,
     is_validated: Optional[bool] = None,
-    failure_mode_type: Optional[str] = None,  # "generic" or "customer_specific"
+    failure_mode_type: Optional[str] = None,  # "generic", "customer_specific", or "recently_added"
+    recently_added_days: Optional[int] = 30,  # For recently_added filter, default 30 days
     skip: int = 0,
     limit: int = 500
 ):
@@ -62,6 +63,7 @@ async def get_failure_modes(
             mechanism=mechanism,
             is_validated=is_validated,
             failure_mode_type=failure_mode_type,
+            recently_added_days=recently_added_days if failure_mode_type == "recently_added" else None,
             skip=skip,
             limit=limit
         )

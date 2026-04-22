@@ -48,18 +48,20 @@ class FailureModesService:
         mechanism: Optional[str] = None,
         is_validated: Optional[bool] = None,
         failure_mode_type: Optional[str] = None,
+        recently_added_days: Optional[int] = None,
         skip: int = 0,
         limit: int = 500
     ) -> Dict[str, Any]:
         """Get failure modes with optional filters."""
         import asyncio
+        from datetime import timedelta
         
         # Check if this is a default query (no filters, first page, default limit)
         is_default_query = (
             not category or category.lower() == "all"
         ) and not equipment and not search and not min_rpn and not equipment_type_id and not mechanism and is_validated is None and (
             not failure_mode_type or failure_mode_type.lower() == "all"
-        ) and skip == 0 and limit >= 500
+        ) and not recently_added_days and skip == 0 and limit >= 500
         
         # Use cache for default unfiltered query
         if is_default_query:
@@ -90,8 +92,14 @@ class FailureModesService:
             query["is_validated"] = is_validated
         
         # Filter by failure mode type (generic vs customer_specific)
-        if failure_mode_type and failure_mode_type.lower() != "all":
+        if failure_mode_type and failure_mode_type.lower() not in ["all", "recently_added"]:
             query["failure_mode_type"] = failure_mode_type.lower()
+        
+        # Filter by recently added (within X days)
+        if recently_added_days or (failure_mode_type and failure_mode_type.lower() == "recently_added"):
+            days = recently_added_days or 30
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+            query["created_at"] = {"$gte": cutoff_date}
         
         # Text search across multiple fields
         if search:
