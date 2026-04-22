@@ -445,7 +445,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
       if (task?.id) {
         clearDraft(task.id);
       }
-      toast.success("Task completed successfully");
+      // Toast is handled by parent component's mutation onSuccess
       onBack();
     } catch (error) {
       console.error("Task completion error:", error);
