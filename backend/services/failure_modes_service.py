@@ -97,7 +97,7 @@ class FailureModesService:
         
         # Filter by recently added (within X days)
         if recently_added_days or (failure_mode_type and failure_mode_type.lower() == "recently_added"):
-            days = recently_added_days or 30
+            days = recently_added_days or 7
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
             query["created_at"] = {"$gte": cutoff_date}
         
