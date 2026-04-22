@@ -744,7 +744,15 @@ export default function ProductionDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
       toast.success("Entry deleted");
     },
-    onError: () => toast.error("Failed to delete entry"),
+    onError: (error) => {
+      // 404 means already deleted - treat as success
+      if (error?.response?.status === 404) {
+        queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+        toast.success("Entry already deleted");
+      } else {
+        toast.error("Failed to delete entry");
+      }
+    },
   });
 
   // Edit state for big bag entries
@@ -2132,7 +2140,7 @@ export default function ProductionDashboardPage() {
       />
 
       {/* ── Delete Confirmation Dialog ── */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open) setDeleteConfirm(null); }}>
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open && !deleteSubmissionMutation.isPending) setDeleteConfirm(null); }}>
         <AlertDialogContent data-testid="delete-confirm-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete entry</AlertDialogTitle>
@@ -2141,16 +2149,17 @@ export default function ProductionDashboardPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="delete-cancel-btn">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="delete-cancel-btn" disabled={deleteSubmissionMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
               data-testid="delete-confirm-btn"
+              disabled={deleteSubmissionMutation.isPending}
               onClick={() => {
                 (deleteConfirm?.ids || []).forEach((id) => deleteSubmissionMutation.mutate(id));
                 setDeleteConfirm(null);
               }}
             >
-              Delete
+              {deleteSubmissionMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
