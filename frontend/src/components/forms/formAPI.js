@@ -42,16 +42,18 @@ export const formAPI = {
     return response.json();
   },
 
-  updateTemplate: async (params) => {
+  updateTemplate: async (idOrParams, dataArg) => {
     let id, data;
-    if (typeof params === 'object' && params.id && params.data) {
-      id = params.id;
-      data = params.data;
-    } else if (typeof params === 'string') {
-      id = params;
-      data = arguments[1];
+    if (typeof idOrParams === 'object' && idOrParams.id && idOrParams.data) {
+      // Called with { id, data } object
+      id = idOrParams.id;
+      data = idOrParams.data;
+    } else if (typeof idOrParams === 'string' && dataArg) {
+      // Called with (id, data) as separate arguments
+      id = idOrParams;
+      data = dataArg;
     } else {
-      throw new Error("Invalid arguments for updateTemplate. Expected { id, data } object.");
+      throw new Error("Invalid arguments for updateTemplate. Expected (id, data) or { id, data }.");
     }
     
     const cleanedData = { ...data };
