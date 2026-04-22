@@ -2142,7 +2142,15 @@ export default function ProductionDashboardPage() {
         equipmentId={formExec?.equipmentId || ""}
         submissionId={formExec?.submissionId}
         initialValues={formExec?.initialValues}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["production-dashboard"] })}
+                onSuccess={() => {
+          // Invalidate and refetch the production dashboard data
+          queryClient.invalidateQueries({ 
+            predicate: (query) => query.queryKey[0] === "production-dashboard"
+          });
+          queryClient.refetchQueries({
+            predicate: (query) => query.queryKey[0] === "production-dashboard"
+          });
+        }}
       />
 
       {/* ── Delete Confirmation Dialog ── */}
