@@ -313,6 +313,8 @@ async def get_production_dashboard(
         date_time_raw = extract_field(sub, "Date & Time") or ""
         total_input = extract_numeric(sub, "Total Input")
         total_wast = extract_numeric(sub, "Total Wast")
+        # Extract notes/comments for display on hover
+        notes = sub.get("notes") or ""
         end_of_shift_entries.append({
             "datetime": _serialize_datetime(dt),
             "date_time_raw": date_time_raw,
@@ -320,6 +322,7 @@ async def get_production_dashboard(
             "total_waste": total_wast if total_wast is not None else 0,
             "submitted_by": sub.get("submitted_by_name", ""),
             "submission_id": sub.get("id", ""),
+            "notes": notes,
         })
 
     # Calculate KPIs

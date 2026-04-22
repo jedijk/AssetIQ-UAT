@@ -205,7 +205,7 @@ BASE_ORIGINS = [
     "https://asset-iq-uat.vercel.app",
     "https://assetiq-uat.vercel.app",
     # Preview/Development
-    "https://version-auto-update.preview.emergentagent.com",
+    "https://multi-env-platform-1.preview.emergentagent.com",
     "http://localhost:3000",
     "http://localhost:5000",
 ]

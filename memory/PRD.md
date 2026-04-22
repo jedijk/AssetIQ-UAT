@@ -144,9 +144,17 @@ Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset ma
 ## End of Shift Details Table on Production Dashboard (DONE - Feb 22, 2026)
 - Replaced the "Waste & Downtime" chart in the Production Dashboard with an "End of Shift Details" data table
 - Backend: Added `END_OF_SHIFT_FORM = "End of shift"` to production forms and builds `end_of_shift_entries` from submissions of template `69dba92cbcbca77f34b27b49`
-- Entries include: `datetime`, `date_time_raw`, `total_input`, `total_waste`, `submitted_by`, `submission_id`
+- Entries include: `datetime`, `date_time_raw`, `total_input`, `total_waste`, `submitted_by`, `submission_id`, `notes`
 - Frontend table columns: Date & Time, Input (kg), Waste (kg)
 - Row actions: Edit (opens FormExecutionDialog prefilled with submission values, PATCHes via `/api/production/submission/{id}`) and Delete (uses existing confirm flow)
 - "Add" button opens the embedded End of Shift form for new submissions, equipment auto-set to Line-90
 - `FormExecutionDialog` extended with `submissionId` + `initialValues` props to support edit mode
+- Files: `/app/backend/routes/production.py`, `/app/frontend/src/pages/ProductionDashboardPage.js`
+
+## End of Shift Completion Comments Hover Tooltip (DONE - Apr 22, 2026)
+- Added hover tooltip to display "Completion Comments" when hovering over End of Shift detail rows
+- Backend: `end_of_shift_entries` now includes `notes` field extracted from form submission notes
+- Frontend: Rows with notes show a MessageCircle icon next to the date and have a subtle amber background highlight
+- Uses Radix UI Tooltip (aliased as RadixTooltip to avoid conflict with Recharts Tooltip)
+- Tooltip displays "Completion Comments:" header with the notes content below
 - Files: `/app/backend/routes/production.py`, `/app/frontend/src/pages/ProductionDashboardPage.js`
