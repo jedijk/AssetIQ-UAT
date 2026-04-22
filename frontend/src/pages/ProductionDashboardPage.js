@@ -475,7 +475,7 @@ const FIELD_TYPE_MAP = {
   date: "date", datetime: "datetime-local", dropdown: "text",
 };
 
-const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmentId, equipmentName, equipmentTag, onSuccess }) => {
+const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmentId, equipmentName, equipmentTag, onSuccess, submissionId, initialValues }) => {
   const [fields, setFields] = useState([]);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false);
@@ -490,13 +490,16 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
       const t = res.data;
       const f = t.fields || [];
       setFields(f);
-      // Set defaults
+      // Set defaults (or prefill from initialValues in edit mode)
       const defaults = {};
       const now = new Date();
       const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
       f.forEach((field) => {
         const ft = field.type || field.field_type || "text";
-        if (ft === "datetime") defaults[field.id] = localISO.slice(0, 16);
+        const prefill = initialValues?.[field.id];
+        if (prefill !== undefined && prefill !== null && prefill !== "") {
+          defaults[field.id] = String(prefill);
+        } else if (ft === "datetime") defaults[field.id] = localISO.slice(0, 16);
         else if (ft === "date") defaults[field.id] = localISO.slice(0, 10);
         else defaults[field.id] = "";
         // Collect dropdown options
@@ -506,7 +509,7 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
       });
       setFormData(defaults);
     }).catch(() => toast.error("Failed to load form")).finally(() => setLoading(false));
-  }, [open, templateId]);
+  }, [open, templateId, submissionId]);
 
   const handleSubmit = async () => {
     // Validate required
@@ -518,22 +521,32 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
     }
     setSubmitting(true);
     try {
-      const values = fields.map((f) => ({
-        field_id: f.id,
-        field_label: f.label,
-        value: String(formData[f.id] ?? ""),
-      }));
-      await api.post("/form-submissions", {
-        form_template_id: templateId,
-        equipment_id: equipmentId || "",
-        values,
-        notes: "",
-      });
-      toast.success(`${templateName} submitted`);
+      if (submissionId) {
+        // Edit mode: send values keyed by field_label (matches productionAPI.updateSubmission)
+        const valuesByLabel = {};
+        fields.forEach((f) => {
+          valuesByLabel[f.label] = String(formData[f.id] ?? "");
+        });
+        await api.patch(`/production/submission/${submissionId}`, { values: valuesByLabel });
+        toast.success(`${templateName} updated`);
+      } else {
+        const values = fields.map((f) => ({
+          field_id: f.id,
+          field_label: f.label,
+          value: String(formData[f.id] ?? ""),
+        }));
+        await api.post("/form-submissions", {
+          form_template_id: templateId,
+          equipment_id: equipmentId || "",
+          values,
+          notes: "",
+        });
+        toast.success(`${templateName} submitted`);
+      }
       onSuccess?.();
       onClose();
     } catch (err) {
-      toast.error("Submission failed");
+      toast.error(submissionId ? "Update failed" : "Submission failed");
     } finally {
       setSubmitting(false);
     }
@@ -543,7 +556,7 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" data-testid="form-execution-dialog">
         <DialogHeader>
-          <DialogTitle>{templateName}</DialogTitle>
+          <DialogTitle>{submissionId ? `Edit ${templateName}` : templateName}</DialogTitle>
         </DialogHeader>
         {loading ? (
           <div className="flex items-center justify-center py-8"><RefreshCw className="w-5 h-5 animate-spin text-blue-500" /></div>
@@ -636,7 +649,8 @@ export default function ProductionDashboardPage() {
       const bigBag = list.find((t) => t.name === "Big Bag Loading");
       const extruder = list.find((t) => t.name === "Extruder settings sample");
       const viscosity = list.find((t) => /mooney viscosity/i.test(t.name));
-      return { bigBag, extruder, viscosity };
+      const endOfShift = list.find((t) => /end of shift/i.test(t.name));
+      return { bigBag, extruder, viscosity, endOfShift };
     },
     staleTime: 600000,
   });
@@ -1348,57 +1362,121 @@ export default function ProductionDashboardPage() {
             )}
           </div>
 
-          {/* ── Waste & Downtime + Actions + Insights Row ── */}
+          {/* ── End of Shift Details + Input Material + Insights Row ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {/* Waste & Downtime */}
-            <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="waste-chart">
+            {/* End of Shift Details */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="end-of-shift-panel">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-700">Waste & Downtime</h3>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" data-testid="waste-add-btn">
+                <h3 className="text-sm font-semibold text-slate-700">End of Shift Details</h3>
+                <div className="flex items-center gap-2">
+                  {data?.end_of_shift_entries?.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">{data.end_of_shift_entries.length}</Badge>
+                  )}
+                  {!isMobile && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1 text-xs"
+                      onClick={() => {
+                        if (formTemplates?.endOfShift) {
+                          setFormExec({
+                            templateId: formTemplates.endOfShift.id,
+                            templateName: "End of Shift",
+                            equipmentId: line90Equipment?.id,
+                          });
+                        } else {
+                          toast.error("End of shift template not found");
+                        }
+                      }}
+                      data-testid="end-of-shift-add-btn"
+                    >
                       <Plus className="w-3 h-3" /> Add
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowAddEvent(true)} data-testid="add-event-option">
-                      Event
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              {data?.waste_downtime_series?.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <ComposedChart data={(data.waste_downtime_series || []).reduce((acc, item, i) => {
-                    const prev = i > 0 ? acc[i - 1].cumWaste : 0;
-                    let label = item.time;
-                    if (isMultiDay && item.datetime) {
-                      try {
-                        const d = new Date(item.datetime);
-                        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-                        const useMonth = ["6m", "1y", "ytd"].includes(period);
-                        label = useMonth ? `${months[d.getMonth()]} ${d.getFullYear()}` : `${d.getDate()} ${months[d.getMonth()]}`;
-                      } catch {}
-                    }
-                    acc.push({ ...item, label, cumWaste: prev + (parseFloat(item.waste) || 0) });
-                    return acc;
-                  }, [])}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey={isMultiDay ? "label" : "time"} tick={{ fontSize: 10 }} stroke="#94a3b8" />
-                    <YAxis yAxisId="left" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} stroke="#f59e0b" />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 10 }} />
-                    <Bar yAxisId="left" dataKey="waste" name="Waste (kg)" fill="#ef4444" radius={[3, 3, 0, 0]} barSize={14} />
-                    <Bar yAxisId="left" dataKey="downtime" name="Downtime" fill="#475569" radius={[3, 3, 0, 0]} barSize={14} />
-                    <Line yAxisId="right" type="monotone" dataKey="cumWaste" name="Cumulative Waste" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-[200px] text-sm text-slate-400">
-                  No data
+                  )}
                 </div>
-              )}
+              </div>
+              <div className="max-h-[240px] overflow-y-auto">
+                {data?.end_of_shift_entries?.length > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Date & Time</th>
+                        <th className="text-right py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Input (kg)</th>
+                        <th className="text-right py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Waste (kg)</th>
+                        <th className="w-14"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.end_of_shift_entries.map((eos, i) => {
+                        let displayDT = "";
+                        const raw = eos.date_time_raw || eos.datetime;
+                        if (raw) {
+                          try {
+                            const d = new Date(raw);
+                            if (!isNaN(d.getTime())) {
+                              const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                              const hh = String(d.getHours()).padStart(2, "0");
+                              const mm = String(d.getMinutes()).padStart(2, "0");
+                              displayDT = `${d.getDate()} ${months[d.getMonth()]} ${hh}:${mm}`;
+                            } else {
+                              displayDT = String(raw);
+                            }
+                          } catch {
+                            displayDT = String(raw);
+                          }
+                        }
+                        return (
+                          <tr key={eos.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 group">
+                            <td className="py-1.5 px-1 text-slate-700 whitespace-nowrap">{displayDT || "—"}</td>
+                            <td className="py-1.5 px-1 text-right tabular-nums text-slate-700">{Number(eos.total_input || 0).toLocaleString()}</td>
+                            <td className="py-1.5 px-1 text-right tabular-nums text-red-600 font-medium">{Number(eos.total_waste || 0).toLocaleString()}</td>
+                            <td className="py-1 px-1">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => {
+                                    if (formTemplates?.endOfShift && eos.submission_id) {
+                                      setFormExec({
+                                        templateId: formTemplates.endOfShift.id,
+                                        templateName: "End of Shift",
+                                        equipmentId: line90Equipment?.id,
+                                        submissionId: eos.submission_id,
+                                        initialValues: {
+                                          "date_&_time": eos.date_time_raw || "",
+                                          "total_input": eos.total_input ?? "",
+                                          "total_wast": eos.total_waste ?? "",
+                                        },
+                                      });
+                                    }
+                                  }}
+                                  className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                  title="Edit"
+                                  data-testid={`edit-eos-${i}`}
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (eos.submission_id) {
+                                      setDeleteConfirm({ ids: [eos.submission_id], label: `end of shift entry (${displayDT || "item"})` });
+                                    }
+                                  }}
+                                  className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                                  title="Delete"
+                                  data-testid={`delete-eos-${i}`}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-xs text-slate-400 py-8 text-center">No end of shift data</p>
+                )}
+              </div>
             </div>
 
             {/* Input Material / Big Bag Loading */}
@@ -2019,6 +2097,8 @@ export default function ProductionDashboardPage() {
         templateId={formExec?.templateId}
         templateName={formExec?.templateName || ""}
         equipmentId={formExec?.equipmentId || ""}
+        submissionId={formExec?.submissionId}
+        initialValues={formExec?.initialValues}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ["production-dashboard"] })}
       />
 

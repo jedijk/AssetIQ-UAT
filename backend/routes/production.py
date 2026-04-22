@@ -34,8 +34,9 @@ VISCOSITY_FORM = "Mooney viscosity sample"
 BIG_BAG_FORM = "Big Bag Loading"
 SCREEN_CHANGE_FORM = "Screen change"
 MAGNET_CLEANING_FORM = "Magnet cleaning"
+END_OF_SHIFT_FORM = "End of shift"
 
-PRODUCTION_FORMS = [EXTRUDER_FORM, VISCOSITY_FORM, BIG_BAG_FORM, SCREEN_CHANGE_FORM, MAGNET_CLEANING_FORM]
+PRODUCTION_FORMS = [EXTRUDER_FORM, VISCOSITY_FORM, BIG_BAG_FORM, SCREEN_CHANGE_FORM, MAGNET_CLEANING_FORM, END_OF_SHIFT_FORM]
 
 EQUIPMENT_NAME = "Line-90"
 
@@ -212,6 +213,11 @@ async def get_production_dashboard(
     big_bag_subs = [s for s in submissions if match_template(s, BIG_BAG_FORM)]
     screen_change_subs = [s for s in submissions if match_template(s, SCREEN_CHANGE_FORM)]
     magnet_subs = [s for s in submissions if match_template(s, MAGNET_CLEANING_FORM)]
+    end_of_shift_subs = sorted(
+        [s for s in submissions if match_template(s, END_OF_SHIFT_FORM)],
+        key=lambda s: s.get("_parsed_time", datetime.min.replace(tzinfo=timezone.utc)),
+        reverse=True,
+    )
 
     # Build production log entries from extruder data
     production_log = []
@@ -297,6 +303,22 @@ async def get_production_dashboard(
             "bag_no": bag_no,
             "lot_no": lot_no,
             "production_date": production_date,
+            "submission_id": sub.get("id", ""),
+        })
+
+    # End of Shift data
+    end_of_shift_entries = []
+    for sub in end_of_shift_subs:
+        dt = sub.get("_parsed_time")
+        date_time_raw = extract_field(sub, "Date & Time") or ""
+        total_input = extract_numeric(sub, "Total Input")
+        total_wast = extract_numeric(sub, "Total Wast")
+        end_of_shift_entries.append({
+            "datetime": _serialize_datetime(dt),
+            "date_time_raw": date_time_raw,
+            "total_input": total_input if total_input is not None else 0,
+            "total_waste": total_wast if total_wast is not None else 0,
+            "submitted_by": sub.get("submitted_by_name", ""),
             "submission_id": sub.get("id", ""),
         })
 
@@ -607,6 +629,7 @@ async def get_production_dashboard(
         "viscosity_series": viscosity_series,
         "viscosity_values": viscosity_values,
         "big_bag_entries": big_bag_entries,
+        "end_of_shift_entries": end_of_shift_entries,
         "screen_changes": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else "", "datetime": s.get("_parsed_time").isoformat() if s.get("_parsed_time") else ""} for s in screen_change_subs],
         "magnet_cleanings": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else "", "datetime": s.get("_parsed_time").isoformat() if s.get("_parsed_time") else ""} for s in magnet_subs],
         "actions": actions,

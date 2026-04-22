@@ -139,3 +139,14 @@ Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset ma
 - `useEffect` now checks both `isAuthenticating` and `user` state before calling `fetchUser()`
 - File: `/app/frontend/src/contexts/AuthContext.js`
 
+
+
+## End of Shift Details Table on Production Dashboard (DONE - Feb 22, 2026)
+- Replaced the "Waste & Downtime" chart in the Production Dashboard with an "End of Shift Details" data table
+- Backend: Added `END_OF_SHIFT_FORM = "End of shift"` to production forms and builds `end_of_shift_entries` from submissions of template `69dba92cbcbca77f34b27b49`
+- Entries include: `datetime`, `date_time_raw`, `total_input`, `total_waste`, `submitted_by`, `submission_id`
+- Frontend table columns: Date & Time, Input (kg), Waste (kg)
+- Row actions: Edit (opens FormExecutionDialog prefilled with submission values, PATCHes via `/api/production/submission/{id}`) and Delete (uses existing confirm flow)
+- "Add" button opens the embedded End of Shift form for new submissions, equipment auto-set to Line-90
+- `FormExecutionDialog` extended with `submissionId` + `initialValues` props to support edit mode
+- Files: `/app/backend/routes/production.py`, `/app/frontend/src/pages/ProductionDashboardPage.js`
