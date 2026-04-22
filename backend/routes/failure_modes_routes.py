@@ -47,7 +47,7 @@ async def get_failure_modes(
     mechanism: Optional[str] = None,
     is_validated: Optional[bool] = None,
     failure_mode_type: Optional[str] = None,  # "generic", "customer_specific", or "recently_added"
-    recently_added_days: Optional[int] = 7,  # For recently_added filter, default 7 days
+    recently_added_days: Optional[int] = 30,  # For recently_added filter, default 30 days
     skip: int = 0,
     limit: int = 500
 ):
