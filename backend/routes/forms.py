@@ -387,7 +387,15 @@ async def delete_form_submission(
     """Delete a form submission by custom ID or MongoDB ObjectId."""
     from bson import ObjectId
     
-    # First try by custom 'id' field (UUID string)
+    # First, get the submission to check if it's linked to a task
+    submission = await db.form_submissions.find_one({"id": submission_id})
+    if not submission:
+        if ObjectId.is_valid(submission_id):
+            submission = await db.form_submissions.find_one({"_id": ObjectId(submission_id)})
+    
+    task_instance_id = submission.get("task_instance_id") if submission else None
+    
+    # Delete the form submission
     result = await db.form_submissions.delete_one({"id": submission_id})
     
     if result.deleted_count == 0:
@@ -397,6 +405,21 @@ async def delete_form_submission(
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Form submission not found")
+    
+    # If the submission was linked to a task instance, reset the task status
+    if task_instance_id:
+        await db.task_instances.update_one(
+            {"id": task_instance_id},
+            {
+                "$set": {
+                    "status": "planned",
+                    "completed_at": None,
+                    "completed_by_id": None,
+                    "completed_by_name": None,
+                    "completion_notes": None,
+                }
+            }
+        )
     
     return {"message": "Form submission deleted successfully"}
 
