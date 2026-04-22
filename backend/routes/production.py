@@ -172,10 +172,10 @@ async def get_production_dashboard(
     if equipment_ids:
         equipment_match.append({"equipment_id": {"$in": equipment_ids}})
 
-    # End of Shift forms without equipment are implicitly for Line-90
-    # Include them in the query by adding a condition for empty/null equipment with End of Shift template
-    end_of_shift_no_equipment = {
-        "form_template_name": {"$regex": f"^{END_OF_SHIFT_FORM}$", "$options": "i"},
+    # Production forms without equipment are implicitly for Line-90
+    # Include them in the query by adding conditions for empty/null equipment
+    forms_without_equipment = {
+        "form_template_name": {"$regex": f"^({END_OF_SHIFT_FORM}|{MAGNET_CLEANING_FORM}|{SCREEN_CHANGE_FORM})$", "$options": "i"},
         "$or": [
             {"equipment_id": ""},
             {"equipment_id": None},
@@ -190,8 +190,8 @@ async def get_production_dashboard(
                 "form_template_name": {"$regex": f"^({form_patterns})$", "$options": "i"},
                 "$or": equipment_match,
             },
-            # End of Shift forms without equipment (implicitly Line-90)
-            end_of_shift_no_equipment,
+            # Forms without equipment (implicitly Line-90)
+            forms_without_equipment,
         ]
     }
 
