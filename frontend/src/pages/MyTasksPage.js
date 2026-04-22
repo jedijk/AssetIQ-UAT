@@ -547,6 +547,7 @@ const MyTasksPage = () => {
         predicate: (query) => query.queryKey[0] === "task-instances" 
       });
       queryClient.invalidateQueries({ queryKey: ["task-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["task-plans"] });
       queryClient.invalidateQueries({ queryKey: ["adhoc-plans"] });
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === "actions" 
@@ -554,6 +555,8 @@ const MyTasksPage = () => {
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === "central-actions" 
       });
+      // Also invalidate overdue actions in notifications
+      queryClient.invalidateQueries({ queryKey: ["overdue-actions"] });
       setDeleteTaskData(null);
     },
     onError: (error) => {
