@@ -24,52 +24,66 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-const DialogContent = React.forwardRef(({ className, children, onPointerDownOutside, onInteractOutside, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      aria-describedby={props['aria-describedby'] || undefined}
-      className={cn(
-        "fixed left-[50%] top-[50%] z-[100] grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-4 sm:p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-lg",
-        className
-      )}
-      onPointerDownOutside={(e) => {
-        // Prevent closing when interacting with Select/Popover portals, DocumentViewer, or image lightbox
-        const target = e.target;
-        if (target?.closest('[data-radix-select-content]') || 
-            target?.closest('[data-radix-popper-content-wrapper]') ||
-            target?.closest('[data-radix-popover-content]') ||
-            target?.closest('[data-testid="document-viewer"]') ||
-            target?.closest('[data-testid="document-viewer-error"]') ||
-            target?.closest('[data-testid="image-lightbox"]')) {
-          e.preventDefault();
-        }
-        onPointerDownOutside?.(e);
-      }}
-      onInteractOutside={(e) => {
-        // Prevent closing when interacting with Select/Popover portals, DocumentViewer, or image lightbox
-        const target = e.target;
-        if (target?.closest('[data-radix-select-content]') || 
-            target?.closest('[data-radix-popper-content-wrapper]') ||
-            target?.closest('[data-radix-popover-content]') ||
-            target?.closest('[data-testid="document-viewer"]') ||
-            target?.closest('[data-testid="document-viewer-error"]') ||
-            target?.closest('[data-testid="image-lightbox"]')) {
-          e.preventDefault();
-        }
-        onInteractOutside?.(e);
-      }}
-      {...props}>
-      {children}
-      <DialogPrimitive.Close
-        className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-))
+const DialogContent = React.forwardRef(({ className, children, onPointerDownOutside, onInteractOutside, ...props }, ref) => {
+  // Check if a date picker is currently active
+  const isDatePickerActive = () => {
+    const activeEl = document.activeElement;
+    if (activeEl?.tagName === 'INPUT') {
+      const type = activeEl.getAttribute('type');
+      return type === 'date' || type === 'datetime-local' || type === 'time';
+    }
+    return false;
+  };
+
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        aria-describedby={props['aria-describedby'] || undefined}
+        className={cn(
+          "fixed left-[50%] top-[50%] z-[100] grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-4 sm:p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-lg",
+          className
+        )}
+        onPointerDownOutside={(e) => {
+          // Prevent closing when interacting with Select/Popover portals, DocumentViewer, image lightbox, or native date pickers
+          const target = e.target;
+          if (target?.closest('[data-radix-select-content]') || 
+              target?.closest('[data-radix-popper-content-wrapper]') ||
+              target?.closest('[data-radix-popover-content]') ||
+              target?.closest('[data-testid="document-viewer"]') ||
+              target?.closest('[data-testid="document-viewer-error"]') ||
+              target?.closest('[data-testid="image-lightbox"]') ||
+              isDatePickerActive()) {
+            e.preventDefault();
+          }
+          onPointerDownOutside?.(e);
+        }}
+        onInteractOutside={(e) => {
+          // Prevent closing when interacting with Select/Popover portals, DocumentViewer, image lightbox, or native date pickers
+          const target = e.target;
+          if (target?.closest('[data-radix-select-content]') || 
+              target?.closest('[data-radix-popper-content-wrapper]') ||
+              target?.closest('[data-radix-popover-content]') ||
+              target?.closest('[data-testid="document-viewer"]') ||
+              target?.closest('[data-testid="document-viewer-error"]') ||
+              target?.closest('[data-testid="image-lightbox"]') ||
+              isDatePickerActive()) {
+            e.preventDefault();
+          }
+          onInteractOutside?.(e);
+        }}
+        {...props}>
+        {children}
+        <DialogPrimitive.Close
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  );
+})
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({

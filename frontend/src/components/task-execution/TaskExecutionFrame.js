@@ -774,6 +774,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
               type="date"
               value={value ?? ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
               className={cn(mobileInputClass, hasError && "border-red-500")}
             />
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
@@ -792,6 +793,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
               type="datetime-local"
               value={value ?? ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
               className={cn(mobileInputClass, hasError && "border-red-500")}
             />
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}

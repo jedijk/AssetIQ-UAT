@@ -599,6 +599,12 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
                       className="h-9 mt-1"
                       value={formData[field.id] ?? ""}
                       onChange={(e) => setFormData((p) => ({ ...p, [field.id]: e.target.value }))}
+                      onMouseDown={(e) => {
+                        // Prevent dialog from capturing date picker clicks
+                        if (inputType === "date" || inputType === "datetime-local") {
+                          e.stopPropagation();
+                        }
+                      }}
                       data-testid={`form-field-${field.id}`}
                     />
                   )}
