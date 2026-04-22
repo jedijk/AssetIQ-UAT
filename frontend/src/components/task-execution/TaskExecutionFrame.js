@@ -50,6 +50,16 @@ import {
 } from "../ui/select";
 import { Label } from "../ui/label";
 import { Checkbox } from "../ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import { cn } from "../../lib/utils";
 import { SignaturePad } from "../ui/signature-pad";
 import { VoiceInput } from "../ui/voice-input";
@@ -105,7 +115,7 @@ const clearDraft = (taskId) => {
   }
 };
 
-const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
+const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState({});
   const [completionNotes, setCompletionNotes] = useState("");
@@ -122,6 +132,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
   const [viewingDocument, setViewingDocument] = useState(null);
   const [showDocumentList, setShowDocumentList] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const docDropdownRef = useRef(null);
   const isInitialLoad = useRef(true);
   
@@ -1399,7 +1410,44 @@ const TaskExecutionFrame = ({ task, onBack, onComplete }) => {
             <span className="hidden sm:inline">View Doc</span>
           </Button>
         )}
+        {onDelete && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            data-testid="delete-task-btn"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this task? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                if (onDelete) {
+                  onDelete(task);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       {/* Task Context */}
       <div className="flex-shrink-0">

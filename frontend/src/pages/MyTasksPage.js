@@ -745,6 +745,10 @@ const MyTasksPage = () => {
           task={selectedTask}
           onBack={handleBackFromExecution}
           onComplete={handleCompleteTask}
+          onDelete={(task) => {
+            handleBackFromExecution();
+            handleDeleteTask(task);
+          }}
         />
       </div>
     );
