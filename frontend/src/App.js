@@ -53,7 +53,7 @@ import { useEffect } from "react";
 import "./App.css";
 
 // Current frontend version - update with each release
-const APP_VERSION = "3.5.4";
+const APP_VERSION = "3.5.5";
 
 // Parse a semver string "A.B.C" into comparable tuple [A, B, C]
 const parseVersion = (v) => {
