@@ -425,6 +425,27 @@ class FormService:
                 if field.get("required") and field["id"] not in value_map:
                     raise ValueError(f"Required field '{field.get('label', field['id'])}' is missing")
         
+        # Validate no future dates
+        for value in values:
+            field_id = value["field_id"]
+            field_def = field_map.get(field_id)
+            if field_def and field_def.get("field_type") in ["date", "datetime"]:
+                date_value = value.get("value")
+                if date_value:
+                    try:
+                        from dateutil import parser
+                        parsed_date = parser.parse(str(date_value))
+                        # Make timezone-aware if naive
+                        if parsed_date.tzinfo is None:
+                            parsed_date = parsed_date.replace(tzinfo=timezone.utc)
+                        if parsed_date > now:
+                            raise ValueError(f"Future dates are not allowed for field '{field_def.get('label', field_id)}'")
+                    except (ValueError, TypeError) as e:
+                        if "Future dates" in str(e):
+                            raise
+                        # Ignore parsing errors for non-date values
+                        pass
+        
         # Evaluate thresholds and failure indicators
         evaluated_values = []
         threshold_breaches = []

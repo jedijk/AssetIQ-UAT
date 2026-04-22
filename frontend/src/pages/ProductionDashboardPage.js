@@ -596,9 +596,23 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
                     <Input
                       type={inputType}
                       step={inputType === "number" ? "any" : undefined}
+                      max={inputType === "date" ? new Date().toISOString().split('T')[0] : 
+                           inputType === "datetime-local" ? new Date().toISOString().slice(0, 16) : undefined}
                       className="h-9 mt-1"
                       value={formData[field.id] ?? ""}
-                      onChange={(e) => setFormData((p) => ({ ...p, [field.id]: e.target.value }))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        // Prevent future dates
+                        if (inputType === "date" && val > new Date().toISOString().split('T')[0]) {
+                          toast.error("Future dates are not allowed");
+                          return;
+                        }
+                        if (inputType === "datetime-local" && val > new Date().toISOString().slice(0, 16)) {
+                          toast.error("Future dates are not allowed");
+                          return;
+                        }
+                        setFormData((p) => ({ ...p, [field.id]: val }));
+                      }}
                       onMouseDown={(e) => {
                         // Prevent dialog from capturing date picker clicks
                         if (inputType === "date" || inputType === "datetime-local") {

@@ -764,6 +764,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
         );
       
       case "date":
+        const todayDate = new Date().toISOString().split('T')[0];
         return (
           <div key={field.id} className="space-y-1.5">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
@@ -773,7 +774,15 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
             <Input
               type="date"
               value={value ?? ""}
-              onChange={(e) => handleFieldChange(field.id, e.target.value)}
+              max={todayDate}
+              onChange={(e) => {
+                const selectedDate = e.target.value;
+                if (selectedDate > todayDate) {
+                  toast.error("Future dates are not allowed");
+                  return;
+                }
+                handleFieldChange(field.id, selectedDate);
+              }}
               onMouseDown={(e) => e.stopPropagation()}
               className={cn(mobileInputClass, hasError && "border-red-500")}
             />
@@ -782,6 +791,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
         );
       
       case "datetime":
+        const nowDateTime = new Date().toISOString().slice(0, 16);
         return (
           <div key={field.id} className="space-y-1.5">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
@@ -792,7 +802,15 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
             <Input
               type="datetime-local"
               value={value ?? ""}
-              onChange={(e) => handleFieldChange(field.id, e.target.value)}
+              max={nowDateTime}
+              onChange={(e) => {
+                const selectedDateTime = e.target.value;
+                if (selectedDateTime > nowDateTime) {
+                  toast.error("Future dates are not allowed");
+                  return;
+                }
+                handleFieldChange(field.id, selectedDateTime);
+              }}
               onMouseDown={(e) => e.stopPropagation()}
               className={cn(mobileInputClass, hasError && "border-red-500")}
             />
