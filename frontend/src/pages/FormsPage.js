@@ -169,7 +169,7 @@ const FormsPage = ({ embedded = false }) => {
     mutationFn: async (template) => {
       // If template has an ID, it's an update, otherwise create new
       if (template.id) {
-        return formAPI.updateTemplate({ id: template.id, data: template });
+        return formAPI.updateTemplate(template.id, template);
       }
       return formAPI.createTemplate(template);
     },
