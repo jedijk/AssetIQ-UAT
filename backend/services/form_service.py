@@ -1219,17 +1219,32 @@ class FormService:
         day_start = datetime.combine(day, datetime.min.time())
         day_end = datetime.combine(day, datetime.max.time())
 
-        # Find Extruder Settings and Mooney viscosity templates
-        extruder_tpl = await self.db.form_templates.find_one(
+        # Find ALL Extruder Settings and Mooney viscosity templates
+        # Note: There may be multiple templates with the same name (different versions)
+        extruder_tpls = await self.db.form_templates.find(
             {"name": {"$regex": "^extruder settings sample$", "$options": "i"}},
-            {"_id": 0, "id": 1, "name": 1},
-        )
-        visc_tpl = await self.db.form_templates.find_one(
+        ).to_list(100)
+        visc_tpls = await self.db.form_templates.find(
             {"name": {"$regex": "^mooney viscosity sample$", "$options": "i"}},
-            {"_id": 0, "id": 1, "name": 1},
-        )
-        if not extruder_tpl:
+        ).to_list(100)
+        
+        if not extruder_tpls:
             return
+
+        # Collect all possible template ID formats (UUID 'id' field and ObjectId '_id')
+        extruder_ids = []
+        for t in extruder_tpls:
+            if t.get("id"):
+                extruder_ids.append(t["id"])
+            if t.get("_id"):
+                extruder_ids.append(str(t["_id"]))
+        
+        visc_ids = []
+        for t in visc_tpls:
+            if t.get("id"):
+                visc_ids.append(t["id"])
+            if t.get("_id"):
+                visc_ids.append(str(t["_id"]))
 
         # Fetch all extruder & existing viscosity submissions for the day.
         # Filter by submitted_at range (broad) then re-filter in Python by Date & Time.
@@ -1237,15 +1252,15 @@ class FormService:
         broad_end = day_end + timedelta(hours=12)
 
         ext_subs = await self.db.form_submissions.find(
-            {"form_template_id": extruder_tpl["id"],
+            {"form_template_id": {"$in": extruder_ids},
              "submitted_at": {"$gte": broad_start, "$lte": broad_end}},
             {"_id": 0, "id": 1, "values": 1, "submitted_at": 1}
         ).to_list(500)
 
         visc_subs = []
-        if visc_tpl:
+        if visc_ids:
             visc_subs = await self.db.form_submissions.find(
-                {"form_template_id": visc_tpl["id"],
+                {"form_template_id": {"$in": visc_ids},
                  "submitted_at": {"$gte": broad_start, "$lte": broad_end}},
                 {"_id": 0, "id": 1, "values": 1, "submitted_at": 1}
             ).to_list(500)
