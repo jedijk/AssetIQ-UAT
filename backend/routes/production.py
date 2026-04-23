@@ -239,6 +239,8 @@ async def get_production_dashboard(
 
     # Build production log entries from extruder data
     production_log = []
+    # NOTE: total_feed is initialized to 0 and ONLY set from End of Shift entries (see below)
+    # Do NOT accumulate from individual FEED values
     total_feed = 0.0
     total_waste = 0.0
 
@@ -262,7 +264,7 @@ async def get_production_dashboard(
         remarks = extract_field(sub, "Remarks") or extract_field(sub, "REMARKS") or ""
         waste = extract_numeric(sub, "Waste") or 0
 
-        total_feed += feed
+        # Do NOT add feed to total_feed - total_input comes ONLY from End of Shift
         total_waste += waste
 
         production_log.append({
