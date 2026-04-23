@@ -17,6 +17,7 @@ import {
   Sigma,
   Clock,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   Search,
   X,
@@ -123,17 +124,22 @@ function MachineAnalysisPanel({ fromDate, toDate, period }) {
   const [createdAt, setCreatedAt] = useState(null);
   const [expanded, setExpanded] = useState(false);
   const [analysisRange, setAnalysisRange] = useState(null);
+  const [error, setError] = useState(null);
 
   const periodLabel = { "1d": "day", "1w": "week", "1m": "month", "3m": "3 months", "6m": "6 months", "1y": "year", "ytd": "YTD" }[period] || period;
 
   const fetchAnalysis = async () => {
     try {
+      setError(null);
       const res = await api.get(`/production/machine-analysis?start=${fromDate}&end=${toDate}`);
       if (res.data?.status === "ok") {
         setAnalysis(res.data.analysis);
         setStats(res.data.stats);
         setCreatedAt(res.data.created_at);
         setAnalysisRange(res.data.date_range);
+      } else if (res.data?.status === "error") {
+        setError(res.data.error);
+        setAnalysis(null);
       }
     } catch {}
   };
@@ -142,6 +148,7 @@ function MachineAnalysisPanel({ fromDate, toDate, period }) {
 
   const runAnalysis = async () => {
     setGenerating(true);
+    setError(null);
     try {
       const res = await api.post("/production/machine-analysis", { start: fromDate, end: toDate });
       if (res.data?.status === "ok") {
@@ -149,9 +156,14 @@ function MachineAnalysisPanel({ fromDate, toDate, period }) {
         setStats(res.data.stats);
         setCreatedAt(new Date().toISOString());
         setAnalysisRange({ start: fromDate, end: toDate });
+        setError(null);
+      } else if (res.data?.status === "error") {
+        setError(res.data.error);
+        setAnalysis(null);
       }
     } catch (err) {
       console.error(err);
+      setError("Failed to run analysis. Please try again.");
     } finally { setGenerating(false); }
   };
 
@@ -206,11 +218,20 @@ function MachineAnalysisPanel({ fromDate, toDate, period }) {
         </div>
       )}
 
-      {!generating && !analysis && (
+      {!generating && !analysis && !error && (
         <div className="text-center py-8">
           <Brain className="w-10 h-10 text-slate-300 mx-auto mb-2" />
           <p className="text-sm text-slate-500">Run analysis to get AI-powered recommendations</p>
           <p className="text-xs text-slate-400 mt-1">Based on all historical production data</p>
+        </div>
+      )}
+
+      {!generating && error && (
+        <div className="text-center py-8" data-testid="analysis-error">
+          <AlertCircle className="w-10 h-10 text-amber-400 mx-auto mb-2" />
+          <p className="text-sm text-slate-600 font-medium">Not enough data for analysis</p>
+          <p className="text-xs text-slate-500 mt-1">{error}</p>
+          <p className="text-xs text-slate-400 mt-2">Try selecting a longer time period or ensure production data has been uploaded.</p>
         </div>
       )}
 
