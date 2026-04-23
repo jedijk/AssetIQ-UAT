@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Single source of truth for the application version.
 # Bump this with each release; the frontend polls /api/health and will force a
 # hard refresh whenever it sees a newer version than the one baked into its bundle.
-APP_VERSION = "3.5.7"
+APP_VERSION = "3.5.8"
 
 # Create FastAPI app IMMEDIATELY - before any potentially failing imports
 app = FastAPI(
@@ -205,7 +205,7 @@ BASE_ORIGINS = [
     "https://asset-iq-uat.vercel.app",
     "https://assetiq-uat.vercel.app",
     # Preview/Development
-    "https://multi-env-platform-1.preview.emergentagent.com",
+    "https://viscosity-editor.preview.emergentagent.com",
     "http://localhost:3000",
     "http://localhost:5000",
 ]

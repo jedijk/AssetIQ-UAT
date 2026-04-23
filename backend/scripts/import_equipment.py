@@ -20,7 +20,7 @@ import pandas as pd
 from io import BytesIO
 
 # Configuration
-API_URL = os.environ.get("API_URL", "https://multi-env-platform-1.preview.emergentagent.com")
+API_URL = os.environ.get("API_URL", "https://viscosity-editor.preview.emergentagent.com")
 TYROMER_INSTALLATION_ID = "5fb4f269-191f-47d1-b190-e865a6430c7e"
 
 # Valid ISO 14224 Levels mapping
