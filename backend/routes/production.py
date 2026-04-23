@@ -833,6 +833,95 @@ async def update_production_submission(
     return {"status": "updated", "source": "production_log", "id": submission_id, "matched_fields": matched}
 
 
+@router.post("/production/create-viscosity")
+async def create_viscosity_submission(
+    data: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Create a new Mooney Viscosity form submission.
+    Used when adding viscosity to an extruder entry that doesn't have a linked viscosity sample.
+    
+    Expected data:
+    - datetime: ISO datetime string (must match extruder entry's date_&_time)
+    - measurement: viscosity value (MU)
+    """
+    import uuid
+    
+    datetime_val = data.get("datetime")
+    measurement = data.get("measurement")
+    
+    if not datetime_val or measurement is None:
+        raise HTTPException(status_code=400, detail="datetime and measurement are required")
+    
+    # Find the Mooney Viscosity template (try multiple possible names/IDs)
+    visc_template = await db.form_templates.find_one(
+        {"name": {"$regex": "^mooney viscosity sample$", "$options": "i"}}
+    )
+    
+    if not visc_template:
+        raise HTTPException(status_code=404, detail="Mooney Viscosity template not found")
+    
+    # Get template ID (could be UUID 'id' or ObjectId '_id')
+    template_id = str(visc_template.get("_id")) if visc_template.get("_id") else visc_template.get("id")
+    template_name = visc_template.get("name", "Mooney viscosity sample")
+    
+    # Find Line-90 equipment for consistent equipment assignment
+    line90 = await db.equipment_nodes.find_one(
+        {"name": {"$regex": "Line.?90", "$options": "i"}}, {"_id": 0, "id": 1, "name": 1}
+    )
+    equipment_id = line90.get("id") if line90 else ""
+    equipment_name = line90.get("name", "Line-90") if line90 else "Line-90"
+    
+    # Create the form submission
+    submission_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    
+    submission = {
+        "id": submission_id,
+        "form_template_id": template_id,
+        "form_template_name": template_name,
+        "equipment_id": equipment_id,
+        "equipment_name": equipment_name,
+        "submitted_by": current_user.get("id"),
+        "submitted_by_name": current_user.get("name", "Unknown"),
+        "submitted_at": now,
+        "values": [
+            {
+                "field_id": "date_&_time",
+                "field_label": "date_&_time",
+                "field_type": "datetime",
+                "value": datetime_val,
+            },
+            {
+                "field_id": "measurement",
+                "field_label": "measurement",
+                "field_type": "number",
+                "value": str(measurement),
+            },
+        ],
+        "created_at": now,
+        "updated_at": now,
+    }
+    
+    await db.form_submissions.insert_one(submission)
+    logger.info(f"Created new viscosity submission {submission_id} for datetime {datetime_val}, measurement={measurement}")
+    
+    # Trigger auto-pairing
+    try:
+        from services.form_service import FormService
+        svc = FormService(db)
+        await svc._auto_pair_viscosity_to_extruder(submission)
+    except Exception as e:
+        logger.warning(f"Auto-pairing failed for new viscosity submission: {e}")
+    
+    return {
+        "status": "created",
+        "id": submission_id,
+        "datetime": datetime_val,
+        "measurement": measurement,
+    }
+
 
 @router.delete("/production/seed-data")
 async def clear_seed_data(

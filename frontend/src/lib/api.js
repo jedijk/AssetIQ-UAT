@@ -1567,6 +1567,10 @@ export const productionAPI = {
     const response = await api.patch(`/production/submission/${submissionId}`, { values });
     return response.data;
   },
+  createViscositySubmission: async (datetime, measurement) => {
+    const response = await api.post("/production/create-viscosity", { datetime, measurement });
+    return response.data;
+  },
   clearSeedData: async () => {
     const response = await api.delete("/production/seed-data");
     return response.data;

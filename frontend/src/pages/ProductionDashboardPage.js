@@ -2177,13 +2177,24 @@ export default function ProductionDashboardPage() {
                       productionAPI.updateSubmission(editEntry.submission_id, values).then(refresh).catch(() => toast.error("Failed to update extruder entry"));
                     }
 
-                    // Update viscosity - either through viscosity submission or directly on production_log
+                    // Update viscosity - either through viscosity submission, production_log, or create new
                     if (editEntry.viscosity !== "" && editEntry.viscosity !== undefined) {
                       if (editEntry._viscosity_submission_id) {
-                        // Has separate viscosity form submission
+                        // Has separate viscosity form submission - update it
                         productionAPI.updateSubmission(editEntry._viscosity_submission_id, { Measurement: editEntry.viscosity }).then(refresh).catch(() => toast.error("Failed to update viscosity"));
+                      } else if (editEntry.datetime) {
+                        // No viscosity submission - create a new one with matching datetime
+                        productionAPI.createViscositySubmission(editEntry.datetime, editEntry.viscosity)
+                          .then(() => {
+                            refresh();
+                            toast.success("Viscosity sample created");
+                          })
+                          .catch((err) => {
+                            console.error("Failed to create viscosity:", err);
+                            toast.error("Failed to create viscosity sample");
+                          });
                       } else if (editEntry.submission_id) {
-                        // No separate viscosity submission - update mooney_viscosity on the production_log directly
+                        // Fallback: try updating production_log directly
                         productionAPI.updateSubmission(editEntry.submission_id, { mooney_viscosity: editEntry.viscosity }).then(refresh).catch(() => toast.error("Failed to update viscosity"));
                       }
                     }
