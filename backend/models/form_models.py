@@ -137,13 +137,25 @@ class FormFieldUpdate(BaseModel):
 
 class PhotoExtractionField(BaseModel):
     """A single field to extract from a photo."""
-    key: str
-    description: str
+    key: Optional[str] = None  # Made optional for backward compatibility
+    name: Optional[str] = None  # Alias for key
+    description: Optional[str] = None  # Made optional
+    label: Optional[str] = None  # Alias for description
     type: str = "string"  # string, number, enum
     unit: Optional[str] = None
     required: bool = False
     enum_values: Optional[List[str]] = None
     target_field_id: Optional[str] = None  # Maps to a form field ID
+    
+    @property
+    def effective_key(self) -> str:
+        """Get the effective key (key or name)."""
+        return self.key or self.name or ""
+    
+    @property
+    def effective_description(self) -> str:
+        """Get the effective description (description or label)."""
+        return self.description or self.label or ""
 
 
 class PhotoExtractionConfig(BaseModel):
