@@ -138,10 +138,17 @@ async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new
 
         failure_mode_name = threat.get("failure_mode")
         if failure_mode_name and failure_mode_name != "Unknown":
-            for fm in FAILURE_MODES_LIBRARY:
-                if fm["failure_mode"].lower() == failure_mode_name.lower():
-                    fmea_score = min(100, int(fm["rpn"] / 10))
-                    break
+            # First check database for user-created failure modes
+            db_fm = await db.failure_modes.find_one({"name": {"$regex": f"^{failure_mode_name}$", "$options": "i"}})
+            if db_fm:
+                rpn = db_fm.get("rpn", 500)
+                fmea_score = min(100, int(rpn / 10))
+            else:
+                # Fall back to static library
+                for fm in FAILURE_MODES_LIBRARY:
+                    if fm["failure_mode"].lower() == failure_mode_name.lower():
+                        fmea_score = min(100, int(fm["rpn"] / 10))
+                        break
 
         # Use installation-specific settings for calculation
         final_risk_score, risk_level = calculate_risk_score(criticality_score, fmea_score, risk_settings)

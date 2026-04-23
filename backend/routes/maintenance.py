@@ -95,13 +95,34 @@ async def generate_maintenance_strategy(
         )
     
     # Get failure modes for this equipment type - use flexible matching
-    failure_modes = [
+    # First check database for user-created failure modes
+    db_failure_modes = await failure_modes_service.get_all(
+        equipment_type=request.equipment_type_name,
+        limit=50
+    )
+    
+    # Also get from static library for legacy data
+    static_failure_modes = [
         fm for fm in FAILURE_MODES_LIBRARY 
         if fm.get("equipment", "").lower() == request.equipment_type_name.lower()
         or request.equipment_type_name.lower() in fm.get("equipment", "").lower()
         or fm.get("equipment", "").lower() in request.equipment_type_name.lower()
         or (fm.get("equipment_type_ids") and request.equipment_type_id in fm.get("equipment_type_ids", []))
     ]
+    
+    # Combine both sources, DB takes priority (deduplication by name)
+    seen_names = set()
+    failure_modes = []
+    for fm in db_failure_modes:
+        name = fm.get("name", "").lower()
+        if name not in seen_names:
+            seen_names.add(name)
+            failure_modes.append(fm)
+    for fm in static_failure_modes:
+        name = fm.get("name", "").lower()
+        if name not in seen_names:
+            seen_names.add(name)
+            failure_modes.append(fm)
     
     # If no specific failure modes found, try flexible matching
     if not failure_modes:
@@ -186,13 +207,34 @@ async def generate_all_maintenance_strategies(
         
         try:
             # Get failure modes for this equipment type - use flexible matching
-            failure_modes = [
+            # First check database for user-created failure modes
+            db_failure_modes = await failure_modes_service.get_all(
+                equipment_type=eq_name,
+                limit=50
+            )
+            
+            # Also get from static library for legacy data
+            static_failure_modes = [
                 fm for fm in FAILURE_MODES_LIBRARY 
                 if fm.get("equipment", "").lower() == eq_name.lower()
                 or eq_name.lower() in fm.get("equipment", "").lower()
                 or fm.get("equipment", "").lower() in eq_name.lower()
                 or (fm.get("equipment_type_ids") and eq_id in fm.get("equipment_type_ids", []))
             ]
+            
+            # Combine both sources, DB takes priority
+            seen_names = set()
+            failure_modes = []
+            for fm in db_failure_modes:
+                name = fm.get("name", "").lower()
+                if name not in seen_names:
+                    seen_names.add(name)
+                    failure_modes.append(fm)
+            for fm in static_failure_modes:
+                name = fm.get("name", "").lower()
+                if name not in seen_names:
+                    seen_names.add(name)
+                    failure_modes.append(fm)
             
             # If no specific failure modes found, try flexible matching
             if not failure_modes:
