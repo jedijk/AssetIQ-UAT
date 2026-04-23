@@ -451,16 +451,17 @@ async def get_production_dashboard(
         ingested = await db.production_logs.aggregate(pipeline).to_list(5000)
 
         if ingested:
-            total_feed = 0.0
+            # NOTE: total_feed (Total Input) is NO LONGER calculated from ingested FEED values.
+            # Total Input now comes ONLY from End of Shift entries (see below).
             total_waste_val = 0.0
             for entry in ingested:
                 m = entry.get("metrics", {})
+                # Extract feed value for display in production_log, but NOT for total_input calculation
                 feed_val = 0
                 try:
                     feed_val = float(m.get("FEED", 0) or 0)
                 except (ValueError, TypeError):
                     pass
-                total_feed += feed_val
 
                 ts = entry.get("timestamp", "")
                 time_label = ""

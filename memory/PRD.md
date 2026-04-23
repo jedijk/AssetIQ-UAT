@@ -6,6 +6,9 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 ## Current Version
 **v3.5.8** (Updated: December 2025)
 
+## Recent Changes
+- [Dec 2025] Removed Total Input fallback - now calculated ONLY from End of Shift entries (no longer sums FEED from ingested logs)
+
 ## Core Features Implemented
 
 ### Production Dashboard
