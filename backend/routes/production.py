@@ -431,190 +431,189 @@ async def get_production_dashboard(
         if materials:
             lot_info += f" {materials[0]}" if lot_info else materials[0]
 
-    # ── Fallback: merge ingested production_logs data when no form submissions ──
-    # This allows data uploaded via Log Ingestion to show on the Production Dashboard.
-    if not production_log:
-        ingested_query = {
-            "asset_id": {"$regex": "line.?90", "$options": "i"},
-            "timestamp": {"$gte": range_start.strftime("%Y-%m-%dT%H:%M:%S"), "$lte": range_end.strftime("%Y-%m-%dT%H:%M:%S")},
-        }
-        # Deduplicate: prefer entries with mooney_viscosity
-        pipeline = [
-            {"$match": ingested_query},
-            {"$addFields": {"_has_visc": {"$cond": [{"$gt": [{"$ifNull": ["$mooney_viscosity", ""]}, ""]}, 1, 0]}}},
-            {"$sort": {"timestamp": 1, "_has_visc": -1}},
-            {"$group": {"_id": "$timestamp", "doc": {"$first": "$$ROOT"}}},
-            {"$replaceRoot": {"newRoot": "$doc"}},
-            {"$sort": {"timestamp": 1}},
-            {"$project": {"_id": 0, "_has_visc": 0}},
-        ]
-        ingested = await db.production_logs.aggregate(pipeline).to_list(5000)
+    # ── ALWAYS merge ingested production_logs data (not just as fallback) ──
+    # This allows data uploaded via Log Ingestion to show alongside form submissions.
+    ingested_query = {
+        "asset_id": {"$regex": "line.?90", "$options": "i"},
+        "timestamp": {"$gte": range_start.strftime("%Y-%m-%dT%H:%M:%S"), "$lte": range_end.strftime("%Y-%m-%dT%H:%M:%S")},
+    }
+    # Deduplicate: prefer entries with mooney_viscosity
+    pipeline = [
+        {"$match": ingested_query},
+        {"$addFields": {"_has_visc": {"$cond": [{"$gt": [{"$ifNull": ["$mooney_viscosity", ""]}, ""]}, 1, 0]}}},
+        {"$sort": {"timestamp": 1, "_has_visc": -1}},
+        {"$group": {"_id": "$timestamp", "doc": {"$first": "$$ROOT"}}},
+        {"$replaceRoot": {"newRoot": "$doc"}},
+        {"$sort": {"timestamp": 1}},
+        {"$project": {"_id": 0, "_has_visc": 0}},
+    ]
+    ingested = await db.production_logs.aggregate(pipeline).to_list(5000)
 
-        if ingested:
-            # NOTE: total_feed (Total Input) is NO LONGER calculated from ingested FEED values.
-            # Total Input now comes ONLY from End of Shift entries (see below).
-            total_waste_val = 0.0
-            for entry in ingested:
-                m = entry.get("metrics", {})
-                # Extract feed value for display in production_log, but NOT for total_input calculation
-                feed_val = 0
+    if ingested:
+        # NOTE: total_feed (Total Input) is NO LONGER calculated from ingested FEED values.
+        # Total Input now comes ONLY from End of Shift entries (see below).
+        total_waste_val = 0.0
+        for entry in ingested:
+            m = entry.get("metrics", {})
+            # Extract feed value for display in production_log, but NOT for total_input calculation
+            feed_val = 0
+            try:
+                feed_val = float(m.get("FEED", 0) or 0)
+            except (ValueError, TypeError):
+                pass
+
+            ts = entry.get("timestamp", "")
+            time_label = ""
+            try:
+                time_label = datetime.fromisoformat(ts).strftime("%H:%M")
+            except Exception:
+                pass
+
+            rpm = 0
+            try: rpm = float(m.get("RPM", 0) or 0)
+            except: pass
+            moisture = 0
+            try:
+                moisture = float(m.get("M%", 0) or 0)
+                if 0 < moisture < 1:
+                    moisture = round(moisture * 100, 1)
+            except: pass
+            energy = 0
+            try: energy = float(m.get("ENERGY", 0) or 0)
+            except: pass
+            mt1 = 0
+            try: mt1 = float(m.get("MT1", 0) or 0)
+            except: pass
+            mt2 = 0
+            try: mt2 = float(m.get("MT2", 0) or 0)
+            except: pass
+            mt3_raw = m.get("MT3", 0)
+            mt3 = 0
+            try: mt3 = float(mt3_raw) if mt3_raw and mt3_raw != "-" else 0
+            except: pass
+            mp1 = 0
+            try: mp1 = float(m.get("MP1", 0) or 0)
+            except: pass
+            mp2 = 0
+            try: mp2 = float(m.get("MP2", 0) or 0)
+            except: pass
+            mp3 = 0
+            try: mp3 = float(m.get("MP3", 0) or 0)
+            except: pass
+            mp4 = 0
+            try: mp4 = float(m.get("MP4", 0) or 0)
+            except: pass
+            co2 = m.get("CO2 Feed/P", "")
+            t_prod_ir = 0
+            try: t_prod_ir = float(m.get("T Product IR", 0) or 0)
+            except: pass
+
+            production_log.append({
+                "time": time_label,
+                "datetime": ts,
+                "submitted_by": "Log Ingestion",
+                "rpm": rpm, "feed": feed_val, "moisture": moisture, "energy": energy,
+                "mt1": mt1, "mt2": mt2, "mt3": mt3,
+                "mp1": mp1, "mp2": mp2, "mp3": mp3, "mp4": mp4,
+                "co2_feed_p": co2, "t_product_ir": t_prod_ir,
+                "remarks": entry.get("status", ""),
+                "waste": 0,
+                "submission_id": entry.get("id", ""),
+            })
+
+            # Viscosity
+            visc_str = entry.get("mooney_viscosity")
+            if visc_str:
                 try:
-                    feed_val = float(m.get("FEED", 0) or 0)
+                    visc_val = float(visc_str)
+                    viscosity_values.append(visc_val)
+                    viscosity_series.append({
+                        "time": time_label,
+                        "datetime": ts,
+                        "viscosity": visc_val,
+                        "sample": entry.get("sample_id", ""),
+                        "submission_id": entry.get("id", ""),
+                    })
                 except (ValueError, TypeError):
                     pass
 
-                ts = entry.get("timestamp", "")
-                time_label = ""
-                try:
-                    time_label = datetime.fromisoformat(ts).strftime("%H:%M")
-                except Exception:
-                    pass
+            # Waste/downtime series
+            waste_downtime_series.append({
+                "time": time_label,
+                "datetime": ts,
+                "waste": 0, "downtime": 0,
+                "feed": feed_val, "rpm": rpm,
+            })
 
-                rpm = 0
-                try: rpm = float(m.get("RPM", 0) or 0)
-                except: pass
-                moisture = 0
-                try:
-                    moisture = float(m.get("M%", 0) or 0)
-                    if 0 < moisture < 1:
-                        moisture = round(moisture * 100, 1)
-                except: pass
-                energy = 0
-                try: energy = float(m.get("ENERGY", 0) or 0)
-                except: pass
-                mt1 = 0
-                try: mt1 = float(m.get("MT1", 0) or 0)
-                except: pass
-                mt2 = 0
-                try: mt2 = float(m.get("MT2", 0) or 0)
-                except: pass
-                mt3_raw = m.get("MT3", 0)
-                mt3 = 0
-                try: mt3 = float(mt3_raw) if mt3_raw and mt3_raw != "-" else 0
-                except: pass
-                mp1 = 0
-                try: mp1 = float(m.get("MP1", 0) or 0)
-                except: pass
-                mp2 = 0
-                try: mp2 = float(m.get("MP2", 0) or 0)
-                except: pass
-                mp3 = 0
-                try: mp3 = float(m.get("MP3", 0) or 0)
-                except: pass
-                mp4 = 0
-                try: mp4 = float(m.get("MP4", 0) or 0)
-                except: pass
-                co2 = m.get("CO2 Feed/P", "")
-                t_prod_ir = 0
-                try: t_prod_ir = float(m.get("T Product IR", 0) or 0)
-                except: pass
+            # Magnet cleaning — detect from clean_magnet_status or clean_magnet_time
+            magnet_status = str(entry.get("clean_magnet_status") or "").strip().lower()
+            magnet_time_val = entry.get("clean_magnet_time")
+            has_magnet = (
+                magnet_status in ("done", "ok", "yes")
+                or (magnet_status and ":" in magnet_status)  # time value like "06:30:00"
+                or (magnet_time_val and str(magnet_time_val).strip())
+            )
+            if has_magnet:
+                magnet_subs.append({"_parsed_time": datetime.fromisoformat(ts) if ts else None})
 
-                production_log.append({
+            # Screen changes — detect from status/remarks text
+            status_text = str(entry.get("status") or "").lower()
+            if "screen" in status_text and "change" in status_text:
+                screen_change_subs.append({"_parsed_time": datetime.fromisoformat(ts) if ts else None})
+
+            # Input material → big bag entries
+            if entry.get("input_material"):
+                big_bag_entries.append({
                     "time": time_label,
-                    "datetime": ts,
-                    "submitted_by": "Log Ingestion",
-                    "rpm": rpm, "feed": feed_val, "moisture": moisture, "energy": energy,
-                    "mt1": mt1, "mt2": mt2, "mt3": mt3,
-                    "mp1": mp1, "mp2": mp2, "mp3": mp3, "mp4": mp4,
-                    "co2_feed_p": co2, "t_product_ir": t_prod_ir,
-                    "remarks": entry.get("status", ""),
-                    "waste": 0,
+                    "material": entry.get("input_material", ""),
+                    "supplier": entry.get("supplier", ""),
+                    "bag_no": entry.get("bag_no", ""),
+                    "lot_no": entry.get("lot_no", ""),
+                    "production_date": entry.get("production_date", ""),
                     "submission_id": entry.get("id", ""),
                 })
 
-                # Viscosity
-                visc_str = entry.get("mooney_viscosity")
-                if visc_str:
-                    try:
-                        visc_val = float(visc_str)
-                        viscosity_values.append(visc_val)
-                        viscosity_series.append({
-                            "time": time_label,
-                            "datetime": ts,
-                            "viscosity": visc_val,
-                            "sample": entry.get("sample_id", ""),
-                            "submission_id": entry.get("id", ""),
-                        })
-                    except (ValueError, TypeError):
-                        pass
+        # Recalculate KPIs from ingested data
+        waste_from_entry = 0
+        try:
+            waste_from_entry = float(ingested[0].get("total_waste", 0) or 0)
+        except (ValueError, TypeError):
+            pass
+        total_waste = waste_from_entry if waste_from_entry > 0 else total_waste
+        waste_kg = total_waste
+        waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 else 0
+        yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
 
-                # Waste/downtime series
-                waste_downtime_series.append({
-                    "time": time_label,
-                    "datetime": ts,
-                    "waste": 0, "downtime": 0,
-                    "feed": feed_val, "rpm": rpm,
-                })
+        avg_viscosity = round(sum(viscosity_values) / len(viscosity_values), 2) if viscosity_values else 0
+        if len(viscosity_values) > 1 and avg_viscosity > 0:
+            mean_v = sum(viscosity_values) / len(viscosity_values)
+            variance_v = sum((v - mean_v) ** 2 for v in viscosity_values) / (len(viscosity_values) - 1)
+            rsd = round((variance_v ** 0.5 / mean_v) * 100, 2)
+        else:
+            rsd = 0
 
-                # Magnet cleaning — detect from clean_magnet_status or clean_magnet_time
-                magnet_status = str(entry.get("clean_magnet_status") or "").strip().lower()
-                magnet_time_val = entry.get("clean_magnet_time")
-                has_magnet = (
-                    magnet_status in ("done", "ok", "yes")
-                    or (magnet_status and ":" in magnet_status)  # time value like "06:30:00"
-                    or (magnet_time_val and str(magnet_time_val).strip())
-                )
-                if has_magnet:
-                    magnet_subs.append({"_parsed_time": datetime.fromisoformat(ts) if ts else None})
-
-                # Screen changes — detect from status/remarks text
-                status_text = str(entry.get("status") or "").lower()
-                if "screen" in status_text and "change" in status_text:
-                    screen_change_subs.append({"_parsed_time": datetime.fromisoformat(ts) if ts else None})
-
-                # Input material → big bag entries
-                if entry.get("input_material"):
-                    big_bag_entries.append({
-                        "time": time_label,
-                        "material": entry.get("input_material", ""),
-                        "supplier": entry.get("supplier", ""),
-                        "bag_no": entry.get("bag_no", ""),
-                        "lot_no": entry.get("lot_no", ""),
-                        "production_date": entry.get("production_date", ""),
-                        "submission_id": entry.get("id", ""),
-                    })
-
-            # Recalculate KPIs from ingested data
-            waste_from_entry = 0
+        if len(production_log) >= 2:
             try:
-                waste_from_entry = float(ingested[0].get("total_waste", 0) or 0)
-            except (ValueError, TypeError):
-                pass
-            total_waste = waste_from_entry if waste_from_entry > 0 else total_waste
-            waste_kg = total_waste
-            waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 else 0
-            yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
-
-            avg_viscosity = round(sum(viscosity_values) / len(viscosity_values), 2) if viscosity_values else 0
-            if len(viscosity_values) > 1 and avg_viscosity > 0:
-                mean_v = sum(viscosity_values) / len(viscosity_values)
-                variance_v = sum((v - mean_v) ** 2 for v in viscosity_values) / (len(viscosity_values) - 1)
-                rsd = round((variance_v ** 0.5 / mean_v) * 100, 2)
-            else:
-                rsd = 0
-
-            if len(production_log) >= 2:
-                try:
-                    t1 = datetime.fromisoformat(production_log[0]["datetime"])
-                    t2 = datetime.fromisoformat(production_log[-1]["datetime"])
-                    runtime_hours = round((t2 - t1).total_seconds() / 3600, 2)
-                except Exception:
-                    runtime_hours = 0
-            else:
+                t1 = datetime.fromisoformat(production_log[0]["datetime"])
+                t2 = datetime.fromisoformat(production_log[-1]["datetime"])
+                runtime_hours = round((t2 - t1).total_seconds() / 3600, 2)
+            except Exception:
                 runtime_hours = 0
+        else:
+            runtime_hours = 0
 
-            # Update lot_info
-            if big_bag_entries and not lot_info:
-                lots = [e.get("lot_no", "") for e in big_bag_entries if e.get("lot_no")]
-                materials_list = [e.get("material", "") for e in big_bag_entries if e.get("material")]
-                if lots:
-                    lot_info = f"Lot: {lots[0]}"
-                if materials_list:
-                    lot_info += f" {materials_list[0]}" if lot_info else materials_list[0]
+        # Update lot_info
+        if big_bag_entries and not lot_info:
+            lots = [e.get("lot_no", "") for e in big_bag_entries if e.get("lot_no")]
+            materials_list = [e.get("material", "") for e in big_bag_entries if e.get("material")]
+            if lots:
+                lot_info = f"Lot: {lots[0]}"
+            if materials_list:
+                lot_info += f" {materials_list[0]}" if lot_info else materials_list[0]
 
-            # Update viscosity range
-            visc_min = min(viscosity_values) if viscosity_values else 55
-            visc_max = max(viscosity_values) if viscosity_values else 60
+        # Update viscosity range
+        visc_min = min(viscosity_values) if viscosity_values else 55
+        visc_max = max(viscosity_values) if viscosity_values else 60
 
     # Override Total Input and Total Waste with End of Shift sums when available
     # (This runs AFTER any ingested-data fallback so End of Shift always wins.)
