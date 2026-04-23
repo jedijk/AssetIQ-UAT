@@ -2081,6 +2081,19 @@ export default function ProductionDashboardPage() {
             <>
               <div className="flex-1 overflow-y-auto -mx-6 px-6 pb-2">
                 <div className="grid grid-cols-2 gap-3 pt-2">
+                  {/* Viscosity at the top for mobile visibility */}
+                  <div className="col-span-2">
+                    <Label className="text-xs font-semibold text-blue-700">Viscosity (MU)</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      className="h-10 mt-1 tabular-nums border-blue-200 focus:border-blue-400"
+                      placeholder={editEntry._viscosity_submission_id ? "" : "No viscosity sample at this time"}
+                      value={editEntry.viscosity ?? ""}
+                      onChange={(e) => setEditEntry((prev) => ({ ...prev, viscosity: e.target.value }))}
+                      data-testid="edit-viscosity"
+                    />
+                  </div>
                   {!editEntry._viscosity_only && [
                     { key: "rpm", label: "RPM" },
                     { key: "feed", label: "Feed" },
@@ -2119,18 +2132,6 @@ export default function ProductionDashboardPage() {
                     />
                   </div>
                   )}
-                  <div className="col-span-2">
-                    <Label className="text-xs">Viscosity (MU)</Label>
-                    <Input
-                      type="number"
-                      step="any"
-                      className="h-9 mt-1 tabular-nums"
-                      placeholder={editEntry._viscosity_submission_id ? "" : "No viscosity sample at this time"}
-                      value={editEntry.viscosity ?? ""}
-                      onChange={(e) => setEditEntry((prev) => ({ ...prev, viscosity: e.target.value }))}
-                      data-testid="edit-viscosity"
-                    />
-                  </div>
                 </div>
               </div>
               <div className="flex-shrink-0 flex justify-end gap-2 pt-3 border-t">
