@@ -271,6 +271,29 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
               val = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
             }
           } catch {}
+        } else if (ft === "date" && val != null) {
+          // Convert various date formats to YYYY-MM-DD for date input
+          const str = String(val).trim();
+          const pad = (n) => String(n).padStart(2, '0');
+          // Already ISO YYYY-MM-DD (optionally with time) → keep just the date
+          let m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (m) {
+            val = `${m[1]}-${m[2]}-${m[3]}`;
+          } else {
+            // DD-MM-YYYY / DD/MM/YYYY / DD.MM.YYYY
+            m = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+            if (m) {
+              let y = parseInt(m[3]);
+              if (y < 100) y += 2000;
+              val = `${y}-${pad(parseInt(m[2]))}-${pad(parseInt(m[1]))}`;
+            } else {
+              // Fallback to Date parser (handles "July 21 2024" etc.)
+              const d = new Date(str);
+              if (!isNaN(d.getTime())) {
+                val = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+              }
+            }
+          }
         } else if (ft === "numeric" && val != null) {
           // Ensure numeric fields get a number value
           const num = parseFloat(String(val).replace(/[^0-9.\-]/g, ""));

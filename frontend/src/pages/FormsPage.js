@@ -860,6 +860,8 @@ const FormsPage = ({ embedded = false }) => {
                           <SelectContent>
                             <SelectItem value="string">Text</SelectItem>
                             <SelectItem value="number">Number</SelectItem>
+                            <SelectItem value="date">Date</SelectItem>
+                            <SelectItem value="datetime">Date & Time</SelectItem>
                             <SelectItem value="enum">Enum</SelectItem>
                           </SelectContent>
                         </Select>

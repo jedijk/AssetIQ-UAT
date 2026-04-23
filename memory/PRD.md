@@ -158,3 +158,16 @@ Create a full-stack platform (React + FastAPI + MongoDB) for industrial asset ma
 - Uses Radix UI Tooltip (aliased as RadixTooltip to avoid conflict with Recharts Tooltip)
 - Tooltip displays "Completion Comments:" header with the notes content below
 - Files: `/app/backend/routes/production.py`, `/app/frontend/src/pages/ProductionDashboardPage.js`
+
+
+## AI Vision Date Extraction Fix (DONE - Feb 23, 2026)
+- Fixed issue where AI Vision did not correctly extract `production_date` in "Big Bag Loading" form (and any form with date/datetime fields)
+- Backend (`/app/backend/routes/ai_extract.py`):
+  - Auto-upgrades extraction-field `type` to `date`/`datetime` by cross-referencing the mapped target form field type, so older configs saved as `string` still get proper AI guidance
+  - Adds explicit date-format rules to the extraction prompt: requires ISO `YYYY-MM-DD`, clarifies European DD-MM-YYYY interpretation, handles Dutch/English month names and 2-digit years
+  - Adds `_normalize_date_value()` safety-net: normalizes AI responses (European formats, Dutch months, slashes/dots/dashes, 2-digit years) to strict ISO before returning to frontend
+- Frontend (`/app/frontend/src/components/task-execution/TaskExecutionFrame.js`):
+  - `handlePhotoAutoFill` now converts `date` field values to `YYYY-MM-DD` (previously only `datetime` was converted) — ensures HTML `<input type="date">` accepts the AI-extracted value
+- Frontend (`/app/frontend/src/pages/FormsPage.js`):
+  - Added "Date" and "Date & Time" as explicit type options in the extraction-field editor
+- Tests: `/app/backend/tests/test_ai_extract_date.py` (12 regression tests covering ISO, European, Dutch months, datetime, two-digit years)

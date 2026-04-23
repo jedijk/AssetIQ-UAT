@@ -5,6 +5,7 @@ Uses OpenAI GPT-4o Vision to extract structured data from images.
 Includes learning from past user corrections.
 """
 import os
+import re
 import json
 import base64
 import logging
@@ -93,6 +94,66 @@ async def _get_learned_hints(form_template_id: Optional[str]) -> List[str]:
         return []
 
 
+_DUTCH_MONTHS = {
+    "jan": 1, "januari": 1, "january": 1,
+    "feb": 2, "februari": 2, "february": 2,
+    "mrt": 3, "maart": 3, "mar": 3, "march": 3,
+    "apr": 4, "april": 4,
+    "mei": 5, "may": 5,
+    "jun": 6, "juni": 6, "june": 6,
+    "jul": 7, "juli": 7, "july": 7,
+    "aug": 8, "augustus": 8, "august": 8,
+    "sep": 9, "sept": 9, "september": 9,
+    "okt": 10, "oct": 10, "oktober": 10, "october": 10,
+    "nov": 11, "november": 11,
+    "dec": 12, "december": 12,
+}
+
+
+def _normalize_date_value(raw: str, kind: str = "date") -> Optional[str]:
+    """Safety-net normalizer for AI-returned date/datetime strings.
+    Returns ISO (YYYY-MM-DD or YYYY-MM-DDTHH:MM) or None if unparseable.
+    """
+    if not raw:
+        return None
+    s = raw.strip()
+
+    # Already ISO date
+    m = re.match(r"^(\d{4})[-/.](\d{2})[-/.](\d{2})(?:[T ](\d{1,2}):(\d{2}))?", s)
+    if m:
+        y, mo, d = m.group(1), m.group(2), m.group(3)
+        if kind == "datetime" and m.group(4):
+            return f"{y}-{mo}-{d}T{int(m.group(4)):02d}:{m.group(5)}"
+        return f"{y}-{mo}-{d}" if kind == "date" else f"{y}-{mo}-{d}T00:00"
+
+    # DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY (optional time)
+    m = re.match(r"^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?", s)
+    if m:
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if y < 100:
+            y += 2000
+        if 1 <= d <= 31 and 1 <= mo <= 12:
+            base = f"{y:04d}-{mo:02d}-{d:02d}"
+            if kind == "datetime":
+                hh = int(m.group(4)) if m.group(4) else 0
+                mm = int(m.group(5)) if m.group(5) else 0
+                return f"{base}T{hh:02d}:{mm:02d}"
+            return base
+
+    # "21 juli 2024" / "21 July 2024"
+    m = re.match(r"^(\d{1,2})\s+([A-Za-z]+)\s+(\d{2,4})", s)
+    if m:
+        d = int(m.group(1))
+        mo = _DUTCH_MONTHS.get(m.group(2).lower())
+        y = int(m.group(3))
+        if y < 100:
+            y += 2000
+        if mo and 1 <= d <= 31:
+            base = f"{y:04d}-{mo:02d}-{d:02d}"
+            return base if kind == "date" else f"{base}T00:00"
+    return None
+
+
 def _build_prompt(schema: ExtractionSchema, hints: List[str] = None) -> str:
     if schema.prompt_template:
         prompt = schema.prompt_template
@@ -107,14 +168,30 @@ def _build_prompt(schema: ExtractionSchema, hints: List[str] = None) -> str:
         "",
         "Fields to extract:",
     ]
+    has_date_field = False
+    has_datetime_field = False
     for f in schema.fields:
         desc = f.description
         if f.unit:
             desc += f" (unit: {f.unit})"
         if f.type == "enum" and f.enum_values:
             desc += f" (must be one of: {', '.join(f.enum_values)})"
+        if f.type == "date":
+            desc += ". Return the date STRICTLY in ISO format YYYY-MM-DD (e.g. 2024-07-21). Handle European DD-MM-YYYY or DD/MM/YYYY dates by converting to YYYY-MM-DD. If only month/day visible without year, assume current year"
+            has_date_field = True
+        elif f.type == "datetime":
+            desc += ". Return the datetime STRICTLY in ISO format YYYY-MM-DDTHH:MM (e.g. 2024-07-21T14:30)"
+            has_datetime_field = True
         required = " [REQUIRED]" if f.required else ""
         lines.append(f'  - "{f.key}": {desc}{required} (type: {f.type})')
+
+    if has_date_field or has_datetime_field:
+        lines.append("")
+        lines.append("DATE FORMAT RULES (very important):")
+        lines.append("- European dates like '21-07-2024', '21/07/2024', '21.07.2024' mean 21 July 2024 (day-month-year).")
+        lines.append("- Always output dates as YYYY-MM-DD (ISO 8601).")
+        lines.append("- Month names in Dutch/German/English (e.g. 'juli', 'Juli', 'July') must be converted to numeric format.")
+        lines.append("- If the year is written with only 2 digits (e.g. '24'), assume 20XX (2024).")
 
     # Append learned corrections
     if hints:
@@ -150,6 +227,36 @@ async def extract_from_image(
         schema = ExtractionSchema(**json.loads(schema_json))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid schema: {e}")
+
+    # Auto-upgrade extraction field types based on the mapped form field types.
+    # This ensures date/datetime fields get proper formatting hints even when
+    # the saved extraction config still has type="string" from older configs.
+    form_template_doc = None
+    if form_template_id:
+        try:
+            form_template_doc = await db.form_templates.find_one(
+                {"id": form_template_id}, {"_id": 0, "fields": 1, "photo_extraction_config": 1}
+            )
+        except Exception as e:
+            logger.warning(f"[AI Extract] Could not fetch form template {form_template_id}: {e}")
+
+    if form_template_doc:
+        form_fields_by_id = {f.get("id"): f for f in (form_template_doc.get("fields") or [])}
+        saved_cfg = form_template_doc.get("photo_extraction_config") or {}
+        saved_fields_by_key = {ef.get("key"): ef for ef in (saved_cfg.get("extraction_fields") or []) if ef.get("key")}
+        for ef in schema.fields:
+            target_id = None
+            saved = saved_fields_by_key.get(ef.key)
+            if saved:
+                target_id = saved.get("target_field_id")
+            form_field = form_fields_by_id.get(target_id) if target_id else None
+            if form_field:
+                target_type = form_field.get("field_type") or form_field.get("type")
+                if target_type in ("date", "datetime") and ef.type not in ("date", "datetime"):
+                    ef.type = target_type
+                    logger.info(f"[AI Extract] Auto-upgraded extraction type for '{ef.key}' to '{target_type}' (mapped to '{target_id}')")
+                elif target_type == "numeric" and ef.type == "string":
+                    ef.type = "number"
 
     # Read and encode image
     image_bytes = await image.read()
@@ -229,10 +336,19 @@ async def extract_from_image(
                 else:
                     matched_key = ai_key
                     logger.warning(f"[AI Extract] No match for AI key '{ai_key}'")
-            
+
+            # Normalize date/datetime values as a safety net in case AI returns non-ISO format
+            value = item.get("value")
+            matched_schema_field = schema_fields.get(matched_key)
+            if value and matched_schema_field and matched_schema_field.type in ("date", "datetime"):
+                normalized = _normalize_date_value(str(value), matched_schema_field.type)
+                if normalized and normalized != value:
+                    logger.info(f"[AI Extract] Normalized {matched_schema_field.type} value for '{matched_key}': '{value}' → '{normalized}'")
+                    value = normalized
+
             extracted.append(ExtractedValue(
                 key=matched_key,
-                value=item.get("value"),
+                value=value,
                 confidence=float(item.get("confidence", 0)),
                 raw_text=item.get("raw_text"),
             ))
