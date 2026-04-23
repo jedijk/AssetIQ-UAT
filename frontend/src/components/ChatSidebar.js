@@ -92,50 +92,66 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   }, [isOpen, refetchHistory]);
 
   // Auto-skip context prompt after 60 seconds
-  useEffect(() => {
-    // Check if the latest assistant message is awaiting context
+  // Derive the awaiting-context message id so this effect only restarts when a NEW
+  // awaiting-context message appears (not on every React Query refetch).
+  const awaitingContextMessageId = (() => {
     const lastAssistantMsg = messages.filter(m => m.role === "assistant").pop();
     const isAwaitingContext = lastAssistantMsg?.chat_state === "awaiting_context" || lastAssistantMsg?.awaiting_context_for_threat;
-    
-    if (isAwaitingContext && isOpen && !isSending) {
-      // Start 60-second countdown
-      setAutoSkipCountdown(60);
-      
-      autoSkipTimerRef.current = setInterval(() => {
-        setAutoSkipCountdown(prev => {
-          if (prev <= 1) {
-            // Time's up - auto-skip by calling API directly
-            clearInterval(autoSkipTimerRef.current);
-            setIsSending(true);
-            chatAPI.sendMessage("skip", null, manualLanguage)
-              .then(() => {
-                queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-                queryClient.invalidateQueries({ queryKey: ["threats"] });
-                queryClient.invalidateQueries({ queryKey: ["stats"] });
-              })
-              .finally(() => {
-                setIsSending(false);
-                setAutoSkipCountdown(null);
-              });
-            return null;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      
-      return () => {
-        if (autoSkipTimerRef.current) {
-          clearInterval(autoSkipTimerRef.current);
-        }
-      };
-    } else {
-      // Clear countdown if not in awaiting context state
+    return isAwaitingContext ? (lastAssistantMsg?.id || lastAssistantMsg?._id || lastAssistantMsg?.timestamp || "awaiting") : null;
+  })();
+
+  // Keep a ref to the latest manualLanguage so the interval callback always uses the current value
+  const manualLanguageRef = useRef(manualLanguage);
+  useEffect(() => { manualLanguageRef.current = manualLanguage; }, [manualLanguage]);
+
+  useEffect(() => {
+    if (!awaitingContextMessageId || !isOpen) {
       setAutoSkipCountdown(null);
       if (autoSkipTimerRef.current) {
         clearInterval(autoSkipTimerRef.current);
+        autoSkipTimerRef.current = null;
       }
+      return;
     }
-  }, [messages, isOpen, isSending, manualLanguage, queryClient]);
+
+    // Start 60-second countdown (fresh for this awaiting message)
+    setAutoSkipCountdown(60);
+
+    autoSkipTimerRef.current = setInterval(() => {
+      setAutoSkipCountdown(prev => {
+        if (prev == null) return null;
+        if (prev <= 1) {
+          // Time's up - auto-skip by calling API directly
+          clearInterval(autoSkipTimerRef.current);
+          autoSkipTimerRef.current = null;
+          setIsSending(true);
+          chatAPI.sendMessage("skip", null, manualLanguageRef.current)
+            .then(() => {
+              queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+              queryClient.invalidateQueries({ queryKey: ["threats"] });
+              queryClient.invalidateQueries({ queryKey: ["stats"] });
+            })
+            .catch((err) => {
+              const msg = err?.response?.data?.detail || "Auto-skip failed";
+              toast.error(msg);
+            })
+            .finally(() => {
+              setIsSending(false);
+              setAutoSkipCountdown(null);
+            });
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (autoSkipTimerRef.current) {
+        clearInterval(autoSkipTimerRef.current);
+        autoSkipTimerRef.current = null;
+      }
+    };
+  }, [awaitingContextMessageId, isOpen, queryClient]);
 
   // Send message mutation
   const sendMutation = useMutation({
