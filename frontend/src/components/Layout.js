@@ -121,10 +121,10 @@ const Layout = () => {
           }
           
           toast.success(`AssetIQ updated to v${APP_VERSION}`, {
-            description: "PDF rotation, file viewer improvements & bug fixes. Refreshing...",
-            duration: 2000,
+            description: "Auto matching viscosity, security update, manual Mooney update mobile, mobile production log view improvement, chat improvements and more",
+            duration: 3000,
           });
-          setTimeout(() => window.location.reload(), 2000);
+          setTimeout(() => window.location.reload(), 3000);
         }
       } catch (error) {
         console.log('Version check failed:', error);
