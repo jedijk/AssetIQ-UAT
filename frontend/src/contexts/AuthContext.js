@@ -237,9 +237,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password) => {
+  const register = async (name, email, password, options = {}) => {
     const API_URL = getApiUrl();
-    const response = await axios.post(`${API_URL}/auth/register`, { name, email, password });
+    const { honeypot = "", recaptchaToken = null } = options;
+    
+    const response = await axios.post(`${API_URL}/auth/register`, { 
+      name, 
+      email, 
+      password,
+      website: honeypot,  // Honeypot field - should be empty
+      recaptcha_token: recaptchaToken,
+    });
     
     // Check if registration requires approval (new workflow)
     if (response.data.status === "pending_approval") {

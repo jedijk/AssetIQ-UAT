@@ -8,6 +8,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 
 ## Recent Changes
 - [Dec 2025] Removed Total Input fallback - now calculated ONLY from End of Shift entries (no longer sums FEED from ingested logs)
+- [Dec 2025] Added registration spam protection:
+  - Rate limiting (3/minute per IP)
+  - Honeypot field detection
+  - Disposable email blocking (400+ domains)
+  - reCAPTCHA v3 ready (disabled by default)
+  - Auto-cleanup of pending accounts after 48 hours
 
 ## Core Features Implemented
 

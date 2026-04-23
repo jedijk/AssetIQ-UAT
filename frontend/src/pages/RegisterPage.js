@@ -197,6 +197,7 @@ const RegisterPage = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [honeypot, setHoneypot] = useState("");  // Hidden field for bot detection
   const [loading, setLoading] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
 
@@ -211,7 +212,7 @@ const RegisterPage = () => {
     setLoading(true);
 
     try {
-      const result = await register(name, email, password);
+      const result = await register(name, email, password, { honeypot });
       // Show pending approval state instead of auto-login
       if (result?.status === "pending_approval") {
         setRegistrationComplete(true);
@@ -390,6 +391,20 @@ const RegisterPage = () => {
           <p className="auth-subtitle">{t("auth.registerSubtitle")}</p>
 
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="register-form">
+            {/* Honeypot field - hidden from users, visible to bots */}
+            <div style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
+              <label htmlFor="website">Website (leave blank)</label>
+              <input
+                type="text"
+                id="website"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+              />
+            </div>
+            
             <div className="space-y-2">
               <Label htmlFor="name">{t("auth.name")}</Label>
               <Input

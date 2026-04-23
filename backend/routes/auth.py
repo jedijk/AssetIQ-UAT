@@ -11,11 +11,13 @@ import re
 import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from typing import Optional
 
 from database import db
 from auth import hash_password, verify_password, create_token, get_current_user
 from models.api_models import UserCreate, UserLogin, UserResponse, TokenResponse
 from pydantic import BaseModel, EmailStr, field_validator
+from utils.spam_protection import is_disposable_email, validate_honeypot, verify_recaptcha
 
 # Try to import resend for email functionality
 try:
@@ -33,12 +35,16 @@ limiter = Limiter(key_func=get_remote_address)
 # Rate limit configurations
 AUTH_RATE_LIMIT = "10/minute"  # 10 auth attempts per minute per IP
 STRICT_AUTH_RATE_LIMIT = "5/minute"  # 5 attempts for sensitive operations
+REGISTRATION_RATE_LIMIT = "3/minute"  # Strict limit for registration to prevent spam
 
 # Security configurations
 MAX_LOGIN_ATTEMPTS = int(os.environ.get("MAX_LOGIN_ATTEMPTS", "5"))
 LOCKOUT_DURATION_MINUTES = int(os.environ.get("LOCKOUT_DURATION_MINUTES", "15"))
 MIN_PASSWORD_LENGTH = int(os.environ.get("MIN_PASSWORD_LENGTH", "8"))
 REQUIRE_PASSWORD_COMPLEXITY = os.environ.get("REQUIRE_PASSWORD_COMPLEXITY", "true").lower() == "true"
+
+# Spam protection configuration
+RECAPTCHA_ENABLED = os.environ.get("RECAPTCHA_ENABLED", "false").lower() == "true"
 
 # Email configuration
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
@@ -185,10 +191,56 @@ class ResetPasswordRequest(BaseModel):
 class VerifyResetTokenRequest(BaseModel):
     token: str
 
+# Extended registration model with spam protection fields
+class RegisterWithProtection(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    # Honeypot field - should be empty, bots will fill it
+    website: Optional[str] = None
+    # reCAPTCHA token
+    recaptcha_token: Optional[str] = None
+
 @router.post("/auth/register", response_model=dict)
-@limiter.limit(AUTH_RATE_LIMIT)
-async def register(request: Request, user_data: UserCreate):
-    # Check if email exists
+@limiter.limit(REGISTRATION_RATE_LIMIT)
+async def register(request: Request, user_data: RegisterWithProtection):
+    """
+    Register a new user with spam protection:
+    - Rate limiting (3 requests/minute per IP)
+    - Honeypot field detection
+    - Disposable email blocking
+    - reCAPTCHA v3 verification (when enabled)
+    """
+    # 1. Honeypot check - bots fill hidden fields, humans don't
+    if not validate_honeypot(user_data.website):
+        logger.warning(f"Honeypot triggered for registration: {user_data.email}")
+        # Return success to not tip off bots, but don't actually register
+        await asyncio.sleep(1)  # Slow down automated attempts
+        return {
+            "message": "Registration successful. Your account is pending approval by an administrator.",
+            "status": "pending_approval",
+            "user": {"email": user_data.email, "name": user_data.name}
+        }
+    
+    # 2. Disposable email check
+    if is_disposable_email(user_data.email):
+        logger.warning(f"Disposable email blocked: {user_data.email}")
+        raise HTTPException(
+            status_code=400, 
+            detail="Please use a permanent email address. Temporary/disposable emails are not allowed."
+        )
+    
+    # 3. reCAPTCHA verification (when enabled)
+    if RECAPTCHA_ENABLED:
+        is_valid, score, error_msg = await verify_recaptcha(
+            user_data.recaptcha_token or "", 
+            action="register"
+        )
+        if not is_valid:
+            logger.warning(f"reCAPTCHA failed for {user_data.email}: {error_msg} (score: {score})")
+            raise HTTPException(status_code=400, detail=error_msg or "Verification failed. Please try again.")
+    
+    # 4. Check if email exists
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")

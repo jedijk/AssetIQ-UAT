@@ -413,6 +413,9 @@ async def background_startup():
             except Exception as e:
                 logger.warning(f"Failure modes seeding skipped: {e}")
             
+            # Start periodic cleanup of old pending registrations
+            asyncio.create_task(cleanup_pending_registrations_task(db))
+            
             app.state.ready = True
         else:
             logger.warning("Database not connected - running in degraded mode")
@@ -424,6 +427,37 @@ async def background_startup():
         
     except Exception as e:
         logger.error(f"Background startup failed: {e}")
+
+
+async def cleanup_pending_registrations_task(db):
+    """
+    Periodically clean up pending registrations older than 48 hours.
+    Runs every 6 hours.
+    """
+    from datetime import datetime, timezone, timedelta
+    
+    CLEANUP_INTERVAL_HOURS = 6
+    PENDING_EXPIRY_HOURS = 48
+    
+    while True:
+        try:
+            await asyncio.sleep(CLEANUP_INTERVAL_HOURS * 3600)  # Sleep first, then cleanup
+            
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=PENDING_EXPIRY_HOURS)
+            cutoff_iso = cutoff_time.isoformat()
+            
+            # Delete pending users created before cutoff
+            result = await db.users.delete_many({
+                "approval_status": "pending",
+                "created_at": {"$lt": cutoff_iso}
+            })
+            
+            if result.deleted_count > 0:
+                logger.info(f"Cleaned up {result.deleted_count} expired pending registrations (older than {PENDING_EXPIRY_HOURS}h)")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Pending registration cleanup error: {e}")
 
 
 # =============================================================================
