@@ -1812,12 +1812,14 @@ export default function ProductionDashboardPage() {
                             <span className="font-medium">Viscosity:</span> {viscValue ?? "—"}
                           </button>
                         ) : (
-                          <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
-                            <div><span className="text-slate-500">RPM:</span> <span className="font-medium">{entry.rpm}</span></div>
-                            <div><span className="text-slate-500">Feed:</span> <span className="font-medium">{entry.feed}</span></div>
-                            <div><span className="text-slate-500">MP4:</span> <span className="font-medium">{entry.mp4}</span></div>
-                            <div className="col-span-2"><span className="text-slate-500">T Product IR:</span> <span className="font-medium">{entry.t_product_ir}</span></div>
-                            <div>
+                          <div className="text-xs">
+                            <div className="flex flex-wrap gap-x-3 gap-y-1">
+                              <span><span className="text-slate-500">RPM:</span> <span className="font-medium">{entry.rpm}</span></span>
+                              <span><span className="text-slate-500">Feed:</span> <span className="font-medium">{entry.feed}</span></span>
+                              <span><span className="text-slate-500">MP4:</span> <span className="font-medium">{entry.mp4}</span></span>
+                              <span><span className="text-slate-500">T Product IR:</span> <span className="font-medium">{entry.t_product_ir}</span></span>
+                            </div>
+                            <div className="mt-1">
                               <span className="text-slate-500">Visc:</span>{" "}
                               <button
                                 type="button"
