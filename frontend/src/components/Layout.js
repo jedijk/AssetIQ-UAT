@@ -595,7 +595,7 @@ const Layout = () => {
   return (
     <div className="app-container">
       {/* Header */}
-      <header className="app-header bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+      <header className="app-header bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 z-[200] relative pointer-events-auto">
         <div className="header-content max-w-full px-4">
           {/* Left Section - Logo & Nav */}
           <div className="flex items-center gap-3 lg:gap-6">
@@ -637,7 +637,10 @@ const Layout = () => {
             {/* Logo */}
             <div
               className="flex items-center gap-2 flex-shrink-0 cursor-pointer"
-              onClick={() => navigate("/dashboard")}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate("/dashboard");
+              }}
               data-testid="app-logo-link"
             >
               <img 
