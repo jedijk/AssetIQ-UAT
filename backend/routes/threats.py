@@ -25,6 +25,61 @@ logger = logging.getLogger(__name__)
 FAILURE_MODES_BY_ID = {fm["id"]: fm for fm in FAILURE_MODES_LIBRARY if "id" in fm}
 FAILURE_MODES_BY_NAME = {fm["failure_mode"].lower(): fm for fm in FAILURE_MODES_LIBRARY if "failure_mode" in fm}
 
+async def get_failure_mode_by_name_or_id(failure_mode_name: str = None, failure_mode_id: str = None):
+    """
+    Get failure mode from database first, then fall back to static library.
+    Returns failure mode dict or None.
+    """
+    fm = None
+    
+    # First check database for user-created failure modes
+    if failure_mode_id:
+        db_fm = await db.failure_modes.find_one({"id": failure_mode_id})
+        if db_fm:
+            db_fm.pop("_id", None)
+            # Normalize field names for compatibility
+            fm = {
+                "id": db_fm.get("id"),
+                "failure_mode": db_fm.get("name", ""),
+                "severity": db_fm.get("severity", 5),
+                "occurrence": db_fm.get("occurrence", 5),
+                "detectability": db_fm.get("detectability", 5),
+                "rpn": db_fm.get("rpn", 125),
+                "recommended_actions": db_fm.get("recommended_actions", []),
+                "equipment": db_fm.get("equipment_type", ""),
+                "mechanism": db_fm.get("mechanism", ""),
+                "effect": db_fm.get("effect", ""),
+                "cause": db_fm.get("cause", ""),
+            }
+            return fm
+    
+    if failure_mode_name:
+        db_fm = await db.failure_modes.find_one({"name": {"$regex": f"^{failure_mode_name}$", "$options": "i"}})
+        if db_fm:
+            db_fm.pop("_id", None)
+            fm = {
+                "id": db_fm.get("id"),
+                "failure_mode": db_fm.get("name", ""),
+                "severity": db_fm.get("severity", 5),
+                "occurrence": db_fm.get("occurrence", 5),
+                "detectability": db_fm.get("detectability", 5),
+                "rpn": db_fm.get("rpn", 125),
+                "recommended_actions": db_fm.get("recommended_actions", []),
+                "equipment": db_fm.get("equipment_type", ""),
+                "mechanism": db_fm.get("mechanism", ""),
+                "effect": db_fm.get("effect", ""),
+                "cause": db_fm.get("cause", ""),
+            }
+            return fm
+    
+    # Fall back to static library
+    if failure_mode_id and failure_mode_id in FAILURE_MODES_BY_ID:
+        return FAILURE_MODES_BY_ID[failure_mode_id]
+    if failure_mode_name and failure_mode_name.lower() in FAILURE_MODES_BY_NAME:
+        return FAILURE_MODES_BY_NAME[failure_mode_name.lower()]
+    
+    return None
+
 # Common failure mode causes for investigation root cause analysis
 FAILURE_MODE_CAUSES = {
     "wear": ["Normal wear and tear", "Inadequate lubrication", "Abrasive particles", "Improper material selection"],
@@ -333,14 +388,15 @@ async def recalculate_all_threat_scores(
     for threat in threats:
         # Get FMEA score from linked failure mode
         failure_mode_name = threat.get("failure_mode")
+        failure_mode_id = threat.get("failure_mode_id")
         fmea_score = threat.get("fmea_score", threat.get("base_risk_score", 50))
         
         if failure_mode_name and failure_mode_name != "Unknown":
-            for fm in FAILURE_MODES_LIBRARY:
-                if fm["failure_mode"].lower() == failure_mode_name.lower():
-                    # Calculate FMEA score from RPN
-                    fmea_score = min(100, int(fm["rpn"] / 10))
-                    break
+            # Check database first, then static library
+            fm = await get_failure_mode_by_name_or_id(failure_mode_name, failure_mode_id)
+            if fm:
+                # Calculate FMEA score from RPN
+                fmea_score = min(100, int(fm["rpn"] / 10))
         
         # Get criticality data from asset (case-insensitive match)
         asset_name = threat.get("asset", "")
@@ -483,12 +539,8 @@ async def get_threat(
         fmea_changed = False
         
         if failure_mode_name and failure_mode_name != "Unknown":
-            # Use optimized O(1) lookup instead of O(n) iteration
-            fm = None
-            if failure_mode_id and failure_mode_id in FAILURE_MODES_BY_ID:
-                fm = FAILURE_MODES_BY_ID[failure_mode_id]
-            elif failure_mode_name.lower() in FAILURE_MODES_BY_NAME:
-                fm = FAILURE_MODES_BY_NAME[failure_mode_name.lower()]
+            # Check database first, then static library
+            fm = await get_failure_mode_by_name_or_id(failure_mode_name, failure_mode_id)
             
             if fm:
                 # Calculate current FMEA score from failure mode
@@ -817,11 +869,11 @@ async def link_threat_to_equipment(
     
     # Check if threat has linked failure mode - recalculate FMEA score
     failure_mode_name = threat.get("failure_mode")
+    failure_mode_id = threat.get("failure_mode_id")
     if failure_mode_name and failure_mode_name != "Unknown":
-        for fm in FAILURE_MODES_LIBRARY:
-            if fm["failure_mode"].lower() == failure_mode_name.lower():
-                fmea_score = min(100, int(fm["rpn"] / 10))
-                break
+        fm = await get_failure_mode_by_name_or_id(failure_mode_name, failure_mode_id)
+        if fm:
+            fmea_score = min(100, int(fm["rpn"] / 10))
     
     # NEW METHODOLOGY: Risk Score = (Criticality × 0.75) + (FMEA × 0.25)
     final_risk_score = int((criticality_score * 0.75) + (fmea_score * 0.25))
@@ -884,12 +936,33 @@ async def link_threat_to_failure_mode(
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
     
-    # Find the failure mode in the library
+    # Find the failure mode - check database first, then static library
     matched_fm = None
-    for fm in FAILURE_MODES_LIBRARY:
-        if fm["id"] == failure_mode_id:
-            matched_fm = fm
-            break
+    
+    # Check database for user-created failure modes
+    db_fm = await db.failure_modes.find_one({"id": str(failure_mode_id)})
+    if db_fm:
+        db_fm.pop("_id", None)
+        matched_fm = {
+            "id": db_fm.get("id"),
+            "failure_mode": db_fm.get("name", ""),
+            "category": db_fm.get("category", ""),
+            "equipment": db_fm.get("equipment_type", ""),
+            "severity": db_fm.get("severity", 5),
+            "occurrence": db_fm.get("occurrence", 5),
+            "detectability": db_fm.get("detectability", 5),
+            "rpn": db_fm.get("rpn", 125),
+            "recommended_actions": db_fm.get("recommended_actions", []),
+            "mechanism": db_fm.get("mechanism", ""),
+            "effect": db_fm.get("effect", ""),
+            "cause": db_fm.get("cause", ""),
+        }
+    else:
+        # Fall back to static library
+        for fm in FAILURE_MODES_LIBRARY:
+            if fm["id"] == failure_mode_id:
+                matched_fm = fm
+                break
     
     if not matched_fm:
         raise HTTPException(status_code=404, detail="Failure mode not found in library")
@@ -1082,19 +1155,40 @@ async def create_investigation_from_threat(
     failure_doc = None
     matching_fm = None
     if threat.get("failure_mode"):
-        # Try to find matching failure mode from library
+        # Try to find matching failure mode - check database first, then static library
         failure_mode_text = threat["failure_mode"].lower()
-        for fm in FAILURE_MODES_LIBRARY:
-            if fm["failure_mode"].lower() in failure_mode_text or failure_mode_text in fm["failure_mode"].lower():
-                matching_fm = fm
-                break
-            # Also check keywords
-            for kw in fm.get("keywords", []):
-                if kw.lower() in failure_mode_text:
+        
+        # Check database for user-created failure modes
+        db_fm = await db.failure_modes.find_one({
+            "$or": [
+                {"name": {"$regex": failure_mode_text, "$options": "i"}},
+                {"keywords": {"$regex": failure_mode_text, "$options": "i"}}
+            ]
+        })
+        if db_fm:
+            db_fm.pop("_id", None)
+            matching_fm = {
+                "id": db_fm.get("id"),
+                "failure_mode": db_fm.get("name", ""),
+                "recommended_actions": db_fm.get("recommended_actions", []),
+                "severity": db_fm.get("severity", 5),
+                "occurrence": db_fm.get("occurrence", 5),
+                "detectability": db_fm.get("detectability", 5),
+                "rpn": db_fm.get("rpn", 125),
+            }
+        else:
+            # Fall back to static library
+            for fm in FAILURE_MODES_LIBRARY:
+                if fm["failure_mode"].lower() in failure_mode_text or failure_mode_text in fm["failure_mode"].lower():
                     matching_fm = fm
                     break
-            if matching_fm:
-                break
+                # Also check keywords
+                for kw in fm.get("keywords", []):
+                    if kw.lower() in failure_mode_text:
+                        matching_fm = fm
+                        break
+                if matching_fm:
+                    break
         
         failure_doc = {
             "id": str(uuid.uuid4()),
