@@ -764,7 +764,9 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
         );
       
       case "date":
-        const todayDate = new Date().toISOString().split('T')[0];
+        // Get today's date in local timezone (not UTC)
+        const now = new Date();
+        const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         return (
           <div key={field.id} className="space-y-1.5">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
@@ -791,7 +793,9 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
         );
       
       case "datetime":
-        const nowDateTime = new Date().toISOString().slice(0, 16);
+        // Get current datetime in local timezone (not UTC)
+        const nowDT = new Date();
+        const nowDateTime = `${nowDT.getFullYear()}-${String(nowDT.getMonth() + 1).padStart(2, '0')}-${String(nowDT.getDate()).padStart(2, '0')}T${String(nowDT.getHours()).padStart(2, '0')}:${String(nowDT.getMinutes()).padStart(2, '0')}`;
         return (
           <div key={field.id} className="space-y-1.5">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>

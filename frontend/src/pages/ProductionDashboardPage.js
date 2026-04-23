@@ -596,18 +596,31 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
                     <Input
                       type={inputType}
                       step={inputType === "number" ? "any" : undefined}
-                      max={inputType === "date" ? new Date().toISOString().split('T')[0] : 
-                           inputType === "datetime-local" ? new Date().toISOString().slice(0, 16) : undefined}
+                      max={(() => {
+                        if (inputType === "date") {
+                          const now = new Date();
+                          return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                        }
+                        if (inputType === "datetime-local") {
+                          const now = new Date();
+                          return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                        }
+                        return undefined;
+                      })()}
                       className="h-9 mt-1"
                       value={formData[field.id] ?? ""}
                       onChange={(e) => {
                         const val = e.target.value;
-                        // Prevent future dates
-                        if (inputType === "date" && val > new Date().toISOString().split('T')[0]) {
+                        // Prevent future dates (using local timezone)
+                        const now = new Date();
+                        const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                        const nowLocal = `${todayLocal}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                        
+                        if (inputType === "date" && val > todayLocal) {
                           toast.error("Future dates are not allowed");
                           return;
                         }
-                        if (inputType === "datetime-local" && val > new Date().toISOString().slice(0, 16)) {
+                        if (inputType === "datetime-local" && val > nowLocal) {
                           toast.error("Future dates are not allowed");
                           return;
                         }

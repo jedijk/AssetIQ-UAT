@@ -8,7 +8,7 @@ Implements:
 - Auto-observations: Create observations on threshold breach
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -425,7 +425,8 @@ class FormService:
                 if field.get("required") and field["id"] not in value_map:
                     raise ValueError(f"Required field '{field.get('label', field['id'])}' is missing")
         
-        # Validate no future dates
+        # Validate no future dates (with 5 minute buffer for clock differences)
+        future_buffer = timedelta(minutes=5)
         for value in values:
             field_id = value["field_id"]
             field_def = field_map.get(field_id)
@@ -435,11 +436,17 @@ class FormService:
                     try:
                         from dateutil import parser
                         parsed_date = parser.parse(str(date_value))
-                        # Make timezone-aware if naive
-                        if parsed_date.tzinfo is None:
-                            parsed_date = parsed_date.replace(tzinfo=timezone.utc)
-                        if parsed_date > now:
-                            raise ValueError(f"Future dates are not allowed for field '{field_def.get('label', field_id)}'")
+                        # For naive datetimes, assume local time and compare date only for "date" fields
+                        if field_def.get("field_type") == "date":
+                            # For date-only fields, compare just the date part
+                            if parsed_date.date() > now.date():
+                                raise ValueError(f"Future dates are not allowed for field '{field_def.get('label', field_id)}'")
+                        else:
+                            # For datetime fields, add buffer for timezone/clock differences
+                            if parsed_date.tzinfo is None:
+                                parsed_date = parsed_date.replace(tzinfo=timezone.utc)
+                            if parsed_date > (now + future_buffer):
+                                raise ValueError(f"Future dates are not allowed for field '{field_def.get('label', field_id)}'")
                     except (ValueError, TypeError) as e:
                         if "Future dates" in str(e):
                             raise
