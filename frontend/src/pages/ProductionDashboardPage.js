@@ -2177,8 +2177,15 @@ export default function ProductionDashboardPage() {
                       productionAPI.updateSubmission(editEntry.submission_id, values).then(refresh).catch(() => toast.error("Failed to update extruder entry"));
                     }
 
-                    if (editEntry._viscosity_submission_id && editEntry.viscosity !== "") {
-                      productionAPI.updateSubmission(editEntry._viscosity_submission_id, { Measurement: editEntry.viscosity }).then(refresh).catch(() => toast.error("Failed to update viscosity"));
+                    // Update viscosity - either through viscosity submission or directly on production_log
+                    if (editEntry.viscosity !== "" && editEntry.viscosity !== undefined) {
+                      if (editEntry._viscosity_submission_id) {
+                        // Has separate viscosity form submission
+                        productionAPI.updateSubmission(editEntry._viscosity_submission_id, { Measurement: editEntry.viscosity }).then(refresh).catch(() => toast.error("Failed to update viscosity"));
+                      } else if (editEntry.submission_id) {
+                        // No separate viscosity submission - update mooney_viscosity on the production_log directly
+                        productionAPI.updateSubmission(editEntry.submission_id, { mooney_viscosity: editEntry.viscosity }).then(refresh).catch(() => toast.error("Failed to update viscosity"));
+                      }
                     }
                   }}
                   data-testid="save-edit-btn"
