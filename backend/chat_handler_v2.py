@@ -38,6 +38,37 @@ def extract_keywords(text: str) -> List[str]:
     return [w for w in words if w not in stop_words]
 
 
+def find_full_equipment_match(message: str, candidates: List[Dict]) -> Dict | None:
+    """Return the candidate whose name or tag exactly matches (case-insensitive)
+    a substring / token in the user's message. Used to auto-select when one
+    of several search results is an unambiguous exact match.
+    """
+    if not message or not candidates:
+        return None
+    msg_norm = normalize_text(message)
+    # Also build a set of tokens (word-boundary splits) from the message for tag matches
+    msg_tokens = set(re.findall(r'[a-zA-Z0-9\-_.]+', msg_norm))
+
+    full_matches = []
+    for eq in candidates:
+        name = normalize_text(eq.get("name") or "")
+        tag = normalize_text(eq.get("tag") or "")
+        # Exact name match anywhere in the message (as a whole phrase)
+        name_hit = bool(name) and len(name) >= 3 and re.search(r'\b' + re.escape(name) + r'\b', msg_norm) is not None
+        # Exact tag match as a token (tags are usually unique identifiers)
+        tag_hit = bool(tag) and tag in msg_tokens
+        if name_hit or tag_hit:
+            full_matches.append((eq, name_hit, tag_hit))
+
+    if len(full_matches) == 1:
+        return full_matches[0][0]
+    # Tag-only match wins over name-only if the tag is unique
+    tag_only = [fm for fm in full_matches if fm[2]]
+    if len(tag_only) == 1:
+        return tag_only[0][0]
+    return None
+
+
 # ------------------------------------------------------------------
 # Equipment search
 # ------------------------------------------------------------------
@@ -345,6 +376,11 @@ async def process_chat_message(
         if len(eq_matches) == 1:
             return _after_equipment_selected(eq_matches[0], failure_modes_library, original_message, pending_data)
         elif len(eq_matches) > 1:
+            # Auto-select when a single full/exact match (by name or unique tag) is present
+            full = find_full_equipment_match(message_content, eq_matches)
+            if full:
+                logger.info(f"Auto-selected full equipment match: {full.get('name')} ({full.get('tag')})")
+                return _after_equipment_selected(full, failure_modes_library, original_message, pending_data)
             return _result(text="Which equipment? Please select:",
                            state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches, orig=original_message)
         else:
@@ -423,7 +459,13 @@ async def process_chat_message(
         pd = {"original_description": message_content}
         return _after_equipment_selected(eq_matches[0], failure_modes_library, message_content, pd)
 
-    # Multiple equipment matches
+    # Multiple equipment matches — auto-select if one is a clear full/exact match
+    full = find_full_equipment_match(message_content, eq_matches)
+    if full:
+        logger.info(f"Auto-selected full equipment match (initial): {full.get('name')} ({full.get('tag')})")
+        pd = {"original_description": message_content}
+        return _after_equipment_selected(full, failure_modes_library, message_content, pd)
+
     return _result(text="Which equipment are you reporting an issue for? Please select:",
                    state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches,
                    pending={"original_description": message_content}, orig=message_content)
