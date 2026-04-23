@@ -1768,6 +1768,17 @@ export default function ProductionDashboardPage() {
                     const viscValue = isViscOnly
                       ? entry._viscosity_value
                       : viscosityByTime[entry.time]?.value;
+                    const viscSubId = isViscOnly
+                      ? entry._viscosity_submission_id
+                      : viscosityByTime[entry.time]?.submission_id;
+                    const openEdit = () => {
+                      if (isViscOnly) {
+                        setEditEntry({ ...entry, _index: i, viscosity: entry._viscosity_value ?? "", _viscosity_submission_id: entry._viscosity_submission_id || "", _viscosity_only: true });
+                      } else {
+                        const viscData = viscosityByTime[entry.time];
+                        setEditEntry({ ...entry, _index: i, viscosity: viscData?.value ?? "", _viscosity_submission_id: viscData?.submission_id || "" });
+                      }
+                    };
                     return (
                       <div
                         key={`${entry.time}-${i}`}
@@ -1776,21 +1787,47 @@ export default function ProductionDashboardPage() {
                       >
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-semibold text-slate-900">{entry.time}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            {entry.submitted_by || "—"}
-                          </Badge>
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="secondary" className="text-xs">
+                              {entry.submitted_by || "—"}
+                            </Badge>
+                            <button
+                              type="button"
+                              onClick={openEdit}
+                              className="p-1 rounded-md bg-white border border-slate-200 text-slate-500 active:bg-slate-100"
+                              data-testid={`mobile-edit-${entry.time}`}
+                              aria-label="Edit entry"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                         {isViscOnly ? (
-                          <div className="text-sm text-slate-600">
+                          <button
+                            type="button"
+                            onClick={openEdit}
+                            className="w-full text-left text-sm text-slate-600"
+                            data-testid={`mobile-visc-edit-${entry.time}`}
+                          >
                             <span className="font-medium">Viscosity:</span> {viscValue ?? "—"}
-                          </div>
+                          </button>
                         ) : (
                           <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
                             <div><span className="text-slate-500">RPM:</span> <span className="font-medium">{entry.rpm}</span></div>
                             <div><span className="text-slate-500">Feed:</span> <span className="font-medium">{entry.feed}</span></div>
                             <div><span className="text-slate-500">MP4:</span> <span className="font-medium">{entry.mp4}</span></div>
                             <div className="col-span-2"><span className="text-slate-500">T Product IR:</span> <span className="font-medium">{entry.t_product_ir}</span></div>
-                            <div><span className="text-slate-500">Visc:</span> <span className="font-medium">{viscValue ?? <span className="text-amber-500">TBD</span>}</span></div>
+                            <div>
+                              <span className="text-slate-500">Visc:</span>{" "}
+                              <button
+                                type="button"
+                                onClick={openEdit}
+                                className="font-medium underline underline-offset-2 decoration-dotted decoration-slate-300"
+                                data-testid={`mobile-visc-edit-${entry.time}`}
+                              >
+                                {viscValue ?? <span className="text-amber-500">TBD</span>}
+                              </button>
+                            </div>
                           </div>
                         )}
                         {entry.remarks && !isViscOnly && (
