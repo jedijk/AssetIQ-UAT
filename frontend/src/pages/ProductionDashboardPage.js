@@ -2073,63 +2073,67 @@ export default function ProductionDashboardPage() {
 
       {/* ── Edit Log Entry Dialog ── */}
       <Dialog open={!!editEntry} onOpenChange={(open) => { if (!open) setEditEntry(null); }}>
-        <DialogContent className="max-w-lg" data-testid="edit-entry-dialog">
-          <DialogHeader>
+        <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] overflow-hidden flex flex-col" data-testid="edit-entry-dialog">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>{editEntry?._viscosity_only ? `Edit Viscosity — ${editEntry?.time}` : `Edit Log Entry — ${editEntry?.time}`}</DialogTitle>
           </DialogHeader>
           {editEntry && (
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              {!editEntry._viscosity_only && [
-                { key: "rpm", label: "RPM" },
-                { key: "feed", label: "Feed" },
-                { key: "moisture", label: "M%" },
-                { key: "energy", label: "Energy" },
-                { key: "mt1", label: "MT1" },
-                { key: "mt2", label: "MT2" },
-                { key: "mt3", label: "MT3" },
-                { key: "mp1", label: "MP1" },
-                { key: "mp2", label: "MP2" },
-                { key: "mp3", label: "MP3" },
-                { key: "mp4", label: "MP4" },
-                { key: "co2_feed_p", label: "CO2 Feed/P" },
-                { key: "t_product_ir", label: "T Product IR" },
-              ].map(({ key, label }) => (
-                <div key={key}>
-                  <Label className="text-xs">{label}</Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    className="h-9 mt-1 tabular-nums"
-                    value={editEntry[key] ?? ""}
-                    onChange={(e) => setEditEntry((prev) => ({ ...prev, [key]: e.target.value }))}
-                    data-testid={`edit-${key}`}
-                  />
+            <>
+              <div className="flex-1 overflow-y-auto -mx-6 px-6 pb-2">
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  {!editEntry._viscosity_only && [
+                    { key: "rpm", label: "RPM" },
+                    { key: "feed", label: "Feed" },
+                    { key: "moisture", label: "M%" },
+                    { key: "energy", label: "Energy" },
+                    { key: "mt1", label: "MT1" },
+                    { key: "mt2", label: "MT2" },
+                    { key: "mt3", label: "MT3" },
+                    { key: "mp1", label: "MP1" },
+                    { key: "mp2", label: "MP2" },
+                    { key: "mp3", label: "MP3" },
+                    { key: "mp4", label: "MP4" },
+                    { key: "co2_feed_p", label: "CO2 Feed/P" },
+                    { key: "t_product_ir", label: "T Product IR" },
+                  ].map(({ key, label }) => (
+                    <div key={key}>
+                      <Label className="text-xs">{label}</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        className="h-9 mt-1 tabular-nums"
+                        value={editEntry[key] ?? ""}
+                        onChange={(e) => setEditEntry((prev) => ({ ...prev, [key]: e.target.value }))}
+                        data-testid={`edit-${key}`}
+                      />
+                    </div>
+                  ))}
+                  {!editEntry._viscosity_only && (
+                  <div className="col-span-2">
+                    <Label className="text-xs">Remarks</Label>
+                    <Input
+                      className="h-9 mt-1"
+                      value={editEntry.remarks ?? ""}
+                      onChange={(e) => setEditEntry((prev) => ({ ...prev, remarks: e.target.value }))}
+                      data-testid="edit-remarks"
+                    />
+                  </div>
+                  )}
+                  <div className="col-span-2">
+                    <Label className="text-xs">Viscosity (MU)</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      className="h-9 mt-1 tabular-nums"
+                      placeholder={editEntry._viscosity_submission_id ? "" : "No viscosity sample at this time"}
+                      value={editEntry.viscosity ?? ""}
+                      onChange={(e) => setEditEntry((prev) => ({ ...prev, viscosity: e.target.value }))}
+                      data-testid="edit-viscosity"
+                    />
+                  </div>
                 </div>
-              ))}
-              {!editEntry._viscosity_only && (
-              <div className="col-span-2">
-                <Label className="text-xs">Remarks</Label>
-                <Input
-                  className="h-9 mt-1"
-                  value={editEntry.remarks ?? ""}
-                  onChange={(e) => setEditEntry((prev) => ({ ...prev, remarks: e.target.value }))}
-                  data-testid="edit-remarks"
-                />
               </div>
-              )}
-              <div className="col-span-2">
-                <Label className="text-xs">Viscosity (MU)</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  className="h-9 mt-1 tabular-nums"
-                  placeholder={editEntry._viscosity_submission_id ? "" : "No viscosity sample at this time"}
-                  value={editEntry.viscosity ?? ""}
-                  onChange={(e) => setEditEntry((prev) => ({ ...prev, viscosity: e.target.value }))}
-                  data-testid="edit-viscosity"
-                />
-              </div>
-              <div className="col-span-2 flex justify-end gap-2 pt-2">
+              <div className="flex-shrink-0 flex justify-end gap-2 pt-3 border-t">
                 <Button variant="outline" size="sm" onClick={() => setEditEntry(null)}>
                   Cancel
                 </Button>
@@ -2181,7 +2185,7 @@ export default function ProductionDashboardPage() {
                   {updateSubmissionMutation.isPending ? "Saving..." : "Save"}
                 </Button>
               </div>
-            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
