@@ -582,6 +582,13 @@ class FormService:
             {"$inc": {"usage_count": 1}}
         )
         
+        # Auto-pair Mooney Viscosity samples to the latest orphan Extruder sample (same date)
+        try:
+            if (template.get("name") or "").strip().lower() == "mooney viscosity sample":
+                await self._auto_pair_viscosity_to_extruder(doc)
+        except Exception as e:
+            logger.warning(f"Viscosity auto-pair failed for submission {doc.get('id')}: {e}")
+
         # Auto-create observations for critical breaches
         observations_created = []
         for breach in threshold_breaches:
@@ -1170,6 +1177,148 @@ class FormService:
             "updated_at": self._serialize_datetime(doc.get("updated_at")),
         }
     
+    async def _auto_pair_viscosity_to_extruder(self, visc_doc: Dict[str, Any]) -> None:
+        """When a Mooney Viscosity sample is submitted, back-date its Date & Time to
+        match the latest 'orphan' Extruder sample on the same date that still shows
+        TBD (no viscosity paired at that HH:MM). This ensures the two show on the
+        same row in the Production Log / Dashboard.
+
+        Silent no-op when no candidate is found.
+        """
+        from dateutil import parser as _date_parser
+
+        def _extract_dt(sub: Dict) -> Optional[datetime]:
+            # Try "Date & Time" in values first
+            for v in sub.get("values", []) or []:
+                label = str(v.get("field_label", "")).strip().lower()
+                fid = str(v.get("field_id", "")).strip().lower()
+                if "date" in label and "time" in label or fid.replace("_", " ").strip() == "date & time" or fid == "date_&_time":
+                    raw = v.get("value")
+                    if raw:
+                        try:
+                            return _date_parser.parse(str(raw))
+                        except Exception:
+                            pass
+            # Fallback to submitted_at
+            sa = sub.get("submitted_at")
+            if isinstance(sa, datetime):
+                return sa
+            if sa:
+                try:
+                    return _date_parser.parse(str(sa).replace("Z", "+00:00"))
+                except Exception:
+                    pass
+            return None
+
+        visc_dt = _extract_dt(visc_doc)
+        if not visc_dt:
+            return
+
+        # Date window: same calendar day (local time — use naive date from parsed value)
+        day = visc_dt.date()
+        day_start = datetime.combine(day, datetime.min.time())
+        day_end = datetime.combine(day, datetime.max.time())
+
+        # Find Extruder Settings and Mooney viscosity templates
+        extruder_tpl = await self.db.form_templates.find_one(
+            {"name": {"$regex": "^extruder settings sample$", "$options": "i"}},
+            {"_id": 0, "id": 1, "name": 1},
+        )
+        visc_tpl = await self.db.form_templates.find_one(
+            {"name": {"$regex": "^mooney viscosity sample$", "$options": "i"}},
+            {"_id": 0, "id": 1, "name": 1},
+        )
+        if not extruder_tpl:
+            return
+
+        # Fetch all extruder & existing viscosity submissions for the day.
+        # Filter by submitted_at range (broad) then re-filter in Python by Date & Time.
+        broad_start = day_start - timedelta(hours=12)
+        broad_end = day_end + timedelta(hours=12)
+
+        ext_subs = await self.db.form_submissions.find(
+            {"form_template_id": extruder_tpl["id"],
+             "submitted_at": {"$gte": broad_start, "$lte": broad_end}},
+            {"_id": 0, "id": 1, "values": 1, "submitted_at": 1}
+        ).to_list(500)
+
+        visc_subs = []
+        if visc_tpl:
+            visc_subs = await self.db.form_submissions.find(
+                {"form_template_id": visc_tpl["id"],
+                 "submitted_at": {"$gte": broad_start, "$lte": broad_end}},
+                {"_id": 0, "id": 1, "values": 1, "submitted_at": 1}
+            ).to_list(500)
+
+        # Build set of HH:MM times already occupied by a viscosity sample on the same day
+        paired_times = set()
+        for s in visc_subs:
+            if s.get("id") == visc_doc.get("id"):
+                continue  # ignore self (we'll overwrite its time below)
+            dt = _extract_dt(s)
+            if dt and dt.date() == day:
+                paired_times.add(dt.strftime("%H:%M"))
+
+        # If our new viscosity's own HH:MM already pairs with an extruder that has no viscosity,
+        # nothing to do — the dashboard will pair them naturally.
+        visc_hhmm = visc_dt.strftime("%H:%M")
+        existing_extruder_at_visc_time = None
+
+        # Find candidate extruder samples on the same date WITHOUT a viscosity pair
+        candidates = []
+        for s in ext_subs:
+            dt = _extract_dt(s)
+            if not dt or dt.date() != day:
+                continue
+            hhmm = dt.strftime("%H:%M")
+            if hhmm == visc_hhmm:
+                existing_extruder_at_visc_time = (s, dt)
+            if hhmm in paired_times:
+                continue  # already paired
+            candidates.append((s, dt, hhmm))
+
+        # Short-circuit: if an extruder already exists at the exact viscosity time AND not paired,
+        # nothing to do (they'll pair by time naturally).
+        if existing_extruder_at_visc_time and existing_extruder_at_visc_time[1].strftime("%H:%M") not in paired_times:
+            return
+
+        # Keep only candidates at or before the viscosity time; pick the LATEST
+        candidates = [c for c in candidates if c[1] <= visc_dt]
+        if not candidates:
+            return
+        candidates.sort(key=lambda c: c[1])
+        target_sub, target_dt, target_hhmm = candidates[-1]
+
+        # Rewrite this viscosity submission's "Date & Time" value to the target extruder's time.
+        new_values = []
+        rewrote = False
+        for v in visc_doc.get("values", []) or []:
+            label = str(v.get("field_label", "")).strip().lower()
+            fid = str(v.get("field_id", "")).strip().lower()
+            is_dt_field = (("date" in label and "time" in label)
+                           or fid == "date_&_time"
+                           or fid.replace("_", " ").strip() == "date & time")
+            if is_dt_field:
+                # Format target in same local-ISO style used by the form (YYYY-MM-DDTHH:MM)
+                new_val = target_dt.strftime("%Y-%m-%dT%H:%M")
+                new_values.append({**v, "value": new_val})
+                rewrote = True
+            else:
+                new_values.append(v)
+
+        if not rewrote:
+            return
+
+        await self.submissions.update_one(
+            {"id": visc_doc["id"]},
+            {"$set": {"values": new_values, "auto_paired_to_extruder_id": target_sub.get("id")}}
+        )
+        visc_doc["values"] = new_values
+        logger.info(
+            f"[Viscosity Auto-Pair] visc={visc_doc.get('id')[:8]} paired→ extruder={target_sub.get('id','')[:8]} "
+            f"visc_time={visc_hhmm} → new_time={target_hhmm}"
+        )
+
     def _serialize_submission(self, doc: Dict) -> Dict[str, Any]:
         """Serialize submission document."""
         values = doc.get("values", [])
