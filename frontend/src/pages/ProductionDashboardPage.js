@@ -1788,9 +1788,8 @@ export default function ProductionDashboardPage() {
                           <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
                             <div><span className="text-slate-500">RPM:</span> <span className="font-medium">{entry.rpm}</span></div>
                             <div><span className="text-slate-500">Feed:</span> <span className="font-medium">{entry.feed}</span></div>
-                            <div><span className="text-slate-500">M%:</span> <span className="font-medium">{entry.moisture}</span></div>
-                            <div><span className="text-slate-500">Energy:</span> <span className="font-medium">{entry.energy}</span></div>
                             <div><span className="text-slate-500">MP4:</span> <span className="font-medium">{entry.mp4}</span></div>
+                            <div className="col-span-2"><span className="text-slate-500">T Product IR:</span> <span className="font-medium">{entry.t_product_ir}</span></div>
                             <div><span className="text-slate-500">Visc:</span> <span className="font-medium">{viscValue ?? <span className="text-amber-500">TBD</span>}</span></div>
                           </div>
                         )}

@@ -2,7 +2,7 @@
 Production Dashboard API endpoints.
 Aggregates form submission data for the Daily Production Overview (Line 90).
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import logging
@@ -728,53 +728,107 @@ async def update_production_submission(
     data: dict,
     current_user: dict = Depends(get_current_user),
 ):
-    """Update field values on a production form submission."""
+    """Update field values on a production form submission OR an ingested production_logs entry."""
     updates = data.get("values", {})
     if not updates:
-        return {"error": "No values provided"}
+        raise HTTPException(status_code=400, detail="No values provided")
 
     sub = await db.form_submissions.find_one({"id": submission_id}, {"_id": 0})
-    if not sub:
-        return {"error": "Submission not found"}
+    if sub:
+        # Update matching fields in the values array (case-insensitive, space/underscore normalized)
+        updates_lower = {k.lower(): v for k, v in updates.items()}
+        new_values = []
+        matched_count = 0
+        for v in sub.get("values", []):
+            label = v.get("field_label", "")
+            fid = v.get("field_id", "")
+            label_lower = label.lower()
+            fid_lower = fid.lower()
+            label_norm = label_lower.replace(" ", "_")
+            fid_norm = fid_lower.replace(" ", "_")
+            matched_key = None
+            for k in updates_lower:
+                k_norm = k.replace(" ", "_")
+                if k == label_lower or k == fid_lower or k_norm == label_norm or k_norm == fid_norm:
+                    matched_key = k
+                    break
+            if matched_key is not None:
+                old_val = v.get("value")
+                new_val = str(updates_lower[matched_key])
+                if old_val != new_val:
+                    logger.info(f"PATCH {submission_id[:15]}: '{label}' {old_val} -> {new_val}")
+                new_values.append({**v, "value": new_val})
+                matched_count += 1
+            else:
+                new_values.append(v)
 
-    # Update matching fields in the values array (case-insensitive, space/underscore normalized)
-    updates_lower = {k.lower(): v for k, v in updates.items()}
-    # Also create underscore-normalized keys for matching multi-word fields
-    updates_normalized = {k.replace(" ", "_"): v for k, v in updates_lower.items()}
-    new_values = []
-    matched_count = 0
-    for v in sub.get("values", []):
-        label = v.get("field_label", "")
-        fid = v.get("field_id", "")
-        label_lower = label.lower()
-        fid_lower = fid.lower()
-        # Also normalize underscores for comparison
-        label_norm = label_lower.replace(" ", "_")
-        fid_norm = fid_lower.replace(" ", "_")
-        matched_key = None
-        for k in updates_lower:
-            k_norm = k.replace(" ", "_")
-            if k == label_lower or k == fid_lower or k_norm == label_norm or k_norm == fid_norm:
-                matched_key = k
-                break
-        if matched_key is not None:
-            old_val = v.get("value")
-            new_val = str(updates_lower[matched_key])
-            if old_val != new_val:
-                logger.info(f"PATCH {submission_id[:15]}: '{label}' {old_val} -> {new_val}")
-            new_values.append({**v, "value": new_val})
-            matched_count += 1
-        else:
-            new_values.append(v)
+        if matched_count == 0:
+            logger.warning(f"PATCH {submission_id[:15]}: NO fields matched! sent={list(updates.keys())}, db={[v.get('field_label','') for v in sub.get('values',[])]}")
 
-    if matched_count == 0:
-        logger.warning(f"PATCH {submission_id[:15]}: NO fields matched! sent={list(updates.keys())}, db={[v.get('field_label','') for v in sub.get('values',[])]}")
+        await db.form_submissions.update_one(
+            {"id": submission_id},
+            {"$set": {"values": new_values, "updated_at": _serialize_datetime(datetime.now(timezone.utc))}}
+        )
+        return {"status": "updated", "source": "form_submission", "id": submission_id, "matched_fields": matched_count}
 
-    await db.form_submissions.update_one(
-        {"id": submission_id},
-        {"$set": {"values": new_values, "updated_at": _serialize_datetime(datetime.now(timezone.utc))}}
-    )
-    return {"status": "updated", "id": submission_id}
+    # Fallback: try the ingested production_logs collection
+    log_entry = await db.production_logs.find_one({"id": submission_id}, {"_id": 0})
+    if not log_entry:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    # Map frontend field labels to production_logs schema
+    # Metrics live in `metrics` dict, viscosity in top-level `mooney_viscosity`, remarks in `status`.
+    metrics_keys = {"RPM", "FEED", "M%", "ENERGY", "MT1", "MT2", "MT3",
+                    "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR"}
+    # Build case-insensitive lookup
+    updates_norm = {str(k).strip(): v for k, v in updates.items()}
+    updates_ci = {k.lower(): (k, v) for k, v in updates_norm.items()}
+
+    set_ops = {}
+    matched = 0
+    current_metrics = dict(log_entry.get("metrics") or {})
+
+    for mk in metrics_keys:
+        hit = updates_ci.get(mk.lower())
+        if hit is None:
+            continue
+        _, raw_val = hit
+        # Preserve numeric type where possible
+        try:
+            current_metrics[mk] = float(raw_val) if raw_val not in (None, "") else raw_val
+        except (ValueError, TypeError):
+            current_metrics[mk] = raw_val
+        matched += 1
+
+    if any(k.lower() in updates_ci for k in ("RPM", "FEED", "M%", "ENERGY", "MT1", "MT2", "MT3",
+                                              "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR")):
+        set_ops["metrics"] = current_metrics
+
+    # Viscosity ("Measurement" or "Mooney" or "mooney_viscosity")
+    for visc_key in ("measurement", "mooney", "mooney_viscosity", "viscosity"):
+        if visc_key in updates_ci:
+            _, v = updates_ci[visc_key]
+            try:
+                set_ops["mooney_viscosity"] = float(v) if v not in (None, "") else None
+            except (ValueError, TypeError):
+                set_ops["mooney_viscosity"] = v
+            matched += 1
+            break
+
+    # Remarks
+    if "remarks" in updates_ci:
+        _, v = updates_ci["remarks"]
+        set_ops["status"] = v
+        matched += 1
+
+    if not set_ops:
+        logger.warning(f"PATCH production_log {submission_id[:15]}: no matching keys. sent={list(updates.keys())}")
+        raise HTTPException(status_code=400, detail="No matching fields to update")
+
+    set_ops["updated_at"] = _serialize_datetime(datetime.now(timezone.utc))
+    await db.production_logs.update_one({"id": submission_id}, {"$set": set_ops})
+    logger.info(f"PATCH production_log {submission_id[:15]}: updated {matched} fields ({list(set_ops.keys())})")
+    return {"status": "updated", "source": "production_log", "id": submission_id, "matched_fields": matched}
 
 
 
