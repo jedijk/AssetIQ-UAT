@@ -830,11 +830,34 @@ class TaskService:
         
         if result:
             created_submission_id = None
+            label_print_config = None
             # Create form submission if form_data is present
             if data.get("form_data") and instance.get("form_template_id"):
                 created_submission_id = await self._create_form_submission(
                     instance, data, now, completed_by_id, completed_by_name
                 )
+                # Fetch form template to return its label_print_config (so the
+                # frontend can trigger auto-print even when the cached task
+                # object predates this field being exposed).
+                try:
+                    from bson import ObjectId as _OID
+                    ftid = instance.get("form_template_id")
+                    ft = None
+                    if ftid:
+                        if _OID.is_valid(str(ftid)):
+                            ft = await self.db.form_templates.find_one(
+                                {"_id": _OID(str(ftid))},
+                                {"_id": 0, "label_print_config": 1},
+                            )
+                        if not ft:
+                            ft = await self.db.form_templates.find_one(
+                                {"id": str(ftid)},
+                                {"_id": 0, "label_print_config": 1},
+                            )
+                    if ft:
+                        label_print_config = ft.get("label_print_config")
+                except Exception as e:
+                    logger.warning(f"label_print_config lookup failed: {e}")
             
             # Update plan: set last_executed_at and calculate next_due_date
             plan_id = instance.get("task_plan_id")
@@ -871,6 +894,8 @@ class TaskService:
             serialized = self._serialize_instance(result)
             if created_submission_id:
                 serialized["form_submission_id"] = created_submission_id
+            if label_print_config:
+                serialized["label_print_config"] = label_print_config
             return serialized
         return None
     

@@ -454,9 +454,11 @@ const MyTasksPage = () => {
         }
 
         // Trigger label printing if configured on the form
-        const labelCfg = selectedTask?.form_template?.label_print_config
+        const labelCfg = result?.label_print_config
+          || selectedTask?.form_template?.label_print_config
           || selectedTask?.label_print_config;
         const submissionId = result?.form_submission_id;
+        console.log("[LabelPrint] result keys:", Object.keys(result || {}), "labelCfg:", labelCfg, "submissionId:", submissionId);
         if (labelCfg?.enabled && labelCfg?.label_template_id && submissionId) {
           const trigger = labelCfg.trigger || "manual";
           if (trigger === "on_submit" || trigger === "both") {
