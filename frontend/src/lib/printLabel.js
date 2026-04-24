@@ -3,13 +3,16 @@
  *
  * Desktop: creates a hidden iframe, loads the PDF, and calls print() —
  *          avoids pop-up blockers and doesn't leave an orphan tab open.
- * Mobile:  silently downloads the PDF (mobile browsers don't expose a
- *          reliable print() API for blob URLs). User prints via the
- *          share sheet / native PDF viewer.
+ * Mobile:  loads a print-ready HTML page (with auto window.print()) into a
+ *          hidden iframe. Mobile browsers DO trigger their native print
+ *          sheet from HTML content — this works on both Android Chrome
+ *          and iOS Safari (AirPrint).
  *
  * Usage:
- *   await printLabelBlob(blob, "my-label.pdf");
+ *   await printLabel({ template_id, submission_id, copies });
  */
+import { labelsAPI } from "./api";
+
 export const isMobileDevice = () => {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
@@ -30,75 +33,155 @@ function downloadBlob(blob, filename) {
 }
 
 
-function printViaHiddenIframe(blob, filename, onFallback) {
-  try {
-    const url = URL.createObjectURL(blob);
-    // Remove any previous print iframe
-    const prev = document.getElementById("__label-print-iframe__");
-    if (prev) prev.remove();
+function removeOldPrintIframes() {
+  document.querySelectorAll("iframe[data-print-iframe]").forEach((n) => n.remove());
+}
 
+
+function printHtmlViaIframe(html) {
+  return new Promise((resolve) => {
+    removeOldPrintIframes();
     const iframe = document.createElement("iframe");
-    iframe.id = "__label-print-iframe__";
+    iframe.setAttribute("data-print-iframe", "1");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
     iframe.style.bottom = "0";
     iframe.style.width = "0";
     iframe.style.height = "0";
     iframe.style.border = "0";
-    iframe.src = url;
+    // srcdoc yields a same-origin document so we can call contentWindow.print()
+    iframe.srcdoc = html;
 
-    let printed = false;
-    const tryPrint = () => {
-      if (printed) return;
-      printed = true;
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      resolve(ok);
+      // Leave iframe attached briefly so the print sheet can read the doc
+      setTimeout(() => iframe.remove(), 30000);
+    };
+
+    iframe.onload = () => {
       try {
+        // HTML includes an auto-print <script>, but we also call print()
+        // explicitly from the parent side in case the inline script is
+        // blocked by some CSP.
         iframe.contentWindow.focus();
         iframe.contentWindow.print();
-      } catch (_e) {
-        // Cross-origin or blocked — fall back to download
-        if (onFallback) onFallback();
-        else downloadBlob(blob, filename);
+        finish(true);
+      } catch (_err) {
+        finish(false);
       }
     };
-    iframe.onload = () => {
-      // Small timeout gives PDF viewer a moment to render
-      setTimeout(tryPrint, 400);
-    };
+    // Hard timeout
+    setTimeout(() => finish(true), 2500);
     document.body.appendChild(iframe);
+  });
+}
 
-    // Hard timeout — some browsers never fire onload for PDF blobs
-    setTimeout(tryPrint, 1500);
-    // Revoke URL later
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+function printPdfViaIframe(blob) {
+  return new Promise((resolve) => {
+    try {
+      removeOldPrintIframes();
+      const url = URL.createObjectURL(blob);
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("data-print-iframe", "1");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.src = url;
+
+      let printed = false;
+      const tryPrint = () => {
+        if (printed) return;
+        printed = true;
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+          resolve(true);
+        } catch (_e) {
+          resolve(false);
+        }
+      };
+      iframe.onload = () => setTimeout(tryPrint, 400);
+      setTimeout(tryPrint, 1800);
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        iframe.remove();
+      }, 60000);
+      document.body.appendChild(iframe);
+    } catch (_err) {
+      resolve(false);
+    }
+  });
+}
+
+
+/**
+ * Trigger a native print for a label in the most reliable way per device.
+ *
+ * @param {object} payload - { template_id, submission_id, asset_ids, copies }
+ * @param {object} opts - { filename }
+ * @returns {Promise<{ method: "html" | "pdf" | "download", ok: boolean, mobile: boolean }>}
+ */
+export async function printLabel(payload, opts = {}) {
+  const mobile = isMobileDevice();
+  const filename = opts.filename || `label-${Date.now()}.pdf`;
+
+  if (mobile) {
+    // Mobile: fetch HTML page, inject into iframe, let the auto-print script fire
+    try {
+      const html = await labelsAPI.renderHtml({ ...payload, auto_print: true });
+      const ok = await printHtmlViaIframe(html);
+      return { method: "html", ok, mobile: true };
+    } catch (_err) {
+      // Network or CORS problem — fall back to PDF download
+      try {
+        const blob = await labelsAPI.printBlob(payload);
+        downloadBlob(blob, filename);
+      } catch (_e2) { /* swallow */ }
+      return { method: "download", ok: false, mobile: true };
+    }
+  }
+
+  // Desktop: PDF in hidden iframe → native print dialog
+  try {
+    const blob = await labelsAPI.printBlob(payload);
+    const ok = await printPdfViaIframe(blob);
+    if (!ok) {
+      downloadBlob(blob, filename);
+      return { method: "download", ok: false, mobile: false };
+    }
+    return { method: "pdf", ok: true, mobile: false };
   } catch (_err) {
-    if (onFallback) onFallback();
-    else downloadBlob(blob, filename);
+    return { method: "download", ok: false, mobile: false };
   }
 }
 
 
 /**
- * Print a label PDF Blob in the most reliable way for the current device.
- *
- * @param {Blob} blob - the PDF blob
- * @param {string} filename - suggested filename for downloads
- * @returns {Promise<{ printed: boolean, downloaded: boolean, mobile: boolean }>}
+ * Direct blob print (kept for backward compat — LabelsPage uses it for the
+ * bulk-print flow that pre-builds the PDF server-side).
  */
 export async function printLabelBlob(blob, filename = "label.pdf") {
   const mobile = isMobileDevice();
   if (mobile) {
-    // Mobile: just download — user taps to open in native PDF viewer, then prints
+    // No payload to re-fetch HTML — just download
     downloadBlob(blob, filename);
     return { printed: false, downloaded: true, mobile: true };
   }
-  // Desktop: hidden iframe trick, with download fallback
   return new Promise((resolve) => {
-    printViaHiddenIframe(blob, filename, () => {
-      downloadBlob(blob, filename);
-      resolve({ printed: false, downloaded: true, mobile: false });
+    printPdfViaIframe(blob).then((ok) => {
+      if (!ok) {
+        downloadBlob(blob, filename);
+        resolve({ printed: false, downloaded: true, mobile: false });
+      } else {
+        resolve({ printed: true, downloaded: false, mobile: false });
+      }
     });
-    // Resolve "printed: true" optimistically after a short delay — we can't
-    // actually detect a successful print, only a failed attempt.
-    setTimeout(() => resolve({ printed: true, downloaded: false, mobile: false }), 1800);
   });
 }

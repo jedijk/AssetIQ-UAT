@@ -462,26 +462,24 @@ const MyTasksPage = () => {
         if (labelCfg?.enabled && labelCfg?.label_template_id && submissionId) {
           const trigger = labelCfg.trigger || "manual";
           if (trigger === "on_submit" || trigger === "both") {
-            // Auto-print using cross-platform helper
+            // Auto-print using cross-platform helper (HTML on mobile, PDF on desktop)
             (async () => {
               try {
-                const { labelsAPI } = await import("../lib/api");
-                const { printLabelBlob, isMobileDevice } = await import("../lib/printLabel");
-                const blob = await labelsAPI.printBlob({
+                const { printLabel } = await import("../lib/printLabel");
+                const res = await printLabel({
                   template_id: labelCfg.label_template_id,
                   submission_id: submissionId,
                   copies: 1,
                 });
-                const res = await printLabelBlob(blob, `label-${Date.now()}.pdf`);
-                if (res.mobile) {
-                  toast.info("Label downloaded — open it to print via your phone's share menu.");
-                } else if (res.downloaded) {
-                  toast.info("Print dialog blocked — label downloaded instead.");
+                if (res.mobile && res.method === "html" && res.ok) {
+                  toast.success("Label sent to print");
+                } else if (res.mobile) {
+                  toast.info("Label downloaded — open it to print");
+                } else if (res.method === "download") {
+                  toast.info("Print blocked — label downloaded instead.");
                 } else {
                   toast.success("Label sent to printer");
                 }
-                // Silence the unused-var lint by using isMobileDevice in a no-op
-                void isMobileDevice;
               } catch (err) {
                 toast.error("Label auto-print failed");
               }
@@ -493,14 +491,12 @@ const MyTasksPage = () => {
                 label: "Print",
                 onClick: async () => {
                   try {
-                    const { labelsAPI } = await import("../lib/api");
-                    const { printLabelBlob } = await import("../lib/printLabel");
-                    const blob = await labelsAPI.printBlob({
+                    const { printLabel } = await import("../lib/printLabel");
+                    await printLabel({
                       template_id: labelCfg.label_template_id,
                       submission_id: submissionId,
                       copies: 1,
                     });
-                    await printLabelBlob(blob, `label-${Date.now()}.pdf`);
                   } catch (_e) { toast.error("Label print failed"); }
                 },
               },

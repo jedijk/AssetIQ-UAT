@@ -9,7 +9,6 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ThresholdBadge } from "./FieldPreview";
 import { formatDateTime } from "../../lib/dateUtils";
-import { labelsAPI } from "../../lib/api";
 import { formAPI } from "./formAPI";
 
 export const SubmissionRow = ({ submission }) => {
@@ -39,15 +38,15 @@ export const SubmissionRow = ({ submission }) => {
         toast.error("This form has no label template configured. Enable it in the form designer.");
         return;
       }
-      const blob = await labelsAPI.printBlob({
+      const { printLabel } = await import("../../lib/printLabel");
+      const res = await printLabel({
         template_id: cfg.label_template_id,
         submission_id: submission.id,
         copies: 1,
-      });
-      const { printLabelBlob } = await import("../../lib/printLabel");
-      const res = await printLabelBlob(blob, `${submission.template_name || "label"}.pdf`);
-      if (res.mobile) toast.info("Label downloaded — open it to print via your phone's share menu.");
-      else if (res.downloaded) toast.info("Print dialog blocked — label downloaded instead.");
+      }, { filename: `${submission.template_name || "label"}.pdf` });
+      if (res.mobile && res.ok) toast.success("Label sent to print");
+      else if (res.mobile) toast.info("Label downloaded — open it to print");
+      else if (res.method === "download") toast.info("Print dialog blocked — label downloaded instead.");
       else toast.success("Print dialog opened");
     } catch (err) {
       toast.error(err.response?.data?.detail || "Print failed");

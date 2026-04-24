@@ -482,6 +482,222 @@ def _render_pdf(tpl: dict, datasets: List[dict], copies: int = 1, margin_offset_
     return buf.read()
 
 
+def _qr_data_uri(payload: str) -> str:
+    """Return the QR as a data: PNG URI usable in <img src>."""
+    import base64
+    img = _qr_image(payload)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _html_escape(s: str) -> str:
+    return (
+        (s or "")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_print: bool = True) -> str:
+    """Render a print-ready HTML page mirroring the PDF layout.
+
+    Used on mobile where browsers can invoke the native print sheet on HTML
+    content via window.print() (but not on PDF blobs).
+    Layout uses absolute mm units so CSS @page keeps the print dialog paper size.
+    """
+    w_mm = float(tpl.get("width_mm", 50))
+    h_mm = float(tpl.get("height_mm", 30))
+    orientation = tpl.get("orientation", "portrait")
+    preset = tpl.get("preset", "standard")
+    bindings = [FieldBinding(**b) if isinstance(b, dict) else b for b in (tpl.get("field_bindings") or [])]
+    qr_cfg = QRConfig(**(tpl.get("qr_config") or {}))
+
+    labels_html = []
+    records = datasets if datasets else [SAMPLE_DATA]
+    for rec in records:
+        rec2 = _inject_print_datetime(rec)
+        qr_src = _qr_data_uri(_build_qr_payload(qr_cfg, rec2))
+        lines = [_resolve_field_value(b, rec2) for b in bindings]
+
+        if preset == "qr_only":
+            caption = next((v for (_, v) in lines if v), rec2.get("asset_id", ""))
+            inner = f"""
+              <div class="lbl-qr-only">
+                <img src="{qr_src}" alt="qr" />
+                <div class="cap">{_html_escape(caption[:32])}</div>
+              </div>
+            """
+        elif preset == "compact":
+            title = rec2.get("asset_name", "")
+            rows = "".join(
+                f'<div class="row"><b>{_html_escape(lbl)}:</b> {_html_escape(val)}</div>'
+                for (lbl, val) in lines[:3] if val
+            )
+            inner = f"""
+              <div class="lbl-compact">
+                <img class="qr" src="{qr_src}" alt="qr" />
+                <div class="side">
+                  <div class="title">{_html_escape(title[:32])}</div>
+                  {rows}
+                </div>
+              </div>
+            """
+        elif preset == "with_logo":
+            rows = "".join(
+                f'<div class="row"><b>{_html_escape(lbl)}:</b> {_html_escape(val)}</div>'
+                for (lbl, val) in lines[:4] if val
+            )
+            inner = f"""
+              <div class="lbl-logo">
+                <div class="top">
+                  <div class="logo">LOGO</div>
+                  <div class="title">{_html_escape(rec2.get('asset_name','')[:28])}</div>
+                </div>
+                <div class="bottom">
+                  <img class="qr" src="{qr_src}" alt="qr" />
+                  <div class="side">{rows}</div>
+                </div>
+              </div>
+            """
+        elif preset == "title_date_time":
+            bmap = {b.source: b for b in bindings}
+            title_val = rec2.get("asset_name", "")
+            if "asset_name" in bmap:
+                _, title_val = _resolve_field_value(bmap["asset_name"], rec2)
+            date_lbl, date_val = ("Date", rec2.get("print_date", ""))
+            time_lbl, time_val = ("Time", rec2.get("print_time", ""))
+            if "print_date" in bmap:
+                date_lbl, date_val = _resolve_field_value(bmap["print_date"], rec2)
+            if "print_time" in bmap:
+                time_lbl, time_val = _resolve_field_value(bmap["print_time"], rec2)
+            extras = [b for b in bindings if b.source not in ("asset_name", "print_date", "print_time")]
+            extras_html = "".join(
+                f'<div class="ext">{_html_escape(lbl)}: {_html_escape(val)}</div>'
+                for (lbl, val) in [_resolve_field_value(e, rec2) for e in extras[:2]] if val
+            )
+            inner = f"""
+              <div class="lbl-tdt">
+                <div class="title">{_html_escape(title_val[:40])}</div>
+                <img class="qr" src="{qr_src}" alt="qr" />
+                <div class="meta">
+                  <div>{_html_escape(date_lbl)}: {_html_escape(date_val)}</div>
+                  <div>{_html_escape(time_lbl)}: {_html_escape(time_val)}</div>
+                  {extras_html}
+                </div>
+              </div>
+            """
+        elif preset == "blank":
+            rows = "".join(
+                f'<div class="row">{_html_escape(lbl)}: {_html_escape(val)}</div>'
+                for (lbl, val) in lines if val or ((lbl, val) and _resolve_field_value is not None)
+            )
+            inner = f"""
+              <div class="lbl-blank">
+                <div class="lines">{rows}</div>
+                <img class="qr" src="{qr_src}" alt="qr" />
+              </div>
+            """
+        else:  # standard
+            title = rec2.get("asset_name", "")
+            rows = "".join(
+                f'<div class="row">{_html_escape(lbl)}: {_html_escape(val)}</div>'
+                for (lbl, val) in lines[:2] if val
+            )
+            inner = f"""
+              <div class="lbl-std">
+                <div class="title">{_html_escape(title[:28])}</div>
+                <img class="qr" src="{qr_src}" alt="qr" />
+                <div class="foot">{rows}</div>
+              </div>
+            """
+
+        for _ in range(max(1, copies)):
+            labels_html.append(f'<div class="label">{inner}</div>')
+
+    # Swap page dimensions for landscape
+    if orientation == "landscape" and w_mm < h_mm:
+        page_w_mm, page_h_mm = h_mm, w_mm
+    else:
+        page_w_mm, page_h_mm = w_mm, h_mm
+
+    auto_print_js = """
+      <script>
+        window.addEventListener('load', function(){
+          setTimeout(function(){ try{ window.focus(); window.print(); }catch(e){} }, 300);
+        });
+      </script>
+    """ if auto_print else ""
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Label</title>
+<style>
+  @page {{ size: {page_w_mm}mm {page_h_mm}mm; margin: 0; }}
+  html, body {{ margin: 0; padding: 0; background: #fff; }}
+  body {{ font-family: Helvetica, Arial, sans-serif; color: #000; }}
+  .label {{
+    width: {page_w_mm}mm; height: {page_h_mm}mm;
+    box-sizing: border-box; padding: 2mm;
+    position: relative;
+    page-break-after: always;
+    overflow: hidden;
+  }}
+  .label:last-child {{ page-break-after: auto; }}
+
+  /* standard */
+  .lbl-std {{ display: flex; flex-direction: column; align-items: center; height: 100%; }}
+  .lbl-std .title {{ font-weight: bold; font-size: 9pt; text-align: center; }}
+  .lbl-std .qr   {{ width: 45%; height: auto; margin: auto; }}
+  .lbl-std .foot {{ font-size: 6.5pt; text-align: center; }}
+
+  /* compact */
+  .lbl-compact {{ display: flex; gap: 2mm; height: 100%; }}
+  .lbl-compact .qr {{ height: 100%; width: auto; }}
+  .lbl-compact .title {{ font-weight: bold; font-size: 8pt; }}
+  .lbl-compact .row {{ font-size: 6.5pt; }}
+
+  /* qr only */
+  .lbl-qr-only {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }}
+  .lbl-qr-only img {{ max-width: 70%; max-height: 70%; }}
+  .lbl-qr-only .cap {{ font-size: 7pt; font-weight: bold; }}
+
+  /* with logo */
+  .lbl-logo {{ display: flex; flex-direction: column; height: 100%; gap: 1mm; }}
+  .lbl-logo .top {{ display: flex; gap: 2mm; align-items: center; }}
+  .lbl-logo .logo {{ width: 8mm; height: 8mm; border: 0.3mm solid #888; display:flex;align-items:center;justify-content:center;font-size:5pt;color:#888; }}
+  .lbl-logo .title {{ font-weight: bold; font-size: 8pt; }}
+  .lbl-logo .bottom {{ display: flex; gap: 2mm; flex: 1; }}
+  .lbl-logo .qr {{ width: 40%; height: auto; max-height: 100%; }}
+  .lbl-logo .row {{ font-size: 6.5pt; }}
+
+  /* title + date + time */
+  .lbl-tdt {{ display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; height: 100%; }}
+  .lbl-tdt .title {{ grid-column: 1 / -1; text-align: center; font-weight: bold; font-size: 11pt; }}
+  .lbl-tdt .qr {{ grid-column: 1; justify-self: start; align-self: end; height: 85%; width: auto; max-width: 100%; }}
+  .lbl-tdt .meta {{ grid-column: 2; justify-self: end; align-self: end; text-align: right; font-size: 8pt; line-height: 1.3; }}
+  .lbl-tdt .ext {{ font-size: 6.5pt; }}
+
+  /* blank */
+  .lbl-blank {{ position: relative; height: 100%; }}
+  .lbl-blank .lines {{ width: 62%; font-size: 8pt; line-height: 1.35; }}
+  .lbl-blank .row {{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  .lbl-blank .qr {{ position: absolute; right: 2mm; bottom: 2mm; width: 30%; height: auto; }}
+</style>
+</head>
+<body>
+  {"".join(labels_html)}
+  {auto_print_js}
+</body>
+</html>"""
+    return html
+
+
 # ==================== TEMPLATE CRUD ====================
 
 @router.get("/templates")
@@ -689,6 +905,91 @@ async def print_labels(body: PrintRequest, current_user: dict = Depends(get_curr
             "X-Print-Job-Id": job["id"],
         },
     )
+
+
+# ==================== HTML RENDER (for mobile print) ====================
+
+from fastapi.responses import HTMLResponse
+
+
+async def _resolve_datasets_for_render(
+    template_id: str,
+    asset_ids: List[str],
+    submission_id: Optional[str],
+) -> tuple[dict, List[dict], List[str]]:
+    tpl_doc = await db.label_templates.find_one({"id": template_id}, {"_id": 0})
+    if not tpl_doc:
+        raise HTTPException(status_code=404, detail="Template not found")
+    datasets: List[dict] = []
+    resolved: List[str] = []
+    if submission_id:
+        sub_data = await _load_submission_data(submission_id)
+        if not sub_data:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        base = SAMPLE_DATA.copy()
+        eq_id = sub_data.pop("_linked_equipment_id", None) if "_linked_equipment_id" in sub_data else None
+        if asset_ids and asset_ids[0]:
+            a = await _load_asset(asset_ids[0])
+            if a:
+                base.update(a)
+                resolved.append(asset_ids[0])
+        elif eq_id:
+            a = await _load_asset(eq_id)
+            if a:
+                base.update(a)
+                resolved.append(eq_id)
+        base.update(sub_data)
+        datasets.append(base)
+    elif asset_ids:
+        for aid in asset_ids[:500]:
+            d = await _load_asset(aid)
+            if d:
+                datasets.append(d)
+                resolved.append(aid)
+    if not datasets:
+        datasets = [SAMPLE_DATA.copy()]
+    return tpl_doc, datasets, resolved
+
+
+class RenderHtmlRequest(BaseModel):
+    template_id: str
+    asset_ids: List[str] = Field(default_factory=list)
+    submission_id: Optional[str] = None
+    copies: int = 1
+    auto_print: bool = True
+
+
+@router.post("/render-html")
+async def render_label_html(
+    body: RenderHtmlRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return the label as a standalone print-ready HTML page.
+
+    Used on mobile where browsers can trigger native print only on HTML
+    (not on PDF blobs). The page auto-calls window.print() on load by default.
+    """
+    tpl_doc, datasets, resolved = await _resolve_datasets_for_render(
+        body.template_id, body.asset_ids, body.submission_id
+    )
+    html = _render_label_html(tpl_doc, datasets, copies=body.copies, auto_print=body.auto_print)
+
+    # Record a print job so history still shows it (printer_name marks it as mobile)
+    job = {
+        "id": str(uuid.uuid4()),
+        "template_id": body.template_id,
+        "template_name": tpl_doc.get("name"),
+        "user_id": current_user.get("id"),
+        "user_name": current_user.get("name") or current_user.get("email"),
+        "printer_name": "mobile-html",
+        "asset_ids": resolved,
+        "qty": len(datasets) * max(1, int(body.copies)),
+        "copies": body.copies,
+        "status": "success",
+        "created_at": _now(),
+    }
+    await db.label_print_jobs.insert_one(job)
+    return HTMLResponse(content=html, headers={"X-Print-Job-Id": job["id"]})
 
 
 @router.get("/jobs")

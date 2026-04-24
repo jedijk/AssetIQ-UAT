@@ -1742,6 +1742,10 @@ export const labelsAPI = {
     const res = await api.post("/labels/print", payload, { responseType: "blob" });
     return res.data; // Blob
   },
+  renderHtml: async (payload) => {
+    const res = await api.post("/labels/render-html", payload, { responseType: "text" });
+    return res.data; // string (HTML)
+  },
   listJobs: async (limit = 50) => {
     const res = await api.get(`/labels/jobs?limit=${limit}`);
     return res.data;
