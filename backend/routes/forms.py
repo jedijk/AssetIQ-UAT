@@ -91,7 +91,10 @@ async def create_form_template(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new form template."""
-    return await form_service.create_template(data.model_dump(), current_user["id"])
+    from services.query_cache import query_cache
+    result = await form_service.create_template(data.model_dump(), current_user["id"])
+    query_cache.invalidate("form_templates")
+    return result
 
 @router.patch("/form-templates/{template_id}")
 async def update_form_template(
@@ -102,6 +105,7 @@ async def update_form_template(
 ):
     """Update a form template. Creates new version if template has been used."""
     import logging
+    from services.query_cache import query_cache
     logger = logging.getLogger(__name__)
     
     # Log update attempt
@@ -121,6 +125,7 @@ async def update_form_template(
             logger.warning(f"[FormTemplateUpdate] template_id={template_id} not found")
             raise HTTPException(status_code=404, detail="Form template not found")
         
+        query_cache.invalidate("form_templates")
         logger.info(f"[FormTemplateUpdate] success template_id={template_id} version={result.get('version')}")
         return result
     except HTTPException:
@@ -135,9 +140,11 @@ async def delete_form_template(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete (deactivate) a form template."""
+    from services.query_cache import query_cache
     deleted = await form_service.delete_template(template_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Form template not found")
+    query_cache.invalidate("form_templates")
     return {"message": "Form template deactivated"}
 
 # --- Form Fields ---
