@@ -3,13 +3,66 @@
  * Displays a single form submission with expandable details
  */
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Clock, CheckCircle2 } from "lucide-react";
+import { ChevronRight, ChevronDown, Clock, CheckCircle2, Printer, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import { ThresholdBadge } from "./FieldPreview";
 import { formatDateTime } from "../../lib/dateUtils";
+import { labelsAPI } from "../../lib/api";
+import { formAPI } from "./formAPI";
 
 export const SubmissionRow = ({ submission }) => {
   const [expanded, setExpanded] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [labelConfig, setLabelConfig] = useState(undefined); // undefined = not loaded, null = no config
+
+  const ensureConfig = async () => {
+    if (labelConfig !== undefined) return labelConfig;
+    try {
+      const tpl = await formAPI.getTemplate(submission.template_id || submission.form_template_id);
+      const cfg = tpl?.label_print_config || null;
+      setLabelConfig(cfg);
+      return cfg;
+    } catch (_e) {
+      setLabelConfig(null);
+      return null;
+    }
+  };
+
+  const handlePrint = async (e) => {
+    e.stopPropagation();
+    setPrinting(true);
+    try {
+      const cfg = await ensureConfig();
+      if (!cfg?.enabled || !cfg?.label_template_id) {
+        toast.error("This form has no label template configured. Enable it in the form designer.");
+        return;
+      }
+      const blob = await labelsAPI.printBlob({
+        template_id: cfg.label_template_id,
+        submission_id: submission.id,
+        copies: 1,
+      });
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url, "_blank");
+      if (w) {
+        setTimeout(() => { try { w.print(); } catch (_e2) {} }, 500);
+        toast.success("Print dialog opened");
+      } else {
+        // pop-up blocked — fall back to download
+        const a = document.createElement("a");
+        a.href = url; a.download = `${submission.template_name || "label"}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+        toast.info("Pop-up blocked — PDF downloaded instead");
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Print failed");
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A";
@@ -50,6 +103,17 @@ export const SubmissionRow = ({ submission }) => {
               submission.status || "Pending"
             )}
           </Badge>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-slate-500 hover:text-indigo-600"
+            title="Print Label"
+            data-testid={`print-label-${submission.id}`}
+            onClick={handlePrint}
+            disabled={printing}
+          >
+            {printing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+          </Button>
         </div>
       </div>
 

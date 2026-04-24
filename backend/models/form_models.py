@@ -168,6 +168,18 @@ class PhotoExtractionConfig(BaseModel):
     extraction_fields: List[PhotoExtractionField] = Field(default_factory=list)
 
 
+class LabelPrintConfig(BaseModel):
+    """Form-level label printing configuration.
+
+    When a form template has this enabled, submitting the form can open/download
+    a printable label that merges the linked asset's fields with the submission values.
+    """
+    enabled: bool = False
+    label_template_id: Optional[str] = None  # ref -> label_templates.id
+    trigger: str = "manual"  # "on_submit" | "manual" | "both"
+    button_label: str = "Print Label"
+
+
 class FormTemplateCreate(BaseModel):
     """Create a new form template."""
     name: str = Field(..., min_length=1, max_length=200)
@@ -194,6 +206,9 @@ class FormTemplateCreate(BaseModel):
     # Photo AI Extraction
     photo_extraction_config: Optional[PhotoExtractionConfig] = None
 
+    # Label Printing
+    label_print_config: Optional[LabelPrintConfig] = None
+
 
 class FormTemplateUpdate(BaseModel):
     """Update a form template (creates new version)."""
@@ -209,6 +224,7 @@ class FormTemplateUpdate(BaseModel):
     tags: Optional[List[str]] = None
     is_active: Optional[bool] = None
     photo_extraction_config: Optional[PhotoExtractionConfig] = None
+    label_print_config: Optional[LabelPrintConfig] = None
 
 
 # ============= FORM SUBMISSION MODELS =============

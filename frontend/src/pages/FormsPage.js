@@ -1,6 +1,7 @@
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import PhotoDataCaptureField from '../components/forms/PhotoDataCaptureField';
 import { EXTRACTION_TEMPLATES } from '../components/forms/extractionTemplates';
+import LabelPrintConfigPanel from '../components/forms/LabelPrintConfigPanel';
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { createPortal } from "react-dom";
@@ -689,9 +690,35 @@ const FormsPage = ({ embedded = false }) => {
                     />
                     <Label htmlFor="photo-extraction-enabled" className="cursor-pointer">Photo AI Extraction</Label>
                   </div>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="label-print-enabled"
+                      checked={newTemplate.label_print_config?.enabled || false}
+                      onCheckedChange={(v) => setNewTemplate(prev => ({
+                        ...prev,
+                        label_print_config: {
+                          ...(prev.label_print_config || { trigger: "manual", button_label: "Print Label" }),
+                          enabled: v,
+                        }
+                      }))}
+                      data-testid="label-print-toggle"
+                    />
+                    <Label htmlFor="label-print-enabled" className="cursor-pointer">Label Printing</Label>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Label Printing Config */}
+            {newTemplate.label_print_config?.enabled && (
+              <LabelPrintConfigPanel
+                config={newTemplate.label_print_config}
+                onChange={(patch) => setNewTemplate(prev => ({
+                  ...prev,
+                  label_print_config: { ...(prev.label_print_config || {}), ...patch }
+                }))}
+              />
+            )}
 
             {/* Photo Extraction Config - shown when enabled */}
             {newTemplate.photo_extraction_config?.enabled && (

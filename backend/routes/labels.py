@@ -80,12 +80,14 @@ class PreviewRequest(BaseModel):
     template: Optional[LabelTemplateCreate] = None   # for live designer preview
     template_id: Optional[str] = None                 # or an existing saved template
     asset_id: Optional[str] = None                    # equipment_node id (optional; uses sample if missing)
+    submission_id: Optional[str] = None               # include form submission values
     sample_data: Optional[dict] = None
 
 
 class PrintRequest(BaseModel):
     template_id: str
     asset_ids: List[str] = Field(default_factory=list)  # empty => single sample label
+    submission_id: Optional[str] = None               # single-label print for one submission
     copies: int = 1
     printer_name: Optional[str] = None
     margin_offset_mm: float = 0.0
@@ -131,6 +133,55 @@ async def _load_asset(asset_id: str) -> dict:
     }
 
 
+async def _load_submission_data(submission_id: str) -> dict:
+    """Load a form submission and return a dict of values keyed as `form.<field_id>`
+    plus any fields whose key looks like an asset identifier."""
+    sub = await db.form_submissions.find_one({"id": submission_id}, {"_id": 0})
+    if not sub:
+        return {}
+    out: dict = {}
+    values = sub.get("values") or sub.get("responses") or {}
+    # Values can be either dict {field_id: value} or list of {field_id, value, ...}
+    pairs = []
+    if isinstance(values, dict):
+        pairs = list(values.items())
+    elif isinstance(values, list):
+        for item in values:
+            if isinstance(item, dict):
+                k = item.get("field_id") or item.get("field_key") or item.get("key") or item.get("id")
+                v = item.get("value")
+                if k is not None:
+                    pairs.append((k, v))
+    for k, v in pairs:
+        if v is None:
+            continue
+        if isinstance(v, list):
+            str_val = ", ".join(map(str, v))
+        elif isinstance(v, dict):
+            str_val = ""
+        else:
+            str_val = str(v)
+        out[f"form.{k}"] = str_val
+        out.setdefault(k, str_val)
+    # Submission-level metadata
+    out["submission_id"] = str(sub.get("id", ""))
+    if sub.get("submitted_at"):
+        try:
+            dt = sub["submitted_at"]
+            if isinstance(dt, str):
+                dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+            out["form.submitted_at"] = dt.strftime("%Y-%m-%d %H:%M")
+            out.setdefault("submission_date", dt.strftime("%Y-%m-%d"))
+            out.setdefault("submission_time", dt.strftime("%H:%M"))
+        except (ValueError, TypeError, AttributeError):
+            pass
+    # Linked equipment
+    eq_id = sub.get("equipment_id") or sub.get("linked_equipment_id")
+    if eq_id:
+        out["_linked_equipment_id"] = eq_id
+    return out
+
+
 SAMPLE_DATA = {
     "asset_id": "EQ-00123",
     "asset_name": "Extruder Unit 1",
@@ -153,10 +204,21 @@ def _inject_print_datetime(data: dict) -> dict:
 
 
 def _resolve_field_value(binding: FieldBinding, data: dict) -> tuple[str, str]:
-    """Return (label, value) for a binding given asset data."""
+    """Return (label, value) for a binding given asset data.
+
+    Custom bindings support placeholder substitution, e.g. value="Lot {form.lot_no}"
+    will substitute data["form.lot_no"] if present.
+    """
     source = binding.source
     if source == "custom":
-        return (binding.label or "Info", binding.value or "")
+        raw_value = binding.value or ""
+        # Placeholder substitution: replace {key} with data[key]
+        def _sub(match):
+            key = match.group(1).strip()
+            return str(data.get(key, f"{{{key}}}"))
+        import re
+        val = re.sub(r"\{([^{}]+)\}", _sub, raw_value)
+        return (binding.label or "Info", val)
     pretty = {
         "asset_id": "Asset ID",
         "asset_name": "Name",
@@ -513,6 +575,16 @@ async def preview_label(body: PreviewRequest, current_user: dict = Depends(get_c
     else:
         data = SAMPLE_DATA.copy()
 
+    # Merge form submission values (if provided) so bindings can reference them
+    if body.submission_id:
+        sub_data = await _load_submission_data(body.submission_id)
+        # If no explicit asset was supplied, try using the submission's linked equipment
+        if not body.asset_id and sub_data.get("_linked_equipment_id"):
+            asset_d = await _load_asset(sub_data["_linked_equipment_id"])
+            if asset_d:
+                data = {**SAMPLE_DATA, **asset_d}
+        data.update(sub_data)
+
     pdf_bytes = _render_pdf(tpl, [data], copies=1)
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
@@ -530,7 +602,27 @@ async def print_labels(body: PrintRequest, current_user: dict = Depends(get_curr
 
     datasets: List[dict] = []
     resolved_assets: List[str] = []
-    if body.asset_ids:
+
+    # Submission-based single label: load submission, merge with linked asset
+    if body.submission_id:
+        sub_data = await _load_submission_data(body.submission_id)
+        if not sub_data:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        base = SAMPLE_DATA.copy()
+        eq_id = sub_data.pop("_linked_equipment_id", None) if "_linked_equipment_id" in sub_data else None
+        if body.asset_ids and body.asset_ids[0]:
+            a = await _load_asset(body.asset_ids[0])
+            if a:
+                base.update(a)
+                resolved_assets.append(body.asset_ids[0])
+        elif eq_id:
+            a = await _load_asset(eq_id)
+            if a:
+                base.update(a)
+                resolved_assets.append(eq_id)
+        base.update(sub_data)
+        datasets.append(base)
+    elif body.asset_ids:
         for aid in body.asset_ids[:500]:  # cap at 500 per job
             d = await _load_asset(aid)
             if d:
