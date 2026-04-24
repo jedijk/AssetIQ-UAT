@@ -550,6 +550,42 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           <p className="whitespace-pre-wrap">{msg.content}</p>
         )}
         
+        {/* Context Prompt for non-threat messages (e.g., after adding context) */}
+        {!msg.threat_id && isInteractive && (msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
+          <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex flex-wrap gap-2 items-center">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSending}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors text-xs font-medium disabled:opacity-50"
+                data-testid="add-more-photo-btn"
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                Add Photo
+              </button>
+              <button
+                onClick={() => {
+                  if (autoSkipTimerRef.current) {
+                    clearInterval(autoSkipTimerRef.current);
+                  }
+                  setAutoSkipCountdown(null);
+                  sendMutation.mutate({ content: "skip", image: null });
+                }}
+                disabled={isSending}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-500 rounded-lg hover:bg-slate-100 transition-colors text-xs font-medium disabled:opacity-50"
+                data-testid="skip-more-context-btn"
+              >
+                Done {autoSkipCountdown && `(${autoSkipCountdown}s)`}
+              </button>
+              {autoSkipCountdown && (
+                <span className="text-xs text-slate-400 ml-1">
+                  Auto-continue in {autoSkipCountdown}s
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        
         {/* Equipment Suggestions - only on latest message */}
         {isInteractive && msg.equipment_suggestions && msg.equipment_suggestions.length > 0 && (
           <div className="mt-3 space-y-2">
