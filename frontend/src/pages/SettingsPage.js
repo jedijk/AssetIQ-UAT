@@ -16,7 +16,8 @@ import {
   ArrowLeft,
   FileText,
   Shield,
-  Trash2
+  Trash2,
+  Tag
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -128,6 +129,15 @@ const SETTINGS_SECTIONS = [
     icon: Shield,
     path: "/settings/consent-management",
     roles: ["owner"]
+  },
+  {
+    id: "labels",
+    label: "Smart Labels",
+    description: "Label templates & QR-enabled print",
+    icon: Tag,
+    path: "/settings/labels",
+    roles: ["owner"],
+    desktopOnly: true
   }
 ];
 
@@ -147,9 +157,10 @@ export default function SettingsPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Filter sections based on user role
+  // Filter sections based on user role + device
   const visibleSections = SETTINGS_SECTIONS.filter(section => {
     if (!user?.role) return false;
+    if (section.desktopOnly && isMobileView) return false;
     return section.roles.includes(user.role);
   });
 

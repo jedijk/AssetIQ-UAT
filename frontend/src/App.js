@@ -335,7 +335,7 @@ function App() {
                 <Route path="my-tasks" element={<MyTasksPage />} />
                 <Route path="forms" element={<Navigate to="/tasks?tab=forms" replace />} />
                 <Route path="form-submissions" element={<FormSubmissionsPage />} />
-                <Route path="labels" element={<LabelsPage />} />
+                <Route path="labels" element={<Navigate to="/settings/labels" replace />} />
                 <Route path="decision-engine" element={<UnderDevelopmentPage />} />
                 <Route path="feedback" element={<FeedbackPage />} />
                 
@@ -347,6 +347,7 @@ function App() {
                   <Route path="user-management" element={<SettingsUserManagementPage />} />
                   <Route path="permissions" element={<SettingsPermissionsPage />} />
                   <Route path="qr" element={<SettingsQRPage />} />
+                  <Route path="labels" element={<LabelsPage />} />
                   <Route path="notifications" element={<SettingsNotificationsPage />} />
                   <Route path="risk-calculation" element={<SettingsRiskCalculationPage />} />
                   <Route path="ai-usage" element={<SettingsAIUsagePage />} />
