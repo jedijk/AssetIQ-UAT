@@ -13,7 +13,7 @@ import { springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.5.9";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.0";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -121,10 +121,10 @@ const Layout = () => {
           }
           
           toast.success(`AssetIQ updated to v${APP_VERSION}`, {
-            description: "Auto matching viscosity, security update, manual Mooney update mobile, mobile production log view improvement, chat improvements and more",
-            duration: 3000,
+            description: "New Label Print feature — design labels and print directly from form submissions. Plus mobile print support, form field bindings, and bug fixes.",
+            duration: 4500,
           });
-          setTimeout(() => window.location.reload(), 3000);
+          setTimeout(() => window.location.reload(), 4500);
         }
       } catch (error) {
         console.log('Version check failed:', error);
