@@ -415,14 +415,17 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             else:
                 await db.threats.update_one({"id": threat_id}, {"$set": ctx})
 
-        # Reset state
-        await _reset_conv(user_id)
-
-        # Build reply
+        # Build reply and determine next state
         if is_skip:
+            # User explicitly skipped - reset and move on
+            await _reset_conv(user_id)
             reply = "Got it! Your observation has been saved. What else would you like to report?"
-        elif image_base64 and analysis:
-            parts = ["Thanks! I've added your photo and context to the observation."]
+            await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
+            return ChatResponse(message=reply, detected_language=detected_lang)
+        
+        # User added context - ask for more context (keep skip timer running)
+        if image_base64 and analysis:
+            parts = ["Thanks! I've added your photo to the observation."]
             desc = analysis.get("image_description")
             if desc:
                 parts.append(f"\n\n**Image analysis:** {desc}")
@@ -437,15 +440,33 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 parts.append(f"\n\n**{len(ai_actions)} action(s) created from photo analysis:**")
                 for a in ai_actions[:3]:
                     parts.append(f"- [{a.get('priority','').capitalize()}] {a.get('action','')[:80]}")
-            parts.append("\n\nWhat else would you like to report?")
+            parts.append("\n\n**Would you like to add more photos or context?** You can skip if you're done.")
             reply = "".join(parts)
         elif image_base64:
-            reply = "Thanks! I've added your context to the observation along with the photo. What else would you like to report?"
+            reply = "Thanks! I've added your photo to the observation.\n\n**Would you like to add more photos or context?** You can skip if you're done."
         else:
-            reply = "Thanks! I've added your context to the observation. What else would you like to report?"
+            reply = "Thanks! I've added your context to the observation.\n\n**Would you like to add more photos or context?** You can skip if you're done."
 
-        await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
-        return ChatResponse(message=reply, detected_language=detected_lang)
+        # Keep awaiting_context state so skip timer runs
+        await _write_conv(
+            user_id,
+            state=ChatState.AWAITING_CONTEXT,
+            pending_data={},
+            awaiting_context_for_threat=threat_id,
+        )
+        await _store_assistant_msg(
+            user_id, reply,
+            chat_state=ChatState.AWAITING_CONTEXT,
+            awaiting_context_for_threat=threat_id,
+            question_type="context",
+        )
+        return ChatResponse(
+            message=reply,
+            follow_up_question=reply,
+            question_type="context",
+            awaiting_context_for_threat=threat_id,
+            detected_language=detected_lang,
+        )
 
     # ------------------------------------------------------------------
     # 4. Race-condition guard: message looks like equipment but state is INITIAL
