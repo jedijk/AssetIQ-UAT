@@ -456,7 +456,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         )
         await _store_assistant_msg(
             user_id, reply,
-            chat_state=ChatState.AWAITING_CONTEXT.value,
+            chat_state="awaiting_context",
             awaiting_context_for_threat=threat_id,
             question_type="context",
         )
