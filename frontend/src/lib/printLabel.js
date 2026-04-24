@@ -1,15 +1,20 @@
 /**
- * Cross-platform label print helper.
+ * Cross-platform label print helper — v2, iOS-safe.
  *
- * Desktop: creates a hidden iframe, loads the PDF, and calls print() —
- *          avoids pop-up blockers and doesn't leave an orphan tab open.
- * Mobile:  loads a print-ready HTML page (with auto window.print()) into a
- *          hidden iframe. Mobile browsers DO trigger their native print
- *          sheet from HTML content — this works on both Android Chrome
- *          and iOS Safari (AirPrint).
+ * iOS Safari quirks:
+ *  - `window.open` MUST be called synchronously inside a user-gesture event.
+ *    Calling it after an `await` in a mutation's onSuccess is blocked.
+ *  - `iframe.srcdoc + contentWindow.print()` does NOT reliably open AirPrint.
+ *  - A top-level document with its own <script>window.print()</script> DOES
+ *    fire AirPrint reliably.
  *
- * Usage:
- *   await printLabel({ template_id, submission_id, copies });
+ * Strategy:
+ *  - `openPrintWindow()` synchronously opens `window.open('', '_blank', ...)`
+ *    from the caller's click handler. Callers pass the returned handle into
+ *    `printLabel({ win })` after the async fetch completes.
+ *  - Desktop still uses the hidden-iframe path for pixel-perfect PDF output.
+ *  - If no window handle is provided (e.g. async onSuccess chain), we fall
+ *    back to downloading the PDF so the user can Share → Print.
  */
 import { labelsAPI } from "./api";
 
@@ -19,6 +24,42 @@ export const isMobileDevice = () => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)
     || (typeof window !== "undefined" && window.innerWidth < 768);
 };
+
+
+export const isIOS = () => {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /iPhone|iPad|iPod/i.test(ua)
+    || (ua.includes("Mac") && "ontouchend" in document); // iPadOS desktop mode
+};
+
+
+/**
+ * Call this synchronously from a user-gesture click handler BEFORE any await,
+ * then pass the returned handle to `printLabel({ win })` once the data is ready.
+ *
+ * Returns null if the browser blocks the pop-up (rare — mobile browsers allow
+ * this when inside a direct tap handler).
+ */
+export function openPrintWindow() {
+  try {
+    const w = window.open("", "_blank", "noopener=no");
+    if (!w) return null;
+    // Show a "Preparing…" placeholder while we fetch the HTML
+    try {
+      w.document.open();
+      w.document.write(
+        '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preparing label…</title>' +
+        '<style>body{font-family:-apple-system,system-ui,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#64748b}</style>' +
+        '</head><body>Preparing label…</body></html>'
+      );
+      w.document.close();
+    } catch (_e) { /* ignore */ }
+    return w;
+  } catch (_err) {
+    return null;
+  }
+}
 
 
 function downloadBlob(blob, filename) {
@@ -38,55 +79,29 @@ function removeOldPrintIframes() {
 }
 
 
-function printHtmlViaIframe(html) {
-  return new Promise((resolve) => {
-    removeOldPrintIframes();
-    const iframe = document.createElement("iframe");
-    iframe.setAttribute("data-print-iframe", "1");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    // Strip any Cloudflare challenge / analytics scripts that proxies may
-    // inject into cross-origin responses — they're useless inside the iframe
-    // and add noise to printed output.
-    const cleaned = String(html).replace(
-      /<script\b[^>]*>[\s\S]*?cdn-cgi\/challenge-platform[\s\S]*?<\/script>/gi,
-      ""
-    ).replace(
-      /<script\b[^>]*cloudflare[\s\S]*?<\/script>/gi,
-      ""
-    );
-    // srcdoc yields a same-origin document so we can call contentWindow.print()
-    iframe.srcdoc = cleaned;
-
-    let done = false;
-    const finish = (ok) => {
-      if (done) return;
-      done = true;
-      resolve(ok);
-      // Leave iframe attached briefly so the print sheet can read the doc
-      setTimeout(() => iframe.remove(), 30000);
-    };
-
-    iframe.onload = () => {
-      try {
-        // HTML includes an auto-print <script>, but we also call print()
-        // explicitly from the parent side in case the inline script is
-        // blocked by some CSP.
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        finish(true);
-      } catch (_err) {
-        finish(false);
-      }
-    };
-    // Hard timeout
-    setTimeout(() => finish(true), 2500);
-    document.body.appendChild(iframe);
-  });
+function writeHtmlIntoWindow(win, html) {
+  try {
+    // Strip Cloudflare challenge scripts injected by the proxy
+    const cleaned = String(html)
+      .replace(/<script\b[^>]*>[\s\S]*?cdn-cgi\/challenge-platform[\s\S]*?<\/script>/gi, "")
+      .replace(/<script\b[^>]*cloudflare[\s\S]*?<\/script>/gi, "");
+    win.document.open();
+    win.document.write(cleaned);
+    win.document.close();
+    // The HTML itself contains an auto-print <script>. We also call
+    // win.print() as a belt-and-braces fallback after load.
+    const fallbackPrint = () => { try { win.focus(); win.print(); } catch (_e) { /* ignore */ } };
+    if (win.document.readyState === "complete") {
+      setTimeout(fallbackPrint, 350);
+    } else {
+      win.addEventListener("load", () => setTimeout(fallbackPrint, 350), { once: true });
+      // Safety net
+      setTimeout(fallbackPrint, 1800);
+    }
+    return true;
+  } catch (_err) {
+    return false;
+  }
 }
 
 
@@ -132,28 +147,44 @@ function printPdfViaIframe(blob) {
 
 
 /**
- * Trigger a native print for a label in the most reliable way per device.
+ * Trigger a native print for a label.
  *
- * @param {object} payload - { template_id, submission_id, asset_ids, copies }
- * @param {object} opts - { filename }
- * @returns {Promise<{ method: "html" | "pdf" | "download", ok: boolean, mobile: boolean }>}
+ * @param {object} payload  - { template_id, submission_id, asset_ids, copies }
+ * @param {object} opts     - { win?: Window, filename?: string }
+ *   - win: a Window handle returned from openPrintWindow() (REQUIRED on mobile
+ *     for reliable printing; optional on desktop)
+ *   - filename: suggested file name if we fall back to download
+ * @returns {Promise<{ method: "window"|"iframe"|"download", ok: boolean, mobile: boolean }>}
  */
 export async function printLabel(payload, opts = {}) {
   const mobile = isMobileDevice();
   const filename = opts.filename || `label-${Date.now()}.pdf`;
+  const preOpened = opts.win || null;
 
   if (mobile) {
-    // Mobile: fetch HTML page, inject into iframe, let the auto-print script fire
     try {
       const html = await labelsAPI.renderHtml({ ...payload, auto_print: true });
-      const ok = await printHtmlViaIframe(html);
-      return { method: "html", ok, mobile: true };
+      if (preOpened && !preOpened.closed) {
+        const ok = writeHtmlIntoWindow(preOpened, html);
+        if (ok) return { method: "window", ok: true, mobile: true };
+      }
+      // Fallback: download PDF so user can Share → Print from native viewer
+      try {
+        const blob = await labelsAPI.printBlob(payload);
+        downloadBlob(blob, filename);
+      } catch (_e) { /* swallow */ }
+      if (preOpened && !preOpened.closed) {
+        try { preOpened.close(); } catch (_c) { /* ignore */ }
+      }
+      return { method: "download", ok: false, mobile: true };
     } catch (_err) {
-      // Network or CORS problem — fall back to PDF download
       try {
         const blob = await labelsAPI.printBlob(payload);
         downloadBlob(blob, filename);
       } catch (_e2) { /* swallow */ }
+      if (preOpened && !preOpened.closed) {
+        try { preOpened.close(); } catch (_c) { /* ignore */ }
+      }
       return { method: "download", ok: false, mobile: true };
     }
   }
@@ -161,12 +192,21 @@ export async function printLabel(payload, opts = {}) {
   // Desktop: PDF in hidden iframe → native print dialog
   try {
     const blob = await labelsAPI.printBlob(payload);
+    // If a window was pre-opened on desktop, prefer HTML path (consistent UX)
+    if (preOpened && !preOpened.closed) {
+      try {
+        const html = await labelsAPI.renderHtml({ ...payload, auto_print: true });
+        if (writeHtmlIntoWindow(preOpened, html)) {
+          return { method: "window", ok: true, mobile: false };
+        }
+      } catch (_e) { /* fall through to iframe */ }
+    }
     const ok = await printPdfViaIframe(blob);
     if (!ok) {
       downloadBlob(blob, filename);
       return { method: "download", ok: false, mobile: false };
     }
-    return { method: "pdf", ok: true, mobile: false };
+    return { method: "iframe", ok: true, mobile: false };
   } catch (_err) {
     return { method: "download", ok: false, mobile: false };
   }
@@ -174,13 +214,11 @@ export async function printLabel(payload, opts = {}) {
 
 
 /**
- * Direct blob print (kept for backward compat — LabelsPage uses it for the
- * bulk-print flow that pre-builds the PDF server-side).
+ * Direct blob print (kept for LabelsPage bulk-print that pre-builds PDF).
  */
 export async function printLabelBlob(blob, filename = "label.pdf") {
   const mobile = isMobileDevice();
   if (mobile) {
-    // No payload to re-fetch HTML — just download
     downloadBlob(blob, filename);
     return { printed: false, downloaded: true, mobile: true };
   }

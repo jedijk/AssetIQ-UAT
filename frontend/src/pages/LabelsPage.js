@@ -599,6 +599,14 @@ function PrintDialog({ open, template, onClose }) {
 
   const onPrint = async (download = false) => {
     if (!template) return;
+    // Pre-open window synchronously within the click handler for iOS.
+    let preOpened = null;
+    if (!download) {
+      try {
+        const { openPrintWindow, isMobileDevice } = await import("../lib/printLabel");
+        if (isMobileDevice()) preOpened = openPrintWindow();
+      } catch (_e) { /* ignore */ }
+    }
     setPrinting(true);
     try {
       const blob = await labelsAPI.printBlob({
@@ -615,13 +623,22 @@ function PrintDialog({ open, template, onClose }) {
         downloadBlob(blob, `${template.name || "labels"}.pdf`);
         toast.success("PDF downloaded");
       } else {
-        const { printLabelBlob } = await import("../lib/printLabel");
-        const res = await printLabelBlob(blob, `${template.name || "labels"}.pdf`);
-        if (res.mobile) toast.info("PDF downloaded — open it to print via your phone's share menu.");
-        else if (res.downloaded) toast.info("Print blocked — PDF downloaded instead.");
+        const { printLabel } = await import("../lib/printLabel");
+        const res = await printLabel({
+          template_id: template.id,
+          asset_ids: assetIdsText
+            .split(/[\s,;\n]+/)
+            .map((s) => s.trim())
+            .filter(Boolean),
+          copies: Math.max(1, Number(copies) || 1),
+        }, { win: preOpened, filename: `${template.name || "labels"}.pdf` });
+        if (res.method === "window") toast.success("Print dialog opened");
+        else if (res.mobile) toast.info("PDF downloaded — use Share → Print");
+        else if (res.method === "download") toast.info("Print blocked — PDF downloaded instead.");
         else toast.success("Print dialog opened");
       }
     } catch (e) {
+      if (preOpened && !preOpened.closed) preOpened.close();
       toast.error(e.response?.data?.detail || "Print failed");
     } finally {
       setPrinting(false);

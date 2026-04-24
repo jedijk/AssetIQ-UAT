@@ -31,11 +31,20 @@ export const SubmissionRow = ({ submission }) => {
 
   const handlePrint = async (e) => {
     e.stopPropagation();
+    // IMPORTANT: open the new window SYNCHRONOUSLY within the click event so
+    // iOS Safari doesn't block it. We fill it with HTML once the fetch returns.
+    let preOpened = null;
+    try {
+      const { openPrintWindow, isMobileDevice } = await import("../../lib/printLabel");
+      if (isMobileDevice()) preOpened = openPrintWindow();
+    } catch (_e) { /* ignore */ }
+
     setPrinting(true);
     try {
       const cfg = await ensureConfig();
       if (!cfg?.enabled || !cfg?.label_template_id) {
         toast.error("This form has no label template configured. Enable it in the form designer.");
+        if (preOpened && !preOpened.closed) preOpened.close();
         return;
       }
       const { printLabel } = await import("../../lib/printLabel");
@@ -43,12 +52,16 @@ export const SubmissionRow = ({ submission }) => {
         template_id: cfg.label_template_id,
         submission_id: submission.id,
         copies: 1,
-      }, { filename: `${submission.template_name || "label"}.pdf` });
-      if (res.mobile && res.ok) toast.success("Label sent to print");
-      else if (res.mobile) toast.info("Label downloaded — open it to print");
-      else if (res.method === "download") toast.info("Print dialog blocked — label downloaded instead.");
+      }, {
+        win: preOpened,
+        filename: `${submission.template_name || "label"}.pdf`,
+      });
+      if (res.method === "window") toast.success("Label print dialog opened");
+      else if (res.mobile) toast.info("Label downloaded — use Share → Print");
+      else if (res.method === "download") toast.info("Print blocked — label downloaded.");
       else toast.success("Print dialog opened");
     } catch (err) {
+      if (preOpened && !preOpened.closed) preOpened.close();
       toast.error(err.response?.data?.detail || "Print failed");
     } finally {
       setPrinting(false);

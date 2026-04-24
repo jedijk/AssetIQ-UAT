@@ -461,48 +461,77 @@ const MyTasksPage = () => {
         console.log("[LabelPrint] result keys:", Object.keys(result || {}), "labelCfg:", labelCfg, "submissionId:", submissionId);
         if (labelCfg?.enabled && labelCfg?.label_template_id && submissionId) {
           const trigger = labelCfg.trigger || "manual";
+          (async () => {
           if (trigger === "on_submit" || trigger === "both") {
-            // Auto-print using cross-platform helper (HTML on mobile, PDF on desktop)
-            (async () => {
-              try {
-                const { printLabel } = await import("../lib/printLabel");
-                const res = await printLabel({
-                  template_id: labelCfg.label_template_id,
-                  submission_id: submissionId,
-                  copies: 1,
-                });
-                if (res.mobile && res.method === "html" && res.ok) {
-                  toast.success("Label sent to print");
-                } else if (res.mobile) {
-                  toast.info("Label downloaded — open it to print");
-                } else if (res.method === "download") {
-                  toast.info("Print blocked — label downloaded instead.");
-                } else {
+            // On mobile (iOS especially), window.open after an async chain is
+            // blocked. Always route auto-print through a sticky toast action
+            // that the user taps — making it a true user gesture.
+            const { isMobileDevice } = await import("../lib/printLabel");
+            const mobile = isMobileDevice();
+
+            if (!mobile) {
+              // Desktop: can auto-print via hidden iframe, no user gesture needed
+              (async () => {
+                try {
+                  const { printLabel } = await import("../lib/printLabel");
+                  await printLabel({
+                    template_id: labelCfg.label_template_id,
+                    submission_id: submissionId,
+                    copies: 1,
+                  });
                   toast.success("Label sent to printer");
+                } catch (err) {
+                  toast.error("Label auto-print failed");
                 }
-              } catch (err) {
-                toast.error("Label auto-print failed");
-              }
-            })();
+              })();
+            } else {
+              // Mobile: sticky toast with Print action — tap fires window.open
+              toast.success(labelCfg.button_label || "Print Label", {
+                description: "Tap Print to open the print sheet",
+                action: {
+                  label: "Print",
+                  onClick: async () => {
+                    const { openPrintWindow, printLabel } = await import("../lib/printLabel");
+                    const win = openPrintWindow();
+                    try {
+                      await printLabel({
+                        template_id: labelCfg.label_template_id,
+                        submission_id: submissionId,
+                        copies: 1,
+                      }, { win });
+                    } catch (_e) {
+                      if (win && !win.closed) win.close();
+                      toast.error("Label print failed");
+                    }
+                  },
+                },
+                duration: 20000,
+              });
+            }
           } else if (trigger === "manual") {
             toast.success(labelCfg.button_label || "Print Label", {
-              description: "Label ready — tap Print",
+              description: "Tap Print to open the print sheet",
               action: {
                 label: "Print",
                 onClick: async () => {
+                  const { openPrintWindow, printLabel } = await import("../lib/printLabel");
+                  const win = openPrintWindow();
                   try {
-                    const { printLabel } = await import("../lib/printLabel");
                     await printLabel({
                       template_id: labelCfg.label_template_id,
                       submission_id: submissionId,
                       copies: 1,
-                    });
-                  } catch (_e) { toast.error("Label print failed"); }
+                    }, { win });
+                  } catch (_e) {
+                    if (win && !win.closed) win.close();
+                    toast.error("Label print failed");
+                  }
                 },
               },
-              duration: 15000,
+              duration: 20000,
             });
           }
+          })();
         }
       }
       // Invalidate all my-tasks queries regardless of filters
