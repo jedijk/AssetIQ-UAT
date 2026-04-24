@@ -1637,6 +1637,7 @@ export default function ProductionDashboardPage() {
                             <span>Supplier: {bag.supplier || "—"}</span>
                             <span>Bag: {bag.bag_no || "—"}</span>
                             <span>Lot: {bag.lot_no || "—"}</span>
+                            <span>Prod. Date: {bag.production_date || "—"}</span>
                           </div>
                         </div>
                       ))}
