@@ -483,6 +483,7 @@ function PrintDialog({ open, template, onClose }) {
   const [assetIdsText, setAssetIdsText] = useState("");
   const [margin, setMargin] = useState(0);
   const [printing, setPrinting] = useState(false);
+  const qc = useQueryClient();
 
   const onPrint = async (download = false) => {
     if (!template) return;
@@ -497,14 +498,19 @@ function PrintDialog({ open, template, onClose }) {
         copies: Math.max(1, Number(copies) || 1),
         margin_offset_mm: Number(margin) || 0,
       });
+      qc.invalidateQueries({ queryKey: ["label-jobs"] });
       if (download) {
         downloadBlob(blob, `${template.name || "labels"}.pdf`);
         toast.success("PDF downloaded");
       } else {
         const url = URL.createObjectURL(blob);
         const w = window.open(url, "_blank");
-        if (w) setTimeout(() => { try { w.print(); } catch (_e) { /* ignore */ } }, 500);
-        toast.success("Print dialog opened");
+        if (w) {
+          setTimeout(() => { try { w.print(); } catch (_e) { /* ignore */ } }, 500);
+          toast.success("Print dialog opened");
+        } else {
+          toast.info("Pop-up blocked — use Download PDF instead");
+        }
       }
     } catch (e) {
       toast.error(e.response?.data?.detail || "Print failed");
@@ -602,6 +608,7 @@ export default function LabelsPage() {
     queryKey: ["label-jobs"],
     queryFn: () => labelsAPI.listJobs(100),
     enabled: activeTab === "history",
+    refetchOnMount: "always",
   });
   const jobs = jobsData?.jobs || [];
 

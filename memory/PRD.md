@@ -7,6 +7,16 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.5.9** (Updated: April 2026)
 
 ## Recent Changes
+- [Apr 2026] Sprint 1 of Smart Labeling System shipped:
+  - Preset-based label designer (standard / compact / qr_only / with_logo)
+  - Template CRUD + duplicate + soft-archive + versioning
+  - PDF preview & print endpoints (reportlab + qrcode, cap 500 assets/job)
+  - QR target configurable per template (asset_page / inspection_form / maintenance_request / custom_url with {asset_id} substitution)
+  - Print job history; cache invalidated after print
+  - New route `/labels`; menu link added
+  - 22/22 backend pytest cases green; frontend flow verified
+- [Apr 2026] Input Material card — production date now visible on mobile.
+- [Apr 2026] Observation Related Activity timeline: Tasks removed (shows only Observations, Actions, Investigations).
 - [Apr 2026] UAT environment provisioning complete:
   - MongoDB `assetiq` → `assetiq-UAT` cloned (32,472 documents)
   - Cloudflare R2 `assetiq-files` → `assetiq-files-uat` mirrored (2,230 objects / 242 MB)
