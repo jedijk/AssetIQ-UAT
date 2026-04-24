@@ -829,9 +829,12 @@ class TaskService:
         )
         
         if result:
+            created_submission_id = None
             # Create form submission if form_data is present
             if data.get("form_data") and instance.get("form_template_id"):
-                await self._create_form_submission(instance, data, now, completed_by_id, completed_by_name)
+                created_submission_id = await self._create_form_submission(
+                    instance, data, now, completed_by_id, completed_by_name
+                )
             
             # Update plan: set last_executed_at and calculate next_due_date
             plan_id = instance.get("task_plan_id")
@@ -865,7 +868,10 @@ class TaskService:
             if data.get("create_observation") and data.get("issues_found"):
                 await self._create_observation_from_task(instance, data, now)
             
-            return self._serialize_instance(result)
+            serialized = self._serialize_instance(result)
+            if created_submission_id:
+                serialized["form_submission_id"] = created_submission_id
+            return serialized
         return None
     
     async def _create_observation_from_task(

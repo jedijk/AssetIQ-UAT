@@ -452,6 +452,63 @@ const MyTasksPage = () => {
         if (result?.completion_notification) {
           setClosureSuggestion(result.completion_notification);
         }
+
+        // Trigger label printing if configured on the form
+        const labelCfg = selectedTask?.form_template?.label_print_config
+          || selectedTask?.label_print_config;
+        const submissionId = result?.form_submission_id;
+        if (labelCfg?.enabled && labelCfg?.label_template_id && submissionId) {
+          const trigger = labelCfg.trigger || "manual";
+          if (trigger === "on_submit" || trigger === "both") {
+            // Auto-open print dialog
+            (async () => {
+              try {
+                const { labelsAPI } = await import("../lib/api");
+                const blob = await labelsAPI.printBlob({
+                  template_id: labelCfg.label_template_id,
+                  submission_id: submissionId,
+                  copies: 1,
+                });
+                const url = URL.createObjectURL(blob);
+                const w = window.open(url, "_blank");
+                if (w) {
+                  setTimeout(() => { try { w.print(); } catch (_e) {} }, 500);
+                  toast.info("Label sent to printer");
+                } else {
+                  const a = document.createElement("a");
+                  a.href = url; a.download = "label.pdf";
+                  document.body.appendChild(a); a.click(); a.remove();
+                  toast.info("Pop-up blocked — label downloaded");
+                }
+                setTimeout(() => URL.revokeObjectURL(url), 2000);
+              } catch (err) {
+                toast.error("Label auto-print failed");
+              }
+            })();
+          } else if (trigger === "manual") {
+            toast.success(labelCfg.button_label || "Print Label", {
+              description: "Label ready to print",
+              action: {
+                label: "Print",
+                onClick: async () => {
+                  try {
+                    const { labelsAPI } = await import("../lib/api");
+                    const blob = await labelsAPI.printBlob({
+                      template_id: labelCfg.label_template_id,
+                      submission_id: submissionId,
+                      copies: 1,
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const w = window.open(url, "_blank");
+                    if (w) setTimeout(() => { try { w.print(); } catch (_e) {} }, 500);
+                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                  } catch (_e) { toast.error("Label print failed"); }
+                },
+              },
+              duration: 10000,
+            });
+          }
+        }
       }
       // Invalidate all my-tasks queries regardless of filters
       queryClient.invalidateQueries({ 

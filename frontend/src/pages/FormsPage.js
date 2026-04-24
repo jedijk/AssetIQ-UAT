@@ -37,6 +37,7 @@ import {
   List,
   Sparkles,
   Calendar,
+  Printer,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -1910,6 +1911,17 @@ const FormsPage = ({ embedded = false }) => {
                             <div className="h-11 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
                               <span className="text-white font-medium">Submit Form</span>
                             </div>
+                            {selectedTemplate?.label_print_config?.enabled && (
+                              <div className="mt-2 h-10 bg-white border border-violet-300 text-violet-700 rounded-lg flex items-center justify-center gap-2 cursor-default">
+                                <Printer className="w-4 h-4" />
+                                <span className="text-sm font-medium">
+                                  {selectedTemplate.label_print_config.button_label || "Print Label"}
+                                </span>
+                                <span className="text-[10px] text-violet-400 ml-1">
+                                  ({selectedTemplate.label_print_config.trigger})
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2055,6 +2067,14 @@ const FormsPage = ({ embedded = false }) => {
                           <div className="h-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
                             <span className="text-white text-sm font-medium">Submit</span>
                           </div>
+                          {selectedTemplate?.label_print_config?.enabled && (
+                            <div className="mt-1.5 h-9 bg-white border border-violet-300 text-violet-700 rounded-lg flex items-center justify-center gap-1.5">
+                              <Printer className="w-3.5 h-3.5" />
+                              <span className="text-xs font-medium">
+                                {selectedTemplate.label_print_config.button_label || "Print Label"}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
