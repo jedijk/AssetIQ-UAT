@@ -26,7 +26,7 @@ router = APIRouter(prefix="/labels", tags=["Labels"])
 
 # ==================== MODELS ====================
 
-ALLOWED_PRESETS = ["standard", "compact", "qr_only", "with_logo", "title_date_time"]
+ALLOWED_PRESETS = ["standard", "compact", "qr_only", "with_logo", "title_date_time", "blank"]
 ALLOWED_ASSET_FIELDS = [
     "asset_id", "asset_name", "serial_number", "location",
     "department", "status", "inspection_date", "asset_type",
@@ -55,7 +55,7 @@ class LabelTemplateCreate(BaseModel):
     width_mm: float = 50.0
     height_mm: float = 30.0
     orientation: Literal["portrait", "landscape"] = "portrait"
-    preset: Literal["standard", "compact", "qr_only", "with_logo", "title_date_time"] = "standard"
+    preset: Literal["standard", "compact", "qr_only", "with_logo", "title_date_time", "blank"] = "standard"
     field_bindings: List[FieldBinding] = Field(default_factory=list)
     qr_config: QRConfig = Field(default_factory=QRConfig)
     default_equipment_type_id: Optional[str] = None
@@ -70,7 +70,7 @@ class LabelTemplateUpdate(BaseModel):
     width_mm: Optional[float] = None
     height_mm: Optional[float] = None
     orientation: Optional[Literal["portrait", "landscape"]] = None
-    preset: Optional[Literal["standard", "compact", "qr_only", "with_logo", "title_date_time"]] = None
+    preset: Optional[Literal["standard", "compact", "qr_only", "with_logo", "title_date_time", "blank"]] = None
     field_bindings: Optional[List[FieldBinding]] = None
     qr_config: Optional[QRConfig] = None
     default_equipment_type_id: Optional[str] = None
@@ -412,6 +412,30 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
                     c.drawRightString(right_x, ex_y, f"{label}: {val}"[:40])
                     ex_y += 8
 
+    elif preset == "blank":
+        # Truly minimal layout: tiny QR bottom-right, all bindings flow as "Label: value" lines
+        # from top-left. Lets the user place anything they want without a predefined theme.
+        qr_size = min(w, h) * 0.35
+        qx = x0 + w - pad - qr_size
+        qy = y0 + pad
+        c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
+
+        # Flow bindings line-by-line starting top-left
+        text_area_w = w - qr_size - 3 * pad
+        c.setFont("Helvetica", 8)
+        y_cursor = y0 + h - pad - 9
+        for b in bindings:
+            if y_cursor < y0 + pad:
+                break
+            label, val = _resolve_field_value(b, data)
+            if not val and b.source != "custom":
+                continue
+            line = f"{label}: {val}" if label and val else (val or label or "")
+            # naive character-based truncation to fit text_area_w
+            max_chars = max(8, int(text_area_w / mm * 1.9))
+            c.drawString(x0 + pad, y_cursor, line[:max_chars])
+            y_cursor -= 10
+
     else:  # standard
         # Top: asset name bold, centered
         title = data.get("asset_name", "")
@@ -719,6 +743,13 @@ async def list_presets(current_user: dict = Depends(get_current_user)):
                 "description": "Wide label: title on top, QR bottom-left, date & time bottom-right",
                 "default_size": {"width_mm": 90.3, "height_mm": 29},
                 "max_bindings": 5,
+            },
+            {
+                "key": "blank",
+                "name": "Blank",
+                "description": "Empty canvas: compact QR bottom-right, your bindings flow as lines",
+                "default_size": {"width_mm": 90.3, "height_mm": 29},
+                "max_bindings": 8,
             },
         ],
         "asset_fields": [
