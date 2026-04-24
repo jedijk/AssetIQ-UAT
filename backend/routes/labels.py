@@ -26,10 +26,11 @@ router = APIRouter(prefix="/labels", tags=["Labels"])
 
 # ==================== MODELS ====================
 
-ALLOWED_PRESETS = ["standard", "compact", "qr_only", "with_logo"]
+ALLOWED_PRESETS = ["standard", "compact", "qr_only", "with_logo", "title_date_time"]
 ALLOWED_ASSET_FIELDS = [
     "asset_id", "asset_name", "serial_number", "location",
     "department", "status", "inspection_date", "asset_type",
+    "print_date", "print_time",
     "custom"
 ]
 
@@ -53,7 +54,7 @@ class LabelTemplateCreate(BaseModel):
     width_mm: float = 50.0
     height_mm: float = 30.0
     orientation: Literal["portrait", "landscape"] = "portrait"
-    preset: Literal["standard", "compact", "qr_only", "with_logo"] = "standard"
+    preset: Literal["standard", "compact", "qr_only", "with_logo", "title_date_time"] = "standard"
     field_bindings: List[FieldBinding] = Field(default_factory=list)
     qr_config: QRConfig = Field(default_factory=QRConfig)
     default_equipment_type_id: Optional[str] = None
@@ -67,7 +68,7 @@ class LabelTemplateUpdate(BaseModel):
     width_mm: Optional[float] = None
     height_mm: Optional[float] = None
     orientation: Optional[Literal["portrait", "landscape"]] = None
-    preset: Optional[Literal["standard", "compact", "qr_only", "with_logo"]] = None
+    preset: Optional[Literal["standard", "compact", "qr_only", "with_logo", "title_date_time"]] = None
     field_bindings: Optional[List[FieldBinding]] = None
     qr_config: Optional[QRConfig] = None
     default_equipment_type_id: Optional[str] = None
@@ -142,6 +143,15 @@ SAMPLE_DATA = {
 }
 
 
+def _inject_print_datetime(data: dict) -> dict:
+    """Add print_date / print_time based on current UTC time if missing."""
+    now = datetime.now(timezone.utc)
+    out = dict(data)
+    out.setdefault("print_date", now.strftime("%Y-%m-%d"))
+    out.setdefault("print_time", now.strftime("%H:%M"))
+    return out
+
+
 def _resolve_field_value(binding: FieldBinding, data: dict) -> tuple[str, str]:
     """Return (label, value) for a binding given asset data."""
     source = binding.source
@@ -156,6 +166,8 @@ def _resolve_field_value(binding: FieldBinding, data: dict) -> tuple[str, str]:
         "status": "Status",
         "inspection_date": "Insp.",
         "asset_type": "Type",
+        "print_date": "Date",
+        "print_time": "Time",
     }
     label = binding.label or pretty.get(source, source)
     value = str(data.get(source, "") or "")
@@ -193,6 +205,7 @@ def _qr_image(payload: str):
 
 def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0), margin_offset_mm: float = 0.0):
     """Draw one label on the canvas at origin (x0, y0) in points."""
+    data = _inject_print_datetime(data)
     x0, y0 = origin
     width_mm = float(tpl.get("width_mm", 50))
     height_mm = float(tpl.get("height_mm", 30))
@@ -279,6 +292,56 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
             y_cursor -= 8
             if y_cursor < y0 + pad:
                 break
+
+    elif preset == "title_date_time":
+        # Long landscape label (e.g. 90.3×29mm): Title on top (bold, centered),
+        # QR on the left bottom, Date + Time stacked on the right bottom.
+        # Other bindings (beyond title/date/time) appear as small extra lines between.
+        bindings_map = {}
+        for b in bindings:
+            bindings_map.setdefault(b.source, b)
+        # Title line
+        title_binding = bindings_map.get("asset_name")
+        title_value = ""
+        if title_binding:
+            _, title_value = _resolve_field_value(title_binding, data)
+        if not title_value:
+            title_value = data.get("asset_name", "")
+        c.setFont("Helvetica-Bold", 11)
+        c.drawCentredString(x0 + w / 2, y0 + h - pad - 10, title_value[:40])
+
+        # QR code bottom-left
+        qr_size = min(h - pad * 2 - 12, w * 0.28)
+        qx = x0 + pad
+        qy = y0 + pad
+        c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
+
+        # Date + Time on the right
+        date_binding = bindings_map.get("print_date")
+        time_binding = bindings_map.get("print_time")
+        date_label, date_value = ("Date", data.get("print_date", ""))
+        time_label, time_value = ("Time", data.get("print_time", ""))
+        if date_binding:
+            date_label, date_value = _resolve_field_value(date_binding, data)
+        if time_binding:
+            time_label, time_value = _resolve_field_value(time_binding, data)
+
+        right_x = x0 + w - pad
+        mid_y = y0 + h / 2 - 8
+        c.setFont("Helvetica", 8)
+        c.drawRightString(right_x, mid_y, f"{date_label}: {date_value}")
+        c.drawRightString(right_x, mid_y - 10, f"{time_label}: {time_value}")
+
+        # Any additional bindings (beyond asset_name/print_date/print_time) printed small above QR baseline
+        extras = [b for b in bindings if b.source not in ("asset_name", "print_date", "print_time")]
+        if extras:
+            c.setFont("Helvetica", 6.5)
+            ex_y = y0 + pad
+            for b in extras[:2]:
+                label, val = _resolve_field_value(b, data)
+                if val:
+                    c.drawRightString(right_x, ex_y, f"{label}: {val}"[:40])
+                    ex_y += 8
 
     else:  # standard
         # Top: asset name bold, centered
@@ -551,16 +614,25 @@ async def list_presets(current_user: dict = Depends(get_current_user)):
                 "default_size": {"width_mm": 60, "height_mm": 30},
                 "max_bindings": 4,
             },
+            {
+                "key": "title_date_time",
+                "name": "Title + Date + Time",
+                "description": "Wide label: title on top, QR bottom-left, date & time bottom-right",
+                "default_size": {"width_mm": 90.3, "height_mm": 29},
+                "max_bindings": 5,
+            },
         ],
         "asset_fields": [
             {"key": "asset_id", "label": "Asset ID"},
-            {"key": "asset_name", "label": "Asset Name"},
+            {"key": "asset_name", "label": "Asset Name (Title)"},
             {"key": "serial_number", "label": "Serial Number"},
             {"key": "location", "label": "Location"},
             {"key": "department", "label": "Department"},
             {"key": "status", "label": "Status"},
             {"key": "inspection_date", "label": "Inspection Date"},
             {"key": "asset_type", "label": "Asset Type"},
+            {"key": "print_date", "label": "Print Date (auto)"},
+            {"key": "print_time", "label": "Print Time (auto)"},
             {"key": "custom", "label": "Custom Text"},
         ],
     }
