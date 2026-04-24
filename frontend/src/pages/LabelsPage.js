@@ -49,6 +49,7 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { labelsAPI } from "../lib/api";
+import { formAPI } from "../components/forms/formAPI";
 
 // ==================== HELPERS ====================
 
@@ -75,6 +76,7 @@ const emptyTemplate = {
     custom_url: "",
     base_url: window.location.origin,
   },
+  source_form_template_ids: [],
   status: "draft",
 };
 
@@ -109,6 +111,39 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
     () => presets.find((p) => p.key === form.preset)?.max_bindings || 4,
     [presets, form.preset]
   );
+
+  // Load available form templates (light list, only when editor is open)
+  const { data: formTemplatesData } = useQuery({
+    queryKey: ["form-templates-for-labels"],
+    queryFn: () => formAPI.getTemplates(),
+    enabled: open,
+    staleTime: 60_000,
+  });
+  const allFormTemplates = useMemo(
+    () => formTemplatesData?.templates || formTemplatesData || [],
+    [formTemplatesData]
+  );
+  const linkedFormIds = form.source_form_template_ids || [];
+
+  // Aggregate fields from linked form templates (unique by id)
+  const availableFormFields = useMemo(() => {
+    const map = new Map();
+    allFormTemplates
+      .filter((ft) => linkedFormIds.includes(ft.id))
+      .forEach((ft) => {
+        (ft.fields || []).forEach((f) => {
+          if (!f?.id) return;
+          if (!map.has(f.id)) {
+            map.set(f.id, {
+              id: f.id,
+              label: f.label || f.id,
+              form_name: ft.name,
+            });
+          }
+        });
+      });
+    return Array.from(map.values());
+  }, [allFormTemplates, linkedFormIds]);
 
   const saveMutation = useMutation({
     mutationFn: async (payload) => {
@@ -302,14 +337,55 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
                 {(form.field_bindings || []).map((b, i) => (
                   <div key={i} className="flex gap-1.5 items-center">
                     <Select
-                      value={b.source}
-                      onValueChange={(v) => updateBinding(i, { source: v, value: v === "custom" ? b.value || "" : undefined })}
+                      value={
+                        b.source === "form_field" && b.form_field_id
+                          ? `form_field::${b.form_field_id}`
+                          : b.source
+                      }
+                      onValueChange={(v) => {
+                        if (v.startsWith("form_field::")) {
+                          const fid = v.replace("form_field::", "");
+                          const field = availableFormFields.find((f) => f.id === fid);
+                          updateBinding(i, {
+                            source: "form_field",
+                            form_field_id: fid,
+                            label: field?.label || fid,
+                            value: undefined,
+                          });
+                        } else {
+                          updateBinding(i, {
+                            source: v,
+                            value: v === "custom" ? b.value || "" : undefined,
+                            form_field_id: undefined,
+                          });
+                        }
+                      }}
                     >
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-8 text-xs min-w-[170px]"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {assetFields.map((f) => (
-                          <SelectItem key={f.key} value={f.key} className="text-xs">{f.label}</SelectItem>
-                        ))}
+                        <div className="px-2 py-1 text-[10px] font-semibold uppercase text-slate-400">Asset</div>
+                        {assetFields
+                          .filter((f) => f.key !== "custom")
+                          .map((f) => (
+                            <SelectItem key={f.key} value={f.key} className="text-xs">{f.label}</SelectItem>
+                          ))}
+                        {availableFormFields.length > 0 && (
+                          <>
+                            <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase text-slate-400 border-t mt-1">Form Field</div>
+                            {availableFormFields.map((f) => (
+                              <SelectItem
+                                key={`ff-${f.id}`}
+                                value={`form_field::${f.id}`}
+                                className="text-xs"
+                              >
+                                {f.label}
+                                <span className="text-[10px] text-slate-400 ml-1">({f.id})</span>
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                        <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase text-slate-400 border-t mt-1">Other</div>
+                        <SelectItem value="custom" className="text-xs">Custom Text</SelectItem>
                       </SelectContent>
                     </Select>
                     {b.source === "custom" ? (
@@ -322,7 +398,7 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
                         />
                         <Input
                           className="h-8 text-xs"
-                          placeholder="Value"
+                          placeholder="Value — supports {asset_id} / {form.field_id}"
                           value={b.value || ""}
                           onChange={(e) => updateBinding(i, { value: e.target.value })}
                         />
@@ -346,6 +422,42 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
                     </Button>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Linked form templates — unlocks Form Field bindings */}
+            <div className="space-y-1.5 border-t pt-3">
+              <Label>Linked Form Templates</Label>
+              <p className="text-[11px] text-slate-500 -mt-0.5">
+                Select the form(s) whose fields you want to print on this label. Their fields will appear in the binding dropdown under “Form Field”.
+              </p>
+              <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 rounded-lg bg-slate-50 min-h-[38px]">
+                {allFormTemplates.length === 0 && (
+                  <span className="text-[11px] text-slate-400">No form templates available</span>
+                )}
+                {allFormTemplates.map((ft) => {
+                  const active = linkedFormIds.includes(ft.id);
+                  return (
+                    <button
+                      key={ft.id}
+                      type="button"
+                      data-testid={`link-form-${ft.id}`}
+                      onClick={() => {
+                        const next = active
+                          ? linkedFormIds.filter((x) => x !== ft.id)
+                          : [...linkedFormIds, ft.id];
+                        setForm({ ...form, source_form_template_ids: next });
+                      }}
+                      className={`text-[11px] px-2 py-0.5 rounded-full border transition-all ${
+                        active
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                      }`}
+                    >
+                      {ft.name}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

@@ -36,9 +36,10 @@ ALLOWED_ASSET_FIELDS = [
 
 
 class FieldBinding(BaseModel):
-    source: str  # one of ALLOWED_ASSET_FIELDS
+    source: str  # "asset_id", "asset_name", ..., "form_field", "custom"
     label: Optional[str] = None  # shown for custom or to override
     value: Optional[str] = None  # used only when source == "custom"
+    form_field_id: Optional[str] = None  # used only when source == "form_field"
 
 
 class QRConfig(BaseModel):
@@ -58,6 +59,7 @@ class LabelTemplateCreate(BaseModel):
     field_bindings: List[FieldBinding] = Field(default_factory=list)
     qr_config: QRConfig = Field(default_factory=QRConfig)
     default_equipment_type_id: Optional[str] = None
+    source_form_template_ids: List[str] = Field(default_factory=list)
     printer_type: Optional[str] = None
     status: Literal["draft", "published", "archived"] = "draft"
 
@@ -72,6 +74,7 @@ class LabelTemplateUpdate(BaseModel):
     field_bindings: Optional[List[FieldBinding]] = None
     qr_config: Optional[QRConfig] = None
     default_equipment_type_id: Optional[str] = None
+    source_form_template_ids: Optional[List[str]] = None
     printer_type: Optional[str] = None
     status: Optional[Literal["draft", "published", "archived"]] = None
 
@@ -219,6 +222,10 @@ def _resolve_field_value(binding: FieldBinding, data: dict) -> tuple[str, str]:
         import re
         val = re.sub(r"\{([^{}]+)\}", _sub, raw_value)
         return (binding.label or "Info", val)
+    if source == "form_field":
+        field_id = binding.form_field_id or ""
+        value = data.get(f"form.{field_id}") or data.get(field_id) or ""
+        return (binding.label or field_id or "Field", str(value))
     pretty = {
         "asset_id": "Asset ID",
         "asset_name": "Name",
