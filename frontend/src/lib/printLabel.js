@@ -49,8 +49,18 @@ function printHtmlViaIframe(html) {
     iframe.style.width = "0";
     iframe.style.height = "0";
     iframe.style.border = "0";
+    // Strip any Cloudflare challenge / analytics scripts that proxies may
+    // inject into cross-origin responses — they're useless inside the iframe
+    // and add noise to printed output.
+    const cleaned = String(html).replace(
+      /<script\b[^>]*>[\s\S]*?cdn-cgi\/challenge-platform[\s\S]*?<\/script>/gi,
+      ""
+    ).replace(
+      /<script\b[^>]*cloudflare[\s\S]*?<\/script>/gi,
+      ""
+    );
     // srcdoc yields a same-origin document so we can call contentWindow.print()
-    iframe.srcdoc = html;
+    iframe.srcdoc = cleaned;
 
     let done = false;
     const finish = (ok) => {

@@ -581,18 +581,20 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
             inner = f"""
               <div class="lbl-tdt">
                 <div class="title">{_html_escape(title_val[:40])}</div>
-                <img class="qr" src="{qr_src}" alt="qr" />
-                <div class="meta">
-                  <div>{_html_escape(date_lbl)}: {_html_escape(date_val)}</div>
-                  <div>{_html_escape(time_lbl)}: {_html_escape(time_val)}</div>
-                  {extras_html}
+                <div class="body">
+                  <img class="qr" src="{qr_src}" alt="qr" />
+                  <div class="meta">
+                    <div>{_html_escape(date_lbl)}: {_html_escape(date_val)}</div>
+                    <div>{_html_escape(time_lbl)}: {_html_escape(time_val)}</div>
+                    {extras_html}
+                  </div>
                 </div>
               </div>
             """
         elif preset == "blank":
             rows = "".join(
                 f'<div class="row">{_html_escape(lbl)}: {_html_escape(val)}</div>'
-                for (lbl, val) in lines if val or ((lbl, val) and _resolve_field_value is not None)
+                for (lbl, val) in lines if val
             )
             inner = f"""
               <div class="lbl-blank">
@@ -639,55 +641,60 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
 <title>Label</title>
 <style>
   @page {{ size: {page_w_mm}mm {page_h_mm}mm; margin: 0; }}
+  * {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }}
   html, body {{ margin: 0; padding: 0; background: #fff; }}
   body {{ font-family: Helvetica, Arial, sans-serif; color: #000; }}
   .label {{
     width: {page_w_mm}mm; height: {page_h_mm}mm;
-    box-sizing: border-box; padding: 2mm;
+    box-sizing: border-box; padding: 1.5mm;
     position: relative;
     page-break-after: always;
     overflow: hidden;
   }}
   .label:last-child {{ page-break-after: auto; }}
+  img {{ display: block; }}
 
   /* standard */
-  .lbl-std {{ display: flex; flex-direction: column; align-items: center; height: 100%; }}
-  .lbl-std .title {{ font-weight: bold; font-size: 9pt; text-align: center; }}
-  .lbl-std .qr   {{ width: 45%; height: auto; margin: auto; }}
-  .lbl-std .foot {{ font-size: 6.5pt; text-align: center; }}
+  .lbl-std {{ display: flex; flex-direction: column; align-items: center; height: 100%; gap: 0.5mm; }}
+  .lbl-std .title {{ font-weight: bold; font-size: 9pt; text-align: center; line-height: 1.1; }}
+  .lbl-std .qr   {{ flex: 1 1 auto; max-height: 70%; width: auto; margin: auto; object-fit: contain; }}
+  .lbl-std .foot {{ font-size: 6.5pt; text-align: center; line-height: 1.2; }}
 
   /* compact */
-  .lbl-compact {{ display: flex; gap: 2mm; height: 100%; }}
-  .lbl-compact .qr {{ height: 100%; width: auto; }}
-  .lbl-compact .title {{ font-weight: bold; font-size: 8pt; }}
-  .lbl-compact .row {{ font-size: 6.5pt; }}
+  .lbl-compact {{ display: flex; gap: 1.5mm; height: 100%; align-items: center; }}
+  .lbl-compact .qr {{ height: 100%; width: auto; max-width: 40%; object-fit: contain; }}
+  .lbl-compact .side {{ flex: 1; min-width: 0; }}
+  .lbl-compact .title {{ font-weight: bold; font-size: 8pt; line-height: 1.1; }}
+  .lbl-compact .row {{ font-size: 6.5pt; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
   /* qr only */
-  .lbl-qr-only {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }}
-  .lbl-qr-only img {{ max-width: 70%; max-height: 70%; }}
-  .lbl-qr-only .cap {{ font-size: 7pt; font-weight: bold; }}
+  .lbl-qr-only {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 0.5mm; }}
+  .lbl-qr-only img {{ max-width: 75%; max-height: 80%; object-fit: contain; }}
+  .lbl-qr-only .cap {{ font-size: 7pt; font-weight: bold; text-align: center; }}
 
   /* with logo */
   .lbl-logo {{ display: flex; flex-direction: column; height: 100%; gap: 1mm; }}
-  .lbl-logo .top {{ display: flex; gap: 2mm; align-items: center; }}
-  .lbl-logo .logo {{ width: 8mm; height: 8mm; border: 0.3mm solid #888; display:flex;align-items:center;justify-content:center;font-size:5pt;color:#888; }}
-  .lbl-logo .title {{ font-weight: bold; font-size: 8pt; }}
-  .lbl-logo .bottom {{ display: flex; gap: 2mm; flex: 1; }}
-  .lbl-logo .qr {{ width: 40%; height: auto; max-height: 100%; }}
-  .lbl-logo .row {{ font-size: 6.5pt; }}
+  .lbl-logo .top {{ display: flex; gap: 2mm; align-items: center; flex: 0 0 auto; }}
+  .lbl-logo .logo {{ width: 7mm; height: 7mm; border: 0.3mm solid #888; display:flex;align-items:center;justify-content:center;font-size:5pt;color:#888; }}
+  .lbl-logo .title {{ font-weight: bold; font-size: 8pt; line-height: 1.1; }}
+  .lbl-logo .bottom {{ display: flex; gap: 2mm; flex: 1; min-height: 0; }}
+  .lbl-logo .qr {{ height: 100%; width: auto; max-width: 40%; object-fit: contain; }}
+  .lbl-logo .side {{ flex: 1; min-width: 0; }}
+  .lbl-logo .row {{ font-size: 6.5pt; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
   /* title + date + time */
-  .lbl-tdt {{ display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; height: 100%; }}
-  .lbl-tdt .title {{ grid-column: 1 / -1; text-align: center; font-weight: bold; font-size: 11pt; }}
-  .lbl-tdt .qr {{ grid-column: 1; justify-self: start; align-self: end; height: 85%; width: auto; max-width: 100%; }}
-  .lbl-tdt .meta {{ grid-column: 2; justify-self: end; align-self: end; text-align: right; font-size: 8pt; line-height: 1.3; }}
+  .lbl-tdt {{ display: flex; flex-direction: column; height: 100%; gap: 0.5mm; }}
+  .lbl-tdt .title {{ text-align: center; font-weight: bold; font-size: 10pt; line-height: 1.1; flex: 0 0 auto; }}
+  .lbl-tdt .body {{ display: flex; gap: 2mm; flex: 1; min-height: 0; align-items: flex-end; }}
+  .lbl-tdt .qr {{ height: 100%; width: auto; max-width: 30%; object-fit: contain; }}
+  .lbl-tdt .meta {{ flex: 1; text-align: right; font-size: 7.5pt; line-height: 1.3; }}
   .lbl-tdt .ext {{ font-size: 6.5pt; }}
 
   /* blank */
-  .lbl-blank {{ position: relative; height: 100%; }}
-  .lbl-blank .lines {{ width: 62%; font-size: 8pt; line-height: 1.35; }}
+  .lbl-blank {{ display: flex; gap: 1.5mm; height: 100%; align-items: stretch; }}
+  .lbl-blank .lines {{ flex: 1; min-width: 0; font-size: 7.5pt; line-height: 1.25; display: flex; flex-direction: column; justify-content: flex-start; }}
   .lbl-blank .row {{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-  .lbl-blank .qr {{ position: absolute; right: 2mm; bottom: 2mm; width: 30%; height: auto; }}
+  .lbl-blank .qr {{ height: 100%; width: auto; max-width: 28%; object-fit: contain; align-self: center; }}
 </style>
 </head>
 <body>
