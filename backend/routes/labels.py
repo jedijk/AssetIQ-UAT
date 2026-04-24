@@ -638,20 +638,36 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Label</title>
+<title></title>
 <style>
   @page {{ size: {page_w_mm}mm {page_h_mm}mm; margin: 0; }}
+  @page :first {{ margin: 0; }}
+  @page :left  {{ margin: 0; }}
+  @page :right {{ margin: 0; }}
   * {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }}
-  html, body {{ margin: 0; padding: 0; background: #fff; }}
+  html, body {{
+    width: {page_w_mm}mm;
+    height: {page_h_mm}mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff;
+    overflow: hidden;
+  }}
   body {{ font-family: Helvetica, Arial, sans-serif; color: #000; }}
   .label {{
     width: {page_w_mm}mm; height: {page_h_mm}mm;
     box-sizing: border-box; padding: 1.5mm;
     position: relative;
-    page-break-after: always;
     overflow: hidden;
+    page-break-after: always;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }}
   .label:last-child {{ page-break-after: auto; }}
+  @media print {{
+    html, body {{ width: {page_w_mm}mm !important; height: {page_h_mm}mm !important; }}
+    body > *:not(.label) {{ display: none !important; }}
+  }}
   img {{ display: block; }}
 
   /* standard */
