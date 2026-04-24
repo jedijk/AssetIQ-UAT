@@ -1434,49 +1434,9 @@ async def get_threat_timeline(
             "source": "action"
         })
     
-    # Get task instances related to this observation or its equipment
-    # Tasks directly linked to this observation should show regardless of creator
-    # Also include tasks from sibling observations (same equipment)
-    direct_task_conditions = [
-        {"observation_id": threat_id},
-        {"threat_id": threat_id},
-        {"source_id": threat_id}
-    ]
-    
-    # Add conditions for tasks linked to sibling observations
-    if sibling_obs_ids:
-        direct_task_conditions.append({"observation_id": {"$in": sibling_obs_ids}})
-        direct_task_conditions.append({"threat_id": {"$in": sibling_obs_ids}})
-        direct_task_conditions.append({"source_id": {"$in": sibling_obs_ids}})
-    
-    equipment_task_conditions = []
-    if equipment_id:
-        equipment_task_conditions.append({"equipment_id": equipment_id})
-        equipment_task_conditions.append({"linked_equipment_id": equipment_id})
-    if asset_name:
-        equipment_task_conditions.append({"equipment_name": asset_name})
-    
-    # Combine: directly linked tasks OR sibling observation tasks OR equipment-linked tasks
-    task_query = {"$or": direct_task_conditions + equipment_task_conditions} if equipment_task_conditions else {"$or": direct_task_conditions}
-    
-    task_instances = await db.task_instances.find(
-        task_query,
-        {"_id": 0}
-    ).to_list(100)
-    
-    for task in task_instances:
-        timeline_items.append({
-            "id": task.get("id"),
-            "type": "task",
-            "title": task.get("name", task.get("task_name", "Untitled Task")),
-            "description": task.get("description", ""),
-            "status": task.get("status", "pending"),
-            "scheduled_date": task.get("scheduled_date"),
-            "completed_at": task.get("completed_at"),
-            "created_at": task.get("created_at"),
-            "updated_at": task.get("updated_at"),
-            "source": "task"
-        })
+    # Tasks are intentionally NOT included in the observation timeline.
+    # Per requirements, the observation timeline shows only Observations, Actions, and Investigations.
+    task_instances = []
     
     # Get investigations linked to this observation or sibling observations
     # Filter by: direct threat link, sibling observation link, or same asset
@@ -1513,13 +1473,19 @@ async def get_threat_timeline(
             })
     
     # Sort by date (most recent first)
+    # For completed tasks, prefer completed_at so they anchor to actual completion time
     def get_sort_date(item):
-        date_str = item.get("created_at") or item.get("scheduled_date") or ""
+        if item.get("type") == "task" and item.get("status") == "completed" and item.get("completed_at"):
+            date_str = item.get("completed_at")
+        else:
+            date_str = item.get("created_at") or item.get("scheduled_date") or ""
         if isinstance(date_str, str):
             try:
                 return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
             except (ValueError, TypeError):
                 return datetime.min.replace(tzinfo=timezone.utc)
+        if hasattr(date_str, 'isoformat'):
+            return date_str if date_str.tzinfo else date_str.replace(tzinfo=timezone.utc)
         return datetime.min.replace(tzinfo=timezone.utc)
     
     timeline_items.sort(key=get_sort_date, reverse=True)

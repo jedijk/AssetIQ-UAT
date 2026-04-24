@@ -309,7 +309,13 @@ const TimelineItem = ({ item, onClick, isFirst, isLast }) => {
       
       {/* Date */}
       <div className="text-center mb-1 md:mb-1.5">
-        <span className="text-[9px] md:text-[10px] text-slate-400">{formatDate(item.created_at)}</span>
+        <span className="text-[9px] md:text-[10px] text-slate-400">
+          {formatDate(
+            item.type === "task" && item.status === "completed" && item.completed_at
+              ? item.completed_at
+              : item.created_at
+          )}
+        </span>
       </div>
       
       {/* Card - lighter styling */}
@@ -469,15 +475,6 @@ const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
           >
             <Target className="w-3 h-3 mr-0.5" />
             {counts.actions}
-          </Button>
-          <Button
-            variant={filter === "task" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter("task")}
-            className="h-6 text-[10px] px-2 flex-shrink-0"
-          >
-            <ClipboardList className="w-3 h-3 mr-0.5" />
-            {counts.tasks}
           </Button>
           <Button
             variant={filter === "investigation" ? "default" : "outline"}

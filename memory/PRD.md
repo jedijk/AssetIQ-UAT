@@ -4,9 +4,14 @@
 Create a robust full-stack platform optimized for multi-environment execution with dynamic database switching, advanced form capabilities, seamless AI integrations, GDPR compliance, version-controlled PWAs, comprehensive log ingestion, and automated data processing.
 
 ## Current Version
-**v3.5.8** (Updated: December 2025)
+**v3.5.9** (Updated: April 2026)
 
 ## Recent Changes
+- [Apr 2026] UAT environment provisioning complete:
+  - MongoDB `assetiq` → `assetiq-UAT` cloned (32,472 documents)
+  - Cloudflare R2 `assetiq-files` → `assetiq-files-uat` mirrored (2,230 objects / 242 MB)
+  - Created `/app/scripts/r2_copy_to_uat.py` as reusable sync tool
+- [Apr 2026] Observation Related Activity timeline: Tasks removed (now shows only Observations, Actions, Investigations per requirements). Fixed task-title field lookup and completed_at display for any downstream task views.
 - [Dec 2025] Removed Total Input fallback - now calculated ONLY from End of Shift entries (no longer sums FEED from ingested logs)
 - [Dec 2025] Added registration spam protection:
   - Rate limiting (3/minute per IP)
