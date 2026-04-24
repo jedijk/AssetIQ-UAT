@@ -40,6 +40,7 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
+import DatabaseEnvSwitcher from "./DatabaseEnvSwitcher";
 import { toast } from "sonner";
 import ChatSidebar from "./ChatSidebar";
 import ImageEditor from "./ImageEditor";
@@ -690,6 +691,10 @@ const Layout = () => {
 
           {/* Right Side */}
           <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2">
+            {/* Database Environment Switcher — Owner only */}
+            {user?.role === "owner" && (
+              <DatabaseEnvSwitcher />
+            )}
             {/* Notifications Bell */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
