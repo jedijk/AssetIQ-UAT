@@ -462,52 +462,49 @@ const MyTasksPage = () => {
         if (labelCfg?.enabled && labelCfg?.label_template_id && submissionId) {
           const trigger = labelCfg.trigger || "manual";
           if (trigger === "on_submit" || trigger === "both") {
-            // Auto-open print dialog
+            // Auto-print using cross-platform helper
             (async () => {
               try {
                 const { labelsAPI } = await import("../lib/api");
+                const { printLabelBlob, isMobileDevice } = await import("../lib/printLabel");
                 const blob = await labelsAPI.printBlob({
                   template_id: labelCfg.label_template_id,
                   submission_id: submissionId,
                   copies: 1,
                 });
-                const url = URL.createObjectURL(blob);
-                const w = window.open(url, "_blank");
-                if (w) {
-                  setTimeout(() => { try { w.print(); } catch (_e) {} }, 500);
-                  toast.info("Label sent to printer");
+                const res = await printLabelBlob(blob, `label-${Date.now()}.pdf`);
+                if (res.mobile) {
+                  toast.info("Label downloaded — open it to print via your phone's share menu.");
+                } else if (res.downloaded) {
+                  toast.info("Print dialog blocked — label downloaded instead.");
                 } else {
-                  const a = document.createElement("a");
-                  a.href = url; a.download = "label.pdf";
-                  document.body.appendChild(a); a.click(); a.remove();
-                  toast.info("Pop-up blocked — label downloaded");
+                  toast.success("Label sent to printer");
                 }
-                setTimeout(() => URL.revokeObjectURL(url), 2000);
+                // Silence the unused-var lint by using isMobileDevice in a no-op
+                void isMobileDevice;
               } catch (err) {
                 toast.error("Label auto-print failed");
               }
             })();
           } else if (trigger === "manual") {
             toast.success(labelCfg.button_label || "Print Label", {
-              description: "Label ready to print",
+              description: "Label ready — tap Print",
               action: {
                 label: "Print",
                 onClick: async () => {
                   try {
                     const { labelsAPI } = await import("../lib/api");
+                    const { printLabelBlob } = await import("../lib/printLabel");
                     const blob = await labelsAPI.printBlob({
                       template_id: labelCfg.label_template_id,
                       submission_id: submissionId,
                       copies: 1,
                     });
-                    const url = URL.createObjectURL(blob);
-                    const w = window.open(url, "_blank");
-                    if (w) setTimeout(() => { try { w.print(); } catch (_e) {} }, 500);
-                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                    await printLabelBlob(blob, `label-${Date.now()}.pdf`);
                   } catch (_e) { toast.error("Label print failed"); }
                 },
               },
-              duration: 10000,
+              duration: 15000,
             });
           }
         }

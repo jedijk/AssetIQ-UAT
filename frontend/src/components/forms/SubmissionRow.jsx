@@ -44,19 +44,11 @@ export const SubmissionRow = ({ submission }) => {
         submission_id: submission.id,
         copies: 1,
       });
-      const url = URL.createObjectURL(blob);
-      const w = window.open(url, "_blank");
-      if (w) {
-        setTimeout(() => { try { w.print(); } catch (_e2) {} }, 500);
-        toast.success("Print dialog opened");
-      } else {
-        // pop-up blocked — fall back to download
-        const a = document.createElement("a");
-        a.href = url; a.download = `${submission.template_name || "label"}.pdf`;
-        document.body.appendChild(a); a.click(); a.remove();
-        toast.info("Pop-up blocked — PDF downloaded instead");
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      const { printLabelBlob } = await import("../../lib/printLabel");
+      const res = await printLabelBlob(blob, `${submission.template_name || "label"}.pdf`);
+      if (res.mobile) toast.info("Label downloaded — open it to print via your phone's share menu.");
+      else if (res.downloaded) toast.info("Print dialog blocked — label downloaded instead.");
+      else toast.success("Print dialog opened");
     } catch (err) {
       toast.error(err.response?.data?.detail || "Print failed");
     } finally {

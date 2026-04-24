@@ -615,14 +615,11 @@ function PrintDialog({ open, template, onClose }) {
         downloadBlob(blob, `${template.name || "labels"}.pdf`);
         toast.success("PDF downloaded");
       } else {
-        const url = URL.createObjectURL(blob);
-        const w = window.open(url, "_blank");
-        if (w) {
-          setTimeout(() => { try { w.print(); } catch (_e) { /* ignore */ } }, 500);
-          toast.success("Print dialog opened");
-        } else {
-          toast.info("Pop-up blocked — use Download PDF instead");
-        }
+        const { printLabelBlob } = await import("../lib/printLabel");
+        const res = await printLabelBlob(blob, `${template.name || "labels"}.pdf`);
+        if (res.mobile) toast.info("PDF downloaded — open it to print via your phone's share menu.");
+        else if (res.downloaded) toast.info("Print blocked — PDF downloaded instead.");
+        else toast.success("Print dialog opened");
       }
     } catch (e) {
       toast.error(e.response?.data?.detail || "Print failed");
