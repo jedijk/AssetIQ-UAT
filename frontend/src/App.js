@@ -40,7 +40,7 @@ import SettingsLogIngestionPage from "./pages/SettingsLogIngestionPage";
 import SettingsPrivacyPage from "./pages/SettingsPrivacyPage";
 import SettingsDeletionRequestsPage from "./pages/SettingsDeletionRequestsPage";
 import SettingsConsentManagementPage from "./pages/SettingsConsentManagementPage";
-import InsightsPage from "./pages/InsightsPage";
+import LabelsPage from "./pages/LabelsPage";import InsightsPage from "./pages/InsightsPage";
 import FormsPage from "./pages/FormsPage";
 import FormSubmissionsPage from "./pages/FormSubmissionsPage";
 import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
@@ -335,6 +335,7 @@ function App() {
                 <Route path="my-tasks" element={<MyTasksPage />} />
                 <Route path="forms" element={<Navigate to="/tasks?tab=forms" replace />} />
                 <Route path="form-submissions" element={<FormSubmissionsPage />} />
+                <Route path="labels" element={<LabelsPage />} />
                 <Route path="decision-engine" element={<UnderDevelopmentPage />} />
                 <Route path="feedback" element={<FeedbackPage />} />
                 

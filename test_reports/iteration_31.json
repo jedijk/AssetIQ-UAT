@@ -1,0 +1,38 @@
+{
+  "summary": "Sprint 1 Smart Labeling System regression. Backend: 22/22 pytest cases green (presets, CRUD, preset variants, update/versioning, duplicate, soft-archive, preview with template_id/inline/sample/custom_url/custom binding, 404/400 error paths, print with copies & job recording, jobs sort). Frontend: /labels loads with heading + New Template button; create-template modal + PDF preview iframe works; created template appears in card grid; duplicate creates (copy); Print dialog opens and Download PDF triggers a blob download with filename <Template>.pdf; archive removes from default list.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Print History tab", "issue": "After performing a Download PDF via the UI (which calls /api/labels/print and should record a job), the Print History tab rendered 0 rows within ~3s. Backend /api/labels/jobs itself works (verified in pytest and returns jobs created by backend tests). Likely a React-Query caching / enabled-on-tab-activation issue or a DB-environment mismatch between the UI's X-Database-Environment header and the backend default. Main agent should verify by opening the tab manually and refetching (e.g. remove staleTime, force refetch on tab activation).", "affected_selectors": ["[data-testid=\"tab-history\"]", "tbody tr"]},
+      {"flow": "Smart Labels nav link discovery", "issue": "Link `a[href=\"/labels\"]` was not found on the main app page by automation — it is declared in Layout.js settings menu (avatar/user dropdown) which was not opened by the test. Not a bug per se; flagged so main agent can verify the dropdown exposes it correctly on desktop."}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_labels.py", "/app/test_reports/pytest/labels_results.xml"],
+  "action_items": [
+    "Investigate why Print History tab shows 0 rows immediately after a successful Download PDF in the UI — likely stale cache or X-Database-Environment mismatch. Consider invalidating ['label-jobs'] after printBlob() resolves and/or forcing refetchOnMount for the history query.",
+    "Manually confirm the Smart Labels link is visible in the user dropdown (Layout.js line 565). Automation did not open the avatar menu."
+  ],
+  "critical_code_review_comments": [
+    "labels.py uses body.dict() — on Pydantic v2 this triggers DeprecationWarning; prefer model_dump().",
+    "In update_template, `{k:v for ... if v is not None}` together with exclude_unset=True silently prevents clearing optional string fields (e.g. resetting description=\"\" works but setting form_id=None is stripped). Acceptable for Sprint 1.",
+    "Duplicate endpoint shallow-copies `existing`; nested dicts (qr_config, field_bindings) share references with the original doc in memory. Not an issue since each goes through insert_one afterwards, but safer to deepcopy.",
+    "_load_asset falls back to matching `name` when id lookup fails — could yield ambiguous matches on equipment with duplicate names.",
+    "print endpoint caps at 500 but silently drops asset IDs beyond the cap with no warning in the response — consider returning skipped_count.",
+    "Frontend PrintDialog's 'Print' button opens a popup and calls w.print() — popup blockers will silently fail; UX would benefit from an info message.",
+    "emptyTemplate in LabelsPage uses window.location.origin at module scope which works but would break SSR — ok for CRA.",
+    "LabelsPage.js is ~840 lines; consider splitting TemplateEditor and PrintDialog into their own files for maintainability."
+  ],
+  "updated_files": ["/app/backend/tests/test_labels.py"],
+  "success_rate": {"backend": "100%", "frontend": "~90% (Print History refresh not verified in UI)"},
+  "test_credentials": "jedijk@gmail.com / Jaap8019@ (owner) — works",
+  "seed_data_creation": "Test templates prefixed TEST_* were created and cleaned up by the pytest suite. One 'Compact Bay Label (copy)' remained from earlier runs and was archived during UI cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression lives at /app/backend/tests/test_labels.py (22 tests, ~15s). Owner login via jedijk@gmail.com works. The frontend UI /labels is fully functional — only the Print History refresh-after-print needs a closer look (cache invalidation). QR target variants (asset_page/custom_url/custom binding) all produce valid %PDF content in the preview endpoint; full QR image decoding was not attempted (only header check as allowed by the request).",
+  "rca of the issue": "Print History tab empty state most likely RCA: the `['label-jobs']` query has `enabled: activeTab === 'history'` but no invalidation is triggered by the Print flow. After a print, switching to history uses the cached empty result (if any) or a fresh fetch — verified backend returns jobs. Suggested fix: in PrintDialog.onPrint success, call `queryClient.invalidateQueries({ queryKey: ['label-jobs'] })`."
+}

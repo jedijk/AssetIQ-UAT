@@ -35,6 +35,7 @@ from routes.production import router as production_router
 from routes.ai_extract import router as ai_extract_router
 from routes.production_logs import router as production_logs_router
 from routes.gdpr import router as gdpr_router
+from routes.labels import router as labels_router
 
 all_routers = [
     auth_router,
@@ -71,4 +72,5 @@ all_routers = [
     ai_extract_router,
     production_logs_router,
     gdpr_router,
+    labels_router,
 ]
