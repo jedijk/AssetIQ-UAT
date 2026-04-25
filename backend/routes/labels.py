@@ -198,6 +198,11 @@ async def _load_submission_data(submission_id: str) -> dict:
     return out
 
 
+# Minimum safety margin enforced inside every label so content
+# (logo, QR, text) never gets clipped by printers / cutters.
+SAFETY_MARGIN_MM = 3.0
+
+
 SAMPLE_DATA = {
     "asset_id": "EQ-00123",
     "asset_name": "Extruder Unit 1",
@@ -487,7 +492,7 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
     height_mm = float(tpl.get("height_mm", 30))
     w = width_mm * mm
     h = height_mm * mm
-    pad = 2 * mm + margin_offset_mm * mm
+    pad = SAFETY_MARGIN_MM * mm + margin_offset_mm * mm
     preset = tpl.get("preset", "standard")
 
     # Logo configuration
@@ -989,7 +994,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
   body {{ font-family: Helvetica, Arial, sans-serif; color: #000; }}
   .label {{
     width: {page_w_mm}mm; height: {page_h_mm}mm;
-    box-sizing: border-box; padding: 1.5mm;
+    box-sizing: border-box; padding: 3mm;
     position: relative;
     overflow: hidden;
     page-break-after: always;
@@ -1006,10 +1011,10 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
   /* Logo positioning classes */
   .assetiq-logo {{ display: inline-flex; align-items: center; gap: 1mm; }}
   .assetiq-logo img {{ display: inline-block; }}
-  .logo-top-left {{ position: absolute; top: 1.5mm; left: 1.5mm; }}
-  .logo-top-right {{ position: absolute; top: 1.5mm; right: 1.5mm; }}
-  .logo-bottom-left {{ position: absolute; bottom: 1.5mm; left: 1.5mm; }}
-  .logo-bottom-right {{ position: absolute; bottom: 1.5mm; right: 1.5mm; }}
+  .logo-top-left {{ position: absolute; top: 3mm; left: 3mm; }}
+  .logo-top-right {{ position: absolute; top: 3mm; right: 3mm; }}
+  .logo-bottom-left {{ position: absolute; bottom: 3mm; left: 3mm; }}
+  .logo-bottom-right {{ position: absolute; bottom: 3mm; right: 3mm; }}
   .logo-inline {{ position: relative; margin-bottom: 1mm; }}
   .logo-placeholder {{ width: 7mm; height: 7mm; border: 0.3mm solid #888; display:flex;align-items:center;justify-content:center;font-size:var(--caption-font);color:#888; }}
 
