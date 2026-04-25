@@ -916,12 +916,12 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                 f'<div class="row">{_html_escape(lbl)}: {_html_escape(val)}</div>'
                 for (lbl, val) in lines if val
             )
-            logo_div = f'<div class="{logo_class} logo-inline">{logo_html}</div>' if logo_enabled else ""
+            logo_div = f'<div class="{logo_class}">{logo_html}</div>' if logo_enabled else ""
             qr_html = f'<img class="qr" src="{qr_src}" alt="qr" />' if show_qr else ""
             inner = f"""
               <div class="lbl-blank {'no-qr' if not show_qr else ''}">
+                {logo_div}
                 <div class="lines">
-                  {logo_div}
                   {rows}
                 </div>
                 {qr_html}
@@ -1034,7 +1034,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
   .lbl-qr-only .cap {{ font-size: var(--caption-font); font-weight: bold; text-align: center; }}
 
   /* with logo */
-  .lbl-logo {{ display: flex; flex-direction: column; height: 100%; gap: 1mm; }}
+  .lbl-logo {{ display: flex; flex-direction: column; height: 100%; gap: 1mm; position: relative; }}
   .lbl-logo .top {{ display: flex; gap: 2mm; align-items: center; flex: 0 0 auto; }}
   .lbl-logo .title {{ font-weight: bold; font-size: var(--title-font); line-height: 1.1; }}
   .lbl-logo .bottom {{ display: flex; gap: 2mm; flex: 1; min-height: 0; }}
@@ -1044,7 +1044,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
   .lbl-logo .row {{ font-size: var(--body-font); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
   /* title + date + time */
-  .lbl-tdt {{ display: flex; flex-direction: column; height: 100%; gap: 0.5mm; }}
+  .lbl-tdt {{ display: flex; flex-direction: column; height: 100%; gap: 0.5mm; position: relative; }}
   .lbl-tdt .header-row {{ display: flex; align-items: center; gap: 2mm; flex: 0 0 auto; }}
   .lbl-tdt .header-row .title {{ flex: 1; text-align: center; font-weight: bold; font-size: var(--title-font); line-height: 1.1; }}
   .lbl-tdt .header-row .logo-top-left {{ position: static; }}
@@ -1056,7 +1056,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
   .lbl-tdt .ext {{ font-size: var(--caption-font); }}
 
   /* blank */
-  .lbl-blank {{ display: flex; gap: 1.5mm; height: 100%; align-items: stretch; }}
+  .lbl-blank {{ display: flex; gap: 1.5mm; height: 100%; align-items: stretch; position: relative; }}
   .lbl-blank .lines {{ flex: 1; min-width: 0; font-size: var(--body-font); line-height: 1.25; display: flex; flex-direction: column; justify-content: flex-start; }}
   .lbl-blank .row {{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
   .lbl-blank .qr {{ height: 100%; width: auto; max-width: 28%; object-fit: contain; align-self: center; }}
@@ -1216,9 +1216,17 @@ async def preview_label(body: PreviewRequest, current_user: dict = Depends(get_c
 @router.post("/print")
 async def print_labels(body: PrintRequest, current_user: dict = Depends(get_current_user)):
     """Render a print-ready PDF for one or many assets and record the job."""
+    import logging
+    logger = logging.getLogger("labels")
+    
     tpl_doc = await db.label_templates.find_one({"id": body.template_id}, {"_id": 0})
     if not tpl_doc:
         raise HTTPException(status_code=404, detail="Template not found")
+    
+    logger.info(f"print_labels: template_id={body.template_id}")
+    logger.info(f"print_labels: tpl_doc logo_config={tpl_doc.get('logo_config')}")
+    logger.info(f"print_labels: tpl_doc show_qr={tpl_doc.get('show_qr')}")
+    logger.info(f"print_labels: tpl_doc preset={tpl_doc.get('preset')}")
 
     datasets: List[dict] = []
     resolved_assets: List[str] = []
