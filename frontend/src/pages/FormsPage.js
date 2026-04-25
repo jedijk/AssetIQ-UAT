@@ -599,9 +599,18 @@ const FormsPage = ({ embedded = false }) => {
               </Card>
             ) : (
               <div className="space-y-3">
-                {submissions.map((submission) => (
-                  <SubmissionRow key={submission.id} submission={submission} />
-                ))}
+                {submissions.map((submission) => {
+                  const tpl = templates.find(
+                    (t) => t.id === (submission.template_id || submission.form_template_id)
+                  );
+                  return (
+                    <SubmissionRow
+                      key={submission.id}
+                      submission={submission}
+                      labelConfig={tpl?.label_print_config || null}
+                    />
+                  );
+                })}
               </div>
             )}
           </TabsContent>

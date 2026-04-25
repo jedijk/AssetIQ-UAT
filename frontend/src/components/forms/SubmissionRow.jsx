@@ -11,10 +11,17 @@ import { ThresholdBadge } from "./FieldPreview";
 import { formatDateTime } from "../../lib/dateUtils";
 import { formAPI } from "./formAPI";
 
-export const SubmissionRow = ({ submission }) => {
+export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
   const [expanded, setExpanded] = useState(false);
   const [printing, setPrinting] = useState(false);
-  const [labelConfig, setLabelConfig] = useState(undefined); // undefined = not loaded, null = no config
+  const [labelConfig, setLabelConfig] = useState(
+    labelConfigProp !== undefined ? labelConfigProp : undefined
+  );
+
+  // Only show the print icon when the form template explicitly has label
+  // printing enabled and a template selected. This prevents misleading users
+  // and avoids "no label template configured" toasts on every click.
+  const labelEnabled = !!(labelConfigProp?.enabled && labelConfigProp?.label_template_id);
 
   const ensureConfig = async () => {
     if (labelConfig !== undefined) return labelConfig;
@@ -107,17 +114,19 @@ export const SubmissionRow = ({ submission }) => {
               submission.status || "Pending"
             )}
           </Badge>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-slate-500 hover:text-indigo-600"
-            title="Print Label"
-            data-testid={`print-label-${submission.id}`}
-            onClick={handlePrint}
-            disabled={printing}
-          >
-            {printing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
-          </Button>
+          {labelEnabled && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-slate-500 hover:text-indigo-600"
+              title="Reprint label"
+              data-testid={`print-label-${submission.id}`}
+              onClick={handlePrint}
+              disabled={printing}
+            >
+              {printing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+            </Button>
+          )}
         </div>
       </div>
 

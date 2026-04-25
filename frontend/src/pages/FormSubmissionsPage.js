@@ -38,6 +38,8 @@ import {
   Settings,
   Sparkles,
   Users,
+  Printer,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -78,6 +80,7 @@ import BackButton from "../components/BackButton";
 import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 import { DocumentViewer } from "../components/DocumentViewer";
 import { formatDate as formatDateUtil, formatDateTime as formatDateTimeUtil } from "../lib/dateUtils";
+import { formAPI } from "../components/forms/formAPI";
 
 const API_BASE_URL = getBackendUrl();
 
@@ -478,6 +481,65 @@ export default function FormSubmissionsPage() {
 
   const submissions = submissionsData?.submissions || [];
 
+  // Fetch form templates so we can decide which submissions allow label reprint.
+  // We only need the (lightweight) list — every template carries label_print_config.
+  const { data: templatesData } = useQuery({
+    queryKey: ["form-templates", "for-label-reprint"],
+    queryFn: () => formAPI.getTemplates(),
+    enabled: !isMobile,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Map: template_id -> label_print_config
+  const labelConfigByTemplate = (templatesData?.templates || []).reduce((acc, t) => {
+    if (t?.id) acc[t.id] = t.label_print_config || null;
+    return acc;
+  }, {});
+
+  // Track per-submission print state so the spinner only flips on the row clicked.
+  const [printingId, setPrintingId] = useState(null);
+
+  const reprintLabel = async (submission, e) => {
+    e?.stopPropagation?.();
+    const cfg = labelConfigByTemplate[submission.form_template_id];
+    if (!cfg?.enabled || !cfg?.label_template_id) {
+      toast.error("This form has no label template configured.");
+      return;
+    }
+    // Open a window synchronously inside the click handler so iOS Safari
+    // doesn't block it; we'll fill it once the fetch returns.
+    let preOpened = null;
+    try {
+      const { openPrintWindow, isMobileDevice } = await import("../lib/printLabel");
+      if (isMobileDevice()) preOpened = openPrintWindow();
+    } catch (_e) { /* ignore */ }
+
+    setPrintingId(submission.id);
+    try {
+      const { printLabel } = await import("../lib/printLabel");
+      const res = await printLabel(
+        {
+          template_id: cfg.label_template_id,
+          submission_id: submission.id,
+          copies: 1,
+        },
+        {
+          win: preOpened,
+          filename: `${submission.form_template_name || "label"}.pdf`,
+        }
+      );
+      if (res.method === "window") toast.success("Label print dialog opened");
+      else if (res.mobile) toast.info("Label downloaded — use Share → Print");
+      else if (res.method === "download") toast.info("Print blocked — label downloaded.");
+      else toast.success("Print dialog opened");
+    } catch (err) {
+      if (preOpened && !preOpened.closed) preOpened.close();
+      toast.error(err?.response?.data?.detail || "Print failed");
+    } finally {
+      setPrintingId(null);
+    }
+  };
+
   // Filter submissions
   const filteredSubmissions = submissions.filter(sub => {
     // Search filter
@@ -751,6 +813,30 @@ export default function FormSubmissionsPage() {
                       
                       {/* Actions - Desktop: View button, Mobile: Menu */}
                       <div className="flex items-center gap-1 shrink-0">
+                        {/* Reprint Label - only when form has label printing enabled */}
+                        {(() => {
+                          const cfg = labelConfigByTemplate[submission.form_template_id];
+                          if (!cfg?.enabled || !cfg?.label_template_id) return null;
+                          const isPrinting = printingId === submission.id;
+                          return (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-500 hover:text-indigo-600"
+                              title="Reprint label"
+                              data-testid={`reprint-label-${submission.id}`}
+                              onClick={(e) => reprintLabel(submission, e)}
+                              disabled={isPrinting}
+                            >
+                              {isPrinting ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Printer className="w-4 h-4" />
+                              )}
+                            </Button>
+                          );
+                        })()}
+
                         {/* View Button - Desktop only */}
                         <Button 
                           variant="ghost" 
