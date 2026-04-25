@@ -65,6 +65,8 @@ class LabelTemplateCreate(BaseModel):
     field_bindings: List[FieldBinding] = Field(default_factory=list)
     qr_config: QRConfig = Field(default_factory=QRConfig)
     logo_config: LogoConfig = Field(default_factory=LogoConfig)
+    show_qr: bool = True  # Toggle to show/hide QR code
+    font_size: Literal["small", "medium", "large"] = "medium"  # Font size preset for field text
     default_equipment_type_id: Optional[str] = None
     source_form_template_ids: List[str] = Field(default_factory=list)
     printer_type: Optional[str] = None
@@ -81,6 +83,8 @@ class LabelTemplateUpdate(BaseModel):
     field_bindings: Optional[List[FieldBinding]] = None
     qr_config: Optional[QRConfig] = None
     logo_config: Optional[LogoConfig] = None
+    show_qr: Optional[bool] = None  # Toggle to show/hide QR code
+    font_size: Optional[Literal["small", "medium", "large"]] = None  # Font size preset
     default_equipment_type_id: Optional[str] = None
     source_form_template_ids: Optional[List[str]] = None
     printer_type: Optional[str] = None
@@ -428,6 +432,19 @@ def _get_logo_with_text_html(size_mm: float, grayscale: bool = True) -> str:
     </span>'''
 
 
+# Font size presets (in points)
+FONT_SIZE_PRESETS = {
+    "small": {"title": 7, "body": 5.5, "caption": 5},
+    "medium": {"title": 9, "body": 6.5, "caption": 6},
+    "large": {"title": 11, "body": 8, "caption": 7},
+}
+
+
+def _get_font_sizes(font_size_preset: str) -> dict:
+    """Get font sizes based on preset (small/medium/large)."""
+    return FONT_SIZE_PRESETS.get(font_size_preset, FONT_SIZE_PRESETS["medium"])
+
+
 def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0), margin_offset_mm: float = 0.0):
     """Draw one label on the canvas at origin (x0, y0) in points."""
     data = _inject_print_datetime(data)
@@ -445,14 +462,25 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
     logo_size_mm = float(logo_cfg.get("size_mm", 8.0))
     logo_grayscale = logo_cfg.get("grayscale", True)
 
-    # Build QR
-    qr_cfg = QRConfig(**(tpl.get("qr_config") or {}))
-    qr_payload = _build_qr_payload(qr_cfg, data)
-    qr_img = _qr_image(qr_payload)
-    qr_buf = io.BytesIO()
-    qr_img.save(qr_buf, format="PNG")
-    qr_buf.seek(0)
-    qr_reader = ImageReader(qr_buf)
+    # QR code visibility
+    show_qr = tpl.get("show_qr", True)
+    
+    # Font size preset
+    font_sizes = _get_font_sizes(tpl.get("font_size", "medium"))
+    title_font = font_sizes["title"]
+    body_font = font_sizes["body"]
+    caption_font = font_sizes["caption"]
+
+    # Build QR only if needed
+    qr_reader = None
+    if show_qr:
+        qr_cfg = QRConfig(**(tpl.get("qr_config") or {}))
+        qr_payload = _build_qr_payload(qr_cfg, data)
+        qr_img = _qr_image(qr_payload)
+        qr_buf = io.BytesIO()
+        qr_img.save(qr_buf, format="PNG")
+        qr_buf.seek(0)
+        qr_reader = ImageReader(qr_buf)
 
     # Bindings
     bindings = [FieldBinding(**b) if isinstance(b, dict) else b for b in (tpl.get("field_bindings") or [])]
@@ -471,23 +499,28 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
         if logo_enabled:
             _draw_logo_with_text(c, x0 + w - pad - logo_size_mm * mm * 3, y0 + h - pad - logo_size_mm * mm, logo_size_mm, logo_grayscale)
         
-        qr_size = min(w, h) - 2 * pad - 4 * mm
-        qx = x0 + (w - qr_size) / 2
-        qy = y0 + (h - qr_size) / 2 + 2 * mm
-        c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
+        if show_qr and qr_reader:
+            qr_size = min(w, h) - 2 * pad - 4 * mm
+            qx = x0 + (w - qr_size) / 2
+            qy = y0 + (h - qr_size) / 2 + 2 * mm
+            c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
         # one line below (asset_id by default)
         caption = next((v for (_, v) in lines if v), data.get("asset_id", ""))
-        c.setFont("Helvetica-Bold", 7)
+        c.setFont("Helvetica-Bold", caption_font)
         c.drawCentredString(x0 + w / 2, y0 + pad, caption[:32])
 
     elif preset == "compact":
-        # QR left, text right, logo at top-right
-        qr_size = h - 2 * pad
-        qx = x0 + pad
-        qy = y0 + pad
-        c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
-        tx = qx + qr_size + 2 * mm
-        tw = w - (tx - x0) - pad
+        # QR left (if enabled), text right, logo at top-right
+        tx = x0 + pad
+        tw = w - 2 * pad
+        
+        if show_qr and qr_reader:
+            qr_size = h - 2 * pad
+            qx = x0 + pad
+            qy = y0 + pad
+            c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
+            tx = qx + qr_size + 2 * mm
+            tw = w - (tx - x0) - pad
         
         # Draw logo at top-right if enabled
         if logo_enabled:
@@ -495,15 +528,15 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
             tw = tw - logo_total_w - 2 * mm
         
         title = data.get("asset_name", "")
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(tx, y0 + h - pad - 8, title[:int(tw / mm * 0.9)])
-        c.setFont("Helvetica", 6.5)
-        y_cursor = y0 + h - pad - 15
+        c.setFont("Helvetica-Bold", title_font)
+        c.drawString(tx, y0 + h - pad - title_font, title[:int(tw / mm * 0.9)])
+        c.setFont("Helvetica", body_font)
+        y_cursor = y0 + h - pad - title_font - 7
         for label, val in lines[:3]:
             if not val:
                 continue
             c.drawString(tx, y_cursor, f"{label}: {val}"[:int(tw / mm * 1.1)])
-            y_cursor -= 8
+            y_cursor -= body_font + 1.5
             if y_cursor < y0 + pad:
                 break
 
@@ -517,27 +550,31 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
             # Placeholder logo box (original behavior)
             c.setStrokeColorRGB(0.8, 0.8, 0.8)
             c.rect(x0 + pad, y0 + h - pad - 8 - 10, 8 * mm, 8 * mm)
-            c.setFont("Helvetica-Oblique", 5)
+            c.setFont("Helvetica-Oblique", caption_font)
             c.drawString(x0 + pad + 0.5 * mm, y0 + h - pad - 8 - 5, "LOGO")
             title_x = x0 + pad + 8 * mm + 2 * mm
         
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(title_x, y0 + h - pad - 8, (data.get("asset_name") or "")[:28])
-        # QR bottom-left
-        qr_size = min(w, h) / 2 - pad
-        qx = x0 + pad
-        qy = y0 + pad
-        c.setStrokeColorRGB(0, 0, 0)
-        c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
-        # Info bottom-right
-        tx = qx + qr_size + 2 * mm
-        c.setFont("Helvetica", 6.5)
-        y_cursor = qy + qr_size - 6
+        c.setFont("Helvetica-Bold", title_font)
+        c.drawString(title_x, y0 + h - pad - title_font, (data.get("asset_name") or "")[:28])
+        
+        # QR bottom-left (if enabled)
+        tx = x0 + pad
+        if show_qr and qr_reader:
+            qr_size = min(w, h) / 2 - pad
+            qx = x0 + pad
+            qy = y0 + pad
+            c.setStrokeColorRGB(0, 0, 0)
+            c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
+            tx = qx + qr_size + 2 * mm
+        
+        # Info (right of QR or full width if no QR)
+        c.setFont("Helvetica", body_font)
+        y_cursor = y0 + h - pad - logo_size_mm * mm - 6 if logo_enabled else y0 + h - pad - 20
         for label, val in lines[:4]:
             if not val:
                 continue
             c.drawString(tx, y_cursor, f"{label}: {val}"[:30])
-            y_cursor -= 8
+            y_cursor -= body_font + 1.5
             if y_cursor < y0 + pad:
                 break
 
@@ -559,14 +596,15 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
         if not title_value:
             title_value = data.get("asset_name", "")
         
-        c.setFont("Helvetica-Bold", 11)
-        c.drawCentredString(x0 + w / 2, y0 + h - pad - 10, title_value[:40])
+        c.setFont("Helvetica-Bold", title_font)
+        c.drawCentredString(x0 + w / 2, y0 + h - pad - title_font, title_value[:40])
 
-        # QR code bottom-left
-        qr_size = min(h - pad * 2 - 12, w * 0.28)
-        qx = x0 + pad
-        qy = y0 + pad
-        c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
+        # QR code bottom-left (if enabled)
+        if show_qr and qr_reader:
+            qr_size = min(h - pad * 2 - 12, w * 0.28)
+            qx = x0 + pad
+            qy = y0 + pad
+            c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
 
         # Date + Time on the right
         date_binding = bindings_map.get("print_date")
@@ -580,37 +618,40 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
 
         right_x = x0 + w - pad
         mid_y = y0 + h / 2 - 8
-        c.setFont("Helvetica", 8)
+        c.setFont("Helvetica", body_font)
         c.drawRightString(right_x, mid_y, f"{date_label}: {date_value}")
-        c.drawRightString(right_x, mid_y - 10, f"{time_label}: {time_value}")
+        c.drawRightString(right_x, mid_y - body_font - 2, f"{time_label}: {time_value}")
 
         # Any additional bindings (beyond asset_name/print_date/print_time) printed small above QR baseline
         extras = [b for b in bindings if b.source not in ("asset_name", "print_date", "print_time")]
         if extras:
-            c.setFont("Helvetica", 6.5)
+            c.setFont("Helvetica", caption_font)
             ex_y = y0 + pad
             for b in extras[:2]:
                 label, val = _resolve_field_value(b, data)
                 if val:
                     c.drawRightString(right_x, ex_y, f"{label}: {val}"[:40])
-                    ex_y += 8
+                    ex_y += caption_font + 2
 
     elif preset == "blank":
-        # Minimal layout: logo top-left, QR bottom-right, bindings flow as lines
-        qr_size = min(w, h) * 0.35
-        qx = x0 + w - pad - qr_size
-        qy = y0 + pad
-        c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
+        # Minimal layout: logo top-left, QR bottom-right (if enabled), bindings flow as lines
+        text_area_w = w - 2 * pad
+        
+        if show_qr and qr_reader:
+            qr_size = min(w, h) * 0.35
+            qx = x0 + w - pad - qr_size
+            qy = y0 + pad
+            c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
+            text_area_w = w - qr_size - 3 * pad
 
         # Draw logo with text at top-left if enabled
-        text_start_y = y0 + h - pad - 9
+        text_start_y = y0 + h - pad - body_font
         if logo_enabled:
             _draw_logo_with_text(c, x0 + pad, y0 + h - pad - logo_size_mm * mm, logo_size_mm, logo_grayscale)
             text_start_y = y0 + h - pad - logo_size_mm * mm - 3
 
         # Flow bindings line-by-line starting below logo
-        text_area_w = w - qr_size - 3 * pad
-        c.setFont("Helvetica", 8)
+        c.setFont("Helvetica", body_font)
         y_cursor = text_start_y
         for b in bindings:
             if y_cursor < y0 + pad:
@@ -622,7 +663,7 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
             # naive character-based truncation to fit text_area_w
             max_chars = max(8, int(text_area_w / mm * 1.9))
             c.drawString(x0 + pad, y_cursor, line[:max_chars])
-            y_cursor -= 10
+            y_cursor -= body_font + 2
 
     else:  # standard
         # Top: logo at top-left, asset name centered
@@ -630,21 +671,24 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
             _draw_logo_with_text(c, x0 + pad, y0 + h - pad - logo_size_mm * mm, logo_size_mm, logo_grayscale)
         
         title = data.get("asset_name", "")
-        c.setFont("Helvetica-Bold", 9)
-        c.drawCentredString(x0 + w / 2, y0 + h - pad - 9, title[:28])
-        # Middle: QR code
-        qr_size = min(w, h) * 0.5
-        qx = x0 + (w - qr_size) / 2
-        qy = y0 + (h - qr_size) / 2 - 1 * mm
-        c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
+        c.setFont("Helvetica-Bold", title_font)
+        c.drawCentredString(x0 + w / 2, y0 + h - pad - title_font, title[:28])
+        
+        # Middle: QR code (if enabled)
+        if show_qr and qr_reader:
+            qr_size = min(w, h) * 0.5
+            qx = x0 + (w - qr_size) / 2
+            qy = y0 + (h - qr_size) / 2 - 1 * mm
+            c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
+        
         # Bottom: first 2 text bindings, centered
-        c.setFont("Helvetica", 6.5)
-        y_cursor = y0 + pad + 7
+        c.setFont("Helvetica", body_font)
+        y_cursor = y0 + pad + body_font
         for label, val in lines[:2][::-1]:  # reverse so first binding sits higher
             if not val:
                 continue
             c.drawCentredString(x0 + w / 2, y_cursor, f"{label}: {val}"[:42])
-            y_cursor -= 7
+            y_cursor -= body_font + 1
             if y_cursor < y0 + pad:
                 break
 
@@ -712,6 +756,15 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
     logo_size_mm = float(logo_cfg.get("size_mm", 8.0))
     logo_grayscale = logo_cfg.get("grayscale", True)
     
+    # QR code visibility
+    show_qr = tpl.get("show_qr", True)
+    
+    # Font size preset
+    font_sizes = _get_font_sizes(tpl.get("font_size", "medium"))
+    title_font = font_sizes["title"]
+    body_font = font_sizes["body"]
+    caption_font = font_sizes["caption"]
+    
     # Get logo HTML if enabled
     logo_html = ""
     if logo_enabled:
@@ -721,16 +774,17 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
     records = datasets if datasets else [SAMPLE_DATA]
     for rec in records:
         rec2 = _inject_print_datetime(rec)
-        qr_src = _qr_data_uri(_build_qr_payload(qr_cfg, rec2))
+        qr_src = _qr_data_uri(_build_qr_payload(qr_cfg, rec2)) if show_qr else ""
         lines = [_resolve_field_value(b, rec2) for b in bindings]
 
         if preset == "qr_only":
             caption = next((v for (_, v) in lines if v), rec2.get("asset_id", ""))
             logo_top = f'<div class="logo-top-right">{logo_html}</div>' if logo_enabled else ""
+            qr_html = f'<img src="{qr_src}" alt="qr" />' if show_qr else ""
             inner = f"""
               <div class="lbl-qr-only">
                 {logo_top}
-                <img src="{qr_src}" alt="qr" />
+                {qr_html}
                 <div class="cap">{_html_escape(caption[:32])}</div>
               </div>
             """
@@ -741,9 +795,10 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                 for (lbl, val) in lines[:3] if val
             )
             logo_top = f'<div class="logo-corner">{logo_html}</div>' if logo_enabled else ""
+            qr_html = f'<img class="qr" src="{qr_src}" alt="qr" />' if show_qr else ""
             inner = f"""
-              <div class="lbl-compact">
-                <img class="qr" src="{qr_src}" alt="qr" />
+              <div class="lbl-compact {'no-qr' if not show_qr else ''}">
+                {qr_html}
                 <div class="side">
                   <div class="title">{_html_escape(title[:32])}</div>
                   {rows}
@@ -758,14 +813,15 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
             )
             # Use real logo if enabled, otherwise placeholder
             logo_part = logo_html if logo_enabled else '<div class="logo-placeholder">LOGO</div>'
+            qr_html = f'<img class="qr" src="{qr_src}" alt="qr" />' if show_qr else ""
             inner = f"""
-              <div class="lbl-logo">
+              <div class="lbl-logo {'no-qr' if not show_qr else ''}">
                 <div class="top">
                   {logo_part}
                   <div class="title">{_html_escape(rec2.get('asset_name','')[:28])}</div>
                 </div>
                 <div class="bottom">
-                  <img class="qr" src="{qr_src}" alt="qr" />
+                  {qr_html}
                   <div class="side">{rows}</div>
                 </div>
               </div>
@@ -787,14 +843,15 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                 for (lbl, val) in [_resolve_field_value(e, rec2) for e in extras[:2]] if val
             )
             logo_top = f'<div class="logo-top-left">{logo_html}</div>' if logo_enabled else ""
+            qr_html = f'<img class="qr" src="{qr_src}" alt="qr" />' if show_qr else ""
             inner = f"""
-              <div class="lbl-tdt">
+              <div class="lbl-tdt {'no-qr' if not show_qr else ''}">
                 <div class="header-row">
                   {logo_top}
                   <div class="title">{_html_escape(title_val[:40])}</div>
                 </div>
                 <div class="body">
-                  <img class="qr" src="{qr_src}" alt="qr" />
+                  {qr_html}
                   <div class="meta">
                     <div>{_html_escape(date_lbl)}: {_html_escape(date_val)}</div>
                     <div>{_html_escape(time_lbl)}: {_html_escape(time_val)}</div>
@@ -809,13 +866,14 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                 for (lbl, val) in lines if val
             )
             logo_top = f'<div class="logo-inline">{logo_html}</div>' if logo_enabled else ""
+            qr_html = f'<img class="qr" src="{qr_src}" alt="qr" />' if show_qr else ""
             inner = f"""
-              <div class="lbl-blank">
+              <div class="lbl-blank {'no-qr' if not show_qr else ''}">
                 <div class="lines">
                   {logo_top}
                   {rows}
                 </div>
-                <img class="qr" src="{qr_src}" alt="qr" />
+                {qr_html}
               </div>
             """
         else:  # standard
@@ -825,11 +883,12 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                 for (lbl, val) in lines[:2] if val
             )
             logo_top = f'<div class="logo-top-left">{logo_html}</div>' if logo_enabled else ""
+            qr_html = f'<img class="qr" src="{qr_src}" alt="qr" />' if show_qr else ""
             inner = f"""
-              <div class="lbl-std">
+              <div class="lbl-std {'no-qr' if not show_qr else ''}">
                 {logo_top}
                 <div class="title">{_html_escape(title[:28])}</div>
-                <img class="qr" src="{qr_src}" alt="qr" />
+                {qr_html}
                 <div class="foot">{rows}</div>
               </div>
             """
@@ -858,6 +917,11 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title></title>
 <style>
+  :root {{
+    --title-font: {title_font}pt;
+    --body-font: {body_font}pt;
+    --caption-font: {caption_font}pt;
+  }}
   @page {{ size: {page_w_mm}mm {page_h_mm}mm; margin: 0; }}
   @page :first {{ margin: 0; }}
   @page :left  {{ margin: 0; }}
@@ -895,51 +959,56 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
   .logo-top-right {{ position: absolute; top: 1.5mm; right: 1.5mm; }}
   .logo-corner {{ position: absolute; top: 1.5mm; right: 1.5mm; }}
   .logo-inline {{ margin-bottom: 1mm; }}
-  .logo-placeholder {{ width: 7mm; height: 7mm; border: 0.3mm solid #888; display:flex;align-items:center;justify-content:center;font-size:5pt;color:#888; }}
+  .logo-placeholder {{ width: 7mm; height: 7mm; border: 0.3mm solid #888; display:flex;align-items:center;justify-content:center;font-size:var(--caption-font);color:#888; }}
 
   /* standard */
   .lbl-std {{ display: flex; flex-direction: column; align-items: center; height: 100%; gap: 0.5mm; position: relative; }}
-  .lbl-std .title {{ font-weight: bold; font-size: 9pt; text-align: center; line-height: 1.1; }}
+  .lbl-std .title {{ font-weight: bold; font-size: var(--title-font); text-align: center; line-height: 1.1; }}
   .lbl-std .qr   {{ flex: 1 1 auto; max-height: 70%; width: auto; margin: auto; object-fit: contain; }}
-  .lbl-std .foot {{ font-size: 6.5pt; text-align: center; line-height: 1.2; }}
+  .lbl-std.no-qr .foot {{ flex: 1; display: flex; flex-direction: column; justify-content: center; }}
+  .lbl-std .foot {{ font-size: var(--body-font); text-align: center; line-height: 1.2; }}
 
   /* compact */
   .lbl-compact {{ display: flex; gap: 1.5mm; height: 100%; align-items: center; position: relative; }}
   .lbl-compact .qr {{ height: 100%; width: auto; max-width: 40%; object-fit: contain; }}
+  .lbl-compact.no-qr .side {{ width: 100%; }}
   .lbl-compact .side {{ flex: 1; min-width: 0; }}
-  .lbl-compact .title {{ font-weight: bold; font-size: 8pt; line-height: 1.1; }}
-  .lbl-compact .row {{ font-size: 6.5pt; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  .lbl-compact .title {{ font-weight: bold; font-size: var(--title-font); line-height: 1.1; }}
+  .lbl-compact .row {{ font-size: var(--body-font); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
   /* qr only */
   .lbl-qr-only {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 0.5mm; position: relative; }}
   .lbl-qr-only img {{ max-width: 75%; max-height: 80%; object-fit: contain; }}
-  .lbl-qr-only .cap {{ font-size: 7pt; font-weight: bold; text-align: center; }}
+  .lbl-qr-only .cap {{ font-size: var(--caption-font); font-weight: bold; text-align: center; }}
 
   /* with logo */
   .lbl-logo {{ display: flex; flex-direction: column; height: 100%; gap: 1mm; }}
   .lbl-logo .top {{ display: flex; gap: 2mm; align-items: center; flex: 0 0 auto; }}
-  .lbl-logo .title {{ font-weight: bold; font-size: 8pt; line-height: 1.1; }}
+  .lbl-logo .title {{ font-weight: bold; font-size: var(--title-font); line-height: 1.1; }}
   .lbl-logo .bottom {{ display: flex; gap: 2mm; flex: 1; min-height: 0; }}
+  .lbl-logo.no-qr .bottom {{ display: block; }}
   .lbl-logo .qr {{ height: 100%; width: auto; max-width: 40%; object-fit: contain; }}
   .lbl-logo .side {{ flex: 1; min-width: 0; }}
-  .lbl-logo .row {{ font-size: 6.5pt; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  .lbl-logo .row {{ font-size: var(--body-font); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
   /* title + date + time */
   .lbl-tdt {{ display: flex; flex-direction: column; height: 100%; gap: 0.5mm; }}
   .lbl-tdt .header-row {{ display: flex; align-items: center; gap: 2mm; flex: 0 0 auto; }}
-  .lbl-tdt .header-row .title {{ flex: 1; text-align: center; font-weight: bold; font-size: 10pt; line-height: 1.1; }}
+  .lbl-tdt .header-row .title {{ flex: 1; text-align: center; font-weight: bold; font-size: var(--title-font); line-height: 1.1; }}
   .lbl-tdt .header-row .logo-top-left {{ position: static; }}
-  .lbl-tdt .title {{ text-align: center; font-weight: bold; font-size: 10pt; line-height: 1.1; flex: 0 0 auto; }}
+  .lbl-tdt .title {{ text-align: center; font-weight: bold; font-size: var(--title-font); line-height: 1.1; flex: 0 0 auto; }}
   .lbl-tdt .body {{ display: flex; gap: 2mm; flex: 1; min-height: 0; align-items: flex-end; }}
+  .lbl-tdt.no-qr .body {{ justify-content: flex-end; }}
   .lbl-tdt .qr {{ height: 100%; width: auto; max-width: 30%; object-fit: contain; }}
-  .lbl-tdt .meta {{ flex: 1; text-align: right; font-size: 7.5pt; line-height: 1.3; }}
-  .lbl-tdt .ext {{ font-size: 6.5pt; }}
+  .lbl-tdt .meta {{ flex: 1; text-align: right; font-size: var(--body-font); line-height: 1.3; }}
+  .lbl-tdt .ext {{ font-size: var(--caption-font); }}
 
   /* blank */
   .lbl-blank {{ display: flex; gap: 1.5mm; height: 100%; align-items: stretch; }}
-  .lbl-blank .lines {{ flex: 1; min-width: 0; font-size: 7.5pt; line-height: 1.25; display: flex; flex-direction: column; justify-content: flex-start; }}
+  .lbl-blank .lines {{ flex: 1; min-width: 0; font-size: var(--body-font); line-height: 1.25; display: flex; flex-direction: column; justify-content: flex-start; }}
   .lbl-blank .row {{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
   .lbl-blank .qr {{ height: 100%; width: auto; max-width: 28%; object-fit: contain; align-self: center; }}
+  .lbl-blank.no-qr .lines {{ width: 100%; }}
 </style>
 </head>
 <body>

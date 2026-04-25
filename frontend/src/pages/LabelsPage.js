@@ -81,6 +81,8 @@ const emptyTemplate = {
     size_mm: 6,
     grayscale: true,
   },
+  show_qr: true,
+  font_size: "medium",
   source_form_template_ids: [],
   status: "draft",
 };
@@ -578,6 +580,62 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* QR Code Toggle */}
+            <div className="space-y-2 border-t pt-3">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/>
+                    <rect x="14" y="14" width="3" height="3"/>
+                    <rect x="18" y="14" width="3" height="3"/>
+                    <rect x="14" y="18" width="3" height="3"/>
+                    <rect x="18" y="18" width="3" height="3"/>
+                  </svg>
+                  QR Code
+                </Label>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={form.show_qr !== false}
+                    onChange={(e) => setForm({ ...form, show_qr: e.target.checked })}
+                    data-testid="show-qr-toggle"
+                  />
+                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                Hide QR code to use full label space for text fields.
+              </p>
+            </div>
+
+            {/* Font Size Preset */}
+            <div className="space-y-2 border-t pt-3">
+              <Label>Font Size</Label>
+              <div className="flex gap-2">
+                {["small", "medium", "large"].map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setForm({ ...form, font_size: size })}
+                    className={`flex-1 py-1.5 px-2 text-xs rounded-md border transition-colors ${
+                      (form.font_size || "medium") === size
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                    }`}
+                    data-testid={`font-size-${size}`}
+                  >
+                    {size.charAt(0).toUpperCase() + size.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                Adjusts text size for field bindings on the label.
+              </p>
             </div>
 
             <div className="space-y-1.5">
