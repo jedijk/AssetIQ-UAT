@@ -80,6 +80,7 @@ const emptyTemplate = {
     enabled: false,
     size_mm: 6,
     grayscale: true,
+    position: "top-left",
   },
   show_qr: true,
   font_size: "medium",
@@ -575,8 +576,38 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
                       <span>15mm</span>
                     </div>
                   </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-500">Position</span>
+                    <div className="grid grid-cols-2 gap-1">
+                      {[
+                        { value: "top-left", label: "↖ Top Left" },
+                        { value: "top-right", label: "↗ Top Right" },
+                        { value: "bottom-left", label: "↙ Bottom Left" },
+                        { value: "bottom-right", label: "↘ Bottom Right" },
+                      ].map((pos) => (
+                        <button
+                          key={pos.value}
+                          type="button"
+                          onClick={() =>
+                            setForm({
+                              ...form,
+                              logo_config: { ...(form.logo_config || {}), position: pos.value },
+                            })
+                          }
+                          className={`py-1 px-2 text-[10px] rounded border transition-colors ${
+                            (form.logo_config?.position || "top-left") === pos.value
+                              ? "bg-indigo-600 text-white border-indigo-600"
+                              : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                          }`}
+                          data-testid={`logo-position-${pos.value}`}
+                        >
+                          {pos.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <p className="text-[10px] text-slate-400 leading-tight">
-                    Logo is rendered in grayscale for thermal printer compatibility. Position is automatic based on preset.
+                    Logo is rendered in grayscale for thermal printer compatibility.
                   </p>
                 </div>
               )}

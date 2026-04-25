@@ -8,10 +8,11 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 
 ## Recent Changes
 - [Apr 25, 2026] **Smart Label Enhancements**:
-  - **Font Size Presets**: Small/Medium/Large options for field binding text (title: 7/9/11pt, body: 5.5/6.5/8pt)
+  - **Logo Position Selector**: Choose where to place the AssetIQ logo (Top Left, Top Right, Bottom Left, Bottom Right)
+  - **Font Size Presets**: Small/Medium/Large options for field binding text
   - **QR Code Toggle**: Hide/show QR code to use full label space for text fields
-  - **AssetIQ Logo**: Toggle to add logo + "AssetIQ" text on labels (grayscale for thermal printers, adjustable 4-15mm)
-- [Apr 24, 2026] Removed UAT/Prod database switcher badge from top header (now only accessible via Settings → Database Environment)
+  - **AssetIQ Logo**: Toggle to add logo + "AssetIQ" text on labels (grayscale for thermal printers)
+- [Apr 24, 2026] Removed UAT/Prod database switcher badge from top header
 - [Apr 2026] Sprint 1 of Smart Labeling System shipped:
   - Preset-based label designer (standard / compact / qr_only / with_logo)
   - Template CRUD + duplicate + soft-archive + versioning
