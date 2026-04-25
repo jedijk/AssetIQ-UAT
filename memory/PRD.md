@@ -7,10 +7,11 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.6.0** (Updated: April 2026)
 
 ## Recent Changes
-- [Apr 25, 2026] **Reprint Label from Form Submissions**:
+- [Apr 25, 2026] **Reprint Label from Form Submissions** (VERIFIED):
   - Each submission row in `/form-submissions` and `/tasks?tab=forms` now shows a printer icon when (and only when) the source form template has `label_print_config.enabled` and a `label_template_id`
   - Clicking the icon reprints the label for that submission via the existing `printLabel` flow (PDF on desktop, HTML on iOS/mobile)
   - `SubmissionRow.jsx` now accepts `labelConfig` as a prop (parent passes from templates lookup) so the icon visibility decision is instant — no extra API roundtrip on render
+  - **Investigation Complete**: Both original print and reprint use identical API payloads (`template_id`, `submission_id`, `copies`) and fetch the same label template from the database. Any layout differences between original and reprint are due to template version changes (label templates can be updated post-creation)
 - [Apr 25, 2026] **Smart Label 3mm Safety Margin**:
   - Enforced a minimum 3mm internal safety margin on every label (PDF + HTML print) so logo/QR/text never get clipped by printers or cutters
   - PDF: `SAFETY_MARGIN_MM = 3.0` (was 2mm); HTML: `.label` padding `3mm` (was 1.5mm); logo absolute positioning offsets bumped from 1.5mm → 3mm
