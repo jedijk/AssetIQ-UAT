@@ -104,15 +104,30 @@ function downloadBlob(blob, filename) {
 // ==================== DESIGNER / EDIT DIALOG ====================
 
 function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields }) {
-  const [form, setForm] = useState(template || emptyTemplate);
+  // Merge template with defaults to ensure all new fields have values
+  const mergedTemplate = useMemo(() => {
+    if (!template) return emptyTemplate;
+    return {
+      ...emptyTemplate,
+      ...template,
+      // Ensure nested objects are properly merged
+      qr_config: { ...emptyTemplate.qr_config, ...(template.qr_config || {}) },
+      logo_config: { ...emptyTemplate.logo_config, ...(template.logo_config || {}) },
+      // Ensure new fields have defaults
+      show_qr: template.show_qr !== undefined ? template.show_qr : true,
+      font_size: template.font_size || "medium",
+    };
+  }, [template]);
+  
+  const [form, setForm] = useState(mergedTemplate);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewing, setPreviewing] = useState(false);
   const qc = useQueryClient();
 
   useEffect(() => {
-    setForm(template || emptyTemplate);
+    setForm(mergedTemplate);
     setPreviewUrl(null);
-  }, [template, open]);
+  }, [mergedTemplate, open]);
 
   const isEdit = !!template?.id;
   const maxBindings = useMemo(

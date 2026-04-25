@@ -7,6 +7,10 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.6.0** (Updated: April 2026)
 
 ## Recent Changes
+- [Apr 25, 2026] **Smart Label Settings Propagation Fix**:
+  - Fixed logo, position, QR toggle, and font size settings not being applied during actual label printing
+  - Issue was templates loaded without new fields weren't being merged with defaults
+  - Frontend now properly merges template with `emptyTemplate` defaults for all nested objects
 - [Apr 25, 2026] **Smart Label Enhancements**:
   - **Logo Position Selector**: Choose where to place the AssetIQ logo (Top Left, Top Right, Bottom Left, Bottom Right)
   - **Font Size Presets**: Small/Medium/Large options for field binding text
