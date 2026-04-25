@@ -4,9 +4,16 @@
 Create a robust full-stack platform optimized for multi-environment execution with dynamic database switching, advanced form capabilities, seamless AI integrations, GDPR compliance, version-controlled PWAs, comprehensive log ingestion, and automated data processing.
 
 ## Current Version
-**v3.5.9** (Updated: April 2026)
+**v3.6.0** (Updated: April 2026)
 
 ## Recent Changes
+- [Apr 25, 2026] **AssetIQ Logo on Labels** - Added logo configuration to Smart Labeling:
+  - Toggle to enable/disable AssetIQ logo + text on labels (like header branding)
+  - User-adjustable logo size (4mm to 15mm slider)
+  - Grayscale rendering for thermal printer compatibility
+  - Position is automatic based on label preset (standard, compact, qr_only, with_logo, title_date_time, blank)
+  - Works on both PDF and HTML (iOS-compatible) print paths
+- [Apr 24, 2026] Removed UAT/Prod database switcher badge from top header (now only accessible via Settings → Database Environment)
 - [Apr 2026] Sprint 1 of Smart Labeling System shipped:
   - Preset-based label designer (standard / compact / qr_only / with_logo)
   - Template CRUD + duplicate + soft-archive + versioning

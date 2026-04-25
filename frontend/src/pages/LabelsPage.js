@@ -76,6 +76,11 @@ const emptyTemplate = {
     custom_url: "",
     base_url: window.location.origin,
   },
+  logo_config: {
+    enabled: false,
+    size_mm: 6,
+    grayscale: true,
+  },
   source_form_template_ids: [],
   status: "draft",
 };
@@ -517,6 +522,62 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
                 }
                 className="text-[11px] text-slate-500"
               />
+            </div>
+
+            {/* Logo Configuration */}
+            <div className="space-y-2 border-t pt-3">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">
+                  <img src="/logo.png" alt="AssetIQ" className="w-4 h-4 rounded" />
+                  AssetIQ Logo
+                </Label>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={form.logo_config?.enabled || false}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        logo_config: { ...(form.logo_config || {}), enabled: e.target.checked },
+                      })
+                    }
+                    data-testid="logo-enabled-toggle"
+                  />
+                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              {form.logo_config?.enabled && (
+                <div className="space-y-2 pl-1">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Size: {form.logo_config?.size_mm || 6}mm</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="4"
+                      max="15"
+                      step="0.5"
+                      value={form.logo_config?.size_mm || 6}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          logo_config: { ...(form.logo_config || {}), size_mm: parseFloat(e.target.value) },
+                        })
+                      }
+                      className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                      data-testid="logo-size-slider"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-400">
+                      <span>4mm</span>
+                      <span>15mm</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-tight">
+                    Logo is rendered in grayscale for thermal printer compatibility. Position is automatic based on preset.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">

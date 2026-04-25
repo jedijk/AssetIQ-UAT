@@ -49,6 +49,12 @@ class QRConfig(BaseModel):
     base_url: Optional[str] = None  # public app URL; defaults to backend resolved value
 
 
+class LogoConfig(BaseModel):
+    enabled: bool = False
+    size_mm: float = 8.0  # User-adjustable size (width), height maintains aspect ratio
+    grayscale: bool = True  # For thermal printer compatibility
+
+
 class LabelTemplateCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -58,6 +64,7 @@ class LabelTemplateCreate(BaseModel):
     preset: Literal["standard", "compact", "qr_only", "with_logo", "title_date_time", "blank"] = "standard"
     field_bindings: List[FieldBinding] = Field(default_factory=list)
     qr_config: QRConfig = Field(default_factory=QRConfig)
+    logo_config: LogoConfig = Field(default_factory=LogoConfig)
     default_equipment_type_id: Optional[str] = None
     source_form_template_ids: List[str] = Field(default_factory=list)
     printer_type: Optional[str] = None
@@ -73,6 +80,7 @@ class LabelTemplateUpdate(BaseModel):
     preset: Optional[Literal["standard", "compact", "qr_only", "with_logo", "title_date_time", "blank"]] = None
     field_bindings: Optional[List[FieldBinding]] = None
     qr_config: Optional[QRConfig] = None
+    logo_config: Optional[LogoConfig] = None
     default_equipment_type_id: Optional[str] = None
     source_form_template_ids: Optional[List[str]] = None
     printer_type: Optional[str] = None
@@ -272,6 +280,154 @@ def _qr_image(payload: str):
     return qr.make_image(fill_color="black", back_color="white")
 
 
+# ==================== LOGO HANDLING ====================
+
+import os
+from PIL import Image
+
+LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "frontend", "public", "logo.png")
+# Fallback paths
+LOGO_PATHS = [
+    LOGO_PATH,
+    "/app/frontend/public/logo.png",
+    os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public", "logo.png"),
+]
+
+_logo_cache: dict = {}
+
+
+def _load_logo_image(grayscale: bool = True) -> Optional[Image.Image]:
+    """Load the AssetIQ logo, optionally converting to grayscale. Cached."""
+    cache_key = f"logo_{grayscale}"
+    if cache_key in _logo_cache:
+        return _logo_cache[cache_key]
+    
+    logo_path = None
+    for p in LOGO_PATHS:
+        if os.path.exists(p):
+            logo_path = p
+            break
+    
+    if not logo_path:
+        return None
+    
+    try:
+        img = Image.open(logo_path)
+        # Convert to RGBA first to handle transparency
+        if img.mode != "RGBA":
+            img = img.convert("RGBA")
+        
+        if grayscale:
+            # Convert to grayscale while preserving transparency
+            # Create a white background
+            background = Image.new("RGBA", img.size, (255, 255, 255, 255))
+            # Composite the logo onto white background
+            composite = Image.alpha_composite(background, img)
+            # Convert to grayscale
+            gray = composite.convert("L")
+            # Convert back to RGBA for consistency
+            img = gray.convert("RGBA")
+        else:
+            # Composite onto white background to remove transparency for PDF
+            background = Image.new("RGBA", img.size, (255, 255, 255, 255))
+            img = Image.alpha_composite(background, img)
+        
+        _logo_cache[cache_key] = img
+        return img
+    except Exception as e:
+        print(f"Failed to load logo: {e}")
+        return None
+
+
+def _get_logo_reader(grayscale: bool = True) -> Optional[ImageReader]:
+    """Get a reportlab ImageReader for the logo."""
+    img = _load_logo_image(grayscale)
+    if not img:
+        return None
+    buf = io.BytesIO()
+    # Convert to RGB for PDF compatibility
+    rgb_img = img.convert("RGB") if img.mode == "RGBA" else img
+    rgb_img.save(buf, format="PNG")
+    buf.seek(0)
+    return ImageReader(buf)
+
+
+def _get_logo_data_uri(grayscale: bool = True) -> Optional[str]:
+    """Get the logo as a data: URI for HTML rendering."""
+    import base64
+    img = _load_logo_image(grayscale)
+    if not img:
+        return None
+    buf = io.BytesIO()
+    rgb_img = img.convert("RGB") if img.mode == "RGBA" else img
+    rgb_img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _get_logo_aspect_ratio() -> float:
+    """Return width/height aspect ratio of the logo."""
+    img = _load_logo_image(grayscale=False)
+    if not img:
+        return 1.0
+    return img.width / img.height if img.height > 0 else 1.0
+
+
+def _draw_logo_with_text(c: canvas.Canvas, x: float, y: float, size_mm: float, grayscale: bool = True):
+    """Draw the AssetIQ logo icon + 'AssetIQ' text, like the app header.
+    
+    Returns the total width used (in points).
+    """
+    logo_reader = _get_logo_reader(grayscale=grayscale)
+    icon_size = size_mm * mm
+    text_size = max(6, size_mm * 0.9)  # Font size proportional to logo size
+    gap = 1.2 * mm  # Gap between icon and text
+    
+    total_width = icon_size
+    
+    if logo_reader:
+        aspect = _get_logo_aspect_ratio()
+        icon_h = icon_size / aspect if aspect > 0 else icon_size
+        c.drawImage(logo_reader, x, y, icon_size, icon_h, preserveAspectRatio=True, mask="auto")
+    
+    # Draw "AssetIQ" text next to the icon
+    c.setFont("Helvetica-Bold", text_size)
+    if grayscale:
+        c.setFillColorRGB(0.2, 0.2, 0.2)  # Dark gray for thermal printers
+    else:
+        c.setFillColorRGB(0.1, 0.1, 0.1)  # Near black
+    
+    text_x = x + icon_size + gap
+    # Vertically center the text with the icon
+    text_y = y + (icon_size * 0.3)  # Adjust baseline to align with icon center
+    c.drawString(text_x, text_y, "AssetIQ")
+    
+    # Calculate text width
+    text_width = c.stringWidth("AssetIQ", "Helvetica-Bold", text_size)
+    total_width = icon_size + gap + text_width
+    
+    # Reset fill color
+    c.setFillColorRGB(0, 0, 0)
+    
+    return total_width
+
+
+def _get_logo_with_text_html(size_mm: float, grayscale: bool = True) -> str:
+    """Return HTML for logo icon + 'AssetIQ' text."""
+    logo_uri = _get_logo_data_uri(grayscale=grayscale)
+    icon_size = size_mm
+    text_size = max(6, size_mm * 0.9)
+    color = "#333" if grayscale else "#1a1a1a"
+    
+    img_html = ""
+    if logo_uri:
+        img_html = f'<img src="{logo_uri}" style="width:{icon_size}mm;height:{icon_size}mm;object-fit:contain;vertical-align:middle;" alt="logo" />'
+    
+    return f'''<span class="assetiq-logo" style="display:inline-flex;align-items:center;gap:1mm;">
+        {img_html}
+        <span style="font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:{text_size}pt;color:{color};vertical-align:middle;">AssetIQ</span>
+    </span>'''
+
+
 def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0), margin_offset_mm: float = 0.0):
     """Draw one label on the canvas at origin (x0, y0) in points."""
     data = _inject_print_datetime(data)
@@ -282,6 +438,12 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
     h = height_mm * mm
     pad = 2 * mm + margin_offset_mm * mm
     preset = tpl.get("preset", "standard")
+
+    # Logo configuration
+    logo_cfg = tpl.get("logo_config") or {}
+    logo_enabled = logo_cfg.get("enabled", False)
+    logo_size_mm = float(logo_cfg.get("size_mm", 8.0))
+    logo_grayscale = logo_cfg.get("grayscale", True)
 
     # Build QR
     qr_cfg = QRConfig(**(tpl.get("qr_config") or {}))
@@ -305,6 +467,10 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
     c.setStrokeColorRGB(0, 0, 0)
 
     if preset == "qr_only":
+        # Draw logo with text at top-right if enabled
+        if logo_enabled:
+            _draw_logo_with_text(c, x0 + w - pad - logo_size_mm * mm * 3, y0 + h - pad - logo_size_mm * mm, logo_size_mm, logo_grayscale)
+        
         qr_size = min(w, h) - 2 * pad - 4 * mm
         qx = x0 + (w - qr_size) / 2
         qy = y0 + (h - qr_size) / 2 + 2 * mm
@@ -315,13 +481,19 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
         c.drawCentredString(x0 + w / 2, y0 + pad, caption[:32])
 
     elif preset == "compact":
-        # QR left, text right
+        # QR left, text right, logo at top-right
         qr_size = h - 2 * pad
         qx = x0 + pad
         qy = y0 + pad
         c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
         tx = qx + qr_size + 2 * mm
         tw = w - (tx - x0) - pad
+        
+        # Draw logo at top-right if enabled
+        if logo_enabled:
+            logo_total_w = _draw_logo_with_text(c, x0 + w - pad - logo_size_mm * mm * 3, y0 + h - pad - logo_size_mm * mm, logo_size_mm, logo_grayscale)
+            tw = tw - logo_total_w - 2 * mm
+        
         title = data.get("asset_name", "")
         c.setFont("Helvetica-Bold", 8)
         c.drawString(tx, y0 + h - pad - 8, title[:int(tw / mm * 0.9)])
@@ -336,14 +508,21 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
                 break
 
     elif preset == "with_logo":
-        # Top: name (we don't have a logo upload yet in MVP - reserve left top for logo placeholder)
+        # Top: AssetIQ logo + text on left, asset name on right
+        title_x = x0 + pad
+        if logo_enabled:
+            logo_total_w = _draw_logo_with_text(c, x0 + pad, y0 + h - pad - logo_size_mm * mm, logo_size_mm, logo_grayscale)
+            title_x = x0 + pad + logo_total_w + 2 * mm
+        else:
+            # Placeholder logo box (original behavior)
+            c.setStrokeColorRGB(0.8, 0.8, 0.8)
+            c.rect(x0 + pad, y0 + h - pad - 8 - 10, 8 * mm, 8 * mm)
+            c.setFont("Helvetica-Oblique", 5)
+            c.drawString(x0 + pad + 0.5 * mm, y0 + h - pad - 8 - 5, "LOGO")
+            title_x = x0 + pad + 8 * mm + 2 * mm
+        
         c.setFont("Helvetica-Bold", 8)
-        c.drawString(x0 + pad, y0 + h - pad - 8, (data.get("asset_name") or "")[:28])
-        # Placeholder logo box
-        c.setStrokeColorRGB(0.8, 0.8, 0.8)
-        c.rect(x0 + pad, y0 + h - pad - 8 - 10, 8 * mm, 8 * mm)
-        c.setFont("Helvetica-Oblique", 5)
-        c.drawString(x0 + pad + 0.5 * mm, y0 + h - pad - 8 - 5, "LOGO")
+        c.drawString(title_x, y0 + h - pad - 8, (data.get("asset_name") or "")[:28])
         # QR bottom-left
         qr_size = min(w, h) / 2 - pad
         qx = x0 + pad
@@ -363,12 +542,15 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
                 break
 
     elif preset == "title_date_time":
-        # Long landscape label (e.g. 90.3×29mm): Title on top (bold, centered),
-        # QR on the left bottom, Date + Time stacked on the right bottom.
-        # Other bindings (beyond title/date/time) appear as small extra lines between.
+        # Long landscape label: Logo top-left, Title centered, QR bottom-left, Date/Time bottom-right
         bindings_map = {}
         for b in bindings:
             bindings_map.setdefault(b.source, b)
+        
+        # Draw logo at top-left if enabled
+        if logo_enabled:
+            _draw_logo_with_text(c, x0 + pad, y0 + h - pad - logo_size_mm * mm, logo_size_mm, logo_grayscale)
+        
         # Title line
         title_binding = bindings_map.get("asset_name")
         title_value = ""
@@ -376,6 +558,7 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
             _, title_value = _resolve_field_value(title_binding, data)
         if not title_value:
             title_value = data.get("asset_name", "")
+        
         c.setFont("Helvetica-Bold", 11)
         c.drawCentredString(x0 + w / 2, y0 + h - pad - 10, title_value[:40])
 
@@ -413,17 +596,22 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
                     ex_y += 8
 
     elif preset == "blank":
-        # Truly minimal layout: tiny QR bottom-right, all bindings flow as "Label: value" lines
-        # from top-left. Lets the user place anything they want without a predefined theme.
+        # Minimal layout: logo top-left, QR bottom-right, bindings flow as lines
         qr_size = min(w, h) * 0.35
         qx = x0 + w - pad - qr_size
         qy = y0 + pad
         c.drawImage(qr_reader, qx, qy, qr_size, qr_size, preserveAspectRatio=True, mask="auto")
 
-        # Flow bindings line-by-line starting top-left
+        # Draw logo with text at top-left if enabled
+        text_start_y = y0 + h - pad - 9
+        if logo_enabled:
+            _draw_logo_with_text(c, x0 + pad, y0 + h - pad - logo_size_mm * mm, logo_size_mm, logo_grayscale)
+            text_start_y = y0 + h - pad - logo_size_mm * mm - 3
+
+        # Flow bindings line-by-line starting below logo
         text_area_w = w - qr_size - 3 * pad
         c.setFont("Helvetica", 8)
-        y_cursor = y0 + h - pad - 9
+        y_cursor = text_start_y
         for b in bindings:
             if y_cursor < y0 + pad:
                 break
@@ -437,7 +625,10 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
             y_cursor -= 10
 
     else:  # standard
-        # Top: asset name bold, centered
+        # Top: logo at top-left, asset name centered
+        if logo_enabled:
+            _draw_logo_with_text(c, x0 + pad, y0 + h - pad - logo_size_mm * mm, logo_size_mm, logo_grayscale)
+        
         title = data.get("asset_name", "")
         c.setFont("Helvetica-Bold", 9)
         c.drawCentredString(x0 + w / 2, y0 + h - pad - 9, title[:28])
@@ -514,6 +705,17 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
     preset = tpl.get("preset", "standard")
     bindings = [FieldBinding(**b) if isinstance(b, dict) else b for b in (tpl.get("field_bindings") or [])]
     qr_cfg = QRConfig(**(tpl.get("qr_config") or {}))
+    
+    # Logo configuration
+    logo_cfg = tpl.get("logo_config") or {}
+    logo_enabled = logo_cfg.get("enabled", False)
+    logo_size_mm = float(logo_cfg.get("size_mm", 8.0))
+    logo_grayscale = logo_cfg.get("grayscale", True)
+    
+    # Get logo HTML if enabled
+    logo_html = ""
+    if logo_enabled:
+        logo_html = _get_logo_with_text_html(logo_size_mm, logo_grayscale)
 
     labels_html = []
     records = datasets if datasets else [SAMPLE_DATA]
@@ -524,8 +726,10 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
 
         if preset == "qr_only":
             caption = next((v for (_, v) in lines if v), rec2.get("asset_id", ""))
+            logo_top = f'<div class="logo-top-right">{logo_html}</div>' if logo_enabled else ""
             inner = f"""
               <div class="lbl-qr-only">
+                {logo_top}
                 <img src="{qr_src}" alt="qr" />
                 <div class="cap">{_html_escape(caption[:32])}</div>
               </div>
@@ -536,6 +740,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                 f'<div class="row"><b>{_html_escape(lbl)}:</b> {_html_escape(val)}</div>'
                 for (lbl, val) in lines[:3] if val
             )
+            logo_top = f'<div class="logo-corner">{logo_html}</div>' if logo_enabled else ""
             inner = f"""
               <div class="lbl-compact">
                 <img class="qr" src="{qr_src}" alt="qr" />
@@ -543,6 +748,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                   <div class="title">{_html_escape(title[:32])}</div>
                   {rows}
                 </div>
+                {logo_top}
               </div>
             """
         elif preset == "with_logo":
@@ -550,10 +756,12 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                 f'<div class="row"><b>{_html_escape(lbl)}:</b> {_html_escape(val)}</div>'
                 for (lbl, val) in lines[:4] if val
             )
+            # Use real logo if enabled, otherwise placeholder
+            logo_part = logo_html if logo_enabled else '<div class="logo-placeholder">LOGO</div>'
             inner = f"""
               <div class="lbl-logo">
                 <div class="top">
-                  <div class="logo">LOGO</div>
+                  {logo_part}
                   <div class="title">{_html_escape(rec2.get('asset_name','')[:28])}</div>
                 </div>
                 <div class="bottom">
@@ -578,9 +786,13 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                 f'<div class="ext">{_html_escape(lbl)}: {_html_escape(val)}</div>'
                 for (lbl, val) in [_resolve_field_value(e, rec2) for e in extras[:2]] if val
             )
+            logo_top = f'<div class="logo-top-left">{logo_html}</div>' if logo_enabled else ""
             inner = f"""
               <div class="lbl-tdt">
-                <div class="title">{_html_escape(title_val[:40])}</div>
+                <div class="header-row">
+                  {logo_top}
+                  <div class="title">{_html_escape(title_val[:40])}</div>
+                </div>
                 <div class="body">
                   <img class="qr" src="{qr_src}" alt="qr" />
                   <div class="meta">
@@ -596,9 +808,13 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                 f'<div class="row">{_html_escape(lbl)}: {_html_escape(val)}</div>'
                 for (lbl, val) in lines if val
             )
+            logo_top = f'<div class="logo-inline">{logo_html}</div>' if logo_enabled else ""
             inner = f"""
               <div class="lbl-blank">
-                <div class="lines">{rows}</div>
+                <div class="lines">
+                  {logo_top}
+                  {rows}
+                </div>
                 <img class="qr" src="{qr_src}" alt="qr" />
               </div>
             """
@@ -608,8 +824,10 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
                 f'<div class="row">{_html_escape(lbl)}: {_html_escape(val)}</div>'
                 for (lbl, val) in lines[:2] if val
             )
+            logo_top = f'<div class="logo-top-left">{logo_html}</div>' if logo_enabled else ""
             inner = f"""
               <div class="lbl-std">
+                {logo_top}
                 <div class="title">{_html_escape(title[:28])}</div>
                 <img class="qr" src="{qr_src}" alt="qr" />
                 <div class="foot">{rows}</div>
@@ -669,29 +887,37 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
     body > *:not(.label) {{ display: none !important; }}
   }}
   img {{ display: block; }}
+  
+  /* Logo positioning classes */
+  .assetiq-logo {{ display: inline-flex; align-items: center; gap: 1mm; }}
+  .assetiq-logo img {{ display: inline-block; }}
+  .logo-top-left {{ position: absolute; top: 1.5mm; left: 1.5mm; }}
+  .logo-top-right {{ position: absolute; top: 1.5mm; right: 1.5mm; }}
+  .logo-corner {{ position: absolute; top: 1.5mm; right: 1.5mm; }}
+  .logo-inline {{ margin-bottom: 1mm; }}
+  .logo-placeholder {{ width: 7mm; height: 7mm; border: 0.3mm solid #888; display:flex;align-items:center;justify-content:center;font-size:5pt;color:#888; }}
 
   /* standard */
-  .lbl-std {{ display: flex; flex-direction: column; align-items: center; height: 100%; gap: 0.5mm; }}
+  .lbl-std {{ display: flex; flex-direction: column; align-items: center; height: 100%; gap: 0.5mm; position: relative; }}
   .lbl-std .title {{ font-weight: bold; font-size: 9pt; text-align: center; line-height: 1.1; }}
   .lbl-std .qr   {{ flex: 1 1 auto; max-height: 70%; width: auto; margin: auto; object-fit: contain; }}
   .lbl-std .foot {{ font-size: 6.5pt; text-align: center; line-height: 1.2; }}
 
   /* compact */
-  .lbl-compact {{ display: flex; gap: 1.5mm; height: 100%; align-items: center; }}
+  .lbl-compact {{ display: flex; gap: 1.5mm; height: 100%; align-items: center; position: relative; }}
   .lbl-compact .qr {{ height: 100%; width: auto; max-width: 40%; object-fit: contain; }}
   .lbl-compact .side {{ flex: 1; min-width: 0; }}
   .lbl-compact .title {{ font-weight: bold; font-size: 8pt; line-height: 1.1; }}
   .lbl-compact .row {{ font-size: 6.5pt; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
   /* qr only */
-  .lbl-qr-only {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 0.5mm; }}
+  .lbl-qr-only {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 0.5mm; position: relative; }}
   .lbl-qr-only img {{ max-width: 75%; max-height: 80%; object-fit: contain; }}
   .lbl-qr-only .cap {{ font-size: 7pt; font-weight: bold; text-align: center; }}
 
   /* with logo */
   .lbl-logo {{ display: flex; flex-direction: column; height: 100%; gap: 1mm; }}
   .lbl-logo .top {{ display: flex; gap: 2mm; align-items: center; flex: 0 0 auto; }}
-  .lbl-logo .logo {{ width: 7mm; height: 7mm; border: 0.3mm solid #888; display:flex;align-items:center;justify-content:center;font-size:5pt;color:#888; }}
   .lbl-logo .title {{ font-weight: bold; font-size: 8pt; line-height: 1.1; }}
   .lbl-logo .bottom {{ display: flex; gap: 2mm; flex: 1; min-height: 0; }}
   .lbl-logo .qr {{ height: 100%; width: auto; max-width: 40%; object-fit: contain; }}
@@ -700,6 +926,9 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
 
   /* title + date + time */
   .lbl-tdt {{ display: flex; flex-direction: column; height: 100%; gap: 0.5mm; }}
+  .lbl-tdt .header-row {{ display: flex; align-items: center; gap: 2mm; flex: 0 0 auto; }}
+  .lbl-tdt .header-row .title {{ flex: 1; text-align: center; font-weight: bold; font-size: 10pt; line-height: 1.1; }}
+  .lbl-tdt .header-row .logo-top-left {{ position: static; }}
   .lbl-tdt .title {{ text-align: center; font-weight: bold; font-size: 10pt; line-height: 1.1; flex: 0 0 auto; }}
   .lbl-tdt .body {{ display: flex; gap: 2mm; flex: 1; min-height: 0; align-items: flex-end; }}
   .lbl-tdt .qr {{ height: 100%; width: auto; max-width: 30%; object-fit: contain; }}
