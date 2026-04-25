@@ -382,7 +382,13 @@ def _draw_logo_with_text(c: canvas.Canvas, x: float, y: float, size_mm: float, g
     
     Returns the total width used (in points).
     """
+    import logging
+    logger = logging.getLogger("labels")
+    logger.info(f"_draw_logo_with_text called: x={x}, y={y}, size_mm={size_mm}, grayscale={grayscale}")
+    
     logo_reader = _get_logo_reader(grayscale=grayscale)
+    logger.info(f"logo_reader: {logo_reader}")
+    
     icon_size = size_mm * mm
     text_size = max(6, size_mm * 0.9)  # Font size proportional to logo size
     gap = 1.2 * mm  # Gap between icon and text
@@ -392,7 +398,10 @@ def _draw_logo_with_text(c: canvas.Canvas, x: float, y: float, size_mm: float, g
     if logo_reader:
         aspect = _get_logo_aspect_ratio()
         icon_h = icon_size / aspect if aspect > 0 else icon_size
+        logger.info(f"Drawing logo at ({x}, {y}) size=({icon_size}, {icon_h})")
         c.drawImage(logo_reader, x, y, icon_size, icon_h, preserveAspectRatio=True, mask="auto")
+    else:
+        logger.warning("logo_reader is None - logo will not be drawn!")
     
     # Draw "AssetIQ" text next to the icon
     c.setFont("Helvetica-Bold", text_size)
@@ -405,6 +414,7 @@ def _draw_logo_with_text(c: canvas.Canvas, x: float, y: float, size_mm: float, g
     # Vertically center the text with the icon
     text_y = y + (icon_size * 0.3)  # Adjust baseline to align with icon center
     c.drawString(text_x, text_y, "AssetIQ")
+    logger.info(f"Drew 'AssetIQ' text at ({text_x}, {text_y})")
     
     # Calculate text width
     text_width = c.stringWidth("AssetIQ", "Helvetica-Bold", text_size)
@@ -468,6 +478,9 @@ def _get_font_sizes(font_size_preset: str) -> dict:
 
 def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0), margin_offset_mm: float = 0.0):
     """Draw one label on the canvas at origin (x0, y0) in points."""
+    import logging
+    logger = logging.getLogger("labels")
+    
     data = _inject_print_datetime(data)
     x0, y0 = origin
     width_mm = float(tpl.get("width_mm", 50))
@@ -483,6 +496,8 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
     logo_size_mm = float(logo_cfg.get("size_mm", 8.0))
     logo_grayscale = logo_cfg.get("grayscale", True)
     logo_position = logo_cfg.get("position", "top-left")
+    
+    logger.info(f"_render_single_label: preset={preset}, logo_enabled={logo_enabled}, logo_position={logo_position}, logo_cfg={logo_cfg}")
 
     # QR code visibility
     show_qr = tpl.get("show_qr", True)
