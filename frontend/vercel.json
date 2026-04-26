@@ -1,4 +1,10 @@
 {
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://assetiq-uat-production.up.railway.app/api/:path*"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
