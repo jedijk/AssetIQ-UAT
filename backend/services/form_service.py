@@ -552,11 +552,17 @@ class FormService:
                 submitted_by_name = user.get("name", "")
 
         # Create submission document
+        label_cfg = template.get("label_print_config") or {}
+        label_template_id = label_cfg.get("label_template_id") if isinstance(label_cfg, dict) else None
         doc = {
             "id": str(uuid.uuid4()),  # Custom string ID for consistency
             "form_template_id": data["form_template_id"],
             "form_template_name": template["name"],
             "form_template_version": template.get("version", 1),
+            # Freeze the label template used at submission-time so reprints match.
+            # If the form template is later reconfigured to a different label template,
+            # the submission can still be reprinted identically.
+            "label_template_id": label_template_id,
             "task_instance_id": data.get("task_instance_id"),
             "task_template_name": data.get("task_template_name"),
             "equipment_id": data.get("equipment_id"),
@@ -1380,6 +1386,7 @@ class FormService:
             "form_template_name": doc.get("form_template_name"),
             "template_name": doc.get("form_template_name"),  # Alias for frontend
             "form_template_version": doc.get("form_template_version"),
+            "label_template_id": doc.get("label_template_id"),
             "task_instance_id": doc.get("task_instance_id"),
             "equipment_id": doc.get("equipment_id"),
             "equipment_name": doc.get("equipment_name"),

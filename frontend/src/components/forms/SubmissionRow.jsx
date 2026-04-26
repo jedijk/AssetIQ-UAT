@@ -49,14 +49,15 @@ export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
     setPrinting(true);
     try {
       const cfg = await ensureConfig();
-      if (!cfg?.enabled || !cfg?.label_template_id) {
+      const templateId = submission?.label_template_id || cfg?.label_template_id;
+      if (!cfg?.enabled || !templateId) {
         toast.error("This form has no label template configured. Enable it in the form designer.");
         if (preOpened && !preOpened.closed) preOpened.close();
         return;
       }
       const { printLabel } = await import("../../lib/printLabel");
       const res = await printLabel({
-        template_id: cfg.label_template_id,
+        template_id: templateId,
         submission_id: submission.id,
         copies: 1,
       }, {

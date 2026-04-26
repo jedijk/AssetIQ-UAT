@@ -14,6 +14,58 @@ import { Checkbox } from "../../components/ui/checkbox";
 
 const STORAGE_KEY = "assetiq_smart_dashboard_widgets_v1";
 
+// Match Production Report visual language (cards + tooltips)
+const fmt1 = (v) => (typeof v === "number" ? v.toFixed(1) : v);
+
+function ReportChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs">
+      <p className="font-semibold text-slate-700 mb-1">{label}</p>
+      {payload.map((entry, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+          <span className="text-slate-600">{entry.name}:</span>
+          <span className="font-medium text-slate-800">{fmt1(entry.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReportKPICard({ icon: Icon, iconColor, label, value, unit, detail, detail2, trend, trendDirection }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-1.5 min-w-0">
+      <div className="flex items-center gap-2 mb-1">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconColor || "bg-slate-100"}`}>
+          {Icon ? <Icon className="w-4 h-4" /> : <Hash className="w-4 h-4" />}
+        </div>
+        <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</span>
+      </div>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-2xl font-bold text-slate-900 tabular-nums">{value}</span>
+        {unit && <span className="text-sm text-slate-500">{unit}</span>}
+      </div>
+      {detail && <p className="text-xs text-slate-500 truncate">{detail}</p>}
+      {detail2 && <p className="text-xs text-slate-400 truncate">{detail2}</p>}
+      {trend !== undefined && (
+        <span
+          className={`text-xs font-medium ${
+            trendDirection === "up"
+              ? "text-emerald-600"
+              : trendDirection === "down"
+                ? "text-red-500"
+                : "text-slate-500"
+          }`}
+        >
+          {trendDirection === "up" ? "+" : ""}
+          {trend}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function safeJsonParse(s, fallback) {
   try {
     return JSON.parse(s);
@@ -357,15 +409,7 @@ function SortableWidgetCard({
 
       <div className="p-4">
         {p.kind === "kpi" ? (
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center">
-              <Hash className="w-5 h-5 text-indigo-600" />
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-slate-900 tabular-nums">{p.value ?? 0}</div>
-              <div className="text-xs text-slate-500">KPI</div>
-            </div>
-          </div>
+          <ReportKPICard label={p.title} value={p.value ?? 0} unit="" detail="KPI" />
         ) : p.kind === "table" ? (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div className="px-3 py-2 border-b border-slate-200 text-xs text-slate-500 flex items-center justify-between">
@@ -405,7 +449,7 @@ function SortableWidgetCard({
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" />
                 <YAxis type="category" dataKey="label" width={120} />
-                <Tooltip />
+                <Tooltip content={<ReportChartTooltip />} />
                 <Bar dataKey="value" fill="#4f46e5" radius={[4, 4, 4, 4]} />
               </BarChart>
             </ResponsiveContainer>
@@ -894,15 +938,7 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
               </div>
               <div className="p-4">
                 {preview.kind === "kpi" ? (
-                  <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-4">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center">
-                      <Hash className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <div className="text-3xl font-bold text-slate-900 tabular-nums">{preview.value ?? 0}</div>
-                      <div className="text-xs text-slate-500">KPI preview</div>
-                    </div>
-                  </div>
+                  <ReportKPICard label={preview.title} value={preview.value ?? 0} unit="" detail="KPI preview" />
                 ) : preview.kind === "table" ? (
                   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <div className="px-3 py-2 border-b border-slate-200 text-xs text-slate-500 flex items-center justify-between">
@@ -945,7 +981,7 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis type="number" />
                         <YAxis type="category" dataKey="label" width={120} />
-                        <Tooltip />
+                        <Tooltip content={<ReportChartTooltip />} />
                         <Bar dataKey="value" fill="#4f46e5" radius={[4, 4, 4, 4]} />
                       </BarChart>
                     </ResponsiveContainer>

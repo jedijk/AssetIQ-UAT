@@ -173,6 +173,10 @@ function canPreviewFile(contentType) {
   if (contentType.startsWith("image/")) return true;
   if (contentType.includes("pdf")) return true;
   if (contentType.includes("presentation") || contentType.includes("powerpoint") || contentType.includes("ppt")) return true;
+  // DocumentViewer supports Office docs by fetching as blob
+  if (contentType.includes("spreadsheet") || contentType.includes("excel") || contentType.includes("xls")) return true;
+  if (contentType.includes("msword") || contentType.includes("wordprocessing") || contentType.includes("doc")) return true;
+  if (contentType.includes("csv")) return true;
   return false;
 }
 
