@@ -367,9 +367,22 @@ async def login(request: Request, credentials: UserLogin, response: Response):
     cookie_enabled = os.environ.get("AUTH_SET_COOKIE_ON_LOGIN", "true").lower() == "true"
     if cookie_enabled:
         try:
-            proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-            secure = proto == "https"
-            same_site = "none" if secure else "lax"
+            # For cross-origin SPA (Vercel) -> API (Railway), cookies must be
+            # SameSite=None; Secure or browsers won't send them on XHR/fetch.
+            origin = request.headers.get("origin") or ""
+            host = request.headers.get("host") or ""
+            proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "").lower()
+
+            is_https = proto == "https"
+            is_cross_site = bool(origin) and bool(host) and (host not in origin)
+
+            force_cross_site = os.environ.get("FORCE_CROSS_SITE_COOKIES", "true").lower() == "true"
+            if force_cross_site and is_cross_site:
+                secure = True
+                same_site = "none"
+            else:
+                secure = is_https
+                same_site = "none" if secure else "lax"
 
             csrf_token = secrets.token_urlsafe(32)
             max_age = int(timedelta(hours=float(JWT_EXPIRATION_HOURS)).total_seconds())
