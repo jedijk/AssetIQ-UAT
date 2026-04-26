@@ -112,6 +112,7 @@ import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame"
 import TaskCard, { priorityColors, taskTypeIcons, SortableTaskCard } from "../components/task-execution/TaskCard";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { AppErrorBoundary } from "../components/AppErrorBoundary";
 
 // API functions for My Tasks
 import { myTasksAPI } from "../lib/api";
@@ -841,15 +842,21 @@ const MyTasksPage = () => {
   if (viewMode === "execution" && selectedTask) {
     return (
       <div className="h-[calc(100vh-64px)]">
-        <TaskExecutionFrame
-          task={selectedTask}
-          onBack={handleBackFromExecution}
-          onComplete={handleCompleteTask}
-          onDelete={(task) => {
-            handleBackFromExecution();
-            handleDeleteTask(task);
-          }}
-        />
+        <AppErrorBoundary
+          context="TaskExecutionFrame"
+          title="Form crashed"
+          subtitle="This form hit an error while you were filling it in. Tap reload and try again."
+        >
+          <TaskExecutionFrame
+            task={selectedTask}
+            onBack={handleBackFromExecution}
+            onComplete={handleCompleteTask}
+            onDelete={(task) => {
+              handleBackFromExecution();
+              handleDeleteTask(task);
+            }}
+          />
+        </AppErrorBoundary>
       </div>
     );
   }
