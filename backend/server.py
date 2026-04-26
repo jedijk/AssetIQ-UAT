@@ -407,6 +407,7 @@ async def csrf_protect_cookie_auth(request: Request, call_next):
         exempt_prefixes = (
             "/api/auth/login",
             "/api/auth/register",
+            "/api/auth/logout",
             "/api/auth/forgot-password",
             "/api/auth/reset-password",
             "/api/auth/verify-reset-token",
@@ -424,12 +425,32 @@ async def csrf_protect_cookie_auth(request: Request, call_next):
         csrf_cookie = request.cookies.get(os.environ.get("CSRF_COOKIE_NAME", "assetiq_csrf"))
         csrf_header = request.headers.get("x-csrf-token")
         if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
-            return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+            resp = JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+            # Ensure the browser can read the response even when this middleware
+            # runs before CORSMiddleware (otherwise it surfaces as a CORS error).
+            try:
+                origin = request.headers.get("origin")
+                if origin and origin in ALLOWED_ORIGINS:
+                    resp.headers["Access-Control-Allow-Origin"] = origin
+                    resp.headers["Vary"] = "Origin"
+                    resp.headers["Access-Control-Allow-Credentials"] = "true"
+            except Exception:
+                pass
+            return resp
 
     except Exception:
         # Fail closed only if explicitly configured.
         if os.environ.get("CSRF_STRICT", "false").lower() == "true":
-            return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+            resp = JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+            try:
+                origin = request.headers.get("origin")
+                if origin and origin in ALLOWED_ORIGINS:
+                    resp.headers["Access-Control-Allow-Origin"] = origin
+                    resp.headers["Vary"] = "Origin"
+                    resp.headers["Access-Control-Allow-Credentials"] = "true"
+            except Exception:
+                pass
+            return resp
 
     return await call_next(request)
 
