@@ -257,7 +257,7 @@ const Layout = () => {
     return () => {
       if (avatarUrl) URL.revokeObjectURL(avatarUrl);
     };
-  }, [user?.id]);
+  }, [user?.id, avatarUrl]);
 
   // Open profile dialog and populate form
   const openProfileDialog = useCallback(() => {
