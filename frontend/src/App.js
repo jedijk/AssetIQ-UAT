@@ -17,45 +17,48 @@ import { getBackendUrl } from "./lib/apiConfig";
 import { debugLog } from "./lib/debug";
 import "./App.css";
 
-const LoginPage = lazy(() => import("./pages/LoginPage"));
-const RegisterPage = lazy(() => import("./pages/RegisterPage"));
-const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
-const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
-const DashboardPage = lazy(() => import("./pages/DashboardPage"));
-const ThreatsPage = lazy(() => import("./pages/ThreatsPage"));
+// iOS Safari can feel slower with too many small lazy chunks (waterfall + parse overhead).
+// Keep core routes eagerly loaded; lazy-load heavier/rare routes.
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import DashboardPage from "./pages/DashboardPage";
+import ThreatsPage from "./pages/ThreatsPage";
+import FailureModesPage from "./pages/FailureModesPage";
+import ActionsPage from "./pages/ActionsPage";
+import TaskSchedulerPage from "./pages/TaskSchedulerPage";
+import MyTasksPage from "./pages/MyTasksPage";
+import FormSubmissionsPage from "./pages/FormSubmissionsPage";
+import QRScanPage from "./pages/QRScanPage";
+
 const ThreatDetailPage = lazy(() => import("./pages/ThreatDetailPage"));
-const FailureModesPage = lazy(() => import("./pages/FailureModesPage"));
+const ActionDetailPage = lazy(() => import("./pages/ActionDetailPage"));
 const EquipmentManagerPage = lazy(() => import("./pages/EquipmentManagerPage"));
 const CausalEnginePage = lazy(() => import("./pages/CausalEnginePage"));
-const ActionsPage = lazy(() => import("./pages/ActionsPage"));
-const ActionDetailPage = lazy(() => import("./pages/ActionDetailPage"));
-const TaskSchedulerPage = lazy(() => import("./pages/TaskSchedulerPage"));
-const MyTasksPage = lazy(() => import("./pages/MyTasksPage"));
+const UnderDevelopmentPage = lazy(() => import("./pages/UnderDevelopmentPage"));
+const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
+const DefinitionsPage = lazy(() => import("./pages/DefinitionsPage"));
+const UserStatisticsPage = lazy(() => import("./pages/UserStatisticsPage"));
+const MobileApp = lazy(() => import("./mobile/MobileApp"));
+
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const SettingsPreferencesPage = lazy(() => import("./pages/SettingsPreferencesPage"));
+const SettingsGeneralPage = lazy(() => import("./pages/SettingsGeneralPage"));
 const SettingsUserManagementPage = lazy(() => import("./pages/SettingsUserManagementPage"));
 const SettingsPermissionsPage = lazy(() => import("./pages/SettingsPermissionsPage"));
-const SettingsAIUsagePage = lazy(() => import("./pages/SettingsAIUsagePage"));
+const SettingsQRPage = lazy(() => import("./pages/SettingsQRPage"));
+const LabelsPage = lazy(() => import("./pages/LabelsPage"));
+const SettingsNotificationsPage = lazy(() => import("./pages/SettingsNotificationsPage"));
 const SettingsRiskCalculationPage = lazy(() => import("./pages/SettingsRiskCalculationPage"));
+const SettingsAIUsagePage = lazy(() => import("./pages/SettingsAIUsagePage"));
 const SettingsServerPerformancePage = lazy(() => import("./pages/SettingsServerPerformancePage"));
 const SettingsDatabasePage = lazy(() => import("./pages/SettingsDatabasePage"));
-const SettingsPreferencesPage = lazy(() => import("./pages/SettingsPreferencesPage"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage"));
-const SettingsGeneralPage = lazy(() => import("./pages/SettingsGeneralPage"));
-const SettingsQRPage = lazy(() => import("./pages/SettingsQRPage"));
-const SettingsNotificationsPage = lazy(() => import("./pages/SettingsNotificationsPage"));
+const InsightsPage = lazy(() => import("./pages/InsightsPage"));
 const SettingsLogIngestionPage = lazy(() => import("./pages/SettingsLogIngestionPage"));
 const SettingsPrivacyPage = lazy(() => import("./pages/SettingsPrivacyPage"));
 const SettingsDeletionRequestsPage = lazy(() => import("./pages/SettingsDeletionRequestsPage"));
 const SettingsConsentManagementPage = lazy(() => import("./pages/SettingsConsentManagementPage"));
-const LabelsPage = lazy(() => import("./pages/LabelsPage"));
-const InsightsPage = lazy(() => import("./pages/InsightsPage"));
-const FormsPage = lazy(() => import("./pages/FormsPage"));
-const FormSubmissionsPage = lazy(() => import("./pages/FormSubmissionsPage"));
-const UnderDevelopmentPage = lazy(() => import("./pages/UnderDevelopmentPage"));
-const UserStatisticsPage = lazy(() => import("./pages/UserStatisticsPage"));
-const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
-const DefinitionsPage = lazy(() => import("./pages/DefinitionsPage"));
-const MobileApp = lazy(() => import("./mobile/MobileApp"));
-const QRScanPage = lazy(() => import("./pages/QRScanPage"));
 
 function RouteFallback() {
   return (

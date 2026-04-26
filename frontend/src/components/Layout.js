@@ -141,6 +141,13 @@ const Layout = () => {
 
   // Touch event handlers for pull-to-refresh
   useEffect(() => {
+    // iOS Safari touch handling is extremely sensitive to document-level
+    // preventDefault on touchmove and can degrade tap/scroll responsiveness.
+    // Use native iOS pull-to-refresh instead (Safari provides it).
+    const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
+    const isIOS = /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
+    if (isIOS) return;
+
     let startScrollY = 0;
     
     const handleTouchStart = (e) => {
