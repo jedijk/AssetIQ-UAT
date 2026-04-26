@@ -58,6 +58,7 @@ import { Label } from "../components/ui/label";
 import InsightsPage from "./InsightsPage";
 import { DISCIPLINES } from "../constants/disciplines";
 import ProductionDashboardPage from "./ProductionDashboardPage";
+import { AIDashboardBuilderPanel } from "../features/dashboardBuilder/AIDashboardBuilderPanel";
 
 // Authenticated Lightbox component for viewing images with proper mobile auth
 const AuthenticatedLightbox = ({ url, name, onClose }) => {
@@ -500,10 +501,14 @@ export default function DashboardPage({ initialTab }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState(initialTab || "operational");
+  // ON by default; disable explicitly with REACT_APP_ENABLE_AI_DASHBOARD_BUILDER=false
+  const aiBuilderEnabled = process.env.REACT_APP_ENABLE_AI_DASHBOARD_BUILDER !== "false";
 
   // Operator view: shown on mobile when role is operator or owner has toggled it
-  const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < 768);
+  const initialIsMobileViewport = window.innerWidth < 768;
+  const [isMobileViewport, setIsMobileViewport] = useState(() => initialIsMobileViewport);
+  const aiBuilderDesktopEnabled = aiBuilderEnabled && !initialIsMobileViewport;
+  const [activeTab, setActiveTab] = useState(initialTab || (aiBuilderDesktopEnabled ? "ai" : "operational"));
   const [operatorToggle, setOperatorToggle] = useState(
     () => localStorage.getItem("operatorViewEnabled") === "true"
   );
@@ -522,6 +527,13 @@ export default function DashboardPage({ initialTab }) {
   }, []);
 
   const isOperatorMode = user?.role === "operator" || operatorToggle;
+
+  // AI builder is desktop-only. If the viewport becomes mobile while on AI tab, move back to operational.
+  useEffect(() => {
+    if (isMobileViewport && activeTab === "ai") {
+      setActiveTab("operational");
+    }
+  }, [isMobileViewport, activeTab]);
   
   // Redirect to operational tab on mobile if viewing hidden tabs (except production which is now mobile-enabled)
   useEffect(() => {
@@ -823,6 +835,19 @@ export default function DashboardPage({ initialTab }) {
         {/* Dashboard Tab Buttons - Mobile Optimized */}
         <div className="flex items-center justify-between gap-4">
           <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1">
+            {aiBuilderEnabled && !isMobileViewport && (
+              <button
+                onClick={() => setActiveTab("ai")}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${
+                  activeTab === "ai" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"
+                }`}
+                data-testid="ai-tab"
+              >
+                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">AI Builder</span>
+                <span className="xs:hidden">AI</span>
+              </button>
+            )}
             <button 
               onClick={() => setActiveTab("operational")}
               className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
@@ -1403,6 +1428,18 @@ export default function DashboardPage({ initialTab }) {
           {activeTab === "reliability" && (
             <div className="animate-fade-in -mx-4 sm:-mx-6">
               <InsightsPage embedded={true} />
+            </div>
+          )}
+
+          {/* AI Dashboard Builder Tab */}
+          {activeTab === "ai" && aiBuilderEnabled && !isMobileViewport && (
+            <div className="animate-fade-in">
+              <AIDashboardBuilderPanel
+                actions={actions}
+                observations={observations}
+                investigations={investigations}
+                users={usersList}
+              />
             </div>
           )}
 

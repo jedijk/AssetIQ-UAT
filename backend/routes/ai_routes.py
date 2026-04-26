@@ -3,7 +3,7 @@ AI Risk Engine routes with rate limiting and security.
 """
 import os
 from fastapi import APIRouter, Depends, HTTPException, Request
-from typing import Optional
+from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone
 import uuid
 import json
@@ -18,6 +18,7 @@ from ai_risk_models import (
     AnalyzeRiskRequest, GenerateCausesRequest, GenerateFaultTreeRequest, OptimizeActionsRequest
 )
 from services.ai_security_service import detect_prompt_injection
+from services.openai_service import chat_completion
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,143 @@ ai_engine = AIRiskEngine(api_key=OPENAI_API_KEY)
 # Rate limit configurations
 AI_RATE_LIMIT = "20/minute"  # 20 AI calls per minute per IP
 AI_HEAVY_RATE_LIMIT = "10/minute"  # 10 heavy AI calls per minute (fault tree, bow tie)
+
+#
+# Dashboard Builder (AI-first) — minimal intent endpoint.
+# This is intentionally template-based in v1 so the frontend can render safely
+# without exposing schema/SQL concepts and without trusting arbitrary code.
+#
+
+class DashboardIntentRequest(dict):
+    """Compat shim: request body is a dict in this codebase."""
+    pass
+
+
+@router.post("/ai/dashboard-intent")
+@limiter.limit(AI_RATE_LIMIT)
+async def dashboard_intent(
+    request: Request,
+    body: Dict[str, Any],
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Convert a natural-language dashboard request into a safe, template-based intent.
+
+    Returns:
+      {
+        "success": true,
+        "intent": {
+          "template_id": "...",
+          "title": "...",
+          "why": "...",
+          "params": {...}
+        }
+      }
+    """
+    prompt = (body or {}).get("prompt") or (body or {}).get("message") or ""
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise HTTPException(status_code=400, detail="prompt is required")
+
+    # Prompt injection check (same approach as the risk engine).
+    check_injection_attempt({"prompt": prompt}, endpoint="/ai/dashboard-intent")
+
+    templates = [
+        {
+            "template_id": "overdue_actions_by_owner",
+            "title": "Overdue actions by owner",
+            "description": "Counts overdue actions (due date before today, not closed) grouped by owner.",
+            "sources": ["Actions"],
+        },
+        {
+            "template_id": "open_actions_kpi",
+            "title": "Open actions",
+            "description": "Counts actions that are not closed/completed.",
+            "sources": ["Actions"],
+        },
+        {
+            "template_id": "open_investigations_kpi",
+            "title": "Open investigations",
+            "description": "Counts investigations that are not completed/closed.",
+            "sources": ["Investigations"],
+        },
+        {
+            "template_id": "critical_observations_kpi",
+            "title": "Critical observations",
+            "description": "Counts observations with risk level Critical/High (where available).",
+            "sources": ["Observations"],
+        },
+        {
+            "template_id": "clarify",
+            "title": "Clarify question",
+            "description": "Ask exactly one clarification question when the prompt is ambiguous.",
+            "sources": [],
+        },
+    ]
+
+    system = (
+        "You are AssetIQ's AI Dashboard Builder. "
+        "Your job is to map a user request into ONE safe dashboard template id from the provided list. "
+        "Do not output SQL, schema, joins, or technical field names. "
+        "If ambiguous, choose template_id='clarify' and ask exactly one short question.\n\n"
+        "Return JSON only with keys: template_id, title, why, params.\n"
+        "params must be an object (can be empty)."
+    )
+
+    user = {
+        "prompt": prompt.strip(),
+        "available_templates": templates,
+        "defaults": {"window": "last_30d", "limit": 10},
+        "user_context": {
+            "role": current_user.get("role"),
+            "user_id": current_user.get("id"),
+        },
+    }
+
+    try:
+        model = os.environ.get("OPENAI_MODEL_DASHBOARD_BUILDER", "gpt-4o-mini")
+        raw = await chat_completion(
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps(user)},
+            ],
+            model=model,
+            temperature=0.2,
+            max_tokens=500,
+            response_format={"type": "json_object"},
+        )
+
+        parsed = json.loads(raw or "{}")
+        template_id = parsed.get("template_id")
+        if template_id not in {t["template_id"] for t in templates}:
+            template_id = "clarify"
+
+        intent = {
+            "template_id": template_id,
+            "title": parsed.get("title") or next((t["title"] for t in templates if t["template_id"] == template_id), "Dashboard widget"),
+            "why": parsed.get("why") or "Generated from your request.",
+            "params": parsed.get("params") if isinstance(parsed.get("params"), dict) else {},
+        }
+
+        # Log usage (lightweight; token counts not available here)
+        await log_ai_usage(
+            user_id=current_user.get("id", "unknown"),
+            feature="dashboard_builder_intent",
+            model=model,
+            prompt_tokens=0,
+            completion_tokens=0,
+            installation_name=current_user.get("installation", "default") if isinstance(current_user, dict) else "default",
+            installation_id=current_user.get("installation_id", "default") if isinstance(current_user, dict) else "default",
+            success=True,
+            metadata={"template_id": template_id},
+        )
+
+        return {"success": True, "intent": intent}
+    except ValueError as ve:
+        # OPENAI_API_KEY missing etc.
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"dashboard_intent error: {e}")
+        raise HTTPException(status_code=500, detail="AI dashboard intent failed")
 
 
 async def log_ai_usage(
