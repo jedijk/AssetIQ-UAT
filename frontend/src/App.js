@@ -53,7 +53,7 @@ import { useEffect } from "react";
 import "./App.css";
 
 // Current frontend version - update with each release
-const APP_VERSION = "3.6.0";
+const APP_VERSION = "3.6.1";
 
 // Parse a semver string "A.B.C" into comparable tuple [A, B, C]
 const parseVersion = (v) => {
@@ -74,26 +74,10 @@ const isRemoteNewer = (remote, local) => {
   return false;
 };
 
-// Hard reload: unregister service workers, clear caches, reload with cache-busting query
-const forceReload = async (remoteVersion) => {
-  try {
-    if ("serviceWorker" in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
-    }
-  } catch (e) {
-    console.warn("[VersionCheck] SW unregister failed:", e);
-  }
-  try {
-    if ("caches" in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames.map((name) => caches.delete(name)));
-    }
-  } catch (e) {
-    console.warn("[VersionCheck] Cache clear failed:", e);
-  }
+// Controlled reload: never reload the app automatically (avoid disrupting typing).
+// Keep the mechanism simple and user-driven.
+const requestReload = (remoteVersion) => {
   localStorage.setItem("app_version", remoteVersion || APP_VERSION);
-  // Cache-busting reload. Keep pathname + hash, replace query with version marker.
   const url = new URL(window.location.href);
   url.searchParams.set("v", remoteVersion || APP_VERSION);
   window.location.replace(url.toString());
@@ -120,8 +104,8 @@ const useVersionCheck = () => {
         if (backendVersion && isRemoteNewer(backendVersion, APP_VERSION)) {
           if (promptedFor === backendVersion) return; // already prompted in this tab
           promptedFor = backendVersion;
-          console.log(`[VersionCheck] Newer version available: ${APP_VERSION} → ${backendVersion}. Forcing refresh.`);
-          // Inline banner + auto-reload after a short delay so the user sees what happened
+          console.log(`[VersionCheck] Newer version available: ${APP_VERSION} → ${backendVersion}. Update available.`);
+          // Inline banner (user-initiated reload)
           try {
             const existing = document.getElementById("app-update-banner");
             if (!existing) {
@@ -141,11 +125,15 @@ const useVersionCheck = () => {
                 "text-align:center",
                 "box-shadow:0 2px 8px rgba(0,0,0,0.15)",
               ].join(";");
-              banner.textContent = `A new version (${backendVersion}) is available. Refreshing…`;
+              banner.innerHTML = `A new version (${backendVersion}) is available. <button id="app-update-reload-btn" style="margin-left:10px;padding:6px 10px;border-radius:8px;border:0;background:#fff;color:#1d4ed8;font-weight:700;cursor:pointer">Reload</button>`;
               document.body.appendChild(banner);
+
+              const btn = document.getElementById("app-update-reload-btn");
+              if (btn) {
+                btn.addEventListener("click", () => requestReload(backendVersion));
+              }
             }
           } catch (_) {}
-          setTimeout(() => forceReload(backendVersion), 1200);
           return;
         }
 

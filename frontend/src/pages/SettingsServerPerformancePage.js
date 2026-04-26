@@ -462,7 +462,7 @@ const SettingsServerPerformancePage = () => {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [isOwner]);
   
   // Initial fetch and auto-refresh
   useEffect(() => {

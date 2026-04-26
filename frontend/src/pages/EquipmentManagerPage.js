@@ -619,11 +619,16 @@ export default function EquipmentManagerPage() {
     }
   };
 
-  const nodes = nodesData?.nodes || [];
-  const equipmentTypes = typesData?.equipment_types || [];
-  const criticalityProfiles = profilesData?.profiles || [];
-  const disciplines = disciplinesData?.disciplines || [];
-  const unstructuredItems = unstructuredData?.items || [];
+  const nodes = useMemo(() => nodesData?.nodes ?? [], [nodesData]);
+  const equipmentTypes = useMemo(() => typesData?.equipment_types ?? [], [typesData]);
+  const criticalityProfiles = useMemo(() => profilesData?.profiles ?? [], [profilesData]);
+  const disciplines = useMemo(() => disciplinesData?.disciplines ?? [], [disciplinesData]);
+  const unstructuredItems = useMemo(() => unstructuredData?.items ?? [], [unstructuredData]);
+
+  const expandedIdsRef = useRef(expandedIds);
+  useEffect(() => {
+    expandedIdsRef.current = expandedIds;
+  }, [expandedIds]);
 
   const treeData = useMemo(() => buildTreeData(nodes), [nodes]);
   
@@ -696,7 +701,7 @@ export default function EquipmentManagerPage() {
     if (searchQuery && expandForSearch.size > 0) {
       // Save current expanded state before search (only once when starting to search)
       if (preSearchExpandedIds === null) {
-        setPreSearchExpandedIds(new Set(expandedIds));
+        setPreSearchExpandedIds(new Set(expandedIdsRef.current));
       }
       // Expand all parents of matching nodes
       setExpandedIds(prev => {

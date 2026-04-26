@@ -70,16 +70,10 @@ if ('serviceWorker' in navigator) {
           
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New version available - show refresh prompt or auto-reload
-              console.log('New version available! Refreshing...');
-              
-              // Option 1: Auto-reload (uncomment to enable)
-              // window.location.reload();
-              
-              // Option 2: Show a toast/banner (current behavior)
-              if (window.confirm('A new version is available. Reload to update?')) {
-                window.location.reload();
-              }
+              // New version available.
+              // Do NOT interrupt the user with confirm/reload while typing.
+              // The app-level version checker will show a banner when applicable.
+              console.log('New version available (service worker).');
             }
           });
         });

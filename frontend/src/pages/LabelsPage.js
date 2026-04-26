@@ -143,10 +143,10 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
     staleTime: 60_000,
   });
   const allFormTemplates = useMemo(
-    () => formTemplatesData?.templates || formTemplatesData || [],
+    () => formTemplatesData?.templates ?? formTemplatesData ?? [],
     [formTemplatesData]
   );
-  const linkedFormIds = form.source_form_template_ids || [];
+  const linkedFormIds = useMemo(() => form.source_form_template_ids ?? [], [form.source_form_template_ids]);
 
   // Aggregate fields from linked form templates (unique by id)
   const availableFormFields = useMemo(() => {
@@ -893,7 +893,7 @@ export default function LabelsPage() {
     queryKey: ["label-templates", statusFilter],
     queryFn: () => labelsAPI.listTemplates(statusFilter === "all" ? undefined : statusFilter),
   });
-  const templates = data?.templates || [];
+  const templates = useMemo(() => data?.templates ?? [], [data]);
 
   const { data: jobsData, isLoading: jobsLoading } = useQuery({
     queryKey: ["label-jobs"],

@@ -136,7 +136,15 @@ export default function CausalEnginePage() {
   // Check if investigation is completed/locked
   const isInvestigationLocked = investigation?.status === "completed" || investigation?.status === "closed";
   
-  const timelineEvents = investigationData?.timeline_events || [];
+  const timelineEvents = useMemo(() => investigationData?.timeline_events ?? [], [investigationData]);
+  const failureIdentifications = useMemo(
+    () => investigationData?.failure_identifications ?? [],
+    [investigationData]
+  );
+  const causeNodes = useMemo(() => investigationData?.cause_nodes ?? [], [investigationData]);
+  const actionItems = useMemo(() => investigationData?.action_items ?? [], [investigationData]);
+  const evidenceItems = useMemo(() => investigationData?.evidence ?? [], [investigationData]);
+
   // Sort timeline events chronologically by event_time
   const sortedTimelineEvents = useMemo(() => {
     return [...timelineEvents].sort((a, b) => {
@@ -146,10 +154,6 @@ export default function CausalEnginePage() {
       return new Date(a.event_time) - new Date(b.event_time);
     });
   }, [timelineEvents]);
-  const failureIdentifications = investigationData?.failure_identifications || [];
-  const causeNodes = investigationData?.cause_nodes || [];
-  const actionItems = investigationData?.action_items || [];
-  const evidenceItems = investigationData?.evidence || [];
 
   const filteredInvestigations = useMemo(() => {
     if (!searchQuery) return investigations;
@@ -261,16 +265,19 @@ export default function CausalEnginePage() {
     }
   }, [investigationData]);
 
+  const updateInvestigation = useCallback(
+    (payload) => updateInvMutation.mutate(payload),
+    [updateInvMutation]
+  );
+
   // Debounced save for notes
-  // Note: updateInvMutation intentionally excluded from deps - it returns a new ref each render
-  // which would cause the timer to reset infinitely. The mutate function is stable in behavior.
   useEffect(() => {
     if (!selectedInvId || localNotes === (investigationData?.notes || "")) return;
     const timer = setTimeout(() => {
-      updateInvMutation.mutate({ id: selectedInvId, data: { notes: localNotes } });
+      updateInvestigation({ id: selectedInvId, data: { notes: localNotes } });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [localNotes, selectedInvId, investigationData]); // updateInvMutation excluded - stable in behavior
+  }, [localNotes, selectedInvId, investigationData, updateInvestigation]);
 
   // File upload handler
   const handleFileUpload = async (event) => {

@@ -238,7 +238,7 @@ const ThreatDetailPage = () => {
     queryFn: equipmentHierarchyAPI.getNodes,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
-  const equipmentNodes = equipmentNodesData?.nodes || [];
+  const equipmentNodes = useMemo(() => equipmentNodesData?.nodes ?? [], [equipmentNodesData]);
 
   // Fetch equipment types for Equipment Type dropdown
   const { data: equipmentTypesData } = useQuery({
@@ -246,7 +246,7 @@ const ThreatDetailPage = () => {
     queryFn: equipmentHierarchyAPI.getEquipmentTypes,
     staleTime: 5 * 60 * 1000,
   });
-  const equipmentTypes = equipmentTypesData?.equipment_types || [];
+  const equipmentTypes = useMemo(() => equipmentTypesData?.equipment_types ?? [], [equipmentTypesData]);
 
   // Fetch failure modes for Failure Mode dropdown
   const { data: failureModesData } = useQuery({
@@ -254,7 +254,7 @@ const ThreatDetailPage = () => {
     queryFn: () => failureModesAPI.getAll({}),
     staleTime: 5 * 60 * 1000,
   });
-  const failureModes = failureModesData?.failure_modes || [];
+  const failureModes = useMemo(() => failureModesData?.failure_modes ?? [], [failureModesData]);
   
   // Fetch users for Owner dropdown
   const { data: usersData } = useQuery({

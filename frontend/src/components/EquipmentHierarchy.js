@@ -761,9 +761,14 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
     queryFn: () => threatsAPI.getAll(),
   });
 
-  const nodes = nodesData?.nodes || [];
-  const equipmentTypes = typesData?.equipment_types || [];
+  const nodes = useMemo(() => nodesData?.nodes ?? [], [nodesData]);
+  const equipmentTypes = useMemo(() => typesData?.equipment_types ?? [], [typesData]);
   const threatCountByAsset = useMemo(() => getThreatCountByAsset(threats), [threats]);
+  
+  const expandedNodesRef = useRef(expandedNodes);
+  useEffect(() => {
+    expandedNodesRef.current = expandedNodes;
+  }, [expandedNodes]);
   
   // Build tree structure
   const treeData = useMemo(() => {
@@ -812,7 +817,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   useEffect(() => {
     if (searchQuery && expandForSearch.size > 0) {
       if (preSearchExpandedNodes === null) {
-        setPreSearchExpandedNodes(new Set(expandedNodes));
+        setPreSearchExpandedNodes(new Set(expandedNodesRef.current));
       }
       setExpandedNodes(prev => {
         const newSet = new Set(prev);

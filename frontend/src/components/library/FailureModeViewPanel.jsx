@@ -110,6 +110,7 @@ export function FailureModeViewPanel({
   
   // Fetch current user avatar for validation dialog
   useEffect(() => {
+    let objectUrl = null;
     const fetchCurrentUserAvatar = async () => {
       if (!currentUser?.id) return;
       try {
@@ -123,7 +124,8 @@ export function FailureModeViewPanel({
         );
         if (response.ok) {
           const blob = await response.blob();
-          setCurrentUserAvatarUrl(URL.createObjectURL(blob));
+          objectUrl = URL.createObjectURL(blob);
+          setCurrentUserAvatarUrl(objectUrl);
         }
       } catch (err) {
         // No avatar available
@@ -131,12 +133,13 @@ export function FailureModeViewPanel({
     };
     fetchCurrentUserAvatar();
     return () => {
-      if (currentUserAvatarUrl) URL.revokeObjectURL(currentUserAvatarUrl);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [currentUser?.id]);
   
   // Fetch validator avatar when viewing validated failure mode
   useEffect(() => {
+    let objectUrl = null;
     const fetchValidatorAvatar = async () => {
       if (!fm?.validated_by_id) {
         setValidatorAvatarUrl(null);
@@ -153,7 +156,8 @@ export function FailureModeViewPanel({
         );
         if (response.ok) {
           const blob = await response.blob();
-          setValidatorAvatarUrl(URL.createObjectURL(blob));
+          objectUrl = URL.createObjectURL(blob);
+          setValidatorAvatarUrl(objectUrl);
         } else {
           setValidatorAvatarUrl(null);
         }
@@ -163,7 +167,7 @@ export function FailureModeViewPanel({
     };
     fetchValidatorAvatar();
     return () => {
-      if (validatorAvatarUrl) URL.revokeObjectURL(validatorAvatarUrl);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [fm?.validated_by_id]);
 

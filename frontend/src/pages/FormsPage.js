@@ -2,7 +2,7 @@ import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import PhotoDataCaptureField from '../components/forms/PhotoDataCaptureField';
 import { EXTRACTION_TEMPLATES } from '../components/forms/extractionTemplates';
 import LabelPrintConfigPanel from '../components/forms/LabelPrintConfigPanel';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -341,8 +341,8 @@ const FormsPage = ({ embedded = false }) => {
     toast.success("Field removed");
   };
 
-  const templates = templatesData?.templates || [];
-  const submissions = submissionsData?.submissions || [];
+  const templates = useMemo(() => templatesData?.templates ?? [], [templatesData]);
+  const submissions = useMemo(() => submissionsData?.submissions ?? [], [submissionsData]);
 
   // Sync selectedTemplate with latest data from templates query
   // Uses version number as the primary change indicator to avoid expensive deep comparisons

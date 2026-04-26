@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { getApiUrl } from "../lib/apiConfig";
 import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtils";
@@ -39,6 +39,40 @@ export const AuthProvider = ({ children }) => {
     userRef.current = user;
   }, [user]);
 
+  const logout = useCallback(() => {
+    localStorage.removeItem("token");
+    delete axios.defaults.headers.common["Authorization"];
+    setToken(null);
+    setUser(null);
+    setMustChangePassword(false);
+    setMustAcceptTerms(false);
+    // Clear cached preferences on logout
+    clearCachedPreferences();
+  }, []);
+
+  const fetchUser = useCallback(async () => {
+    try {
+      const API_URL = getApiUrl();
+      const response = await axios.get(`${API_URL}/auth/me`);
+      setUser(response.data);
+      setMustChangePassword(response.data.must_change_password || false);
+
+      // Check if user needs to accept terms (new or updated terms)
+      const userTermsVersion = response.data.terms_accepted_version;
+      const needsTermsAcceptance = !userTermsVersion || userTermsVersion !== CURRENT_TERMS_VERSION;
+      // Only show terms dialog if password change is not required
+      setMustAcceptTerms(needsTermsAcceptance && !response.data.must_change_password);
+
+      // Fetch and cache user preferences for date/time formatting
+      await fetchAndCachePreferences(API_URL);
+    } catch (error) {
+      console.error("Failed to fetch user:", error);
+      logout();
+    } finally {
+      setLoading(false);
+    }
+  }, [logout]);
+
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
@@ -54,30 +88,7 @@ export const AuthProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
-  }, [token, isAuthenticating]);
-
-  const fetchUser = async () => {
-    try {
-      const API_URL = getApiUrl();
-      const response = await axios.get(`${API_URL}/auth/me`);
-      setUser(response.data);
-      setMustChangePassword(response.data.must_change_password || false);
-      
-      // Check if user needs to accept terms (new or updated terms)
-      const userTermsVersion = response.data.terms_accepted_version;
-      const needsTermsAcceptance = !userTermsVersion || userTermsVersion !== CURRENT_TERMS_VERSION;
-      // Only show terms dialog if password change is not required
-      setMustAcceptTerms(needsTermsAcceptance && !response.data.must_change_password);
-      
-      // Fetch and cache user preferences for date/time formatting
-      await fetchAndCachePreferences(API_URL);
-    } catch (error) {
-      console.error("Failed to fetch user:", error);
-      logout();
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [token, isAuthenticating, fetchUser]);
 
   const login = async (email, password) => {
     const API_URL = getApiUrl();
@@ -264,17 +275,6 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
     
     return userData;
-  };
-
-  const logout = () => {
-    localStorage.removeItem("token");
-    delete axios.defaults.headers.common["Authorization"];
-    setToken(null);
-    setUser(null);
-    setMustChangePassword(false);
-    setMustAcceptTerms(false);
-    // Clear cached preferences on logout
-    clearCachedPreferences();
   };
 
   return (
