@@ -1,7 +1,7 @@
 """
 Authentication routes with rate limiting and security features.
 """
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from datetime import datetime, timezone, timedelta
 import uuid
 import secrets
@@ -14,7 +14,7 @@ from slowapi.util import get_remote_address
 from typing import Optional
 
 from database import db
-from auth import hash_password, verify_password, create_token, get_current_user
+from auth import hash_password, verify_password, create_token, get_current_user, AUTH_COOKIE_NAME, CSRF_COOKIE_NAME
 from models.api_models import UserCreate, UserLogin, UserResponse, TokenResponse
 from pydantic import BaseModel, EmailStr, field_validator
 from utils.spam_protection import is_disposable_email, validate_honeypot, verify_recaptcha
@@ -305,7 +305,7 @@ async def notify_admins_new_user(user_email: str, user_name: str):
 
 @router.post("/auth/login", response_model=TokenResponse)
 @limiter.limit(STRICT_AUTH_RATE_LIMIT)
-async def login(request: Request, credentials: UserLogin):
+async def login(request: Request, credentials: UserLogin, response: Response):
     # Get client IP for audit logging
     ip_address = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
     
@@ -361,6 +361,36 @@ async def login(request: Request, credentials: UserLogin):
     token = create_token(user["id"])
     must_change_password = user.get("must_change_password", False)
     has_seen_intro = user.get("has_seen_intro", True)  # Default to True for existing users
+
+    # Cookie-based auth (recommended). Still returns the token in JSON for backwards compatibility.
+    # Cross-site cookies (Vercel -> Railway) require SameSite=None; Secure.
+    cookie_enabled = os.environ.get("AUTH_SET_COOKIE_ON_LOGIN", "true").lower() == "true"
+    if cookie_enabled:
+        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+        secure = proto == "https"
+        same_site = "none" if secure else "lax"
+
+        csrf_token = secrets.token_urlsafe(32)
+
+        response.set_cookie(
+            key=AUTH_COOKIE_NAME,
+            value=token,
+            httponly=True,
+            secure=secure,
+            samesite=same_site,
+            path="/",
+            max_age=int(timedelta(hours=JWT_EXPIRATION_HOURS).total_seconds()),
+        )
+        # Non-HttpOnly CSRF token cookie (double-submit). Frontend must echo it in X-CSRF-Token.
+        response.set_cookie(
+            key=CSRF_COOKIE_NAME,
+            value=csrf_token,
+            httponly=False,
+            secure=secure,
+            samesite=same_site,
+            path="/",
+            max_age=int(timedelta(hours=JWT_EXPIRATION_HOURS).total_seconds()),
+        )
     
     # Convert datetime to string for Pydantic model
     created_at = user.get("created_at")
@@ -387,6 +417,34 @@ async def login(request: Request, credentials: UserLogin):
             terms_accepted_version=user.get("terms_accepted_version")
         )
     )
+
+
+@router.post("/auth/logout", response_model=dict)
+async def logout(request: Request, response: Response):
+    """Clear auth cookies (cookie-auth mode)."""
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    secure = proto == "https"
+    same_site = "none" if secure else "lax"
+
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value="",
+        httponly=True,
+        secure=secure,
+        samesite=same_site,
+        path="/",
+        max_age=0,
+    )
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME,
+        value="",
+        httponly=False,
+        secure=secure,
+        samesite=same_site,
+        path="/",
+        max_age=0,
+    )
+    return {"status": "ok"}
 
 @router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):

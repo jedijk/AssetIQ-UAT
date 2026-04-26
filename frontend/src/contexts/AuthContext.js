@@ -4,6 +4,7 @@ import { getApiUrl } from "../lib/apiConfig";
 import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtils";
 
 const AuthContext = createContext(null);
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
 
 // Current terms/privacy version - increment when terms change
 const CURRENT_TERMS_VERSION = "1.0";
@@ -25,7 +26,7 @@ const fetchAndCachePreferences = async (API_URL) => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem("token"));
+  const [token, setToken] = useState(AUTH_MODE === "bearer" ? localStorage.getItem("token") : null);
   const [loading, setLoading] = useState(true);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [mustAcceptTerms, setMustAcceptTerms] = useState(false);
@@ -39,7 +40,13 @@ export const AuthProvider = ({ children }) => {
     userRef.current = user;
   }, [user]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    if (AUTH_MODE === "cookie") {
+      try {
+        const API_URL = getApiUrl();
+        await axios.post(`${API_URL}/auth/logout`, {}, { withCredentials: true });
+      } catch (_e) {}
+    }
     localStorage.removeItem("token");
     delete axios.defaults.headers.common["Authorization"];
     setToken(null);
@@ -74,6 +81,13 @@ export const AuthProvider = ({ children }) => {
   }, [logout]);
 
   useEffect(() => {
+    if (AUTH_MODE === "cookie") {
+      // Cookie auth: always attempt to fetch current user on boot.
+      axios.defaults.withCredentials = true;
+      fetchUser();
+      return;
+    }
+
     if (token) {
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       // Only fetch user if:
@@ -110,12 +124,18 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticating(true);
     
     try {
-      const response = await axios.post(loginUrl, { email, password });
+      const response = await axios.post(loginUrl, { email, password }, { withCredentials: AUTH_MODE === "cookie" });
       const { token: newToken, user: userData, must_change_password } = response.data;
-    
-    localStorage.setItem("token", newToken);
-    axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
-    setToken(newToken);
+
+    if (AUTH_MODE === "bearer") {
+      localStorage.setItem("token", newToken);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
+      setToken(newToken);
+    } else {
+      // Cookie mode: token is in HttpOnly cookie, keep state token null.
+      axios.defaults.withCredentials = true;
+      setToken(null);
+    }
     setUser(userData);
     setLoading(false);
     setMustChangePassword(must_change_password || userData.must_change_password || false);

@@ -340,29 +340,98 @@ async def log_requests(request, call_next):
 async def add_security_headers(request, call_next):
     response = await call_next(request)
     
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # Only send HSTS if the request was effectively HTTPS. This avoids accidentally
+    # bricking local/dev HTTP clients while still hardening prod behind proxies.
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    if proto == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
+    # Modern browsers ignore X-XSS-Protection, but leaving it is harmless for legacy.
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
+    response.headers["Permissions-Policy"] = (
+        "accelerometer=(), autoplay=(), camera=(), clipboard-read=(), clipboard-write=(), "
+        "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), "
+        "picture-in-picture=(), usb=()"
+    )
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
     
     docs_paths = ["/api/docs", "/api/redoc", "/api/openapi.json", "/docs", "/redoc", "/openapi.json"]
     if request.url.path in docs_paths:
         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         response.headers["Cross-Origin-Embedder-Policy"] = "unsafe-none"
     else:
+        # CSP on an API doesn't protect your SPA, but it *does* reduce blast radius if
+        # an endpoint ever reflects HTML. Keep it strict and avoid unsafe-eval by default.
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "default-src 'none'; "
+            "base-uri 'none'; "
+            "frame-ancestors 'none'; "
+            "form-action 'none'; "
+            "img-src 'self' data:; "
             "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https: blob:; "
-            "font-src 'self' data:; "
             "connect-src 'self' https:; "
-            "frame-ancestors 'none';"
+            "script-src 'none'; "
+            "object-src 'none'"
         )
     
     return response
+
+
+# =============================================================================
+# CSRF protection for cookie-auth (double submit)
+# =============================================================================
+
+@app.middleware("http")
+async def csrf_protect_cookie_auth(request: Request, call_next):
+    """
+    If the client authenticates via HttpOnly cookie, enforce CSRF protection on
+    unsafe methods using a double-submit token.
+
+    - Cookie `assetiq_csrf` (readable by JS) must match header `X-CSRF-Token`.
+    - Bearer Authorization header requests are not subject to this CSRF check.
+    """
+    try:
+        allow_cookie_auth = os.environ.get("ALLOW_COOKIE_AUTH", "true").lower() == "true"
+        if not allow_cookie_auth:
+            return await call_next(request)
+
+        # Only enforce on unsafe methods.
+        if request.method.upper() in ("GET", "HEAD", "OPTIONS"):
+            return await call_next(request)
+
+        path = request.url.path or ""
+        # Exempt auth endpoints that must work pre-login.
+        exempt_prefixes = (
+            "/api/auth/login",
+            "/api/auth/register",
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password",
+            "/api/auth/verify-reset-token",
+            "/health",
+            "/api/health",
+        )
+        if any(path.startswith(p) for p in exempt_prefixes):
+            return await call_next(request)
+
+        # If Authorization header is present, assume bearer auth and skip CSRF.
+        authz = request.headers.get("authorization") or ""
+        if authz.lower().startswith("bearer "):
+            return await call_next(request)
+
+        csrf_cookie = request.cookies.get(os.environ.get("CSRF_COOKIE_NAME", "assetiq_csrf"))
+        csrf_header = request.headers.get("x-csrf-token")
+        if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+            return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+
+    except Exception:
+        # Fail closed only if explicitly configured.
+        if os.environ.get("CSRF_STRICT", "false").lower() == "true":
+            return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+
+    return await call_next(request)
 
 
 # =============================================================================

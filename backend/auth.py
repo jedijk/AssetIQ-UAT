@@ -13,6 +13,11 @@ from database import db, client, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS
 
 security = HTTPBearer(auto_error=False)
 
+# Cookie auth configuration (opt-in).
+AUTH_COOKIE_NAME = os.environ.get("AUTH_COOKIE_NAME", "assetiq_token")
+CSRF_COOKIE_NAME = os.environ.get("CSRF_COOKIE_NAME", "assetiq_csrf")
+ALLOW_COOKIE_AUTH = os.environ.get("ALLOW_COOKIE_AUTH", "true").lower() == "true"
+
 # Always use production database for user authentication
 # This ensures tokens work across database environments
 AUTH_DB = client[os.environ.get("DB_NAME", "assetiq")]
@@ -56,7 +61,8 @@ async def _validate_token(token: str) -> dict:
 
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    token: Optional[str] = Query(None, description="Auth token (alternative to header)")
+    token: Optional[str] = Query(None, description="Auth token (alternative to header)"),
+    request: Request = None,
 ):
     """Get current user from Authorization header or query parameter token.
     
@@ -67,6 +73,16 @@ async def get_current_user(
     # Try header first
     if credentials and credentials.credentials:
         return await _validate_token(credentials.credentials)
+
+    # Cookie-based auth (preferred when enabled): HttpOnly cookie cannot be read by JS,
+    # reducing XSS blast radius. Works cross-origin with allow_credentials CORS.
+    if ALLOW_COOKIE_AUTH and request is not None:
+        try:
+            cookie_token = request.cookies.get(AUTH_COOKIE_NAME)
+        except Exception:
+            cookie_token = None
+        if cookie_token:
+            return await _validate_token(cookie_token)
     
     # Query parameter auth is OFF by default because tokens in URLs can leak via logs,
     # browser history, referrers, and proxy traces. Enable explicitly only if you have

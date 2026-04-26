@@ -5,18 +5,34 @@ import { debugLog } from "./debug";
 // Get API URL at initialization for static uses
 export const API_URL = getApiUrl();
 
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" (default) | "cookie"
+
+function getCookie(name) {
+  try {
+    const cookies = document.cookie ? document.cookie.split(";") : [];
+    for (const c of cookies) {
+      const [k, ...rest] = c.trim().split("=");
+      if (k === name) return decodeURIComponent(rest.join("=") || "");
+    }
+  } catch (_e) {}
+  return null;
+}
+
 // Log API configuration at startup (development only)
 if (process.env.NODE_ENV === "development") {
   // eslint-disable-next-line no-console
   console.log("[API] Backend URL:", getBackendUrl());
   // eslint-disable-next-line no-console
   console.log("[API] Full API URL:", API_URL);
+  // eslint-disable-next-line no-console
+  console.log("[API] Auth mode:", AUTH_MODE);
 }
 
 // Primary API client
 export const api = axios.create({
   baseURL: API_URL,
   timeout: 30000,
+  withCredentials: AUTH_MODE === "cookie",
 });
 
 api.interceptors.request.use((config) => {
@@ -26,9 +42,19 @@ api.interceptors.request.use((config) => {
     console.error("[API] WARNING: API URL does not include /api prefix:", config.baseURL);
   }
 
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (AUTH_MODE !== "cookie") {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } else {
+    // Double-submit CSRF for unsafe methods when using cookie auth
+    const m = (config.method || "get").toLowerCase();
+    const unsafe = !["get", "head", "options"].includes(m);
+    if (unsafe) {
+      const csrf = getCookie("assetiq_csrf");
+      if (csrf) config.headers["X-CSRF-Token"] = csrf;
+    }
   }
 
   const dbEnv = localStorage.getItem("database_environment");
@@ -90,12 +116,22 @@ api.interceptors.response.use(
 export const aiApi = axios.create({
   baseURL: API_URL,
   timeout: 120000,
+  withCredentials: AUTH_MODE === "cookie",
 });
 
 aiApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (AUTH_MODE !== "cookie") {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } else {
+    const m = (config.method || "get").toLowerCase();
+    const unsafe = !["get", "head", "options"].includes(m);
+    if (unsafe) {
+      const csrf = getCookie("assetiq_csrf");
+      if (csrf) config.headers["X-CSRF-Token"] = csrf;
+    }
   }
   return config;
 });
