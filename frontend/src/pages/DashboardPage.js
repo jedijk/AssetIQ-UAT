@@ -58,7 +58,6 @@ import { Label } from "../components/ui/label";
 import InsightsPage from "./InsightsPage";
 import { DISCIPLINES } from "../constants/disciplines";
 import ProductionDashboardPage from "./ProductionDashboardPage";
-import { AIDashboardBuilderPanel } from "../features/dashboardBuilder/AIDashboardBuilderPanel";
 import { SmartDashboardBuilderPanel } from "../features/dashboardBuilder/SmartDashboardBuilderPanel";
 
 // Authenticated Lightbox component for viewing images with proper mobile auth
@@ -502,17 +501,14 @@ export default function DashboardPage({ initialTab }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
-  // ON by default; disable explicitly with REACT_APP_ENABLE_AI_DASHBOARD_BUILDER=false
-  const aiBuilderEnabled = process.env.REACT_APP_ENABLE_AI_DASHBOARD_BUILDER !== "false";
   // ON by default; disable explicitly with REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER=false
   const manualBuilderEnabled = process.env.REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER !== "false";
 
   // Operator view: shown on mobile when role is operator or owner has toggled it
   const initialIsMobileViewport = window.innerWidth < 768;
   const [isMobileViewport, setIsMobileViewport] = useState(() => initialIsMobileViewport);
-  const aiBuilderDesktopEnabled = aiBuilderEnabled && !initialIsMobileViewport;
   const [activeTab, setActiveTab] = useState(
-    initialTab || (manualBuilderEnabled ? "builder" : aiBuilderDesktopEnabled ? "ai" : "operational")
+    initialTab || (manualBuilderEnabled ? "builder" : "operational")
   );
   const [operatorToggle, setOperatorToggle] = useState(
     () => localStorage.getItem("operatorViewEnabled") === "true"
@@ -533,13 +529,6 @@ export default function DashboardPage({ initialTab }) {
 
   const isOperatorMode = user?.role === "operator" || operatorToggle;
 
-  // AI builder is desktop-only. If the viewport becomes mobile while on AI tab, move back to operational.
-  useEffect(() => {
-    if (isMobileViewport && activeTab === "ai") {
-      setActiveTab("operational");
-    }
-  }, [isMobileViewport, activeTab]);
-  
   // Redirect to operational tab on mobile if viewing hidden tabs (except production which is now mobile-enabled)
   useEffect(() => {
     const handleResize = () => {
@@ -851,19 +840,6 @@ export default function DashboardPage({ initialTab }) {
                 <Sparkles className="w-4 h-4 flex-shrink-0" />
                 <span className="hidden xs:inline">Builder</span>
                 <span className="xs:hidden">Build</span>
-              </button>
-            )}
-            {aiBuilderEnabled && !isMobileViewport && (
-              <button
-                onClick={() => setActiveTab("ai")}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${
-                  activeTab === "ai" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"
-                }`}
-                data-testid="ai-tab"
-              >
-                <Sparkles className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden xs:inline">AI Builder</span>
-                <span className="xs:hidden">AI</span>
               </button>
             )}
             <button 
@@ -1453,18 +1429,6 @@ export default function DashboardPage({ initialTab }) {
           {activeTab === "builder" && manualBuilderEnabled && (
             <div className="animate-fade-in">
               <SmartDashboardBuilderPanel
-                actions={actions}
-                observations={observations}
-                investigations={investigations}
-                users={usersList}
-              />
-            </div>
-          )}
-
-          {/* AI Dashboard Builder Tab */}
-          {activeTab === "ai" && aiBuilderEnabled && !isMobileViewport && (
-            <div className="animate-fade-in">
-              <AIDashboardBuilderPanel
                 actions={actions}
                 observations={observations}
                 investigations={investigations}

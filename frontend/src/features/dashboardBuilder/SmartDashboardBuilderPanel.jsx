@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { formAPI } from "../../components/forms/formAPI";
+import { Checkbox } from "../../components/ui/checkbox";
 
 const STORAGE_KEY = "assetiq_smart_dashboard_widgets_v1";
 
@@ -61,6 +62,7 @@ const SOURCES = [
 const DISPLAY_TYPES = [
   { key: "kpi", label: "KPI" },
   { key: "bar", label: "Bar chart" },
+  { key: "table", label: "Table" },
 ];
 
 const METRICS = {
@@ -82,6 +84,7 @@ const METRICS = {
     { key: "form_submissions_warnings", label: "Form submissions with warnings", defaultDisplay: "kpi" },
     { key: "form_submissions_critical", label: "Form submissions with critical", defaultDisplay: "kpi" },
     { key: "form_submissions_by_form", label: "Form submissions by form", defaultDisplay: "bar" },
+    { key: "form_field_value_distribution", label: "Field values (distribution)", defaultDisplay: "bar" },
   ],
 };
 
@@ -93,7 +96,10 @@ function metricDef(sourceKey, metricKey) {
   return (METRICS[sourceKey] || []).find((m) => m.key === metricKey) || null;
 }
 
-function computePreview({ sourceKey, metricKey, displayType, title }, data) {
+function computePreview(
+  { sourceKey, metricKey, displayType, title, formTemplateId, formFieldIds, xAxisFieldId },
+  data
+) {
   const actions = data.actions || [];
   const observations = data.observations || [];
   const investigations = data.investigations || [];
@@ -107,6 +113,11 @@ function computePreview({ sourceKey, metricKey, displayType, title }, data) {
   const metric = metricDef(sourceKey, metricKey);
   const widgetTitle = title?.trim() || metric?.label || "Widget";
 
+  const selectedTemplate = formTemplateId ? templateById.get(formTemplateId) : null;
+  const selectedFieldIds = Array.isArray(formFieldIds) ? formFieldIds.filter(Boolean) : [];
+  const selectedFields = (selectedTemplate?.fields || []).filter((f) => selectedFieldIds.includes(f.id));
+  const effectiveXAxisFieldId = xAxisFieldId && selectedFieldIds.includes(xAxisFieldId) ? xAxisFieldId : selectedFieldIds[0] || "";
+
   const whyByMetric = {
     open_actions: "Counts actions that are not closed/completed.",
     overdue_actions: "Counts actions where due date is before today and status is not closed.",
@@ -119,6 +130,7 @@ function computePreview({ sourceKey, metricKey, displayType, title }, data) {
     form_submissions_warnings: "Counts submitted forms that have warnings.",
     form_submissions_critical: "Counts submitted forms that have critical items.",
     form_submissions_by_form: "Groups form submissions by form name.",
+    form_field_value_distribution: "Shows the most common values for the selected form field(s).",
   };
   const why = whyByMetric[metricKey] || "Generated from your selections.";
 
@@ -141,7 +153,7 @@ function computePreview({ sourceKey, metricKey, displayType, title }, data) {
     return { kind: "kpi", title: widgetTitle, why, value };
   }
 
-  // Bar charts
+  // Bar charts + tables
   if (metricKey === "overdue_by_owner") {
     const overdue = actions.filter(isActionOverdue);
     const byOwner = countBy(overdue, (a) => a?.assignee || a?.owner_id || a?.owner || "Unassigned");
@@ -150,21 +162,21 @@ function computePreview({ sourceKey, metricKey, displayType, title }, data) {
       value: count,
     }));
     rows.sort((a, b) => b.value - a.value);
-    return { kind: "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
+    return { kind: displayType === "table" ? "table" : "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
   }
 
   if (metricKey === "by_severity") {
     const by = countBy(observations, (o) => o?.severity || o?.risk_level || "Unknown");
     const rows = Array.from(by.entries()).map(([k, v]) => ({ label: String(k), value: v }));
     rows.sort((a, b) => b.value - a.value);
-    return { kind: "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
+    return { kind: displayType === "table" ? "table" : "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
   }
 
   if (metricKey === "by_status") {
     const by = countBy(investigations, (i) => i?.status || "Unknown");
     const rows = Array.from(by.entries()).map(([k, v]) => ({ label: String(k), value: v }));
     rows.sort((a, b) => b.value - a.value);
-    return { kind: "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
+    return { kind: displayType === "table" ? "table" : "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
   }
 
   if (metricKey === "form_submissions_by_form") {
@@ -174,7 +186,47 @@ function computePreview({ sourceKey, metricKey, displayType, title }, data) {
       value: v,
     }));
     rows.sort((a, b) => b.value - a.value);
-    return { kind: "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
+    return { kind: displayType === "table" ? "table" : "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
+  }
+
+  if (metricKey === "form_field_value_distribution") {
+    const subs = formTemplateId
+      ? formSubmissions.filter((s) => (s?.form_template_id || s?.template_id || s?.templateId) === formTemplateId)
+      : formSubmissions;
+
+    const counts = new Map(); // label -> count
+
+    const add = (label) => {
+      counts.set(label, (counts.get(label) || 0) + 1);
+    };
+
+    subs.forEach((s) => {
+      const responsesAll = s?.values || s?.responses || [];
+      (responsesAll || []).forEach((r) => {
+        const fid = r?.field_id || r?.fieldId || r?.id;
+        if (!fid || fid !== effectiveXAxisFieldId) return;
+        const rawVal = r?.value ?? r?.answer ?? r?.response ?? r?.text ?? r?.selected ?? "";
+        const val = Array.isArray(rawVal) ? rawVal.join(", ") : String(rawVal ?? "").trim();
+        if (!val) return;
+        add(val);
+      });
+    });
+
+    const rows = Array.from(counts.entries()).map(([label, value]) => ({ label, value }));
+    rows.sort((a, b) => b.value - a.value);
+    const effectiveWhy =
+      effectiveXAxisFieldId
+        ? why
+        : "Select a form and at least one field to see a distribution.";
+    const axisLabel =
+      selectedTemplate?.fields?.find((f) => f.id === effectiveXAxisFieldId)?.label || effectiveXAxisFieldId || "Field";
+    return {
+      kind: displayType === "table" ? "table" : "bar",
+      title: widgetTitle,
+      why: effectiveWhy,
+      xAxisLabel: axisLabel,
+      series: rows.slice(0, 10),
+    };
   }
 
   return { kind: "bar", title: widgetTitle, why, series: [] };
@@ -199,7 +251,15 @@ function SortableWidgetCard({
   };
 
   const p = computePreview(
-    { sourceKey: widget.sourceKey, metricKey: widget.metricKey, displayType: widget.displayType, title: widget.title },
+    {
+      sourceKey: widget.sourceKey,
+      metricKey: widget.metricKey,
+      displayType: widget.displayType,
+      title: widget.title,
+      formTemplateId: widget.formTemplateId,
+      formFieldIds: widget.formFieldIds,
+      xAxisFieldId: widget.xAxisFieldId,
+    },
     data
   );
 
@@ -306,6 +366,38 @@ function SortableWidgetCard({
               <div className="text-xs text-slate-500">KPI</div>
             </div>
           </div>
+        ) : p.kind === "table" ? (
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-3 py-2 border-b border-slate-200 text-xs text-slate-500 flex items-center justify-between">
+              <span className="truncate">{p?.xAxisLabel ? `X-axis: ${p.xAxisLabel}` : "Table"}</span>
+              <span className="tabular-nums">{(p.series || []).length} rows</span>
+            </div>
+            <div className="max-h-[240px] overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-slate-700">Value</th>
+                    <th className="text-right px-3 py-2 text-xs font-semibold text-slate-700">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(p.series || []).map((row) => (
+                    <tr key={row.label} className="border-b border-slate-100 last:border-b-0">
+                      <td className="px-3 py-2 text-slate-700">{row.label}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-slate-900">{row.value}</td>
+                    </tr>
+                  ))}
+                  {(p.series || []).length === 0 && (
+                    <tr>
+                      <td colSpan={2} className="px-3 py-6 text-center text-xs text-slate-500">
+                        No data yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : (
           <div className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -334,6 +426,10 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
   const [metricKey, setMetricKey] = useState(defaultMetricFor("actions"));
   const [displayType, setDisplayType] = useState("kpi");
   const [title, setTitle] = useState("");
+
+  const [selectedFormTemplateId, setSelectedFormTemplateId] = useState("");
+  const [selectedFormFieldIds, setSelectedFormFieldIds] = useState([]);
+  const [selectedFormXAxisFieldId, setSelectedFormXAxisFieldId] = useState("");
 
   const [formTemplates, setFormTemplates] = useState([]);
   const [formSubmissions, setFormSubmissions] = useState([]);
@@ -379,7 +475,25 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
     const def = metricDef(sourceKey, m);
     if (def?.defaultDisplay) setDisplayType(def.defaultDisplay);
     setTitle("");
+
+    if (sourceKey !== "forms") {
+      setSelectedFormTemplateId("");
+      setSelectedFormFieldIds([]);
+      setSelectedFormXAxisFieldId("");
+    }
   }, [sourceKey]);
+
+  // Keep x-axis field valid when fields change
+  useEffect(() => {
+    if (sourceKey !== "forms") return;
+    if (!selectedFormFieldIds.length) {
+      setSelectedFormXAxisFieldId("");
+      return;
+    }
+    if (!selectedFormXAxisFieldId || !selectedFormFieldIds.includes(selectedFormXAxisFieldId)) {
+      setSelectedFormXAxisFieldId(selectedFormFieldIds[0]);
+    }
+  }, [sourceKey, selectedFormFieldIds, selectedFormXAxisFieldId]);
 
   // Smart defaults when metric changes
   useEffect(() => {
@@ -392,8 +506,29 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
     [actions, observations, investigations, users, formTemplates, formSubmissions, formSubmissionsTotal]
   );
   const preview = useMemo(
-    () => computePreview({ sourceKey, metricKey, displayType, title }, data),
-    [sourceKey, metricKey, displayType, title, data]
+    () =>
+      computePreview(
+        {
+          sourceKey,
+          metricKey,
+          displayType,
+          title,
+          formTemplateId: selectedFormTemplateId,
+          formFieldIds: selectedFormFieldIds,
+          xAxisFieldId: selectedFormXAxisFieldId,
+        },
+        data
+      ),
+    [
+      sourceKey,
+      metricKey,
+      displayType,
+      title,
+      selectedFormTemplateId,
+      selectedFormFieldIds,
+      selectedFormXAxisFieldId,
+      data,
+    ]
   );
 
   const recommendations = useMemo(() => (METRICS[sourceKey] || []).slice(0, 4), [sourceKey]);
@@ -408,6 +543,9 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
         displayType,
         title: title?.trim() || metricDef(sourceKey, metricKey)?.label || "Widget",
         size: "normal",
+        formTemplateId: sourceKey === "forms" ? selectedFormTemplateId : "",
+        formFieldIds: sourceKey === "forms" ? selectedFormFieldIds : [],
+        xAxisFieldId: sourceKey === "forms" ? selectedFormXAxisFieldId : "",
       },
       ...prev,
     ]);
@@ -607,6 +745,122 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
                 </div>
               </div>
 
+              {sourceKey === "forms" && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-slate-900">Which form?</p>
+                    <Select
+                      value={selectedFormTemplateId}
+                      onValueChange={(v) => {
+                        setSelectedFormTemplateId(v);
+                        setSelectedFormFieldIds([]);
+                        setSelectedFormXAxisFieldId("");
+                        // Encourage a field-based metric when user starts configuring fields
+                        if (metricKey === "form_submissions_total") setMetricKey("form_field_value_distribution");
+                        setDisplayType("bar");
+                      }}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder={formTemplates.length ? "Select a form" : "No forms found"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formTemplates.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name || t.title || t.id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-slate-900">Pick field(s)</p>
+                    <div className="bg-white border border-slate-200 rounded-xl p-3 max-h-44 overflow-auto">
+                      {selectedFormTemplateId ? (
+                        (formTemplates.find((t) => t.id === selectedFormTemplateId)?.fields || []).length > 0 ? (
+                          <div className="space-y-2">
+                            {(formTemplates.find((t) => t.id === selectedFormTemplateId)?.fields || []).map((f) => {
+                              const checked = selectedFormFieldIds.includes(f.id);
+                              return (
+                                <label key={f.id} className="flex items-center gap-2 text-sm text-slate-700">
+                                  <Checkbox
+                                    checked={checked}
+                                    onCheckedChange={(next) => {
+                                      const willCheck = !!next;
+                                      setSelectedFormFieldIds((prev) => {
+                                        const set = new Set(prev || []);
+                                        if (willCheck) set.add(f.id);
+                                        else set.delete(f.id);
+                                        return Array.from(set);
+                                      });
+                                      setMetricKey("form_field_value_distribution");
+                                      setDisplayType("bar");
+                                    }}
+                                  />
+                                  <span className="truncate" title={f.label || f.id}>
+                                    {f.label || f.id}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-500">This form has no fields.</div>
+                        )
+                      ) : (
+                        <div className="text-xs text-slate-500">Select a form to choose fields.</div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-slate-500">
+                        Selected: <span className="font-medium text-slate-700">{selectedFormFieldIds.length}</span>
+                      </div>
+                      {selectedFormFieldIds.length > 0 && (
+                        <button
+                          type="button"
+                          className="text-xs text-slate-600 hover:text-slate-900 underline"
+                          onClick={() => {
+                            setSelectedFormFieldIds([]);
+                            setSelectedFormXAxisFieldId("");
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-slate-900">X-axis</p>
+                    <Select
+                      value={selectedFormXAxisFieldId}
+                      onValueChange={(v) => {
+                        setSelectedFormXAxisFieldId(v);
+                        setMetricKey("form_field_value_distribution");
+                        if (displayType === "kpi") setDisplayType("bar");
+                      }}
+                      disabled={selectedFormFieldIds.length === 0}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder={selectedFormFieldIds.length ? "Select X-axis field" : "Select field(s) first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(formTemplates.find((t) => t.id === selectedFormTemplateId)?.fields || [])
+                          .filter((f) => selectedFormFieldIds.includes(f.id))
+                          .map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              {f.label || f.id}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-slate-500">
+                      Choose which field’s values become the categories on the chart/table.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-slate-900">Name (optional)</p>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={metricDef(sourceKey, metricKey)?.label || "Widget"} />
@@ -647,6 +901,38 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
                     <div>
                       <div className="text-3xl font-bold text-slate-900 tabular-nums">{preview.value ?? 0}</div>
                       <div className="text-xs text-slate-500">KPI preview</div>
+                    </div>
+                  </div>
+                ) : preview.kind === "table" ? (
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-3 py-2 border-b border-slate-200 text-xs text-slate-500 flex items-center justify-between">
+                      <span className="truncate">{preview?.xAxisLabel ? `X-axis: ${preview.xAxisLabel}` : "Table"}</span>
+                      <span className="tabular-nums">{(preview.series || []).length} rows</span>
+                    </div>
+                    <div className="max-h-[320px] overflow-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-slate-700">Value</th>
+                            <th className="text-right px-3 py-2 text-xs font-semibold text-slate-700">Count</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(preview.series || []).map((row) => (
+                            <tr key={row.label} className="border-b border-slate-100 last:border-b-0">
+                              <td className="px-3 py-2 text-slate-700">{row.label}</td>
+                              <td className="px-3 py-2 text-right tabular-nums text-slate-900">{row.value}</td>
+                            </tr>
+                          ))}
+                          {(preview.series || []).length === 0 && (
+                            <tr>
+                              <td colSpan={2} className="px-3 py-6 text-center text-xs text-slate-500">
+                                No data yet.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 ) : (
