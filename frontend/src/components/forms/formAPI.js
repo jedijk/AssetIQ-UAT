@@ -5,6 +5,8 @@
 import { getBackendUrl, getAuthHeaders } from '../../lib/apiConfig';
 
 const API_BASE_URL = getBackendUrl();
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer";
+const FETCH_CREDENTIALS = AUTH_MODE === "cookie" ? "include" : "same-origin";
 
 export const formAPI = {
   getTemplates: async (params = {}) => {
@@ -13,6 +15,7 @@ export const formAPI = {
     if (params.discipline) queryParams.append("discipline", params.discipline);
     const response = await fetch(`${API_BASE_URL}/api/form-templates?${queryParams}`, {
       headers: getAuthHeaders(),
+      credentials: FETCH_CREDENTIALS,
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: "Failed to load templates" }));
@@ -24,6 +27,7 @@ export const formAPI = {
   getTemplate: async (id) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       headers: getAuthHeaders(),
+      credentials: FETCH_CREDENTIALS,
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: "Template not found" }));
@@ -36,6 +40,7 @@ export const formAPI = {
     const response = await fetch(`${API_BASE_URL}/api/form-templates`, {
       method: "POST",
       headers: getAuthHeaders(),
+      credentials: FETCH_CREDENTIALS,
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error("Failed to create template");
@@ -63,6 +68,7 @@ export const formAPI = {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       method: "PATCH",
       headers: getAuthHeaders(),
+      credentials: FETCH_CREDENTIALS,
       body: JSON.stringify(cleanedData),
     });
     
@@ -79,6 +85,7 @@ export const formAPI = {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       method: "DELETE",
       headers: getAuthHeaders(),
+      credentials: FETCH_CREDENTIALS,
     });
     if (!response.ok) throw new Error("Failed to delete template");
     return response.json();
@@ -91,6 +98,7 @@ export const formAPI = {
     if (params.limit) queryParams.append("limit", params.limit);
     const response = await fetch(`${API_BASE_URL}/api/form-submissions?${queryParams}`, {
       headers: getAuthHeaders(),
+      credentials: FETCH_CREDENTIALS,
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: "Failed to load submissions" }));
@@ -102,6 +110,7 @@ export const formAPI = {
   getTemplateAnalytics: async (templateId) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/analytics`, {
       headers: getAuthHeaders(),
+      credentials: FETCH_CREDENTIALS,
     });
     return response.json();
   },
@@ -116,6 +125,7 @@ export const formAPI = {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents`, {
       method: "POST",
       headers,
+      credentials: FETCH_CREDENTIALS,
       body: formData,
     });
     if (!response.ok) {
@@ -129,6 +139,7 @@ export const formAPI = {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents/${documentId}`, {
       method: "DELETE",
       headers: getAuthHeaders(),
+      credentials: FETCH_CREDENTIALS,
     });
     if (!response.ok) throw new Error("Failed to delete document");
     return response.json();
@@ -138,6 +149,7 @@ export const formAPI = {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents/search`, {
       method: "POST",
       headers: getAuthHeaders(),
+      credentials: FETCH_CREDENTIALS,
       body: JSON.stringify({ query }),
     });
     return response.json();
@@ -146,7 +158,7 @@ export const formAPI = {
   searchEquipment: async (query) => {
     const response = await fetch(
       `${API_BASE_URL}/api/equipment-hierarchy/search?query=${encodeURIComponent(query)}`,
-      { headers: getAuthHeaders() }
+      { headers: getAuthHeaders(), credentials: FETCH_CREDENTIALS }
     );
     if (response.ok) {
       return response.json();

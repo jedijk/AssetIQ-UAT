@@ -85,6 +85,8 @@ import { formatDate as formatDateUtil, formatDateTime as formatDateTimeUtil } fr
 import { formAPI } from "../components/forms/formAPI";
 
 const API_BASE_URL = getBackendUrl();
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer";
+const FETCH_CREDENTIALS = AUTH_MODE === "cookie" ? "include" : "same-origin";
 
 // Authenticated Lightbox component for viewing images with proper mobile auth
 const AuthenticatedLightbox = ({ url, name, onClose }) => {
@@ -364,6 +366,7 @@ const fetchSubmissions = async (filters) => {
   
   const response = await fetch(`${API_BASE_URL}/api/form-submissions?${params}`, {
     headers: getAuthHeaders(),
+    credentials: FETCH_CREDENTIALS,
   });
   if (!response.ok) throw new Error("Failed to fetch submissions");
   return response.json();
@@ -373,6 +376,7 @@ const fetchSubmissions = async (filters) => {
 const fetchSubmission = async (id) => {
   const response = await fetch(`${API_BASE_URL}/api/form-submissions/${id}`, {
     headers: getAuthHeaders(),
+    credentials: FETCH_CREDENTIALS,
   });
   if (!response.ok) throw new Error("Failed to fetch submission");
   return response.json();
@@ -466,6 +470,7 @@ export default function FormSubmissionsPage() {
       const response = await fetch(`${API_BASE_URL}/api/form-submissions/${submissionId}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
+        credentials: FETCH_CREDENTIALS,
       });
       if (!response.ok) throw new Error("Failed to delete submission");
       return response.json();
