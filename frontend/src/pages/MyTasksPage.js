@@ -113,6 +113,8 @@ import TaskCard, { priorityColors, taskTypeIcons, SortableTaskCard } from "../co
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AppErrorBoundary } from "../components/AppErrorBoundary";
+import { motion } from "framer-motion";
+import { pageTransition, pageVariants } from "../components/animations/constants";
 
 // API functions for My Tasks
 import { myTasksAPI } from "../lib/api";
@@ -841,7 +843,14 @@ const MyTasksPage = () => {
   // If in execution mode, show the execution frame
   if (viewMode === "execution" && selectedTask) {
     return (
-      <div className="h-[calc(100vh-64px)]">
+      <motion.div
+        className="h-[calc(100vh-64px)] bg-slate-50"
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={pageTransition}
+      >
         <AppErrorBoundary
           context="TaskExecutionFrame"
           title="Form crashed"
@@ -857,7 +866,7 @@ const MyTasksPage = () => {
             }}
           />
         </AppErrorBoundary>
-      </div>
+      </motion.div>
     );
   }
   

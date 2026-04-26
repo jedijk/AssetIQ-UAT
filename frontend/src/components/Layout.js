@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
@@ -9,7 +9,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
 import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database } from "lucide-react";
 import AnimatedDrawer from "./animations/AnimatedDrawer";
-import { springPresets } from "./animations/constants";
+import { pageTransition, pageVariants, springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
@@ -47,6 +47,7 @@ import EquipmentHierarchy from "./EquipmentHierarchy";
 import { actionsAPI, feedbackAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
+import { AppErrorBoundary } from "./AppErrorBoundary";
 
 const Layout = () => {
   const { user, logout, mustChangePassword, mustAcceptTerms } = useAuth();
@@ -67,6 +68,7 @@ const Layout = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const avatarObjectUrlRef = useRef(null);
   const [dismissedNotifications, setDismissedNotifications] = useState(false);
   
   // Profile edit dialog state
@@ -245,7 +247,13 @@ const Layout = () => {
         
         if (response.ok) {
           const blob = await response.blob();
-          setAvatarUrl(URL.createObjectURL(blob));
+          const nextUrl = URL.createObjectURL(blob);
+          // Revoke previous object URL to prevent memory growth.
+          if (avatarObjectUrlRef.current) {
+            try { URL.revokeObjectURL(avatarObjectUrlRef.current); } catch (_e) {}
+          }
+          avatarObjectUrlRef.current = nextUrl;
+          setAvatarUrl(nextUrl);
         } else {
           // Avatar not found - will use initials fallback
           setAvatarUrl(null);
@@ -257,9 +265,12 @@ const Layout = () => {
     };
     fetchAvatar();
     return () => {
-      if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+      if (avatarObjectUrlRef.current) {
+        try { URL.revokeObjectURL(avatarObjectUrlRef.current); } catch (_e) {}
+        avatarObjectUrlRef.current = null;
+      }
     };
-  }, [user?.id, avatarUrl]);
+  }, [user?.id]);
 
   // Open profile dialog and populate form
   const openProfileDialog = useCallback(() => {
@@ -1243,24 +1254,29 @@ const Layout = () => {
             </div>
           )}
           
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{
-              type: "tween",
-              duration: 0.25,
-              ease: [0.25, 0.1, 0.25, 1],
-            }}
-            className="h-full"
-            style={{ 
-              paddingTop: isRefreshing ? 48 : pullDistance,
-              transition: 'padding-top 0.2s ease'
-            }}
-          >
-            <Outlet />
-          </motion.div>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={location.pathname}
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={pageTransition}
+              className="h-full"
+              style={{
+                paddingTop: isRefreshing ? 48 : pullDistance,
+                transition: "padding-top 0.2s ease",
+              }}
+            >
+              <AppErrorBoundary
+                context="RouteOutlet"
+                title="This page crashed"
+                subtitle="Something went wrong while rendering this screen. Tap reload to recover."
+              >
+                <Outlet />
+              </AppErrorBoundary>
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 

@@ -1052,12 +1052,28 @@ class TaskService:
             "submitted_by": submitted_by_id,
             "submitted_by_name": submitted_by_name,
             "submitted_at": timestamp,
+            # Freeze label template at submission-time so prints/reprints match even if
+            # the form template's label_print_config is later changed.
+            "label_template_id": None,
             "has_warnings": False,
             "has_critical": False,
             "has_signature": False,
             "status": "completed",
             "created_at": timestamp,
         }
+
+        # Resolve label_template_id from the form template (if available).
+        try:
+            ft_id = task_instance.get("form_template_id")
+            if ft_id:
+                from bson import ObjectId
+                form_tpl = await self.db.form_templates.find_one({"_id": ObjectId(str(ft_id))}, {"_id": 0, "label_print_config": 1})
+                label_cfg = form_tpl.get("label_print_config") if isinstance(form_tpl, dict) else None
+                if isinstance(label_cfg, dict):
+                    submission_doc["label_template_id"] = label_cfg.get("label_template_id")
+        except Exception:
+            # Non-critical — printing can still fall back to current config.
+            pass
         
         # Include AI extraction traceability if present
         ai_extraction = completion_data.get("ai_extraction")

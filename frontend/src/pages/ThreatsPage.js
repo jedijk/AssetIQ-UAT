@@ -58,6 +58,9 @@ import {
 import ThreatCard from "../components/ThreatCard";
 import RiskBadge from "../components/RiskBadge";
 import BackButton from "../components/BackButton";
+import { Skeleton } from "../components/ui/skeleton";
+import { VirtualList } from "../components/ui/VirtualList";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 // Status options with colors and icons
 const STATUS_OPTIONS = [
@@ -116,6 +119,7 @@ const ThreatsPage = () => {
   const queryClient = useQueryClient();
   const { t } = useLanguage();
   const { hasPermission } = usePermissions();
+  const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState([]); // Multi-select: array of selected statuses
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -613,12 +617,23 @@ const ThreatsPage = () => {
         <div className="max-w-7xl mx-auto">
           {/* Threats List */}
           {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="loading-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
+        <div className="py-6 space-y-3" data-testid="threats-skeleton">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-72 rounded" />
+                  <Skeleton className="h-3 w-96 rounded" />
+                  <div className="flex gap-2 pt-1">
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                </div>
+                <Skeleton className="h-9 w-24 rounded-lg" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : !Array.isArray(sortedThreats) || sortedThreats.length === 0 ? (
         <div className="empty-state py-16" data-testid="no-threats-message">
@@ -637,7 +652,107 @@ const ThreatsPage = () => {
         </div>
       ) : (
         <div className="priority-list" data-testid="threats-list">
-          {sortedThreats.map((threat, idx) => {
+          {isMobile ? (
+            <VirtualList
+              className="h-[calc(100vh-220px)]"
+              data={sortedThreats}
+              itemContent={(idx, threat) => {
+                const EquipmentIcon = getEquipmentIcon(threat.equipment_type, threat.asset);
+                const rpnValue = threat.fmea_rpn || threat.rpn || threat.failure_mode_data?.rpn || null;
+
+                const handleMouseEnter = () => {
+                  queryClient.prefetchQuery({
+                    queryKey: ["threat", threat.id],
+                    queryFn: () => threatsAPI.getById(threat.id),
+                    staleTime: 5 * 60 * 1000,
+                  });
+                };
+
+                return (
+                  <motion.div
+                    key={threat.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.01 }}
+                    onClick={() => navigate(`/threats/${threat.id}`)}
+                    onMouseEnter={handleMouseEnter}
+                    className={`priority-item group relative ${
+                      threat.status === "Mitigated" || threat.status === "Closed" 
+                        ? "sm:opacity-100 border-l-4 " + (threat.status === "Mitigated" ? "border-l-green-500 bg-green-50/30" : "border-l-slate-400 bg-slate-50/50")
+                        : ""
+                    }`}
+                    data-testid={`threat-item-${threat.id}`}
+                  >
+                    {(threat.status === "Mitigated" || threat.status === "Closed") && (
+                      <div className="sm:hidden absolute top-2 right-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          threat.status === "Mitigated" 
+                            ? "bg-green-100 text-green-700" 
+                            : "bg-slate-200 text-slate-600"
+                        }`}>
+                          {threat.status === "Mitigated" ? "✓" : "—"} {threat.status}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${
+                      threat.risk_level === "Critical" ? "bg-red-50" :
+                      threat.risk_level === "High" ? "bg-orange-50" :
+                      threat.risk_level === "Medium" ? "bg-yellow-50" :
+                      "bg-green-50"
+                    }`}>
+                      <EquipmentIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${
+                        threat.risk_level === "Critical" ? "text-red-600" :
+                        threat.risk_level === "High" ? "text-orange-600" :
+                        threat.risk_level === "Medium" ? "text-yellow-600" :
+                        "text-green-600"
+                      }`} />
+                    </div>
+
+                    <div className="priority-rank text-sm sm:text-base hidden sm:block" data-testid={`threat-rank-${threat.id}`}>
+                      #{threat.rank}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1 mb-0.5">
+                        <span className="sm:hidden">{threat.failure_mode || threat.title}</span>
+                        <span className="hidden sm:inline">{threat.title}</span>
+                      </h3>
+                      {threat.equipment_tag && (
+                        <div className="text-xs text-slate-400 font-mono mb-1">{threat.equipment_tag}</div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <span className="hidden sm:inline">
+                          <RiskBadge level={threat.risk_level} size="sm" />
+                        </span>
+                        <span className="text-xs sm:text-sm text-slate-500 truncate">
+                          <span className="sm:hidden">{threat.equipment_name || threat.asset}</span>
+                          <span className="hidden sm:inline">{threat.asset}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1 text-right">
+                      {typeof threat.business_risk_score === "number" && (
+                        <div className="hidden sm:flex items-center gap-1 text-xs text-slate-500">
+                          <TrendingUp className="w-3.5 h-3.5" />
+                          <span className="tabular-nums font-semibold text-slate-700">{Math.round(threat.business_risk_score)}</span>
+                        </div>
+                      )}
+                      {rpnValue != null && (
+                        <div className="hidden sm:flex items-center gap-1 text-xs text-slate-500">
+                          <BarChart3 className="w-3.5 h-3.5" />
+                          <span className="tabular-nums font-semibold text-slate-700">{rpnValue}</span>
+                        </div>
+                      )}
+                      <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-slate-400 transition-colors" />
+                    </div>
+                  </motion.div>
+                );
+              }}
+            />
+          ) : (
+          sortedThreats.map((threat, idx) => {
             const EquipmentIcon = getEquipmentIcon(threat.equipment_type, threat.asset);
             const rpnValue = threat.fmea_rpn || threat.rpn || threat.failure_mode_data?.rpn || null;
             
@@ -783,7 +898,8 @@ const ThreatsPage = () => {
               </div>
             </motion.div>
             );
-          })}
+          })
+          )}
         </div>
       )}
         </div>

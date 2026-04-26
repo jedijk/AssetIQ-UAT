@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import { installGlobalDebugHooks, debugLog } from "./lib/debug";
+import { installPerfObservers, PERF_ENABLED } from "./lib/perf";
 
 // Patch ResizeObserver to prevent "loop completed with undelivered notifications" errors
 // This is a known issue with cmdk, Radix UI, and other libraries that use ResizeObserver
@@ -57,6 +58,10 @@ if (typeof window !== 'undefined') {
 
 // Install global debug hooks (opt-in via REACT_APP_DEBUG=true)
 installGlobalDebugHooks();
+// Install perf observers (opt-in via REACT_APP_DEBUG_PERF=true)
+try {
+  if (PERF_ENABLED) installPerfObservers();
+} catch (_e) {}
 
 function isIOSWebAppStandalone() {
   try {

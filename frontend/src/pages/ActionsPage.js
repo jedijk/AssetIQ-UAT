@@ -85,6 +85,8 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import BackButton from "../components/BackButton";
 import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
+import { Skeleton } from "../components/ui/skeleton";
+import { VirtualList } from "../components/ui/VirtualList";
 
 // Status options with colors and icons - matching Observations
 const STATUS_OPTIONS = [
@@ -590,12 +592,23 @@ export default function ActionsPage() {
         <div className="max-w-7xl mx-auto">
           {/* Actions List */}
           {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="loading-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
+        <div className="py-6 space-y-3" data-testid="actions-skeleton">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-80 rounded" />
+                  <Skeleton className="h-3 w-[28rem] rounded" />
+                  <div className="flex gap-2 pt-1">
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                </div>
+                <Skeleton className="h-9 w-24 rounded-lg" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : sortedActions.length === 0 ? (
         <div className="empty-state py-16" data-testid="no-actions-message">
@@ -609,7 +622,91 @@ export default function ActionsPage() {
         </div>
       ) : (
         <div className="priority-list" data-testid="actions-list">
-          {sortedActions.map((action, idx) => {
+          {isMobile ? (
+            <VirtualList
+              className="h-[calc(100vh-220px)]"
+              data={sortedActions}
+              itemContent={(idx, action) => {
+                const StatusIcon = statusConfig[action.status]?.icon || Clock;
+                const SourceIcon = sourceConfig[action.source_type]?.icon || FileText;
+                const priority = priorityConfig[action.priority] || priorityConfig.medium;
+                const overdue = isOverdue(action);
+                const isCompleted = action.status === "completed";
+                const isClosed = action.status === "closed";
+
+                return (
+                  <motion.div
+                    key={action.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.01 }}
+                    className={`group cursor-pointer p-3 sm:p-4 bg-white rounded-xl border border-slate-200 hover:shadow-md hover:border-slate-300 transition-all duration-200 relative ${
+                      overdue ? "border-l-4 border-l-red-400" : 
+                      isCompleted ? "border-l-4 border-l-green-500 bg-green-50/30" :
+                      isClosed ? "border-l-4 border-l-slate-400 bg-slate-50/50" : ""
+                    }`}
+                    data-testid={`action-row-${action.id}`}
+                    onClick={() => navigate(`/actions/${action.id}`)}
+                  >
+                    {(isCompleted || isClosed) && (
+                      <div className="sm:hidden absolute top-2 right-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          isCompleted 
+                            ? "bg-green-100 text-green-700" 
+                            : "bg-slate-200 text-slate-600"
+                        }`}>
+                          {isCompleted ? "✓" : "—"} {isCompleted ? "Completed" : "Closed"}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_auto_1fr_4rem_4rem_auto] items-center gap-2 sm:gap-4">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const nextStatus = action.status === "open" ? "in_progress" : 
+                            action.status === "in_progress" ? "completed" : "open";
+                          quickStatusUpdate(action, nextStatus);
+                        }}
+                        className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center ${priority.iconBg}`}
+                        title={`Status: ${statusConfig[action.status]?.label}. Click to change.`}
+                      >
+                        <StatusIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${priority.iconColor}`} />
+                      </button>
+
+                      <div
+                        className="hidden sm:flex items-center justify-center px-2 py-1 bg-slate-100 rounded-md text-xs font-mono text-slate-500 min-w-[60px]"
+                        data-testid={`action-number-${action.id}`}
+                      >
+                        {action.action_number}
+                      </div>
+
+                      <div className="min-w-0 overflow-hidden">
+                        <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+                          <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1">
+                            {action.title}
+                          </h3>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${priority.color}`}>
+                            {priority.label}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-slate-400">
+                            <SourceIcon className="w-3.5 h-3.5" />
+                            {sourceConfig[action.source_type]?.label || "Action"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <ChevronDown className="w-5 h-5 text-slate-300 group-hover:text-slate-400 transition-colors sm:hidden" />
+                      <ChevronDown className="w-5 h-5 text-slate-300 group-hover:text-slate-400 transition-colors hidden sm:block" />
+                    </div>
+                  </motion.div>
+                );
+              }}
+            />
+          ) : (
+          sortedActions.map((action, idx) => {
             const StatusIcon = statusConfig[action.status]?.icon || Clock;
             const SourceIcon = sourceConfig[action.source_type]?.icon || FileText;
             const priority = priorityConfig[action.priority] || priorityConfig.medium;
@@ -817,7 +914,8 @@ export default function ActionsPage() {
                 </div>{/* Close grid */}
               </motion.div>
             );
-          })}
+          })
+          )}
         </div>
       )}
         </div>

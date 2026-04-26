@@ -7,9 +7,13 @@ export function useProductionDashboardQuery({ fromStr, toStr, shift, period, pro
   return useQuery({
     queryKey: productionKeys.dashboard(period, fromStr, toStr, shift),
     queryFn: () => productionAPI.getDashboard(queryParams),
-    refetchInterval: 60000,
-    staleTime: 5000,
-    refetchOnWindowFocus: true,
+    enabled: !!fromStr && (!!toStr || period === "1d"),
+    // Perceived speed: keep the last successful data while fetching a new period/range.
+    placeholderData: (prev) => prev,
+    // Power efficiency + iOS smoothness: avoid aggressive refetch-on-focus.
+    refetchOnWindowFocus: false,
+    staleTime: 15_000,
+    refetchInterval: 60_000,
   });
 }
 

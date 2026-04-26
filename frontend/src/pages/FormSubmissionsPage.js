@@ -7,6 +7,8 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { AuthenticatedImage, useAuthenticatedMedia } from "../components/AuthenticatedMedia";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { VirtualList } from "../components/ui/VirtualList";
+import { Skeleton } from "../components/ui/skeleton";
 import {
   FileText,
   Search,
@@ -486,7 +488,9 @@ export default function FormSubmissionsPage() {
   const { data: templatesData } = useQuery({
     queryKey: ["form-templates", "for-label-reprint"],
     queryFn: () => formAPI.getTemplates(),
-    enabled: !isMobile,
+    // Needed on mobile too so we can fall back to the form template's label_print_config
+    // when older submissions don't yet have submission.label_template_id.
+    enabled: true,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -518,6 +522,11 @@ export default function FormSubmissionsPage() {
     setPrintingId(submission.id);
     try {
       const { printLabel } = await import("../lib/printLabel");
+      try {
+        // Helpful for iOS debugging: confirm which template is actually being used.
+        // eslint-disable-next-line no-console
+        console.log("[labels] reprint", { submissionId: submission.id, templateId });
+      } catch (_e) {}
       const res = await printLabel(
         {
           template_id: templateId,
@@ -713,9 +722,22 @@ export default function FormSubmissionsPage() {
         {/* Submissions List */}
         <div className="bg-white rounded-lg sm:rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           {isLoading ? (
-            <div className="p-6 sm:p-8 text-center text-slate-500">
-              <div className="animate-spin w-6 h-6 sm:w-8 sm:h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
-              <span className="text-sm">Loading submissions...</span>
+            <div className="p-4 sm:p-6 space-y-3" data-testid="submissions-skeleton">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="p-3 sm:p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <Skeleton className="h-4 w-64 rounded" />
+                      <Skeleton className="h-3 w-80 rounded" />
+                      <div className="flex gap-2 pt-1">
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                        <Skeleton className="h-5 w-24 rounded-full" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-8 w-20 rounded-lg" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : filteredSubmissions.length === 0 ? (
             <div className="p-6 sm:p-8 text-center text-slate-500">
@@ -725,7 +747,61 @@ export default function FormSubmissionsPage() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {filteredSubmissions.map((submission, idx) => {
+              {isMobile ? (
+                <VirtualList
+                  className="h-[calc(100vh-260px)]"
+                  data={filteredSubmissions}
+                  itemContent={(idx, submission) => {
+                    const discInfo = getDisciplineInfo(submission.discipline);
+                    const hasAttachments = submission.attachments?.length > 0;
+                    return (
+                      <motion.div
+                        key={submission.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.01 }}
+                        className="p-3 sm:p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                        onClick={() => handleSubmissionClick(submission)}
+                        data-testid={`submission-row-${submission.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-2 sm:gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+                              <h3 className="font-semibold text-slate-800 text-sm sm:text-base truncate max-w-[180px] sm:max-w-none">
+                                {submission.form_template_name || "Unknown Form"}
+                              </h3>
+                              {getStatusBadge(submission)}
+                              {hasAttachments && (
+                                <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0 gap-0.5 border-blue-200 text-blue-600">
+                                  <Paperclip className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                  {submission.attachments.length}
+                                </Badge>
+                              )}
+                            </div>
+                            {submission.equipment_tag && (
+                              <div className="text-xs text-slate-400 font-mono mb-1">{submission.equipment_tag}</div>
+                            )}
+                            <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-4 gap-y-0.5 text-xs sm:text-sm text-slate-500">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                <span className="sm:hidden">{submission.submitted_at ? formatDateUtil(submission.submitted_at, { format: "short" }) : "N/A"}</span>
+                              </div>
+                              {submission.discipline && (
+                                <div className="flex items-center gap-1">
+                                  <span className={`w-2 h-2 rounded-full ${discInfo.color}`} />
+                                  <span className="hidden sm:inline">{discInfo.label}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0 mt-0.5" />
+                        </div>
+                      </motion.div>
+                    );
+                  }}
+                />
+              ) : (
+              filteredSubmissions.map((submission, idx) => {
                 const discInfo = getDisciplineInfo(submission.discipline);
                 const hasAttachments = submission.attachments?.length > 0;
                 
@@ -886,7 +962,8 @@ export default function FormSubmissionsPage() {
                     </div>
                   </motion.div>
                 );
-              })}
+              })
+              )}
             </div>
           )}
         </div>

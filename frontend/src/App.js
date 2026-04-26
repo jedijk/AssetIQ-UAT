@@ -17,6 +17,7 @@ import { useEffect } from "react";
 import { getBackendUrl } from "./lib/apiConfig";
 import { debugLog } from "./lib/debug";
 import "./App.css";
+import { AppShell } from "./components/AppShell";
 
 // iOS Safari can feel slower with too many small lazy chunks (waterfall + parse overhead).
 // Keep core routes eagerly loaded; lazy-load heavier/rare routes.
@@ -63,13 +64,7 @@ const SettingsConsentManagementPage = lazy(() => import("./pages/SettingsConsent
 
 function RouteFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="loading-dots">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-    </div>
+    <AppShell />
   );
 }
 
@@ -260,13 +255,7 @@ const ProtectedRoute = ({ children }) => {
   
   if (loading || permissionsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="loading-dots">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </div>
+      <AppShell />
     );
   }
   
@@ -290,13 +279,7 @@ const PublicRoute = ({ children }) => {
   
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="loading-dots">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </div>
+      <AppShell />
     );
   }
   
