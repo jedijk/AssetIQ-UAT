@@ -63,11 +63,9 @@ api.interceptors.response.use(
         });
       } catch (_e) {}
       localStorage.removeItem("token");
-      if (!window.location.pathname.includes("/login")) {
-        // eslint-disable-next-line no-console
-        console.warn("Session expired, redirecting to login");
-        window.location.href = "/login";
-      }
+      try {
+        window.dispatchEvent(new CustomEvent("assetiq:auth-expired"));
+      } catch (_e) {}
     }
 
     if (error.code === "ECONNABORTED") {
@@ -107,9 +105,9 @@ aiApi.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
-      if (!window.location.pathname.includes("/login")) {
-        window.location.href = "/login";
-      }
+      try {
+        window.dispatchEvent(new CustomEvent("assetiq:auth-expired"));
+      } catch (_e) {}
     }
 
     if (error.code === "ECONNABORTED") {

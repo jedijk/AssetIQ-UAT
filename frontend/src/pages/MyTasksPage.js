@@ -459,6 +459,22 @@ const MyTasksPage = () => {
           || selectedTask?.label_print_config;
         const submissionId = result?.form_submission_id;
         console.log("[LabelPrint] result keys:", Object.keys(result || {}), "labelCfg:", labelCfg, "submissionId:", submissionId);
+        const resolveTemplateId = async () => {
+          const fallback = labelCfg?.label_template_id || "";
+          if (!submissionId) return fallback;
+          try {
+            const { getBackendUrl, getAuthHeaders } = await import("../lib/apiConfig");
+            const res = await fetch(`${getBackendUrl()}/api/form-submissions/${submissionId}`, {
+              headers: getAuthHeaders(),
+            });
+            if (!res.ok) return fallback;
+            const sub = await res.json();
+            return sub?.label_template_id || fallback;
+          } catch {
+            return fallback;
+          }
+        };
+
         if (labelCfg?.enabled && labelCfg?.label_template_id && submissionId) {
           const trigger = labelCfg.trigger || "manual";
           (async () => {
@@ -474,8 +490,9 @@ const MyTasksPage = () => {
               (async () => {
                 try {
                   const { printLabel } = await import("../lib/printLabel");
+                  const templateId = await resolveTemplateId();
                   await printLabel({
-                    template_id: labelCfg.label_template_id,
+                    template_id: templateId,
                     submission_id: submissionId,
                     copies: 1,
                   });
@@ -494,8 +511,9 @@ const MyTasksPage = () => {
                     const { openPrintWindow, printLabel } = await import("../lib/printLabel");
                     const win = openPrintWindow();
                     try {
+                      const templateId = await resolveTemplateId();
                       await printLabel({
-                        template_id: labelCfg.label_template_id,
+                        template_id: templateId,
                         submission_id: submissionId,
                         copies: 1,
                       }, { win });
@@ -517,8 +535,9 @@ const MyTasksPage = () => {
                   const { openPrintWindow, printLabel } = await import("../lib/printLabel");
                   const win = openPrintWindow();
                   try {
+                    const templateId = await resolveTemplateId();
                     await printLabel({
-                      template_id: labelCfg.label_template_id,
+                      template_id: templateId,
                       submission_id: submissionId,
                       copies: 1,
                     }, { win });

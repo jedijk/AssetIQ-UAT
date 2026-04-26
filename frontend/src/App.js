@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Suspense, lazy } from "react";
@@ -71,6 +71,23 @@ function RouteFallback() {
       </div>
     </div>
   );
+}
+
+function AuthExpiredListener() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const handler = () => {
+      try {
+        debugLog("auth_expired_event", { path: window.location.pathname });
+      } catch (_e) {}
+      if (!window.location.pathname.includes("/login")) {
+        navigate("/login", { replace: true });
+      }
+    };
+    window.addEventListener("assetiq:auth-expired", handler);
+    return () => window.removeEventListener("assetiq:auth-expired", handler);
+  }, [navigate]);
+  return null;
 }
 
 function isIOSDevice() {
@@ -299,6 +316,7 @@ function App() {
               <PermissionsProvider>
                 <UndoProvider>
                   <BrowserRouter>
+                    <AuthExpiredListener />
                     <Toaster 
                       position="top-center" 
                       richColors 

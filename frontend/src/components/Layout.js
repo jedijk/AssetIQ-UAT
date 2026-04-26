@@ -607,6 +607,9 @@ const Layout = () => {
               className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 -ml-1"
               onClick={() => {
                 setOpenHeaderMenu(null);
+                // If the equipment hierarchy overlay is open on mobile,
+                // close it when opening the hamburger menu.
+                setHierarchyOpen(false);
                 setMobileMenuOpen(!mobileMenuOpen);
               }}
               data-testid="mobile-menu-toggle"

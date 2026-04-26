@@ -1308,6 +1308,8 @@ async def print_labels(body: PrintRequest, current_user: dict = Depends(get_curr
         headers={
             "Content-Disposition": f'inline; filename="{filename}"',
             "X-Print-Job-Id": job["id"],
+            "X-Label-Template-Id": body.template_id,
+            "X-Label-Template-Name": str(tpl_doc.get("name") or ""),
         },
     )
 
@@ -1394,7 +1396,14 @@ async def render_label_html(
         "created_at": _now(),
     }
     await db.label_print_jobs.insert_one(job)
-    return HTMLResponse(content=html, headers={"X-Print-Job-Id": job["id"]})
+    return HTMLResponse(
+        content=html,
+        headers={
+            "X-Print-Job-Id": job["id"],
+            "X-Label-Template-Id": body.template_id,
+            "X-Label-Template-Name": str(tpl_doc.get("name") or ""),
+        },
+    )
 
 
 @router.get("/jobs")
