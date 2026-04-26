@@ -13,7 +13,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from typing import Optional
 
-from database import db
+from database import db, JWT_EXPIRATION_HOURS
 from auth import hash_password, verify_password, create_token, get_current_user, AUTH_COOKIE_NAME, CSRF_COOKIE_NAME
 from models.api_models import UserCreate, UserLogin, UserResponse, TokenResponse
 from pydantic import BaseModel, EmailStr, field_validator
@@ -366,31 +366,36 @@ async def login(request: Request, credentials: UserLogin, response: Response):
     # Cross-site cookies (Vercel -> Railway) require SameSite=None; Secure.
     cookie_enabled = os.environ.get("AUTH_SET_COOKIE_ON_LOGIN", "true").lower() == "true"
     if cookie_enabled:
-        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-        secure = proto == "https"
-        same_site = "none" if secure else "lax"
+        try:
+            proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+            secure = proto == "https"
+            same_site = "none" if secure else "lax"
 
-        csrf_token = secrets.token_urlsafe(32)
+            csrf_token = secrets.token_urlsafe(32)
+            max_age = int(timedelta(hours=float(JWT_EXPIRATION_HOURS)).total_seconds())
 
-        response.set_cookie(
-            key=AUTH_COOKIE_NAME,
-            value=token,
-            httponly=True,
-            secure=secure,
-            samesite=same_site,
-            path="/",
-            max_age=int(timedelta(hours=JWT_EXPIRATION_HOURS).total_seconds()),
-        )
-        # Non-HttpOnly CSRF token cookie (double-submit). Frontend must echo it in X-CSRF-Token.
-        response.set_cookie(
-            key=CSRF_COOKIE_NAME,
-            value=csrf_token,
-            httponly=False,
-            secure=secure,
-            samesite=same_site,
-            path="/",
-            max_age=int(timedelta(hours=JWT_EXPIRATION_HOURS).total_seconds()),
-        )
+            response.set_cookie(
+                key=AUTH_COOKIE_NAME,
+                value=token,
+                httponly=True,
+                secure=secure,
+                samesite=same_site,
+                path="/",
+                max_age=max_age,
+            )
+            # Non-HttpOnly CSRF token cookie (double-submit). Frontend must echo it in X-CSRF-Token.
+            response.set_cookie(
+                key=CSRF_COOKIE_NAME,
+                value=csrf_token,
+                httponly=False,
+                secure=secure,
+                samesite=same_site,
+                path="/",
+                max_age=max_age,
+            )
+        except Exception as e:
+            # Never fail login just because cookie config failed
+            logger.warning(f"Auth cookie setup failed: {type(e).__name__}: {e}")
     
     # Convert datetime to string for Pydantic model
     created_at = user.get("created_at")
