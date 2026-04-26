@@ -74,7 +74,12 @@ export const AuthProvider = ({ children }) => {
       // Fetch and cache user preferences for date/time formatting
       await fetchAndCachePreferences(API_URL);
     } catch (error) {
-      console.error("Failed to fetch user:", error);
+      // A 401 here is normal when booting logged-out (especially in cookie mode).
+      // Only log unexpected errors.
+      const status = error?.response?.status;
+      if (status && status !== 401) {
+        console.error("Failed to fetch user:", error);
+      }
       // Avoid calling remote logout on a simple 401 (especially in cookie mode),
       // otherwise we can create a noisy loop if CORS/session is misconfigured.
       logout({ remote: false });

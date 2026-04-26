@@ -135,9 +135,27 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception on {request.url.path}: {exc}")
     
     if isinstance(exc, HTTPException):
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        resp = JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        try:
+            origin = request.headers.get("origin")
+            if origin and origin in ALLOWED_ORIGINS:
+                resp.headers["Access-Control-Allow-Origin"] = origin
+                resp.headers["Vary"] = "Origin"
+                resp.headers["Access-Control-Allow-Credentials"] = "true"
+        except Exception:
+            pass
+        return resp
     
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    resp = JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    try:
+        origin = request.headers.get("origin")
+        if origin and origin in ALLOWED_ORIGINS:
+            resp.headers["Access-Control-Allow-Origin"] = origin
+            resp.headers["Vary"] = "Origin"
+            resp.headers["Access-Control-Allow-Credentials"] = "true"
+    except Exception:
+        pass
+    return resp
 
 
 # Load all API routes (wrapped for safety)
@@ -252,8 +270,15 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
         if request.url.path in ["/health", "/", "/api/health"]:
             return await call_next(request)
         
-        # Use longer timeout for file storage/download endpoints, AI analysis, and imports
-        if "/storage/" in request.url.path or "/avatar" in request.url.path or "/ai/" in request.url.path or "/import" in request.url.path or "/ai-insights" in request.url.path:
+        # Use longer timeout for file storage/download endpoints, AI analysis, imports, and auth.
+        if (
+            "/storage/" in request.url.path
+            or "/avatar" in request.url.path
+            or "/ai/" in request.url.path
+            or "/import" in request.url.path
+            or "/ai-insights" in request.url.path
+            or "/auth/" in request.url.path
+        ):
             request_timeout = self.long_timeout
         else:
             request_timeout = self.timeout
@@ -267,7 +292,16 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             return response
         except asyncio.TimeoutError:
             logger.error(f"Request timeout: {request.method} {request.url.path} exceeded {request_timeout}s")
-            return JSONResponse(status_code=504, content={"detail": "Request timeout - please try again"})
+            resp = JSONResponse(status_code=504, content={"detail": "Request timeout - please try again"})
+            try:
+                origin = request.headers.get("origin")
+                if origin and origin in ALLOWED_ORIGINS:
+                    resp.headers["Access-Control-Allow-Origin"] = origin
+                    resp.headers["Vary"] = "Origin"
+                    resp.headers["Access-Control-Allow-Credentials"] = "true"
+            except Exception:
+                pass
+            return resp
 
 app.add_middleware(TimeoutMiddleware, timeout=25.0, long_timeout=120.0)
 
