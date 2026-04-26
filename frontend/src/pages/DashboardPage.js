@@ -510,8 +510,10 @@ export default function DashboardPage({ initialTab }) {
   // Operator view: shown on mobile when role is operator or owner has toggled it
   const initialIsMobileViewport = window.innerWidth < 768;
   const [isMobileViewport, setIsMobileViewport] = useState(() => initialIsMobileViewport);
+  const isOwner = user?.role === "owner";
+  const canShowBuilder = manualBuilderEnabled && !isMobileViewport && isOwner;
   const [activeTab, setActiveTab] = useState(
-    initialTab || (manualBuilderEnabled ? "builder" : "operational")
+    initialTab || (manualBuilderEnabled && !initialIsMobileViewport ? "builder" : "operational")
   );
   const [operatorToggle, setOperatorToggle] = useState(
     () => localStorage.getItem("operatorViewEnabled") === "true"
@@ -537,7 +539,7 @@ export default function DashboardPage({ initialTab }) {
     const handleResize = () => {
       // sm breakpoint is 640px
       // Only redirect reliability tab on mobile, production is now mobile-friendly
-      if (window.innerWidth < 640 && activeTab === "reliability") {
+      if (window.innerWidth < 640 && (activeTab === "reliability" || activeTab === "builder")) {
         setActiveTab("operational");
       }
     };
@@ -549,6 +551,20 @@ export default function DashboardPage({ initialTab }) {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [activeTab]);
+
+  // If we enter mobile viewport while on builder, force back to operational.
+  useEffect(() => {
+    if (isMobileViewport && activeTab === "builder") {
+      setActiveTab("operational");
+    }
+  }, [activeTab, isMobileViewport]);
+
+  // If user is not allowed to see builder, force back to operational.
+  useEffect(() => {
+    if (!canShowBuilder && activeTab === "builder") {
+      setActiveTab("operational");
+    }
+  }, [activeTab, canShowBuilder]);
   
   // Filter states
   const [disciplineFilter, setDisciplineFilter] = useState("all");
@@ -832,7 +848,7 @@ export default function DashboardPage({ initialTab }) {
         {/* Dashboard Tab Buttons - Mobile Optimized */}
         <div className="flex items-center justify-between gap-4">
           <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1">
-            {manualBuilderEnabled && (
+            {canShowBuilder && (
               <button
                 onClick={() => setActiveTab("builder")}
                 className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${
@@ -1429,7 +1445,7 @@ export default function DashboardPage({ initialTab }) {
           )}
 
           {/* Smart Dashboard Builder Tab (manual, intuitive) */}
-          {activeTab === "builder" && manualBuilderEnabled && (
+          {activeTab === "builder" && canShowBuilder && (
             <div className="animate-fade-in">
               <Suspense
                 fallback={

@@ -58,6 +58,22 @@ if (typeof window !== 'undefined') {
 // Install global debug hooks (opt-in via REACT_APP_DEBUG=true)
 installGlobalDebugHooks();
 
+function isIOSWebAppStandalone() {
+  try {
+    const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
+    const isIOSLike = /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && "ontouchend" in document); // iPadOS desktop mode
+    if (!isIOSLike) return false;
+    const navStandalone = typeof navigator !== "undefined" && navigator.standalone === true; // iOS Safari A2HS
+    const mqlStandalone =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(display-mode: standalone)").matches;
+    return !!(navStandalone || mqlStandalone);
+  } catch (_e) {
+    return false;
+  }
+}
+
 function showBootError(message) {
   try {
     const el = document.getElementById("root");
@@ -92,6 +108,13 @@ function showBootError(message) {
     // ignore
   }
 }
+
+const IOS_WEBAPP_STANDALONE = isIOSWebAppStandalone();
+try {
+  if (IOS_WEBAPP_STANDALONE) {
+    debugLog("ios_webapp_standalone", { standalone: true });
+  }
+} catch (_e) {}
 
 // Register Service Worker for PWA (OFF by default: avoids mobile white-screen
 // issues due to stale caches / SW update races). Enable explicitly by setting:
@@ -167,9 +190,37 @@ window.addEventListener("error", (e) => {
   }
 });
 
+// Some chunk-load failures arrive as unhandled promise rejections.
+window.addEventListener("unhandledrejection", (e) => {
+  const reason = e?.reason;
+  const msg = String(reason?.message || reason || "");
+  if (msg.includes("Loading chunk") || msg.includes("ChunkLoadError")) {
+    debugLog("chunk_load_rejection", { message: msg });
+    showBootError("A new version was deployed while your browser cached an older one. Tap Reload.");
+  }
+});
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(
+
+// iOS standalone webapps are more sensitive to timing/memory edge cases; avoid
+// StrictMode double-invocation to reduce “random white screen” reports.
+const appTree = IOS_WEBAPP_STANDALONE ? <App /> : (
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
+  </React.StrictMode>
 );
+root.render(appTree);
+
+// Boot watchdog: if the app fails to mount, show the recovery UI instead of a blank screen.
+try {
+  if (typeof window !== "undefined") {
+    setTimeout(() => {
+      const el = document.getElementById("root");
+      const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
+      if (!hasContent) {
+        debugLog("boot_blank_screen", { ios_webapp: IOS_WEBAPP_STANDALONE });
+        showBootError("The app started but did not render. Tap Reload to recover.");
+      }
+    }, IOS_WEBAPP_STANDALONE ? 4500 : 6500);
+  }
+} catch (_e) {}

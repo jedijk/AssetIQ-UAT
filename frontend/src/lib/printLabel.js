@@ -162,6 +162,60 @@ export async function printLabel(payload, opts = {}) {
   const preOpened = opts.win || null;
 
   if (mobile) {
+    // iOS Safari does not reliably honor custom `@page size` for HTML printing
+    // (small label stock), which can cause mis-scaled/incorrect layouts.
+    // PDF output is pixel-perfect and matches desktop.
+    if (isIOS()) {
+      try {
+        const blob = await labelsAPI.printBlob(payload);
+        const url = URL.createObjectURL(blob);
+        if (preOpened && !preOpened.closed) {
+          try {
+            // Navigate the already-opened window to the PDF blob URL.
+            // User can Print/Share from the native PDF viewer.
+            preOpened.location.href = url;
+            // Best-effort: some browsers will allow print after load.
+            preOpened.addEventListener(
+              "load",
+              () => {
+                try {
+                  preOpened.focus();
+                  preOpened.print();
+                } catch (_e) {
+                  /* ignore */
+                }
+              },
+              { once: true }
+            );
+            // Cleanup later; keep URL alive long enough for the viewer.
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+            return { method: "window", ok: true, mobile: true };
+          } catch (_navErr) {
+            // fall through to download
+          }
+        }
+        downloadBlob(blob, filename);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        if (preOpened && !preOpened.closed) {
+          try {
+            preOpened.close();
+          } catch (_c) {
+            /* ignore */
+          }
+        }
+        return { method: "download", ok: true, mobile: true };
+      } catch (_err) {
+        if (preOpened && !preOpened.closed) {
+          try {
+            preOpened.close();
+          } catch (_c) {
+            /* ignore */
+          }
+        }
+        return { method: "download", ok: false, mobile: true };
+      }
+    }
+
     try {
       const html = await labelsAPI.renderHtml({ ...payload, auto_print: true });
       if (preOpened && !preOpened.closed) {
