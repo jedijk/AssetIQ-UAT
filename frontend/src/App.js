@@ -134,9 +134,28 @@ const useVersionCheck = () => {
     const backendUrl = getBackendUrl().replace(/\/$/, "");
     let cancelled = false;
     let promptedFor = null;
+    let timerId = null;
+
+    const isMobileLike = () => {
+      try {
+        return (
+          typeof navigator !== "undefined" &&
+          (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "") || (typeof window !== "undefined" && window.innerWidth < 768))
+        );
+      } catch {
+        return false;
+      }
+    };
+
+    const getIntervalMs = () => {
+      // Power efficiency: check less frequently on mobile.
+      return isMobileLike() ? 15 * 60_000 : 5 * 60_000;
+    };
 
     const checkVersion = async () => {
       if (cancelled) return;
+      // Power efficiency: don't poll while tab is hidden.
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       try {
         if (!backendUrl) return;
         const response = await fetch(`${backendUrl}/api/health`, {
@@ -191,20 +210,31 @@ const useVersionCheck = () => {
       }
     };
 
+    const scheduleNext = (delayMs) => {
+      if (cancelled) return;
+      if (timerId) clearTimeout(timerId);
+      timerId = setTimeout(async () => {
+        await checkVersion();
+        scheduleNext(getIntervalMs());
+      }, delayMs);
+    };
+
     // First check shortly after mount so auth/init aren't disturbed
-    const initialId = setTimeout(checkVersion, 1500);
-    // Poll every 60 seconds
-    const intervalId = setInterval(checkVersion, 60_000);
-    // Re-check when the tab regains focus (common case for long-idle tabs)
+    scheduleNext(1500);
+
+    // Re-check when the tab regains focus (common case for long-idle tabs).
+    // Also restart the throttled timer (power efficient).
     const onVisibility = () => {
-      if (document.visibilityState === "visible") checkVersion();
+      if (document.visibilityState === "visible") {
+        checkVersion();
+        scheduleNext(getIntervalMs());
+      }
     };
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       cancelled = true;
-      clearTimeout(initialId);
-      clearInterval(intervalId);
+      if (timerId) clearTimeout(timerId);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
@@ -215,6 +245,10 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 60,
       retry: 1,
+      // Power efficiency: avoid refetching on every focus on mobile Safari.
+      // Users can pull-to-refresh (non-iOS) or navigate to refresh.
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
     },
   },
 });
