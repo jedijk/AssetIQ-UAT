@@ -301,6 +301,7 @@ async def get_production_dashboard(
             viscosity_values.append(measurement)
             viscosity_entries.append({
                 "time": time_label,
+                "datetime": _serialize_datetime(dt) if dt else "",
                 "sample_no": sample_no,
                 "value": measurement,
                 "submission_id": sub.get("id", ""),

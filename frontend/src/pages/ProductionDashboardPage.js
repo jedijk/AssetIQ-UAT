@@ -719,12 +719,16 @@ export default function ProductionDashboardPage() {
     if (!data?.production_log) return [];
 
     // Merge standalone viscosity entries (no matching extruder time) as separate rows
-    const logTimes = new Set((data.production_log || []).map((e) => getTimeKey(e)).filter(Boolean));
+    const logKeys = new Set(
+      (data.production_log || [])
+        .map((e) => (isMultiDay ? e.datetime : getTimeKey(e)))
+        .filter(Boolean)
+    );
     const standaloneVisc = (data?.viscosity_series || [])
-      .filter((v) => v.time && !logTimes.has(v.time))
+      .filter((v) => (isMultiDay ? v.datetime : v.time) && !logKeys.has(isMultiDay ? v.datetime : v.time))
       .map((v) => ({
         time: v.time,
-        datetime: "",
+        datetime: v.datetime || "",
         submitted_by: "",
         rpm: null, feed: null, moisture: null, energy: null,
         mt1: null, mt2: null, mt3: null,
@@ -750,7 +754,7 @@ export default function ProductionDashboardPage() {
         String(e.rpm).includes(s) ||
         String(e.feed).includes(s)
     );
-  }, [data?.production_log, data?.viscosity_series, logSearch]);
+  }, [data?.production_log, data?.viscosity_series, logSearch, isMultiDay]);
 
   // Combined time series for Mooney Viscosity chart (merges viscosity + production log data)
   const isMultiDay = period !== "1d";

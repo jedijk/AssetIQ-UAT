@@ -59,6 +59,7 @@ import InsightsPage from "./InsightsPage";
 import { DISCIPLINES } from "../constants/disciplines";
 import ProductionDashboardPage from "./ProductionDashboardPage";
 import { AIDashboardBuilderPanel } from "../features/dashboardBuilder/AIDashboardBuilderPanel";
+import { SmartDashboardBuilderPanel } from "../features/dashboardBuilder/SmartDashboardBuilderPanel";
 
 // Authenticated Lightbox component for viewing images with proper mobile auth
 const AuthenticatedLightbox = ({ url, name, onClose }) => {
@@ -503,12 +504,16 @@ export default function DashboardPage({ initialTab }) {
   const { user } = useAuth();
   // ON by default; disable explicitly with REACT_APP_ENABLE_AI_DASHBOARD_BUILDER=false
   const aiBuilderEnabled = process.env.REACT_APP_ENABLE_AI_DASHBOARD_BUILDER !== "false";
+  // ON by default; disable explicitly with REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER=false
+  const manualBuilderEnabled = process.env.REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER !== "false";
 
   // Operator view: shown on mobile when role is operator or owner has toggled it
   const initialIsMobileViewport = window.innerWidth < 768;
   const [isMobileViewport, setIsMobileViewport] = useState(() => initialIsMobileViewport);
   const aiBuilderDesktopEnabled = aiBuilderEnabled && !initialIsMobileViewport;
-  const [activeTab, setActiveTab] = useState(initialTab || (aiBuilderDesktopEnabled ? "ai" : "operational"));
+  const [activeTab, setActiveTab] = useState(
+    initialTab || (manualBuilderEnabled ? "builder" : aiBuilderDesktopEnabled ? "ai" : "operational")
+  );
   const [operatorToggle, setOperatorToggle] = useState(
     () => localStorage.getItem("operatorViewEnabled") === "true"
   );
@@ -835,6 +840,19 @@ export default function DashboardPage({ initialTab }) {
         {/* Dashboard Tab Buttons - Mobile Optimized */}
         <div className="flex items-center justify-between gap-4">
           <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1">
+            {manualBuilderEnabled && (
+              <button
+                onClick={() => setActiveTab("builder")}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${
+                  activeTab === "builder" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"
+                }`}
+                data-testid="builder-tab"
+              >
+                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">Builder</span>
+                <span className="xs:hidden">Build</span>
+              </button>
+            )}
             {aiBuilderEnabled && !isMobileViewport && (
               <button
                 onClick={() => setActiveTab("ai")}
@@ -1428,6 +1446,18 @@ export default function DashboardPage({ initialTab }) {
           {activeTab === "reliability" && (
             <div className="animate-fade-in -mx-4 sm:-mx-6">
               <InsightsPage embedded={true} />
+            </div>
+          )}
+
+          {/* Smart Dashboard Builder Tab (manual, intuitive) */}
+          {activeTab === "builder" && manualBuilderEnabled && (
+            <div className="animate-fade-in">
+              <SmartDashboardBuilderPanel
+                actions={actions}
+                observations={observations}
+                investigations={investigations}
+                users={usersList}
+              />
             </div>
           )}
 
