@@ -23,7 +23,9 @@ import * as XLSX from "xlsx";
 import * as pdfjsLib from "pdfjs-dist";
 
 // Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs`;
+// Use the classic minified worker to avoid nested worker sourcemap fetches
+// that can show up as noisy "blob://null...*.map" console errors in production.
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.js`;
 
 // Get the API base URL for document proxying
 import { getBackendUrl } from '../lib/apiConfig';
