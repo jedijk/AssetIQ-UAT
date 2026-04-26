@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { Toaster } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Suspense, lazy } from "react";
+import { MotionConfig } from "framer-motion";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { PermissionsProvider, usePermissions } from "./contexts/PermissionsContext";
 import { UndoProvider } from "./contexts/UndoContext";
@@ -70,6 +71,12 @@ function RouteFallback() {
       </div>
     </div>
   );
+}
+
+function isIOSDevice() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && typeof document !== "undefined" && "ontouchend" in document);
 }
 
 // Current frontend version - update with each release
@@ -281,27 +288,29 @@ const MobileLayout = () => {
 function App() {
   // Check for version updates on app load
   useVersionCheck();
+  const reduceMotion = isIOSDevice();
   
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <LanguageProvider>
-          <AuthProvider>
-            <PermissionsProvider>
-              <UndoProvider>
-                <BrowserRouter>
-                  <Toaster 
-                    position="top-center" 
-                    richColors 
-                    closeButton
-                    toastOptions={{
-                    style: {
-                    fontFamily: 'Inter, sans-serif',
-                  },
-                }}
-              />
-              <LandscapeBlocker />
-            <Routes>
+      <MotionConfig reducedMotion={reduceMotion ? "always" : "user"}>
+        <ThemeProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              <PermissionsProvider>
+                <UndoProvider>
+                  <BrowserRouter>
+                    <Toaster 
+                      position="top-center" 
+                      richColors 
+                      closeButton
+                      toastOptions={{
+                      style: {
+                      fontFamily: 'Inter, sans-serif',
+                    },
+                  }}
+                />
+                <LandscapeBlocker />
+              <Routes>
               <Route path="/mobile" element={<MobileLayout />} />
               <Route path="/login" element={
                 <PublicRoute>
@@ -391,12 +400,13 @@ function App() {
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-          </BrowserRouter>
-        </UndoProvider>
-      </PermissionsProvider>
-      </AuthProvider>
-    </LanguageProvider>
-  </ThemeProvider>
+            </BrowserRouter>
+          </UndoProvider>
+        </PermissionsProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </ThemeProvider>
+  </MotionConfig>
   </QueryClientProvider>
   );
 }
