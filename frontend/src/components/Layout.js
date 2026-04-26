@@ -113,18 +113,11 @@ const Layout = () => {
         
         if (data.version === APP_VERSION) {
           localStorage.setItem(STORAGE_KEY, "true");
-          
-          // Clear caches
-          if ('caches' in window) {
-            const names = await caches.keys();
-            await Promise.all(names.map(n => caches.delete(n)));
-          }
-          
+
           toast.success(`AssetIQ updated to v${APP_VERSION}`, {
             description: "New Label Print feature — design labels and print directly from form submissions. Plus mobile print support, form field bindings, and bug fixes.",
             duration: 4500,
           });
-          setTimeout(() => window.location.reload(), 4500);
         }
       } catch (error) {
         console.log('Version check failed:', error);

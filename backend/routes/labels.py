@@ -174,7 +174,26 @@ async def _load_submission_data(submission_id: str) -> dict:
         if isinstance(v, list):
             str_val = ", ".join(map(str, v))
         elif isinstance(v, dict):
-            str_val = ""
+            # Many submissions store complex field values as objects (e.g. file uploads,
+            # structured selects). Try common keys first, otherwise fall back to JSON.
+            if "value" in v and v.get("value") is not None:
+                raw = v.get("value")
+                if isinstance(raw, list):
+                    str_val = ", ".join(map(str, raw))
+                else:
+                    str_val = str(raw)
+            elif "name" in v and v.get("name"):
+                str_val = str(v.get("name"))
+            elif "filename" in v and v.get("filename"):
+                str_val = str(v.get("filename"))
+            elif "url" in v and v.get("url"):
+                str_val = str(v.get("url"))
+            else:
+                import json
+                try:
+                    str_val = json.dumps(v, ensure_ascii=False)
+                except Exception:
+                    str_val = str(v)
         else:
             str_val = str(v)
         out[f"form.{k}"] = str_val
