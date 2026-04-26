@@ -9,6 +9,7 @@ import { Badge } from "../../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { formAPI } from "../../components/forms/formAPI";
 
 const STORAGE_KEY = "assetiq_smart_dashboard_widgets_v1";
 
@@ -54,6 +55,7 @@ const SOURCES = [
   { key: "actions", label: "Actions" },
   { key: "observations", label: "Observations" },
   { key: "investigations", label: "Investigations" },
+  { key: "forms", label: "Forms" },
 ];
 
 const DISPLAY_TYPES = [
@@ -75,6 +77,12 @@ const METRICS = {
     { key: "open_investigations", label: "Open investigations", defaultDisplay: "kpi" },
     { key: "by_status", label: "Investigations by status", defaultDisplay: "bar" },
   ],
+  forms: [
+    { key: "form_submissions_total", label: "Form submissions (total)", defaultDisplay: "kpi" },
+    { key: "form_submissions_warnings", label: "Form submissions with warnings", defaultDisplay: "kpi" },
+    { key: "form_submissions_critical", label: "Form submissions with critical", defaultDisplay: "kpi" },
+    { key: "form_submissions_by_form", label: "Form submissions by form", defaultDisplay: "bar" },
+  ],
 };
 
 function defaultMetricFor(sourceKey) {
@@ -90,7 +98,11 @@ function computePreview({ sourceKey, metricKey, displayType, title }, data) {
   const observations = data.observations || [];
   const investigations = data.investigations || [];
   const users = data.users || [];
+  const formTemplates = data.formTemplates || [];
+  const formSubmissions = data.formSubmissions || [];
+  const formSubmissionsTotal = Number.isFinite(data.formSubmissionsTotal) ? data.formSubmissionsTotal : formSubmissions.length;
   const usersById = new Map((users || []).map((u) => [u.id, u]));
+  const templateById = new Map((formTemplates || []).map((t) => [t.id, t]));
 
   const metric = metricDef(sourceKey, metricKey);
   const widgetTitle = title?.trim() || metric?.label || "Widget";
@@ -103,6 +115,10 @@ function computePreview({ sourceKey, metricKey, displayType, title }, data) {
     by_severity: "Groups observations by severity/risk level.",
     open_investigations: "Counts investigations that are not completed/closed.",
     by_status: "Groups investigations by status.",
+    form_submissions_total: "Counts all submitted forms.",
+    form_submissions_warnings: "Counts submitted forms that have warnings.",
+    form_submissions_critical: "Counts submitted forms that have critical items.",
+    form_submissions_by_form: "Groups form submissions by form name.",
   };
   const why = whyByMetric[metricKey] || "Generated from your selections.";
 
@@ -117,6 +133,11 @@ function computePreview({ sourceKey, metricKey, displayType, title }, data) {
         const s = lc(i?.status);
         return s && s !== "completed" && s !== "closed";
       }).length;
+    else if (metricKey === "form_submissions_total") value = formSubmissionsTotal;
+    else if (metricKey === "form_submissions_warnings")
+      value = formSubmissions.filter((s) => !!(s?.has_warnings ?? s?.hasWarnings)).length;
+    else if (metricKey === "form_submissions_critical")
+      value = formSubmissions.filter((s) => !!(s?.has_critical ?? s?.hasCritical)).length;
     return { kind: "kpi", title: widgetTitle, why, value };
   }
 
@@ -142,6 +163,16 @@ function computePreview({ sourceKey, metricKey, displayType, title }, data) {
   if (metricKey === "by_status") {
     const by = countBy(investigations, (i) => i?.status || "Unknown");
     const rows = Array.from(by.entries()).map(([k, v]) => ({ label: String(k), value: v }));
+    rows.sort((a, b) => b.value - a.value);
+    return { kind: "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
+  }
+
+  if (metricKey === "form_submissions_by_form") {
+    const by = countBy(formSubmissions, (s) => s?.template_id || s?.templateId || "Unknown");
+    const rows = Array.from(by.entries()).map(([k, v]) => ({
+      label: templateById.get(k)?.name || String(k),
+      value: v,
+    }));
     rows.sort((a, b) => b.value - a.value);
     return { kind: "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
   }
@@ -304,11 +335,42 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
   const [displayType, setDisplayType] = useState("kpi");
   const [title, setTitle] = useState("");
 
+  const [formTemplates, setFormTemplates] = useState([]);
+  const [formSubmissions, setFormSubmissions] = useState([]);
+  const [formSubmissionsTotal, setFormSubmissionsTotal] = useState(0);
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
   }, [widgets]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadForms = async () => {
+      try {
+        const [templatesRes, submissionsRes] = await Promise.all([
+          formAPI.getTemplates({}),
+          formAPI.getSubmissions({ limit: 500 }),
+        ]);
+        if (cancelled) return;
+        setFormTemplates(Array.isArray(templatesRes?.templates) ? templatesRes.templates : []);
+        const subs = Array.isArray(submissionsRes?.submissions) ? submissionsRes.submissions : [];
+        setFormSubmissions(subs);
+        setFormSubmissionsTotal(typeof submissionsRes?.total === "number" ? submissionsRes.total : subs.length);
+      } catch {
+        // Forms are optional; builder should still work without them.
+        if (cancelled) return;
+        setFormTemplates([]);
+        setFormSubmissions([]);
+        setFormSubmissionsTotal(0);
+      }
+    };
+    loadForms();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Smart defaults when source changes
   useEffect(() => {
@@ -325,7 +387,10 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
     if (def?.defaultDisplay) setDisplayType(def.defaultDisplay);
   }, [sourceKey, metricKey]);
 
-  const data = useMemo(() => ({ actions, observations, investigations, users }), [actions, observations, investigations, users]);
+  const data = useMemo(
+    () => ({ actions, observations, investigations, users, formTemplates, formSubmissions, formSubmissionsTotal }),
+    [actions, observations, investigations, users, formTemplates, formSubmissions, formSubmissionsTotal]
+  );
   const preview = useMemo(
     () => computePreview({ sourceKey, metricKey, displayType, title }, data),
     [sourceKey, metricKey, displayType, title, data]

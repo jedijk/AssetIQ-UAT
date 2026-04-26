@@ -714,6 +714,9 @@ export default function ProductionDashboardPage() {
     setToDate(to);
   };
 
+  // Combined time series for Mooney Viscosity chart (merges viscosity + production log data)
+  const isMultiDay = period !== "1d";
+
   // Filtered production log
   const filteredLog = useMemo(() => {
     if (!data?.production_log) return [];
@@ -755,9 +758,6 @@ export default function ProductionDashboardPage() {
         String(e.feed).includes(s)
     );
   }, [data?.production_log, data?.viscosity_series, logSearch, isMultiDay]);
-
-  // Combined time series for Mooney Viscosity chart (merges viscosity + production log data)
-  const isMultiDay = period !== "1d";
 
   const combinedSeries = useMemo(() => {
     const log = data?.production_log || [];
