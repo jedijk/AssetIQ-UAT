@@ -414,6 +414,17 @@ export default function ProductionDashboardPage() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
+  const getTimeKey = (entry) => {
+    if (entry?.time) return entry.time;
+    if (entry?.datetime) {
+      const d = new Date(entry.datetime);
+      if (!isNaN(d)) {
+        return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+      }
+    }
+    return "";
+  };
+
   const {
     period,
     setPeriod,
@@ -578,11 +589,12 @@ export default function ProductionDashboardPage() {
         (data.viscosity_series || []).forEach((v) => { if (v.time) viscMap[v.time] = v.viscosity; });
         (data.production_log || []).forEach((e, i) => {
           const dateStr = e.datetime ? new Date(e.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : '';
+          const timeKey = getTimeKey(e);
           logRows.push([
-            i + 1, dateStr, e.time, e.rpm, e.feed, e.moisture, e.energy,
+            i + 1, dateStr, timeKey || "—", e.rpm, e.feed, e.moisture, e.energy,
             e.mt1, e.mt2, e.mt3, e.mp1, e.mp2, e.mp3, e.mp4,
             e.co2_feed_p, e.t_product_ir,
-            viscMap[e.time] !== undefined ? viscMap[e.time] : "TBD",
+            timeKey && viscMap[timeKey] !== undefined ? viscMap[timeKey] : "TBD",
             e.remarks || "", e.submitted_by || "",
           ]);
         });
@@ -707,7 +719,7 @@ export default function ProductionDashboardPage() {
     if (!data?.production_log) return [];
 
     // Merge standalone viscosity entries (no matching extruder time) as separate rows
-    const logTimes = new Set((data.production_log || []).map((e) => e.time));
+    const logTimes = new Set((data.production_log || []).map((e) => getTimeKey(e)).filter(Boolean));
     const standaloneVisc = (data?.viscosity_series || [])
       .filter((v) => v.time && !logTimes.has(v.time))
       .map((v) => ({
@@ -733,7 +745,7 @@ export default function ProductionDashboardPage() {
     const s = logSearch.toLowerCase();
     return merged.filter(
       (e) =>
-        e.time?.toLowerCase().includes(s) ||
+        getTimeKey(e)?.toLowerCase().includes(s) ||
         e.submitted_by?.toLowerCase().includes(s) ||
         String(e.rpm).includes(s) ||
         String(e.feed).includes(s)
@@ -758,10 +770,12 @@ export default function ProductionDashboardPage() {
 
       const timeMap = {};
       log.forEach((entry) => {
-        timeMap[entry.time] = {
-          time: entry.time,
+        const timeKey = getTimeKey(entry);
+        if (!timeKey) return;
+        timeMap[timeKey] = {
+          time: timeKey,
           rpm: entry.rpm, feed: entry.feed, mp4: entry.mp4, t_product_ir: entry.t_product_ir,
-          viscosity: viscByTime[entry.time] ?? null,
+          viscosity: viscByTime[timeKey] ?? null,
           screenChange: null, magnetCleaning: null,
         };
       });
@@ -1508,28 +1522,30 @@ export default function ProductionDashboardPage() {
                   filteredLog.map((entry, i) => {
                     const anomaly = isAnomalyRow(entry);
                     const isViscOnly = entry._viscosity_only;
+                    const timeKey = getTimeKey(entry);
+                    const timeLabel = timeKey || "—";
                     const viscValue = isViscOnly
                       ? entry._viscosity_value
-                      : viscosityByTime[entry.time]?.value;
+                      : timeKey ? viscosityByTime[timeKey]?.value : undefined;
                     const viscSubId = isViscOnly
                       ? entry._viscosity_submission_id
-                      : viscosityByTime[entry.time]?.submission_id;
+                      : timeKey ? viscosityByTime[timeKey]?.submission_id : undefined;
                     const openEdit = () => {
                       if (isViscOnly) {
                         setEditEntry({ ...entry, _index: i, viscosity: entry._viscosity_value ?? "", _viscosity_submission_id: entry._viscosity_submission_id || "", _viscosity_only: true });
                       } else {
-                        const viscData = viscosityByTime[entry.time];
+                        const viscData = timeKey ? viscosityByTime[timeKey] : undefined;
                         setEditEntry({ ...entry, _index: i, viscosity: viscData?.value ?? "", _viscosity_submission_id: viscData?.submission_id || "" });
                       }
                     };
                     return (
                       <div
-                        key={`${entry.time}-${i}`}
+                        key={`${timeKey || "no-time"}-${i}`}
                         className={`p-3 rounded-lg border ${isViscOnly ? "bg-blue-50/40 border-blue-100" : anomaly ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-100"}`}
-                        data-testid={`mobile-log-${entry.time}`}
+                        data-testid={`mobile-log-${timeKey || i}`}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold text-slate-900">{entry.time}</span>
+                          <span className="font-semibold text-slate-900">{timeLabel}</span>
                           <div className="flex items-center gap-1.5">
                             <Badge variant="secondary" className="text-xs">
                               {entry.submitted_by || "—"}
@@ -1538,7 +1554,7 @@ export default function ProductionDashboardPage() {
                               type="button"
                               onClick={openEdit}
                               className="p-1 rounded-md bg-white border border-slate-200 text-slate-500 active:bg-slate-100"
-                              data-testid={`mobile-edit-${entry.time}`}
+                              data-testid={`mobile-edit-${timeKey || i}`}
                               aria-label="Edit entry"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -1550,7 +1566,7 @@ export default function ProductionDashboardPage() {
                             type="button"
                             onClick={openEdit}
                             className="w-full text-left text-sm text-slate-600"
-                            data-testid={`mobile-visc-edit-${entry.time}`}
+                            data-testid={`mobile-visc-edit-${timeKey || i}`}
                           >
                             <span className="font-medium">Viscosity:</span> {viscValue ?? "—"}
                           </button>
@@ -1568,7 +1584,7 @@ export default function ProductionDashboardPage() {
                                 type="button"
                                 onClick={openEdit}
                                 className="font-medium underline underline-offset-2 decoration-dotted decoration-slate-300"
-                                data-testid={`mobile-visc-edit-${entry.time}`}
+                                data-testid={`mobile-visc-edit-${timeKey || i}`}
                               >
                                 {viscValue ?? <span className="text-amber-500">TBD</span>}
                               </button>
@@ -1608,25 +1624,27 @@ export default function ProductionDashboardPage() {
                   {filteredLog.length > 0 ? (
                     filteredLog.map((entry, i) => {
                       const anomaly = isAnomalyRow(entry);
-                      const isHighlighted = selectedTime && entry.time === selectedTime;
+                      const timeKey = getTimeKey(entry);
+                      const timeLabel = timeKey || "—";
+                      const isHighlighted = selectedTime && timeKey && timeKey === selectedTime;
                       const isViscOnly = entry._viscosity_only;
                       const viscValue = isViscOnly
                         ? entry._viscosity_value
-                        : viscosityByTime[entry.time]?.value;
+                        : timeKey ? viscosityByTime[timeKey]?.value : undefined;
                       const viscSubId = isViscOnly
                         ? entry._viscosity_submission_id
-                        : viscosityByTime[entry.time]?.submission_id;
+                        : timeKey ? viscosityByTime[timeKey]?.submission_id : undefined;
                       const tbdCell = <span className="text-slate-300">—</span>;
                       return (
                         <tr
-                          key={`${entry.time}-${i}`}
+                          key={`${timeKey || "no-time"}-${i}`}
                           className={`border-b border-slate-50 transition-colors ${isHighlighted ? "bg-purple-50 ring-1 ring-purple-300" : isViscOnly ? "bg-blue-50/40" : anomaly ? "bg-amber-50" : "hover:bg-slate-50"}`}
-                          data-testid={`log-row-${entry.time}`}
+                          data-testid={`log-row-${timeKey || i}`}
                           ref={isHighlighted ? (el) => el?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined}
                         >
                           <td className="py-2 px-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs tabular-nums whitespace-nowrap">{entry.datetime ? new Date(entry.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : ''}</td>
-                          <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{entry.time}</td>
+                          <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{timeLabel}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.rpm}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.feed}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.moisture}</td>
@@ -1649,12 +1667,12 @@ export default function ProductionDashboardPage() {
                                 if (isViscOnly) {
                                   setEditEntry({ ...entry, _index: i, viscosity: entry._viscosity_value ?? "", _viscosity_submission_id: entry._viscosity_submission_id || "", _viscosity_only: true });
                                 } else {
-                                  const viscData = viscosityByTime[entry.time];
+                                  const viscData = timeKey ? viscosityByTime[timeKey] : undefined;
                                   setEditEntry({ ...entry, _index: i, viscosity: viscData?.value ?? "", _viscosity_submission_id: viscData?.submission_id || "" });
                                 }
                               }}
                               className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                              data-testid={`edit-row-${entry.time}`}
+                              data-testid={`edit-row-${timeKey || i}`}
                               title="Edit"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -1662,14 +1680,14 @@ export default function ProductionDashboardPage() {
                             <button
                               onClick={() => {
                                 if (isViscOnly) {
-                                  setDeleteConfirm({ ids: [entry._viscosity_submission_id].filter(Boolean), label: `viscosity sample at ${entry.time}` });
+                                  setDeleteConfirm({ ids: [entry._viscosity_submission_id].filter(Boolean), label: `viscosity sample at ${timeLabel}` });
                                 } else {
-                                  const ids = [entry.submission_id, viscosityByTime[entry.time]?.submission_id].filter(Boolean);
-                                  setDeleteConfirm({ ids, label: `log entry at ${entry.time}` });
+                                  const ids = [entry.submission_id, timeKey ? viscosityByTime[timeKey]?.submission_id : undefined].filter(Boolean);
+                                  setDeleteConfirm({ ids, label: `log entry at ${timeLabel}` });
                                 }
                               }}
                               className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
-                              data-testid={`delete-row-${entry.time}`}
+                              data-testid={`delete-row-${timeKey || i}`}
                               title="Delete"
                             >
                               <Trash2 className="w-3.5 h-3.5" />

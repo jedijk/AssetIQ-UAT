@@ -54,8 +54,12 @@ if (typeof window !== 'undefined') {
   }, true);
 }
 
-// Register Service Worker for PWA
-if ('serviceWorker' in navigator) {
+// Register Service Worker for PWA (OFF by default: avoids mobile white-screen
+// issues due to stale caches / SW update races). Enable explicitly by setting:
+// REACT_APP_ENABLE_SERVICE_WORKER=true at build time.
+const ENABLE_SERVICE_WORKER = process.env.REACT_APP_ENABLE_SERVICE_WORKER === "true";
+
+if ('serviceWorker' in navigator && ENABLE_SERVICE_WORKER) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
       .then((registration) => {

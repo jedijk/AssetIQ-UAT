@@ -50,6 +50,7 @@ import DefinitionsPage from "./pages/DefinitionsPage";
 import MobileApp from "./mobile/MobileApp";
 import QRScanPage from "./pages/QRScanPage";
 import { useEffect } from "react";
+import { getBackendUrl } from "./lib/apiConfig";
 import "./App.css";
 
 // Current frontend version - update with each release
@@ -86,13 +87,14 @@ const requestReload = (remoteVersion) => {
 // Version check hook - polls backend and forces refresh when a newer version is deployed
 const useVersionCheck = () => {
   useEffect(() => {
-    const backendUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
+    const backendUrl = getBackendUrl().replace(/\/$/, "");
     let cancelled = false;
     let promptedFor = null;
 
     const checkVersion = async () => {
       if (cancelled) return;
       try {
+        if (!backendUrl) return;
         const response = await fetch(`${backendUrl}/api/health`, {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache" },
