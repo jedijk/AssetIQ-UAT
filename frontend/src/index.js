@@ -58,10 +58,63 @@ if (typeof window !== 'undefined') {
 // Install global debug hooks (opt-in via REACT_APP_DEBUG=true)
 installGlobalDebugHooks();
 
+function showBootError(message) {
+  try {
+    const el = document.getElementById("root");
+    if (!el) return;
+    el.innerHTML = `
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#ffffff;color:#0f172a;padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+        <div style="max-width:520px;width:100%;">
+          <div style="font-weight:800;font-size:18px;margin-bottom:8px;">App failed to load</div>
+          <div style="font-size:13px;line-height:1.4;color:#475569;margin-bottom:14px;">${message || "Please refresh the page."}</div>
+          <button id="assetiq-hard-reload" style="padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;background:#0f172a;color:#fff;font-weight:700;cursor:pointer;">Reload</button>
+          <div style="margin-top:10px;font-size:12px;color:#94a3b8;">If this keeps happening on iOS, it is usually a cached update. Reload will clear local caches.</div>
+        </div>
+      </div>
+    `;
+    const btn = document.getElementById("assetiq-hard-reload");
+    if (btn) {
+      btn.onclick = async () => {
+        try {
+          if ("serviceWorker" in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((r) => r.unregister()));
+          }
+          if ("caches" in window) {
+            const names = await caches.keys();
+            await Promise.all(names.map((n) => caches.delete(n)));
+          }
+        } catch (_e) {}
+        window.location.reload();
+      };
+    }
+  } catch (_e) {
+    // ignore
+  }
+}
+
 // Register Service Worker for PWA (OFF by default: avoids mobile white-screen
 // issues due to stale caches / SW update races). Enable explicitly by setting:
 // REACT_APP_ENABLE_SERVICE_WORKER=true at build time.
 const ENABLE_SERVICE_WORKER = process.env.REACT_APP_ENABLE_SERVICE_WORKER === "true";
+
+// If SW is disabled, actively unregister any previously installed SW and clear caches.
+// This prevents iOS Safari getting stuck on white screens after chunking changes.
+if ("serviceWorker" in navigator && !ENABLE_SERVICE_WORKER) {
+  try {
+    navigator.serviceWorker.getRegistrations().then(async (regs) => {
+      if (regs?.length) {
+        debugLog("sw_unreg_start", { count: regs.length });
+      }
+      await Promise.all((regs || []).map((r) => r.unregister()));
+      if ("caches" in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((n) => caches.delete(n)));
+      }
+      if (regs?.length) debugLog("sw_unreg_done", {});
+    });
+  } catch (_e) {}
+}
 
 if ('serviceWorker' in navigator && ENABLE_SERVICE_WORKER) {
   window.addEventListener('load', () => {
@@ -104,6 +157,15 @@ if ('serviceWorker' in navigator && ENABLE_SERVICE_WORKER) {
     }
   });
 }
+
+// Catch chunk-load failures (common after deploy on iOS) and show a recovery UI.
+window.addEventListener("error", (e) => {
+  const msg = String(e?.message || "");
+  if (msg.includes("Loading chunk") || msg.includes("ChunkLoadError")) {
+    debugLog("chunk_load_error", { message: msg });
+    showBootError("A new version was deployed while your browser cached an older one. Tap Reload.");
+  }
+});
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
