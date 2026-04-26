@@ -88,6 +88,17 @@ const API_BASE_URL = getBackendUrl();
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer";
 const FETCH_CREDENTIALS = AUTH_MODE === "cookie" ? "include" : "same-origin";
 
+function getCookie(name) {
+  try {
+    const cookies = document.cookie ? document.cookie.split(";") : [];
+    for (const c of cookies) {
+      const [k, ...rest] = c.trim().split("=");
+      if (k === name) return decodeURIComponent(rest.join("=") || "");
+    }
+  } catch (_e) {}
+  return null;
+}
+
 // Authenticated Lightbox component for viewing images with proper mobile auth
 const AuthenticatedLightbox = ({ url, name, onClose }) => {
   const [blobUrl, setBlobUrl] = useState(null);
@@ -121,10 +132,14 @@ const AuthenticatedLightbox = ({ url, name, onClose }) => {
           fullUrl = `${API_BASE_URL}${url}`;
         }
 
+        const headers = {};
+        if (AUTH_MODE !== "cookie" && token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
         const response = await fetch(fullUrl, {
-          headers: {
-            "Authorization": token ? `Bearer ${token}` : "",
-          },
+          headers,
+          credentials: FETCH_CREDENTIALS,
         });
 
         if (!response.ok) {
@@ -467,9 +482,14 @@ export default function FormSubmissionsPage() {
   // Delete mutation - must be before any early returns
   const deleteMutation = useMutation({
     mutationFn: async (submissionId) => {
+      const headers = getAuthHeaders();
+      if (AUTH_MODE === "cookie") {
+        const csrf = getCookie("assetiq_csrf");
+        if (csrf) headers["X-CSRF-Token"] = csrf;
+      }
       const response = await fetch(`${API_BASE_URL}/api/form-submissions/${submissionId}`, {
         method: "DELETE",
-        headers: getAuthHeaders(),
+        headers,
         credentials: FETCH_CREDENTIALS,
       });
       if (!response.ok) throw new Error("Failed to delete submission");
