@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
+import { installGlobalDebugHooks, debugLog } from "./lib/debug";
 
 // Patch ResizeObserver to prevent "loop completed with undelivered notifications" errors
 // This is a known issue with cmdk, Radix UI, and other libraries that use ResizeObserver
@@ -54,6 +55,9 @@ if (typeof window !== 'undefined') {
   }, true);
 }
 
+// Install global debug hooks (opt-in via REACT_APP_DEBUG=true)
+installGlobalDebugHooks();
+
 // Register Service Worker for PWA (OFF by default: avoids mobile white-screen
 // issues due to stale caches / SW update races). Enable explicitly by setting:
 // REACT_APP_ENABLE_SERVICE_WORKER=true at build time.
@@ -64,6 +68,7 @@ if ('serviceWorker' in navigator && ENABLE_SERVICE_WORKER) {
     navigator.serviceWorker.register('/service-worker.js')
       .then((registration) => {
         console.log('ServiceWorker registered: ', registration.scope);
+        debugLog("sw_registered", { scope: registration.scope });
         
         // Force update check on every page load
         registration.update();
@@ -78,12 +83,14 @@ if ('serviceWorker' in navigator && ENABLE_SERVICE_WORKER) {
               // Do NOT interrupt the user with confirm/reload while typing.
               // The app-level version checker will show a banner when applicable.
               console.log('New version available (service worker).');
+              debugLog("sw_update_available", {});
             }
           });
         });
       })
       .catch((error) => {
         console.log('ServiceWorker registration failed: ', error);
+        debugLog("sw_register_failed", { error: String(error) });
       });
   });
   
@@ -92,6 +99,7 @@ if ('serviceWorker' in navigator && ENABLE_SERVICE_WORKER) {
     if (document.visibilityState === 'visible') {
       navigator.serviceWorker.ready.then((registration) => {
         registration.update();
+        debugLog("sw_update_check_visibility", {});
       });
     }
   });

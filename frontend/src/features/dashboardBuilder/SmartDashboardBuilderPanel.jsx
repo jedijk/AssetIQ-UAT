@@ -478,6 +478,7 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
   const [formTemplates, setFormTemplates] = useState([]);
   const [formSubmissions, setFormSubmissions] = useState([]);
   const [formSubmissionsTotal, setFormSubmissionsTotal] = useState(0);
+  const [formsLoaded, setFormsLoaded] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -485,32 +486,42 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
     localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
   }, [widgets]);
 
+  // Load Forms data lazily (only when user actually uses Forms source).
   useEffect(() => {
+    const needsForms =
+      sourceKey === "forms" ||
+      widgets.some((w) => w.sourceKey === "forms") ||
+      metricKey?.startsWith?.("form_");
+    if (!needsForms || formsLoaded) return;
+
     let cancelled = false;
     const loadForms = async () => {
       try {
         const [templatesRes, submissionsRes] = await Promise.all([
           formAPI.getTemplates({}),
-          formAPI.getSubmissions({ limit: 500 }),
+          // Backend enforces a strict cap anyway; avoid requesting huge limits.
+          formAPI.getSubmissions({ limit: 50 }),
         ]);
         if (cancelled) return;
         setFormTemplates(Array.isArray(templatesRes?.templates) ? templatesRes.templates : []);
         const subs = Array.isArray(submissionsRes?.submissions) ? submissionsRes.submissions : [];
         setFormSubmissions(subs);
         setFormSubmissionsTotal(typeof submissionsRes?.total === "number" ? submissionsRes.total : subs.length);
+        setFormsLoaded(true);
       } catch {
-        // Forms are optional; builder should still work without them.
         if (cancelled) return;
         setFormTemplates([]);
         setFormSubmissions([]);
         setFormSubmissionsTotal(0);
+        setFormsLoaded(true);
       }
     };
+
     loadForms();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [formsLoaded, metricKey, sourceKey, widgets]);
 
   // Smart defaults when source changes
   useEffect(() => {

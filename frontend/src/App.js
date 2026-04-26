@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Suspense, lazy } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { PermissionsProvider, usePermissions } from "./contexts/PermissionsContext";
 import { UndoProvider } from "./contexts/UndoContext";
@@ -11,47 +12,62 @@ import ChangePasswordDialog from "./components/ChangePasswordDialog";
 import TermsAcceptanceDialog from "./components/TermsAcceptanceDialog";
 import FirstLoginFlow from "./components/FirstLoginFlow";
 import LandscapeBlocker from "./components/LandscapeBlocker";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import DashboardPage from "./pages/DashboardPage";
-import ThreatsPage from "./pages/ThreatsPage";
-import ThreatDetailPage from "./pages/ThreatDetailPage";
-import FailureModesPage from "./pages/FailureModesPage";
-import EquipmentManagerPage from "./pages/EquipmentManagerPage";
-import CausalEnginePage from "./pages/CausalEnginePage";
-import ActionsPage from "./pages/ActionsPage";
-import ActionDetailPage from "./pages/ActionDetailPage";
-import TaskSchedulerPage from "./pages/TaskSchedulerPage";
-import MyTasksPage from "./pages/MyTasksPage";
-import SettingsUserManagementPage from "./pages/SettingsUserManagementPage";
-import SettingsPermissionsPage from "./pages/SettingsPermissionsPage";
-import SettingsAIUsagePage from "./pages/SettingsAIUsagePage";
-import SettingsRiskCalculationPage from "./pages/SettingsRiskCalculationPage";
-import SettingsServerPerformancePage from "./pages/SettingsServerPerformancePage";
-import SettingsDatabasePage from "./pages/SettingsDatabasePage";
-import SettingsPreferencesPage from "./pages/SettingsPreferencesPage";
-import SettingsPage from "./pages/SettingsPage";
-import SettingsGeneralPage from "./pages/SettingsGeneralPage";
-import SettingsQRPage from "./pages/SettingsQRPage";
-import SettingsNotificationsPage from "./pages/SettingsNotificationsPage";
-import SettingsLogIngestionPage from "./pages/SettingsLogIngestionPage";
-import SettingsPrivacyPage from "./pages/SettingsPrivacyPage";
-import SettingsDeletionRequestsPage from "./pages/SettingsDeletionRequestsPage";
-import SettingsConsentManagementPage from "./pages/SettingsConsentManagementPage";
-import LabelsPage from "./pages/LabelsPage";import InsightsPage from "./pages/InsightsPage";
-import FormsPage from "./pages/FormsPage";
-import FormSubmissionsPage from "./pages/FormSubmissionsPage";
-import UnderDevelopmentPage from "./pages/UnderDevelopmentPage";
-import UserStatisticsPage from "./pages/UserStatisticsPage";
-import FeedbackPage from "./pages/FeedbackPage";
-import DefinitionsPage from "./pages/DefinitionsPage";
-import MobileApp from "./mobile/MobileApp";
-import QRScanPage from "./pages/QRScanPage";
 import { useEffect } from "react";
 import { getBackendUrl } from "./lib/apiConfig";
+import { debugLog } from "./lib/debug";
 import "./App.css";
+
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const ThreatsPage = lazy(() => import("./pages/ThreatsPage"));
+const ThreatDetailPage = lazy(() => import("./pages/ThreatDetailPage"));
+const FailureModesPage = lazy(() => import("./pages/FailureModesPage"));
+const EquipmentManagerPage = lazy(() => import("./pages/EquipmentManagerPage"));
+const CausalEnginePage = lazy(() => import("./pages/CausalEnginePage"));
+const ActionsPage = lazy(() => import("./pages/ActionsPage"));
+const ActionDetailPage = lazy(() => import("./pages/ActionDetailPage"));
+const TaskSchedulerPage = lazy(() => import("./pages/TaskSchedulerPage"));
+const MyTasksPage = lazy(() => import("./pages/MyTasksPage"));
+const SettingsUserManagementPage = lazy(() => import("./pages/SettingsUserManagementPage"));
+const SettingsPermissionsPage = lazy(() => import("./pages/SettingsPermissionsPage"));
+const SettingsAIUsagePage = lazy(() => import("./pages/SettingsAIUsagePage"));
+const SettingsRiskCalculationPage = lazy(() => import("./pages/SettingsRiskCalculationPage"));
+const SettingsServerPerformancePage = lazy(() => import("./pages/SettingsServerPerformancePage"));
+const SettingsDatabasePage = lazy(() => import("./pages/SettingsDatabasePage"));
+const SettingsPreferencesPage = lazy(() => import("./pages/SettingsPreferencesPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const SettingsGeneralPage = lazy(() => import("./pages/SettingsGeneralPage"));
+const SettingsQRPage = lazy(() => import("./pages/SettingsQRPage"));
+const SettingsNotificationsPage = lazy(() => import("./pages/SettingsNotificationsPage"));
+const SettingsLogIngestionPage = lazy(() => import("./pages/SettingsLogIngestionPage"));
+const SettingsPrivacyPage = lazy(() => import("./pages/SettingsPrivacyPage"));
+const SettingsDeletionRequestsPage = lazy(() => import("./pages/SettingsDeletionRequestsPage"));
+const SettingsConsentManagementPage = lazy(() => import("./pages/SettingsConsentManagementPage"));
+const LabelsPage = lazy(() => import("./pages/LabelsPage"));
+const InsightsPage = lazy(() => import("./pages/InsightsPage"));
+const FormsPage = lazy(() => import("./pages/FormsPage"));
+const FormSubmissionsPage = lazy(() => import("./pages/FormSubmissionsPage"));
+const UnderDevelopmentPage = lazy(() => import("./pages/UnderDevelopmentPage"));
+const UserStatisticsPage = lazy(() => import("./pages/UserStatisticsPage"));
+const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
+const DefinitionsPage = lazy(() => import("./pages/DefinitionsPage"));
+const MobileApp = lazy(() => import("./mobile/MobileApp"));
+const QRScanPage = lazy(() => import("./pages/QRScanPage"));
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="loading-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+  );
+}
 
 // Current frontend version - update with each release
 const APP_VERSION = "3.6.2";
@@ -81,6 +97,7 @@ const requestReload = (remoteVersion) => {
   localStorage.setItem("app_version", remoteVersion || APP_VERSION);
   const url = new URL(window.location.href);
   url.searchParams.set("v", remoteVersion || APP_VERSION);
+  debugLog("request_reload", { remoteVersion: remoteVersion || APP_VERSION });
   window.location.replace(url.toString());
 };
 
@@ -107,6 +124,7 @@ const useVersionCheck = () => {
           if (promptedFor === backendVersion) return; // already prompted in this tab
           promptedFor = backendVersion;
           console.log(`[VersionCheck] Newer version available: ${APP_VERSION} → ${backendVersion}. Update available.`);
+          debugLog("version_update_available", { from: APP_VERSION, to: backendVersion });
           // Inline banner (user-initiated reload)
           try {
             const existing = document.getElementById("app-update-banner");
@@ -142,6 +160,7 @@ const useVersionCheck = () => {
         localStorage.setItem("app_version", APP_VERSION);
       } catch (error) {
         console.log("[VersionCheck] failed:", error);
+        debugLog("version_check_failed", { error: String(error) });
       }
     };
 
@@ -283,26 +302,38 @@ function App() {
               <Route path="/mobile" element={<MobileLayout />} />
               <Route path="/login" element={
                 <PublicRoute>
-                  <LoginPage />
+                  <Suspense fallback={<RouteFallback />}>
+                    <LoginPage />
+                  </Suspense>
                 </PublicRoute>
               } />
               <Route path="/register" element={
                 <PublicRoute>
-                  <RegisterPage />
+                  <Suspense fallback={<RouteFallback />}>
+                    <RegisterPage />
+                  </Suspense>
                 </PublicRoute>
               } />
               <Route path="/forgot-password" element={
                 <PublicRoute>
-                  <ForgotPasswordPage />
+                  <Suspense fallback={<RouteFallback />}>
+                    <ForgotPasswordPage />
+                  </Suspense>
                 </PublicRoute>
               } />
               <Route path="/reset-password" element={
                 <PublicRoute>
-                  <ResetPasswordPage />
+                  <Suspense fallback={<RouteFallback />}>
+                    <ResetPasswordPage />
+                  </Suspense>
                 </PublicRoute>
               } />
               {/* QR Code Scan Landing Page */}
-              <Route path="/qr/:qrId" element={<QRScanPage />} />
+              <Route path="/qr/:qrId" element={
+                <Suspense fallback={<RouteFallback />}>
+                  <QRScanPage />
+                </Suspense>
+              } />
               <Route path="/" element={
                 <ProtectedRoute>
                   <FirstLoginFlow>
@@ -310,50 +341,50 @@ function App() {
                   </FirstLoginFlow>
                 </ProtectedRoute>
               }>
-                <Route index element={<DashboardPage />} />
-                <Route path="dashboard" element={<DashboardPage />} />
-                <Route path="production" element={<DashboardPage initialTab="production" />} />
-                <Route path="definitions" element={<DefinitionsPage />} />
-                <Route path="threats" element={<ThreatsPage />} />
-                <Route path="threats/:id" element={<ThreatDetailPage />} />
-                <Route path="actions" element={<ActionsPage />} />
-                <Route path="actions/:actionId" element={<ActionDetailPage />} />
-                <Route path="library" element={<FailureModesPage />} />
-                <Route path="equipment-manager" element={<EquipmentManagerPage />} />
-                <Route path="causal-engine" element={<CausalEnginePage />} />
-                <Route path="tasks" element={<TaskSchedulerPage />} />
-                <Route path="my-tasks" element={<MyTasksPage />} />
+                <Route index element={<Suspense fallback={<RouteFallback />}><DashboardPage /></Suspense>} />
+                <Route path="dashboard" element={<Suspense fallback={<RouteFallback />}><DashboardPage /></Suspense>} />
+                <Route path="production" element={<Suspense fallback={<RouteFallback />}><DashboardPage initialTab="production" /></Suspense>} />
+                <Route path="definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
+                <Route path="threats" element={<Suspense fallback={<RouteFallback />}><ThreatsPage /></Suspense>} />
+                <Route path="threats/:id" element={<Suspense fallback={<RouteFallback />}><ThreatDetailPage /></Suspense>} />
+                <Route path="actions" element={<Suspense fallback={<RouteFallback />}><ActionsPage /></Suspense>} />
+                <Route path="actions/:actionId" element={<Suspense fallback={<RouteFallback />}><ActionDetailPage /></Suspense>} />
+                <Route path="library" element={<Suspense fallback={<RouteFallback />}><FailureModesPage /></Suspense>} />
+                <Route path="equipment-manager" element={<Suspense fallback={<RouteFallback />}><EquipmentManagerPage /></Suspense>} />
+                <Route path="causal-engine" element={<Suspense fallback={<RouteFallback />}><CausalEnginePage /></Suspense>} />
+                <Route path="tasks" element={<Suspense fallback={<RouteFallback />}><TaskSchedulerPage /></Suspense>} />
+                <Route path="my-tasks" element={<Suspense fallback={<RouteFallback />}><MyTasksPage /></Suspense>} />
                 <Route path="forms" element={<Navigate to="/tasks?tab=forms" replace />} />
-                <Route path="form-submissions" element={<FormSubmissionsPage />} />
+                <Route path="form-submissions" element={<Suspense fallback={<RouteFallback />}><FormSubmissionsPage /></Suspense>} />
                 <Route path="labels" element={<Navigate to="/settings/labels" replace />} />
-                <Route path="decision-engine" element={<UnderDevelopmentPage />} />
-                <Route path="feedback" element={<FeedbackPage />} />
+                <Route path="decision-engine" element={<Suspense fallback={<RouteFallback />}><UnderDevelopmentPage /></Suspense>} />
+                <Route path="feedback" element={<Suspense fallback={<RouteFallback />}><FeedbackPage /></Suspense>} />
                 
                 {/* Settings Layout with nested routes */}
-                <Route path="settings" element={<SettingsPage />}>
+                <Route path="settings" element={<Suspense fallback={<RouteFallback />}><SettingsPage /></Suspense>}>
                   <Route index element={<Navigate to="/settings/preferences" replace />} />
-                  <Route path="preferences" element={<SettingsPreferencesPage />} />
-                  <Route path="general" element={<SettingsGeneralPage />} />
-                  <Route path="user-management" element={<SettingsUserManagementPage />} />
-                  <Route path="permissions" element={<SettingsPermissionsPage />} />
-                  <Route path="qr" element={<SettingsQRPage />} />
-                  <Route path="labels" element={<LabelsPage />} />
-                  <Route path="notifications" element={<SettingsNotificationsPage />} />
-                  <Route path="risk-calculation" element={<SettingsRiskCalculationPage />} />
-                  <Route path="ai-usage" element={<SettingsAIUsagePage />} />
-                  <Route path="server-performance" element={<SettingsServerPerformancePage />} />
-                  <Route path="database" element={<SettingsDatabasePage />} />
-                  <Route path="insights" element={<InsightsPage />} />
-                  <Route path="statistics" element={<UserStatisticsPage />} />
-                  <Route path="criticality-definitions" element={<DefinitionsPage />} />
-                  <Route path="feedback" element={<FeedbackPage />} />
-                  <Route path="log-ingestion" element={<SettingsLogIngestionPage />} />
-                  <Route path="privacy" element={<SettingsPrivacyPage />} />
-                  <Route path="deletion-requests" element={<SettingsDeletionRequestsPage />} />
-                  <Route path="consent-management" element={<SettingsConsentManagementPage />} />
+                  <Route path="preferences" element={<Suspense fallback={<RouteFallback />}><SettingsPreferencesPage /></Suspense>} />
+                  <Route path="general" element={<Suspense fallback={<RouteFallback />}><SettingsGeneralPage /></Suspense>} />
+                  <Route path="user-management" element={<Suspense fallback={<RouteFallback />}><SettingsUserManagementPage /></Suspense>} />
+                  <Route path="permissions" element={<Suspense fallback={<RouteFallback />}><SettingsPermissionsPage /></Suspense>} />
+                  <Route path="qr" element={<Suspense fallback={<RouteFallback />}><SettingsQRPage /></Suspense>} />
+                  <Route path="labels" element={<Suspense fallback={<RouteFallback />}><LabelsPage /></Suspense>} />
+                  <Route path="notifications" element={<Suspense fallback={<RouteFallback />}><SettingsNotificationsPage /></Suspense>} />
+                  <Route path="risk-calculation" element={<Suspense fallback={<RouteFallback />}><SettingsRiskCalculationPage /></Suspense>} />
+                  <Route path="ai-usage" element={<Suspense fallback={<RouteFallback />}><SettingsAIUsagePage /></Suspense>} />
+                  <Route path="server-performance" element={<Suspense fallback={<RouteFallback />}><SettingsServerPerformancePage /></Suspense>} />
+                  <Route path="database" element={<Suspense fallback={<RouteFallback />}><SettingsDatabasePage /></Suspense>} />
+                  <Route path="insights" element={<Suspense fallback={<RouteFallback />}><InsightsPage /></Suspense>} />
+                  <Route path="statistics" element={<Suspense fallback={<RouteFallback />}><UserStatisticsPage /></Suspense>} />
+                  <Route path="criticality-definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
+                  <Route path="feedback" element={<Suspense fallback={<RouteFallback />}><FeedbackPage /></Suspense>} />
+                  <Route path="log-ingestion" element={<Suspense fallback={<RouteFallback />}><SettingsLogIngestionPage /></Suspense>} />
+                  <Route path="privacy" element={<Suspense fallback={<RouteFallback />}><SettingsPrivacyPage /></Suspense>} />
+                  <Route path="deletion-requests" element={<Suspense fallback={<RouteFallback />}><SettingsDeletionRequestsPage /></Suspense>} />
+                  <Route path="consent-management" element={<Suspense fallback={<RouteFallback />}><SettingsConsentManagementPage /></Suspense>} />
                 </Route>
                 
-                <Route path="user-statistics" element={<UserStatisticsPage />} />
+                <Route path="user-statistics" element={<Suspense fallback={<RouteFallback />}><UserStatisticsPage /></Suspense>} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

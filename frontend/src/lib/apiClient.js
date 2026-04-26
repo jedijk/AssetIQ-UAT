@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getApiUrl, getBackendUrl } from "./apiConfig";
+import { debugLog } from "./debug";
 
 // Get API URL at initialization for static uses
 export const API_URL = getApiUrl();
@@ -35,13 +36,32 @@ api.interceptors.request.use((config) => {
     config.headers["X-Database-Environment"] = dbEnv;
   }
 
+  try {
+    debugLog("api_request", {
+      method: config.method,
+      url: `${config.baseURL || ""}${config.url || ""}`,
+    });
+  } catch (_e) {}
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    try {
+      debugLog("api_response", {
+        status: response.status,
+        url: `${response.config?.baseURL || ""}${response.config?.url || ""}`,
+      });
+    } catch (_e) {}
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
+      try {
+        debugLog("api_401", {
+          url: `${error.config?.baseURL || ""}${error.config?.url || ""}`,
+        });
+      } catch (_e) {}
       localStorage.removeItem("token");
       if (!window.location.pathname.includes("/login")) {
         // eslint-disable-next-line no-console
@@ -56,6 +76,14 @@ api.interceptors.response.use(
       error.code = "ERR_NETWORK";
       error.message = "Network error - please check your connection";
     }
+    try {
+      debugLog("api_error", {
+        code: error.code,
+        status: error.response?.status,
+        message: error.message,
+        url: `${error.config?.baseURL || ""}${error.config?.url || ""}`,
+      });
+    } catch (_e) {}
     return Promise.reject(error);
   }
 );

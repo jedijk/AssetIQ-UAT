@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -57,8 +57,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from "../components/ui/label";
 import InsightsPage from "./InsightsPage";
 import { DISCIPLINES } from "../constants/disciplines";
-import ProductionDashboardPage from "./ProductionDashboardPage";
-import { SmartDashboardBuilderPanel } from "../features/dashboardBuilder/SmartDashboardBuilderPanel";
+
+const ProductionDashboardPage = lazy(() => import("./ProductionDashboardPage"));
+const SmartDashboardBuilderPanel = lazy(() =>
+  import("../features/dashboardBuilder/SmartDashboardBuilderPanel").then((m) => ({ default: m.SmartDashboardBuilderPanel }))
+);
 
 // Authenticated Lightbox component for viewing images with proper mobile auth
 const AuthenticatedLightbox = ({ url, name, onClose }) => {
@@ -1428,19 +1431,35 @@ export default function DashboardPage({ initialTab }) {
           {/* Smart Dashboard Builder Tab (manual, intuitive) */}
           {activeTab === "builder" && manualBuilderEnabled && (
             <div className="animate-fade-in">
-              <SmartDashboardBuilderPanel
-                actions={actions}
-                observations={observations}
-                investigations={investigations}
-                users={usersList}
-              />
+              <Suspense
+                fallback={
+                  <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500">
+                    Loading builder…
+                  </div>
+                }
+              >
+                <SmartDashboardBuilderPanel
+                  actions={actions}
+                  observations={observations}
+                  investigations={investigations}
+                  users={usersList}
+                />
+              </Suspense>
             </div>
           )}
 
           {/* Production Dashboard Tab */}
           {activeTab === "production" && (
             <div className="animate-fade-in -mx-4 sm:-mx-6">
-              <ProductionDashboardPage />
+              <Suspense
+                fallback={
+                  <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500 mx-4 sm:mx-6">
+                    Loading production dashboard…
+                  </div>
+                }
+              >
+                <ProductionDashboardPage />
+              </Suspense>
             </div>
           )}
         </div>
