@@ -58,6 +58,8 @@ const Layout = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Ensure only one header dropdown menu is open at once (mobile + desktop).
+  const [openHeaderMenu, setOpenHeaderMenu] = useState(null); // "notifications" | "help" | "settings" | "profile" | null
   const [chatOpen, setChatOpen] = useState(false);
   const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
   const [hierarchyOpen, setHierarchyOpen] = useState(typeof window !== 'undefined' && window.innerWidth >= 1024);
@@ -603,7 +605,10 @@ const Layout = () => {
             {!isOperatorActive && (
             <motion.button
               className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 -ml-1"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={() => {
+                setOpenHeaderMenu(null);
+                setMobileMenuOpen(!mobileMenuOpen);
+              }}
               data-testid="mobile-menu-toggle"
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               whileHover={{ scale: 1.05 }}
@@ -691,7 +696,10 @@ const Layout = () => {
           {/* Right Side */}
           <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2">
             {/* Notifications Bell */}
-            <DropdownMenu>
+            <DropdownMenu
+              open={openHeaderMenu === "notifications"}
+              onOpenChange={(open) => setOpenHeaderMenu(open ? "notifications" : null)}
+            >
               <DropdownMenuTrigger asChild>
                 <motion.div
                   whileHover={{ scale: 1.08 }}
@@ -905,7 +913,10 @@ const Layout = () => {
             )}
 
             {/* Help Button */}
-            <DropdownMenu>
+            <DropdownMenu
+              open={openHeaderMenu === "help"}
+              onOpenChange={(open) => setOpenHeaderMenu(open ? "help" : null)}
+            >
               <DropdownMenuTrigger asChild>
                 <motion.div
                   whileHover={{ scale: 1.08 }}
@@ -947,7 +958,10 @@ const Layout = () => {
 
             {/* Settings - Navigate to /settings on desktop, dropdown on mobile */}
             {isMobileView ? (
-              <DropdownMenu>
+              <DropdownMenu
+                open={openHeaderMenu === "settings"}
+                onOpenChange={(open) => setOpenHeaderMenu(open ? "settings" : null)}
+              >
                 <DropdownMenuTrigger asChild>
                   <motion.div
                     whileHover={{ scale: 1.08, rotate: 15 }}
@@ -1004,7 +1018,10 @@ const Layout = () => {
             )}
 
             {/* User Avatar with Profile Dropdown */}
-            <DropdownMenu>
+            <DropdownMenu
+              open={openHeaderMenu === "profile"}
+              onOpenChange={(open) => setOpenHeaderMenu(open ? "profile" : null)}
+            >
               <DropdownMenuTrigger asChild>
                 <motion.button 
                   className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden border-2 border-slate-200 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
