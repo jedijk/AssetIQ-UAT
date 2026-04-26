@@ -597,7 +597,7 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
         c.drawString(tx, y0 + h - pad - title_font, title[:int(tw / mm * 0.9)])
         c.setFont("Helvetica", body_font)
         y_cursor = y0 + h - pad - title_font - 7
-        for label, val in lines[:3]:
+        for label, val in lines:
             if not val:
                 continue
             c.drawString(tx, y_cursor, f"{label}: {val}"[:int(tw / mm * 1.1)])
@@ -638,7 +638,7 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
         # Info (right of QR or full width if no QR)
         c.setFont("Helvetica", body_font)
         y_cursor = y0 + h - pad - logo_size_mm * mm - 6 if logo_enabled else y0 + h - pad - 20
-        for label, val in lines[:4]:
+        for label, val in lines:
             if not val:
                 continue
             c.drawString(tx, y_cursor, f"{label}: {val}"[:30])
@@ -757,7 +757,8 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
         # Bottom: first 2 text bindings, centered
         c.setFont("Helvetica", body_font)
         y_cursor = y0 + pad + body_font
-        for label, val in lines[:2][::-1]:  # reverse so first binding sits higher
+        # Bottom: as many bindings as fit, centered.
+        for label, val in list(lines)[::-1]:  # reverse so first binding sits higher
             if not val:
                 continue
             c.drawCentredString(x0 + w / 2, y_cursor, f"{label}: {val}"[:42])
@@ -867,7 +868,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
             title = rec2.get("asset_name", "")
             rows = "".join(
                 f'<div class="row"><b>{_html_escape(lbl)}:</b> {_html_escape(val)}</div>'
-                for (lbl, val) in lines[:3] if val
+                for (lbl, val) in lines if val
             )
             logo_div = f'<div class="{logo_class}">{logo_html}</div>' if logo_enabled else ""
             qr_html = f'<img class="qr" src="{qr_src}" alt="qr" />' if show_qr else ""
@@ -884,7 +885,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
         elif preset == "with_logo":
             rows = "".join(
                 f'<div class="row"><b>{_html_escape(lbl)}:</b> {_html_escape(val)}</div>'
-                for (lbl, val) in lines[:4] if val
+                for (lbl, val) in lines if val
             )
             # Use real logo if enabled, otherwise placeholder
             logo_part = f'<div class="{logo_class}">{logo_html}</div>' if logo_enabled else '<div class="logo-placeholder">LOGO</div>'
@@ -955,7 +956,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
             title = rec2.get("asset_name", "")
             rows = "".join(
                 f'<div class="row">{_html_escape(lbl)}: {_html_escape(val)}</div>'
-                for (lbl, val) in lines[:2] if val
+                for (lbl, val) in lines if val
             )
             logo_div = f'<div class="{logo_class}">{logo_html}</div>' if logo_enabled else ""
             qr_html = f'<img class="qr" src="{qr_src}" alt="qr" />' if show_qr else ""
