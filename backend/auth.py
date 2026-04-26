@@ -60,9 +60,9 @@ async def _validate_token(token: str) -> dict:
 
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     token: Optional[str] = Query(None, description="Auth token (alternative to header)"),
-    request: Request = None,
 ):
     """Get current user from Authorization header or query parameter token.
     
@@ -76,6 +76,7 @@ async def get_current_user(
 
     # Cookie-based auth (preferred when enabled): HttpOnly cookie cannot be read by JS,
     # reducing XSS blast radius. Works cross-origin with allow_credentials CORS.
+    # FastAPI should inject Request here; keep a defensive check anyway.
     if ALLOW_COOKIE_AUTH and request is not None:
         try:
             cookie_token = request.cookies.get(AUTH_COOKIE_NAME)
