@@ -88,7 +88,11 @@ api.interceptors.response.use(
           url: `${error.config?.baseURL || ""}${error.config?.url || ""}`,
         });
       } catch (_e) {}
-      localStorage.removeItem("token");
+      // In cookie-auth mode, a 401 can simply mean "no session cookie".
+      // Do not clear localStorage token here (it may not exist or may be in transition).
+      if (AUTH_MODE !== "cookie") {
+        localStorage.removeItem("token");
+      }
       try {
         window.dispatchEvent(new CustomEvent("assetiq:auth-expired"));
       } catch (_e) {}
@@ -140,7 +144,9 @@ aiApi.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("token");
+      if (AUTH_MODE !== "cookie") {
+        localStorage.removeItem("token");
+      }
       try {
         window.dispatchEvent(new CustomEvent("assetiq:auth-expired"));
       } catch (_e) {}

@@ -40,8 +40,9 @@ export const AuthProvider = ({ children }) => {
     userRef.current = user;
   }, [user]);
 
-  const logout = useCallback(async () => {
-    if (AUTH_MODE === "cookie") {
+  const logout = useCallback(async (options = {}) => {
+    const { remote = true } = options || {};
+    if (AUTH_MODE === "cookie" && remote) {
       try {
         const API_URL = getApiUrl();
         await axios.post(`${API_URL}/auth/logout`, {}, { withCredentials: true });
@@ -74,7 +75,9 @@ export const AuthProvider = ({ children }) => {
       await fetchAndCachePreferences(API_URL);
     } catch (error) {
       console.error("Failed to fetch user:", error);
-      logout();
+      // Avoid calling remote logout on a simple 401 (especially in cookie mode),
+      // otherwise we can create a noisy loop if CORS/session is misconfigured.
+      logout({ remote: false });
     } finally {
       setLoading(false);
     }
