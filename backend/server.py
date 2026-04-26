@@ -221,14 +221,20 @@ if env_origins and env_origins != '*':
 
 logger.info(f"CORS configured for {len(ALLOWED_ORIGINS)} origins including: {', '.join(ALLOWED_ORIGINS[:5])}...")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.(vercel\.app|emergentagent\.com|emergent\.host|railway\.app)",
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Build CORSMiddleware kwargs without passing allow_origin_regex=None.
+cors_kwargs = {
+    "allow_credentials": True,
+    "allow_origins": ALLOWED_ORIGINS,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+
+# Broad wildcard preview origins are OFF by default for safety.
+# If you need this for ephemeral preview deployments, enable explicitly via env.
+if os.environ.get("ALLOW_WILDCARD_PREVIEW_ORIGINS", "false").lower() == "true":
+    cors_kwargs["allow_origin_regex"] = r"https://.*\.(vercel\.app|emergentagent\.com|emergent\.host|railway\.app)"
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 
 # =============================================================================

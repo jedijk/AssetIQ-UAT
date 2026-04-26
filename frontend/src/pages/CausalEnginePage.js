@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { investigationAPI, actionsAPI, usersAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
 import { compressImage, formatFileSize, getCompressionPercent } from "../lib/imageCompression";
@@ -8,6 +8,7 @@ import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatDate, formatDateTime } from "../lib/dateUtils";
+import { useCausalEngineData } from "../hooks/investigations/useCausalEngineData";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -30,37 +31,12 @@ import BackButton from "../components/BackButton";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { NewInvestigationDialog, EventDialog, FailureDialog, CauseDialog, ActionDialog } from "../components/causal-engine/InvestigationDialogs";
 import EquipmentTimeline from "../components/EquipmentTimeline";
-
-const EVENT_CATEGORIES = [
-  { value: "operational_event", label: "Operational Event", bgClass: "bg-blue-100 text-blue-700", dotClass: "bg-blue-500" },
-  { value: "alarm", label: "Alarm", bgClass: "bg-red-100 text-red-700", dotClass: "bg-red-500" },
-  { value: "maintenance_action", label: "Maintenance Action", bgClass: "bg-orange-100 text-orange-700", dotClass: "bg-orange-500" },
-  { value: "human_decision", label: "Human Decision", bgClass: "bg-purple-100 text-purple-700", dotClass: "bg-purple-500" },
-  { value: "system_response", label: "System Response", bgClass: "bg-cyan-100 text-cyan-700", dotClass: "bg-cyan-500" },
-  { value: "environmental_condition", label: "Environmental", bgClass: "bg-green-100 text-green-700", dotClass: "bg-green-500" },
-];
-
-const ACTION_PRIORITIES = [
-  { value: "critical", label: "Critical", bgClass: "bg-red-100 text-red-700" },
-  { value: "high", label: "High", bgClass: "bg-orange-100 text-orange-700" },
-  { value: "medium", label: "Medium", bgClass: "bg-yellow-100 text-yellow-700" },
-  { value: "low", label: "Low", bgClass: "bg-green-100 text-green-700" },
-];
-
-const ACTION_STATUSES = [
-  { value: "open", label: "Open" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "completed", label: "Completed" },
-  { value: "closed", label: "Closed" },
-];
-
-const INVESTIGATION_STATUSES = [
-  { value: "draft", label: "Draft" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "review", label: "Under Review" },
-  { value: "completed", label: "Completed" },
-  { value: "closed", label: "Closed" },
-];
+import {
+  ACTION_PRIORITIES,
+  ACTION_STATUSES,
+  EVENT_CATEGORIES,
+  INVESTIGATION_STATUSES,
+} from "../components/causal-engine/constants";
 
 export default function CausalEnginePage() {
   const queryClient = useQueryClient();
@@ -130,55 +106,25 @@ export default function CausalEnginePage() {
     }
   }, [searchParams, setSearchParams, selectedInvId]);
 
-  const { data: investigationsData, isLoading: loadingInvestigations, error: investigationsError } = useQuery({
-    queryKey: ["investigations"],
-    queryFn: () => investigationAPI.getAll(),
-    staleTime: 0,
-    refetchOnMount: 'always',
-    retry: 2,
+  const {
+    investigations,
+    loadingInvestigations,
+    investigationsError,
+    users,
+    equipmentNodes,
+    failureModesList,
+    centralActions,
+    investigationData,
+    investigation,
+    loadingInvestigation,
+  } = useCausalEngineData({
+    selectedInvId,
+    investigationAPI,
+    actionsAPI,
+    usersAPI,
+    equipmentHierarchyAPI,
+    failureModesAPI,
   });
-  
-  const investigations = investigationsData?.investigations || [];
-  
-  // Fetch users for lead selection
-  const { data: usersData } = useQuery({
-    queryKey: ["rbac-users"],
-    queryFn: () => usersAPI.getAll(),
-    staleTime: 60000, // Cache for 1 minute
-  });
-  const users = usersData?.users || [];
-  
-  // Fetch equipment nodes for equipment dropdown
-  const { data: equipmentNodesData } = useQuery({
-    queryKey: ["equipment-nodes"],
-    queryFn: () => equipmentHierarchyAPI.getNodes(),
-    staleTime: 60000, // Cache for 1 minute
-  });
-  const equipmentNodes = equipmentNodesData?.nodes || [];
-  
-  // Fetch failure modes for failure mode dropdown
-  const { data: failureModesData } = useQuery({
-    queryKey: ["failure-modes-list"],
-    queryFn: () => failureModesAPI.getAll(),
-    staleTime: 60000, // Cache for 1 minute
-  });
-  const failureModesList = failureModesData?.failure_modes || [];
-  
-  // Fetch central actions linked to this investigation (for Action Plan section)
-  const { data: centralActionsData } = useQuery({
-    queryKey: ["central-actions", "investigation", selectedInvId],
-    queryFn: async () => {
-      const response = await actionsAPI.getAll();
-      const allActions = response?.actions || response || [];
-      // Filter actions linked to this investigation
-      return allActions.filter(
-        action => action.source_type === "investigation" && action.source_id === selectedInvId
-      );
-    },
-    enabled: !!selectedInvId,
-    staleTime: 30000,
-  });
-  const centralActions = centralActionsData || [];
   
   // Log error for debugging
   useEffect(() => {
@@ -186,17 +132,6 @@ export default function CausalEnginePage() {
       console.error("Failed to load investigations:", investigationsError);
     }
   }, [investigationsError]);
-  
-  const { data: investigationData, isLoading: loadingInvestigation } = useQuery({
-    queryKey: ["investigation", selectedInvId],
-    queryFn: () => investigationAPI.getById(selectedInvId),
-    enabled: !!selectedInvId,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    retry: 2,
-  });
-  
-  const investigation = investigationData?.investigation;
   
   // Check if investigation is completed/locked
   const isInvestigationLocked = investigation?.status === "completed" || investigation?.status === "closed";

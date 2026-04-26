@@ -84,34 +84,8 @@ import {
   ReferenceArea,
 } from "recharts";
 import { toast } from "sonner";
-
-// ──────────────────────────────────────────
-// Date helpers (timezone-safe: use local date strings, not UTC)
-// ──────────────────────────────────────────
-const fmtDate = (d) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
-const displayDate = (d) => {
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-};
-const today = () => { const d = new Date(); d.setHours(12,0,0,0); return d; };
-const daysAgo = (n) => { const d = today(); d.setDate(d.getDate() - n); return d; };
-const monthsAgo = (n) => { const d = today(); d.setMonth(d.getMonth() - n); return d; };
-const startOfYear = () => { const d = today(); d.setMonth(0, 1); return d; };
-
-const PERIOD_OPTIONS = [
-  { key: "1d", label: "1D" },
-  { key: "1w", label: "1W" },
-  { key: "1m", label: "1M" },
-  { key: "3m", label: "3M" },
-  { key: "6m", label: "6M" },
-  { key: "1y", label: "1Y" },
-  { key: "ytd", label: "YTD" },
-];
+import { fmtDate, today, daysAgo, monthsAgo, startOfYear, displayDate, PERIOD_OPTIONS } from "../lib/production/dateRange";
+import { useProductionDashboardQuery } from "../hooks/production/useProductionDashboardQuery";
 
 // ──────────────────────────────────────────
 // Machine Analysis Panel
@@ -749,18 +723,13 @@ export default function ProductionDashboardPage() {
   const fromStr = fmtDate(fromDate);
   const toStr = fmtDate(toDate);
 
-  // Build query params
-  const queryParams = period === "1d"
-    ? { date: fromStr, shift }
-    : { from_date: fromStr, to_date: toStr, shift };
-
   // Fetch dashboard data
-  const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["production-dashboard", fromStr, toStr, shift],
-    queryFn: () => productionAPI.getDashboard(queryParams),
-    refetchInterval: 60000,
-    staleTime: 5000,
-    refetchOnWindowFocus: true,
+  const { data, isLoading, isFetching, refetch } = useProductionDashboardQuery({
+    fromStr,
+    toStr,
+    shift,
+    period,
+    productionAPI,
   });
 
   // Mutation for creating events

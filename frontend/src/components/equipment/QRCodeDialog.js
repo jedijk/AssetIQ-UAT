@@ -43,19 +43,12 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Checkbox } from "../ui/checkbox";
+import { QR_PRINT_TEMPLATES } from "../../lib/qrTemplates";
 
 // Action type configurations
 const ACTION_TYPES = [
   { id: "view_asset", label: "View Asset Dashboard", icon: Eye, description: "Opens the equipment detail page" },
   { id: "report_observation", label: "Report Observation", icon: MessageSquare, description: "Opens chat to report an issue" },
-];
-
-// Print template options
-const PRINT_TEMPLATES = [
-  { id: "single", label: "Single Label", description: "One QR per page" },
-  { id: "a4_2x2", label: "A4 - 2×2", description: "4 labels per page" },
-  { id: "a4_3x3", label: "A4 - 3×3", description: "9 labels per page" },
-  { id: "a4_4x5", label: "A4 - 4×5", description: "20 labels per page" },
 ];
 
 // Size options
@@ -319,7 +312,7 @@ export function QRCodeDialog({ open, onOpenChange, equipment, existingQR = null 
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {PRINT_TEMPLATES.map(t => (
+                          {QR_PRINT_TEMPLATES.map(t => (
                             <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
                           ))}
                         </SelectContent>

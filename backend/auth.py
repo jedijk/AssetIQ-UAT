@@ -68,8 +68,11 @@ async def get_current_user(
     if credentials and credentials.credentials:
         return await _validate_token(credentials.credentials)
     
-    # Fall back to query parameter
-    if token:
+    # Query parameter auth is OFF by default because tokens in URLs can leak via logs,
+    # browser history, referrers, and proxy traces. Enable explicitly only if you have
+    # a constrained use-case (e.g., short-lived signed URLs for media).
+    allow_query_token = os.environ.get("ALLOW_QUERY_TOKEN_AUTH", "false").lower() == "true"
+    if allow_query_token and token:
         return await _validate_token(token)
     
     # No auth provided

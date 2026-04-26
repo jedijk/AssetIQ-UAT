@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useMemo } from "react";
+import { createTranslator } from "../lib/i18n/translate";
 
 const LanguageContext = createContext();
 
@@ -2491,14 +2492,7 @@ export const LanguageProvider = ({ children }) => {
     localStorage.setItem("reliabilityos_language", language);
   }, [language]);
 
-  const t = (key) => {
-    const keys = key.split(".");
-    let value = translations[language];
-    for (const k of keys) {
-      value = value?.[k];
-    }
-    return value || key;
-  };
+  const t = useMemo(() => createTranslator(translations, language), [language]);
 
   const toggleLanguage = () => {
     setLanguage(prev => prev === "en" ? "nl" : "en");

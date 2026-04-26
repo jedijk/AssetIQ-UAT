@@ -45,14 +45,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { SettingsSection, SettingsCard } from "./SettingsPage";
-
-// Print template options
-const PRINT_TEMPLATES = [
-  { id: "single", label: "Single Label", description: "One QR per page" },
-  { id: "a4_2x2", label: "A4 - 2×2", description: "4 labels per page" },
-  { id: "a4_3x3", label: "A4 - 3×3", description: "9 labels per page" },
-  { id: "a4_4x5", label: "A4 - 4×5", description: "20 labels per page" },
-];
+import { QR_PRINT_TEMPLATES } from "../lib/qrTemplates";
 
 export default function SettingsQRPage() {
   const queryClient = useQueryClient();
@@ -481,7 +474,7 @@ export default function SettingsQRPage() {
             <div>
               <label className="text-sm font-medium text-slate-700">Template</label>
               <div className="grid grid-cols-2 gap-2 mt-2">
-                {PRINT_TEMPLATES.map(template => (
+                {QR_PRINT_TEMPLATES.map(template => (
                   <button
                     key={template.id}
                     onClick={() => setPrintTemplate(template.id)}
