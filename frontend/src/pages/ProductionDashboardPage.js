@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionAPI } from "../lib/api";
-import api from "../lib/api";
+import { api } from "../lib/apiClient";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { formatDateTime } from "../lib/dateUtils";
@@ -84,8 +84,10 @@ import {
   ReferenceArea,
 } from "recharts";
 import { toast } from "sonner";
-import { fmtDate, today, daysAgo, monthsAgo, startOfYear, displayDate, PERIOD_OPTIONS } from "../lib/production/dateRange";
+import { displayDate, PERIOD_OPTIONS } from "../lib/production/dateRange";
 import { useProductionDashboardQuery } from "../hooks/production/useProductionDashboardQuery";
+import { useProductionDateRange } from "../features/production/hooks/useProductionDateRange";
+import { productionKeys } from "../features/production/queryKeys";
 
 // ──────────────────────────────────────────
 // Machine Analysis Panel
@@ -654,17 +656,27 @@ export default function ProductionDashboardPage() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
+  const {
+    period,
+    setPeriod,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+    showCustomDate,
+    setShowCustomDate,
+    handlePeriod,
+    fromStr,
+    toStr,
+  } = useProductionDateRange();
+
   // State
-  const [period, setPeriod] = useState("1d");
-  const [fromDate, setFromDate] = useState(today());
-  const [toDate, setToDate] = useState(today());
   const [shift, setShift] = useState("day");
   const [logSearch, setLogSearch] = useState("");
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", description: "", type: "action", severity: "info" });
   const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mp4: false, t_product_ir: false, screenChange: false, magnetCleaning: false });
   const [expandedEosNotes, setExpandedEosNotes] = useState(null); // Track which EOS row has notes expanded (for mobile)
-  const [showCustomDate, setShowCustomDate] = useState(false);
   const [formExec, setFormExec] = useState(null); // { templateId, templateName }
   const [selectedTime, setSelectedTime] = useState(null); // highlighted time from chart click
 
@@ -678,7 +690,7 @@ export default function ProductionDashboardPage() {
 
   // Template IDs (fetched once)
   const { data: formTemplates } = useQuery({
-    queryKey: ["production-form-templates"],
+    queryKey: productionKeys.formTemplates(),
     queryFn: async () => {
       const res = await api.get("/form-templates");
       const list = Array.isArray(res.data) ? res.data : res.data.templates || [];
@@ -702,27 +714,6 @@ export default function ProductionDashboardPage() {
     staleTime: 600000,
   });
 
-  // Period change handler
-  const handlePeriod = (p) => {
-    setPeriod(p);
-    setShowCustomDate(false);
-    const t = today();
-    setToDate(t);
-    switch (p) {
-      case "1d": setFromDate(t); break;
-      case "1w": setFromDate(daysAgo(7)); break;
-      case "1m": setFromDate(monthsAgo(1)); break;
-      case "3m": setFromDate(monthsAgo(3)); break;
-      case "6m": setFromDate(monthsAgo(6)); break;
-      case "1y": setFromDate(monthsAgo(12)); break;
-      case "ytd": setFromDate(startOfYear()); break;
-      default: setFromDate(t);
-    }
-  };
-
-  const fromStr = fmtDate(fromDate);
-  const toStr = fmtDate(toDate);
-
   // Fetch dashboard data
   const { data, isLoading, isFetching, refetch } = useProductionDashboardQuery({
     fromStr,
@@ -732,11 +723,14 @@ export default function ProductionDashboardPage() {
     productionAPI,
   });
 
+  const invalidateDashboard = () =>
+    queryClient.invalidateQueries({ queryKey: productionKeys.dashboard(period, fromStr, toStr, shift) });
+
   // Mutation for creating events
   const createEventMutation = useMutation({
     mutationFn: (eventData) => productionAPI.createEvent(eventData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      invalidateDashboard();
       setShowAddEvent(false);
       setNewEvent({ title: "", description: "", type: "action", severity: "info" });
       toast.success("Event created");
@@ -754,7 +748,7 @@ export default function ProductionDashboardPage() {
   const updateSubmissionMutation = useMutation({
     mutationFn: ({ id, values }) => productionAPI.updateSubmission(id, values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      invalidateDashboard();
       setEditEntry(null);
       toast.success("Entry updated");
     },
@@ -765,13 +759,13 @@ export default function ProductionDashboardPage() {
   const deleteSubmissionMutation = useMutation({
     mutationFn: (id) => productionAPI.deleteSubmission(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      invalidateDashboard();
       toast.success("Entry deleted");
     },
     onError: (error) => {
       // 404 means already deleted - treat as success
       if (error?.response?.status === 404) {
-        queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+        invalidateDashboard();
         toast.success("Entry already deleted");
       } else {
         toast.error("Failed to delete entry");
@@ -792,7 +786,7 @@ export default function ProductionDashboardPage() {
       actions: data?.actions || [],
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      invalidateDashboard();
       toast.success("AI insights generated");
     },
     onError: () => toast.error("Failed to generate insights"),
@@ -2113,7 +2107,7 @@ export default function ProductionDashboardPage() {
                   disabled={updateSubmissionMutation.isPending}
                   onClick={async () => {
                     const refresh = () => {
-                      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+                      invalidateDashboard();
                       setEditEntry(null);
                       toast.success("Entry updated");
                     };
