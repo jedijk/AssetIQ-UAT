@@ -186,13 +186,25 @@ const useVersionCheck = () => {
                 "text-align:center",
                 "box-shadow:0 2px 8px rgba(0,0,0,0.15)",
               ].join(";");
-              banner.innerHTML = `A new version (${backendVersion}) is available. <button id="app-update-reload-btn" style="margin-left:10px;padding:6px 10px;border-radius:8px;border:0;background:#fff;color:#1d4ed8;font-weight:700;cursor:pointer">Reload</button>`;
+              // Avoid innerHTML to reduce XSS sink surface.
+              banner.textContent = `A new version (${backendVersion}) is available. `;
+              const btn = document.createElement("button");
+              btn.id = "app-update-reload-btn";
+              btn.type = "button";
+              btn.textContent = "Reload";
+              btn.style.cssText = [
+                "margin-left:10px",
+                "padding:6px 10px",
+                "border-radius:8px",
+                "border:0",
+                "background:#fff",
+                "color:#1d4ed8",
+                "font-weight:700",
+                "cursor:pointer",
+              ].join(";");
+              btn.addEventListener("click", () => requestReload(backendVersion));
+              banner.appendChild(btn);
               document.body.appendChild(banner);
-
-              const btn = document.getElementById("app-update-reload-btn");
-              if (btn) {
-                btn.addEventListener("click", () => requestReload(backendVersion));
-              }
             }
           } catch (_) {}
           return;

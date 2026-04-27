@@ -83,17 +83,56 @@ function showBootError(message) {
   try {
     const el = document.getElementById("root");
     if (!el) return;
-    el.innerHTML = `
-      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#ffffff;color:#0f172a;padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-        <div style="max-width:520px;width:100%;">
-          <div style="font-weight:800;font-size:18px;margin-bottom:8px;">App failed to load</div>
-          <div style="font-size:13px;line-height:1.4;color:#475569;margin-bottom:14px;">${message || "Please refresh the page."}</div>
-          <button id="assetiq-hard-reload" style="padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;background:#0f172a;color:#fff;font-weight:700;cursor:pointer;">Reload</button>
-          <div style="margin-top:10px;font-size:12px;color:#94a3b8;">If this keeps happening on iOS, it is usually a cached update. Reload will clear local caches.</div>
-        </div>
-      </div>
-    `;
-    const btn = document.getElementById("assetiq-hard-reload");
+    // Avoid innerHTML to reduce XSS sink surface.
+    el.textContent = "";
+    const outer = document.createElement("div");
+    outer.style.cssText = [
+      "min-height:100vh",
+      "display:flex",
+      "align-items:center",
+      "justify-content:center",
+      "background:#ffffff",
+      "color:#0f172a",
+      "padding:24px",
+      "font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif",
+    ].join(";");
+
+    const inner = document.createElement("div");
+    inner.style.cssText = ["max-width:520px", "width:100%"].join(";");
+
+    const title = document.createElement("div");
+    title.textContent = "App failed to load";
+    title.style.cssText = ["font-weight:800", "font-size:18px", "margin-bottom:8px"].join(";");
+
+    const msg = document.createElement("div");
+    msg.textContent = message || "Please refresh the page.";
+    msg.style.cssText = ["font-size:13px", "line-height:1.4", "color:#475569", "margin-bottom:14px"].join(";");
+
+    const btn = document.createElement("button");
+    btn.id = "assetiq-hard-reload";
+    btn.type = "button";
+    btn.textContent = "Reload";
+    btn.style.cssText = [
+      "padding:10px 14px",
+      "border-radius:10px",
+      "border:1px solid #cbd5e1",
+      "background:#0f172a",
+      "color:#fff",
+      "font-weight:700",
+      "cursor:pointer",
+    ].join(";");
+
+    const help = document.createElement("div");
+    help.textContent = "If this keeps happening on iOS, it is usually a cached update. Reload will clear local caches.";
+    help.style.cssText = ["margin-top:10px", "font-size:12px", "color:#94a3b8"].join(";");
+
+    inner.appendChild(title);
+    inner.appendChild(msg);
+    inner.appendChild(btn);
+    inner.appendChild(help);
+    outer.appendChild(inner);
+    el.appendChild(outer);
+
     if (btn) {
       btn.onclick = async () => {
         try {

@@ -17,6 +17,7 @@
  *    back to downloading the PDF so the user can Share → Print.
  */
 import { labelsAPI } from "./api";
+import DOMPurify from "dompurify";
 
 export const isMobileDevice = () => {
   if (typeof navigator === "undefined") return false;
@@ -48,12 +49,26 @@ export function openPrintWindow() {
     // Show a "Preparing…" placeholder while we fetch the HTML
     try {
       w.document.open();
-      w.document.write(
-        '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preparing label…</title>' +
-        '<style>body{font-family:-apple-system,system-ui,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#64748b}</style>' +
-        '</head><body>Preparing label…</body></html>'
-      );
       w.document.close();
+      // Avoid document.write: render a minimal placeholder via DOM APIs.
+      const doc = w.document;
+      doc.title = "Preparing label…";
+      const metaCharset = doc.createElement("meta");
+      metaCharset.setAttribute("charset", "utf-8");
+      const metaViewport = doc.createElement("meta");
+      metaViewport.setAttribute("name", "viewport");
+      metaViewport.setAttribute("content", "width=device-width,initial-scale=1");
+      doc.head.appendChild(metaCharset);
+      doc.head.appendChild(metaViewport);
+
+      const style = doc.createElement("style");
+      style.textContent =
+        "body{font-family:-apple-system,system-ui,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#64748b}";
+      doc.head.appendChild(style);
+
+      const body = doc.body || doc.createElement("body");
+      body.textContent = "Preparing label…";
+      if (!doc.body) doc.documentElement.appendChild(body);
     } catch (_e) { /* ignore */ }
     return w;
   } catch (_err) {
@@ -85,9 +100,15 @@ function writeHtmlIntoWindow(win, html) {
     const cleaned = String(html)
       .replace(/<script\b[^>]*>[\s\S]*?cdn-cgi\/challenge-platform[\s\S]*?<\/script>/gi, "")
       .replace(/<script\b[^>]*cloudflare[\s\S]*?<\/script>/gi, "");
+    // Sanitize HTML before rendering into a new window. This is defense-in-depth:
+    // label HTML should be server-generated, but sanitization reduces DOM XSS sink risk.
+    const sanitized = DOMPurify.sanitize(cleaned, {
+      USE_PROFILES: { html: true },
+    });
+    // Avoid document.write: assign via DOM and preserve the full HTML document.
     win.document.open();
-    win.document.write(cleaned);
     win.document.close();
+    win.document.documentElement.innerHTML = sanitized;
     // The HTML itself contains an auto-print <script>. We also call
     // win.print() as a belt-and-braces fallback after load.
     const fallbackPrint = () => { try { win.focus(); win.print(); } catch (_e) { /* ignore */ } };

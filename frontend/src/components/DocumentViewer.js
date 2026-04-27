@@ -21,6 +21,7 @@ import { Button } from "./ui/button";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import * as pdfjsLib from "pdfjs-dist";
+import DOMPurify from "dompurify";
 
 // Set up PDF.js worker
 // Use the classic minified worker to avoid nested worker sourcemap fetches
@@ -793,7 +794,11 @@ export const DocumentViewer = ({
                     wordBreak: 'break-word',
                     overflowWrap: 'break-word'
                   }}
-                  dangerouslySetInnerHTML={{ __html: docxHtml }}
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(String(docxHtml || ""), {
+                      USE_PROFILES: { html: true },
+                    }),
+                  }}
                 />
               </div>
             </div>

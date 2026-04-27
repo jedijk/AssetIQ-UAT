@@ -400,6 +400,18 @@ async def delete_form_submission(
         if ObjectId.is_valid(submission_id):
             submission = await db.form_submissions.find_one({"_id": ObjectId(submission_id)})
     
+    if not submission:
+        raise HTTPException(status_code=404, detail="Form submission not found")
+
+    # Authorization: only owner/admin or the original submitter can delete.
+    role = (current_user or {}).get("role")
+    user_id = (current_user or {}).get("id")
+    submitted_by = submission.get("submitted_by")
+    is_privileged = role in ("owner", "admin")
+    is_submitter = bool(user_id) and bool(submitted_by) and (submitted_by == user_id)
+    if not (is_privileged or is_submitter):
+        raise HTTPException(status_code=403, detail="Not allowed to delete this submission")
+    
     task_instance_id = submission.get("task_instance_id") if submission else None
     
     # Delete the form submission
