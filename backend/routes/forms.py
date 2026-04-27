@@ -238,6 +238,8 @@ async def get_form_submissions(
         "id": 1,
         "form_template_id": 1,
         "form_template_name": 1,
+        # Critical for consistent reprints: use the label template captured at submission time
+        "label_template_id": 1,
         "task_instance_id": 1,
         "equipment_id": 1,
         "equipment_name": 1,
@@ -334,6 +336,7 @@ async def get_form_submissions(
                 "id": doc.get("id"),
                 "form_template_id": doc.get("form_template_id"),
                 "form_template_name": doc.get("form_template_name"),
+                "label_template_id": doc.get("label_template_id"),
                 "task_instance_id": doc.get("task_instance_id"),
                 "task_template_name": doc.get("task_template_name"),
                 "equipment_id": doc.get("equipment_id"),

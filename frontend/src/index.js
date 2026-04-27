@@ -235,7 +235,12 @@ window.addEventListener("error", (e) => {
 
   // iOS Safari sometimes reports minified runtime TypeErrors that otherwise surface as a blank screen.
   // Show the recovery UI so users can reload and clear caches, and log a fingerprint for debugging.
-  if (msg.includes("undefined is not an object") && msg.includes("t[e]")) {
+  const isTE =
+    (msg.includes("undefined is not an object") && msg.includes("t[e]")) ||
+    // Chrome/V8 phrasing for similar minified crashes:
+    msg.includes("Cannot read properties of undefined (reading 'e')") ||
+    msg.includes("Cannot read properties of undefined (reading \"e\")");
+  if (isTE) {
     try {
       debugLog("runtime_typeerror_te", {
         message: msg,

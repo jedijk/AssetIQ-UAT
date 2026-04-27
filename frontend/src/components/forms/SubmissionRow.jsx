@@ -10,6 +10,7 @@ import { Button } from "../ui/button";
 import { ThresholdBadge } from "./FieldPreview";
 import { formatDateTime } from "../../lib/dateUtils";
 import { formAPI } from "./formAPI";
+import { openPrintWindow, isMobileDevice } from "../../lib/printLabel";
 
 export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
   const [expanded, setExpanded] = useState(false);
@@ -42,7 +43,6 @@ export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
     // iOS Safari doesn't block it. We fill it with HTML once the fetch returns.
     let preOpened = null;
     try {
-      const { openPrintWindow, isMobileDevice } = await import("../../lib/printLabel");
       if (isMobileDevice()) preOpened = openPrintWindow();
     } catch (_e) { /* ignore */ }
 

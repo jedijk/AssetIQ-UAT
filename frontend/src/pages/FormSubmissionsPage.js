@@ -83,6 +83,7 @@ import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 import { DocumentViewer } from "../components/DocumentViewer";
 import { formatDate as formatDateUtil, formatDateTime as formatDateTimeUtil } from "../lib/dateUtils";
 import { formAPI } from "../components/forms/formAPI";
+import { openPrintWindow, isMobileDevice } from "../lib/printLabel";
 
 const API_BASE_URL = getBackendUrl();
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer";
@@ -540,7 +541,6 @@ export default function FormSubmissionsPage() {
     // doesn't block it; we'll fill it once the fetch returns.
     let preOpened = null;
     try {
-      const { openPrintWindow, isMobileDevice } = await import("../lib/printLabel");
       if (isMobileDevice()) preOpened = openPrintWindow();
     } catch (_e) { /* ignore */ }
 
