@@ -315,11 +315,47 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 @app.middleware("http")
 async def set_database_context(request, call_next):
-    """Set the database context based on X-Database-Environment header."""
+    """
+    Set the database context for multi-database support.
+
+    Priority order:
+    1) Explicit header: X-Database-Environment
+    2) Explicit query param: ?db_env=uat|production
+    3) Cookie: assetiq_db_env (optional)
+    4) Host-based inference (e.g. *uat* domains default to uat)
+    5) Fallback: production/default
+    """
     from database import set_request_db, get_db_name_for_environment, AVAILABLE_DATABASES, DEFAULT_DB_NAME
     
-    # Get the environment from header
-    db_env = request.headers.get("X-Database-Environment", "production")
+    # 1) Header
+    db_env = request.headers.get("X-Database-Environment")
+
+    # 2) Query param fallback (useful for direct navigations like <img src>, window.open)
+    if not db_env:
+        try:
+            db_env = request.query_params.get("db_env")
+        except Exception:
+            db_env = None
+
+    # 3) Cookie fallback
+    if not db_env:
+        try:
+            db_env = request.cookies.get("assetiq_db_env")
+        except Exception:
+            db_env = None
+
+    # 4) Host inference
+    if not db_env:
+        try:
+            host = (request.headers.get("host") or "").lower()
+            if "uat" in host:
+                db_env = "uat"
+        except Exception:
+            db_env = None
+
+    # 5) Default
+    if not db_env:
+        db_env = "production"
     
     # Validate and set the database name
     if db_env in AVAILABLE_DATABASES:
