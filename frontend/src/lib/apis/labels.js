@@ -33,7 +33,8 @@ export const labelsAPI = {
   },
   previewBlob: async (payload) => {
     const res = await api.post("/labels/preview", payload, { responseType: "blob" });
-    return res.data; // Blob
+    const contentType = res.headers?.["content-type"] || res.headers?.["Content-Type"] || "";
+    return { blob: res.data, contentType }; // { blob: Blob, contentType: string }
   },
   printBlob: async (payload) => {
     const res = await api.post("/labels/print", payload, { responseType: "blob" });

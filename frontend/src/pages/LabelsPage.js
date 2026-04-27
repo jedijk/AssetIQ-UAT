@@ -194,8 +194,26 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
             .slice(0, maxBindings),
         },
       };
-      const blob = await labelsAPI.previewBlob(payload);
-      const url = URL.createObjectURL(blob);
+      const res = await labelsAPI.previewBlob(payload);
+      const rawBlob = res?.blob;
+      const contentType = String(res?.contentType || "");
+      // If backend returned JSON error (common for auth/validation), show it instead of a blank iframe.
+      if (contentType.includes("application/json")) {
+        try {
+          const text = await rawBlob.text();
+          const j = JSON.parse(text);
+          toast.error(j?.detail || j?.message || "Preview failed");
+        } catch (_e) {
+          toast.error("Preview failed");
+        }
+        return;
+      }
+      // Ensure a real PDF MIME type (some browsers require it for iframe blob URLs).
+      const pdfBlob =
+        rawBlob && rawBlob.type === "application/pdf"
+          ? rawBlob
+          : new Blob([rawBlob], { type: "application/pdf" });
+      const url = URL.createObjectURL(pdfBlob);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(url);
     } catch (e) {

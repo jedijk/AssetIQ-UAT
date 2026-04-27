@@ -17,7 +17,6 @@
  *    back to downloading the PDF so the user can Share → Print.
  */
 import { labelsAPI } from "./api";
-import DOMPurify from "dompurify";
 
 export const isMobileDevice = () => {
   if (typeof navigator === "undefined") return false;
@@ -100,15 +99,24 @@ function writeHtmlIntoWindow(win, html) {
     const cleaned = String(html)
       .replace(/<script\b[^>]*>[\s\S]*?cdn-cgi\/challenge-platform[\s\S]*?<\/script>/gi, "")
       .replace(/<script\b[^>]*cloudflare[\s\S]*?<\/script>/gi, "");
-    // Sanitize HTML before rendering into a new window. This is defense-in-depth:
-    // label HTML should be server-generated, but sanitization reduces DOM XSS sink risk.
-    const sanitized = DOMPurify.sanitize(cleaned, {
-      USE_PROFILES: { html: true },
-    });
-    // Avoid document.write: assign via DOM and preserve the full HTML document.
+    // IMPORTANT: Do not sanitize the label HTML here. The backend generates a full
+    // print-ready document with critical <style> rules and @page sizing. Some
+    // sanitizers remove <style> which breaks print layout (seen on iOS/thermal).
+    //
+    // We still avoid document.write by parsing and copying head/body content.
+    const parser = new DOMParser();
+    const parsed = parser.parseFromString(cleaned, "text/html");
     win.document.open();
     win.document.close();
-    win.document.documentElement.innerHTML = sanitized;
+    try {
+      win.document.title = parsed.title || "";
+    } catch (_t) {}
+    try {
+      win.document.head.innerHTML = parsed.head ? parsed.head.innerHTML : "";
+    } catch (_h) {}
+    try {
+      win.document.body.innerHTML = parsed.body ? parsed.body.innerHTML : "";
+    } catch (_b) {}
     // The HTML itself contains an auto-print <script>. We also call
     // win.print() as a belt-and-braces fallback after load.
     const fallbackPrint = () => { try { win.focus(); win.print(); } catch (_e) { /* ignore */ } };
