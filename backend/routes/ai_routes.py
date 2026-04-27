@@ -2,7 +2,9 @@
 AI Risk Engine routes with rate limiting and security.
 """
 import os
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone
 import uuid
@@ -483,6 +485,17 @@ async def generate_threat_causes(
     current_user: dict = Depends(get_current_user)
 ):
     """AI-powered causal analysis - generates probable causes"""
+    # Fast path: if we already have cached analysis, return it and avoid slow AI calls
+    # that can time out through the Vercel -> Railway proxy (seen as 502s).
+    try:
+        existing = await db.ai_causal_analysis.find_one({"threat_id": threat_id}, {"_id": 0})
+        if existing and isinstance(existing, dict) and existing.get("probable_causes"):
+            existing["cached"] = True
+            return existing
+    except Exception:
+        # Cache read failure should not block generation.
+        pass
+
     threat = await db.threats.find_one(
         {"id": threat_id},
         {"_id": 0}
@@ -536,44 +549,58 @@ async def generate_threat_causes(
         equipment_history["actions"] = past_actions
     
     max_causes = body.max_causes if body else 5
-    
-    result = await ai_engine.generate_causes(
-        threat=threat,
-        equipment_data=equipment_data,
-        equipment_history=equipment_history,
-        max_causes=max_causes
+
+    async def _compute_and_store():
+        result = await ai_engine.generate_causes(
+            threat=threat,
+            equipment_data=equipment_data,
+            equipment_history=equipment_history,
+            max_causes=max_causes,
+        )
+
+        # Log AI usage for causal intelligence
+        installation_name = threat.get("installation", threat.get("location", "default"))
+        await log_ai_usage(
+            user_id=current_user["id"],
+            feature="causal_intelligence",
+            model="gpt-4o",
+            prompt_tokens=600,
+            completion_tokens=1200,
+            installation_name=installation_name,
+            installation_id=threat.get("installation_id", "default"),
+            success=True,
+            metadata={"threat_id": threat_id, "max_causes": max_causes},
+        )
+
+        # Store the causal analysis
+        await db.ai_causal_analysis.update_one(
+            {"threat_id": threat_id},
+            {"$set": {
+                "threat_id": threat_id,
+                "summary": result.summary,
+                "probable_causes": [c.model_dump() for c in result.probable_causes],
+                "contributing_factors": result.contributing_factors,
+                "confidence": result.confidence.value,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "created_by": current_user["id"],
+            }},
+            upsert=True,
+        )
+        return result
+
+    # If this request came through the Vercel proxy, long-running OpenAI calls can
+    # surface as 502 Bad Gateway. Run the heavy work in the background and return
+    # a quick 202; the client should poll GET /api/ai/causal-analysis/{threat_id}.
+    try:
+        asyncio.create_task(_compute_and_store())
+    except Exception as e:
+        logger.error(f"Failed to schedule causal generation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to start causal analysis")
+
+    return JSONResponse(
+        status_code=202,
+        content={"status": "pending", "threat_id": threat_id},
     )
-    
-    # Log AI usage for causal intelligence
-    installation_name = threat.get("installation", threat.get("location", "default"))
-    await log_ai_usage(
-        user_id=current_user["id"],
-        feature="causal_intelligence",
-        model="gpt-4o",
-        prompt_tokens=600,
-        completion_tokens=1200,
-        installation_name=installation_name,
-        installation_id=threat.get("installation_id", "default"),
-        success=True,
-        metadata={"threat_id": threat_id, "max_causes": max_causes}
-    )
-    
-    # Store the causal analysis
-    await db.ai_causal_analysis.update_one(
-        {"threat_id": threat_id},
-        {"$set": {
-            "threat_id": threat_id,
-            "summary": result.summary,
-            "probable_causes": [c.model_dump() for c in result.probable_causes],
-            "contributing_factors": result.contributing_factors,
-            "confidence": result.confidence.value,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "created_by": current_user["id"]
-        }},
-        upsert=True
-    )
-    
-    return result.model_dump()
 
 
 @router.get("/ai/causal-analysis/{threat_id}")

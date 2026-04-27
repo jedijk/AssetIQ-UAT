@@ -24,11 +24,42 @@ export const aiRiskAPI = {
 
   // Causal Analysis - uses extended timeout
   generateCauses: async (threatId, options = {}) => {
-    const response = await aiApi.post(`/ai/generate-causes/${threatId}`, {
+    const payload = {
       max_causes: options.maxCauses ?? 5,
       include_evidence: options.includeEvidence ?? true,
       include_mitigations: options.includeMitigations ?? true,
+    };
+
+    const response = await aiApi.post(`/ai/generate-causes/${threatId}`, payload, {
+      validateStatus: (s) => (s >= 200 && s < 300) || s === 202,
     });
+
+    // Backend may return 202 quickly and compute in background to avoid Vercel proxy 502 timeouts.
+    if (response.status === 202 || response.data?.status === "pending") {
+      const deadlineMs = Date.now() + (options.pollTimeoutMs ?? 90_000);
+      const intervalMs = options.pollIntervalMs ?? 2000;
+      // Poll cached result until available.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        if (Date.now() > deadlineMs) {
+          const err = new Error("Causal analysis is taking longer than expected. Please try again.");
+          err.code = "AI_POLL_TIMEOUT";
+          throw err;
+        }
+        try {
+          const cached = await aiRiskAPI.getCausalAnalysis(threatId);
+          if (cached) return cached;
+        } catch (e) {
+          const status = e?.response?.status;
+          // 404 means not ready yet.
+          if (status && status !== 404) throw e;
+        }
+        // Wait before polling again.
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+    }
+
     return response.data;
   },
 
