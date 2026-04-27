@@ -231,7 +231,8 @@ const Layout = () => {
       if (!user?.id) return;
       
       try {
-        const token = localStorage.getItem("token");
+        const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+        const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
         const backendUrl = getBackendUrl();
         
         // Only fetch if we have a valid backend URL configured
@@ -239,11 +240,17 @@ const Layout = () => {
           setAvatarUrl(null);
           return;
         }
-        
-        const response = await fetch(
-          `${backendUrl}/api/users/${user.id}/avatar?token=${token}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+
+        const avatarUrl = AUTH_MODE === "cookie"
+          ? `${backendUrl}/api/users/${user.id}/avatar`
+          : `${backendUrl}/api/users/${user.id}/avatar?token=${token}`;
+
+        const response = await fetch(avatarUrl, {
+          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+          headers: {
+            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         
         if (response.ok) {
           const blob = await response.blob();
@@ -370,10 +377,17 @@ const Layout = () => {
       }
 
       // Refresh avatar
-      const avatarResponse = await fetch(
-        `${backendUrl}/api/users/${user.id}/avatar?token=${token}&t=${Date.now()}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+      const avatarFetchUrl = AUTH_MODE === "cookie"
+        ? `${backendUrl}/api/users/${user.id}/avatar?t=${Date.now()}`
+        : `${backendUrl}/api/users/${user.id}/avatar?token=${token}&t=${Date.now()}`;
+
+      const avatarResponse = await fetch(avatarFetchUrl, {
+        credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+        headers: {
+          ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       
       if (avatarResponse.ok) {
         const blob = await avatarResponse.blob();

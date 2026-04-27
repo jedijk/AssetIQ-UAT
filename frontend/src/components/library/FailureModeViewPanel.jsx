@@ -114,14 +114,20 @@ export function FailureModeViewPanel({
     const fetchCurrentUserAvatar = async () => {
       if (!currentUser?.id) return;
       try {
-        const token = localStorage.getItem("token");
+        const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+        const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
         const backendUrl = getBackendUrl();
         if (!backendUrl || !backendUrl.startsWith('http')) return;
         
-        const response = await fetch(
-          `${backendUrl}/api/users/${currentUser.id}/avatar?token=${token}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const url = AUTH_MODE === "cookie"
+          ? `${backendUrl}/api/users/${currentUser.id}/avatar`
+          : `${backendUrl}/api/users/${currentUser.id}/avatar?token=${token}`;
+        const response = await fetch(url, {
+          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+          headers: {
+            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         if (response.ok) {
           const blob = await response.blob();
           objectUrl = URL.createObjectURL(blob);
@@ -146,14 +152,20 @@ export function FailureModeViewPanel({
         return;
       }
       try {
-        const token = localStorage.getItem("token");
+        const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+        const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
         const backendUrl = getBackendUrl();
         if (!backendUrl || !backendUrl.startsWith('http')) return;
         
-        const response = await fetch(
-          `${backendUrl}/api/users/${fm.validated_by_id}/avatar?token=${token}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const url = AUTH_MODE === "cookie"
+          ? `${backendUrl}/api/users/${fm.validated_by_id}/avatar`
+          : `${backendUrl}/api/users/${fm.validated_by_id}/avatar?token=${token}`;
+        const response = await fetch(url, {
+          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+          headers: {
+            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         if (response.ok) {
           const blob = await response.blob();
           objectUrl = URL.createObjectURL(blob);
