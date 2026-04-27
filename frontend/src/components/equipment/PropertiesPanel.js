@@ -238,9 +238,12 @@ function EquipmentFiles({ equipmentId }) {
 
   const handleView = (file) => {
     const ext = file.filename.split('.').pop()?.toLowerCase() || '';
+    const dbEnv = localStorage.getItem("database_environment");
+    const dbEnvQs = dbEnv ? `?db_env=${encodeURIComponent(dbEnv)}` : "";
     setPreviewFile({ 
       name: file.filename, 
-      url: `${getBackendUrl()}/api/equipment-files/${file.id}/download`,
+      // Use inline viewer endpoint for reliable PDF/Image rendering
+      url: `${getBackendUrl()}/api/equipment-files/${file.id}/view${dbEnvQs}`,
       type: ext 
     });
   };
