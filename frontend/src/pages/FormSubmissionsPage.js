@@ -41,6 +41,7 @@ import {
   Sparkles,
   Users,
   Printer,
+  ChevronRight,
   Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";

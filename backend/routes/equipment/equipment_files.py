@@ -138,7 +138,6 @@ async def view_equipment_file_public(file_id: str):
         media_type=ct,
         headers={
             "Content-Disposition": f'inline; filename="{doc["filename"]}"',
-            "Access-Control-Allow-Origin": "*",
         },
     )
 

@@ -24,9 +24,18 @@ import * as pdfjsLib from "pdfjs-dist";
 import DOMPurify from "dompurify";
 
 // Set up PDF.js worker
-// Use the classic minified worker to avoid nested worker sourcemap fetches
-// that can show up as noisy "blob://null...*.map" console errors in production.
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.js`;
+// Keep the worker same-origin so strict CSP (`script-src 'self'`) doesn't block it.
+// Webpack will bundle this as an asset and return a URL.
+try {
+  // pdfjs-dist v4 ships ESM workers (.mjs)
+  // eslint-disable-next-line no-undef
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.mjs",
+    import.meta.url
+  ).toString();
+} catch (_e) {
+  // Fallback: PDF.js will attempt a "fake worker" (slower) if needed.
+}
 
 // Get the API base URL for document proxying
 import { getBackendUrl } from '../lib/apiConfig';
