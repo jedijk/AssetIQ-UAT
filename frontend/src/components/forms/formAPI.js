@@ -6,7 +6,26 @@ import { getBackendUrl, getAuthHeaders } from '../../lib/apiConfig';
 
 const API_BASE_URL = getBackendUrl();
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer";
-const FETCH_CREDENTIALS = AUTH_MODE === "cookie" ? "include" : "same-origin";
+// In bearer mode we must NOT send cookies (prevents auth confusion / CSRF coupling).
+const FETCH_CREDENTIALS = AUTH_MODE === "cookie" ? "include" : "omit";
+
+function getCookie(name) {
+  try {
+    const value = `; ${document.cookie || ""}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(";").shift();
+  } catch (_e) {}
+  return null;
+}
+
+function withCsrf(headers = {}) {
+  // Cookie-auth uses double-submit CSRF:
+  // Cookie `assetiq_csrf` must match header `X-CSRF-Token` on unsafe methods.
+  if (AUTH_MODE !== "cookie") return headers;
+  const csrf = getCookie(process.env.REACT_APP_CSRF_COOKIE_NAME || "assetiq_csrf");
+  if (!csrf) return headers;
+  return { ...headers, "X-CSRF-Token": csrf };
+}
 
 export const formAPI = {
   getTemplates: async (params = {}) => {
@@ -39,7 +58,7 @@ export const formAPI = {
   createTemplate: async (data) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: withCsrf(getAuthHeaders()),
       credentials: FETCH_CREDENTIALS,
       body: JSON.stringify(data),
     });
@@ -67,7 +86,7 @@ export const formAPI = {
     
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       method: "PATCH",
-      headers: getAuthHeaders(),
+      headers: withCsrf(getAuthHeaders()),
       credentials: FETCH_CREDENTIALS,
       body: JSON.stringify(cleanedData),
     });
@@ -84,7 +103,7 @@ export const formAPI = {
   deleteTemplate: async (id) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${id}`, {
       method: "DELETE",
-      headers: getAuthHeaders(),
+      headers: withCsrf(getAuthHeaders()),
       credentials: FETCH_CREDENTIALS,
     });
     if (!response.ok) throw new Error("Failed to delete template");
@@ -120,7 +139,7 @@ export const formAPI = {
     formData.append("file", file);
     if (description) formData.append("description", description);
 
-    const headers = getAuthHeaders();
+    const headers = withCsrf(getAuthHeaders());
     delete headers["Content-Type"];
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents`, {
       method: "POST",
@@ -138,7 +157,7 @@ export const formAPI = {
   deleteDocument: async (templateId, documentId) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents/${documentId}`, {
       method: "DELETE",
-      headers: getAuthHeaders(),
+      headers: withCsrf(getAuthHeaders()),
       credentials: FETCH_CREDENTIALS,
     });
     if (!response.ok) throw new Error("Failed to delete document");
@@ -148,7 +167,7 @@ export const formAPI = {
   searchDocuments: async (templateId, query) => {
     const response = await fetch(`${API_BASE_URL}/api/form-templates/${templateId}/documents/search`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: withCsrf(getAuthHeaders()),
       credentials: FETCH_CREDENTIALS,
       body: JSON.stringify({ query }),
     });
