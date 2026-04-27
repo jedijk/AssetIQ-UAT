@@ -395,6 +395,8 @@ async def analyze_threat_risk(
     )
     
     # Store the AI insights for the threat
+    updated_at = datetime.now(timezone.utc).isoformat()
+
     await db.ai_risk_insights.update_one(
         {"threat_id": threat_id},
         {"$set": {
@@ -403,11 +405,29 @@ async def analyze_threat_risk(
             "forecasts": [f.model_dump() for f in result.forecasts],
             "key_insights": result.key_insights,
             "recommendations": result.recommendations,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": updated_at,
             "created_by": current_user["id"]
         }},
         upsert=True
     )
+
+    # Also link the cached AI insight back onto the observation/threat document so the UI
+    # can show "AI analyzed" without having to probe the ai_risk_insights collection.
+    try:
+        await db.threats.update_one(
+            {"id": threat_id},
+            {"$set": {
+                "ai_risk_insights_updated_at": updated_at,
+                "ai_risk_insights_created_by": current_user["id"],
+                # Keep this lightweight; the full payload remains in ai_risk_insights.
+                "ai_risk_summary": {
+                    "risk_score": result.dynamic_risk.risk_score,
+                    "risk_level": getattr(result.dynamic_risk, "risk_level", None),
+                },
+            }}
+        )
+    except Exception as e:
+        logger.warning(f"Failed linking ai_risk_insights onto threat {threat_id}: {e}")
     
     return result.model_dump()
 
