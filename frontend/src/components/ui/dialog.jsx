@@ -24,6 +24,25 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+function hasRadixDialogTitle(node) {
+  if (!node) return false;
+
+  if (React.isValidElement(node)) {
+    // Direct <DialogPrimitive.Title />
+    if (node.type === DialogPrimitive.Title) return true;
+
+    // Recurse into children (covers <DialogHeader><DialogTitle/></DialogHeader>, fragments, etc.)
+    const { children } = node.props || {};
+    if (children) return hasRadixDialogTitle(children);
+    return false;
+  }
+
+  if (Array.isArray(node)) return node.some(hasRadixDialogTitle);
+
+  // React.Children.toArray() can yield strings/numbers; ignore
+  return false;
+}
+
 const DialogContent = React.forwardRef(({ className, children, onPointerDownOutside, onInteractOutside, ...props }, ref) => {
   // Check if a date picker is currently active
   const isDatePickerActive = () => {
@@ -34,6 +53,9 @@ const DialogContent = React.forwardRef(({ className, children, onPointerDownOuts
     }
     return false;
   };
+
+  const childrenArray = React.Children.toArray(children);
+  const titlePresent = hasRadixDialogTitle(childrenArray);
 
   return (
     <DialogPortal>
@@ -74,7 +96,10 @@ const DialogContent = React.forwardRef(({ className, children, onPointerDownOuts
           onInteractOutside?.(e);
         }}
         {...props}>
-        {children}
+        {!titlePresent && (
+          <DialogPrimitive.Title className="sr-only">Dialog</DialogPrimitive.Title>
+        )}
+        {childrenArray}
         <DialogPrimitive.Close
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
           <X className="h-4 w-4" />

@@ -15,12 +15,21 @@ const haptic = () => {
 };
 
 const fetchTaskCounts = async () => {
-  const token = localStorage.getItem("token");
-  const headers = { Authorization: `Bearer ${token}` };
+  const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+  const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
+  const headers = {
+    ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+  };
   const base = `${getBackendUrl()}/api/my-tasks`;
   const [openRes, overdueRes] = await Promise.all([
-    fetch(`${base}?filter=open`, { headers }),
-    fetch(`${base}?filter=overdue`, { headers }),
+    fetch(`${base}?filter=open`, {
+      headers,
+      credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+    }),
+    fetch(`${base}?filter=overdue`, {
+      headers,
+      credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+    }),
   ]);
   const openData = await openRes.json();
   const overdueData = await overdueRes.json();

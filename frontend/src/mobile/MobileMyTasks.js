@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 const API_BASE_URL = getBackendUrl();
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
 
 const MobileMyTasks = () => {
   const [filter, setFilter] = useState("today");
@@ -24,8 +25,12 @@ const MobileMyTasks = () => {
   const { data: tasksData = {}, isLoading } = useQuery({
     queryKey: ["myTasks", filter],
     queryFn: async () => {
+      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const response = await fetch(`${API_BASE_URL}/api/my-tasks?filter=${filter}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+        headers: {
+          ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
       if (!response.ok) throw new Error("Failed to fetch tasks");
       return response.json();

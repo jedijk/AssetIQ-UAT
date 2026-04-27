@@ -94,7 +94,7 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
         method: "POST",
         headers,
         // Cookie auth must include credentials (Safari/iOS especially)
-        credentials: AUTH_MODE === "cookie" ? "include" : "same-origin",
+        credentials: AUTH_MODE === "cookie" ? "include" : "omit",
         body: fd,
       });
 

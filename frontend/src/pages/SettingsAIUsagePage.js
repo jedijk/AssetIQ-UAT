@@ -50,12 +50,14 @@ import {
 
 // API helper
 const fetchWithAuth = async (url, options = {}) => {
-  const token = localStorage.getItem("token");
+  const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+  const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
   const response = await fetch(`${getBackendUrl()}${url}`, {
     ...options,
+    credentials: AUTH_MODE === "cookie" ? "include" : "omit",
     headers: {
       ...options.headers,
-      Authorization: `Bearer ${token}`,
+      ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
       "Content-Type": "application/json",
     },
   });

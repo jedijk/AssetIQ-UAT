@@ -24,6 +24,7 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import { getBackendUrl } from "../lib/apiConfig";
 
 const API_URL = getBackendUrl();
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
 
 const SettingsRiskCalculationPage = () => {
   const navigate = useNavigate();
@@ -42,9 +43,12 @@ const SettingsRiskCalculationPage = () => {
 
   const fetchRiskSettings = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const response = await fetch(`${API_URL}/api/risk-settings`, {
-        headers: { Authorization: `Bearer ${token}` }
+        credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+        headers: {
+          ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
       
       if (response.ok) {
@@ -109,15 +113,16 @@ const SettingsRiskCalculationPage = () => {
     
     setSaving(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const response = await fetch(
         `${API_URL}/api/risk-settings/${selectedInstallation.installation_id}?recalculate=true`,
         {
           method: "PUT",
           headers: {
-            Authorization: `Bearer ${token}`,
+            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json"
           },
+          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
           body: JSON.stringify(settings)
         }
       );
@@ -148,12 +153,15 @@ const SettingsRiskCalculationPage = () => {
     
     setRecalculating(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const response = await fetch(
         `${API_URL}/api/risk-settings/${selectedInstallation.installation_id}?recalculate=true`,
         {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` }
+          headers: {
+            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
         }
       );
       
@@ -176,12 +184,15 @@ const SettingsRiskCalculationPage = () => {
     
     setRecalculating(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const response = await fetch(
         `${API_URL}/api/risk-settings/${selectedInstallation.installation_id}/recalculate`,
         {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` }
+          headers: {
+            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
         }
       );
       

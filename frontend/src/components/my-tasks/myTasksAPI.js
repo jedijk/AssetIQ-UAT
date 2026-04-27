@@ -5,6 +5,19 @@
 import { getBackendUrl } from '../../lib/apiConfig';
 
 const API_BASE_URL = getBackendUrl();
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+
+function getAuthFetchOptions(options = {}) {
+  const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
+  return {
+    ...options,
+    credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+    headers: {
+      ...(options.headers || {}),
+      ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  };
+}
 
 export const myTasksAPI = {
   getTasks: async (params = {}) => {
@@ -13,9 +26,10 @@ export const myTasksAPI = {
     if (params.priority) queryParams.append("priority", params.priority);
     if (params.source) queryParams.append("source", params.source);
     if (params.search) queryParams.append("search", params.search);
-    const response = await fetch(`${API_BASE_URL}/api/my-tasks?${queryParams}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/api/my-tasks?${queryParams}`,
+      getAuthFetchOptions()
+    );
     if (!response.ok) throw new Error("Failed to fetch tasks");
     return response.json();
   },
@@ -26,7 +40,7 @@ export const myTasksAPI = {
 
     const response = await fetch(`${API_BASE_URL}/api/tasks/upload-attachment`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      ...getAuthFetchOptions(),
       body: formData,
     });
     if (!response.ok) throw new Error("Failed to upload attachment");
@@ -34,9 +48,10 @@ export const myTasksAPI = {
   },
 
   getAdhocPlans: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/adhoc-plans`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/api/adhoc-plans`,
+      getAuthFetchOptions()
+    );
     if (!response.ok) throw new Error("Failed to fetch ad-hoc plans");
     return response.json();
   },
@@ -44,7 +59,7 @@ export const myTasksAPI = {
   executeAdhocPlan: async (planId) => {
     const response = await fetch(`${API_BASE_URL}/api/adhoc-plans/${planId}/execute`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      ...getAuthFetchOptions(),
     });
     if (!response.ok) throw new Error("Failed to execute plan");
     return response.json();
@@ -53,7 +68,7 @@ export const myTasksAPI = {
   deleteTask: async (taskId) => {
     const response = await fetch(`${API_BASE_URL}/api/my-tasks/${taskId}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      ...getAuthFetchOptions(),
     });
     if (!response.ok) throw new Error("Failed to delete task");
     return response.json();
@@ -66,10 +81,9 @@ export const myTasksAPI = {
 
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
+      ...getAuthFetchOptions({
+        headers: { "Content-Type": "application/json" },
+      }),
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error("Failed to complete task");
@@ -79,7 +93,7 @@ export const myTasksAPI = {
   startTask: async (taskId) => {
     const response = await fetch(`${API_BASE_URL}/api/task-instances/${taskId}/start`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      ...getAuthFetchOptions(),
     });
     if (!response.ok) throw new Error("Failed to start task");
     return response.json();
@@ -88,7 +102,7 @@ export const myTasksAPI = {
   searchEquipment: async (query) => {
     const response = await fetch(
       `${API_BASE_URL}/api/equipment-hierarchy/search?query=${encodeURIComponent(query)}`,
-      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      getAuthFetchOptions()
     );
     if (response.ok) {
       return response.json();

@@ -91,7 +91,10 @@ async def download_equipment_file(file_id: str, current_user: dict = Depends(get
 
     # New path: fetch from storage_service via storage_path
     if doc.get("storage_path"):
-        content, ct = await get_object_async(doc["storage_path"])
+        try:
+            content, ct = await get_object_async(doc["storage_path"])
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="File content not found")
     # Legacy path: inline base64
     elif doc.get("data"):
         import base64
@@ -118,7 +121,10 @@ async def view_equipment_file_public(file_id: str):
 
     # New path: fetch from storage_service via storage_path
     if doc.get("storage_path"):
-        content, ct = await get_object_async(doc["storage_path"])
+        try:
+            content, ct = await get_object_async(doc["storage_path"])
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="File content not found")
     # Legacy path: inline base64
     elif doc.get("data"):
         import base64
