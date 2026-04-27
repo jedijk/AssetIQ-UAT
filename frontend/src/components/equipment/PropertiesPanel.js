@@ -242,8 +242,9 @@ function EquipmentFiles({ equipmentId }) {
     const dbEnvQs = dbEnv ? `?db_env=${encodeURIComponent(dbEnv)}` : "";
     setPreviewFile({ 
       name: file.filename, 
-      // Use inline viewer endpoint for reliable PDF/Image rendering
-      url: `${getBackendUrl()}/api/equipment-files/${file.id}/view${dbEnvQs}`,
+      // Use the authenticated download endpoint for preview too.
+      // iOS is much more reliable when preview bytes match download bytes.
+      url: `${getBackendUrl()}/api/equipment-files/${file.id}/download${dbEnvQs}`,
       type: ext 
     });
   };
