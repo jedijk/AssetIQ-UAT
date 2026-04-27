@@ -34,6 +34,110 @@ ALLOWED_ASSET_FIELDS = [
     "custom"
 ]
 
+def _coerce_bool(v, default: bool = False) -> bool:
+    """Coerce common persisted representations to a real bool.
+
+    Mongo docs or legacy clients can accidentally persist booleans as strings
+    like "false"/"true" or numbers. Treat these consistently to avoid
+    mistakenly rendering QR codes when the toggle is off.
+    """
+    if v is None:
+        return default
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in ("false", "0", "no", "off", "disabled", "n"):
+            return False
+        if s in ("true", "1", "yes", "on", "enabled", "y"):
+            return True
+    return default
+
+def _coerce_float(v, default: float) -> float:
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        try:
+            return float(v)
+        except Exception:
+            return default
+    if isinstance(v, str):
+        try:
+            return float(v.strip())
+        except Exception:
+            return default
+    return default
+
+def _coerce_choice(v, allowed: list[str], default: str) -> str:
+    if not v:
+        return default
+    s = str(v).strip()
+    return s if s in allowed else default
+
+def _normalize_logo_config(cfg: dict | None) -> dict:
+    cfg = cfg or {}
+    allowed_positions = ["top-left", "top-right", "bottom-left", "bottom-right"]
+    return {
+        "enabled": _coerce_bool(cfg.get("enabled", False), default=False),
+        "size_mm": _coerce_float(cfg.get("size_mm", 8.0), default=8.0),
+        "grayscale": _coerce_bool(cfg.get("grayscale", True), default=True),
+        "position": _coerce_choice(cfg.get("position", "top-left"), allowed_positions, "top-left"),
+    }
+
+def _normalize_qr_config(cfg: dict | None) -> dict:
+    cfg = cfg or {}
+    allowed_targets = ["asset_page", "inspection_form", "maintenance_request", "custom_url"]
+    return {
+        "target_type": _coerce_choice(cfg.get("target_type", "asset_page"), allowed_targets, "asset_page"),
+        "form_id": (str(cfg.get("form_id")) if cfg.get("form_id") is not None else None) or None,
+        "custom_url": (str(cfg.get("custom_url")) if cfg.get("custom_url") is not None else None) or None,
+        "base_url": (str(cfg.get("base_url")) if cfg.get("base_url") is not None else None) or None,
+    }
+
+def _normalize_field_bindings(bindings) -> list[dict]:
+    if not bindings:
+        return []
+    out: list[dict] = []
+    if isinstance(bindings, list):
+        for b in bindings:
+            if isinstance(b, FieldBinding):
+                out.append(b.dict())
+            elif isinstance(b, dict):
+                # Coerce common keys to strings to avoid pydantic surprises later.
+                out.append(
+                    {
+                        "source": str(b.get("source") or ""),
+                        "label": b.get("label"),
+                        "value": b.get("value"),
+                        "form_field_id": b.get("form_field_id"),
+                    }
+                )
+    return [b for b in out if b.get("source")]
+
+def _normalize_template_doc(doc: dict) -> dict:
+    """Normalize a template dict so renderers see consistent types."""
+    allowed_orientations = ["portrait", "landscape"]
+    allowed_font_sizes = ["small", "medium", "large"]
+    out = dict(doc or {})
+    out["width_mm"] = _coerce_float(out.get("width_mm", 50.0), default=50.0)
+    out["height_mm"] = _coerce_float(out.get("height_mm", 30.0), default=30.0)
+    out["orientation"] = _coerce_choice(out.get("orientation", "portrait"), allowed_orientations, "portrait")
+    out["preset"] = _coerce_choice(out.get("preset", "standard"), ALLOWED_PRESETS, "standard")
+    out["font_size"] = _coerce_choice(out.get("font_size", "medium"), allowed_font_sizes, "medium")
+    out["show_qr"] = _coerce_bool(out.get("show_qr", True), default=True)
+    out["logo_config"] = _normalize_logo_config(out.get("logo_config"))
+    out["qr_config"] = _normalize_qr_config(out.get("qr_config"))
+    out["field_bindings"] = _normalize_field_bindings(out.get("field_bindings"))
+    # Normalize list fields if they were saved as comma strings
+    sft = out.get("source_form_template_ids")
+    if isinstance(sft, str):
+        out["source_form_template_ids"] = [x.strip() for x in sft.split(",") if x.strip()]
+    elif not isinstance(sft, list):
+        out["source_form_template_ids"] = []
+    return out
+
 
 class FieldBinding(BaseModel):
     source: str  # "asset_id", "asset_name", ..., "form_field", "custom"
@@ -507,6 +611,7 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
     
     data = _inject_print_datetime(data)
     x0, y0 = origin
+    tpl = _normalize_template_doc(tpl)
     width_mm = float(tpl.get("width_mm", 50))
     height_mm = float(tpl.get("height_mm", 30))
     w = width_mm * mm
@@ -516,15 +621,15 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
 
     # Logo configuration
     logo_cfg = tpl.get("logo_config") or {}
-    logo_enabled = logo_cfg.get("enabled", False)
-    logo_size_mm = float(logo_cfg.get("size_mm", 8.0))
-    logo_grayscale = logo_cfg.get("grayscale", True)
-    logo_position = logo_cfg.get("position", "top-left")
+    logo_enabled = _coerce_bool(logo_cfg.get("enabled", False), default=False)
+    logo_size_mm = _coerce_float(logo_cfg.get("size_mm", 8.0), default=8.0)
+    logo_grayscale = _coerce_bool(logo_cfg.get("grayscale", True), default=True)
+    logo_position = _coerce_choice(logo_cfg.get("position", "top-left"), ["top-left", "top-right", "bottom-left", "bottom-right"], "top-left")
     
     logger.info(f"_render_single_label: preset={preset}, logo_enabled={logo_enabled}, logo_position={logo_position}, logo_cfg={logo_cfg}")
 
     # QR code visibility
-    show_qr = tpl.get("show_qr", True)
+    show_qr = _coerce_bool(tpl.get("show_qr", True), default=True)
     
     # Font size preset
     font_sizes = _get_font_sizes(tpl.get("font_size", "medium"))
@@ -817,6 +922,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
     content via window.print() (but not on PDF blobs).
     Layout uses absolute mm units so CSS @page keeps the print dialog paper size.
     """
+    tpl = _normalize_template_doc(tpl)
     w_mm = float(tpl.get("width_mm", 50))
     h_mm = float(tpl.get("height_mm", 30))
     orientation = tpl.get("orientation", "portrait")
@@ -826,13 +932,13 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
     
     # Logo configuration
     logo_cfg = tpl.get("logo_config") or {}
-    logo_enabled = logo_cfg.get("enabled", False)
-    logo_size_mm = float(logo_cfg.get("size_mm", 8.0))
-    logo_grayscale = logo_cfg.get("grayscale", True)
-    logo_position = logo_cfg.get("position", "top-left")
+    logo_enabled = _coerce_bool(logo_cfg.get("enabled", False), default=False)
+    logo_size_mm = _coerce_float(logo_cfg.get("size_mm", 8.0), default=8.0)
+    logo_grayscale = _coerce_bool(logo_cfg.get("grayscale", True), default=True)
+    logo_position = _coerce_choice(logo_cfg.get("position", "top-left"), ["top-left", "top-right", "bottom-left", "bottom-right"], "top-left")
     
     # QR code visibility
-    show_qr = tpl.get("show_qr", True)
+    show_qr = _coerce_bool(tpl.get("show_qr", True), default=True)
     
     # Font size preset
     font_sizes = _get_font_sizes(tpl.get("font_size", "medium"))
@@ -1111,6 +1217,10 @@ async def list_templates(
     docs = await db.label_templates.find(query, {"_id": 0}).sort("updated_at", -1).to_list(500)
     for d in docs:
         _serialize_dt(d)
+        # Normalize so UI sees consistent types even for legacy docs.
+        nd = _normalize_template_doc(d)
+        d.clear()
+        d.update(nd)
     return {"templates": docs, "total": len(docs)}
 
 
@@ -1119,7 +1229,8 @@ async def get_template(template_id: str, current_user: dict = Depends(get_curren
     doc = await db.label_templates.find_one({"id": template_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Template not found")
-    return _serialize_dt(doc)
+    _serialize_dt(doc)
+    return _normalize_template_doc(doc)
 
 
 @router.post("/templates")
@@ -1137,6 +1248,7 @@ async def create_template(
         "created_at": now,
         "updated_at": now,
     }
+    doc = _normalize_template_doc(doc)
     await db.label_templates.insert_one(doc)
     _strip_mongo_id(doc)
     return _serialize_dt(doc)
@@ -1156,9 +1268,33 @@ async def update_template(
         return _serialize_dt(existing)
     updates["updated_at"] = _now()
     updates["version"] = int(existing.get("version", 1)) + 1
-    await db.label_templates.update_one({"id": template_id}, {"$set": updates})
+    # Normalize the merged doc so type mismatches don't break renderers.
+    merged = {**existing, **updates}
+    merged = _normalize_template_doc(merged)
+    # Store only normalized fields for the keys we control (avoid mutating unknown keys).
+    normalized_updates = {k: merged.get(k) for k in [
+        "name",
+        "description",
+        "width_mm",
+        "height_mm",
+        "orientation",
+        "preset",
+        "field_bindings",
+        "qr_config",
+        "logo_config",
+        "show_qr",
+        "font_size",
+        "default_equipment_type_id",
+        "source_form_template_ids",
+        "printer_type",
+        "status",
+        "updated_at",
+        "version",
+    ] if k in merged}
+    await db.label_templates.update_one({"id": template_id}, {"$set": normalized_updates})
     doc = await db.label_templates.find_one({"id": template_id}, {"_id": 0})
-    return _serialize_dt(doc)
+    _serialize_dt(doc)
+    return _normalize_template_doc(doc)
 
 
 @router.delete("/templates/{template_id}")
@@ -1190,6 +1326,7 @@ async def duplicate_template(template_id: str, current_user: dict = Depends(get_
         "created_at": now,
         "updated_at": now,
     }
+    new_doc = _normalize_template_doc(new_doc)
     new_doc.pop("_id", None)
     await db.label_templates.insert_one(new_doc)
     _strip_mongo_id(new_doc)
