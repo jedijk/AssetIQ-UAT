@@ -656,7 +656,7 @@ const FormsPage = ({ embedded = false }) => {
                 <div className="space-y-2">
                   <Label>{t("forms.discipline")}</Label>
                   <Select
-                    value={newTemplate.discipline}
+                    value={newTemplate.discipline || ""}
                     onValueChange={(v) => setNewTemplate(prev => ({ ...prev, discipline: v }))}
                   >
                     <SelectTrigger>
