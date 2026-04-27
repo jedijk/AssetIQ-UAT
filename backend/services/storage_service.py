@@ -68,11 +68,30 @@ _storage_db = None
 
 
 async def _get_storage_db():
-    """Get database with extended timeouts for large file operations."""
+    """
+    Get the database for file_storage metadata.
+
+    IMPORTANT:
+    This app supports per-request database switching via `database.py` using a ContextVar
+    set from the `X-Database-Environment` header. For correctness, `file_storage` metadata
+    must live in the SAME database as the request-scoped application data (e.g. `equipment_files`).
+
+    Therefore we prefer the request-scoped DB from `database.get_request_db()`.
+    We keep the legacy AsyncIOMotorClient path as a fallback (mainly for scripts/background
+    contexts where the request DB context may not be initialized).
+    """
     global _storage_client, _storage_db
 
     if _storage_db is not None:
         return _storage_db
+
+    # Prefer the app's request-scoped DB (supports multi-environment switching)
+    try:
+        from database import get_request_db
+        _storage_db = get_request_db()
+        return _storage_db
+    except Exception as e:
+        logger.warning(f"Falling back to standalone storage DB client: {e}")
 
     mongo_url = os.environ.get('MONGO_URL')
     db_name = os.environ.get('DB_NAME', 'test_database').strip('"')

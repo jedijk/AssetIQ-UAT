@@ -779,14 +779,19 @@ const TaskSchedulerPage = () => {
                       return isSameDay(instDate, day);
                     });
                     
-                    // Also show plans with next_due_date on this day (that don't have instances yet)
-                    const dayPlans = (plans || []).filter((plan) => {
-                      if (!plan.next_due_date || !plan.is_active) return false;
-                      const planDate = parseISO(plan.next_due_date);
-                      // Check if plan has no instance on this date
-                      const hasInstance = dayInstances.some(inst => inst.task_plan_id === plan.id);
-                      return isSameDay(planDate, day) && !hasInstance;
-                    });
+                    // Also show PLANS (not submissions) with next_due_date on this day
+                    // Only include these when the user is looking at "all/planned" executions.
+                    // Otherwise they inflate the calendar counts compared to "submitted/completed".
+                    const includePlansInCalendar = statusFilter === "all" || statusFilter === "planned";
+                    const dayPlans = includePlansInCalendar
+                      ? (plans || []).filter((plan) => {
+                          if (!plan.next_due_date || !plan.is_active) return false;
+                          const planDate = parseISO(plan.next_due_date);
+                          // Check if plan has no instance on this date
+                          const hasInstance = dayInstances.some(inst => inst.task_plan_id === plan.id);
+                          return isSameDay(planDate, day) && !hasInstance;
+                        })
+                      : [];
                     
                     const isCurrentMonth = isSameMonth(day, currentMonth);
                     const isSelected = selectedDate && isSameDay(day, selectedDate);

@@ -434,7 +434,9 @@ const ThreatsPage = () => {
           </div>
           {/* Mobile: Inline stats */}
           <div className="flex sm:hidden items-center gap-2 text-xs">
-            <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">{stats?.total || 0}</span>
+            <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">
+              {Array.isArray(sortedThreats) ? sortedThreats.length : 0}
+            </span>
             {(stats?.critical_count || 0) > 0 && (
               <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats?.critical_count} critical</span>
             )}

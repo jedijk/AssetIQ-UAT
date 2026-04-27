@@ -309,10 +309,12 @@ const UserAvatar = ({ name, photo, size = "sm" }) => {
     if (!photo || imageError) return null;
     
     if (photo.startsWith("/api/")) {
-      const token = localStorage.getItem("token");
+      const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const backendUrl = getBackendUrl();
-      if (token && backendUrl && backendUrl.startsWith('http')) {
-        return `${backendUrl}${photo}?token=${token}`;
+      if (backendUrl && backendUrl.startsWith('http')) {
+        if (AUTH_MODE === "cookie") return `${backendUrl}${photo}`;
+        if (token) return `${backendUrl}${photo}?token=${token}`;
       }
       return null;
     }
