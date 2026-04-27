@@ -31,6 +31,19 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.8.69/bu
 // Get the API base URL for document proxying
 import { getBackendUrl } from '../lib/apiConfig';
 const API_BASE_URL = getBackendUrl();
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+
+function getAuthFetchInit(extra = {}) {
+  const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
+  return {
+    ...extra,
+    credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+    headers: {
+      ...(extra.headers || {}),
+      ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  };
+}
 
 /**
  * Mobile-friendly PDF viewer using canvas rendering
@@ -326,11 +339,7 @@ export const DocumentViewer = ({
     setError(null);
     
     try {
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(url, { 
-        headers: token ? { Authorization: `Bearer ${token}` } : {} 
-      });
+      const response = await fetch(url, getAuthFetchInit());
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -357,11 +366,7 @@ export const DocumentViewer = ({
     setError(null);
     
     try {
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(url, { 
-        headers: token ? { Authorization: `Bearer ${token}` } : {} 
-      });
+      const response = await fetch(url, getAuthFetchInit());
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -421,9 +426,8 @@ export const DocumentViewer = ({
       }
       // Load PDF/Image as blob for authenticated access
       setLoading(true);
-      const token = localStorage.getItem("token");
       
-      fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      fetch(url, getAuthFetchInit())
         .then(async response => {
           if (!response.ok) {
             const errorText = await response.text();
@@ -650,10 +654,7 @@ export const DocumentViewer = ({
                     window.document.body.removeChild(a);
                     return;
                   }
-                  const token = localStorage.getItem("token");
-                  const response = await fetch(url, { 
-                    headers: token ? { Authorization: `Bearer ${token}` } : {} 
-                  });
+                  const response = await fetch(url, getAuthFetchInit());
                   if (!response.ok) throw new Error("Download failed");
                   const blob = await response.blob();
                   const downloadUrl = URL.createObjectURL(blob);
@@ -853,10 +854,7 @@ export const DocumentViewer = ({
                   className="bg-indigo-600 hover:bg-indigo-700"
                   onClick={async () => {
                     try {
-                      const token = localStorage.getItem("token");
-                      const response = await fetch(url, { 
-                        headers: token ? { Authorization: `Bearer ${token}` } : {} 
-                      });
+                      const response = await fetch(url, getAuthFetchInit());
                       if (!response.ok) throw new Error("Download failed");
                       const blob = await response.blob();
                       const downloadUrl = URL.createObjectURL(blob);

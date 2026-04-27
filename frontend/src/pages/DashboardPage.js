@@ -1292,7 +1292,7 @@ export default function DashboardPage({ initialTab }) {
             <div 
               key={item.id || `submission-${idx}`} 
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
-              onClick={(e) => { e.stopPropagation(); navigate("/form-submissions", { state: { submissionId: item.id } }); }}
+              onClick={(e) => { e.stopPropagation(); handleQuickViewClick(item); }}
               data-testid={`form-submission-item-${item.id}`}
             >
               <UserAvatar 
