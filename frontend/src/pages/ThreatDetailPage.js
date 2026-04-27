@@ -88,6 +88,7 @@ import {
 import RiskBadge from "../components/RiskBadge";
 import AIInsightsPanel from "../components/AIInsightsPanel";
 import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
+import DocumentViewer from "../components/DocumentViewer";
 
 // Extracted components
 import { ThreatHeader, RiskScoreCard, RecommendedActionsSection } from "../components/threat-detail";
@@ -112,6 +113,7 @@ const ThreatDetailPage = () => {
 
   // Image viewer state
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null);
 
   // Sticky header visibility state (must be before any early returns)
   const [showStickyHeader, setShowStickyHeader] = useState(false);
@@ -120,20 +122,14 @@ const ThreatDetailPage = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef(null);
 
-  // Handle photo upload in edit mode
-  const handlePhotoUpload = async (e) => {
+  // Handle attachment upload in edit mode (images + documents)
+  const handleAttachmentUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-    
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('Image size must be less than 10MB');
+      toast.error('File size must be less than 10MB');
       return;
     }
     
@@ -142,9 +138,15 @@ const ThreatDetailPage = () => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64Data = reader.result;
+        const isImage = (file.type || "").startsWith("image/");
+        const ext = file.name?.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
         const newAttachment = {
           id: `att-${Date.now()}`,
-          type: 'image',
+          type: isImage ? 'image' : 'file',
+          name: file.name,
+          mime: file.type || "application/octet-stream",
+          size: file.size,
+          ext,
           data: base64Data,
           created_at: new Date().toISOString(),
         };
@@ -152,17 +154,17 @@ const ThreatDetailPage = () => {
           ...prev,
           attachments: [...(prev.attachments || []), newAttachment]
         }));
-        toast.success('Photo added');
+        toast.success(isImage ? 'Photo added' : 'File added');
         setUploadingPhoto(false);
       };
       reader.onerror = () => {
-        toast.error('Failed to read image');
+        toast.error('Failed to read file');
         setUploadingPhoto(false);
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      console.error('Photo upload error:', err);
-      toast.error('Failed to add photo');
+      console.error('Attachment upload error:', err);
+      toast.error('Failed to add file');
       setUploadingPhoto(false);
     }
     
@@ -170,6 +172,21 @@ const ThreatDetailPage = () => {
     if (photoInputRef.current) {
       photoInputRef.current.value = '';
     }
+  };
+
+  const openAttachment = (attachment) => {
+    if (!attachment) return;
+    if (attachment.type === "image") {
+      setSelectedImage(attachment.data);
+      return;
+    }
+    const name = attachment.name || "Attachment";
+    const ext = (attachment.ext || name.split(".").pop() || "").toLowerCase();
+    setSelectedDocument({
+      name,
+      url: attachment.data, // data: URL supported by DocumentViewer
+      type: ext || "bin",
+    });
   };
 
   // Generate shareable link
@@ -1333,10 +1350,9 @@ const ThreatDetailPage = () => {
                 <input
                   ref={photoInputRef}
                   type="file"
-                  accept="image/*"
-                  capture="environment"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
                   className="hidden"
-                  onChange={handlePhotoUpload}
+                  onChange={handleAttachmentUpload}
                   data-testid="photo-input"
                 />
                 <Button
@@ -1353,19 +1369,19 @@ const ThreatDetailPage = () => {
                   ) : (
                     <Camera className="w-4 h-4" />
                   )}
-                  <span className="hidden sm:inline">Add Photo</span>
+                  <span className="hidden sm:inline">Add File</span>
                 </Button>
               </>
             )}
           </div>
           
-          {/* Photo grid */}
+          {/* Attachments grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
             {(isEditing ? editForm.attachments : threat.attachments)?.map((attachment, idx) => (
               <div
                 key={attachment.id || attachment.url || `attachment-${idx}-${attachment.created_at || ''}`}
                 className="relative group cursor-pointer rounded-lg overflow-hidden border border-slate-200 hover:border-blue-400 transition-colors"
-                onClick={() => !isEditing && setSelectedImage(attachment.data)}
+                onClick={() => !isEditing && openAttachment(attachment)}
                 data-testid={`attachment-${idx}`}
               >
                 {attachment.type === 'image' && attachment.data ? (
@@ -1404,8 +1420,11 @@ const ThreatDetailPage = () => {
                     )}
                   </>
                 ) : (
-                  <div className="w-full h-20 sm:h-24 md:h-32 bg-slate-100 flex items-center justify-center">
-                    <Image className="w-8 h-8 text-slate-300" />
+                  <div className="w-full h-20 sm:h-24 md:h-32 bg-slate-50 flex flex-col items-center justify-center gap-1 px-2">
+                    <FileText className="w-7 h-7 text-slate-300" />
+                    <div className="text-[10px] text-slate-500 text-center line-clamp-2">
+                      {attachment.name || "File"}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1425,7 +1444,7 @@ const ThreatDetailPage = () => {
                 ) : (
                   <>
                     <Camera className="w-6 h-6" />
-                    <span className="text-xs">Add Photo</span>
+                    <span className="text-xs">Add File</span>
                   </>
                 )}
               </button>
@@ -1564,6 +1583,16 @@ const ThreatDetailPage = () => {
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+      )}
+
+      {/* Document Viewer (PDF/DOCX/XLS/etc) */}
+      {selectedDocument && (
+        <DocumentViewer
+          document={selectedDocument}
+          onClose={() => setSelectedDocument(null)}
+          onBack={() => setSelectedDocument(null)}
+          showBackButton={true}
+        />
       )}
 
       {/* Share Link Dialog */}

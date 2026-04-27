@@ -239,7 +239,7 @@ export const DocumentViewer = ({
   const url = useMemo(() => {
     if (!rawUrl) return null;
     // If already a full URL or blob URL, use as-is
-    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('blob:')) {
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('blob:') || rawUrl.startsWith('data:')) {
       return rawUrl;
     }
     // Otherwise, proxy through the form-documents endpoint

@@ -722,7 +722,7 @@ const ThreatsPage = () => {
                     </div>
 
                     <div className="priority-rank text-sm sm:text-base hidden sm:block" data-testid={`threat-rank-${threat.id}`}>
-                      #{threat.rank}
+                      #{idx + 1}
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -822,7 +822,7 @@ const ThreatsPage = () => {
 
               {/* Rank - Hidden on mobile */}
               <div className="priority-rank text-sm sm:text-base hidden sm:block" data-testid={`threat-rank-${threat.id}`}>
-                #{threat.rank}
+                #{idx + 1}
               </div>
               
               <div className="flex-1 min-w-0">
