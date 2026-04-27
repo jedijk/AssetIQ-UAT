@@ -193,6 +193,20 @@ window.addEventListener("error", (e) => {
     debugLog("chunk_load_error", { message: msg });
     showBootError("A new version was deployed while your browser cached an older one. Tap Reload.");
   }
+
+  // iOS Safari sometimes reports minified runtime TypeErrors that otherwise surface as a blank screen.
+  // Show the recovery UI so users can reload and clear caches, and log a fingerprint for debugging.
+  if (msg.includes("undefined is not an object") && msg.includes("t[e]")) {
+    try {
+      debugLog("runtime_typeerror_te", {
+        message: msg,
+        href: typeof window !== "undefined" ? window.location.href : "",
+        ua: typeof navigator !== "undefined" ? navigator.userAgent : "",
+        stack: String(e?.error?.stack || ""),
+      });
+    } catch (_e2) {}
+    showBootError("The app hit a runtime error. Tap Reload to recover.");
+  }
 });
 
 // Some chunk-load failures arrive as unhandled promise rejections.
