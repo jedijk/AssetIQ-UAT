@@ -822,9 +822,13 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
         text_start_y = y0 + h - pad - body_font
         if logo_enabled:
             lx, ly = _calculate_logo_position(logo_position, x0, y0, w, h, pad, logo_size_mm)
-            _draw_logo_with_text(c, lx, ly, logo_size_mm, logo_grayscale)
-            # Adjust text start if logo is at top
-            if "top" in logo_position:
+            logo_total_w = _draw_logo_with_text(c, lx, ly, logo_size_mm, logo_grayscale)
+            # If the logo is on the RIGHT, keep full vertical space for lines but reserve horizontal space
+            # so text doesn't overlap the logo area.
+            if "right" in logo_position:
+                text_area_w = max(10 * mm, text_area_w - logo_total_w - 2 * mm)
+            # Only push the text down when the logo is at TOP-LEFT (it would overlap the text column).
+            if "top" in logo_position and "left" in logo_position:
                 text_start_y = y0 + h - pad - logo_size_mm * mm - 3
 
         # Flow bindings line-by-line starting below logo

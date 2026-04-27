@@ -21,8 +21,10 @@ import { labelsAPI } from "./api";
 export const isMobileDevice = () => {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)
-    || (typeof window !== "undefined" && window.innerWidth < 768);
+  // IMPORTANT: do not treat a narrow desktop window as "mobile".
+  // This helper decides which print strategy to use; desktop Chrome with a
+  // small viewport should still use the PDF iframe print path.
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
 };
 
 
