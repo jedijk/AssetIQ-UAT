@@ -264,12 +264,18 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
     
     // If it's an API path, add auth token and backend URL
     if (photo.startsWith("/api/")) {
-      const token = localStorage.getItem("token");
+      const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const backendUrl = getBackendUrl();
       
       // Only build URL if we have all required parts
-      if (token && backendUrl && backendUrl.startsWith('http')) {
-        return `${backendUrl}${photo}?token=${token}`;
+      if (backendUrl && backendUrl.startsWith('http')) {
+        if (AUTH_MODE === "cookie") {
+          return `${backendUrl}${photo}`;
+        }
+        if (token) {
+          return `${backendUrl}${photo}?token=${token}`;
+        }
       }
       // If backend URL is not configured, skip the image
       return null;

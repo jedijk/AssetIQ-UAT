@@ -137,6 +137,12 @@ aiApi.interceptors.request.use((config) => {
       if (csrf) config.headers["X-CSRF-Token"] = csrf;
     }
   }
+
+  // Keep DB environment switching consistent with the primary api client
+  const dbEnv = localStorage.getItem("database_environment");
+  if (dbEnv) {
+    config.headers["X-Database-Environment"] = dbEnv;
+  }
   return config;
 });
 
