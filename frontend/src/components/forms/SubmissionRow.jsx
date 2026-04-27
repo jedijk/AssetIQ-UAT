@@ -43,7 +43,8 @@ export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
     // iOS Safari doesn't block it. We fill it with HTML once the fetch returns.
     let preOpened = null;
     try {
-      if (isMobileDevice()) preOpened = openPrintWindow();
+      // Open for desktop too: avoids Chrome blocking prints triggered after async fetch.
+      preOpened = openPrintWindow();
     } catch (_e) { /* ignore */ }
 
     setPrinting(true);

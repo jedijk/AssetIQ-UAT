@@ -122,11 +122,13 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
   const [form, setForm] = useState(mergedTemplate);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewing, setPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState(null);
   const qc = useQueryClient();
 
   useEffect(() => {
     setForm(mergedTemplate);
     setPreviewUrl(null);
+    setPreviewError(null);
   }, [mergedTemplate, open]);
 
   const isEdit = !!template?.id;
@@ -184,6 +186,7 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
 
   const generatePreview = async () => {
     setPreviewing(true);
+    setPreviewError(null);
     try {
       // strip empty bindings
       const payload = {
@@ -197,13 +200,27 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
       const res = await labelsAPI.previewBlob(payload);
       const rawBlob = res?.blob;
       const contentType = String(res?.contentType || "");
+      if (!rawBlob) {
+        setPreviewError("Preview failed (empty response).");
+        toast.error("Preview failed");
+        return;
+      }
       // If backend returned JSON error (common for auth/validation), show it instead of a blank iframe.
-      if (contentType.includes("application/json")) {
+      if (contentType.includes("application/json") || contentType.includes("text/html")) {
         try {
           const text = await rawBlob.text();
-          const j = JSON.parse(text);
-          toast.error(j?.detail || j?.message || "Preview failed");
+          let msg = "Preview failed";
+          try {
+            const j = JSON.parse(text);
+            msg = j?.detail || j?.message || msg;
+          } catch (_jsonErr) {
+            // If it's HTML/text, keep a short snippet for debugging.
+            msg = (text || "").slice(0, 180) || msg;
+          }
+          setPreviewError(msg);
+          toast.error(msg);
         } catch (_e) {
+          setPreviewError("Preview failed");
           toast.error("Preview failed");
         }
         return;
@@ -217,6 +234,7 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(url);
     } catch (e) {
+      setPreviewError("Preview failed");
       toast.error("Preview failed");
     } finally {
       setPreviewing(false);
@@ -745,6 +763,10 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
                   className="w-full h-full"
                   data-testid="preview-iframe"
                 />
+              ) : previewError ? (
+                <div className="text-xs text-rose-600 text-center px-4">
+                  {String(previewError)}
+                </div>
               ) : (
                 <div className="text-xs text-slate-400 text-center px-4">
                   Click “Generate” to render a PDF preview using sample data

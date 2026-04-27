@@ -277,13 +277,25 @@ export async function printLabel(payload, opts = {}) {
   // Desktop: PDF in hidden iframe → native print dialog
   try {
     const blob = await labelsAPI.printBlob(payload);
-    // If a window was pre-opened on desktop, prefer HTML path (consistent UX)
+    // If a window was pre-opened, navigate it to the PDF blob URL.
+    // This keeps the action user-gesture associated (popup opened on click),
+    // and avoids Chrome blocking iframe.print() after an async fetch.
     if (preOpened && !preOpened.closed) {
       try {
-        const html = await labelsAPI.renderHtml({ ...payload, auto_print: true });
-        if (writeHtmlIntoWindow(preOpened, html)) {
-          return { method: "window", ok: true, mobile: false };
-        }
+        const url = URL.createObjectURL(blob);
+        preOpened.location.href = url;
+        preOpened.addEventListener(
+          "load",
+          () => {
+            try {
+              preOpened.focus();
+              preOpened.print();
+            } catch (_e) {}
+          },
+          { once: true }
+        );
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        return { method: "window", ok: true, mobile: false };
       } catch (_e) { /* fall through to iframe */ }
     }
     const ok = await printPdfViaIframe(blob);
