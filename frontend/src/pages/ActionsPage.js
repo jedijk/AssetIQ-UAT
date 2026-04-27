@@ -154,6 +154,16 @@ export default function ActionsPage() {
   const canDelete = hasPermission("actions", "delete");
   
   const isMobile = useIsMobile();
+  // iOS Safari has had rare crashes in virtualized list rendering; disable
+  // virtualization on iOS to avoid blank-screen runtime TypeErrors.
+  const isIOSLike = (() => {
+    try {
+      const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
+      return /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
+    } catch (_e) {
+      return false;
+    }
+  })();
 
   // Toggle status in multi-select
   const toggleStatus = (status) => {
@@ -622,7 +632,7 @@ export default function ActionsPage() {
         </div>
       ) : (
         <div className="priority-list" data-testid="actions-list">
-          {isMobile ? (
+          {isMobile && !isIOSLike ? (
             <VirtualList
               className="h-[calc(100vh-220px)]"
               data={sortedActions}

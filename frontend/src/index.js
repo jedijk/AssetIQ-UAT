@@ -239,7 +239,14 @@ window.addEventListener("error", (e) => {
     try {
       debugLog("runtime_typeerror_te", {
         message: msg,
+        filename: String(e?.filename || ""),
+        lineno: Number.isFinite(e?.lineno) ? e.lineno : null,
+        colno: Number.isFinite(e?.colno) ? e.colno : null,
         href: typeof window !== "undefined" ? window.location.href : "",
+        path:
+          typeof window !== "undefined" && window.location
+            ? `${window.location.pathname || ""}${window.location.search || ""}${window.location.hash || ""}`
+            : "",
         ua: typeof navigator !== "undefined" ? navigator.userAgent : "",
         stack: String(e?.error?.stack || ""),
       });

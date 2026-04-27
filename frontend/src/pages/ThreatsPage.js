@@ -120,6 +120,16 @@ const ThreatsPage = () => {
   const { t } = useLanguage();
   const { hasPermission } = usePermissions();
   const isMobile = useIsMobile();
+  // iOS Safari has had rare crashes in virtualized list rendering; disable
+  // virtualization on iOS to avoid blank-screen runtime TypeErrors.
+  const isIOSLike = (() => {
+    try {
+      const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
+      return /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
+    } catch (_e) {
+      return false;
+    }
+  })();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState([]); // Multi-select: array of selected statuses
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -652,7 +662,7 @@ const ThreatsPage = () => {
         </div>
       ) : (
         <div className="priority-list" data-testid="threats-list">
-          {isMobile ? (
+          {isMobile && !isIOSLike ? (
             <VirtualList
               className="h-[calc(100vh-220px)]"
               data={sortedThreats}
