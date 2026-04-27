@@ -446,6 +446,24 @@ async def get_risk_insights(
     )
     if not insight:
         raise HTTPException(status_code=404, detail="No AI insights available for this threat. Run analysis first.")
+
+    # Backfill/link onto the threat doc (handles older cached insights + ensures UI can show state)
+    try:
+        updated_at = insight.get("updated_at") or datetime.now(timezone.utc).isoformat()
+        dyn = insight.get("dynamic_risk") or {}
+        await db.threats.update_one(
+            {"id": threat_id},
+            {"$set": {
+                "ai_risk_insights_updated_at": updated_at,
+                "ai_risk_insights_created_by": insight.get("created_by"),
+                "ai_risk_summary": {
+                    "risk_score": dyn.get("risk_score"),
+                    "risk_level": dyn.get("risk_level"),
+                },
+            }}
+        )
+    except Exception as e:
+        logger.warning(f"Failed backfilling ai_risk_insights onto threat {threat_id}: {e}")
     return insight
 
 
