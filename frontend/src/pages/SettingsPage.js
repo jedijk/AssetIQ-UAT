@@ -24,6 +24,8 @@ import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { cn } from "../lib/utils";
 
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.3";
+
 // Settings sections configuration
 const SETTINGS_SECTIONS = [
   {
@@ -291,7 +293,7 @@ export default function SettingsPage() {
               <span className="font-medium">{user?.role}</span> access level
             </div>
             <div className="text-slate-400">
-              Version 3.6.2
+              Version {APP_VERSION}
             </div>
           </div>
         </div>
