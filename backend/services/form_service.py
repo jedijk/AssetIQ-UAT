@@ -1201,11 +1201,18 @@ class FormService:
         from dateutil import parser as _date_parser
 
         def _extract_dt(sub: Dict) -> Optional[datetime]:
-            # Try "Date & Time" in values first
+            # Try "Date & Time" (or similar) in values first
             for v in sub.get("values", []) or []:
                 label = str(v.get("field_label", "")).strip().lower()
                 fid = str(v.get("field_id", "")).strip().lower()
-                if "date" in label and "time" in label or fid.replace("_", " ").strip() == "date & time" or fid == "date_&_time":
+                is_dt_like = (
+                    ("date" in label and "time" in label)
+                    or ("date/time" in label)
+                    or ("datetime" in label)
+                    or (fid.replace("_", " ").strip() == "date & time")
+                    or (fid == "date_&_time")
+                )
+                if is_dt_like:
                     raw = v.get("value")
                     if raw:
                         try:
@@ -1327,22 +1334,36 @@ class FormService:
         # Rewrite this viscosity submission's "Date & Time" value to the target extruder's time.
         new_values = []
         rewrote = False
+        new_val = target_dt.strftime("%Y-%m-%dT%H:%M")
         for v in visc_doc.get("values", []) or []:
             label = str(v.get("field_label", "")).strip().lower()
             fid = str(v.get("field_id", "")).strip().lower()
-            is_dt_field = (("date" in label and "time" in label)
-                           or fid == "date_&_time"
-                           or fid.replace("_", " ").strip() == "date & time")
+            # Templates often use UUID field_ids; rely primarily on the label, with a
+            # couple of legacy id patterns as fallback.
+            is_dt_field = (
+                ("date" in label and "time" in label)
+                or ("date/time" in label)
+                or ("datetime" in label)
+                or (fid == "date_&_time")
+                or (fid.replace("_", " ").strip() == "date & time")
+            )
             if is_dt_field:
                 # Format target in same local-ISO style used by the form (YYYY-MM-DDTHH:MM)
-                new_val = target_dt.strftime("%Y-%m-%dT%H:%M")
                 new_values.append({**v, "value": new_val})
                 rewrote = True
             else:
                 new_values.append(v)
 
         if not rewrote:
-            return
+            # As a last resort, inject a synthetic Date & Time field so the production
+            # dashboard pairing logic can still align rows by time.
+            new_values.append({
+                "field_id": "auto_paired_date_time",
+                "field_label": "Date & Time",
+                "value": new_val,
+                "threshold_status": "normal",
+            })
+            rewrote = True
 
         await self.submissions.update_one(
             {"id": visc_doc["id"]},
