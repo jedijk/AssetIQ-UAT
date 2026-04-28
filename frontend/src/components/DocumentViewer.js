@@ -81,6 +81,7 @@ const IOSPdfViewer = ({ blobUrl, title }) => {
   const [numPages, setNumPages] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+  const [previewUnavailable, setPreviewUnavailable] = useState(false);
   const canvasRef = React.useRef(null);
   const renderTaskRef = React.useRef(null);
 
@@ -89,6 +90,7 @@ const IOSPdfViewer = ({ blobUrl, title }) => {
     let cancelled = false;
     setLoading(true);
     setErr(null);
+    setPreviewUnavailable(false);
     setPdfDoc(null);
     setNumPages(null);
     setPageNumber(1);
@@ -119,7 +121,10 @@ const IOSPdfViewer = ({ blobUrl, title }) => {
             // eslint-disable-next-line no-console
             console.warn("[IOSPdfViewer] Failed to load PDF:", e);
           } catch (_e) {}
-          setErr("Failed to load PDF");
+          // On iOS, PDF.js rendering can fail due to WKWebView/CSP quirks even when the PDF
+          // is otherwise fine. Don't show a scary error; offer a reliable "Open" fallback.
+          setPreviewUnavailable(true);
+          setErr(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -172,11 +177,12 @@ const IOSPdfViewer = ({ blobUrl, title }) => {
     );
   }
 
-  if (err) {
+  if (previewUnavailable) {
     return (
       <div className="p-8 text-center">
-        <AlertCircle className="w-8 h-8 mx-auto text-red-400" />
-        <p className="text-slate-500 mt-2">{err}</p>
+        <AlertCircle className="w-8 h-8 mx-auto text-slate-400" />
+        <p className="text-slate-600 mt-2">Preview isn’t available on iOS for this PDF.</p>
+        <p className="text-slate-500 text-sm mt-1">Tap Open to view or save it.</p>
         {blobUrl ? (
           <div className="mt-3">
             <Button
@@ -194,6 +200,15 @@ const IOSPdfViewer = ({ blobUrl, title }) => {
             </Button>
           </div>
         ) : null}
+      </div>
+    );
+  }
+
+  if (err) {
+    return (
+      <div className="p-8 text-center">
+        <AlertCircle className="w-8 h-8 mx-auto text-red-400" />
+        <p className="text-slate-500 mt-2">{err}</p>
       </div>
     );
   }
