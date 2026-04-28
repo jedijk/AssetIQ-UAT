@@ -22,6 +22,15 @@ function formatForDateTimeLocal(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
+function formatDateOnly(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "2-digit" }).format(d);
+  } catch (_e) {
+    return d.toLocaleDateString();
+  }
+}
+
 function mergeDateAndTime(dateOnly, timeStr) {
   if (!(dateOnly instanceof Date) || Number.isNaN(dateOnly.getTime())) return null;
   const [hh, mm] = String(timeStr || "00:00").split(":").map((x) => parseInt(x, 10) || 0);
@@ -39,17 +48,17 @@ function DateTimePicker({ value, onChange, placeholder = "Select…" }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
-  const label = dateOk ? formatDateTime(date) : placeholder;
+  const label = dateOk ? formatDateOnly(date) : placeholder;
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-col sm:flex-row gap-2">
       <Popover>
         <PopoverTrigger asChild>
           <button
             type="button"
             className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 text-left text-sm flex items-center justify-between"
           >
-            <span className={dateOk ? "text-slate-900" : "text-slate-400"}>{label}</span>
+            <span className={`${dateOk ? "text-slate-900" : "text-slate-400"} truncate pr-2`}>{label}</span>
             <CalendarIcon className="w-4 h-4 text-slate-400" />
           </button>
         </PopoverTrigger>
@@ -77,7 +86,7 @@ function DateTimePicker({ value, onChange, placeholder = "Select…" }) {
           const next = mergeDateAndTime(base, t);
           if (next) onChange?.(formatForDateTimeLocal(next));
         }}
-        className="w-[120px]"
+        className="w-full sm:w-[110px]"
       />
     </div>
   );
