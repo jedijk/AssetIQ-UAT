@@ -248,6 +248,52 @@ const IOSPdfViewer = ({ blobUrl, title }) => {
 };
 
 /**
+ * iOS PDF fallback: open in a new tab (system viewer).
+ *
+ * In iOS WebApps/WKWebView, in-app PDF rendering is often unreliable even when the bytes
+ * are correct. Opening the blob URL in a new tab matches the proven “executing/print”
+ * behavior: the OS PDF viewer handles it.
+ */
+const IOSPdfOpenViewer = ({ blobUrl, title }) => {
+  const openedRef = React.useRef(false);
+
+  useEffect(() => {
+    if (!blobUrl || openedRef.current) return;
+    openedRef.current = true;
+    try {
+      const w = window.open(blobUrl, "_blank", "noopener,noreferrer");
+      if (!w) window.location.href = blobUrl;
+    } catch (_e) {}
+  }, [blobUrl]);
+
+  return (
+    <div className="p-8 text-center">
+      <AlertCircle className="w-8 h-8 mx-auto text-slate-400" />
+      <p className="text-slate-600 mt-2">Opening PDF…</p>
+      <p className="text-slate-500 text-sm mt-1">
+        If nothing happens, tap Open.
+      </p>
+      <div className="mt-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            try {
+              const w = window.open(blobUrl, "_blank", "noopener,noreferrer");
+              if (!w) window.location.href = blobUrl;
+            } catch (_e) {}
+          }}
+          className="gap-2"
+        >
+          Open
+        </Button>
+      </div>
+      {title ? <div className="mt-2 text-xs text-slate-400 truncate">{title}</div> : null}
+    </div>
+  );
+};
+
+/**
  * In-app Document Viewer with back button
  * Supports: PDF (iframe), Images (native), DOCX (mammoth), XLS/XLSX (sheetjs), Others (download link)
  */
@@ -738,7 +784,7 @@ export const DocumentViewer = ({
           {isPdf && !loading && !error && blobUrl && (
             <div className="flex-1 w-full flex items-center justify-center">
               {isIOSLikeDevice() ? (
-                <IOSPdfViewer blobUrl={blobUrl} title={name} />
+                <IOSPdfOpenViewer blobUrl={blobUrl} title={name} />
               ) : (
                 <NativePdfViewer blobUrl={blobUrl} title={name} />
               )}
