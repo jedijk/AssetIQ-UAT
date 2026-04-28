@@ -594,7 +594,9 @@ class FormService:
         
         # Auto-pair Mooney Viscosity samples to the latest orphan Extruder sample (same date)
         try:
-            if (template.get("name") or "").strip().lower() == "mooney viscosity sample":
+            # Be flexible: production templates are often versioned (e.g. "Mooney viscosity v3").
+            tpl_name_norm = (template.get("name") or "").strip().lower()
+            if "mooney" in tpl_name_norm and "viscos" in tpl_name_norm:
                 await self._auto_pair_viscosity_to_extruder(doc)
         except Exception as e:
             logger.warning(f"Viscosity auto-pair failed for submission {doc.get('id')}: {e}")
@@ -1230,14 +1232,21 @@ class FormService:
         day_start = datetime.combine(day, datetime.min.time())
         day_end = datetime.combine(day, datetime.max.time())
 
-        # Find ALL Extruder Settings and Mooney viscosity templates
-        # Note: There may be multiple templates with the same name (different versions)
+        # Find ALL Extruder Settings and Mooney viscosity templates.
+        #
+        # Production naming often includes versions, line names, or suffixes:
+        # - "Extruder Settings v16"
+        # - "Extruder settings sample"
+        # - "Mooney viscosity sample"
+        # - "Mooney Viscosity v2"
+        #
+        # Match broadly but still specific enough to avoid accidental cross-template pairing.
         extruder_tpls = await self.db.form_templates.find(
-            {"name": {"$regex": "^extruder settings sample$", "$options": "i"}},
-        ).to_list(100)
+            {"name": {"$regex": r"extruder\\s*settings", "$options": "i"}},
+        ).to_list(200)
         visc_tpls = await self.db.form_templates.find(
-            {"name": {"$regex": "^mooney viscosity sample$", "$options": "i"}},
-        ).to_list(100)
+            {"name": {"$regex": r"mooney.*viscos", "$options": "i"}},
+        ).to_list(200)
         
         if not extruder_tpls:
             return
