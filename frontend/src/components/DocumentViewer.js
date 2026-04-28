@@ -95,15 +95,32 @@ const IOSPdfViewer = ({ blobUrl, title }) => {
 
     (async () => {
       try {
-        const res = await fetch(blobUrl);
-        const data = await res.arrayBuffer();
-        const task = pdfjsLib.getDocument({ data, disableWorker: true });
+        // Prefer loading directly from the blob URL. iOS can be finicky with
+        // `fetch(blob:...)` under CSP/WKWebView, so avoid the extra fetch hop.
+        let task = null;
+        try {
+          task = pdfjsLib.getDocument({ url: blobUrl, disableWorker: true });
+        } catch (_e) {
+          task = null;
+        }
+
+        if (!task) {
+          const res = await fetch(blobUrl);
+          const data = await res.arrayBuffer();
+          task = pdfjsLib.getDocument({ data, disableWorker: true });
+        }
         const doc = await task.promise;
         if (cancelled) return;
         setPdfDoc(doc);
         setNumPages(doc.numPages || null);
       } catch (e) {
-        if (!cancelled) setErr("Failed to load PDF");
+        if (!cancelled) {
+          try {
+            // eslint-disable-next-line no-console
+            console.warn("[IOSPdfViewer] Failed to load PDF:", e);
+          } catch (_e) {}
+          setErr("Failed to load PDF");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -160,6 +177,23 @@ const IOSPdfViewer = ({ blobUrl, title }) => {
       <div className="p-8 text-center">
         <AlertCircle className="w-8 h-8 mx-auto text-red-400" />
         <p className="text-slate-500 mt-2">{err}</p>
+        {blobUrl ? (
+          <div className="mt-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                try {
+                  const w = window.open(blobUrl, "_blank", "noopener,noreferrer");
+                  if (!w) window.location.href = blobUrl;
+                } catch (_e) {}
+              }}
+              className="gap-2"
+            >
+              Open
+            </Button>
+          </div>
+        ) : null}
       </div>
     );
   }
