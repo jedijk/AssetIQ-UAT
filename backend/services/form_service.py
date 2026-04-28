@@ -1324,12 +1324,20 @@ class FormService:
         if existing_extruder_at_visc_time and existing_extruder_at_visc_time[1].strftime("%H:%M") not in paired_times:
             return
 
-        # Keep only candidates at or before the viscosity time; pick the LATEST
-        candidates = [c for c in candidates if c[1] <= visc_dt]
+        # If there's no exact-time orphan extruder sample, pair to the *closest* orphan
+        # extruder sample on the same date (time may be earlier or later).
         if not candidates:
             return
-        candidates.sort(key=lambda c: c[1])
-        target_sub, target_dt, target_hhmm = candidates[-1]
+
+        def _pair_sort_key(c):
+            _sub, _dt, _hhmm = c
+            # Primary: absolute time difference (closest wins)
+            # Secondary: prefer earlier sample if equally close (stable + intuitive)
+            diff = abs((_dt - visc_dt).total_seconds())
+            return (diff, _dt)
+
+        candidates.sort(key=_pair_sort_key)
+        target_sub, target_dt, target_hhmm = candidates[0]
 
         # Rewrite this viscosity submission's "Date & Time" value to the target extruder's time.
         new_values = []

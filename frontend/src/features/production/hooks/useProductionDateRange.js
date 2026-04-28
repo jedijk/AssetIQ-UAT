@@ -2,9 +2,11 @@ import { useState } from "react";
 import { daysAgo, monthsAgo, startOfYear, today, fmtDate } from "../../../lib/production/dateRange";
 
 export function useProductionDateRange() {
-  const [period, setPeriod] = useState("1w");
-  const [fromDate, setFromDate] = useState(daysAgo(7));
-  const [toDate, setToDate] = useState(today());
+  // Default the Production Report to "today" on first open.
+  const t0 = today();
+  const [period, setPeriod] = useState("1d");
+  const [fromDate, setFromDate] = useState(t0);
+  const [toDate, setToDate] = useState(t0);
   const [showCustomDate, setShowCustomDate] = useState(false);
 
   const handlePeriod = (p) => {
