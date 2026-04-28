@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, ArrowLeft, RefreshCw, Search, Filter, User, Clock } from "lucide-react";
+import { Shield, ArrowLeft, RefreshCw, Search, Filter, User, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -8,8 +8,80 @@ import { Input } from "../components/ui/input";
 import { formatDateTime } from "../lib/dateUtils";
 import { api } from "../lib/apiClient";
 import { useAuth } from "../contexts/AuthContext";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { Calendar } from "../components/ui/calendar";
 
 const METHODS = ["POST", "PUT", "PATCH", "DELETE"];
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function formatForDateTimeLocal(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function mergeDateAndTime(dateOnly, timeStr) {
+  if (!(dateOnly instanceof Date) || Number.isNaN(dateOnly.getTime())) return null;
+  const [hh, mm] = String(timeStr || "00:00").split(":").map((x) => parseInt(x, 10) || 0);
+  return new Date(dateOnly.getFullYear(), dateOnly.getMonth(), dateOnly.getDate(), hh, mm, 0, 0);
+}
+
+function DateTimePicker({ value, onChange, placeholder = "Select…" }) {
+  const date = value ? new Date(value) : null;
+  const dateOk = date && !Number.isNaN(date.getTime());
+  const [time, setTime] = useState(() => (dateOk ? `${pad2(date.getHours())}:${pad2(date.getMinutes())}` : "00:00"));
+
+  useEffect(() => {
+    if (!dateOk) return;
+    setTime(`${pad2(date.getHours())}:${pad2(date.getMinutes())}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const label = dateOk ? formatDateTime(date) : placeholder;
+
+  return (
+    <div className="flex gap-2">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 text-left text-sm flex items-center justify-between"
+          >
+            <span className={dateOk ? "text-slate-900" : "text-slate-400"}>{label}</span>
+            <CalendarIcon className="w-4 h-4 text-slate-400" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-0">
+          <Calendar
+            mode="single"
+            selected={dateOk ? date : undefined}
+            onSelect={(d) => {
+              if (!d) return;
+              const next = mergeDateAndTime(d, time) || d;
+              onChange?.(formatForDateTimeLocal(next));
+            }}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+
+      <Input
+        type="time"
+        value={time}
+        onChange={(e) => {
+          const t = e.target.value;
+          setTime(t);
+          const base = dateOk ? date : new Date();
+          const next = mergeDateAndTime(base, t);
+          if (next) onChange?.(formatForDateTimeLocal(next));
+        }}
+        className="w-[120px]"
+      />
+    </div>
+  );
+}
 
 function statusVariant(status) {
   if (!status) return "secondary";
@@ -23,7 +95,7 @@ export default function SettingsAuditLogPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const isAllowed = user?.role === "owner" || user?.role === "admin";
+  const isAllowed = user?.role === "owner";
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -161,14 +233,14 @@ export default function SettingsAuditLogPage() {
                 <Clock className="w-3 h-3" />
                 From
               </label>
-              <Input type="datetime-local" value={fromTs} onChange={(e) => setFromTs(e.target.value)} />
+              <DateTimePicker value={fromTs} onChange={setFromTs} placeholder="Start date/time" />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-slate-600 flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 To
               </label>
-              <Input type="datetime-local" value={toTs} onChange={(e) => setToTs(e.target.value)} />
+              <DateTimePicker value={toTs} onChange={setToTs} placeholder="End date/time" />
             </div>
           </div>
         </CardContent>

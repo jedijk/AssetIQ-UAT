@@ -595,8 +595,8 @@ const Layout = () => {
     { path: "/settings/server-performance", label: "Server Performance", icon: Server, ownerOnly: true },
     { path: "/settings/database", label: "Database Environment", icon: Database, ownerOnly: true },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
-    // Explicit roles to keep UX consistent with SettingsPage + backend (owner/admin).
-    { path: "/settings/audit-log", label: "Audit Log", icon: ScrollText, roles: ["owner", "admin"] },
+    // Explicit roles to keep UX consistent with SettingsPage + backend (owner only).
+    { path: "/settings/audit-log", label: "Audit Log", icon: ScrollText, roles: ["owner"] },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "settings" },
   ];

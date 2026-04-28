@@ -148,7 +148,7 @@ const SETTINGS_SECTIONS = [
     description: "Who changed what, and when",
     icon: ScrollText,
     path: "/settings/audit-log",
-    roles: ["owner", "admin"]
+    roles: ["owner"]
   }
 ];
 

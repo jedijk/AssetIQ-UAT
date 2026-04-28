@@ -15,9 +15,9 @@ from database import db
 router = APIRouter(tags=["Audit Log"])
 
 
-def _require_owner_or_admin(user: dict):
+def _require_owner(user: dict):
     role = (user or {}).get("role")
-    if role not in ("owner", "admin"):
+    if role != "owner":
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
 
@@ -37,9 +37,9 @@ async def list_audit_log(
     """
     List application audit log events.
 
-    Owner/Admin only.
+    Owner only.
     """
-    _require_owner_or_admin(current_user)
+    _require_owner(current_user)
 
     q: Dict[str, Any] = {}
 
