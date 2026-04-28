@@ -1228,6 +1228,15 @@ class FormService:
                     return _date_parser.parse(str(sa).replace("Z", "+00:00"))
                 except Exception:
                     pass
+            # Fallback to created_at
+            ca = sub.get("created_at")
+            if isinstance(ca, datetime):
+                return ca
+            if ca:
+                try:
+                    return _date_parser.parse(str(ca).replace("Z", "+00:00"))
+                except Exception:
+                    pass
             return None
 
         def _extract_measurement(sub: Dict) -> Optional[float]:
@@ -1324,19 +1333,28 @@ class FormService:
         broad_start = day_start - timedelta(days=7)
         broad_end = day_end + timedelta(days=7)
 
+        # Some environments store submitted_at/created_at as strings. Query using both
+        # datetime and ISO-string ranges, then re-filter using extracted sample datetime.
+        broad_start_iso = broad_start.isoformat()
+        broad_end_iso = broad_end.isoformat()
+        time_window_or = [
+            {"submitted_at": {"$gte": broad_start, "$lte": broad_end}},
+            {"submitted_at": {"$gte": broad_start_iso, "$lte": broad_end_iso}},
+            {"created_at": {"$gte": broad_start, "$lte": broad_end}},
+            {"created_at": {"$gte": broad_start_iso, "$lte": broad_end_iso}},
+        ]
+
         ext_subs = await self.db.form_submissions.find(
-            {"form_template_id": {"$in": extruder_ids},
-             "submitted_at": {"$gte": broad_start, "$lte": broad_end}},
-            {"_id": 0, "id": 1, "values": 1, "submitted_at": 1}
-        ).to_list(500)
+            {"form_template_id": {"$in": extruder_ids}, "$or": time_window_or},
+            {"_id": 0, "id": 1, "values": 1, "submitted_at": 1, "created_at": 1}
+        ).to_list(2000)
 
         visc_subs = []
         if visc_ids:
             visc_subs = await self.db.form_submissions.find(
-                {"form_template_id": {"$in": visc_ids},
-                 "submitted_at": {"$gte": broad_start, "$lte": broad_end}},
-                {"_id": 0, "id": 1, "values": 1, "submitted_at": 1}
-            ).to_list(500)
+                {"form_template_id": {"$in": visc_ids}, "$or": time_window_or},
+                {"_id": 0, "id": 1, "values": 1, "submitted_at": 1, "created_at": 1}
+            ).to_list(2000)
 
         # Build set of HH:MM times already occupied by a viscosity sample on the same day
         paired_times = set()

@@ -1190,14 +1190,44 @@ async def viscosity_pairing_debug_report(
         {"_id": 0},
     ).to_list(5000)
 
+    def _extract_form_dt_raw(sub):
+        # Prefer the canonical Date & Time lookup used by the production dashboard,
+        # but fall back to any "datetime-like" field label/id so we still report what
+        # the operator entered even if the label differs (e.g. "Datetime").
+        raw = extract_field(sub, "Date & Time")
+        if raw:
+            return raw, "Date & Time"
+
+        for v in sub.get("values", []) or []:
+            label = str(v.get("field_label") or "").strip().lower()
+            fid = str(v.get("field_id") or "").strip().lower()
+            is_dt_like = (
+                ("date" in label and "time" in label)
+                or ("date/time" in label)
+                or ("datetime" in label)
+                or (fid.replace("_", " ").strip() == "date & time")
+                or (fid == "date_&_time")
+            )
+            if is_dt_like and v.get("value"):
+                return v.get("value"), f"values:{v.get('field_label') or v.get('field_id')}"
+        return None, None
+
+    def _parse_dt(raw):
+        if not raw:
+            return None
+        try:
+            dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except Exception:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+
     def _effective_dt(sub):
-        dt = parse_submitted_at(sub)
-        date_time_val = extract_field(sub, "Date & Time")
-        if date_time_val:
-            try:
-                dt = datetime.fromisoformat(str(date_time_val).replace("Z", "+00:00"))
-            except Exception:
-                pass
+        # "Effective dt" is what the report code will key on. This is based on the
+        # form-entered Date & Time when present; otherwise it falls back to submitted_at.
+        raw, _src = _extract_form_dt_raw(sub)
+        dt = _parse_dt(raw) if raw else parse_submitted_at(sub)
         if not dt:
             return None
         if dt.tzinfo is None:
@@ -1223,6 +1253,8 @@ async def viscosity_pairing_debug_report(
         sid = s.get("id", "")
         ftid = s.get("form_template_id")
         ftid_type = type(ftid).__name__ if ftid is not None else None
+        form_dt_raw, form_dt_src = _extract_form_dt_raw(s)
+        form_dt_parsed = _parse_dt(form_dt_raw)
 
         if ("extruder" in tpl.lower()) and ("setting" in tpl.lower()):
             extruder_forms.append({
@@ -1233,7 +1265,9 @@ async def viscosity_pairing_debug_report(
                 "template": tpl,
                 "hhmm": hhmm,
                 "datetime": _serialize_datetime(dt),
-                "date_time_raw": extract_field(s, "Date & Time"),
+                "form_date_time_raw": form_dt_raw,
+                "form_date_time_source": form_dt_src,
+                "form_date_time_parsed": _serialize_datetime(form_dt_parsed) if form_dt_parsed else "",
                 "submitted_at": str(s.get("submitted_at") or ""),
             })
         if ("mooney" in tpl.lower()) and ("viscos" in tpl.lower()):
@@ -1246,7 +1280,9 @@ async def viscosity_pairing_debug_report(
                 "template": tpl,
                 "hhmm": hhmm,
                 "datetime": _serialize_datetime(dt),
-                "date_time_raw": extract_field(s, "Date & Time"),
+                "form_date_time_raw": form_dt_raw,
+                "form_date_time_source": form_dt_src,
+                "form_date_time_parsed": _serialize_datetime(form_dt_parsed) if form_dt_parsed else "",
                 "measurement": meas,
                 "measurement_field": meas_key,
                 "auto_paired_to_extruder_id": s.get("auto_paired_to_extruder_id"),
@@ -1300,6 +1336,32 @@ async def viscosity_pairing_debug_report(
     viscosity_times = sorted({s["hhmm"] for s in viscosity_slots if s.get("hhmm")})
     missing = [t for t in extruder_times if t not in viscosity_times]
 
+    # Include the exact payload the report page uses (single-day mode).
+    # Keep sizes bounded so the downloaded JSON stays usable.
+    try:
+        report_payload = await get_production_dashboard(
+            date=date,
+            from_date=None,
+            to_date=None,
+            shift="day",
+            current_user=current_user,
+        )
+    except Exception as e:
+        report_payload = {"error": f"Failed to generate report payload: {e}"}
+
+    def _clip_list(v, limit=250):
+        if not isinstance(v, list):
+            return v
+        return v[:limit]
+
+    if isinstance(report_payload, dict):
+        report_payload_clipped = dict(report_payload)
+        for k in ("production_log", "viscosity_series", "big_bag_entries", "end_of_shift_entries", "actions", "insights"):
+            if k in report_payload_clipped:
+                report_payload_clipped[k] = _clip_list(report_payload_clipped.get(k))
+    else:
+        report_payload_clipped = report_payload
+
     return {
         "report_version": 2,
         "generated_at": _serialize_datetime(datetime.now(timezone.utc)),
@@ -1314,6 +1376,7 @@ async def viscosity_pairing_debug_report(
         "missing_viscosity_times": missing,
         "extruder_slots": extruder_slots,
         "viscosity_slots": viscosity_slots,
+        "report_page_payload": report_payload_clipped,
     }
 
 
