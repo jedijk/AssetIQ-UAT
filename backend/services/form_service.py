@@ -1281,19 +1281,39 @@ class FormService:
             return
 
         # Collect all possible template ID formats (UUID 'id' field and ObjectId '_id')
+        def _add_template_id_variants(out: list, raw_id: Any):
+            """Add both string and ObjectId variants when possible.
+
+            Some environments store `form_template_id` as a string, others as an actual ObjectId.
+            We include both so $in matches regardless of storage type.
+            """
+            if not raw_id:
+                return
+            try:
+                s = str(raw_id)
+            except Exception:
+                return
+            if s not in out:
+                out.append(s)
+            try:
+                from bson import ObjectId as _OID
+                if _OID.is_valid(s):
+                    oid = _OID(s)
+                    if oid not in out:
+                        out.append(oid)
+            except Exception:
+                # If bson isn't available for some reason, keep string-only.
+                pass
+
         extruder_ids = []
         for t in extruder_tpls:
-            if t.get("id"):
-                extruder_ids.append(t["id"])
-            if t.get("_id"):
-                extruder_ids.append(str(t["_id"]))
+            _add_template_id_variants(extruder_ids, t.get("id"))
+            _add_template_id_variants(extruder_ids, t.get("_id"))
         
         visc_ids = []
         for t in visc_tpls:
-            if t.get("id"):
-                visc_ids.append(t["id"])
-            if t.get("_id"):
-                visc_ids.append(str(t["_id"]))
+            _add_template_id_variants(visc_ids, t.get("id"))
+            _add_template_id_variants(visc_ids, t.get("_id"))
 
         # Fetch all extruder & existing viscosity submissions for the day.
         #
