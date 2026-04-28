@@ -61,6 +61,7 @@ const SettingsLogIngestionPage = lazy(() => import("./pages/SettingsLogIngestion
 const SettingsPrivacyPage = lazy(() => import("./pages/SettingsPrivacyPage"));
 const SettingsDeletionRequestsPage = lazy(() => import("./pages/SettingsDeletionRequestsPage"));
 const SettingsConsentManagementPage = lazy(() => import("./pages/SettingsConsentManagementPage"));
+const SettingsAuditLogPage = lazy(() => import("./pages/SettingsAuditLogPage"));
 
 function RouteFallback() {
   return (
@@ -92,7 +93,7 @@ function isIOSDevice() {
 }
 
 // Current frontend version - update with each release
-const APP_VERSION = "3.6.2";
+const APP_VERSION = "3.6.3";
 
 // Parse a semver string "A.B.C" into comparable tuple [A, B, C]
 const parseVersion = (v) => {
@@ -187,7 +188,7 @@ const useVersionCheck = () => {
                 "box-shadow:0 2px 8px rgba(0,0,0,0.15)",
               ].join(";");
               // Avoid innerHTML to reduce XSS sink surface.
-              banner.textContent = `A new version (${backendVersion}) is available. `;
+              banner.textContent = `Update available: ${APP_VERSION} → ${backendVersion}. `;
               const btn = document.createElement("button");
               btn.id = "app-update-reload-btn";
               btn.type = "button";
@@ -433,6 +434,7 @@ function App() {
                   <Route path="ai-usage" element={<Suspense fallback={<RouteFallback />}><SettingsAIUsagePage /></Suspense>} />
                   <Route path="server-performance" element={<Suspense fallback={<RouteFallback />}><SettingsServerPerformancePage /></Suspense>} />
                   <Route path="database" element={<Suspense fallback={<RouteFallback />}><SettingsDatabasePage /></Suspense>} />
+                  <Route path="audit-log" element={<Suspense fallback={<RouteFallback />}><SettingsAuditLogPage /></Suspense>} />
                   <Route path="insights" element={<Suspense fallback={<RouteFallback />}><InsightsPage /></Suspense>} />
                   <Route path="statistics" element={<Suspense fallback={<RouteFallback />}><UserStatisticsPage /></Suspense>} />
                   <Route path="criticality-definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />

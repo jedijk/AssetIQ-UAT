@@ -7,13 +7,13 @@ import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database, ScrollText } from "lucide-react";
 import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { pageTransition, pageVariants, springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.2";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.3";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -595,6 +595,8 @@ const Layout = () => {
     { path: "/settings/server-performance", label: "Server Performance", icon: Server, ownerOnly: true },
     { path: "/settings/database", label: "Database Environment", icon: Database, ownerOnly: true },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
+    // Explicit roles to keep UX consistent with SettingsPage + backend (owner/admin).
+    { path: "/settings/audit-log", label: "Audit Log", icon: ScrollText, roles: ["owner", "admin"] },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "settings" },
   ];
@@ -605,6 +607,8 @@ const Layout = () => {
     if (isMobileView && (user?.role === "operator" || operatorViewEnabled)) {
       return item.path === "/definitions";
     }
+    // Optional explicit role allowlist (used for items like Audit Log)
+    if (item.roles && (!user?.role || !item.roles.includes(user.role))) return false;
     // Filter desktop-only items for mobile
     if (isMobileView && item.desktopOnly) return false;
     // Filter owner-only items for non-owners

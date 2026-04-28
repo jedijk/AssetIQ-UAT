@@ -1158,6 +1158,39 @@ const SettingsServerPerformancePage = () => {
                       </div>
                     ))}
                   </div>
+
+                  {/* Security Standards & Baselines */}
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-2 sm:p-3">
+                    <div className="text-xs sm:text-sm font-medium text-slate-700">
+                      Security standards & baselines
+                    </div>
+                    <div className="mt-1 text-[10px] sm:text-xs text-slate-600 space-y-1">
+                      <div>
+                        <span className="font-medium">OWASP ASVS (v4.x)</span> – auth/session, access control,
+                        configuration hardening.
+                      </div>
+                      <div>
+                        <span className="font-medium">OWASP Top 10</span> – focuses on misconfiguration, auth failures,
+                        broken access control, token leakage.
+                      </div>
+                      <div>
+                        <span className="font-medium">Cookie + CSRF best practices</span> – HttpOnly cookie sessions +
+                        double-submit CSRF for unsafe requests.
+                      </div>
+                      <div>
+                        <span className="font-medium">Credentialed CORS best practices</span> – origin allowlist (no
+                        wildcard with credentials).
+                      </div>
+                      <div>
+                        <span className="font-medium">Browser hardening</span> – CSP, HSTS (HTTPS only),
+                        frame-ancestors/XFO, referrer & permissions policies.
+                      </div>
+                      <div>
+                        <span className="font-medium">Auditability</span> – security events + application transaction
+                        audit log coverage.
+                      </div>
+                    </div>
+                  </div>
                   
                   {/* Last Scan Timestamp */}
                   <div className="pt-2 border-t border-slate-100">

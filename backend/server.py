@@ -15,6 +15,8 @@ import os
 import logging
 import asyncio
 import time
+import json
+from datetime import datetime, timezone
 
 # Configure logging FIRST
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -23,7 +25,7 @@ logger = logging.getLogger(__name__)
 # Single source of truth for the application version.
 # Bump this with each release; the frontend polls /api/health and will force a
 # hard refresh whenever it sees a newer version than the one baked into its bundle.
-APP_VERSION = "3.6.2"
+APP_VERSION = "3.6.3"
 
 # Create FastAPI app IMMEDIATELY - before any potentially failing imports
 app = FastAPI(
@@ -523,6 +525,196 @@ async def csrf_protect_cookie_auth(request: Request, call_next):
             return resp
 
     return await call_next(request)
+
+
+# =============================================================================
+# Application Audit Log (change/transaction logging)
+# =============================================================================
+
+_AUDIT_MAX_BODY_BYTES = int(os.environ.get("AUDIT_MAX_BODY_BYTES", "65536"))  # 64KB
+
+_AUDIT_REDACT_KEYS = {
+    "password",
+    "new_password",
+    "current_password",
+    "token",
+    "access_token",
+    "refresh_token",
+    "authorization",
+    "csrf",
+    "x-csrf-token",
+    "secret",
+    "jwt",
+    "jwt_secret",
+    "jwt_secret_key",
+}
+
+
+def _audit_redact(value, key_hint: str = ""):
+    if key_hint and key_hint.lower() in _AUDIT_REDACT_KEYS:
+        return "[REDACTED]"
+    # Avoid logging very large blobs/strings
+    if isinstance(value, (bytes, bytearray)):
+        return f"[bytes:{len(value)}]"
+    if isinstance(value, str) and len(value) > 2000:
+        return value[:2000] + "…"
+    return value
+
+
+def _audit_sanitize(obj):
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            out[k] = _audit_sanitize(_audit_redact(v, str(k)))
+        return out
+    if isinstance(obj, list):
+        # Cap list length to keep payloads small
+        return [_audit_sanitize(x) for x in obj[:50]]
+    return _audit_redact(obj)
+
+
+async def _audit_get_actor(request: Request):
+    """
+    Best-effort user lookup (never blocks request on audit failures).
+    """
+    try:
+        from auth import _validate_token, AUTH_COOKIE_NAME, ALLOW_COOKIE_AUTH
+    except Exception:
+        return None
+
+    token = None
+    try:
+        authz = request.headers.get("authorization") or ""
+        if authz.lower().startswith("bearer "):
+            token = authz.split(" ", 1)[1].strip()
+    except Exception:
+        token = None
+
+    if not token and getattr(request, "cookies", None):
+        try:
+            if ALLOW_COOKIE_AUTH:
+                token = request.cookies.get(AUTH_COOKIE_NAME)
+        except Exception:
+            token = None
+
+    if not token:
+        return None
+
+    try:
+        user = await _validate_token(token)
+        return {
+            "id": user.get("id"),
+            "name": user.get("name") or user.get("email") or user.get("username"),
+            "email": user.get("email"),
+            "role": user.get("role"),
+        }
+    except Exception:
+        return None
+
+
+@app.middleware("http")
+async def application_audit_log(request: Request, call_next):
+    """
+    Logs all application write transactions (POST/PATCH/PUT/DELETE) to MongoDB.
+
+    Captures: timestamp, actor, path/method/status, and what changed (field names).
+    Payload is redacted and size-limited to reduce risk and cost.
+    """
+    method = (request.method or "").upper()
+    path = request.url.path or ""
+
+    # Only log API write operations; skip health/docs/static.
+    if method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/"):
+        # Read body early (Starlette caches it so downstream can still read it).
+        raw_body = b""
+        try:
+            raw_body = await request.body()
+            if raw_body and len(raw_body) > _AUDIT_MAX_BODY_BYTES:
+                raw_body = raw_body[:_AUDIT_MAX_BODY_BYTES]
+        except Exception:
+            raw_body = b""
+        request.state._audit_raw_body = raw_body
+
+    response = await call_next(request)
+
+    if method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return response
+    if not path.startswith("/api/"):
+        return response
+
+    # Exempt auth endpoints to avoid any chance of credential logging.
+    exempt_prefixes = (
+        "/api/auth/login",
+        "/api/auth/register",
+        "/api/auth/forgot-password",
+        "/api/auth/reset-password",
+        "/api/auth/verify-reset-token",
+    )
+    if any(path.startswith(p) for p in exempt_prefixes):
+        return response
+
+    try:
+        from database import db
+    except Exception:
+        return response
+
+    try:
+        actor = await _audit_get_actor(request)
+        status = int(getattr(response, "status_code", 0) or 0)
+
+        # Parse JSON body (best-effort)
+        changed_fields = []
+        payload = None
+        content_type = (request.headers.get("content-type") or "").lower()
+        raw_body = getattr(request.state, "_audit_raw_body", b"") or b""
+
+        if raw_body and "application/json" in content_type:
+            try:
+                parsed = json.loads(raw_body.decode("utf-8", errors="ignore") or "{}")
+                payload = _audit_sanitize(parsed)
+                if isinstance(parsed, dict):
+                    changed_fields = list(parsed.keys())
+            except Exception:
+                payload = None
+        else:
+            # For multipart/form-data or other content types, avoid parsing streams.
+            payload = None
+
+        # Basic db env inference for visibility in multi-db setups
+        db_env = (
+            request.headers.get("x-database-environment")
+            or request.query_params.get("db_env")
+            or request.cookies.get("db_env")
+        )
+
+        entry = {
+            "ts": datetime.now(timezone.utc),
+            "actor": actor,
+            "http": {
+                "method": method,
+                "path": path,
+                "query": dict(request.query_params) if getattr(request, "query_params", None) else {},
+                "status": status,
+            },
+            "change": {
+                "fields": changed_fields,
+                "payload": payload,
+                "content_type": request.headers.get("content-type"),
+                "content_length": request.headers.get("content-length"),
+            },
+            "client": {
+                "ip": request.client.host if request.client else None,
+                "user_agent": request.headers.get("user-agent"),
+            },
+            "db_env": db_env,
+        }
+
+        # Insert best-effort (never fail the request)
+        await db.audit_log.insert_one(entry)
+    except Exception:
+        pass
+
+    return response
 
 
 # =============================================================================

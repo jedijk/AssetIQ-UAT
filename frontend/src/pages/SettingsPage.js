@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   FileText,
   Shield,
+  ScrollText,
   Trash2,
   Tag
 } from "lucide-react";
@@ -138,6 +139,14 @@ const SETTINGS_SECTIONS = [
     path: "/settings/labels",
     roles: ["owner"],
     desktopOnly: true
+  },
+  {
+    id: "audit-log",
+    label: "Audit Log",
+    description: "Who changed what, and when",
+    icon: ScrollText,
+    path: "/settings/audit-log",
+    roles: ["owner", "admin"]
   }
 ];
 

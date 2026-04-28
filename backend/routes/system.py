@@ -484,14 +484,44 @@ async def get_security_status(
     checks = []
     
     try:
-        # 1. Authentication Check
+        # 1) Authentication & session strategy (2026 baseline)
+        allow_cookie_auth = os.environ.get("ALLOW_COOKIE_AUTH", "true").lower() == "true"
+        auth_cookie_name = os.environ.get("AUTH_COOKIE_NAME", "assetiq_token")
+        csrf_cookie_name = os.environ.get("CSRF_COOKIE_NAME", "assetiq_csrf")
+        allow_query_token = os.environ.get("ALLOW_QUERY_TOKEN_AUTH", "false").lower() == "true"
+
         checks.append({
             "name": "Authentication",
             "status": "pass",
-            "message": "JWT-based authentication enabled with bcrypt hashing"
+            "message": "JWT auth enabled (bcrypt passwords). Prefer HttpOnly cookie sessions where possible."
         })
+        if allow_cookie_auth:
+            checks.append({
+                "name": "Cookie Sessions",
+                "status": "pass",
+                "message": f"Cookie auth enabled ({auth_cookie_name}); CSRF double-submit expected via {csrf_cookie_name}."
+            })
+        else:
+            checks.append({
+                "name": "Cookie Sessions",
+                "status": "warning",
+                "message": "Cookie auth is disabled; bearer tokens increase XSS blast radius if stored in JS-readable storage."
+            })
+
+        if allow_query_token:
+            checks.append({
+                "name": "Token Leakage Protection",
+                "status": "fail",
+                "message": "Query-parameter token auth is ENABLED (ALLOW_QUERY_TOKEN_AUTH=true). Disable to prevent token leakage via logs/referrers/history."
+            })
+        else:
+            checks.append({
+                "name": "Token Leakage Protection",
+                "status": "pass",
+                "message": "Query-parameter token auth is disabled (recommended)."
+            })
         
-        # 2. Password Policy Check
+        # 2) Password Policy
         min_password_length = int(os.environ.get("MIN_PASSWORD_LENGTH", "8"))
         require_complexity = os.environ.get("REQUIRE_PASSWORD_COMPLEXITY", "true").lower() == "true"
         
@@ -514,65 +544,61 @@ async def get_security_status(
                 "message": "Consider stronger password requirements"
             })
         
-        # 3. HTTPS Check
-        # Check if request came over HTTPS
+        # 3) Transport security (HTTPS / HSTS)
         is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
         if is_https:
             checks.append({
-                "name": "HTTPS",
+                "name": "Transport Security",
                 "status": "pass",
-                "message": "Secure connection is enforced"
+                "message": "HTTPS is in use (HSTS should be enabled when behind HTTPS)."
             })
         else:
             # In development, this might be expected
             is_production = os.environ.get("ENVIRONMENT", "development") == "production"
             if is_production:
                 checks.append({
-                    "name": "HTTPS",
+                    "name": "Transport Security",
                     "status": "fail",
-                    "message": "Secure connection not enforced"
+                    "message": "Production request is not HTTPS (check proxy x-forwarded-proto and TLS termination)."
                 })
             else:
                 checks.append({
-                    "name": "HTTPS",
+                    "name": "Transport Security",
                     "status": "warning",
                     "message": "Using HTTP (acceptable for development)"
                 })
         
-        # 4. CORS Configuration Check
-        # Check the actual CORS middleware configuration, not just env var
+        # 4) CORS safety for credentialed sessions
         cors_origins = os.environ.get("CORS_ORIGINS", "")
-        # Also check if we're using the hardcoded secure origins in server.py
-        secure_domains = ["assetiq.tech", "emergentagent.com", "localhost"]
-        is_cors_secure = cors_origins != "*" and cors_origins != ""
-        
-        # If env var not set, check if request origin is from known secure domains
-        request_origin = request.headers.get("origin", "")
-        if not is_cors_secure and request_origin:
-            is_cors_secure = any(domain in request_origin for domain in secure_domains)
-        
-        # Also pass if we're running from assetiq.tech (production)
-        if "assetiq.tech" in request.headers.get("host", "") or "assetiq.tech" in request.headers.get("origin", ""):
-            is_cors_secure = True
-        
-        if is_cors_secure:
+        allow_wildcard_preview = os.environ.get("ALLOW_WILDCARD_PREVIEW_ORIGINS", "false").lower() == "true"
+        if cors_origins.strip() == "*":
+            # With allow_credentials=True, wildcard is unsafe / invalid for browsers.
             checks.append({
                 "name": "CORS Configuration",
-                "status": "pass",
-                "message": "CORS is properly restricted"
+                "status": "fail",
+                "message": "CORS_ORIGINS='*' is unsafe when credentials are used. Use an allowlist of exact origins."
             })
         else:
             checks.append({
                 "name": "CORS Configuration",
+                "status": "pass",
+                "message": "CORS uses an allowlist of origins (recommended for credentialed requests)."
+            })
+        if allow_wildcard_preview:
+            checks.append({
+                "name": "Preview Origin Wildcards",
                 "status": "warning",
-                "message": "CORS allows all origins (consider restricting)"
+                "message": "Wildcard preview origin regex is enabled. Keep OFF in production unless strictly needed."
+            })
+        else:
+            checks.append({
+                "name": "Preview Origin Wildcards",
+                "status": "pass",
+                "message": "Wildcard preview origins are disabled (recommended)."
             })
         
-        # 5. Rate Limiting Check
-        # Check if slowapi is imported and middleware is active
-        # Rate limiting is configured via slowapi in server.py
+        # 5) Rate limiting
         rate_limit_enabled = os.environ.get("RATE_LIMIT_ENABLED", "true").lower() == "true"
-        # Also check if slowapi limiter exists (it's configured in server.py)
         try:
             from slowapi import Limiter
             # If we can import slowapi, rate limiting is available
@@ -585,8 +611,8 @@ async def get_security_status(
             if rate_limit_enabled:
                 checks.append({
                     "name": "Rate Limiting",
-                    "status": "pass",
-                    "message": "API rate limiting is active"
+                    "status": "warning",
+                    "message": "Rate limiting expected but slowapi not available in this build/runtime."
                 })
             else:
                 checks.append({
@@ -595,65 +621,73 @@ async def get_security_status(
                     "message": "Rate limiting not configured"
                 })
         
-        # 6. Dependencies Check
-        # Check for known vulnerabilities using pip-audit if available
-        pip_audit_paths = ["/root/.venv/bin/pip-audit", "/usr/local/bin/pip-audit", "pip-audit"]
-        pip_audit_found = False
-        
-        for pip_audit_path in pip_audit_paths:
-            try:
-                if os.path.exists(pip_audit_path) or pip_audit_path == "pip-audit":
-                    # pip-audit is available, run it with longer timeout
-                    result = subprocess.run(
-                        [pip_audit_path, "--format", "json", "-q", "--progress-spinner", "off"],
-                        capture_output=True,
-                        text=True,
-                        timeout=30
-                    )
-                    pip_audit_found = True
-                    if result.returncode == 0:
-                        checks.append({
-                            "name": "Dependencies",
-                            "status": "pass",
-                            "message": "No known vulnerabilities in packages"
-                        })
-                    else:
-                        # Parse output to see if vulnerabilities found
+        # 6) Dependency hygiene
+        #
+        # Do NOT misleadingly report "pass" unless we actually scanned, because the
+        # presence of dependency vulnerabilities cannot be inferred safely here.
+        # Default: report "warning" and recommend CI-based scanning.
+        # Optional: enable a runtime scan (pip-audit) via env for on-demand checks.
+        run_dependency_audit = os.environ.get("RUN_DEPENDENCY_AUDIT", "false").lower() == "true"
+        if not run_dependency_audit:
+            checks.append({
+                "name": "Dependency Hygiene",
+                "status": "warning",
+                "message": "Runtime dependency vulnerability scan is disabled. Use CI-based scanning (pip-audit/Snyk/GitHub alerts) or set RUN_DEPENDENCY_AUDIT=true for an on-demand check."
+            })
+        else:
+            pip_audit_paths = ["/root/.venv/bin/pip-audit", "/usr/local/bin/pip-audit", "pip-audit"]
+            pip_audit_found = False
+            audit_vuln_count = None
+            audit_error = None
+
+            for pip_audit_path in pip_audit_paths:
+                try:
+                    if os.path.exists(pip_audit_path) or pip_audit_path == "pip-audit":
+                        result = subprocess.run(
+                            [pip_audit_path, "--format", "json", "-q", "--progress-spinner", "off"],
+                            capture_output=True,
+                            text=True,
+                            timeout=25
+                        )
+                        pip_audit_found = True
                         import json as json_module
                         try:
                             vulns = json_module.loads(result.stdout) if result.stdout else []
-                            if len(vulns) > 0:
-                                checks.append({
-                                    "name": "Dependencies",
-                                    "status": "warning",
-                                    "message": f"{len(vulns)} packages may need updates"
-                                })
-                            else:
-                                checks.append({
-                                    "name": "Dependencies",
-                                    "status": "pass",
-                                    "message": "No known vulnerabilities in packages"
-                                })
-                        except Exception:
-                            checks.append({
-                                "name": "Dependencies",
-                                "status": "pass",
-                                "message": "Dependency check completed"
-                            })
-                    break
-            except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-                continue
+                            audit_vuln_count = len(vulns) if isinstance(vulns, list) else None
+                        except Exception as e:
+                            audit_error = f"Failed to parse audit output: {e}"
+                        break
+                except Exception as e:
+                    audit_error = str(e)
+                    continue
+
+            if not pip_audit_found:
+                checks.append({
+                    "name": "Dependency Hygiene",
+                    "status": "warning",
+                    "message": "RUN_DEPENDENCY_AUDIT=true but pip-audit is not available in this runtime. Prefer CI-based scanning."
+                })
+            elif audit_error:
+                checks.append({
+                    "name": "Dependency Hygiene",
+                    "status": "warning",
+                    "message": f"Dependency scan ran but could not complete reliably: {audit_error}"
+                })
+            else:
+                if audit_vuln_count is not None and audit_vuln_count > 0:
+                    checks.append({
+                        "name": "Dependency Hygiene",
+                        "status": "warning",
+                        "message": f"Dependency scan found {audit_vuln_count} potential vulnerability finding(s). Review and update packages."
+                    })
+                else:
+                    checks.append({
+                        "name": "Dependency Hygiene",
+                        "status": "pass",
+                        "message": "Dependency scan completed (no findings reported by pip-audit)."
+                    })
         
-        if not pip_audit_found:
-            # If pip-audit not available, still pass but note it
-            checks.append({
-                "name": "Dependencies",
-                "status": "pass",
-                "message": "Using managed dependencies (pip-audit not required)"
-            })
-        
-        # 7. Database Access Check
-        # Check if MongoDB requires authentication
+        # 7) Database access / auth
         try:
             # Try to get server info - if we can access it, auth is working
             await db.command("ping")
@@ -677,35 +711,30 @@ async def get_security_status(
                 "message": "Unable to verify database security"
             })
         
-        # 8. Environment Variables Check
-        # Check if sensitive keys are properly configured (not default/empty)
-        jwt_secret = os.environ.get("JWT_SECRET_KEY", "") or os.environ.get("JWT_SECRET", "")
-        
-        # Default secure values that are acceptable
-        secure_defaults = [
-            "assetiq_production_jwt_key_2024_secure_random_string_here",
-            "threatbase_super_secret_jwt_key_2024"
-        ]
-        
-        sensitive_issues = []
-        # Only flag if JWT is completely missing/empty or very short
-        if not jwt_secret or jwt_secret == "your-secret-key" or len(jwt_secret) < 16:
-            sensitive_issues.append("JWT secret")
-        
-        if sensitive_issues:
+        # 8) Secrets & fail-fast config
+        env = os.environ.get("ENVIRONMENT", "development").lower()
+        require_jwt = os.environ.get("REQUIRE_JWT_SECRET_KEY", "false").lower() == "true"
+        jwt_secret = os.environ.get("JWT_SECRET_KEY") or os.environ.get("JWT_SECRET") or ""
+        if (env == "production" or require_jwt) and (not jwt_secret or jwt_secret == "default_secret_key"):
             checks.append({
-                "name": "Environment Variables",
+                "name": "Secrets",
+                "status": "fail",
+                "message": "JWT secret is missing/unsafe for production. Set JWT_SECRET_KEY and enable REQUIRE_JWT_SECRET_KEY=true."
+            })
+        elif not jwt_secret or jwt_secret == "default_secret_key" or len(jwt_secret) < 32:
+            checks.append({
+                "name": "Secrets",
                 "status": "warning",
-                "message": f"Review configuration: {', '.join(sensitive_issues)}"
+                "message": "JWT secret is weak/missing. Use a long random value (32+ chars) and consider REQUIRE_JWT_SECRET_KEY=true."
             })
         else:
             checks.append({
-                "name": "Environment Variables",
+                "name": "Secrets",
                 "status": "pass",
-                "message": "Sensitive keys are properly configured"
+                "message": "JWT secret appears set and non-trivial."
             })
         
-        # 9. Brute Force Protection Check
+        # 9) Brute force protection
         max_attempts = int(os.environ.get("MAX_LOGIN_ATTEMPTS", "5"))
         lockout_duration = int(os.environ.get("LOCKOUT_DURATION_MINUTES", "15"))
         checks.append({
@@ -714,42 +743,46 @@ async def get_security_status(
             "message": f"Account lockout after {max_attempts} failed attempts for {lockout_duration} mins"
         })
         
-        # 10. Security Headers Check
+        # 10) Browser hardening headers (server.py middleware)
         checks.append({
             "name": "Security Headers",
             "status": "pass",
-            "message": "HSTS, X-Frame-Options, CSP, XSS-Protection enabled"
+            "message": "Security headers middleware enabled (CSP, frame-ancestors, HSTS on HTTPS, Referrer-Policy, Permissions-Policy)."
         })
         
-        # 11. Audit Logging Check
+        # 11) Audit logging (security events + transactions)
         try:
-            # Check if audit log collection exists and has recent entries
-            audit_count = await db.security_audit_log.count_documents({})
+            security_audit_count = await db.security_audit_log.count_documents({})
+            app_audit_count = await db.audit_log.count_documents({})
             checks.append({
                 "name": "Audit Logging",
                 "status": "pass",
-                "message": f"Security events logged ({audit_count} entries)"
+                "message": f"Security events: {security_audit_count} entries; App transactions: {app_audit_count} entries"
             })
         except Exception:
             checks.append({
                 "name": "Audit Logging",
                 "status": "pass",
-                "message": "Security audit logging enabled"
+                "message": "Audit logging enabled (counts unavailable)"
             })
         
-        # 12. Session Security Check
-        token_expiry = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
-        if token_expiry <= 1440:  # 24 hours or less
+        # 12) Session duration (JWT expiration)
+        try:
+            from database import JWT_EXPIRATION_HOURS
+            hours = int(JWT_EXPIRATION_HOURS)
+        except Exception:
+            hours = 24
+        if hours <= 24:
             checks.append({
-                "name": "Session Security",
+                "name": "Session Duration",
                 "status": "pass",
-                "message": f"Token expiration: {token_expiry} minutes"
+                "message": f"JWT expiration: {hours} hour(s)"
             })
         else:
             checks.append({
-                "name": "Session Security",
+                "name": "Session Duration",
                 "status": "warning",
-                "message": f"Consider shorter token expiration (currently {token_expiry} mins)"
+                "message": f"Consider reducing JWT expiration (currently {hours} hours)"
             })
         
         # Calculate overall status
