@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI } from "../lib/api";
 import { formAPI } from "../components/forms";
 import { useAuth } from "../contexts/AuthContext";
@@ -30,6 +30,7 @@ import {
   Calendar,
   Users,
   Gauge,
+  RefreshCw,
   ExternalLink,
   User,
   Briefcase,
@@ -510,6 +511,8 @@ export default function DashboardPage({ initialTab }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const isFetchingAny = useIsFetching() > 0;
   // ON by default; disable explicitly with REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER=false
   const manualBuilderEnabled = process.env.REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER !== "false";
 
@@ -539,6 +542,17 @@ export default function DashboardPage({ initialTab }) {
   }, []);
 
   const isOperatorMode = user?.role === "operator" || operatorToggle;
+
+  const refreshDashboard = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["stats"] });
+    queryClient.invalidateQueries({ queryKey: ["threats"] });
+    queryClient.invalidateQueries({ queryKey: ["actions"] });
+    queryClient.invalidateQueries({ queryKey: ["investigations"] });
+    queryClient.invalidateQueries({ queryKey: ["form-submissions-dashboard"] });
+    queryClient.invalidateQueries({ queryKey: ["top-observations"] });
+    queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
+    queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+  }, [queryClient]);
 
   // Redirect to operational tab on mobile if viewing hidden tabs (except production which is now mobile-enabled)
   useEffect(() => {
@@ -854,19 +868,6 @@ export default function DashboardPage({ initialTab }) {
         {/* Dashboard Tab Buttons - Mobile Optimized */}
         <div className="flex items-center justify-between gap-4">
           <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1">
-            {canShowBuilder && (
-              <button
-                onClick={() => setActiveTab("builder")}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${
-                  activeTab === "builder" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"
-                }`}
-                data-testid="builder-tab"
-              >
-                <Sparkles className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden xs:inline">Builder</span>
-                <span className="xs:hidden">Build</span>
-              </button>
-            )}
             <button 
               onClick={() => setActiveTab("operational")}
               className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
@@ -894,11 +895,34 @@ export default function DashboardPage({ initialTab }) {
               <span className="hidden xs:inline">Production</span>
               <span className="xs:hidden">Prod</span>
             </button>
+            {canShowBuilder && (
+              <button
+                onClick={() => setActiveTab("builder")}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${
+                  activeTab === "builder" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"
+                }`}
+                data-testid="builder-tab"
+              >
+                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">Builder</span>
+                <span className="xs:hidden">Build</span>
+              </button>
+            )}
           </div>
           
           {/* Filter Button - Next to tabs, only on operational */}
           {activeTab === "operational" && (
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                onClick={refreshDashboard}
+                title="Refresh"
+                data-testid="dashboard-refresh-btn"
+              >
+                <RefreshCw className={`w-4 h-4 ${isFetchingAny ? "animate-spin" : ""}`} />
+              </Button>
               {/* Active Filter Badges */}
               {hasActiveFilters && (
                 <div className="hidden sm:flex items-center gap-2">

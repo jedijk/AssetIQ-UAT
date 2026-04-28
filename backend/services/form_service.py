@@ -1232,6 +1232,9 @@ class FormService:
 
         visc_dt = _extract_dt(visc_doc)
         if not visc_dt:
+            logger.info(
+                f"[Viscosity Auto-Pair] skip: cannot extract datetime from visc={str(visc_doc.get('id',''))[:8]}"
+            )
             return
 
         # Date window: same calendar day (local time — use naive date from parsed value)
@@ -1256,6 +1259,9 @@ class FormService:
         ).to_list(200)
         
         if not extruder_tpls:
+            logger.info(
+                f"[Viscosity Auto-Pair] skip: no extruder templates found for day={day} visc={str(visc_doc.get('id',''))[:8]}"
+            )
             return
 
         # Collect all possible template ID formats (UUID 'id' field and ObjectId '_id')
@@ -1323,14 +1329,25 @@ class FormService:
                 continue  # already paired
             candidates.append((s, dt, hhmm))
 
+        logger.info(
+            f"[Viscosity Auto-Pair] day={day} visc={str(visc_doc.get('id',''))[:8]} "
+            f"visc_hhmm={visc_hhmm} ext_subs_window={len(ext_subs)} candidates={len(candidates)} paired_times={len(paired_times)}"
+        )
+
         # Short-circuit: if an extruder already exists at the exact viscosity time AND not paired,
         # nothing to do (they'll pair by time naturally).
         if existing_extruder_at_visc_time and existing_extruder_at_visc_time[1].strftime("%H:%M") not in paired_times:
+            logger.info(
+                f"[Viscosity Auto-Pair] no-op: exact-time extruder exists at {visc_hhmm} (not paired); visc={str(visc_doc.get('id',''))[:8]}"
+            )
             return
 
         # If there's no exact-time orphan extruder sample, pair to the *closest* orphan
         # extruder sample on the same date (time may be earlier or later).
         if not candidates:
+            logger.info(
+                f"[Viscosity Auto-Pair] skip: no orphan extruder candidates on day={day}; visc={str(visc_doc.get('id',''))[:8]}"
+            )
             return
 
         # Primary preference: pair "backwards" to fill earlier extruder slots on the same day.
@@ -1348,9 +1365,12 @@ class FormService:
         new_values = []
         rewrote = False
         new_val = target_dt.strftime("%Y-%m-%dT%H:%M")
+        has_canonical_dt = False
         for v in visc_doc.get("values", []) or []:
             label = str(v.get("field_label", "")).strip().lower()
             fid = str(v.get("field_id", "")).strip().lower()
+            if label == "date & time" or fid == "date & time" or fid == "date_&_time":
+                has_canonical_dt = True
             # Templates often use UUID field_ids; rely primarily on the label, with a
             # couple of legacy id patterns as fallback.
             is_dt_field = (
@@ -1367,16 +1387,30 @@ class FormService:
             else:
                 new_values.append(v)
 
-        if not rewrote:
-            # As a last resort, inject a synthetic Date & Time field so the production
-            # dashboard pairing logic can still align rows by time.
+        # Ensure the production dashboard can *always* read the paired time.
+        # `backend/routes/production.py` currently extracts by literal "Date & Time",
+        # so we guarantee a canonical field exists, even if the template's datetime
+        # field uses a different label like "Datetime".
+        if not has_canonical_dt:
             new_values.append({
-                "field_id": "auto_paired_date_time",
+                "field_id": "date_&_time",
                 "field_label": "Date & Time",
                 "value": new_val,
                 "threshold_status": "normal",
             })
             rewrote = True
+        elif not rewrote:
+            # Canonical exists but we didn't rewrite anything (unexpected); force it.
+            patched = []
+            for v in new_values:
+                label = str(v.get("field_label", "")).strip().lower()
+                fid = str(v.get("field_id", "")).strip().lower()
+                if label == "date & time" or fid == "date & time" or fid == "date_&_time":
+                    patched.append({**v, "value": new_val})
+                    rewrote = True
+                else:
+                    patched.append(v)
+            new_values = patched
 
         await self.submissions.update_one(
             {"id": visc_doc["id"]},
