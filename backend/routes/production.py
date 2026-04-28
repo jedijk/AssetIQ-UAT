@@ -318,7 +318,13 @@ async def get_production_dashboard(
     for sub in viscosity_subs:
         dt = sub.get("_parsed_time")
         time_label = dt.strftime("%H:%M") if dt else ""
-        measurement = extract_numeric(sub, "Measurement")
+        measurement = None
+        # Be flexible: production Mooney forms differ across versions.
+        # Prefer the dedicated "Measurement" field, but accept common variants.
+        for key in ("Measurement", "Mooney", "Mooney Viscosity", "Viscosity", "MU"):
+            measurement = extract_numeric(sub, key)
+            if measurement is not None:
+                break
         sample_no = extract_field(sub, "Sample No.")
         if measurement is not None:
             viscosity_values.append(measurement)
