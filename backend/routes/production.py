@@ -216,9 +216,32 @@ async def get_production_dashboard(
             sub["_parsed_time"] = dt
             submissions.append(sub)
 
-    # Separate by form type (case-insensitive)
-    def match_template(sub, name):
-        return sub.get("form_template_name", "").lower() == name.lower()
+    # Separate by form type.
+    #
+    # Production templates are often versioned / suffixed (e.g. "Extruder Settings v16"),
+    # so we match by intent rather than exact equality, while keeping the historical
+    # exact-name behavior as a fast path.
+    def match_template(sub, name: str):
+        tpl = (sub.get("form_template_name") or "").strip().lower()
+        target = (name or "").strip().lower()
+        if not tpl or not target:
+            return False
+        if tpl == target:
+            return True
+        # Flexible matching for known production forms
+        if target == EXTRUDER_FORM.lower():
+            return ("extruder" in tpl) and ("setting" in tpl)
+        if target == VISCOSITY_FORM.lower():
+            return ("mooney" in tpl) and ("viscos" in tpl)
+        if target == BIG_BAG_FORM.lower():
+            return ("big" in tpl) and ("bag" in tpl)
+        if target == SCREEN_CHANGE_FORM.lower():
+            return ("screen" in tpl) and ("change" in tpl)
+        if target == MAGNET_CLEANING_FORM.lower():
+            return ("magnet" in tpl) and ("clean" in tpl)
+        if target == END_OF_SHIFT_FORM.lower():
+            return ("end" in tpl) and ("shift" in tpl)
+        return False
 
     extruder_subs = sorted(
         [s for s in submissions if match_template(s, EXTRUDER_FORM)],

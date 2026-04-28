@@ -1144,9 +1144,11 @@ export default function ProductionDashboardPage() {
                   if (e?.activeLabel) setSelectedTime((prev) => prev === e.activeLabel ? null : e.activeLabel);
                 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <ReferenceArea yAxisId="left" y1={50} y2={60} fill="#22c55e" fillOpacity={0.1} />
+                  {/* Target bands: orange (50-70) behind, green (55-65) on top */}
+                  <ReferenceArea yAxisId="left" y1={50} y2={70} fill="#f97316" fillOpacity={0.08} />
+                  <ReferenceArea yAxisId="left" y1={55} y2={65} fill="#22c55e" fillOpacity={0.12} />
                   <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" interval="preserveStartEnd" />
-                  <YAxis yAxisId="left" tick={{ fontSize: 10 }} stroke="#94a3b8" domain={[48, 62]} label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 10 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 10 }} stroke="#94a3b8" domain={[48, 72]} label={{ value: "MU", position: "insideTopLeft", offset: -5, fontSize: 10 }} />
                   {(chartSeries.rpm || chartSeries.feed || chartSeries.mp4 || chartSeries.t_product_ir) && (
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} stroke="#94a3b8" />
                   )}
