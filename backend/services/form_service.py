@@ -1230,6 +1230,22 @@ class FormService:
                     pass
             return None
 
+        def _extract_measurement(sub: Dict) -> Optional[float]:
+            # Best-effort extraction of the viscosity measurement value from the submission values.
+            # The production route is label-based and templates vary, so accept common variants.
+            for v in sub.get("values", []) or []:
+                label = str(v.get("field_label", "")).strip().lower()
+                fid = str(v.get("field_id", "")).strip().lower()
+                if any(k in label for k in ("measurement", "mooney", "viscos")) or fid in ("measurement", "mooney", "viscosity"):
+                    raw = v.get("value")
+                    if raw in (None, ""):
+                        continue
+                    try:
+                        return float(raw)
+                    except (ValueError, TypeError):
+                        continue
+            return None
+
         visc_dt = _extract_dt(visc_doc)
         if not visc_dt:
             logger.info(
@@ -1342,11 +1358,55 @@ class FormService:
             )
             return
 
-        # If there's no exact-time orphan extruder sample, pair to the *closest* orphan
-        # extruder sample on the same date (time may be earlier or later).
+        # If there are no extruder form submissions to pair to, fall back to ingested production logs.
+        # This happens when the extruder row the user sees comes from `production_logs` ingestion.
+        if not candidates:
+            try:
+                # Timestamps are stored as ISO strings in `production_logs.timestamp`.
+                day_start_iso = day_start.strftime("%Y-%m-%dT00:00:00")
+                day_end_iso = day_end.strftime("%Y-%m-%dT23:59:59")
+                ingested = await self.db.production_logs.find(
+                    {
+                        "asset_id": {"$regex": "line.?90", "$options": "i"},
+                        "timestamp": {"$gte": day_start_iso, "$lte": day_end_iso},
+                    },
+                    {"_id": 0, "timestamp": 1, "mooney_viscosity": 1},
+                ).to_list(5000)
+
+                ingested_candidates = []
+                for row in ingested:
+                    ts = row.get("timestamp")
+                    if not ts:
+                        continue
+                    try:
+                        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                    except Exception:
+                        continue
+                    if dt.date() != day:
+                        continue
+                    hhmm = dt.strftime("%H:%M")
+                    # Only fill slots that don't already have a viscosity value and aren't already paired by time.
+                    has_visc = row.get("mooney_viscosity") not in (None, "", "-")
+                    if has_visc or hhmm in paired_times:
+                        continue
+                    ingested_candidates.append(({"id": f"ingested:{ts}"}, dt, hhmm))
+
+                logger.info(
+                    f"[Viscosity Auto-Pair] fallback=ingested day={day} visc={str(visc_doc.get('id',''))[:8]} "
+                    f"ingested_rows={len(ingested)} ingested_candidates={len(ingested_candidates)}"
+                )
+
+                candidates = ingested_candidates
+            except Exception as e:
+                logger.info(
+                    f"[Viscosity Auto-Pair] skip: no extruder candidates and ingested fallback failed ({e}); "
+                    f"day={day} visc={str(visc_doc.get('id',''))[:8]}"
+                )
+                return
+
         if not candidates:
             logger.info(
-                f"[Viscosity Auto-Pair] skip: no orphan extruder candidates on day={day}; visc={str(visc_doc.get('id',''))[:8]}"
+                f"[Viscosity Auto-Pair] skip: no orphan candidates (extruder+ingested) on day={day}; visc={str(visc_doc.get('id',''))[:8]}"
             )
             return
 
