@@ -173,6 +173,10 @@ function canPreviewFile(contentType) {
   if (contentType.startsWith("image/")) return true;
   if (contentType.includes("pdf")) return true;
   if (contentType.includes("presentation") || contentType.includes("powerpoint") || contentType.includes("ppt")) return true;
+  // DocumentViewer supports Office docs by fetching as blob
+  if (contentType.includes("spreadsheet") || contentType.includes("excel") || contentType.includes("xls")) return true;
+  if (contentType.includes("msword") || contentType.includes("wordprocessing") || contentType.includes("doc")) return true;
+  if (contentType.includes("csv")) return true;
   return false;
 }
 
@@ -222,11 +226,26 @@ function EquipmentFiles({ equipmentId }) {
     try {
       const blob = await equipmentHierarchyAPI.downloadEquipmentFile(fileId);
       const url = window.URL.createObjectURL(blob);
+      const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
+      const isIOSLike = /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && typeof document !== "undefined" && "ontouchend" in document);
+
+      if (isIOSLike) {
+        // iOS Safari often ignores `a.download` for blob URLs; open the blob so the user can
+        // Save/Share from the viewer.
+        const w = window.open(url, "_blank", "noopener,noreferrer");
+        if (!w) window.location.href = url;
+        window.setTimeout(() => window.URL.revokeObjectURL(url), 30_000);
+        return;
+      }
+
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
+      a.rel = "noopener";
+      document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      a.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 5_000);
     } catch {
       toast.error("Download failed");
     }
@@ -234,9 +253,13 @@ function EquipmentFiles({ equipmentId }) {
 
   const handleView = (file) => {
     const ext = file.filename.split('.').pop()?.toLowerCase() || '';
+    const dbEnv = localStorage.getItem("database_environment");
+    const dbEnvQs = dbEnv ? `?db_env=${encodeURIComponent(dbEnv)}` : "";
     setPreviewFile({ 
       name: file.filename, 
-      url: `${getBackendUrl()}/api/equipment-files/${file.id}/download`,
+      // Use the authenticated download endpoint for preview too.
+      // iOS is much more reliable when preview bytes match download bytes.
+      url: `${getBackendUrl()}/api/equipment-files/${file.id}/download${dbEnvQs}`,
       type: ext 
     });
   };

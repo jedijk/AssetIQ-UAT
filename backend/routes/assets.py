@@ -1,11 +1,12 @@
 """
 Static assets route - serves assets from MongoDB storage.
 """
-from fastapi import APIRouter, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import Response
 import logging
 
 from services.storage_service import get_object_async, is_storage_available
+from auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +15,9 @@ router = APIRouter(tags=["Assets"])
 
 @router.get("/storage/{path:path}")
 async def serve_storage_file(
+    request: Request,
     path: str,
-    token: str = Query(None),
-    authorization: str = Header(None)
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Serve a file from MongoDB storage.
@@ -27,9 +28,10 @@ async def serve_storage_file(
     - User avatars
     - Any other uploaded files
     
-    Authentication can be provided via:
-    - Authorization: Bearer <token> header
-    - ?token=<token> query parameter (for browser image loading)
+    Authentication is enforced via the shared `get_current_user` dependency:
+    - Bearer token (Authorization header) OR
+    - HttpOnly cookie session (when enabled)
+    - Optional query token ONLY if `ALLOW_QUERY_TOKEN_AUTH=true`
     """
     # Check if storage is available
     if not is_storage_available():
@@ -38,12 +40,7 @@ async def serve_storage_file(
             status_code=503, 
             detail="Storage service not available"
         )
-    
-    # Validate auth
-    auth_header = authorization or (f"Bearer {token}" if token else None)
-    if not auth_header:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     try:
         # Get the file from MongoDB storage
         content, content_type = await get_object_async(path)
@@ -56,10 +53,8 @@ async def serve_storage_file(
             media_type=content_type,
             headers={
                 "Content-Disposition": f"inline; filename=\"{filename}\"",
-                "Cache-Control": "public, max-age=3600",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Authorization, Content-Type"
+                # Files are auth-gated; avoid shared/public caching.
+                "Cache-Control": "private, max-age=3600",
             }
         )
     except FileNotFoundError:

@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database, ScrollText } from "lucide-react";
 import AnimatedDrawer from "./animations/AnimatedDrawer";
-import { springPresets } from "./animations/constants";
+import { pageTransition, pageVariants, springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
@@ -47,6 +47,7 @@ import EquipmentHierarchy from "./EquipmentHierarchy";
 import { actionsAPI, feedbackAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
+import { AppErrorBoundary } from "./AppErrorBoundary";
 
 const Layout = () => {
   const { user, logout, mustChangePassword, mustAcceptTerms } = useAuth();
@@ -58,6 +59,8 @@ const Layout = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Ensure only one header dropdown menu is open at once (mobile + desktop).
+  const [openHeaderMenu, setOpenHeaderMenu] = useState(null); // "notifications" | "help" | "settings" | "profile" | null
   const [chatOpen, setChatOpen] = useState(false);
   const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
   const [hierarchyOpen, setHierarchyOpen] = useState(typeof window !== 'undefined' && window.innerWidth >= 1024);
@@ -65,6 +68,7 @@ const Layout = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const avatarObjectUrlRef = useRef(null);
   const [dismissedNotifications, setDismissedNotifications] = useState(false);
   
   // Profile edit dialog state
@@ -113,18 +117,11 @@ const Layout = () => {
         
         if (data.version === APP_VERSION) {
           localStorage.setItem(STORAGE_KEY, "true");
-          
-          // Clear caches
-          if ('caches' in window) {
-            const names = await caches.keys();
-            await Promise.all(names.map(n => caches.delete(n)));
-          }
-          
+
           toast.success(`AssetIQ updated to v${APP_VERSION}`, {
-            description: "Auto matching viscosity, security update, manual Mooney update mobile, mobile production log view improvement, chat improvements and more",
-            duration: 3000,
+            description: "New Label Print feature — design labels and print directly from form submissions. Plus mobile print support, form field bindings, and bug fixes.",
+            duration: 4500,
           });
-          setTimeout(() => window.location.reload(), 3000);
         }
       } catch (error) {
         console.log('Version check failed:', error);
@@ -148,6 +145,13 @@ const Layout = () => {
 
   // Touch event handlers for pull-to-refresh
   useEffect(() => {
+    // iOS Safari touch handling is extremely sensitive to document-level
+    // preventDefault on touchmove and can degrade tap/scroll responsiveness.
+    // Use native iOS pull-to-refresh instead (Safari provides it).
+    const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
+    const isIOS = /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
+    if (isIOS) return;
+
     let startScrollY = 0;
     
     const handleTouchStart = (e) => {
@@ -227,7 +231,8 @@ const Layout = () => {
       if (!user?.id) return;
       
       try {
-        const token = localStorage.getItem("token");
+        const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+        const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
         const backendUrl = getBackendUrl();
         
         // Only fetch if we have a valid backend URL configured
@@ -235,15 +240,27 @@ const Layout = () => {
           setAvatarUrl(null);
           return;
         }
-        
-        const response = await fetch(
-          `${backendUrl}/api/users/${user.id}/avatar?token=${token}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+
+        const avatarUrl = AUTH_MODE === "cookie"
+          ? `${backendUrl}/api/users/${user.id}/avatar`
+          : `${backendUrl}/api/users/${user.id}/avatar?token=${token}`;
+
+        const response = await fetch(avatarUrl, {
+          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+          headers: {
+            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         
         if (response.ok) {
           const blob = await response.blob();
-          setAvatarUrl(URL.createObjectURL(blob));
+          const nextUrl = URL.createObjectURL(blob);
+          // Revoke previous object URL to prevent memory growth.
+          if (avatarObjectUrlRef.current) {
+            try { URL.revokeObjectURL(avatarObjectUrlRef.current); } catch (_e) {}
+          }
+          avatarObjectUrlRef.current = nextUrl;
+          setAvatarUrl(nextUrl);
         } else {
           // Avatar not found - will use initials fallback
           setAvatarUrl(null);
@@ -255,7 +272,10 @@ const Layout = () => {
     };
     fetchAvatar();
     return () => {
-      if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+      if (avatarObjectUrlRef.current) {
+        try { URL.revokeObjectURL(avatarObjectUrlRef.current); } catch (_e) {}
+        avatarObjectUrlRef.current = null;
+      }
     };
   }, [user?.id]);
 
@@ -357,10 +377,17 @@ const Layout = () => {
       }
 
       // Refresh avatar
-      const avatarResponse = await fetch(
-        `${backendUrl}/api/users/${user.id}/avatar?token=${token}&t=${Date.now()}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+      const avatarFetchUrl = AUTH_MODE === "cookie"
+        ? `${backendUrl}/api/users/${user.id}/avatar?t=${Date.now()}`
+        : `${backendUrl}/api/users/${user.id}/avatar?token=${token}&t=${Date.now()}`;
+
+      const avatarResponse = await fetch(avatarFetchUrl, {
+        credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+        headers: {
+          ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       
       if (avatarResponse.ok) {
         const blob = await avatarResponse.blob();
@@ -568,6 +595,8 @@ const Layout = () => {
     { path: "/settings/server-performance", label: "Server Performance", icon: Server, ownerOnly: true },
     { path: "/settings/database", label: "Database Environment", icon: Database, ownerOnly: true },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
+    // Explicit roles to keep UX consistent with SettingsPage + backend (owner only).
+    { path: "/settings/audit-log", label: "Audit Log", icon: ScrollText, roles: ["owner"] },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },
     { path: "/definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "settings" },
   ];
@@ -578,6 +607,8 @@ const Layout = () => {
     if (isMobileView && (user?.role === "operator" || operatorViewEnabled)) {
       return item.path === "/definitions";
     }
+    // Optional explicit role allowlist (used for items like Audit Log)
+    if (item.roles && (!user?.role || !item.roles.includes(user.role))) return false;
     // Filter desktop-only items for mobile
     if (isMobileView && item.desktopOnly) return false;
     // Filter owner-only items for non-owners
@@ -603,7 +634,13 @@ const Layout = () => {
             {!isOperatorActive && (
             <motion.button
               className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 -ml-1"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={() => {
+                setOpenHeaderMenu(null);
+                // If the equipment hierarchy overlay is open on mobile,
+                // close it when opening the hamburger menu.
+                setHierarchyOpen(false);
+                setMobileMenuOpen(!mobileMenuOpen);
+              }}
               data-testid="mobile-menu-toggle"
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               whileHover={{ scale: 1.05 }}
@@ -691,7 +728,10 @@ const Layout = () => {
           {/* Right Side */}
           <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2">
             {/* Notifications Bell */}
-            <DropdownMenu>
+            <DropdownMenu
+              open={openHeaderMenu === "notifications"}
+              onOpenChange={(open) => setOpenHeaderMenu(open ? "notifications" : null)}
+            >
               <DropdownMenuTrigger asChild>
                 <motion.div
                   whileHover={{ scale: 1.08 }}
@@ -905,7 +945,10 @@ const Layout = () => {
             )}
 
             {/* Help Button */}
-            <DropdownMenu>
+            <DropdownMenu
+              open={openHeaderMenu === "help"}
+              onOpenChange={(open) => setOpenHeaderMenu(open ? "help" : null)}
+            >
               <DropdownMenuTrigger asChild>
                 <motion.div
                   whileHover={{ scale: 1.08 }}
@@ -947,7 +990,10 @@ const Layout = () => {
 
             {/* Settings - Navigate to /settings on desktop, dropdown on mobile */}
             {isMobileView ? (
-              <DropdownMenu>
+              <DropdownMenu
+                open={openHeaderMenu === "settings"}
+                onOpenChange={(open) => setOpenHeaderMenu(open ? "settings" : null)}
+              >
                 <DropdownMenuTrigger asChild>
                   <motion.div
                     whileHover={{ scale: 1.08, rotate: 15 }}
@@ -1004,7 +1050,10 @@ const Layout = () => {
             )}
 
             {/* User Avatar with Profile Dropdown */}
-            <DropdownMenu>
+            <DropdownMenu
+              open={openHeaderMenu === "profile"}
+              onOpenChange={(open) => setOpenHeaderMenu(open ? "profile" : null)}
+            >
               <DropdownMenuTrigger asChild>
                 <motion.button 
                   className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden border-2 border-slate-200 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -1223,24 +1272,29 @@ const Layout = () => {
             </div>
           )}
           
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{
-              type: "tween",
-              duration: 0.25,
-              ease: [0.25, 0.1, 0.25, 1],
-            }}
-            className="h-full"
-            style={{ 
-              paddingTop: isRefreshing ? 48 : pullDistance,
-              transition: 'padding-top 0.2s ease'
-            }}
-          >
-            <Outlet />
-          </motion.div>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={location.pathname}
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={pageTransition}
+              className="h-full"
+              style={{
+                paddingTop: isRefreshing ? 48 : pullDistance,
+                transition: "padding-top 0.2s ease",
+              }}
+            >
+              <AppErrorBoundary
+                context="RouteOutlet"
+                title="This page crashed"
+                subtitle="Something went wrong while rendering this screen. Tap reload to recover."
+              >
+                <Outlet />
+              </AppErrorBoundary>
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 

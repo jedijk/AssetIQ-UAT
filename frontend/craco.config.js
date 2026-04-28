@@ -28,7 +28,9 @@ let webpackConfig = {
       extends: ["plugin:react-hooks/recommended"],
       rules: {
         "react-hooks/rules-of-hooks": "error",
-        "react-hooks/exhaustive-deps": "warn",
+        // CRA treats warnings as errors in CI (e.g. Vercel), so keep this visible
+        // for local dev while not breaking production builds.
+        "react-hooks/exhaustive-deps": process.env.CI ? "off" : "warn",
       },
     },
   },
@@ -37,6 +39,11 @@ let webpackConfig = {
       '@': path.resolve(__dirname, 'src'),
     },
     configure: (webpackConfig) => {
+      // Reduce production console noise and avoid worker sourcemap fetches
+      // like "blob://nullhttps//...worker.js.map" on iOS/Chromium.
+      if (process.env.NODE_ENV === "production") {
+        webpackConfig.devtool = false;
+      }
 
       // Add ignored patterns to reduce watched directories
         webpackConfig.watchOptions = {

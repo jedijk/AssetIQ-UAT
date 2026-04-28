@@ -2,8 +2,10 @@
 AI Risk Engine routes with rate limiting and security.
 """
 import os
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
-from typing import Optional
+from fastapi.responses import JSONResponse
+from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone
 import uuid
 import json
@@ -18,6 +20,7 @@ from ai_risk_models import (
     AnalyzeRiskRequest, GenerateCausesRequest, GenerateFaultTreeRequest, OptimizeActionsRequest
 )
 from services.ai_security_service import detect_prompt_injection
+from services.openai_service import chat_completion
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +36,143 @@ ai_engine = AIRiskEngine(api_key=OPENAI_API_KEY)
 # Rate limit configurations
 AI_RATE_LIMIT = "20/minute"  # 20 AI calls per minute per IP
 AI_HEAVY_RATE_LIMIT = "10/minute"  # 10 heavy AI calls per minute (fault tree, bow tie)
+
+#
+# Dashboard Builder (AI-first) — minimal intent endpoint.
+# This is intentionally template-based in v1 so the frontend can render safely
+# without exposing schema/SQL concepts and without trusting arbitrary code.
+#
+
+class DashboardIntentRequest(dict):
+    """Compat shim: request body is a dict in this codebase."""
+    pass
+
+
+@router.post("/ai/dashboard-intent")
+@limiter.limit(AI_RATE_LIMIT)
+async def dashboard_intent(
+    request: Request,
+    body: Dict[str, Any],
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Convert a natural-language dashboard request into a safe, template-based intent.
+
+    Returns:
+      {
+        "success": true,
+        "intent": {
+          "template_id": "...",
+          "title": "...",
+          "why": "...",
+          "params": {...}
+        }
+      }
+    """
+    prompt = (body or {}).get("prompt") or (body or {}).get("message") or ""
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise HTTPException(status_code=400, detail="prompt is required")
+
+    # Prompt injection check (same approach as the risk engine).
+    check_injection_attempt({"prompt": prompt}, endpoint="/ai/dashboard-intent")
+
+    templates = [
+        {
+            "template_id": "overdue_actions_by_owner",
+            "title": "Overdue actions by owner",
+            "description": "Counts overdue actions (due date before today, not closed) grouped by owner.",
+            "sources": ["Actions"],
+        },
+        {
+            "template_id": "open_actions_kpi",
+            "title": "Open actions",
+            "description": "Counts actions that are not closed/completed.",
+            "sources": ["Actions"],
+        },
+        {
+            "template_id": "open_investigations_kpi",
+            "title": "Open investigations",
+            "description": "Counts investigations that are not completed/closed.",
+            "sources": ["Investigations"],
+        },
+        {
+            "template_id": "critical_observations_kpi",
+            "title": "Critical observations",
+            "description": "Counts observations with risk level Critical/High (where available).",
+            "sources": ["Observations"],
+        },
+        {
+            "template_id": "clarify",
+            "title": "Clarify question",
+            "description": "Ask exactly one clarification question when the prompt is ambiguous.",
+            "sources": [],
+        },
+    ]
+
+    system = (
+        "You are AssetIQ's AI Dashboard Builder. "
+        "Your job is to map a user request into ONE safe dashboard template id from the provided list. "
+        "Do not output SQL, schema, joins, or technical field names. "
+        "If ambiguous, choose template_id='clarify' and ask exactly one short question.\n\n"
+        "Return JSON only with keys: template_id, title, why, params.\n"
+        "params must be an object (can be empty)."
+    )
+
+    user = {
+        "prompt": prompt.strip(),
+        "available_templates": templates,
+        "defaults": {"window": "last_30d", "limit": 10},
+        "user_context": {
+            "role": current_user.get("role"),
+            "user_id": current_user.get("id"),
+        },
+    }
+
+    try:
+        model = os.environ.get("OPENAI_MODEL_DASHBOARD_BUILDER", "gpt-4o-mini")
+        raw = await chat_completion(
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps(user)},
+            ],
+            model=model,
+            temperature=0.2,
+            max_tokens=500,
+            response_format={"type": "json_object"},
+        )
+
+        parsed = json.loads(raw or "{}")
+        template_id = parsed.get("template_id")
+        if template_id not in {t["template_id"] for t in templates}:
+            template_id = "clarify"
+
+        intent = {
+            "template_id": template_id,
+            "title": parsed.get("title") or next((t["title"] for t in templates if t["template_id"] == template_id), "Dashboard widget"),
+            "why": parsed.get("why") or "Generated from your request.",
+            "params": parsed.get("params") if isinstance(parsed.get("params"), dict) else {},
+        }
+
+        # Log usage (lightweight; token counts not available here)
+        await log_ai_usage(
+            user_id=current_user.get("id", "unknown"),
+            feature="dashboard_builder_intent",
+            model=model,
+            prompt_tokens=0,
+            completion_tokens=0,
+            installation_name=current_user.get("installation", "default") if isinstance(current_user, dict) else "default",
+            installation_id=current_user.get("installation_id", "default") if isinstance(current_user, dict) else "default",
+            success=True,
+            metadata={"template_id": template_id},
+        )
+
+        return {"success": True, "intent": intent}
+    except ValueError as ve:
+        # OPENAI_API_KEY missing etc.
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"dashboard_intent error: {e}")
+        raise HTTPException(status_code=500, detail="AI dashboard intent failed")
 
 
 async def log_ai_usage(
@@ -255,6 +395,8 @@ async def analyze_threat_risk(
     )
     
     # Store the AI insights for the threat
+    updated_at = datetime.now(timezone.utc).isoformat()
+
     await db.ai_risk_insights.update_one(
         {"threat_id": threat_id},
         {"$set": {
@@ -263,11 +405,29 @@ async def analyze_threat_risk(
             "forecasts": [f.model_dump() for f in result.forecasts],
             "key_insights": result.key_insights,
             "recommendations": result.recommendations,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": updated_at,
             "created_by": current_user["id"]
         }},
         upsert=True
     )
+
+    # Also link the cached AI insight back onto the observation/threat document so the UI
+    # can show "AI analyzed" without having to probe the ai_risk_insights collection.
+    try:
+        await db.threats.update_one(
+            {"id": threat_id},
+            {"$set": {
+                "ai_risk_insights_updated_at": updated_at,
+                "ai_risk_insights_created_by": current_user["id"],
+                # Keep this lightweight; the full payload remains in ai_risk_insights.
+                "ai_risk_summary": {
+                    "risk_score": result.dynamic_risk.risk_score,
+                    "risk_level": getattr(result.dynamic_risk, "risk_level", None),
+                },
+            }}
+        )
+    except Exception as e:
+        logger.warning(f"Failed linking ai_risk_insights onto threat {threat_id}: {e}")
     
     return result.model_dump()
 
@@ -286,6 +446,24 @@ async def get_risk_insights(
     )
     if not insight:
         raise HTTPException(status_code=404, detail="No AI insights available for this threat. Run analysis first.")
+
+    # Backfill/link onto the threat doc (handles older cached insights + ensures UI can show state)
+    try:
+        updated_at = insight.get("updated_at") or datetime.now(timezone.utc).isoformat()
+        dyn = insight.get("dynamic_risk") or {}
+        await db.threats.update_one(
+            {"id": threat_id},
+            {"$set": {
+                "ai_risk_insights_updated_at": updated_at,
+                "ai_risk_insights_created_by": insight.get("created_by"),
+                "ai_risk_summary": {
+                    "risk_score": dyn.get("risk_score"),
+                    "risk_level": dyn.get("risk_level"),
+                },
+            }}
+        )
+    except Exception as e:
+        logger.warning(f"Failed backfilling ai_risk_insights onto threat {threat_id}: {e}")
     return insight
 
 
@@ -345,6 +523,17 @@ async def generate_threat_causes(
     current_user: dict = Depends(get_current_user)
 ):
     """AI-powered causal analysis - generates probable causes"""
+    # Fast path: if we already have cached analysis, return it and avoid slow AI calls
+    # that can time out through the Vercel -> Railway proxy (seen as 502s).
+    try:
+        existing = await db.ai_causal_analysis.find_one({"threat_id": threat_id}, {"_id": 0})
+        if existing and isinstance(existing, dict) and existing.get("probable_causes"):
+            existing["cached"] = True
+            return existing
+    except Exception:
+        # Cache read failure should not block generation.
+        pass
+
     threat = await db.threats.find_one(
         {"id": threat_id},
         {"_id": 0}
@@ -398,44 +587,58 @@ async def generate_threat_causes(
         equipment_history["actions"] = past_actions
     
     max_causes = body.max_causes if body else 5
-    
-    result = await ai_engine.generate_causes(
-        threat=threat,
-        equipment_data=equipment_data,
-        equipment_history=equipment_history,
-        max_causes=max_causes
+
+    async def _compute_and_store():
+        result = await ai_engine.generate_causes(
+            threat=threat,
+            equipment_data=equipment_data,
+            equipment_history=equipment_history,
+            max_causes=max_causes,
+        )
+
+        # Log AI usage for causal intelligence
+        installation_name = threat.get("installation", threat.get("location", "default"))
+        await log_ai_usage(
+            user_id=current_user["id"],
+            feature="causal_intelligence",
+            model="gpt-4o",
+            prompt_tokens=600,
+            completion_tokens=1200,
+            installation_name=installation_name,
+            installation_id=threat.get("installation_id", "default"),
+            success=True,
+            metadata={"threat_id": threat_id, "max_causes": max_causes},
+        )
+
+        # Store the causal analysis
+        await db.ai_causal_analysis.update_one(
+            {"threat_id": threat_id},
+            {"$set": {
+                "threat_id": threat_id,
+                "summary": result.summary,
+                "probable_causes": [c.model_dump() for c in result.probable_causes],
+                "contributing_factors": result.contributing_factors,
+                "confidence": result.confidence.value,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "created_by": current_user["id"],
+            }},
+            upsert=True,
+        )
+        return result
+
+    # If this request came through the Vercel proxy, long-running OpenAI calls can
+    # surface as 502 Bad Gateway. Run the heavy work in the background and return
+    # a quick 202; the client should poll GET /api/ai/causal-analysis/{threat_id}.
+    try:
+        asyncio.create_task(_compute_and_store())
+    except Exception as e:
+        logger.error(f"Failed to schedule causal generation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to start causal analysis")
+
+    return JSONResponse(
+        status_code=202,
+        content={"status": "pending", "threat_id": threat_id},
     )
-    
-    # Log AI usage for causal intelligence
-    installation_name = threat.get("installation", threat.get("location", "default"))
-    await log_ai_usage(
-        user_id=current_user["id"],
-        feature="causal_intelligence",
-        model="gpt-4o",
-        prompt_tokens=600,
-        completion_tokens=1200,
-        installation_name=installation_name,
-        installation_id=threat.get("installation_id", "default"),
-        success=True,
-        metadata={"threat_id": threat_id, "max_causes": max_causes}
-    )
-    
-    # Store the causal analysis
-    await db.ai_causal_analysis.update_one(
-        {"threat_id": threat_id},
-        {"$set": {
-            "threat_id": threat_id,
-            "summary": result.summary,
-            "probable_causes": [c.model_dump() for c in result.probable_causes],
-            "contributing_factors": result.contributing_factors,
-            "confidence": result.confidence.value,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "created_by": current_user["id"]
-        }},
-        upsert=True
-    )
-    
-    return result.model_dump()
 
 
 @router.get("/ai/causal-analysis/{threat_id}")

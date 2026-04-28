@@ -239,13 +239,13 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     if (isOpen && messages.length > 0) {
       scrollToBottom("smooth");
     }
-  }, [messages]);
+  }, [isOpen, messages]);
 
   useEffect(() => {
     if (isOpen && (isSending || isTranscribing)) {
       scrollToBottom("smooth");
     }
-  }, [isSending, isTranscribing]);
+  }, [isOpen, isSending, isTranscribing]);
 
   // Handle send
   const handleSend = () => {

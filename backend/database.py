@@ -171,7 +171,24 @@ async def safe_db_query(query_func, fallback_value=None, timeout: float = 5.0):
         return fallback_value
 
 # JWT Config
-JWT_SECRET = os.environ.get('JWT_SECRET_KEY', 'default_secret_key')
+#
+# Backwards-compatible behavior:
+# - If JWT_SECRET_KEY is missing, we fall back to an insecure default (same risk as before),
+#   but we log loudly so misconfig is obvious.
+# - If you want fail-fast behavior in production, set REQUIRE_JWT_SECRET_KEY=true.
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
+REQUIRE_JWT_SECRET_KEY = os.environ.get("REQUIRE_JWT_SECRET_KEY", "false").lower() == "true"
+
+JWT_SECRET = os.environ.get("JWT_SECRET_KEY")
+if not JWT_SECRET:
+    if REQUIRE_JWT_SECRET_KEY and ENVIRONMENT not in ("development", "dev", "local", "test", "testing"):
+        raise ValueError("JWT_SECRET_KEY environment variable is required (REQUIRE_JWT_SECRET_KEY=true)")
+
+    JWT_SECRET = "default_secret_key"
+    logger.warning(
+        "JWT_SECRET_KEY not set; using insecure default secret. "
+        "Set JWT_SECRET_KEY (recommended) or set REQUIRE_JWT_SECRET_KEY=true to fail fast."
+    )
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 

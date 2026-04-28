@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -57,7 +57,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from "../components/ui/label";
 import InsightsPage from "./InsightsPage";
 import { DISCIPLINES } from "../constants/disciplines";
-import ProductionDashboardPage from "./ProductionDashboardPage";
+
+const ProductionDashboardPage = lazy(() => import("./ProductionDashboardPage"));
+const SmartDashboardBuilderPanel = lazy(() =>
+  import("../features/dashboardBuilder/SmartDashboardBuilderPanel").then((m) => ({ default: m.SmartDashboardBuilderPanel }))
+);
 
 // Authenticated Lightbox component for viewing images with proper mobile auth
 const AuthenticatedLightbox = ({ url, name, onClose }) => {
@@ -260,12 +264,18 @@ const UserAvatar = ({ name, photo, initials, size = "sm", position = null, showP
     
     // If it's an API path, add auth token and backend URL
     if (photo.startsWith("/api/")) {
-      const token = localStorage.getItem("token");
+      const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const backendUrl = getBackendUrl();
       
       // Only build URL if we have all required parts
-      if (token && backendUrl && backendUrl.startsWith('http')) {
-        return `${backendUrl}${photo}?token=${token}`;
+      if (backendUrl && backendUrl.startsWith('http')) {
+        if (AUTH_MODE === "cookie") {
+          return `${backendUrl}${photo}`;
+        }
+        if (token) {
+          return `${backendUrl}${photo}?token=${token}`;
+        }
       }
       // If backend URL is not configured, skip the image
       return null;
@@ -500,10 +510,17 @@ export default function DashboardPage({ initialTab }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState(initialTab || "operational");
+  // ON by default; disable explicitly with REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER=false
+  const manualBuilderEnabled = process.env.REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER !== "false";
 
   // Operator view: shown on mobile when role is operator or owner has toggled it
-  const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < 768);
+  const initialIsMobileViewport = window.innerWidth < 768;
+  const [isMobileViewport, setIsMobileViewport] = useState(() => initialIsMobileViewport);
+  const isOwner = user?.role === "owner";
+  const canShowBuilder = manualBuilderEnabled && !isMobileViewport && isOwner;
+  const [activeTab, setActiveTab] = useState(
+    initialTab || (manualBuilderEnabled && !initialIsMobileViewport ? "builder" : "operational")
+  );
   const [operatorToggle, setOperatorToggle] = useState(
     () => localStorage.getItem("operatorViewEnabled") === "true"
   );
@@ -522,13 +539,13 @@ export default function DashboardPage({ initialTab }) {
   }, []);
 
   const isOperatorMode = user?.role === "operator" || operatorToggle;
-  
+
   // Redirect to operational tab on mobile if viewing hidden tabs (except production which is now mobile-enabled)
   useEffect(() => {
     const handleResize = () => {
       // sm breakpoint is 640px
       // Only redirect reliability tab on mobile, production is now mobile-friendly
-      if (window.innerWidth < 640 && activeTab === "reliability") {
+      if (window.innerWidth < 640 && (activeTab === "reliability" || activeTab === "builder")) {
         setActiveTab("operational");
       }
     };
@@ -540,6 +557,20 @@ export default function DashboardPage({ initialTab }) {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [activeTab]);
+
+  // If we enter mobile viewport while on builder, force back to operational.
+  useEffect(() => {
+    if (isMobileViewport && activeTab === "builder") {
+      setActiveTab("operational");
+    }
+  }, [activeTab, isMobileViewport]);
+
+  // If user is not allowed to see builder, force back to operational.
+  useEffect(() => {
+    if (!canShowBuilder && activeTab === "builder") {
+      setActiveTab("operational");
+    }
+  }, [activeTab, canShowBuilder]);
   
   // Filter states
   const [disciplineFilter, setDisciplineFilter] = useState("all");
@@ -823,6 +854,19 @@ export default function DashboardPage({ initialTab }) {
         {/* Dashboard Tab Buttons - Mobile Optimized */}
         <div className="flex items-center justify-between gap-4">
           <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1">
+            {canShowBuilder && (
+              <button
+                onClick={() => setActiveTab("builder")}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${
+                  activeTab === "builder" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"
+                }`}
+                data-testid="builder-tab"
+              >
+                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">Builder</span>
+                <span className="xs:hidden">Build</span>
+              </button>
+            )}
             <button 
               onClick={() => setActiveTab("operational")}
               className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
@@ -1254,7 +1298,7 @@ export default function DashboardPage({ initialTab }) {
             <div 
               key={item.id || `submission-${idx}`} 
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
-              onClick={(e) => { e.stopPropagation(); navigate("/form-submissions", { state: { submissionId: item.id } }); }}
+              onClick={(e) => { e.stopPropagation(); handleQuickViewClick(item); }}
               data-testid={`form-submission-item-${item.id}`}
             >
               <UserAvatar 
@@ -1406,10 +1450,38 @@ export default function DashboardPage({ initialTab }) {
             </div>
           )}
 
+          {/* Smart Dashboard Builder Tab (manual, intuitive) */}
+          {activeTab === "builder" && canShowBuilder && (
+            <div className="animate-fade-in">
+              <Suspense
+                fallback={
+                  <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500">
+                    Loading builder…
+                  </div>
+                }
+              >
+                <SmartDashboardBuilderPanel
+                  actions={actions}
+                  observations={observations}
+                  investigations={investigations}
+                  users={usersList}
+                />
+              </Suspense>
+            </div>
+          )}
+
           {/* Production Dashboard Tab */}
           {activeTab === "production" && (
             <div className="animate-fade-in -mx-4 sm:-mx-6">
-              <ProductionDashboardPage />
+              <Suspense
+                fallback={
+                  <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500 mx-4 sm:mx-6">
+                    Loading production dashboard…
+                  </div>
+                }
+              >
+                <ProductionDashboardPage />
+              </Suspense>
             </div>
           )}
         </div>

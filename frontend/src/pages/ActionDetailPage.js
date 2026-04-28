@@ -50,6 +50,7 @@ import { actionsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { DocumentViewer } from "../components/DocumentViewer";
+import AttachmentsPanel from "../components/attachments/AttachmentsPanel";
 
 const API_BASE_URL = getBackendUrl();
 
@@ -83,8 +84,6 @@ export default function ActionDetailPage() {
   const [usersList, setUsersList] = useState([]);
   const [closureSuggestion, setClosureSuggestion] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const [viewingAttachment, setViewingAttachment] = useState(null);
-  const [viewingImage, setViewingImage] = useState(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   // Generate shareable link
@@ -406,127 +405,58 @@ export default function ActionDetailPage() {
 
               {/* Attachments Section - Compact */}
               <div className="bg-white rounded-lg border border-slate-200 p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-[10px] font-medium text-slate-400 uppercase flex items-center gap-1">
-                    <Paperclip className="w-3 h-3" />
-                    Attachments
-                    {editForm.attachments?.length > 0 && (
-                      <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0 h-4">
-                        {editForm.attachments.length}
-                      </Badge>
-                    )}
-                  </label>
-                  <input
-                    type="file"
-                    id="action-detail-attachment"
-                    className="hidden"
-                    multiple
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-                    onChange={async (e) => {
-                      const files = Array.from(e.target.files || []);
-                      if (files.length === 0) return;
-                      setUploadingAttachment(true);
-                      try {
-                        for (const file of files) {
-                          let processedFile = file;
-                          
-                          // Compress images before upload
-                          if (file.type.startsWith('image/')) {
-                            try {
-                              const result = await compressImage(file, {
-                                maxWidth: 1920,
-                                maxHeight: 1920,
-                                quality: 0.8,
-                                maxSizeMB: 1,
-                              });
-                              processedFile = result.file;
-                              if (result.wasCompressed) {
-                                const savedPercent = getCompressionPercent(result.originalSize, result.compressedSize);
-                                toast.success(`${file.name} compressed (${savedPercent}% smaller)`);
-                              }
-                            } catch (err) {
-                              console.error('Image compression failed:', err);
+                <AttachmentsPanel
+                  title="Attachments"
+                  items={editForm.attachments || []}
+                  editable={true}
+                  isUploading={uploadingAttachment}
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                  getKey={(a) => a?.url || a?.name}
+                  getName={(a) => a?.name || "Attachment"}
+                  getUrl={(a) => (a?.url ? `${API_BASE_URL}/api/storage/${a.url}` : null)}
+                  getContentType={(a) => a?.type}
+                  onAddFiles={async (files) => {
+                    setUploadingAttachment(true);
+                    try {
+                      for (const file of files) {
+                        let processedFile = file;
+                        if (file.type.startsWith("image/")) {
+                          try {
+                            const result = await compressImage(file, {
+                              maxWidth: 1920,
+                              maxHeight: 1920,
+                              quality: 0.8,
+                              maxSizeMB: 1,
+                            });
+                            processedFile = result.file;
+                            if (result.wasCompressed) {
+                              const savedPercent = getCompressionPercent(result.originalSize, result.compressedSize);
+                              toast.success(`${file.name} compressed (${savedPercent}% smaller)`);
                             }
+                          } catch (err) {
+                            console.error("Image compression failed:", err);
                           }
-                          
-                          const result = await actionsAPI.uploadAttachment(processedFile);
-                          setEditForm(prev => ({
-                            ...prev,
-                            attachments: [...(prev.attachments || []), result]
-                          }));
                         }
-                        toast.success(`${files.length} file(s) uploaded`);
-                      } catch (error) {
-                        toast.error("Failed to upload file(s)");
-                      } finally {
-                        setUploadingAttachment(false);
-                        e.target.value = "";
+                        const result = await actionsAPI.uploadAttachment(processedFile);
+                        setEditForm((prev) => ({
+                          ...prev,
+                          attachments: [...(prev.attachments || []), result],
+                        }));
                       }
-                    }}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 text-xs px-2"
-                    disabled={uploadingAttachment}
-                    onClick={() => document.getElementById("action-detail-attachment")?.click()}
-                  >
-                    {uploadingAttachment ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <><Upload className="w-3 h-3 mr-1" />Add</>
-                    )}
-                  </Button>
-                </div>
-                
-                {/* Attachments Grid - Horizontal scroll on desktop for compactness */}
-                {editForm.attachments?.length > 0 ? (
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {editForm.attachments.map((att, idx) => {
-                      const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
-                      const isPdf = att.type === 'application/pdf' || /\.pdf$/i.test(att.name);
-                      const isDoc = /\.(doc|docx)$/i.test(att.name);
-                      const previewUrl = att.url || att.data;
-                      
-                      return (
-                        <div 
-                          key={idx} 
-                          className="relative group flex-shrink-0 w-16 h-16 bg-slate-50 rounded-lg border border-slate-200 overflow-hidden"
-                        >
-                          <button
-                            onClick={() => {
-                              if (previewUrl) {
-                                if (isImage) setViewingImage({ url: previewUrl, name: att.name });
-                                else if (isPdf || isDoc) setViewingAttachment(att);
-                                else { const link = document.createElement('a'); link.href = previewUrl; link.download = att.name; link.click(); }
-                              }
-                            }}
-                            className="w-full h-full"
-                          >
-                            {isImage && previewUrl ? (
-                              <img src={previewUrl} alt={att.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex flex-col items-center justify-center">
-                                {isPdf ? <FileText className="w-5 h-5 text-red-400" /> : isDoc ? <FileText className="w-5 h-5 text-blue-400" /> : <File className="w-5 h-5 text-slate-400" />}
-                                <span className="text-[8px] text-slate-500 uppercase mt-0.5">{att.name?.split('.').pop()}</span>
-                              </div>
-                            )}
-                          </button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            className="absolute top-0.5 right-0.5 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => { e.stopPropagation(); setEditForm(prev => ({ ...prev, attachments: prev.attachments.filter((_, i) => i !== idx) })); }}
-                          >
-                            <X className="w-2.5 h-2.5" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-2 text-xs text-slate-400">No attachments</div>
-                )}
+                      toast.success(`${files.length} file(s) uploaded`);
+                    } catch (_e) {
+                      toast.error("Failed to upload file(s)");
+                    } finally {
+                      setUploadingAttachment(false);
+                    }
+                  }}
+                  onRemove={(raw) => {
+                    setEditForm((prev) => ({
+                      ...prev,
+                      attachments: (prev.attachments || []).filter((a) => a?.url !== raw?.url),
+                    }));
+                  }}
+                />
               </div>
             </div>
 
@@ -748,65 +678,7 @@ export default function ActionDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Attachment Viewer */}
-      {viewingAttachment && (
-        <DocumentViewer
-          url={viewingAttachment.url || viewingAttachment.data}
-          fileName={viewingAttachment.name}
-          fileType={viewingAttachment.type}
-          onClose={() => setViewingAttachment(null)}
-        />
-      )}
-
-      {/* Image Lightbox */}
-      {viewingImage && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setViewingImage(null)}
-        >
-          <div className="relative max-w-full max-h-full">
-            {/* Close button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute -top-12 right-0 text-white hover:bg-white/20"
-              onClick={() => setViewingImage(null)}
-            >
-              <X className="w-6 h-6" />
-            </Button>
-            
-            {/* Image */}
-            <img
-              src={viewingImage.url}
-              alt={viewingImage.name}
-              className="max-w-full max-h-[85vh] object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
-            
-            {/* File name */}
-            <div className="absolute -bottom-10 left-0 right-0 text-center">
-              <p className="text-white/80 text-sm">{viewingImage.name}</p>
-            </div>
-            
-            {/* Download button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute -top-12 left-0 text-white hover:bg-white/20"
-              onClick={(e) => {
-                e.stopPropagation();
-                const link = document.createElement('a');
-                link.href = viewingImage.url;
-                link.download = viewingImage.name;
-                link.click();
-              }}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* Attachment preview handled by AttachmentsPanel */}
 
       {/* Share Link Dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>

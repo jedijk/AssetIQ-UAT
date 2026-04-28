@@ -2,14 +2,15 @@
 User profile and avatar routes.
 Handles user profile photos using object storage or MongoDB fallback.
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Header, Response
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Header, Response, Request
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timezone
 import logging
 import uuid
 import base64
 import os
-from database import db, rbac_service
+import jwt
+from database import db, rbac_service, JWT_SECRET, JWT_ALGORITHM
 from auth import get_current_user, hash_password
 from services.storage_service import upload_avatar_async, get_object_async, get_mime_type, is_storage_available
 from services.cache_service import CacheService as cache
@@ -458,6 +459,7 @@ async def delete_my_avatar(
 @router.get("/users/{user_id}/avatar")
 async def get_user_avatar(
     user_id: str,
+    request: Request,
     authorization: str = Header(None),
     token: str = Query(None),  # Changed from 'auth' to 'token' to match frontend
     auth: str = Query(None)    # Keep 'auth' for backwards compatibility
@@ -468,11 +470,34 @@ async def get_user_avatar(
     Handles both object storage and MongoDB-stored avatars.
     Returns 204 No Content (instead of 404) when avatar unavailable to prevent frontend errors.
     """
-    # Simple auth check - accept header, token query param, or auth query param
+    # Auth check:
+    # - Bearer Authorization header
+    # - Cookie auth (HttpOnly) if present (preferred)
+    # - Optional token/auth query param for <img src> compatibility in bearer-mode setups
+    cookie_name = os.environ.get("AUTH_COOKIE_NAME", "assetiq_token")
+    cookie_token = None
+    try:
+        cookie_token = request.cookies.get(cookie_name)
+    except Exception:
+        cookie_token = None
+
     auth_token = token or auth  # Prefer 'token' but accept 'auth' for backwards compat
-    auth_header = authorization or (f"Bearer {auth_token}" if auth_token else None)
-    if not auth_header:
+    raw = None
+    if authorization and authorization.lower().startswith("bearer "):
+        raw = authorization.split(" ", 1)[1].strip()
+    elif cookie_token:
+        raw = cookie_token
+    elif auth_token:
+        raw = str(auth_token).strip()
+
+    if not raw:
         raise HTTPException(status_code=401, detail="Authentication required")
+
+    # Validate token signature/expiry (defense-in-depth; prevents unauthenticated avatar scraping).
+    try:
+        jwt.decode(raw, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
     
     # Get user with all avatar fields
     user = await db.users.find_one(

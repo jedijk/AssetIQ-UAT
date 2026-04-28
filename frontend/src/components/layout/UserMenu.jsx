@@ -39,10 +39,14 @@ export const UserMenu = ({
   // Build authenticated avatar URL
   const getAvatarUrl = () => {
     if (!user?.avatar_url) return null;
+    const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+    // avatar_url is like "/api/users/{id}/avatar", we need full URL
+    const baseUrl = getApiUrl().replace("/api", "");
+    if (AUTH_MODE === "cookie") {
+      return `${baseUrl}${user.avatar_url}`;
+    }
     const token = localStorage.getItem("token");
     if (!token) return null;
-    // avatar_url is like "/api/users/{id}/avatar", we need full URL with auth
-    const baseUrl = getApiUrl().replace("/api", "");
     return `${baseUrl}${user.avatar_url}?token=${token}`;
   };
 

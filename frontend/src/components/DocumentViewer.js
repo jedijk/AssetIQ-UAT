@@ -21,125 +21,154 @@ import { Button } from "./ui/button";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import * as pdfjsLib from "pdfjs-dist";
-
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs`;
+import DOMPurify from "dompurify";
 
 // Get the API base URL for document proxying
 import { getBackendUrl } from '../lib/apiConfig';
 const API_BASE_URL = getBackendUrl();
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+
+function isIOSLikeDevice() {
+  try {
+    const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
+    return /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && typeof document !== "undefined" && "ontouchend" in document);
+  } catch (_e) {
+    return false;
+  }
+}
+
+function getAuthFetchInit(extra = {}) {
+  const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
+  return {
+    ...extra,
+    credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+    headers: {
+      ...(extra.headers || {}),
+      ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  };
+}
 
 /**
- * Mobile-friendly PDF viewer using canvas rendering
- * Uses pdfjs-dist directly for reliable rendering
- * Supports page navigation, zoom, and scrolling
+ * Native PDF viewer.
+ *
+ * We intentionally avoid PDF.js here because strict CSP often blocks web workers
+ * (worker-src / script-src), especially on iOS webapps. Using the browser's
+ * built-in PDF renderer is dramatically more reliable.
  */
-const MobilePdfViewer = ({ blobUrl, isMobile }) => {
+const NativePdfViewer = ({ blobUrl, title }) => {
+  if (!blobUrl) return null;
+  return (
+    <iframe
+      src={blobUrl}
+      title={title || "PDF"}
+      className="w-full h-[calc(100vh-200px)] bg-white rounded-lg shadow-2xl"
+      style={{ border: 0 }}
+    />
+  );
+};
+
+/**
+ * iOS-friendly PDF viewer (no worker).
+ *
+ * iOS Safari / iOS WebApps often render `blob:` PDFs inside iframes as a blank page.
+ * We render via PDF.js in the main thread with `disableWorker: true` to avoid CSP
+ * worker restrictions and to reliably show PDFs in-app.
+ */
+const IOSPdfViewer = ({ blobUrl, title }) => {
   const [pdfDoc, setPdfDoc] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [numPages, setNumPages] = useState(null);
-  const [pdfLoading, setPdfLoading] = useState(true);
-  const [pdfError, setPdfError] = useState(null);
-  const [zoom, setZoom] = useState(100);
-  const [rotation, setRotation] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [previewUnavailable, setPreviewUnavailable] = useState(false);
   const canvasRef = React.useRef(null);
   const renderTaskRef = React.useRef(null);
-  const containerRef = React.useRef(null);
-  
-  // Load PDF document
+
   useEffect(() => {
     if (!blobUrl) return;
-    
     let cancelled = false;
-    setPdfLoading(true);
-    setPdfError(null);
-    
-    const loadPdf = async () => {
+    setLoading(true);
+    setErr(null);
+    setPreviewUnavailable(false);
+    setPdfDoc(null);
+    setNumPages(null);
+    setPageNumber(1);
+
+    (async () => {
       try {
-        const loadingTask = pdfjsLib.getDocument(blobUrl);
-        const doc = await loadingTask.promise;
-        if (!cancelled) {
-          setPdfDoc(doc);
-          setNumPages(doc.numPages);
-          setPageNumber(1);
-          setZoom(100);
+        // Prefer loading directly from the blob URL. iOS can be finicky with
+        // `fetch(blob:...)` under CSP/WKWebView, so avoid the extra fetch hop.
+        let task = null;
+        try {
+          task = pdfjsLib.getDocument({ url: blobUrl, disableWorker: true });
+        } catch (_e) {
+          task = null;
         }
-      } catch (err) {
-        console.error("PDF loading error:", err);
+
+        if (!task) {
+          const res = await fetch(blobUrl);
+          const data = await res.arrayBuffer();
+          task = pdfjsLib.getDocument({ data, disableWorker: true });
+        }
+        const doc = await task.promise;
+        if (cancelled) return;
+        setPdfDoc(doc);
+        setNumPages(doc.numPages || null);
+      } catch (e) {
         if (!cancelled) {
-          setPdfError("Failed to load PDF");
+          try {
+            // eslint-disable-next-line no-console
+            console.warn("[IOSPdfViewer] Failed to load PDF:", e);
+          } catch (_e) {}
+          // On iOS, PDF.js rendering can fail due to WKWebView/CSP quirks even when the PDF
+          // is otherwise fine. Don't show a scary error; offer a reliable "Open" fallback.
+          setPreviewUnavailable(true);
+          setErr(null);
         }
       } finally {
-        if (!cancelled) {
-          setPdfLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
-    };
-    
-    loadPdf();
-    
+    })();
+
     return () => {
       cancelled = true;
+      try {
+        if (renderTaskRef.current) renderTaskRef.current.cancel();
+      } catch (_e) {}
     };
   }, [blobUrl]);
-  
-  // Render current page with zoom
+
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return;
-    
-    const renderPage = async () => {
-      // Cancel any ongoing render
-      if (renderTaskRef.current) {
-        renderTaskRef.current.cancel();
-      }
-      
+    let cancelled = false;
+
+    (async () => {
       try {
+        if (renderTaskRef.current) renderTaskRef.current.cancel();
         const page = await pdfDoc.getPage(pageNumber);
+        if (cancelled) return;
+        const viewport = page.getViewport({ scale: 1.6 });
         const canvas = canvasRef.current;
-        const context = canvas.getContext("2d");
-        
-        // Calculate scale based on zoom level
-        const baseWidth = isMobile ? 350 : 700;
-        const viewport = page.getViewport({ scale: 1, rotation });
-        const baseScale = baseWidth / viewport.width;
-        const scale = baseScale * (zoom / 100);
-        const scaledViewport = page.getViewport({ scale, rotation });
-        
-        // Set canvas dimensions
-        canvas.height = scaledViewport.height;
-        canvas.width = scaledViewport.width;
-        
-        // Render the page
-        const renderContext = {
-          canvasContext: context,
-          viewport: scaledViewport,
-        };
-        
-        renderTaskRef.current = page.render(renderContext);
+        const ctx = canvas.getContext("2d");
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        renderTaskRef.current = page.render({ canvasContext: ctx, viewport });
         await renderTaskRef.current.promise;
-      } catch (err) {
-        if (err.name !== "RenderingCancelledException") {
-          console.error("Page render error:", err);
-        }
+      } catch (e) {
+        // ignore cancelled renders
       }
-    };
-    
-    renderPage();
-    
+    })();
+
     return () => {
-      if (renderTaskRef.current) {
-        renderTaskRef.current.cancel();
-      }
+      cancelled = true;
+      try {
+        if (renderTaskRef.current) renderTaskRef.current.cancel();
+      } catch (_e) {}
     };
-  }, [pdfDoc, pageNumber, isMobile, zoom, rotation]);
-  
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 200));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 50));
-  const handleZoomReset = () => setZoom(100);
-  const handleRotateCW = () => setRotation(prev => (prev + 90) % 360);
-  const handleRotateCCW = () => setRotation(prev => (prev + 270) % 360);
-  
-  if (pdfLoading) {
+  }, [pdfDoc, pageNumber]);
+
+  if (loading) {
     return (
       <div className="p-8 text-center">
         <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
@@ -147,115 +176,119 @@ const MobilePdfViewer = ({ blobUrl, isMobile }) => {
       </div>
     );
   }
-  
-  if (pdfError) {
+
+  if (previewUnavailable) {
     return (
       <div className="p-8 text-center">
-        <AlertCircle className="w-8 h-8 mx-auto text-red-400" />
-        <p className="text-slate-500 mt-2">{pdfError}</p>
+        <AlertCircle className="w-8 h-8 mx-auto text-slate-400" />
+        <p className="text-slate-600 mt-2">Preview isn’t available on iOS for this PDF.</p>
+        <p className="text-slate-500 text-sm mt-1">Tap Open to view or save it.</p>
+        {blobUrl ? (
+          <div className="mt-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                try {
+                  const w = window.open(blobUrl, "_blank", "noopener,noreferrer");
+                  if (!w) window.location.href = blobUrl;
+                } catch (_e) {}
+              }}
+              className="gap-2"
+            >
+              Open
+            </Button>
+          </div>
+        ) : null}
       </div>
     );
   }
-  
+
+  if (err) {
+    return (
+      <div className="p-8 text-center">
+        <AlertCircle className="w-8 h-8 mx-auto text-red-400" />
+        <p className="text-slate-500 mt-2">{err}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full flex flex-col items-center">
-      {/* PDF Controls - Page Navigation + Zoom */}
-      <div className="flex items-center gap-2 mb-4 bg-slate-700 rounded-lg px-3 py-2 flex-wrap justify-center">
-        {/* Page Navigation */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setPageNumber(prev => Math.max(1, prev - 1))}
-            disabled={pageNumber <= 1}
-            className="text-white hover:bg-slate-600 h-8 w-8"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <span className="text-white text-sm min-w-[80px] text-center">
-            {pageNumber} / {numPages || '?'}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setPageNumber(prev => Math.min(numPages || prev, prev + 1))}
-            disabled={pageNumber >= (numPages || 1)}
-            className="text-white hover:bg-slate-600 h-8 w-8"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </Button>
-        </div>
-        
-        {/* Divider */}
-        <div className="w-px h-6 bg-slate-500 mx-1" />
-        
-        {/* Zoom Controls */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleZoomOut}
-            disabled={zoom <= 50}
-            className="text-white hover:bg-slate-600 h-8 w-8"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </Button>
-          <button
-            onClick={handleZoomReset}
-            className="text-white text-xs min-w-[45px] text-center hover:bg-slate-600 px-1 py-1 rounded"
-          >
-            {zoom}%
-          </button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleZoomIn}
-            disabled={zoom >= 200}
-            className="text-white hover:bg-slate-600 h-8 w-8"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </Button>
-        </div>
-        
-        {/* Divider */}
-        <div className="w-px h-6 bg-slate-500 mx-1" />
-        
-        {/* Rotation Controls */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRotateCCW}
-            className="text-white hover:bg-slate-600 h-8 w-8"
-            title="Rotate left"
-          >
-            <RotateCw className="w-4 h-4 -scale-x-100" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRotateCW}
-            className="text-white hover:bg-slate-600 h-8 w-8"
-            title="Rotate right"
-          >
-            <RotateCw className="w-4 h-4" />
-          </Button>
+      <div className="flex items-center gap-2 mb-3 bg-slate-700 rounded-lg px-3 py-2 justify-center">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+          disabled={pageNumber <= 1}
+          className="text-white hover:bg-slate-600 h-8 w-8"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </Button>
+        <span className="text-white text-sm min-w-[90px] text-center">
+          {pageNumber} / {numPages || "?"}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setPageNumber((p) => Math.min(numPages || p, p + 1))}
+          disabled={!!numPages && pageNumber >= numPages}
+          className="text-white hover:bg-slate-600 h-8 w-8"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </Button>
+      </div>
+      <div className="flex-1 overflow-auto bg-white rounded-lg shadow-2xl w-full" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className="p-3 min-w-fit">
+          <canvas ref={canvasRef} className="block mx-auto" aria-label={title || "PDF"} />
         </div>
       </div>
-      
-      {/* PDF Canvas - Scrollable container */}
-      <div 
-        ref={containerRef}
-        className="flex-1 overflow-auto bg-white rounded-lg shadow-2xl w-full"
-        style={{ 
-          maxHeight: 'calc(100vh - 200px)',
-          touchAction: 'pan-x pan-y pinch-zoom'
-        }}
-      >
-        <div className="p-4 min-w-fit">
-          <canvas ref={canvasRef} className="block mx-auto" />
-        </div>
+    </div>
+  );
+};
+
+/**
+ * iOS PDF fallback: open in a new tab (system viewer).
+ *
+ * In iOS WebApps/WKWebView, in-app PDF rendering is often unreliable even when the bytes
+ * are correct. Opening the blob URL in a new tab matches the proven “executing/print”
+ * behavior: the OS PDF viewer handles it.
+ */
+const IOSPdfOpenViewer = ({ blobUrl, title }) => {
+  const openedRef = React.useRef(false);
+
+  useEffect(() => {
+    if (!blobUrl || openedRef.current) return;
+    openedRef.current = true;
+    try {
+      const w = window.open(blobUrl, "_blank", "noopener,noreferrer");
+      if (!w) window.location.href = blobUrl;
+    } catch (_e) {}
+  }, [blobUrl]);
+
+  return (
+    <div className="p-8 text-center">
+      <AlertCircle className="w-8 h-8 mx-auto text-slate-400" />
+      <p className="text-slate-600 mt-2">Opening PDF…</p>
+      <p className="text-slate-500 text-sm mt-1">
+        If nothing happens, tap Open.
+      </p>
+      <div className="mt-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            try {
+              const w = window.open(blobUrl, "_blank", "noopener,noreferrer");
+              if (!w) window.location.href = blobUrl;
+            } catch (_e) {}
+          }}
+          className="gap-2"
+        >
+          Open
+        </Button>
       </div>
+      {title ? <div className="mt-2 text-xs text-slate-400 truncate">{title}</div> : null}
     </div>
   );
 };
@@ -301,7 +334,7 @@ export const DocumentViewer = ({
   const url = useMemo(() => {
     if (!rawUrl) return null;
     // If already a full URL or blob URL, use as-is
-    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('blob:')) {
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('blob:') || rawUrl.startsWith('data:')) {
       return rawUrl;
     }
     // Otherwise, proxy through the form-documents endpoint
@@ -323,11 +356,7 @@ export const DocumentViewer = ({
     setError(null);
     
     try {
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(url, { 
-        headers: token ? { Authorization: `Bearer ${token}` } : {} 
-      });
+      const response = await fetch(url, getAuthFetchInit());
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -354,11 +383,7 @@ export const DocumentViewer = ({
     setError(null);
     
     try {
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(url, { 
-        headers: token ? { Authorization: `Bearer ${token}` } : {} 
-      });
+      const response = await fetch(url, getAuthFetchInit());
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -411,16 +436,16 @@ export const DocumentViewer = ({
       loadExcel();
     } else if ((isPdf || isImage) && url) {
       // If already a blob URL, use directly without re-fetching
-      if (url.startsWith('blob:')) {
+      if (url.startsWith('blob:') || url.startsWith('data:')) {
         isExternalBlob.current = true;
         setBlobUrl(url);
+        setLoading(false);
         return;
       }
       // Load PDF/Image as blob for authenticated access
       setLoading(true);
-      const token = localStorage.getItem("token");
       
-      fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      fetch(url, getAuthFetchInit())
         .then(async response => {
           if (!response.ok) {
             const errorText = await response.text();
@@ -647,10 +672,7 @@ export const DocumentViewer = ({
                     window.document.body.removeChild(a);
                     return;
                   }
-                  const token = localStorage.getItem("token");
-                  const response = await fetch(url, { 
-                    headers: token ? { Authorization: `Bearer ${token}` } : {} 
-                  });
+                  const response = await fetch(url, getAuthFetchInit());
                   if (!response.ok) throw new Error("Download failed");
                   const blob = await response.blob();
                   const downloadUrl = URL.createObjectURL(blob);
@@ -761,10 +783,11 @@ export const DocumentViewer = ({
           {/* PDF Viewer - Mobile friendly with page navigation */}
           {isPdf && !loading && !error && blobUrl && (
             <div className="flex-1 w-full flex items-center justify-center">
-              <MobilePdfViewer 
-                blobUrl={blobUrl}
-                isMobile={isMobile}
-              />
+              {isIOSLikeDevice() ? (
+                <IOSPdfOpenViewer blobUrl={blobUrl} title={name} />
+              ) : (
+                <NativePdfViewer blobUrl={blobUrl} title={name} />
+              )}
             </div>
           )}
 
@@ -791,7 +814,11 @@ export const DocumentViewer = ({
                     wordBreak: 'break-word',
                     overflowWrap: 'break-word'
                   }}
-                  dangerouslySetInnerHTML={{ __html: docxHtml }}
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(String(docxHtml || ""), {
+                      USE_PROFILES: { html: true },
+                    }),
+                  }}
                 />
               </div>
             </div>
@@ -846,10 +873,7 @@ export const DocumentViewer = ({
                   className="bg-indigo-600 hover:bg-indigo-700"
                   onClick={async () => {
                     try {
-                      const token = localStorage.getItem("token");
-                      const response = await fetch(url, { 
-                        headers: token ? { Authorization: `Bearer ${token}` } : {} 
-                      });
+                      const response = await fetch(url, getAuthFetchInit());
                       if (!response.ok) throw new Error("Download failed");
                       const blob = await response.blob();
                       const downloadUrl = URL.createObjectURL(blob);

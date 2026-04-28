@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -88,23 +88,6 @@ export default function SettingsPreferencesPage() {
     },
   });
 
-  // Auto-save detected timezone if auto-detect is enabled and timezone differs
-  useEffect(() => {
-    if (!prefsLoading && preferences) {
-      const autoDetectEnabled = preferences.timezone_auto_detect !== false; // default to true
-      const currentSavedTimezone = preferences.timezone;
-      
-      // If auto-detect is enabled and detected timezone differs from saved, update it
-      if (autoDetectEnabled && detectedTimezone && detectedTimezone !== currentSavedTimezone) {
-        console.log(`Auto-updating timezone from ${currentSavedTimezone} to ${detectedTimezone}`);
-        updateMutation.mutate({
-          timezone: detectedTimezone,
-          timezone_auto_detect: true,
-        });
-      }
-    }
-  }, [prefsLoading, preferences?.timezone, preferences?.timezone_auto_detect, detectedTimezone]);
-
   // Fetch available timezones
   const { data: timezonesData } = useQuery({
     queryKey: ["timezones"],
@@ -126,6 +109,28 @@ export default function SettingsPreferencesPage() {
       toast.error("Failed to save preferences");
     },
   });
+
+  const updatePreferences = useCallback(
+    (payload) => updateMutation.mutate(payload),
+    [updateMutation]
+  );
+
+  // Auto-save detected timezone if auto-detect is enabled and timezone differs
+  useEffect(() => {
+    if (!prefsLoading && preferences) {
+      const autoDetectEnabled = preferences.timezone_auto_detect !== false; // default to true
+      const currentSavedTimezone = preferences.timezone;
+      
+      // If auto-detect is enabled and detected timezone differs from saved, update it
+      if (autoDetectEnabled && detectedTimezone && detectedTimezone !== currentSavedTimezone) {
+        console.log(`Auto-updating timezone from ${currentSavedTimezone} to ${detectedTimezone}`);
+        updatePreferences({
+          timezone: detectedTimezone,
+          timezone_auto_detect: true,
+        });
+      }
+    }
+  }, [prefsLoading, preferences, detectedTimezone, updatePreferences]);
 
   // Update current time display
   useEffect(() => {

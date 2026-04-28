@@ -28,7 +28,7 @@ import {
   ArrowDownRight,
   Minus
 } from "lucide-react";
-import axios from "axios";
+import api from "../lib/api";
 import { toast } from "sonner";
 
 const API_URL = getBackendUrl();
@@ -73,12 +73,12 @@ const InsightsPage = ({ embedded = false }) => {
         qualityRes,
         gapsRes
       ] = await Promise.all([
-        axios.get(`${API_URL}/api/insights/summary`, { headers }),
-        axios.get(`${API_URL}/api/execution/actions`, { headers }),
-        axios.get(`${API_URL}/api/execution/tasks`, { headers }),
-        axios.get(`${API_URL}/api/execution/disciplines`, { headers }),
-        axios.get(`${API_URL}/api/reliability/data-quality`, { headers }),
-        axios.get(`${API_URL}/api/reliability/gaps`, { headers })
+        api.get("/insights/summary", { headers }),
+        api.get("/execution/actions", { headers }),
+        api.get("/execution/tasks", { headers }),
+        api.get("/execution/disciplines", { headers }),
+        api.get("/reliability/data-quality", { headers }),
+        api.get("/reliability/gaps", { headers })
       ]);
       
       setSummary(summaryRes.data);
@@ -100,7 +100,7 @@ const InsightsPage = ({ embedded = false }) => {
     setGeneratingRecommendations(true);
     try {
       const headers = getAuthHeaders();
-      const res = await axios.post(`${API_URL}/api/ai/recommendations`, {}, { headers });
+      const res = await api.post("/ai/recommendations", {}, { headers });
       setRecommendations(res.data);
       toast.success("Recommendations generated successfully");
     } catch (err) {

@@ -483,6 +483,8 @@ async def get_my_tasks(
                 task["form_documents"] = form_template.get("documents", [])
                 # Include photo extraction config
                 task["photo_extraction_config"] = form_template.get("photo_extraction_config")
+                # Include label print config so the task completion flow can trigger printing
+                task["label_print_config"] = form_template.get("label_print_config")
                 task["has_form"] = True
         
         # Determine source - check after is_recurring is set

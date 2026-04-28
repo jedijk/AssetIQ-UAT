@@ -1,7 +1,8 @@
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import PhotoDataCaptureField from '../components/forms/PhotoDataCaptureField';
 import { EXTRACTION_TEMPLATES } from '../components/forms/extractionTemplates';
-import { useState, useEffect } from "react";
+import LabelPrintConfigPanel from '../components/forms/LabelPrintConfigPanel';
+import { useState, useEffect, useMemo } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -36,6 +37,7 @@ import {
   List,
   Sparkles,
   Calendar,
+  Printer,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -339,8 +341,8 @@ const FormsPage = ({ embedded = false }) => {
     toast.success("Field removed");
   };
 
-  const templates = templatesData?.templates || [];
-  const submissions = submissionsData?.submissions || [];
+  const templates = useMemo(() => templatesData?.templates ?? [], [templatesData]);
+  const submissions = useMemo(() => submissionsData?.submissions ?? [], [submissionsData]);
 
   // Sync selectedTemplate with latest data from templates query
   // Uses version number as the primary change indicator to avoid expensive deep comparisons
@@ -597,9 +599,18 @@ const FormsPage = ({ embedded = false }) => {
               </Card>
             ) : (
               <div className="space-y-3">
-                {submissions.map((submission) => (
-                  <SubmissionRow key={submission.id} submission={submission} />
-                ))}
+                {submissions.map((submission) => {
+                  const tpl = templates.find(
+                    (t) => t.id === (submission.template_id || submission.form_template_id)
+                  );
+                  return (
+                    <SubmissionRow
+                      key={submission.id}
+                      submission={submission}
+                      labelConfig={tpl?.label_print_config || null}
+                    />
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -645,7 +656,7 @@ const FormsPage = ({ embedded = false }) => {
                 <div className="space-y-2">
                   <Label>{t("forms.discipline")}</Label>
                   <Select
-                    value={newTemplate.discipline}
+                    value={newTemplate.discipline || ""}
                     onValueChange={(v) => setNewTemplate(prev => ({ ...prev, discipline: v }))}
                   >
                     <SelectTrigger>
@@ -689,9 +700,35 @@ const FormsPage = ({ embedded = false }) => {
                     />
                     <Label htmlFor="photo-extraction-enabled" className="cursor-pointer">Photo AI Extraction</Label>
                   </div>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="label-print-enabled"
+                      checked={newTemplate.label_print_config?.enabled || false}
+                      onCheckedChange={(v) => setNewTemplate(prev => ({
+                        ...prev,
+                        label_print_config: {
+                          ...(prev.label_print_config || { trigger: "manual", button_label: "Print Label" }),
+                          enabled: v,
+                        }
+                      }))}
+                      data-testid="label-print-toggle"
+                    />
+                    <Label htmlFor="label-print-enabled" className="cursor-pointer">Label Printing</Label>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Label Printing Config */}
+            {newTemplate.label_print_config?.enabled && (
+              <LabelPrintConfigPanel
+                config={newTemplate.label_print_config}
+                onChange={(patch) => setNewTemplate(prev => ({
+                  ...prev,
+                  label_print_config: { ...(prev.label_print_config || {}), ...patch }
+                }))}
+              />
+            )}
 
             {/* Photo Extraction Config - shown when enabled */}
             {newTemplate.photo_extraction_config?.enabled && (
@@ -1883,6 +1920,17 @@ const FormsPage = ({ embedded = false }) => {
                             <div className="h-11 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
                               <span className="text-white font-medium">Submit Form</span>
                             </div>
+                            {selectedTemplate?.label_print_config?.enabled && (
+                              <div className="mt-2 h-10 bg-white border border-violet-300 text-violet-700 rounded-lg flex items-center justify-center gap-2 cursor-default">
+                                <Printer className="w-4 h-4" />
+                                <span className="text-sm font-medium">
+                                  {selectedTemplate.label_print_config.button_label || "Print Label"}
+                                </span>
+                                <span className="text-[10px] text-violet-400 ml-1">
+                                  ({selectedTemplate.label_print_config.trigger})
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2028,6 +2076,14 @@ const FormsPage = ({ embedded = false }) => {
                           <div className="h-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
                             <span className="text-white text-sm font-medium">Submit</span>
                           </div>
+                          {selectedTemplate?.label_print_config?.enabled && (
+                            <div className="mt-1.5 h-9 bg-white border border-violet-300 text-violet-700 rounded-lg flex items-center justify-center gap-1.5">
+                              <Printer className="w-3.5 h-3.5" />
+                              <span className="text-xs font-medium">
+                                {selectedTemplate.label_print_config.button_label || "Print Label"}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
 

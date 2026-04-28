@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Camera, Loader2, CheckCircle, AlertTriangle, RotateCcw, X } from "lucide-react";
 import { Button } from "../ui/button";
-import { getBackendUrl } from "../../lib/apiConfig";
+import { getApiUrl } from "../../lib/apiConfig";
 import { compressImage } from "../../lib/imageCompression";
 
 const CONFIDENCE_COLORS = {
@@ -9,6 +9,19 @@ const CONFIDENCE_COLORS = {
   low: "ring-amber-400 bg-amber-50",
   missing: "ring-red-300 bg-red-50",
 };
+
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+
+function getCookie(name) {
+  try {
+    const cookies = document.cookie ? document.cookie.split(";") : [];
+    for (const c of cookies) {
+      const [k, ...rest] = c.trim().split("=");
+      if (k === name) return decodeURIComponent(rest.join("=") || "");
+    }
+  } catch (_e) {}
+  return null;
+}
 
 export default function PhotoDataCaptureField({ config, formData, onAutoFill, formTemplateId }) {
   const [status, setStatus] = useState("idle"); // idle, processing, success, error
@@ -67,10 +80,21 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
     if (formTemplateId) fd.append("form_template_id", formTemplateId);
 
     try {
-      const token = localStorage.getItem("token");
-      const resp = await fetch(`${getBackendUrl()}/api/ai/extract`, {
+      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
+      const headers = {};
+      if (AUTH_MODE !== "cookie" && token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      if (AUTH_MODE === "cookie") {
+        const csrf = getCookie("assetiq_csrf");
+        if (csrf) headers["X-CSRF-Token"] = csrf;
+      }
+
+      const resp = await fetch(`${getApiUrl()}/ai/extract`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
+        // Cookie auth must include credentials (Safari/iOS especially)
+        credentials: AUTH_MODE === "cookie" ? "include" : "omit",
         body: fd,
       });
 

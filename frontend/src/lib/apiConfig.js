@@ -27,6 +27,14 @@ const logDebug = (message, ...args) => {
 
 // Get the backend BASE URL (without /api suffix)
 export const getBackendUrl = () => {
+  // Cookie auth should be same-origin to avoid third-party cookie restrictions
+  // (notably Safari/iOS). We rely on Vercel rewrites for /api -> backend.
+  const authMode = process.env.REACT_APP_AUTH_MODE || "bearer";
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  if (authMode === "cookie" && currentOrigin) {
+    return currentOrigin;
+  }
+
   // REACT_APP_BACKEND_URL should be the base URL (e.g., https://backend.railway.app)
   const backendUrl = process.env.REACT_APP_BACKEND_URL;
   
@@ -45,7 +53,7 @@ export const getBackendUrl = () => {
   }
   
   // Detect current environment
-  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  // Note: currentOrigin already defined above
   const isVercel = currentOrigin.includes('vercel.app');
   const isEmergent = currentOrigin.includes('emergentagent.com') || currentOrigin.includes('emergent.host');
   const isLocalhost = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1');

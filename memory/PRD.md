@@ -4,9 +4,37 @@
 Create a robust full-stack platform optimized for multi-environment execution with dynamic database switching, advanced form capabilities, seamless AI integrations, GDPR compliance, version-controlled PWAs, comprehensive log ingestion, and automated data processing.
 
 ## Current Version
-**v3.5.9** (Updated: April 2026)
+**v3.6.0** (Updated: April 2026)
 
 ## Recent Changes
+- [Apr 25, 2026] **Reprint Label from Form Submissions** (VERIFIED):
+  - Each submission row in `/form-submissions` and `/tasks?tab=forms` now shows a printer icon when (and only when) the source form template has `label_print_config.enabled` and a `label_template_id`
+  - Clicking the icon reprints the label for that submission via the existing `printLabel` flow (PDF on desktop, HTML on iOS/mobile)
+  - `SubmissionRow.jsx` now accepts `labelConfig` as a prop (parent passes from templates lookup) so the icon visibility decision is instant — no extra API roundtrip on render
+  - **Investigation Complete**: Both original print and reprint use identical API payloads (`template_id`, `submission_id`, `copies`) and fetch the same label template from the database. Any layout differences between original and reprint are due to template version changes (label templates can be updated post-creation)
+- [Apr 25, 2026] **Smart Label 3mm Safety Margin**:
+  - Enforced a minimum 3mm internal safety margin on every label (PDF + HTML print) so logo/QR/text never get clipped by printers or cutters
+  - PDF: `SAFETY_MARGIN_MM = 3.0` (was 2mm); HTML: `.label` padding `3mm` (was 1.5mm); logo absolute positioning offsets bumped from 1.5mm → 3mm
+- [Apr 25, 2026] **Smart Label Settings Propagation Fix**:
+  - Fixed logo, position, QR toggle, and font size settings not being applied during actual label printing
+  - Issue was templates loaded without new fields weren't being merged with defaults
+  - Frontend now properly merges template with `emptyTemplate` defaults for all nested objects
+- [Apr 25, 2026] **Smart Label Enhancements**:
+  - **Logo Position Selector**: Choose where to place the AssetIQ logo (Top Left, Top Right, Bottom Left, Bottom Right)
+  - **Font Size Presets**: Small/Medium/Large options for field binding text
+  - **QR Code Toggle**: Hide/show QR code to use full label space for text fields
+  - **AssetIQ Logo**: Toggle to add logo + "AssetIQ" text on labels (grayscale for thermal printers)
+- [Apr 24, 2026] Removed UAT/Prod database switcher badge from top header
+- [Apr 2026] Sprint 1 of Smart Labeling System shipped:
+  - Preset-based label designer (standard / compact / qr_only / with_logo)
+  - Template CRUD + duplicate + soft-archive + versioning
+  - PDF preview & print endpoints (reportlab + qrcode, cap 500 assets/job)
+  - QR target configurable per template (asset_page / inspection_form / maintenance_request / custom_url with {asset_id} substitution)
+  - Print job history; cache invalidated after print
+  - New route `/labels`; menu link added
+  - 22/22 backend pytest cases green; frontend flow verified
+- [Apr 2026] Input Material card — production date now visible on mobile.
+- [Apr 2026] Observation Related Activity timeline: Tasks removed (shows only Observations, Actions, Investigations).
 - [Apr 2026] UAT environment provisioning complete:
   - MongoDB `assetiq` → `assetiq-UAT` cloned (32,472 documents)
   - Cloudflare R2 `assetiq-files` → `assetiq-files-uat` mirrored (2,230 objects / 242 MB)

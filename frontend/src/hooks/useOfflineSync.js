@@ -27,25 +27,6 @@ export const useOfflineSync = () => {
     setPendingCounts(counts);
   }, []);
 
-  // Set up network listeners
-  useEffect(() => {
-    const handleOnline = async () => {
-      setIsOnline(true);
-      toast.success('Back online! Syncing pending data...');
-      await syncAllPending();
-    };
-
-    const handleOffline = () => {
-      setIsOnline(false);
-      toast.warning('You are offline. Data will be saved locally.');
-    };
-
-    const cleanup = offlineQueue.addNetworkListener(handleOnline, handleOffline);
-    updatePendingCounts();
-
-    return cleanup;
-  }, [updatePendingCounts]);
-
   // Queue an observation for offline sync
   const queueObservation = useCallback(async (data) => {
     const result = await offlineQueue.queueOfflineItem('pending_observations', {
@@ -174,6 +155,25 @@ export const useOfflineSync = () => {
       setIsSyncing(false);
     }
   }, [updatePendingCounts]);
+
+  // Set up network listeners
+  useEffect(() => {
+    const handleOnline = async () => {
+      setIsOnline(true);
+      toast.success('Back online! Syncing pending data...');
+      await syncAllPending();
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.warning('You are offline. Data will be saved locally.');
+    };
+
+    const cleanup = offlineQueue.addNetworkListener(handleOnline, handleOffline);
+    updatePendingCounts();
+
+    return cleanup;
+  }, [syncAllPending, updatePendingCounts]);
 
   // Get total pending count
   const totalPending = Object.values(pendingCounts).reduce((a, b) => a + b, 0);

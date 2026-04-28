@@ -473,16 +473,36 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
     try {
       const blob = await equipmentHierarchyAPI.downloadEquipmentFile(fileId);
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-      window.URL.revokeObjectURL(url);
+      const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
+      const isIOSLike = /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && typeof document !== "undefined" && "ontouchend" in document);
+
+      if (isIOSLike) {
+        const w = window.open(url, "_blank", "noopener,noreferrer");
+        if (!w) window.location.href = url;
+        window.setTimeout(() => window.URL.revokeObjectURL(url), 30_000);
+        return;
+      }
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 5_000);
     } catch { toast.error("Download failed"); }
   };
 
   const handleView = (file) => {
     const ext = file.filename.split('.').pop()?.toLowerCase() || '';
+    const dbEnv = localStorage.getItem("database_environment");
+    const dbEnvQs = dbEnv ? `?db_env=${encodeURIComponent(dbEnv)}` : "";
     setPreviewFile({ 
       name: file.filename, 
-      url: `${getBackendUrl()}/api/equipment-files/${file.id}/download`,
+      // Use the authenticated download endpoint for preview too.
+      // iOS is much more reliable when preview bytes match download bytes.
+      url: `${getBackendUrl()}/api/equipment-files/${file.id}/download${dbEnvQs}`,
       type: ext 
     });
   };
@@ -761,9 +781,14 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
     queryFn: () => threatsAPI.getAll(),
   });
 
-  const nodes = nodesData?.nodes || [];
-  const equipmentTypes = typesData?.equipment_types || [];
+  const nodes = useMemo(() => nodesData?.nodes ?? [], [nodesData]);
+  const equipmentTypes = useMemo(() => typesData?.equipment_types ?? [], [typesData]);
   const threatCountByAsset = useMemo(() => getThreatCountByAsset(threats), [threats]);
+  
+  const expandedNodesRef = useRef(expandedNodes);
+  useEffect(() => {
+    expandedNodesRef.current = expandedNodes;
+  }, [expandedNodes]);
   
   // Build tree structure
   const treeData = useMemo(() => {
@@ -812,7 +837,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   useEffect(() => {
     if (searchQuery && expandForSearch.size > 0) {
       if (preSearchExpandedNodes === null) {
-        setPreSearchExpandedNodes(new Set(expandedNodes));
+        setPreSearchExpandedNodes(new Set(expandedNodesRef.current));
       }
       setExpandedNodes(prev => {
         const newSet = new Set(prev);

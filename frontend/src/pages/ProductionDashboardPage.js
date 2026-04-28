@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionAPI } from "../lib/api";
-import api from "../lib/api";
+import { api } from "../lib/apiClient";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { formatDateTime } from "../lib/dateUtils";
@@ -84,277 +84,11 @@ import {
   ReferenceArea,
 } from "recharts";
 import { toast } from "sonner";
-
-// ──────────────────────────────────────────
-// Date helpers (timezone-safe: use local date strings, not UTC)
-// ──────────────────────────────────────────
-const fmtDate = (d) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
-const displayDate = (d) => {
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-};
-const today = () => { const d = new Date(); d.setHours(12,0,0,0); return d; };
-const daysAgo = (n) => { const d = today(); d.setDate(d.getDate() - n); return d; };
-const monthsAgo = (n) => { const d = today(); d.setMonth(d.getMonth() - n); return d; };
-const startOfYear = () => { const d = today(); d.setMonth(0, 1); return d; };
-
-const PERIOD_OPTIONS = [
-  { key: "1d", label: "1D" },
-  { key: "1w", label: "1W" },
-  { key: "1m", label: "1M" },
-  { key: "3m", label: "3M" },
-  { key: "6m", label: "6M" },
-  { key: "1y", label: "1Y" },
-  { key: "ytd", label: "YTD" },
-];
-
-// ──────────────────────────────────────────
-// Machine Analysis Panel
-// ──────────────────────────────────────────
-function MachineAnalysisPanel({ fromDate, toDate, period }) {
-  const [analysis, setAnalysis] = useState(null);
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [createdAt, setCreatedAt] = useState(null);
-  const [expanded, setExpanded] = useState(false);
-  const [analysisRange, setAnalysisRange] = useState(null);
-  const [error, setError] = useState(null);
-
-  const periodLabel = { "1d": "day", "1w": "week", "1m": "month", "3m": "3 months", "6m": "6 months", "1y": "year", "ytd": "YTD" }[period] || period;
-
-  const fetchAnalysis = async () => {
-    try {
-      setError(null);
-      const res = await api.get(`/production/machine-analysis?start=${fromDate}&end=${toDate}`);
-      if (res.data?.status === "ok") {
-        setAnalysis(res.data.analysis);
-        setStats(res.data.stats);
-        setCreatedAt(res.data.created_at);
-        setAnalysisRange(res.data.date_range);
-      } else if (res.data?.status === "error") {
-        setError(res.data.error);
-        setAnalysis(null);
-      }
-    } catch {}
-  };
-
-  useEffect(() => { fetchAnalysis(); }, [fromDate, toDate]);
-
-  const runAnalysis = async () => {
-    setGenerating(true);
-    setError(null);
-    try {
-      const res = await api.post("/production/machine-analysis", { start: fromDate, end: toDate });
-      if (res.data?.status === "ok") {
-        setAnalysis(res.data.analysis);
-        setStats(res.data.stats);
-        setCreatedAt(new Date().toISOString());
-        setAnalysisRange({ start: fromDate, end: toDate });
-        setError(null);
-      } else if (res.data?.status === "error") {
-        setError(res.data.error);
-        setAnalysis(null);
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Failed to run analysis. Please try again.");
-    } finally { setGenerating(false); }
-  };
-
-  const opt = analysis?.optimal_settings || {};
-
-  const fmtDate = (d) => {
-    if (!d || d === 'all') return '';
-    try { return new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
-    catch { return d; }
-  };
-  const rangeBadge = (() => {
-    const r = analysisRange || (fromDate && toDate ? { start: fromDate, end: toDate } : null);
-    if (!r) return null;
-    const s = fmtDate(r.start);
-    const e = fmtDate(r.end);
-    if (s && e && s !== e) return `${s} — ${e}`;
-    if (s) return s;
-    return null;
-  })();
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5" data-testid="machine-analysis">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-            <Brain className="w-4 h-4 text-indigo-600" />
-            AI Machine Settings Analysis
-          </h3>
-          {analysis && rangeBadge && (
-            <Badge className="bg-indigo-100 text-indigo-700 text-[10px] font-medium border-0" data-testid="analysis-date-range">
-              {rangeBadge}
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {createdAt && (
-            <span className="text-[10px] text-slate-400">
-              {new Date(createdAt).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
-            </span>
-          )}
-          <Button variant="outline" size="sm" onClick={runAnalysis} disabled={generating} data-testid="run-analysis-btn">
-            {generating ? <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />}
-            {generating ? "Analyzing..." : analysis ? "Re-analyze" : `Analyze ${periodLabel}`}
-          </Button>
-        </div>
-      </div>
-
-      {generating && (
-        <div className="flex items-center justify-center py-12 text-sm text-slate-500 gap-2">
-          <RefreshCw className="w-4 h-4 animate-spin text-indigo-500" />
-          Analyzing {stats?.total_samples || "all"} samples across {stats?.total_days || "all"} production days...
-        </div>
-      )}
-
-      {!generating && !analysis && !error && (
-        <div className="text-center py-8">
-          <Brain className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">Run analysis to get AI-powered recommendations</p>
-          <p className="text-xs text-slate-400 mt-1">Based on all historical production data</p>
-        </div>
-      )}
-
-      {!generating && error && (
-        <div className="text-center py-8" data-testid="analysis-error">
-          <AlertCircle className="w-10 h-10 text-amber-400 mx-auto mb-2" />
-          <p className="text-sm text-slate-600 font-medium">Not enough data for analysis</p>
-          <p className="text-xs text-slate-500 mt-1">{error}</p>
-          <p className="text-xs text-slate-400 mt-2">Try selecting a longer time period or ensure production data has been uploaded.</p>
-        </div>
-      )}
-
-      {!generating && analysis && (
-        <div className="space-y-4">
-          {/* Summary */}
-          <p className="text-sm text-slate-600 bg-indigo-50 rounded-lg p-3 leading-relaxed" data-testid="analysis-summary">
-            {analysis.summary}
-          </p>
-
-          {/* Stats bar */}
-          {stats && (
-            <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-              <span className="bg-slate-50 px-2 py-1 rounded">{stats.total_samples} samples</span>
-              <span className="bg-slate-50 px-2 py-1 rounded">{stats.total_days} days</span>
-              <span className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded">{stats.in_target_pct}% in target</span>
-              <span className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded">{stats.good_days} good days</span>
-              <span className="bg-red-50 text-red-600 px-2 py-1 rounded">{stats.bad_days} problem days</span>
-            </div>
-          )}
-
-          {/* Optimal Settings Grid */}
-          <div>
-            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Target className="w-3.5 h-3.5 text-emerald-600" /> Optimal Settings
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              {Object.entries(opt).map(([key, val]) => (
-                <div key={key} className="bg-gradient-to-b from-slate-50 to-white border border-slate-200 rounded-lg p-3 text-center" data-testid={`setting-${key.toLowerCase()}`}>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1">{key}</div>
-                  <div className="text-lg font-bold text-slate-900 tabular-nums">{val.recommended}</div>
-                  <div className="text-[10px] text-slate-400">{val.unit}</div>
-                  {val.range && (
-                    <div className="text-[10px] text-slate-400 mt-0.5 tabular-nums">{val.range[0]}–{val.range[1]}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Expandable details */}
-          <button onClick={() => setExpanded(!expanded)} className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
-            {expanded ? "Hide details" : "Show detailed findings"}
-            <ChevronRight className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`} />
-          </button>
-
-          {expanded && (
-            <div className="space-y-4 animate-in fade-in">
-              {/* Key Findings */}
-              {analysis.key_findings?.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 text-amber-500" /> Key Findings
-                  </h4>
-                  <ul className="space-y-1.5">
-                    {analysis.key_findings.map((f, i) => (
-                      <li key={i} className="text-sm text-slate-600 flex items-start gap-2">
-                        <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Correlations */}
-              {analysis.correlations?.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <TrendingUp className="w-3.5 h-3.5 text-blue-500" /> Correlations
-                  </h4>
-                  <ul className="space-y-1.5">
-                    {analysis.correlations.map((c, i) => (
-                      <li key={i} className="text-sm text-slate-600 flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-2 flex-shrink-0" />
-                        {c}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Risk Factors */}
-              {analysis.risk_factors?.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> Risk Factors
-                  </h4>
-                  <ul className="space-y-1.5">
-                    {analysis.risk_factors.map((r, i) => (
-                      <li key={i} className="text-sm text-slate-600 flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 mt-2 flex-shrink-0" />
-                        {r}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Recommendations */}
-              {analysis.improvement_recommendations?.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Recommendations
-                  </h4>
-                  <ul className="space-y-1.5">
-                    {analysis.improvement_recommendations.map((r, i) => (
-                      <li key={i} className="text-sm text-slate-600 flex items-start gap-2">
-                        <span className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
-                        {r}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
+import { displayDate, PERIOD_OPTIONS } from "../lib/production/dateRange";
+import { useProductionDashboardQuery } from "../hooks/production/useProductionDashboardQuery";
+import { useProductionDateRange } from "../features/production/hooks/useProductionDateRange";
+import { productionKeys } from "../features/production/queryKeys";
+import { MachineAnalysisPanel } from "../features/production/components/MachineAnalysisPanel";
 
 // ──────────────────────────────────────────
 // KPI Card
@@ -537,7 +271,7 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
       });
       setFormData(defaults);
     }).catch(() => toast.error("Failed to load form")).finally(() => setLoading(false));
-  }, [open, templateId, submissionId]);
+  }, [open, templateId, submissionId, initialValues]);
 
   const handleSubmit = async () => {
     // Validate required
@@ -680,17 +414,38 @@ export default function ProductionDashboardPage() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
+  const getTimeKey = (entry) => {
+    if (entry?.time) return entry.time;
+    if (entry?.datetime) {
+      const d = new Date(entry.datetime);
+      if (!isNaN(d)) {
+        return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+      }
+    }
+    return "";
+  };
+
+  const {
+    period,
+    setPeriod,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+    showCustomDate,
+    setShowCustomDate,
+    handlePeriod,
+    fromStr,
+    toStr,
+  } = useProductionDateRange();
+
   // State
-  const [period, setPeriod] = useState("1d");
-  const [fromDate, setFromDate] = useState(today());
-  const [toDate, setToDate] = useState(today());
   const [shift, setShift] = useState("day");
   const [logSearch, setLogSearch] = useState("");
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", description: "", type: "action", severity: "info" });
   const [chartSeries, setChartSeries] = useState({ rpm: false, feed: false, mp4: false, t_product_ir: false, screenChange: false, magnetCleaning: false });
   const [expandedEosNotes, setExpandedEosNotes] = useState(null); // Track which EOS row has notes expanded (for mobile)
-  const [showCustomDate, setShowCustomDate] = useState(false);
   const [formExec, setFormExec] = useState(null); // { templateId, templateName }
   const [selectedTime, setSelectedTime] = useState(null); // highlighted time from chart click
 
@@ -700,11 +455,11 @@ export default function ProductionDashboardPage() {
       setPeriod("1d");
       setShowCustomDate(false);
     }
-  }, [isMobile, period]);
+  }, [isMobile, period, setPeriod, setShowCustomDate]);
 
   // Template IDs (fetched once)
   const { data: formTemplates } = useQuery({
-    queryKey: ["production-form-templates"],
+    queryKey: productionKeys.formTemplates(),
     queryFn: async () => {
       const res = await api.get("/form-templates");
       const list = Array.isArray(res.data) ? res.data : res.data.templates || [];
@@ -728,46 +483,23 @@ export default function ProductionDashboardPage() {
     staleTime: 600000,
   });
 
-  // Period change handler
-  const handlePeriod = (p) => {
-    setPeriod(p);
-    setShowCustomDate(false);
-    const t = today();
-    setToDate(t);
-    switch (p) {
-      case "1d": setFromDate(t); break;
-      case "1w": setFromDate(daysAgo(7)); break;
-      case "1m": setFromDate(monthsAgo(1)); break;
-      case "3m": setFromDate(monthsAgo(3)); break;
-      case "6m": setFromDate(monthsAgo(6)); break;
-      case "1y": setFromDate(monthsAgo(12)); break;
-      case "ytd": setFromDate(startOfYear()); break;
-      default: setFromDate(t);
-    }
-  };
-
-  const fromStr = fmtDate(fromDate);
-  const toStr = fmtDate(toDate);
-
-  // Build query params
-  const queryParams = period === "1d"
-    ? { date: fromStr, shift }
-    : { from_date: fromStr, to_date: toStr, shift };
-
   // Fetch dashboard data
-  const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["production-dashboard", fromStr, toStr, shift],
-    queryFn: () => productionAPI.getDashboard(queryParams),
-    refetchInterval: 60000,
-    staleTime: 5000,
-    refetchOnWindowFocus: true,
+  const { data, isLoading, isFetching, refetch } = useProductionDashboardQuery({
+    fromStr,
+    toStr,
+    shift,
+    period,
+    productionAPI,
   });
+
+  const invalidateDashboard = () =>
+    queryClient.invalidateQueries({ queryKey: productionKeys.dashboard(period, fromStr, toStr, shift) });
 
   // Mutation for creating events
   const createEventMutation = useMutation({
     mutationFn: (eventData) => productionAPI.createEvent(eventData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      invalidateDashboard();
       setShowAddEvent(false);
       setNewEvent({ title: "", description: "", type: "action", severity: "info" });
       toast.success("Event created");
@@ -785,7 +517,7 @@ export default function ProductionDashboardPage() {
   const updateSubmissionMutation = useMutation({
     mutationFn: ({ id, values }) => productionAPI.updateSubmission(id, values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      invalidateDashboard();
       setEditEntry(null);
       toast.success("Entry updated");
     },
@@ -796,13 +528,13 @@ export default function ProductionDashboardPage() {
   const deleteSubmissionMutation = useMutation({
     mutationFn: (id) => productionAPI.deleteSubmission(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      invalidateDashboard();
       toast.success("Entry deleted");
     },
     onError: (error) => {
       // 404 means already deleted - treat as success
       if (error?.response?.status === 404) {
-        queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+        invalidateDashboard();
         toast.success("Entry already deleted");
       } else {
         toast.error("Failed to delete entry");
@@ -823,7 +555,7 @@ export default function ProductionDashboardPage() {
       actions: data?.actions || [],
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+      invalidateDashboard();
       toast.success("AI insights generated");
     },
     onError: () => toast.error("Failed to generate insights"),
@@ -857,11 +589,12 @@ export default function ProductionDashboardPage() {
         (data.viscosity_series || []).forEach((v) => { if (v.time) viscMap[v.time] = v.viscosity; });
         (data.production_log || []).forEach((e, i) => {
           const dateStr = e.datetime ? new Date(e.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : '';
+          const timeKey = getTimeKey(e);
           logRows.push([
-            i + 1, dateStr, e.time, e.rpm, e.feed, e.moisture, e.energy,
+            i + 1, dateStr, timeKey || "—", e.rpm, e.feed, e.moisture, e.energy,
             e.mt1, e.mt2, e.mt3, e.mp1, e.mp2, e.mp3, e.mp4,
             e.co2_feed_p, e.t_product_ir,
-            viscMap[e.time] !== undefined ? viscMap[e.time] : "TBD",
+            timeKey && viscMap[timeKey] !== undefined ? viscMap[timeKey] : "TBD",
             e.remarks || "", e.submitted_by || "",
           ]);
         });
@@ -981,17 +714,24 @@ export default function ProductionDashboardPage() {
     setToDate(to);
   };
 
+  // Combined time series for Mooney Viscosity chart (merges viscosity + production log data)
+  const isMultiDay = period !== "1d";
+
   // Filtered production log
   const filteredLog = useMemo(() => {
     if (!data?.production_log) return [];
 
     // Merge standalone viscosity entries (no matching extruder time) as separate rows
-    const logTimes = new Set((data.production_log || []).map((e) => e.time));
+    const logKeys = new Set(
+      (data.production_log || [])
+        .map((e) => (isMultiDay ? e.datetime : getTimeKey(e)))
+        .filter(Boolean)
+    );
     const standaloneVisc = (data?.viscosity_series || [])
-      .filter((v) => v.time && !logTimes.has(v.time))
+      .filter((v) => (isMultiDay ? v.datetime : v.time) && !logKeys.has(isMultiDay ? v.datetime : v.time))
       .map((v) => ({
         time: v.time,
-        datetime: "",
+        datetime: v.datetime || "",
         submitted_by: "",
         rpm: null, feed: null, moisture: null, energy: null,
         mt1: null, mt2: null, mt3: null,
@@ -1012,15 +752,12 @@ export default function ProductionDashboardPage() {
     const s = logSearch.toLowerCase();
     return merged.filter(
       (e) =>
-        e.time?.toLowerCase().includes(s) ||
+        getTimeKey(e)?.toLowerCase().includes(s) ||
         e.submitted_by?.toLowerCase().includes(s) ||
         String(e.rpm).includes(s) ||
         String(e.feed).includes(s)
     );
-  }, [data?.production_log, data?.viscosity_series, logSearch]);
-
-  // Combined time series for Mooney Viscosity chart (merges viscosity + production log data)
-  const isMultiDay = period !== "1d";
+  }, [data?.production_log, data?.viscosity_series, logSearch, isMultiDay]);
 
   const combinedSeries = useMemo(() => {
     const log = data?.production_log || [];
@@ -1037,10 +774,12 @@ export default function ProductionDashboardPage() {
 
       const timeMap = {};
       log.forEach((entry) => {
-        timeMap[entry.time] = {
-          time: entry.time,
+        const timeKey = getTimeKey(entry);
+        if (!timeKey) return;
+        timeMap[timeKey] = {
+          time: timeKey,
           rpm: entry.rpm, feed: entry.feed, mp4: entry.mp4, t_product_ir: entry.t_product_ir,
-          viscosity: viscByTime[entry.time] ?? null,
+          viscosity: viscByTime[timeKey] ?? null,
           screenChange: null, magnetCleaning: null,
         };
       });
@@ -1787,28 +1526,30 @@ export default function ProductionDashboardPage() {
                   filteredLog.map((entry, i) => {
                     const anomaly = isAnomalyRow(entry);
                     const isViscOnly = entry._viscosity_only;
+                    const timeKey = getTimeKey(entry);
+                    const timeLabel = timeKey || "—";
                     const viscValue = isViscOnly
                       ? entry._viscosity_value
-                      : viscosityByTime[entry.time]?.value;
+                      : timeKey ? viscosityByTime[timeKey]?.value : undefined;
                     const viscSubId = isViscOnly
                       ? entry._viscosity_submission_id
-                      : viscosityByTime[entry.time]?.submission_id;
+                      : timeKey ? viscosityByTime[timeKey]?.submission_id : undefined;
                     const openEdit = () => {
                       if (isViscOnly) {
                         setEditEntry({ ...entry, _index: i, viscosity: entry._viscosity_value ?? "", _viscosity_submission_id: entry._viscosity_submission_id || "", _viscosity_only: true });
                       } else {
-                        const viscData = viscosityByTime[entry.time];
+                        const viscData = timeKey ? viscosityByTime[timeKey] : undefined;
                         setEditEntry({ ...entry, _index: i, viscosity: viscData?.value ?? "", _viscosity_submission_id: viscData?.submission_id || "" });
                       }
                     };
                     return (
                       <div
-                        key={`${entry.time}-${i}`}
+                        key={`${timeKey || "no-time"}-${i}`}
                         className={`p-3 rounded-lg border ${isViscOnly ? "bg-blue-50/40 border-blue-100" : anomaly ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-100"}`}
-                        data-testid={`mobile-log-${entry.time}`}
+                        data-testid={`mobile-log-${timeKey || i}`}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold text-slate-900">{entry.time}</span>
+                          <span className="font-semibold text-slate-900">{timeLabel}</span>
                           <div className="flex items-center gap-1.5">
                             <Badge variant="secondary" className="text-xs">
                               {entry.submitted_by || "—"}
@@ -1817,7 +1558,7 @@ export default function ProductionDashboardPage() {
                               type="button"
                               onClick={openEdit}
                               className="p-1 rounded-md bg-white border border-slate-200 text-slate-500 active:bg-slate-100"
-                              data-testid={`mobile-edit-${entry.time}`}
+                              data-testid={`mobile-edit-${timeKey || i}`}
                               aria-label="Edit entry"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -1829,7 +1570,7 @@ export default function ProductionDashboardPage() {
                             type="button"
                             onClick={openEdit}
                             className="w-full text-left text-sm text-slate-600"
-                            data-testid={`mobile-visc-edit-${entry.time}`}
+                            data-testid={`mobile-visc-edit-${timeKey || i}`}
                           >
                             <span className="font-medium">Viscosity:</span> {viscValue ?? "—"}
                           </button>
@@ -1847,7 +1588,7 @@ export default function ProductionDashboardPage() {
                                 type="button"
                                 onClick={openEdit}
                                 className="font-medium underline underline-offset-2 decoration-dotted decoration-slate-300"
-                                data-testid={`mobile-visc-edit-${entry.time}`}
+                                data-testid={`mobile-visc-edit-${timeKey || i}`}
                               >
                                 {viscValue ?? <span className="text-amber-500">TBD</span>}
                               </button>
@@ -1887,25 +1628,27 @@ export default function ProductionDashboardPage() {
                   {filteredLog.length > 0 ? (
                     filteredLog.map((entry, i) => {
                       const anomaly = isAnomalyRow(entry);
-                      const isHighlighted = selectedTime && entry.time === selectedTime;
+                      const timeKey = getTimeKey(entry);
+                      const timeLabel = timeKey || "—";
+                      const isHighlighted = selectedTime && timeKey && timeKey === selectedTime;
                       const isViscOnly = entry._viscosity_only;
                       const viscValue = isViscOnly
                         ? entry._viscosity_value
-                        : viscosityByTime[entry.time]?.value;
+                        : timeKey ? viscosityByTime[timeKey]?.value : undefined;
                       const viscSubId = isViscOnly
                         ? entry._viscosity_submission_id
-                        : viscosityByTime[entry.time]?.submission_id;
+                        : timeKey ? viscosityByTime[timeKey]?.submission_id : undefined;
                       const tbdCell = <span className="text-slate-300">—</span>;
                       return (
                         <tr
-                          key={`${entry.time}-${i}`}
+                          key={`${timeKey || "no-time"}-${i}`}
                           className={`border-b border-slate-50 transition-colors ${isHighlighted ? "bg-purple-50 ring-1 ring-purple-300" : isViscOnly ? "bg-blue-50/40" : anomaly ? "bg-amber-50" : "hover:bg-slate-50"}`}
-                          data-testid={`log-row-${entry.time}`}
+                          data-testid={`log-row-${timeKey || i}`}
                           ref={isHighlighted ? (el) => el?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined}
                         >
                           <td className="py-2 px-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
                           <td className="py-2 px-2 text-slate-500 text-xs tabular-nums whitespace-nowrap">{entry.datetime ? new Date(entry.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : ''}</td>
-                          <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{entry.time}</td>
+                          <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{timeLabel}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.rpm}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.feed}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.moisture}</td>
@@ -1928,12 +1671,12 @@ export default function ProductionDashboardPage() {
                                 if (isViscOnly) {
                                   setEditEntry({ ...entry, _index: i, viscosity: entry._viscosity_value ?? "", _viscosity_submission_id: entry._viscosity_submission_id || "", _viscosity_only: true });
                                 } else {
-                                  const viscData = viscosityByTime[entry.time];
+                                  const viscData = timeKey ? viscosityByTime[timeKey] : undefined;
                                   setEditEntry({ ...entry, _index: i, viscosity: viscData?.value ?? "", _viscosity_submission_id: viscData?.submission_id || "" });
                                 }
                               }}
                               className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                              data-testid={`edit-row-${entry.time}`}
+                              data-testid={`edit-row-${timeKey || i}`}
                               title="Edit"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -1941,14 +1684,14 @@ export default function ProductionDashboardPage() {
                             <button
                               onClick={() => {
                                 if (isViscOnly) {
-                                  setDeleteConfirm({ ids: [entry._viscosity_submission_id].filter(Boolean), label: `viscosity sample at ${entry.time}` });
+                                  setDeleteConfirm({ ids: [entry._viscosity_submission_id].filter(Boolean), label: `viscosity sample at ${timeLabel}` });
                                 } else {
-                                  const ids = [entry.submission_id, viscosityByTime[entry.time]?.submission_id].filter(Boolean);
-                                  setDeleteConfirm({ ids, label: `log entry at ${entry.time}` });
+                                  const ids = [entry.submission_id, timeKey ? viscosityByTime[timeKey]?.submission_id : undefined].filter(Boolean);
+                                  setDeleteConfirm({ ids, label: `log entry at ${timeLabel}` });
                                 }
                               }}
                               className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
-                              data-testid={`delete-row-${entry.time}`}
+                              data-testid={`delete-row-${timeKey || i}`}
                               title="Delete"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -2144,7 +1887,7 @@ export default function ProductionDashboardPage() {
                   disabled={updateSubmissionMutation.isPending}
                   onClick={async () => {
                     const refresh = () => {
-                      queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
+                      invalidateDashboard();
                       setEditEntry(null);
                       toast.success("Entry updated");
                     };

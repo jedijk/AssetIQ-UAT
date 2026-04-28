@@ -30,6 +30,7 @@ import {
   Brain,
   Plus,
   Calculator,
+  FileText,
   Shield,
   Cog,
   Leaf,
@@ -88,6 +89,8 @@ import {
 import RiskBadge from "../components/RiskBadge";
 import AIInsightsPanel from "../components/AIInsightsPanel";
 import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
+import DocumentViewer from "../components/DocumentViewer";
+import AttachmentsPanel from "../components/attachments/AttachmentsPanel";
 
 // Extracted components
 import { ThreatHeader, RiskScoreCard, RecommendedActionsSection } from "../components/threat-detail";
@@ -110,8 +113,7 @@ const ThreatDetailPage = () => {
   const [scoreCalcPopup, setScoreCalcPopup] = useState({ show: false, x: 0, y: 0 });
   const scorePopupRef = useRef(null);
 
-  // Image viewer state
-  const [selectedImage, setSelectedImage] = useState(null);
+  // Attachment viewer is handled by AttachmentsPanel (DocumentViewer)
 
   // Sticky header visibility state (must be before any early returns)
   const [showStickyHeader, setShowStickyHeader] = useState(false);
@@ -120,20 +122,14 @@ const ThreatDetailPage = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef(null);
 
-  // Handle photo upload in edit mode
-  const handlePhotoUpload = async (e) => {
+  // Handle attachment upload in edit mode (images + documents)
+  const handleAttachmentUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-    
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('Image size must be less than 10MB');
+      toast.error('File size must be less than 10MB');
       return;
     }
     
@@ -142,9 +138,15 @@ const ThreatDetailPage = () => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64Data = reader.result;
+        const isImage = (file.type || "").startsWith("image/");
+        const ext = file.name?.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
         const newAttachment = {
           id: `att-${Date.now()}`,
-          type: 'image',
+          type: isImage ? 'image' : 'file',
+          name: file.name,
+          mime: file.type || "application/octet-stream",
+          size: file.size,
+          ext,
           data: base64Data,
           created_at: new Date().toISOString(),
         };
@@ -152,17 +154,17 @@ const ThreatDetailPage = () => {
           ...prev,
           attachments: [...(prev.attachments || []), newAttachment]
         }));
-        toast.success('Photo added');
+        toast.success(isImage ? 'Photo added' : 'File added');
         setUploadingPhoto(false);
       };
       reader.onerror = () => {
-        toast.error('Failed to read image');
+        toast.error('Failed to read file');
         setUploadingPhoto(false);
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      console.error('Photo upload error:', err);
-      toast.error('Failed to add photo');
+      console.error('Attachment upload error:', err);
+      toast.error('Failed to add file');
       setUploadingPhoto(false);
     }
     
@@ -171,6 +173,8 @@ const ThreatDetailPage = () => {
       photoInputRef.current.value = '';
     }
   };
+
+  // Preview/open is handled by AttachmentsPanel
 
   // Generate shareable link
   const shareableLink = `${window.location.origin}/threats/${id}`;
@@ -238,7 +242,7 @@ const ThreatDetailPage = () => {
     queryFn: equipmentHierarchyAPI.getNodes,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
-  const equipmentNodes = equipmentNodesData?.nodes || [];
+  const equipmentNodes = useMemo(() => equipmentNodesData?.nodes ?? [], [equipmentNodesData]);
 
   // Fetch equipment types for Equipment Type dropdown
   const { data: equipmentTypesData } = useQuery({
@@ -246,7 +250,7 @@ const ThreatDetailPage = () => {
     queryFn: equipmentHierarchyAPI.getEquipmentTypes,
     staleTime: 5 * 60 * 1000,
   });
-  const equipmentTypes = equipmentTypesData?.equipment_types || [];
+  const equipmentTypes = useMemo(() => equipmentTypesData?.equipment_types ?? [], [equipmentTypesData]);
 
   // Fetch failure modes for Failure Mode dropdown
   const { data: failureModesData } = useQuery({
@@ -254,7 +258,7 @@ const ThreatDetailPage = () => {
     queryFn: () => failureModesAPI.getAll({}),
     staleTime: 5 * 60 * 1000,
   });
-  const failureModes = failureModesData?.failure_modes || [];
+  const failureModes = useMemo(() => failureModesData?.failure_modes ?? [], [failureModesData]);
   
   // Fetch users for Owner dropdown
   const { data: usersData } = useQuery({
@@ -1320,122 +1324,50 @@ const ThreatDetailPage = () => {
           className="card p-4 sm:p-6 mb-6"
           data-testid="threat-attachments-section"
         >
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="flex items-center gap-2">
-              <FileImage className="w-5 h-5 text-slate-500" />
-              <h3 className="font-semibold text-slate-900">Attachments</h3>
-              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                {(isEditing ? editForm.attachments : threat.attachments)?.length || 0} {((isEditing ? editForm.attachments : threat.attachments)?.length || 0) === 1 ? 'image' : 'images'}
-              </span>
-            </div>
-            {isEditing && (
-              <>
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handlePhotoUpload}
-                  data-testid="photo-input"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => photoInputRef.current?.click()}
-                  disabled={uploadingPhoto}
-                  className="flex items-center gap-2"
-                  data-testid="add-photo-btn"
-                >
-                  {uploadingPhoto ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Camera className="w-4 h-4" />
-                  )}
-                  <span className="hidden sm:inline">Add Photo</span>
-                </Button>
-              </>
-            )}
-          </div>
-          
-          {/* Photo grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
-            {(isEditing ? editForm.attachments : threat.attachments)?.map((attachment, idx) => (
-              <div
-                key={attachment.id || attachment.url || `attachment-${idx}-${attachment.created_at || ''}`}
-                className="relative group cursor-pointer rounded-lg overflow-hidden border border-slate-200 hover:border-blue-400 transition-colors"
-                onClick={() => !isEditing && setSelectedImage(attachment.data)}
-                data-testid={`attachment-${idx}`}
-              >
-                {attachment.type === 'image' && attachment.data ? (
-                  <>
-                    <img
-                      src={attachment.data.startsWith('data:') ? attachment.data : `data:image/jpeg;base64,${attachment.data}`}
-                      alt={`Attachment ${idx + 1}`}
-                      className="w-full h-20 sm:h-24 md:h-32 object-cover"
-                    />
-                    {isEditing ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditForm(prev => ({
-                            ...prev,
-                            attachments: prev.attachments.filter((_, i) => i !== idx)
-                          }));
-                        }}
-                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                        data-testid={`remove-attachment-${idx}`}
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    ) : (
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                        <Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    )}
-                    {attachment.created_at && !isEditing && (
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1">
-                        <span className="text-[10px] text-white/80">
-                          {formatDate(attachment.created_at)}
-                        </span>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="w-full h-20 sm:h-24 md:h-32 bg-slate-100 flex items-center justify-center">
-                    <Image className="w-8 h-8 text-slate-300" />
-                  </div>
-                )}
-              </div>
-            ))}
-            
-            {/* Add photo placeholder in edit mode */}
-            {isEditing && (
-              <button
-                type="button"
-                onClick={() => photoInputRef.current?.click()}
-                disabled={uploadingPhoto}
-                className="w-full h-20 sm:h-24 md:h-32 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center gap-1 text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
-                data-testid="add-photo-placeholder"
-              >
-                {uploadingPhoto ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  <>
-                    <Camera className="w-6 h-6" />
-                    <span className="text-xs">Add Photo</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-          
-          {/* Empty state when not in edit mode */}
-          {!isEditing && (!threat.attachments || threat.attachments.length === 0) && (
-            <p className="text-sm text-slate-400 text-center py-4">No attachments</p>
-          )}
+          <AttachmentsPanel
+            title="Attachments"
+            items={isEditing ? editForm.attachments : (threat.attachments || [])}
+            editable={isEditing}
+            isUploading={uploadingPhoto}
+            getKey={(a) => a?.id}
+            getName={(a) => a?.name || a?.filename || "Attachment"}
+            getUrl={(a) => a?.data}
+            getContentType={(a) => a?.mime || a?.content_type || a?.type}
+            onAddFiles={async (files) => {
+              // Reuse existing file->data-url logic
+              for (const file of files) {
+                await new Promise((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => resolve(reader.result);
+                  reader.onerror = () => reject(new Error("Failed to read file"));
+                  reader.readAsDataURL(file);
+                }).then((dataUrl) => {
+                  const isImage = (file.type || "").startsWith("image/");
+                  const ext = file.name?.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
+                  const newAttachment = {
+                    id: `att-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                    type: isImage ? "image" : "file",
+                    name: file.name,
+                    mime: file.type || "application/octet-stream",
+                    size: file.size,
+                    ext,
+                    data: dataUrl,
+                    created_at: new Date().toISOString(),
+                  };
+                  setEditForm((prev) => ({
+                    ...prev,
+                    attachments: [...(prev.attachments || []), newAttachment],
+                  }));
+                });
+              }
+            }}
+            onRemove={(_raw, idToRemove) => {
+              setEditForm((prev) => ({
+                ...prev,
+                attachments: (prev.attachments || []).filter((a) => a?.id !== idToRemove),
+              }));
+            }}
+          />
         </motion.div>
       )}
 
@@ -1544,27 +1476,7 @@ const ThreatDetailPage = () => {
       </motion.div>
       </div>
 
-      {/* Image Viewer Modal */}
-      {selectedImage && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setSelectedImage(null)}
-          data-testid="image-viewer-modal"
-        >
-          <button
-            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-            onClick={() => setSelectedImage(null)}
-          >
-            <X className="w-6 h-6" />
-          </button>
-          <img
-            src={selectedImage.startsWith('data:') ? selectedImage : `data:image/jpeg;base64,${selectedImage}`}
-            alt="Full size attachment"
-            className="max-w-full max-h-[90vh] object-contain rounded-lg"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+      {/* Attachment viewer handled by AttachmentsPanel */}
 
       {/* Share Link Dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>

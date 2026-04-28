@@ -113,6 +113,7 @@ class ThreatUpdate(BaseModel):
     linked_equipment_id: Optional[str] = None
     is_new_failure_mode: Optional[bool] = None
     fmea_rpn: Optional[int] = None
+    attachments: Optional[List[dict]] = None
     owner_id: Optional[str] = None
     owner_name: Optional[str] = None
     discipline: Optional[str] = None

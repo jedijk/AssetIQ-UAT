@@ -64,12 +64,32 @@ def _r2_available() -> bool:
 # ==================== MONGODB CONNECTION (legacy) ====================
 
 _storage_client: Optional[AsyncIOMotorClient] = None
-_storage_db = None
+_storage_db = None  # fallback-only cache (non-request contexts)
 
 
 async def _get_storage_db():
-    """Get database with extended timeouts for large file operations."""
+    """
+    Get the database for file_storage metadata.
+
+    IMPORTANT:
+    This app supports per-request database switching via `database.py` using a ContextVar
+    set from the `X-Database-Environment` header. For correctness, `file_storage` metadata
+    must live in the SAME database as the request-scoped application data (e.g. `equipment_files`).
+
+    Therefore we prefer the request-scoped DB from `database.get_request_db()`.
+    We keep the legacy AsyncIOMotorClient path as a fallback (mainly for scripts/background
+    contexts where the request DB context may not be initialized).
+    """
     global _storage_client, _storage_db
+
+    # Prefer the app's request-scoped DB (supports multi-environment switching).
+    # IMPORTANT: do NOT cache this globally — request DB changes per request/env.
+    try:
+        from database import get_request_db
+        return get_request_db()
+    except Exception as e:
+        # Non-request contexts (scripts/background tasks) fall back to a standalone client.
+        logger.warning(f"Falling back to standalone storage DB client: {e}")
 
     if _storage_db is not None:
         return _storage_db

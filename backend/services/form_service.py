@@ -51,6 +51,8 @@ class FormService:
             "allow_partial_submission": data.get("allow_partial_submission", False),
             "require_signature": data.get("require_signature", False),
             "tags": data.get("tags", []),
+            "photo_extraction_config": data.get("photo_extraction_config"),
+            "label_print_config": data.get("label_print_config"),
             "version": 1,
             "is_active": True,
             "is_latest": True,
@@ -192,6 +194,7 @@ class FormService:
                 "require_signature": data.get("require_signature", existing.get("require_signature", False)),
                 "tags": data.get("tags", existing.get("tags", [])),
                 "photo_extraction_config": data.get("photo_extraction_config", existing.get("photo_extraction_config")),
+                "label_print_config": data.get("label_print_config", existing.get("label_print_config")),
                 "version": existing.get("version", 1) + 1,
                 "is_active": True,
                 "is_latest": True,
@@ -221,7 +224,8 @@ class FormService:
             allowed_fields = [
                 "name", "description", "discipline", "failure_mode_ids",
                 "equipment_type_ids", "fields", "documents", "allow_partial_submission",
-                "require_signature", "tags", "is_active", "photo_extraction_config"
+                "require_signature", "tags", "is_active", "photo_extraction_config",
+                "label_print_config"
             ]
             
             for field in allowed_fields:
@@ -548,11 +552,17 @@ class FormService:
                 submitted_by_name = user.get("name", "")
 
         # Create submission document
+        label_cfg = template.get("label_print_config") or {}
+        label_template_id = label_cfg.get("label_template_id") if isinstance(label_cfg, dict) else None
         doc = {
             "id": str(uuid.uuid4()),  # Custom string ID for consistency
             "form_template_id": data["form_template_id"],
             "form_template_name": template["name"],
             "form_template_version": template.get("version", 1),
+            # Freeze the label template used at submission-time so reprints match.
+            # If the form template is later reconfigured to a different label template,
+            # the submission can still be reprinted identically.
+            "label_template_id": label_template_id,
             "task_instance_id": data.get("task_instance_id"),
             "task_template_name": data.get("task_template_name"),
             "equipment_id": data.get("equipment_id"),
@@ -584,7 +594,9 @@ class FormService:
         
         # Auto-pair Mooney Viscosity samples to the latest orphan Extruder sample (same date)
         try:
-            if (template.get("name") or "").strip().lower() == "mooney viscosity sample":
+            # Be flexible: production templates are often versioned (e.g. "Mooney viscosity v3").
+            tpl_name_norm = (template.get("name") or "").strip().lower()
+            if "mooney" in tpl_name_norm and "viscos" in tpl_name_norm:
                 await self._auto_pair_viscosity_to_extruder(doc)
         except Exception as e:
             logger.warning(f"Viscosity auto-pair failed for submission {doc.get('id')}: {e}")
@@ -1169,6 +1181,7 @@ class FormService:
             "require_signature": doc.get("require_signature", False),
             "tags": doc.get("tags", []),
             "photo_extraction_config": doc.get("photo_extraction_config"),
+            "label_print_config": doc.get("label_print_config"),
             "version": doc.get("version", 1),
             "is_active": doc.get("is_active", True),
             "is_latest": doc.get("is_latest", True),
@@ -1219,14 +1232,21 @@ class FormService:
         day_start = datetime.combine(day, datetime.min.time())
         day_end = datetime.combine(day, datetime.max.time())
 
-        # Find ALL Extruder Settings and Mooney viscosity templates
-        # Note: There may be multiple templates with the same name (different versions)
+        # Find ALL Extruder Settings and Mooney viscosity templates.
+        #
+        # Production naming often includes versions, line names, or suffixes:
+        # - "Extruder Settings v16"
+        # - "Extruder settings sample"
+        # - "Mooney viscosity sample"
+        # - "Mooney Viscosity v2"
+        #
+        # Match broadly but still specific enough to avoid accidental cross-template pairing.
         extruder_tpls = await self.db.form_templates.find(
-            {"name": {"$regex": "^extruder settings sample$", "$options": "i"}},
-        ).to_list(100)
+            {"name": {"$regex": r"extruder\\s*settings", "$options": "i"}},
+        ).to_list(200)
         visc_tpls = await self.db.form_templates.find(
-            {"name": {"$regex": "^mooney viscosity sample$", "$options": "i"}},
-        ).to_list(100)
+            {"name": {"$regex": r"mooney.*viscos", "$options": "i"}},
+        ).to_list(200)
         
         if not extruder_tpls:
             return
@@ -1375,6 +1395,7 @@ class FormService:
             "form_template_name": doc.get("form_template_name"),
             "template_name": doc.get("form_template_name"),  # Alias for frontend
             "form_template_version": doc.get("form_template_version"),
+            "label_template_id": doc.get("label_template_id"),
             "task_instance_id": doc.get("task_instance_id"),
             "equipment_id": doc.get("equipment_id"),
             "equipment_name": doc.get("equipment_name"),

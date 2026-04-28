@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { investigationAPI, actionsAPI, usersAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
 import { compressImage, formatFileSize, getCompressionPercent } from "../lib/imageCompression";
@@ -8,8 +8,11 @@ import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatDate, formatDateTime } from "../lib/dateUtils";
+import { useCausalEngineData } from "../hooks/investigations/useCausalEngineData";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { getBackendUrl } from "../lib/apiConfig";
+import AttachmentsPanel from "../components/attachments/AttachmentsPanel";
 import {
   Search, Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
   ChevronRight, Trash2, Calendar, User, MapPin,
@@ -30,37 +33,12 @@ import BackButton from "../components/BackButton";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { NewInvestigationDialog, EventDialog, FailureDialog, CauseDialog, ActionDialog } from "../components/causal-engine/InvestigationDialogs";
 import EquipmentTimeline from "../components/EquipmentTimeline";
-
-const EVENT_CATEGORIES = [
-  { value: "operational_event", label: "Operational Event", bgClass: "bg-blue-100 text-blue-700", dotClass: "bg-blue-500" },
-  { value: "alarm", label: "Alarm", bgClass: "bg-red-100 text-red-700", dotClass: "bg-red-500" },
-  { value: "maintenance_action", label: "Maintenance Action", bgClass: "bg-orange-100 text-orange-700", dotClass: "bg-orange-500" },
-  { value: "human_decision", label: "Human Decision", bgClass: "bg-purple-100 text-purple-700", dotClass: "bg-purple-500" },
-  { value: "system_response", label: "System Response", bgClass: "bg-cyan-100 text-cyan-700", dotClass: "bg-cyan-500" },
-  { value: "environmental_condition", label: "Environmental", bgClass: "bg-green-100 text-green-700", dotClass: "bg-green-500" },
-];
-
-const ACTION_PRIORITIES = [
-  { value: "critical", label: "Critical", bgClass: "bg-red-100 text-red-700" },
-  { value: "high", label: "High", bgClass: "bg-orange-100 text-orange-700" },
-  { value: "medium", label: "Medium", bgClass: "bg-yellow-100 text-yellow-700" },
-  { value: "low", label: "Low", bgClass: "bg-green-100 text-green-700" },
-];
-
-const ACTION_STATUSES = [
-  { value: "open", label: "Open" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "completed", label: "Completed" },
-  { value: "closed", label: "Closed" },
-];
-
-const INVESTIGATION_STATUSES = [
-  { value: "draft", label: "Draft" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "review", label: "Under Review" },
-  { value: "completed", label: "Completed" },
-  { value: "closed", label: "Closed" },
-];
+import {
+  ACTION_PRIORITIES,
+  ACTION_STATUSES,
+  EVENT_CATEGORIES,
+  INVESTIGATION_STATUSES,
+} from "../components/causal-engine/constants";
 
 export default function CausalEnginePage() {
   const queryClient = useQueryClient();
@@ -118,6 +96,7 @@ export default function CausalEnginePage() {
   const [isGeneratingAISummary, setIsGeneratingAISummary] = useState(false);
   const [closureSuggestion, setClosureSuggestion] = useState(null); // Investigation closure suggestion
   const fileInputRef = useRef(null);
+  const API_BASE_URL = getBackendUrl();
   
   // Handle inv query parameter - auto-select investigation from URL
   useEffect(() => {
@@ -130,55 +109,25 @@ export default function CausalEnginePage() {
     }
   }, [searchParams, setSearchParams, selectedInvId]);
 
-  const { data: investigationsData, isLoading: loadingInvestigations, error: investigationsError } = useQuery({
-    queryKey: ["investigations"],
-    queryFn: () => investigationAPI.getAll(),
-    staleTime: 0,
-    refetchOnMount: 'always',
-    retry: 2,
+  const {
+    investigations,
+    loadingInvestigations,
+    investigationsError,
+    users,
+    equipmentNodes,
+    failureModesList,
+    centralActions,
+    investigationData,
+    investigation,
+    loadingInvestigation,
+  } = useCausalEngineData({
+    selectedInvId,
+    investigationAPI,
+    actionsAPI,
+    usersAPI,
+    equipmentHierarchyAPI,
+    failureModesAPI,
   });
-  
-  const investigations = investigationsData?.investigations || [];
-  
-  // Fetch users for lead selection
-  const { data: usersData } = useQuery({
-    queryKey: ["rbac-users"],
-    queryFn: () => usersAPI.getAll(),
-    staleTime: 60000, // Cache for 1 minute
-  });
-  const users = usersData?.users || [];
-  
-  // Fetch equipment nodes for equipment dropdown
-  const { data: equipmentNodesData } = useQuery({
-    queryKey: ["equipment-nodes"],
-    queryFn: () => equipmentHierarchyAPI.getNodes(),
-    staleTime: 60000, // Cache for 1 minute
-  });
-  const equipmentNodes = equipmentNodesData?.nodes || [];
-  
-  // Fetch failure modes for failure mode dropdown
-  const { data: failureModesData } = useQuery({
-    queryKey: ["failure-modes-list"],
-    queryFn: () => failureModesAPI.getAll(),
-    staleTime: 60000, // Cache for 1 minute
-  });
-  const failureModesList = failureModesData?.failure_modes || [];
-  
-  // Fetch central actions linked to this investigation (for Action Plan section)
-  const { data: centralActionsData } = useQuery({
-    queryKey: ["central-actions", "investigation", selectedInvId],
-    queryFn: async () => {
-      const response = await actionsAPI.getAll();
-      const allActions = response?.actions || response || [];
-      // Filter actions linked to this investigation
-      return allActions.filter(
-        action => action.source_type === "investigation" && action.source_id === selectedInvId
-      );
-    },
-    enabled: !!selectedInvId,
-    staleTime: 30000,
-  });
-  const centralActions = centralActionsData || [];
   
   // Log error for debugging
   useEffect(() => {
@@ -187,21 +136,18 @@ export default function CausalEnginePage() {
     }
   }, [investigationsError]);
   
-  const { data: investigationData, isLoading: loadingInvestigation } = useQuery({
-    queryKey: ["investigation", selectedInvId],
-    queryFn: () => investigationAPI.getById(selectedInvId),
-    enabled: !!selectedInvId,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    retry: 2,
-  });
-  
-  const investigation = investigationData?.investigation;
-  
   // Check if investigation is completed/locked
   const isInvestigationLocked = investigation?.status === "completed" || investigation?.status === "closed";
   
-  const timelineEvents = investigationData?.timeline_events || [];
+  const timelineEvents = useMemo(() => investigationData?.timeline_events ?? [], [investigationData]);
+  const failureIdentifications = useMemo(
+    () => investigationData?.failure_identifications ?? [],
+    [investigationData]
+  );
+  const causeNodes = useMemo(() => investigationData?.cause_nodes ?? [], [investigationData]);
+  const actionItems = useMemo(() => investigationData?.action_items ?? [], [investigationData]);
+  const evidenceItems = useMemo(() => investigationData?.evidence ?? [], [investigationData]);
+
   // Sort timeline events chronologically by event_time
   const sortedTimelineEvents = useMemo(() => {
     return [...timelineEvents].sort((a, b) => {
@@ -211,10 +157,6 @@ export default function CausalEnginePage() {
       return new Date(a.event_time) - new Date(b.event_time);
     });
   }, [timelineEvents]);
-  const failureIdentifications = investigationData?.failure_identifications || [];
-  const causeNodes = investigationData?.cause_nodes || [];
-  const actionItems = investigationData?.action_items || [];
-  const evidenceItems = investigationData?.evidence || [];
 
   const filteredInvestigations = useMemo(() => {
     if (!searchQuery) return investigations;
@@ -326,16 +268,19 @@ export default function CausalEnginePage() {
     }
   }, [investigationData]);
 
+  const updateInvestigation = useCallback(
+    (payload) => updateInvMutation.mutate(payload),
+    [updateInvMutation]
+  );
+
   // Debounced save for notes
-  // Note: updateInvMutation intentionally excluded from deps - it returns a new ref each render
-  // which would cause the timer to reset infinitely. The mutate function is stable in behavior.
   useEffect(() => {
     if (!selectedInvId || localNotes === (investigationData?.notes || "")) return;
     const timer = setTimeout(() => {
-      updateInvMutation.mutate({ id: selectedInvId, data: { notes: localNotes } });
+      updateInvestigation({ id: selectedInvId, data: { notes: localNotes } });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [localNotes, selectedInvId, investigationData]); // updateInvMutation excluded - stable in behavior
+  }, [localNotes, selectedInvId, investigationData, updateInvestigation]);
 
   // File upload handler
   const handleFileUpload = async (event) => {
@@ -1237,92 +1182,57 @@ export default function CausalEnginePage() {
                   />
                 )}
 
-                {/* Attached Files */}
+                {/* Attachments (aligned with Observations/Actions) */}
                 <div className="bg-white rounded-lg border p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <Upload className="w-4 h-4" />
-                      <span className="font-medium text-sm">{t("causal.attachedFiles") || "Attached Files"}</span>
-                      {evidenceItems.length > 0 && (
-                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-full">{evidenceItems.length}</span>
-                      )}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="h-8"
-                      data-testid="upload-file-btn"
-                    >
-                      {isUploading ? (
-                        <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />{t("common.uploading") || "Uploading..."}</>
-                      ) : (
-                        <><Plus className="w-3.5 h-3.5 mr-2" />{t("causal.addFile") || "Add File"}</>
-                      )}
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp"
-                    />
-                  </div>
-                  
-                  {evidenceItems.length === 0 ? (
-                    <div className="text-center py-8 border-2 border-dashed rounded-lg bg-slate-50">
-                      <Upload className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                      <p className="text-sm text-slate-500">{t("causal.noFilesYet") || "No files attached yet"}</p>
-                      <p className="text-xs text-slate-400 mt-1">{t("causal.dropFilesHint") || "Click 'Add File' to upload documents, images, or reports"}</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {evidenceItems.map((evidence) => {
-                        const isImage = evidence.evidence_type === "photo" || evidence.content_type?.startsWith("image/");
-                        const FileIcon = isImage ? Image : File;
-                        const fileSize = evidence.file_size ? (evidence.file_size / 1024).toFixed(1) + " KB" : "";
-                        
-                        return (
-                          <div 
-                            key={evidence.id}
-                            className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg group hover:bg-slate-100 transition-colors"
-                          >
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isImage ? "bg-purple-100" : "bg-blue-100"}`}>
-                              <FileIcon className={`w-5 h-5 ${isImage ? "text-purple-600" : "text-blue-600"}`} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{evidence.original_filename || evidence.name}</p>
-                              <p className="text-xs text-slate-500">
-                                {evidence.evidence_type} {fileSize && `• ${fileSize}`}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleFileDownload(evidence)}
-                                className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600"
-                                data-testid={`download-file-${evidence.id}`}
-                              >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => deleteEvidenceMutation.mutate({ invId: selectedInvId, evidenceId: evidence.id })}
-                                className="h-8 w-8 p-0 text-slate-500 hover:text-red-600"
-                                data-testid={`delete-file-${evidence.id}`}
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <AttachmentsPanel
+                    title={t("causal.attachedFiles") || "Attachments"}
+                    items={evidenceItems}
+                    editable={!isInvestigationLocked}
+                    isUploading={isUploading}
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                    getKey={(e) => e?.id}
+                    getName={(e) => e?.original_filename || e?.name || "Attachment"}
+                    getUrl={(e) => (e?.storage_path ? `${API_BASE_URL}/api/storage/${e.storage_path}` : null)}
+                    getContentType={(e) => e?.content_type}
+                    onAddFiles={async (files) => {
+                      if (!selectedInvId) return;
+                      setIsUploading(true);
+                      try {
+                        for (const file of files) {
+                          let processedFile = file;
+                          if (file.type.startsWith("image/")) {
+                            try {
+                              const result = await compressImage(file, {
+                                maxWidth: 1920,
+                                maxHeight: 1920,
+                                quality: 0.8,
+                                maxSizeMB: 1,
+                              });
+                              processedFile = result.file;
+                              if (result.wasCompressed) {
+                                const savedPercent = getCompressionPercent(result.originalSize, result.compressedSize);
+                                toast.success(`${file.name} compressed (${savedPercent}% smaller)`);
+                              }
+                            } catch (err) {
+                              console.error("Image compression failed:", err);
+                            }
+                          }
+                          await investigationAPI.uploadFile(selectedInvId, processedFile);
+                        }
+                        queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+                        toast.success(t("causal.filesUploaded") || `${files.length} file(s) uploaded successfully`);
+                      } catch (error) {
+                        console.error("Upload failed:", error);
+                        toast.error(t("causal.uploadFailed") || "Failed to upload file(s)");
+                      } finally {
+                        setIsUploading(false);
+                      }
+                    }}
+                    onRemove={(raw) => {
+                      if (!selectedInvId || !raw?.id) return;
+                      deleteEvidenceMutation.mutate({ invId: selectedInvId, evidenceId: raw.id });
+                    }}
+                  />
                 </div>
               </div>
             )}

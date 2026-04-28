@@ -135,6 +135,30 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const docDropdownRef = useRef(null);
   const isInitialLoad = useRef(true);
+  const contentRef = useRef(null);
+
+  // iOS/webapp polish: gently focus the first interactive field so users can start typing
+  // without extra taps, but avoid stealing focus if something is already focused.
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root) return;
+    const t = setTimeout(() => {
+      try {
+        const active = document.activeElement;
+        if (active && active !== document.body && root.contains(active)) return;
+        const el = root.querySelector(
+          "input:not([type='hidden']):not([disabled]), textarea:not([disabled]), [role='combobox']:not([aria-disabled='true'])"
+        );
+        if (el && typeof el.focus === "function") {
+          el.focus({ preventScroll: true });
+          if (typeof el.scrollIntoView === "function") {
+            el.scrollIntoView({ block: "center", behavior: "smooth" });
+          }
+        }
+      } catch (_e) {}
+    }, 300);
+    return () => clearTimeout(t);
+  }, [task?.id]);
   
   // Close document dropdown when clicking outside
   useEffect(() => {
@@ -1414,9 +1438,9 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
 
   // Main Task Execution View
   return (
-    <div className="h-full flex flex-col bg-slate-50">
+    <div className="h-full flex flex-col bg-slate-50 overscroll-contain">
       {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-slate-200 bg-white sticky top-0 z-10">
+      <div className="flex items-center gap-3 p-4 border-b border-slate-200 bg-white/95 backdrop-blur sticky top-0 z-10 pt-[calc(env(safe-area-inset-top,0px)+16px)]">
         <Button variant="ghost" size="sm" onClick={onBack} data-testid="back-btn">
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -1502,7 +1526,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
       </div>
       
       {/* Scrollable Form Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={contentRef} className="flex-1 overflow-y-auto">
         {TaskFormContent}
       </div>
     </div>

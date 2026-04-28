@@ -24,10 +24,27 @@ import {
 
 const API = getBackendUrl();
 const getHeaders = () => {
-  const h = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+  const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+  const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
+  const h = {};
+  if (AUTH_MODE === "bearer" && token) {
+    h.Authorization = `Bearer ${token}`;
+  }
   const dbEnv = localStorage.getItem("database_environment");
   if (dbEnv) h["X-Database-Environment"] = dbEnv;
   return h;
+};
+
+const getFetchOpts = (opts = {}) => {
+  const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+  return {
+    ...opts,
+    credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+    headers: {
+      ...getHeaders(),
+      ...(opts.headers || {}),
+    },
+  };
 };
 
 const STATUS_STYLES = {
@@ -228,7 +245,7 @@ function ConfigureStep({ jobId, onPreview, onBack, onIngestDone }) {
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const res = await fetch(`${API}/api/production-logs/templates`, { headers: getHeaders() });
+        const res = await fetch(`${API}/api/production-logs/templates`, getFetchOpts());
         if (res.ok) {
           const data = await res.json();
           setTemplates(data.templates || []);
@@ -314,7 +331,10 @@ function ConfigureStep({ jobId, onPreview, onBack, onIngestDone }) {
     try {
       const fd = new FormData();
       fd.append("job_id", jobId);
-      const res = await fetch(`${API}/api/production-logs/ai-parse`, { method: "POST", headers: getHeaders(), body: fd });
+      const res = await fetch(
+        `${API}/api/production-logs/ai-parse`,
+        getFetchOpts({ method: "POST", body: fd })
+      );
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "AI analysis failed"); }
       const data = await res.json();
       if (data.success && data.analysis) {
@@ -729,7 +749,7 @@ function BatchConfigureStep({ jobIds, jobs, onDone, onBack }) {
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const res = await fetch(`${API}/api/production-logs/templates`, { headers: getHeaders() });
+        const res = await fetch(`${API}/api/production-logs/templates`, getFetchOpts());
         if (res.ok) {
           const data = await res.json();
           setTemplates(data.templates || []);
@@ -1249,7 +1269,7 @@ function TemplatesPanel() {
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/production-logs/templates`, { headers: getHeaders() });
+      const res = await fetch(`${API}/api/production-logs/templates`, getFetchOpts());
       if (res.ok) {
         const data = await res.json();
         setTemplates(data.templates || []);
@@ -1505,7 +1525,7 @@ function LogDashboard() {
 
   const fetchAssets = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/production-logs/assets`, { headers: getHeaders() });
+      const res = await fetch(`${API}/api/production-logs/assets`, getFetchOpts());
       if (res.ok) {
         const data = await res.json();
         setAssets(data.assets || []);
@@ -1518,7 +1538,10 @@ function LogDashboard() {
   const fetchDates = useCallback(async () => {
     if (!selectedAsset) return;
     try {
-      const res = await fetch(`${API}/api/production-logs/available-dates?asset_id=${encodeURIComponent(selectedAsset)}`, { headers: getHeaders() });
+      const res = await fetch(
+        `${API}/api/production-logs/available-dates?asset_id=${encodeURIComponent(selectedAsset)}`,
+        getFetchOpts()
+      );
       if (res.ok) {
         const data = await res.json();
         const dates = data.dates || [];
@@ -1531,7 +1554,7 @@ function LogDashboard() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/production-logs/stats`, { headers: getHeaders() });
+      const res = await fetch(`${API}/api/production-logs/stats`, getFetchOpts());
       if (res.ok) setStats(await res.json());
     } catch {}
   }, []);
@@ -1539,7 +1562,10 @@ function LogDashboard() {
   const fetchTimeseries = useCallback(async () => {
     if (!selectedAsset) return;
     try {
-      const res = await fetch(`${API}/api/production-logs/timeseries?asset_id=${encodeURIComponent(selectedAsset)}`, { headers: getHeaders() });
+      const res = await fetch(
+        `${API}/api/production-logs/timeseries?asset_id=${encodeURIComponent(selectedAsset)}`,
+        getFetchOpts()
+      );
       if (res.ok) setTimeseries(await res.json());
     } catch {}
   }, [selectedAsset]);
@@ -1550,7 +1576,10 @@ function LogDashboard() {
     try {
       const startTs = `${selectedDate}T00:00:00`;
       const endTs = `${selectedDate}T23:59:59`;
-      const res = await fetch(`${API}/api/production-logs/entries?asset_id=${encodeURIComponent(selectedAsset)}&start=${startTs}&end=${endTs}&limit=100`, { headers: getHeaders() });
+      const res = await fetch(
+        `${API}/api/production-logs/entries?asset_id=${encodeURIComponent(selectedAsset)}&start=${startTs}&end=${endTs}&limit=100`,
+        getFetchOpts()
+      );
       if (res.ok) {
         const data = await res.json();
         setEntries(data.entries || []);
@@ -1583,7 +1612,7 @@ function LogDashboard() {
   const runAggregation = async () => {
     setAggregating(true);
     try {
-      const res = await fetch(`${API}/api/production-logs/aggregate`, { method: "POST", headers: getHeaders() });
+      const res = await fetch(`${API}/api/production-logs/aggregate`, getFetchOpts({ method: "POST" }));
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Failed"); }
       toast.success("Aggregation started");
       setTimeout(() => { fetchTimeseries(); fetchStats(); setAggregating(false); }, 3000);
@@ -2068,7 +2097,7 @@ export default function SettingsLogIngestionPage() {
 
   const fetchJobs = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/production-logs/jobs`, { headers: getHeaders() });
+      const res = await fetch(`${API}/api/production-logs/jobs`, getFetchOpts());
       if (!res.ok) return;
       const data = await res.json();
       setJobs(data.jobs || []);
@@ -2077,7 +2106,7 @@ export default function SettingsLogIngestionPage() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/production-logs/stats`, { headers: getHeaders() });
+      const res = await fetch(`${API}/api/production-logs/stats`, getFetchOpts());
       if (!res.ok) return;
       setStats(await res.json());
     } catch {}
@@ -2099,7 +2128,10 @@ export default function SettingsLogIngestionPage() {
   const deleteJob = async (jobId) => {
     if (!window.confirm("Delete this job and all its ingested data?")) return;
     try {
-      const res = await fetch(`${API}/api/production-logs/jobs/${jobId}`, { method: "DELETE", headers: getHeaders() });
+      const res = await fetch(
+        `${API}/api/production-logs/jobs/${jobId}`,
+        getFetchOpts({ method: "DELETE" })
+      );
       if (!res.ok) throw new Error("Delete failed");
       toast.success("Job deleted");
       fetchJobs();

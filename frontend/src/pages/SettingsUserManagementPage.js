@@ -1,5 +1,5 @@
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -372,7 +372,7 @@ const SettingsUserManagementPage = () => {
   });
 
   // Extract users from data
-  const users = usersData?.users || [];
+  const users = useMemo(() => usersData?.users ?? [], [usersData]);
 
   // Load avatars when users data changes
   useEffect(() => {

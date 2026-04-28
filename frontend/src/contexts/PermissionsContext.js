@@ -23,17 +23,7 @@ export const PermissionsProvider = ({ children }) => {
   const [permissions, setPermissions] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch permissions when user logs in
-  useEffect(() => {
-    if (user && token) {
-      fetchPermissions();
-    } else {
-      setPermissions(null);
-      setLoading(false);
-    }
-  }, [user?.id, token]);
-
-  const fetchPermissions = async () => {
+  const fetchPermissions = useCallback(async () => {
     try {
       setLoading(true);
       const data = await permissionsAPI.getMy();
@@ -48,7 +38,17 @@ export const PermissionsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.role]);
+
+  // Fetch permissions when user logs in
+  useEffect(() => {
+    if (user && token) {
+      fetchPermissions();
+    } else {
+      setPermissions(null);
+      setLoading(false);
+    }
+  }, [user, token, fetchPermissions]);
 
   // Check if user has a specific permission
   const hasPermission = useCallback((feature, action = "read") => {
@@ -93,7 +93,7 @@ export const PermissionsProvider = ({ children }) => {
     if (user && token) {
       fetchPermissions();
     }
-  }, [user, token]);
+  }, [user, token, fetchPermissions]);
 
   return (
     <PermissionsContext.Provider value={{ 

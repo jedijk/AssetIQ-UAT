@@ -112,6 +112,9 @@ import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame"
 import TaskCard, { priorityColors, taskTypeIcons, SortableTaskCard } from "../components/task-execution/TaskCard";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { AppErrorBoundary } from "../components/AppErrorBoundary";
+import { motion } from "framer-motion";
+import { pageTransition, pageVariants } from "../components/animations/constants";
 
 // API functions for My Tasks
 import { myTasksAPI } from "../lib/api";
@@ -452,6 +455,106 @@ const MyTasksPage = () => {
         if (result?.completion_notification) {
           setClosureSuggestion(result.completion_notification);
         }
+
+        // Trigger label printing if configured on the form
+        const labelCfg = result?.label_print_config
+          || selectedTask?.form_template?.label_print_config
+          || selectedTask?.label_print_config;
+        const submissionId = result?.form_submission_id;
+        console.log("[LabelPrint] result keys:", Object.keys(result || {}), "labelCfg:", labelCfg, "submissionId:", submissionId);
+        const resolveTemplateId = async () => {
+          const fallback = labelCfg?.label_template_id || "";
+          if (!submissionId) return fallback;
+          try {
+            const { getBackendUrl, getAuthHeaders } = await import("../lib/apiConfig");
+            const res = await fetch(`${getBackendUrl()}/api/form-submissions/${submissionId}`, {
+              headers: getAuthHeaders(),
+            });
+            if (!res.ok) return fallback;
+            const sub = await res.json();
+            return sub?.label_template_id || fallback;
+          } catch {
+            return fallback;
+          }
+        };
+
+        if (labelCfg?.enabled && labelCfg?.label_template_id && submissionId) {
+          const trigger = labelCfg.trigger || "manual";
+          (async () => {
+          if (trigger === "on_submit" || trigger === "both") {
+            // On mobile (iOS especially), window.open after an async chain is
+            // blocked. Always route auto-print through a sticky toast action
+            // that the user taps — making it a true user gesture.
+            const { isMobileDevice } = await import("../lib/printLabel");
+            const mobile = isMobileDevice();
+
+            if (!mobile) {
+              // Desktop: can auto-print via hidden iframe, no user gesture needed
+              (async () => {
+                try {
+                  const { printLabel } = await import("../lib/printLabel");
+                  const templateId = await resolveTemplateId();
+                  await printLabel({
+                    template_id: templateId,
+                    submission_id: submissionId,
+                    copies: 1,
+                  });
+                  toast.success("Label sent to printer");
+                } catch (err) {
+                  toast.error("Label auto-print failed");
+                }
+              })();
+            } else {
+              // Mobile: sticky toast with Print action — tap fires window.open
+              toast.success(labelCfg.button_label || "Print Label", {
+                description: "Tap Print to open the print sheet",
+                action: {
+                  label: "Print",
+                  onClick: async () => {
+                    const { openPrintWindow, printLabel } = await import("../lib/printLabel");
+                    const win = openPrintWindow();
+                    try {
+                      const templateId = await resolveTemplateId();
+                      await printLabel({
+                        template_id: templateId,
+                        submission_id: submissionId,
+                        copies: 1,
+                      }, { win });
+                    } catch (_e) {
+                      if (win && !win.closed) win.close();
+                      toast.error("Label print failed");
+                    }
+                  },
+                },
+                duration: 20000,
+              });
+            }
+          } else if (trigger === "manual") {
+            toast.success(labelCfg.button_label || "Print Label", {
+              description: "Tap Print to open the print sheet",
+              action: {
+                label: "Print",
+                onClick: async () => {
+                  const { openPrintWindow, printLabel } = await import("../lib/printLabel");
+                  const win = openPrintWindow();
+                  try {
+                    const templateId = await resolveTemplateId();
+                    await printLabel({
+                      template_id: templateId,
+                      submission_id: submissionId,
+                      copies: 1,
+                    }, { win });
+                  } catch (_e) {
+                    if (win && !win.closed) win.close();
+                    toast.error("Label print failed");
+                  }
+                },
+              },
+              duration: 20000,
+            });
+          }
+          })();
+        }
       }
       // Invalidate all my-tasks queries regardless of filters
       queryClient.invalidateQueries({ 
@@ -740,17 +843,30 @@ const MyTasksPage = () => {
   // If in execution mode, show the execution frame
   if (viewMode === "execution" && selectedTask) {
     return (
-      <div className="h-[calc(100vh-64px)]">
-        <TaskExecutionFrame
-          task={selectedTask}
-          onBack={handleBackFromExecution}
-          onComplete={handleCompleteTask}
-          onDelete={(task) => {
-            handleBackFromExecution();
-            handleDeleteTask(task);
-          }}
-        />
-      </div>
+      <motion.div
+        className="h-[calc(100vh-64px)] bg-slate-50"
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={pageTransition}
+      >
+        <AppErrorBoundary
+          context="TaskExecutionFrame"
+          title="Form crashed"
+          subtitle="This form hit an error while you were filling it in. Tap reload and try again."
+        >
+          <TaskExecutionFrame
+            task={selectedTask}
+            onBack={handleBackFromExecution}
+            onComplete={handleCompleteTask}
+            onDelete={(task) => {
+              handleBackFromExecution();
+              handleDeleteTask(task);
+            }}
+          />
+        </AppErrorBoundary>
+      </motion.div>
     );
   }
   

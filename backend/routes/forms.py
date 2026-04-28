@@ -91,7 +91,10 @@ async def create_form_template(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new form template."""
-    return await form_service.create_template(data.model_dump(), current_user["id"])
+    from services.query_cache import query_cache
+    result = await form_service.create_template(data.model_dump(), current_user["id"])
+    query_cache.invalidate("form_templates")
+    return result
 
 @router.patch("/form-templates/{template_id}")
 async def update_form_template(
@@ -102,6 +105,7 @@ async def update_form_template(
 ):
     """Update a form template. Creates new version if template has been used."""
     import logging
+    from services.query_cache import query_cache
     logger = logging.getLogger(__name__)
     
     # Log update attempt
@@ -121,6 +125,7 @@ async def update_form_template(
             logger.warning(f"[FormTemplateUpdate] template_id={template_id} not found")
             raise HTTPException(status_code=404, detail="Form template not found")
         
+        query_cache.invalidate("form_templates")
         logger.info(f"[FormTemplateUpdate] success template_id={template_id} version={result.get('version')}")
         return result
     except HTTPException:
@@ -135,9 +140,11 @@ async def delete_form_template(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete (deactivate) a form template."""
+    from services.query_cache import query_cache
     deleted = await form_service.delete_template(template_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Form template not found")
+    query_cache.invalidate("form_templates")
     return {"message": "Form template deactivated"}
 
 # --- Form Fields ---
@@ -231,6 +238,8 @@ async def get_form_submissions(
         "id": 1,
         "form_template_id": 1,
         "form_template_name": 1,
+        # Critical for consistent reprints: use the label template captured at submission time
+        "label_template_id": 1,
         "task_instance_id": 1,
         "equipment_id": 1,
         "equipment_name": 1,
@@ -327,6 +336,7 @@ async def get_form_submissions(
                 "id": doc.get("id"),
                 "form_template_id": doc.get("form_template_id"),
                 "form_template_name": doc.get("form_template_name"),
+                "label_template_id": doc.get("label_template_id"),
                 "task_instance_id": doc.get("task_instance_id"),
                 "task_template_name": doc.get("task_template_name"),
                 "equipment_id": doc.get("equipment_id"),
@@ -392,6 +402,18 @@ async def delete_form_submission(
     if not submission:
         if ObjectId.is_valid(submission_id):
             submission = await db.form_submissions.find_one({"_id": ObjectId(submission_id)})
+    
+    if not submission:
+        raise HTTPException(status_code=404, detail="Form submission not found")
+
+    # Authorization: only owner/admin or the original submitter can delete.
+    role = (current_user or {}).get("role")
+    user_id = (current_user or {}).get("id")
+    submitted_by = submission.get("submitted_by")
+    is_privileged = role in ("owner", "admin")
+    is_submitter = bool(user_id) and bool(submitted_by) and (submitted_by == user_id)
+    if not (is_privileged or is_submitter):
+        raise HTTPException(status_code=403, detail="Not allowed to delete this submission")
     
     task_instance_id = submission.get("task_instance_id") if submission else None
     

@@ -564,10 +564,6 @@ const TaskSchedulerPage = () => {
             <RefreshCw className={`w-4 h-4 mr-2 ${generateInstancesMutation.isPending ? "animate-spin" : ""}`} />
             {t("taskScheduler.generateExecutions")}
           </Button>
-          <Button size="sm" onClick={() => setShowTemplateDialog(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            {t("taskScheduler.newTemplate")}
-          </Button>
         </div>
       </div>
 
@@ -779,14 +775,19 @@ const TaskSchedulerPage = () => {
                       return isSameDay(instDate, day);
                     });
                     
-                    // Also show plans with next_due_date on this day (that don't have instances yet)
-                    const dayPlans = (plans || []).filter((plan) => {
-                      if (!plan.next_due_date || !plan.is_active) return false;
-                      const planDate = parseISO(plan.next_due_date);
-                      // Check if plan has no instance on this date
-                      const hasInstance = dayInstances.some(inst => inst.task_plan_id === plan.id);
-                      return isSameDay(planDate, day) && !hasInstance;
-                    });
+                    // Also show PLANS (not submissions) with next_due_date on this day
+                    // Only include these when the user is looking at "all/planned" executions.
+                    // Otherwise they inflate the calendar counts compared to "submitted/completed".
+                    const includePlansInCalendar = statusFilter === "all" || statusFilter === "planned";
+                    const dayPlans = includePlansInCalendar
+                      ? (plans || []).filter((plan) => {
+                          if (!plan.next_due_date || !plan.is_active) return false;
+                          const planDate = parseISO(plan.next_due_date);
+                          // Check if plan has no instance on this date
+                          const hasInstance = dayInstances.some(inst => inst.task_plan_id === plan.id);
+                          return isSameDay(planDate, day) && !hasInstance;
+                        })
+                      : [];
                     
                     const isCurrentMonth = isSameMonth(day, currentMonth);
                     const isSelected = selectedDate && isSameDay(day, selectedDate);
@@ -972,6 +973,10 @@ const TaskSchedulerPage = () => {
         {/* Task Library Tab (merged Templates + Plans) */}
         <TabsContent value="templates">
           <div className="flex justify-end mb-4 gap-2">
+            <Button size="sm" onClick={() => setShowTemplateDialog(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              {t("taskScheduler.newTemplate")}
+            </Button>
             <Button onClick={() => setShowPlanDialog(true)} variant="outline" className="gap-2">
               <CalendarDays className="w-4 h-4" />
               {t("taskScheduler.newPlan")}
@@ -1066,17 +1071,24 @@ const TaskSchedulerPage = () => {
                               e.stopPropagation();
                               setExpandedTemplateId(isExpanded ? null : template.id);
                             }}
-                            className="flex items-center justify-between w-full text-sm text-slate-600 hover:text-slate-900"
+                            aria-expanded={isExpanded}
+                            className="flex items-center justify-between w-full rounded-md px-2 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                           >
-                            <span className="flex items-center gap-2">
-                              <CalendarDays className="w-4 h-4" />
-                              {templatePlans.length} {templatePlans.length === 1 ? 'Plan' : 'Plans'}
+                            {/* pointer-events-none so taps hit the button (SVG chevrons can steal clicks on iOS) */}
+                            <span className="pointer-events-none flex min-w-0 flex-1 items-center gap-2">
+                              <CalendarDays className="w-4 h-4 shrink-0" />
+                              <span className="truncate">
+                                {templatePlans.length}{" "}
+                                {templatePlans.length === 1 ? "Plan" : "Plans"}
+                              </span>
                             </span>
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4" />
-                            )}
+                            <span className="pointer-events-none ms-2 inline-flex shrink-0 items-center justify-center">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </span>
                           </button>
                           
                           {isExpanded && (

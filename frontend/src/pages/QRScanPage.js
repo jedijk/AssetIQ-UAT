@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { qrCodeAPI } from "../lib/api";
@@ -35,14 +35,7 @@ export default function QRScanPage() {
     retry: false,
   });
 
-  // Auto-redirect if single action or default action
-  useEffect(() => {
-    if (data && !data.has_multiple_actions && data.default_action) {
-      handleAction(data.default_action);
-    }
-  }, [data]);
-
-  const handleAction = (actionType) => {
+  const handleAction = useCallback((actionType) => {
     if (!data?.hierarchy_item) return;
 
     const equipmentId = data.hierarchy_item.id;
@@ -60,7 +53,14 @@ export default function QRScanPage() {
       default:
         break;
     }
-  };
+  }, [data, navigate]);
+
+  // Auto-redirect if single action or default action
+  useEffect(() => {
+    if (data && !data.has_multiple_actions && data.default_action) {
+      handleAction(data.default_action);
+    }
+  }, [data, handleAction]);
 
   // Show login prompt if not authenticated
   if (!authLoading && !user) {

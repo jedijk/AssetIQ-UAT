@@ -11,6 +11,7 @@ import {
   MoreVertical,
   Clock,
   CheckCircle2,
+  Tag as LabelIcon,
 } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -74,6 +75,11 @@ export const TemplateCard = ({ template, onEdit, onDelete, onView }) => {
           <Badge className="text-xs bg-slate-100 text-slate-700 border-slate-200">
             v{template.version || 1}
           </Badge>
+          {template.label_print_config?.enabled && (
+            <Badge className="text-xs bg-violet-100 text-violet-700 border-violet-200">
+              <LabelIcon className="w-3 h-3 mr-1" /> Label Print
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500">
           {template.is_active ? (

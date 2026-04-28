@@ -829,9 +829,35 @@ class TaskService:
         )
         
         if result:
+            created_submission_id = None
+            label_print_config = None
             # Create form submission if form_data is present
             if data.get("form_data") and instance.get("form_template_id"):
-                await self._create_form_submission(instance, data, now, completed_by_id, completed_by_name)
+                created_submission_id = await self._create_form_submission(
+                    instance, data, now, completed_by_id, completed_by_name
+                )
+                # Fetch form template to return its label_print_config (so the
+                # frontend can trigger auto-print even when the cached task
+                # object predates this field being exposed).
+                try:
+                    from bson import ObjectId as _OID
+                    ftid = instance.get("form_template_id")
+                    ft = None
+                    if ftid:
+                        if _OID.is_valid(str(ftid)):
+                            ft = await self.db.form_templates.find_one(
+                                {"_id": _OID(str(ftid))},
+                                {"_id": 0, "label_print_config": 1},
+                            )
+                        if not ft:
+                            ft = await self.db.form_templates.find_one(
+                                {"id": str(ftid)},
+                                {"_id": 0, "label_print_config": 1},
+                            )
+                    if ft:
+                        label_print_config = ft.get("label_print_config")
+                except Exception as e:
+                    logger.warning(f"label_print_config lookup failed: {e}")
             
             # Update plan: set last_executed_at and calculate next_due_date
             plan_id = instance.get("task_plan_id")
@@ -865,7 +891,12 @@ class TaskService:
             if data.get("create_observation") and data.get("issues_found"):
                 await self._create_observation_from_task(instance, data, now)
             
-            return self._serialize_instance(result)
+            serialized = self._serialize_instance(result)
+            if created_submission_id:
+                serialized["form_submission_id"] = created_submission_id
+            if label_print_config:
+                serialized["label_print_config"] = label_print_config
+            return serialized
         return None
     
     async def _create_observation_from_task(
@@ -1021,12 +1052,28 @@ class TaskService:
             "submitted_by": submitted_by_id,
             "submitted_by_name": submitted_by_name,
             "submitted_at": timestamp,
+            # Freeze label template at submission-time so prints/reprints match even if
+            # the form template's label_print_config is later changed.
+            "label_template_id": None,
             "has_warnings": False,
             "has_critical": False,
             "has_signature": False,
             "status": "completed",
             "created_at": timestamp,
         }
+
+        # Resolve label_template_id from the form template (if available).
+        try:
+            ft_id = task_instance.get("form_template_id")
+            if ft_id:
+                from bson import ObjectId
+                form_tpl = await self.db.form_templates.find_one({"_id": ObjectId(str(ft_id))}, {"_id": 0, "label_print_config": 1})
+                label_cfg = form_tpl.get("label_print_config") if isinstance(form_tpl, dict) else None
+                if isinstance(label_cfg, dict):
+                    submission_doc["label_template_id"] = label_cfg.get("label_template_id")
+        except Exception:
+            # Non-critical — printing can still fall back to current config.
+            pass
         
         # Include AI extraction traceability if present
         ai_extraction = completion_data.get("ai_extraction")
