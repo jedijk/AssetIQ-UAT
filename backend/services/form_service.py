@@ -1326,35 +1326,41 @@ class FormService:
 
         # Fetch all extruder & existing viscosity submissions for the day.
         #
-        # IMPORTANT: operators sometimes submit forms later (retro-entry),
-        # so `submitted_at` can be far from the sample's actual "Date & Time".
-        # We therefore use a wide submitted_at window and then re-filter in Python
-        # using the extracted sample datetime.
+        # IMPORTANT:
+        # - operators sometimes submit forms later (retro-entry)
+        # - some environments store submitted_at as strings (often "YYYY-MM-DD HH:MM:SS.ssssss")
+        #
+        # We therefore use an *inclusive* query (template_id + rough day match) and then
+        # strictly re-filter in Python using the extracted sample datetime.
         broad_start = day_start - timedelta(days=7)
         broad_end = day_end + timedelta(days=7)
-
-        # Some environments store submitted_at/created_at as strings. Query using both
-        # datetime and ISO-string ranges, then re-filter using extracted sample datetime.
         broad_start_iso = broad_start.isoformat()
         broad_end_iso = broad_end.isoformat()
+        day_prefix = day.strftime("%Y-%m-%d")
+
         time_window_or = [
+            # datetime fields
             {"submitted_at": {"$gte": broad_start, "$lte": broad_end}},
-            {"submitted_at": {"$gte": broad_start_iso, "$lte": broad_end_iso}},
             {"created_at": {"$gte": broad_start, "$lte": broad_end}},
+            # ISO-like string fields
+            {"submitted_at": {"$gte": broad_start_iso, "$lte": broad_end_iso}},
             {"created_at": {"$gte": broad_start_iso, "$lte": broad_end_iso}},
+            # legacy "YYYY-MM-DD HH:MM:SS" string fields (space separator)
+            {"submitted_at": {"$regex": f"^{day_prefix}"}},
+            {"created_at": {"$regex": f"^{day_prefix}"}},
         ]
 
         ext_subs = await self.db.form_submissions.find(
             {"form_template_id": {"$in": extruder_ids}, "$or": time_window_or},
             {"_id": 0, "id": 1, "values": 1, "submitted_at": 1, "created_at": 1}
-        ).to_list(2000)
+        ).to_list(5000)
 
         visc_subs = []
         if visc_ids:
             visc_subs = await self.db.form_submissions.find(
                 {"form_template_id": {"$in": visc_ids}, "$or": time_window_or},
                 {"_id": 0, "id": 1, "values": 1, "submitted_at": 1, "created_at": 1}
-            ).to_list(2000)
+            ).to_list(5000)
 
         # Build set of HH:MM times already occupied by a viscosity sample on the same day
         paired_times = set()
