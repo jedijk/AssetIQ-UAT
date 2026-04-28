@@ -1133,14 +1133,32 @@ async def repair_viscosity_pairing(
     svc = FormService(db)
 
     repaired = 0
+    paired = []
+    skipped = []
     for s in day_visc:
         try:
             await svc._auto_pair_viscosity_to_extruder(s)
             repaired += 1
+            updated = await db.form_submissions.find_one(
+                {"id": s.get("id")},
+                {"_id": 0, "id": 1, "auto_paired_to_extruder_id": 1},
+            )
+            paired_to = (updated or {}).get("auto_paired_to_extruder_id")
+            if paired_to:
+                paired.append({"visc_id": s.get("id"), "paired_to": paired_to})
+            else:
+                skipped.append({"visc_id": s.get("id"), "reason": "no_pair"})
         except Exception as e:
             logger.warning(f"Repair viscosity pairing failed for {str(s.get('id',''))[:8]}: {e}")
+            skipped.append({"visc_id": s.get("id"), "reason": f"error:{e}"})
 
-    return {"date": date, "processed": len(day_visc), "attempted_repairs": repaired}
+    return {
+        "date": date,
+        "processed": len(day_visc),
+        "attempted_repairs": repaired,
+        "paired": paired,
+        "skipped": skipped,
+    }
 
 
 @router.get("/production/viscosity-pairing/debug-report")
@@ -1203,21 +1221,28 @@ async def viscosity_pairing_debug_report(
         hhmm = dt.strftime("%H:%M")
         tpl = (s.get("form_template_name") or "").strip()
         sid = s.get("id", "")
+        ftid = s.get("form_template_id")
+        ftid_type = type(ftid).__name__ if ftid is not None else None
 
         if ("extruder" in tpl.lower()) and ("setting" in tpl.lower()):
             extruder_forms.append({
                 "source": "form",
                 "id": sid,
+                "form_template_id": str(ftid) if ftid is not None else None,
+                "form_template_id_type": ftid_type,
                 "template": tpl,
                 "hhmm": hhmm,
                 "datetime": _serialize_datetime(dt),
                 "date_time_raw": extract_field(s, "Date & Time"),
+                "submitted_at": str(s.get("submitted_at") or ""),
             })
         if ("mooney" in tpl.lower()) and ("viscos" in tpl.lower()):
             meas, meas_key = _measurement(s)
             viscosity_forms.append({
                 "source": "form",
                 "id": sid,
+                "form_template_id": str(ftid) if ftid is not None else None,
+                "form_template_id_type": ftid_type,
                 "template": tpl,
                 "hhmm": hhmm,
                 "datetime": _serialize_datetime(dt),
@@ -1225,6 +1250,7 @@ async def viscosity_pairing_debug_report(
                 "measurement": meas,
                 "measurement_field": meas_key,
                 "auto_paired_to_extruder_id": s.get("auto_paired_to_extruder_id"),
+                "submitted_at": str(s.get("submitted_at") or ""),
             })
 
     # --- Ingested production logs ---
@@ -1275,6 +1301,8 @@ async def viscosity_pairing_debug_report(
     missing = [t for t in extruder_times if t not in viscosity_times]
 
     return {
+        "report_version": 2,
+        "generated_at": _serialize_datetime(datetime.now(timezone.utc)),
         "date": date,
         "counts": {
             "extruder_forms": len(extruder_forms),
