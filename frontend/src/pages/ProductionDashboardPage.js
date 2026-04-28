@@ -509,6 +509,32 @@ export default function ProductionDashboardPage() {
     }
   };
 
+  const downloadPairingDebugReport = async () => {
+    try {
+      if (period !== "1d") {
+        toast.error("Debug report can only run in 1D mode");
+        return;
+      }
+      const res = await api.get(`/production/viscosity-pairing/debug-report?date=${encodeURIComponent(fromStr)}`);
+      const payload = res?.data || {};
+      const json = JSON.stringify(payload, null, 2);
+
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pairing-debug-${fromStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2500);
+
+      toast.success("Pairing debug report downloaded");
+    } catch (e) {
+      toast.error("Failed to generate debug report");
+    }
+  };
+
   const invalidateDashboard = () =>
     queryClient.invalidateQueries({ queryKey: productionKeys.dashboard(period, fromStr, toStr, shift) });
 
@@ -1049,6 +1075,20 @@ export default function ProductionDashboardPage() {
                 title="Re-run Mooney → Extruder pairing for this day"
               >
                 <Sparkles className="w-3.5 h-3.5" /> <span>Run pairing</span>
+              </Button>
+            )}
+
+            {user?.role === "owner" && !isMobile && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1"
+                onClick={downloadPairingDebugReport}
+                disabled={period !== "1d" || isFetching}
+                data-testid="pairing-debug-btn"
+                title="Download a JSON report explaining viscosity pairing for this day"
+              >
+                <Search className="w-3.5 h-3.5" /> <span>Debug pairing</span>
               </Button>
             )}
 

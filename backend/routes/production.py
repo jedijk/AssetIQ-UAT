@@ -1143,6 +1143,152 @@ async def repair_viscosity_pairing(
     return {"date": date, "processed": len(day_visc), "attempted_repairs": repaired}
 
 
+@router.get("/production/viscosity-pairing/debug-report")
+async def viscosity_pairing_debug_report(
+    date: str = Query(..., description="YYYY-MM-DD"),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Owner-only: generate a detailed pairing report for analysis.
+    Includes:
+    - extruder slots (forms + ingested)
+    - viscosity slots (forms + ingested)
+    - how the API would key each item (HH:MM)
+    - which extruder slots are missing viscosity
+    """
+    _require_owner(current_user)
+
+    try:
+        target_day = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format, expected YYYY-MM-DD")
+
+    day_start = datetime.combine(target_day, datetime.min.time()).replace(tzinfo=timezone.utc)
+    day_end = datetime.combine(target_day, datetime.max.time()).replace(tzinfo=timezone.utc)
+
+    # --- Form submissions ---
+    subs = await db.form_submissions.find(
+        {"form_template_name": {"$regex": r"(extruder.*setting|mooney.*viscos)", "$options": "i"}},
+        {"_id": 0},
+    ).to_list(5000)
+
+    def _effective_dt(sub):
+        dt = parse_submitted_at(sub)
+        date_time_val = extract_field(sub, "Date & Time")
+        if date_time_val:
+            try:
+                dt = datetime.fromisoformat(str(date_time_val).replace("Z", "+00:00"))
+            except Exception:
+                pass
+        if not dt:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    def _measurement(sub):
+        # mirrors the flexible extraction in the dashboard route
+        for key in ("Measurement", "Mooney", "Mooney Viscosity", "Viscosity", "MU"):
+            v = extract_numeric(sub, key)
+            if v is not None:
+                return v, key
+        return None, None
+
+    extruder_forms = []
+    viscosity_forms = []
+    for s in subs:
+        dt = _effective_dt(s)
+        if not dt or not (day_start <= dt <= day_end):
+            continue
+        hhmm = dt.strftime("%H:%M")
+        tpl = (s.get("form_template_name") or "").strip()
+        sid = s.get("id", "")
+
+        if ("extruder" in tpl.lower()) and ("setting" in tpl.lower()):
+            extruder_forms.append({
+                "source": "form",
+                "id": sid,
+                "template": tpl,
+                "hhmm": hhmm,
+                "datetime": _serialize_datetime(dt),
+                "date_time_raw": extract_field(s, "Date & Time"),
+            })
+        if ("mooney" in tpl.lower()) and ("viscos" in tpl.lower()):
+            meas, meas_key = _measurement(s)
+            viscosity_forms.append({
+                "source": "form",
+                "id": sid,
+                "template": tpl,
+                "hhmm": hhmm,
+                "datetime": _serialize_datetime(dt),
+                "date_time_raw": extract_field(s, "Date & Time"),
+                "measurement": meas,
+                "measurement_field": meas_key,
+                "auto_paired_to_extruder_id": s.get("auto_paired_to_extruder_id"),
+            })
+
+    # --- Ingested production logs ---
+    day_start_iso = f"{date}T00:00:00"
+    day_end_iso = f"{date}T23:59:59"
+    ingested = await db.production_logs.find(
+        {"asset_id": {"$regex": "line.?90", "$options": "i"}, "timestamp": {"$gte": day_start_iso, "$lte": day_end_iso}},
+        {"_id": 0, "id": 1, "timestamp": 1, "mooney_viscosity": 1},
+    ).to_list(5000)
+
+    extruder_ingested = []
+    viscosity_ingested = []
+    for row in ingested:
+        ts = row.get("timestamp")
+        if not ts:
+            continue
+        try:
+            dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if dt.date() != target_day:
+            continue
+        hhmm = dt.strftime("%H:%M")
+        extruder_ingested.append({
+            "source": "ingested",
+            "id": row.get("id", ""),
+            "hhmm": hhmm,
+            "datetime": _serialize_datetime(dt),
+            "timestamp": ts,
+        })
+        if row.get("mooney_viscosity") not in (None, "", "-"):
+            viscosity_ingested.append({
+                "source": "ingested",
+                "id": row.get("id", ""),
+                "hhmm": hhmm,
+                "datetime": _serialize_datetime(dt),
+                "timestamp": ts,
+                "measurement": row.get("mooney_viscosity"),
+            })
+
+    extruder_slots = sorted(extruder_forms + extruder_ingested, key=lambda x: (x.get("hhmm") or ""))
+    viscosity_slots = sorted(viscosity_forms + viscosity_ingested, key=lambda x: (x.get("hhmm") or ""))
+
+    extruder_times = sorted({s["hhmm"] for s in extruder_slots if s.get("hhmm")})
+    viscosity_times = sorted({s["hhmm"] for s in viscosity_slots if s.get("hhmm")})
+    missing = [t for t in extruder_times if t not in viscosity_times]
+
+    return {
+        "date": date,
+        "counts": {
+            "extruder_forms": len(extruder_forms),
+            "extruder_ingested": len(extruder_ingested),
+            "viscosity_forms": len(viscosity_forms),
+            "viscosity_ingested": len(viscosity_ingested),
+            "missing_times": len(missing),
+        },
+        "missing_viscosity_times": missing,
+        "extruder_slots": extruder_slots,
+        "viscosity_slots": viscosity_slots,
+    }
+
+
 @router.delete("/production/seed-data")
 async def clear_seed_data(
     current_user: dict = Depends(get_current_user),
