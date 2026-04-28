@@ -186,7 +186,12 @@ export const equipmentHierarchyAPI = {
     return response.data;
   },
   downloadEquipmentFile: async (fileId) => {
-    const response = await api.get(`/equipment-files/${fileId}/download`, { responseType: "blob" });
+    // Redundant db_env propagation:
+    // - Axios interceptor adds X-Database-Environment header
+    // - Query param ensures correct env even when headers are dropped (new tab / some browsers)
+    const dbEnv = localStorage.getItem("database_environment");
+    const qs = dbEnv ? `?db_env=${encodeURIComponent(dbEnv)}` : "";
+    const response = await api.get(`/equipment-files/${fileId}/download${qs}`, { responseType: "blob" });
     return response.data;
   },
   deleteEquipmentFile: async (fileId) => {

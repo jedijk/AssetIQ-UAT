@@ -51,7 +51,7 @@ function DateTimePicker({ value, onChange, placeholder = "Select…" }) {
   const label = dateOk ? formatDateOnly(date) : placeholder;
 
   return (
-    <div className="flex flex-col sm:flex-row gap-2">
+    <div className="flex flex-col gap-2">
       <Popover>
         <PopoverTrigger asChild>
           <button
@@ -86,7 +86,7 @@ function DateTimePicker({ value, onChange, placeholder = "Select…" }) {
           const next = mergeDateAndTime(base, t);
           if (next) onChange?.(formatForDateTimeLocal(next));
         }}
-        className="w-full sm:w-[110px]"
+        className="w-full"
       />
     </div>
   );
@@ -203,8 +203,8 @@ export default function SettingsAuditLogPage() {
             Filters
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="space-y-1">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+          <div className="space-y-1 lg:col-span-2">
             <label className="text-xs text-slate-600">Path contains</label>
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-2 top-2.5" />
@@ -212,7 +212,7 @@ export default function SettingsAuditLogPage() {
             </div>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 lg:col-span-1">
             <label className="text-xs text-slate-600">Method</label>
             <select
               className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 text-sm"
@@ -228,7 +228,7 @@ export default function SettingsAuditLogPage() {
             </select>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 lg:col-span-1">
             <label className="text-xs text-slate-600">Actor user id</label>
             <div className="relative">
               <User className="w-4 h-4 text-slate-400 absolute left-2 top-2.5" />
@@ -236,7 +236,7 @@ export default function SettingsAuditLogPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 lg:col-span-2">
             <div className="space-y-1">
               <label className="text-xs text-slate-600 flex items-center gap-1">
                 <Clock className="w-3 h-3" />

@@ -64,7 +64,7 @@ def _r2_available() -> bool:
 # ==================== MONGODB CONNECTION (legacy) ====================
 
 _storage_client: Optional[AsyncIOMotorClient] = None
-_storage_db = None
+_storage_db = None  # fallback-only cache (non-request contexts)
 
 
 async def _get_storage_db():
@@ -82,16 +82,17 @@ async def _get_storage_db():
     """
     global _storage_client, _storage_db
 
-    if _storage_db is not None:
-        return _storage_db
-
-    # Prefer the app's request-scoped DB (supports multi-environment switching)
+    # Prefer the app's request-scoped DB (supports multi-environment switching).
+    # IMPORTANT: do NOT cache this globally — request DB changes per request/env.
     try:
         from database import get_request_db
-        _storage_db = get_request_db()
-        return _storage_db
+        return get_request_db()
     except Exception as e:
+        # Non-request contexts (scripts/background tasks) fall back to a standalone client.
         logger.warning(f"Falling back to standalone storage DB client: {e}")
+
+    if _storage_db is not None:
+        return _storage_db
 
     mongo_url = os.environ.get('MONGO_URL')
     db_name = os.environ.get('DB_NAME', 'test_database').strip('"')
