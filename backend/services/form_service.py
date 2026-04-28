@@ -1274,9 +1274,13 @@ class FormService:
                 visc_ids.append(str(t["_id"]))
 
         # Fetch all extruder & existing viscosity submissions for the day.
-        # Filter by submitted_at range (broad) then re-filter in Python by Date & Time.
-        broad_start = day_start - timedelta(hours=12)
-        broad_end = day_end + timedelta(hours=12)
+        #
+        # IMPORTANT: operators sometimes submit forms later (retro-entry),
+        # so `submitted_at` can be far from the sample's actual "Date & Time".
+        # We therefore use a wide submitted_at window and then re-filter in Python
+        # using the extracted sample datetime.
+        broad_start = day_start - timedelta(days=7)
+        broad_end = day_end + timedelta(days=7)
 
         ext_subs = await self.db.form_submissions.find(
             {"form_template_id": {"$in": extruder_ids},
