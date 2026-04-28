@@ -341,9 +341,10 @@ export const DocumentViewer = ({
       loadExcel();
     } else if ((isPdf || isImage) && url) {
       // If already a blob URL, use directly without re-fetching
-      if (url.startsWith('blob:')) {
+      if (url.startsWith('blob:') || url.startsWith('data:')) {
         isExternalBlob.current = true;
         setBlobUrl(url);
+        setLoading(false);
         return;
       }
       // Load PDF/Image as blob for authenticated access

@@ -226,11 +226,26 @@ function EquipmentFiles({ equipmentId }) {
     try {
       const blob = await equipmentHierarchyAPI.downloadEquipmentFile(fileId);
       const url = window.URL.createObjectURL(blob);
+      const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
+      const isIOSLike = /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && typeof document !== "undefined" && "ontouchend" in document);
+
+      if (isIOSLike) {
+        // iOS Safari often ignores `a.download` for blob URLs; open the blob so the user can
+        // Save/Share from the viewer.
+        const w = window.open(url, "_blank", "noopener,noreferrer");
+        if (!w) window.location.href = url;
+        window.setTimeout(() => window.URL.revokeObjectURL(url), 30_000);
+        return;
+      }
+
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
+      a.rel = "noopener";
+      document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      a.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 5_000);
     } catch {
       toast.error("Download failed");
     }
