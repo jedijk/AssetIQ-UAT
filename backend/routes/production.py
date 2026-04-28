@@ -15,6 +15,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Production Dashboard"])
 
 
+def _require_owner_or_admin(user: dict):
+    role = (user or {}).get("role")
+    if role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+
+def _require_owner(user: dict):
+    role = (user or {}).get("role")
+    if role != "owner":
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+
 def _serialize_datetime(dt):
     """Serialize datetime to ISO format with UTC timezone suffix."""
     if dt is None:
@@ -251,6 +263,15 @@ async def get_production_dashboard(
         [s for s in submissions if match_template(s, VISCOSITY_FORM)],
         key=lambda s: s.get("_parsed_time", datetime.min.replace(tzinfo=timezone.utc)),
     )
+
+    # Lookup for stable pairing when viscosity submissions were auto-paired to a specific
+    # extruder submission id.
+    extruder_time_by_id = {}
+    for sub in extruder_subs:
+        sid = sub.get("id")
+        dt = sub.get("_parsed_time")
+        if sid and dt:
+            extruder_time_by_id[sid] = dt
     big_bag_subs = [s for s in submissions if match_template(s, BIG_BAG_FORM)]
     screen_change_subs = [s for s in submissions if match_template(s, SCREEN_CHANGE_FORM)]
     magnet_subs = [s for s in submissions if match_template(s, MAGNET_CLEANING_FORM)]
@@ -317,6 +338,9 @@ async def get_production_dashboard(
     viscosity_entries = []
     for sub in viscosity_subs:
         dt = sub.get("_parsed_time")
+        paired_to = sub.get("auto_paired_to_extruder_id")
+        if paired_to and paired_to in extruder_time_by_id:
+            dt = extruder_time_by_id[paired_to]
         time_label = dt.strftime("%H:%M") if dt else ""
         measurement = None
         # Be flexible: production Mooney forms differ across versions.
@@ -951,6 +975,172 @@ async def create_viscosity_submission(
         "datetime": datetime_val,
         "measurement": measurement,
     }
+
+
+@router.get("/production/viscosity-pairing/status")
+async def viscosity_pairing_status(
+    date: str = Query(..., description="YYYY-MM-DD"),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Diagnostics for why viscosity pairing shows TBD.
+    Returns:
+    - extruder times (forms + ingested)
+    - viscosity times (forms + ingested)
+    - missing viscosity times (extruder time not in viscosity time)
+    """
+    _require_owner_or_admin(current_user)
+
+    try:
+        target_day = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format, expected YYYY-MM-DD")
+
+    day_start = datetime.combine(target_day, datetime.min.time()).replace(tzinfo=timezone.utc)
+    day_end = datetime.combine(target_day, datetime.max.time()).replace(tzinfo=timezone.utc)
+
+    # Pull all relevant form submissions (broad query, then filter by extracted Date & Time)
+    form_patterns = "|".join([p.replace(" ", "\\s*") for p in PRODUCTION_FORMS])
+    query = {"form_template_name": {"$regex": f"^({form_patterns}).*$", "$options": "i"}}
+    subs = await db.form_submissions.find(query, {"_id": 0}).to_list(2000)
+
+    def _time_hhmm(sub):
+        dt = parse_submitted_at(sub)
+        date_time_val = extract_field(sub, "Date & Time")
+        if date_time_val:
+            try:
+                dt = datetime.fromisoformat(str(date_time_val).replace("Z", "+00:00"))
+            except Exception:
+                pass
+        if not dt:
+            return None, None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if not (day_start <= dt <= day_end):
+            return None, None
+        return dt, dt.strftime("%H:%M")
+
+    extruder_form_times = []
+    visc_form_times = []
+    for s in subs:
+        tpl = (s.get("form_template_name") or "").lower()
+        dt, hhmm = _time_hhmm(s)
+        if not hhmm:
+            continue
+        if "extruder" in tpl and "setting" in tpl:
+            extruder_form_times.append(hhmm)
+        if "mooney" in tpl and "viscos" in tpl:
+            visc_form_times.append(hhmm)
+
+    # Ingested production logs (Line-90)
+    day_start_iso = f"{date}T00:00:00"
+    day_end_iso = f"{date}T23:59:59"
+    ingested = await db.production_logs.find(
+        {"asset_id": {"$regex": "line.?90", "$options": "i"}, "timestamp": {"$gte": day_start_iso, "$lte": day_end_iso}},
+        {"_id": 0, "timestamp": 1, "mooney_viscosity": 1},
+    ).to_list(5000)
+    extruder_ingested_times = []
+    visc_ingested_times = []
+    for row in ingested:
+        ts = row.get("timestamp")
+        if not ts:
+            continue
+        try:
+            dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if dt.date() != target_day:
+            continue
+        hhmm = dt.strftime("%H:%M")
+        extruder_ingested_times.append(hhmm)
+        if row.get("mooney_viscosity") not in (None, "", "-"):
+            visc_ingested_times.append(hhmm)
+
+    extruder_times = sorted(set(extruder_form_times) | set(extruder_ingested_times))
+    viscosity_times = sorted(set(visc_form_times) | set(visc_ingested_times))
+    missing = [t for t in extruder_times if t not in viscosity_times]
+
+    return {
+        "date": date,
+        "extruder_times": extruder_times,
+        "viscosity_times": viscosity_times,
+        "missing_viscosity_times": missing,
+        "counts": {
+            "extruder_form": len(set(extruder_form_times)),
+            "extruder_ingested": len(set(extruder_ingested_times)),
+            "visc_form": len(set(visc_form_times)),
+            "visc_ingested": len(set(visc_ingested_times)),
+        },
+    }
+
+
+@router.post("/production/viscosity-pairing/repair")
+async def repair_viscosity_pairing(
+    date: str = Query(..., description="YYYY-MM-DD"),
+    limit: int = Query(50, ge=1, le=500),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Re-run viscosity auto-pairing for already-submitted Mooney samples on a given day.
+    Useful when pairing logic changed or ingestion/form timing was off.
+    """
+    _require_owner(current_user)
+
+    try:
+        target_day = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format, expected YYYY-MM-DD")
+
+    day_start = datetime.combine(target_day, datetime.min.time()).replace(tzinfo=timezone.utc)
+    day_end = datetime.combine(target_day, datetime.max.time()).replace(tzinfo=timezone.utc)
+
+    # Find Mooney viscosity submissions broadly (including versioned template names)
+    visc_subs = await db.form_submissions.find(
+        {"form_template_name": {"$regex": r"mooney.*viscos", "$options": "i"}},
+        {"_id": 0},
+    ).to_list(2000)
+
+    def _extract_dt_for_filter(sub):
+        dt = parse_submitted_at(sub)
+        date_time_val = extract_field(sub, "Date & Time")
+        if date_time_val:
+            try:
+                dt = datetime.fromisoformat(str(date_time_val).replace("Z", "+00:00"))
+            except Exception:
+                pass
+        if not dt:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    # Only keep those whose effective datetime is on the target day
+    day_visc = []
+    for s in visc_subs:
+        dt = _extract_dt_for_filter(s)
+        if not dt:
+            continue
+        if day_start <= dt <= day_end:
+            day_visc.append(s)
+
+    # Pair in chronological order (stable)
+    day_visc.sort(key=lambda s: (_extract_dt_for_filter(s) or day_start))
+    day_visc = day_visc[:limit]
+
+    from services.form_service import FormService
+    svc = FormService(db)
+
+    repaired = 0
+    for s in day_visc:
+        try:
+            await svc._auto_pair_viscosity_to_extruder(s)
+            repaired += 1
+        except Exception as e:
+            logger.warning(f"Repair viscosity pairing failed for {str(s.get('id',''))[:8]}: {e}")
+
+    return {"date": date, "processed": len(day_visc), "attempted_repairs": repaired}
 
 
 @router.delete("/production/seed-data")

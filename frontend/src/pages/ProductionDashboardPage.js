@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionAPI } from "../lib/api";
 import { api } from "../lib/apiClient";
+import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { formatDateTime } from "../lib/dateUtils";
@@ -411,6 +412,7 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
 // ──────────────────────────────────────────
 export default function ProductionDashboardPage() {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
@@ -491,6 +493,21 @@ export default function ProductionDashboardPage() {
     period,
     productionAPI,
   });
+
+  const runPairingRepair = async () => {
+    try {
+      if (period !== "1d") {
+        toast.error("Pairing repair can only run in 1D mode");
+        return;
+      }
+      const res = await api.post(`/production/viscosity-pairing/repair?date=${encodeURIComponent(fromStr)}&limit=500`);
+      const processed = res?.data?.processed ?? 0;
+      toast.success(`Pairing run complete (${processed} samples checked)`);
+      await refetch();
+    } catch (e) {
+      toast.error("Failed to run pairing");
+    }
+  };
 
   const invalidateDashboard = () =>
     queryClient.invalidateQueries({ queryKey: productionKeys.dashboard(period, fromStr, toStr, shift) });
@@ -1019,6 +1036,21 @@ export default function ProductionDashboardPage() {
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => refetch()} data-testid="refresh-btn">
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
+
+            {/* Owner-only pairing repair (single-day only) */}
+            {user?.role === "owner" && !isMobile && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1"
+                onClick={runPairingRepair}
+                disabled={period !== "1d" || isFetching}
+                data-testid="pairing-repair-btn"
+                title="Re-run Mooney → Extruder pairing for this day"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> <span>Run pairing</span>
+              </Button>
+            )}
 
             {/* Date display - desktop only */}
             <span className="hidden sm:flex text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2 sm:px-3 h-8 items-center tabular-nums whitespace-nowrap" data-testid="date-display">
