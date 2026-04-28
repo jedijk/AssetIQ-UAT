@@ -1283,14 +1283,37 @@ async def create_investigation_from_threat(
     elif threat.get("recommended_actions"):
         recommended_actions = threat["recommended_actions"]
     
+    def _normalize_recommended_action(a: Any):
+        # Supports both legacy string actions and structured dict actions from the UI/library.
+        if isinstance(a, dict):
+            desc = a.get("description") or a.get("action") or ""
+            typ = a.get("action_type") or ""
+            disc = a.get("discipline") or ""
+            return str(desc).strip(), str(typ).strip(), str(disc).strip()
+        return str(a).strip(), "", ""
+
+    def _map_action_type(t: str) -> str:
+        # Investigation action_items historically used corrective/preventive.
+        x = (t or "").strip().upper()
+        if x == "CM":
+            return "corrective"
+        if x == "PM":
+            return "preventive"
+        if x == "PDM":
+            return "predictive"
+        return "corrective"
+
     for i, action in enumerate(recommended_actions[:5]):  # Limit to 5 actions
         action_number = f"ACT-{case_number}-{str(i+1).zfill(3)}"
+        desc, action_type_code, discipline = _normalize_recommended_action(action)
         action_items.append({
             "id": str(uuid.uuid4()),
             "investigation_id": inv_id,
             "action_number": action_number,
-            "description": action,
-            "action_type": "corrective",
+            "description": desc,
+            "action_type": _map_action_type(action_type_code),
+            "action_type_code": action_type_code or None,
+            "discipline": discipline or None,
             "priority": "medium" if i > 1 else "high",
             "owner": current_user["name"],
             "due_date": None,

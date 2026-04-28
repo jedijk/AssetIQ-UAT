@@ -1350,16 +1350,38 @@ class FormService:
             {"created_at": {"$regex": f"^{day_prefix}"}},
         ]
 
+        # Match by template_id OR by template name (fallback) to handle historical data
+        # where form_template_id may not align with the template collection.
         ext_subs = await self.db.form_submissions.find(
-            {"form_template_id": {"$in": extruder_ids}, "$or": time_window_or},
-            {"_id": 0, "id": 1, "values": 1, "submitted_at": 1, "created_at": 1}
+            {
+                "$and": [
+                    {
+                        "$or": [
+                            {"form_template_id": {"$in": extruder_ids}},
+                            {"form_template_name": {"$regex": r"extruder\\s*settings", "$options": "i"}},
+                        ]
+                    },
+                    {"$or": time_window_or},
+                ]
+            },
+            {"_id": 0, "id": 1, "values": 1, "submitted_at": 1, "created_at": 1, "form_template_name": 1}
         ).to_list(5000)
 
         visc_subs = []
         if visc_ids:
             visc_subs = await self.db.form_submissions.find(
-                {"form_template_id": {"$in": visc_ids}, "$or": time_window_or},
-                {"_id": 0, "id": 1, "values": 1, "submitted_at": 1, "created_at": 1}
+                {
+                    "$and": [
+                        {
+                            "$or": [
+                                {"form_template_id": {"$in": visc_ids}},
+                                {"form_template_name": {"$regex": r"mooney.*viscos", "$options": "i"}},
+                            ]
+                        },
+                        {"$or": time_window_or},
+                    ]
+                },
+                {"_id": 0, "id": 1, "values": 1, "submitted_at": 1, "created_at": 1, "form_template_name": 1}
             ).to_list(5000)
 
         # Build set of HH:MM times already occupied by a viscosity sample on the same day
