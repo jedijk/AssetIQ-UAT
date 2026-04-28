@@ -1329,15 +1329,16 @@ class FormService:
         if not candidates:
             return
 
-        def _pair_sort_key(c):
-            _sub, _dt, _hhmm = c
-            # Primary: absolute time difference (closest wins)
-            # Secondary: prefer earlier sample if equally close (stable + intuitive)
-            diff = abs((_dt - visc_dt).total_seconds())
-            return (diff, _dt)
-
-        candidates.sort(key=_pair_sort_key)
-        target_sub, target_dt, target_hhmm = candidates[0]
+        # Primary preference: pair "backwards" to fill earlier extruder slots on the same day.
+        # 1) pick the LATEST orphan extruder sample at-or-before the viscosity time
+        # 2) if none exist, pick the EARLIEST orphan extruder sample after the viscosity time
+        earlier = [c for c in candidates if c[1] <= visc_dt]
+        if earlier:
+            earlier.sort(key=lambda c: c[1])
+            target_sub, target_dt, target_hhmm = earlier[-1]
+        else:
+            candidates.sort(key=lambda c: c[1])
+            target_sub, target_dt, target_hhmm = candidates[0]
 
         # Rewrite this viscosity submission's "Date & Time" value to the target extruder's time.
         new_values = []
