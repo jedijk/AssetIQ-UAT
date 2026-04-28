@@ -382,7 +382,7 @@ const LoginPage = () => {
         
         {/* Version Number - Bottom Right */}
         <div className="login-version">
-          Version 3.5.9
+          Version {process.env.REACT_APP_VERSION || "3.6.4"}
         </div>
       </div>
 
