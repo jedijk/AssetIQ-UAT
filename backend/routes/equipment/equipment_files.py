@@ -89,19 +89,25 @@ async def download_equipment_file(file_id: str, current_user: dict = Depends(get
 
     from fastapi.responses import Response
 
-    # New path: fetch from storage_service via storage_path
+    # Prefer storage_service via storage_path, but gracefully fall back
+    # to legacy inline base64 if the storage object is missing.
+    content = None
+    ct = None
     if doc.get("storage_path"):
         try:
             content, ct = await get_object_async(doc["storage_path"])
         except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="File content not found")
-    # Legacy path: inline base64
-    elif doc.get("data"):
+            content = None
+            ct = None
+
+    # Legacy path: inline base64 (or fallback when storage content missing)
+    if content is None and doc.get("data"):
         import base64
         content = base64.b64decode(doc["data"])
         ct = doc.get("content_type", "application/octet-stream")
-    else:
-        raise HTTPException(status_code=404, detail="File data not found")
+
+    if content is None:
+        raise HTTPException(status_code=404, detail="File content not found")
 
     return Response(
         content=content,
@@ -119,19 +125,25 @@ async def view_equipment_file_public(file_id: str):
 
     from fastapi.responses import Response
 
-    # New path: fetch from storage_service via storage_path
+    # Prefer storage_service via storage_path, but gracefully fall back
+    # to legacy inline base64 if the storage object is missing.
+    content = None
+    ct = None
     if doc.get("storage_path"):
         try:
             content, ct = await get_object_async(doc["storage_path"])
         except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="File content not found")
-    # Legacy path: inline base64
-    elif doc.get("data"):
+            content = None
+            ct = None
+
+    # Legacy path: inline base64 (or fallback when storage content missing)
+    if content is None and doc.get("data"):
         import base64
         content = base64.b64decode(doc["data"])
         ct = doc.get("content_type", "application/octet-stream")
-    else:
-        raise HTTPException(status_code=404, detail="File data not found")
+
+    if content is None:
+        raise HTTPException(status_code=404, detail="File content not found")
 
     return Response(
         content=content,
