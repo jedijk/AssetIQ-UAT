@@ -85,14 +85,18 @@ def extract_numeric(submission, field_label):
 
 
 def parse_submitted_at(sub):
-    """Parse submitted_at into a datetime object."""
-    raw = sub.get("submitted_at", "")
-    if isinstance(raw, datetime):
-        return raw
-    try:
-        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
-    except Exception:
-        return None
+    """Parse submitted_at (fallback: created_at) into a datetime object."""
+    for key in ("submitted_at", "created_at"):
+        raw = sub.get(key, "")
+        if isinstance(raw, datetime):
+            return raw
+        if not raw:
+            continue
+        try:
+            return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except Exception:
+            continue
+    return None
 
 
 @router.get("/production/dashboard")
@@ -144,10 +148,6 @@ async def get_production_dashboard(
         is_range = False
 
     shift_config = SHIFTS.get(shift, SHIFTS["day"])
-
-    # Query all form submissions for production forms for Line-90 in date range
-    # Use case-insensitive regex to match template names
-    form_patterns = "|".join(PRODUCTION_FORMS)
 
     # Find Line-90 equipment ID and all ancestor/descendant IDs
     line90 = await db.equipment_nodes.find_one(
@@ -216,25 +216,74 @@ async def get_production_dashboard(
         if alt:
             equipment_match.append({"equipment_name": {"$regex": alt, "$options": "i"}})
 
+    # Query filter for template names: must match match_template() intent. Exact ^(…)$
+    # omitted versioned / localized template titles, so the dashboard showed no rows.
+    flex_production_template = {
+        "$or": [
+            {"$and": [
+                {"form_template_name": {"$regex": "extruder", "$options": "i"}},
+                {"form_template_name": {"$regex": "setting", "$options": "i"}},
+            ]},
+            {"$and": [
+                {"form_template_name": {"$regex": "mooney", "$options": "i"}},
+                {"$or": [
+                    {"form_template_name": {"$regex": "viscos", "$options": "i"}},
+                    {"form_template_name": {"$regex": "sample", "$options": "i"}},
+                ]},
+            ]},
+            {"$and": [
+                {"form_template_name": {"$regex": "big", "$options": "i"}},
+                {"form_template_name": {"$regex": "bag", "$options": "i"}},
+            ]},
+            {"$and": [
+                {"form_template_name": {"$regex": "screen", "$options": "i"}},
+                {"form_template_name": {"$regex": "change", "$options": "i"}},
+            ]},
+            {"$and": [
+                {"form_template_name": {"$regex": "magnet", "$options": "i"}},
+                {"form_template_name": {"$regex": "clean", "$options": "i"}},
+            ]},
+            {"$and": [
+                {"form_template_name": {"$regex": "end", "$options": "i"}},
+                {"form_template_name": {"$regex": "shift", "$options": "i"}},
+            ]},
+        ]
+    }
+
     # Production forms without equipment are implicitly for Line-90
     # Include them in the query by adding conditions for empty/null equipment
     forms_without_equipment = {
-        "form_template_name": {"$regex": f"^({END_OF_SHIFT_FORM}|{MAGNET_CLEANING_FORM}|{SCREEN_CHANGE_FORM})$", "$options": "i"},
-        "$or": [
-            {"equipment_id": ""},
-            {"equipment_id": None},
-            {"equipment_id": {"$exists": False}},
+        "$and": [
+            {"$or": [
+                {"$and": [
+                    {"form_template_name": {"$regex": "screen", "$options": "i"}},
+                    {"form_template_name": {"$regex": "change", "$options": "i"}},
+                ]},
+                {"$and": [
+                    {"form_template_name": {"$regex": "magnet", "$options": "i"}},
+                    {"form_template_name": {"$regex": "clean", "$options": "i"}},
+                ]},
+                {"$and": [
+                    {"form_template_name": {"$regex": "end", "$options": "i"}},
+                    {"form_template_name": {"$regex": "shift", "$options": "i"}},
+                ]},
+            ]},
+            {"$or": [
+                {"equipment_id": ""},
+                {"equipment_id": None},
+                {"equipment_id": {"$exists": False}},
+            ]},
         ]
     }
-    
+
     query = {
         "$or": [
-            # Standard query: production forms with Line-90 equipment
             {
-                "form_template_name": {"$regex": f"^({form_patterns})$", "$options": "i"},
-                "$or": equipment_match,
+                "$and": [
+                    flex_production_template,
+                    {"$or": equipment_match},
+                ]
             },
-            # Forms without equipment (implicitly Line-90)
             forms_without_equipment,
         ]
     }
@@ -517,15 +566,28 @@ async def get_production_dashboard(
     _ingest_exact = sorted(t for t in line90_subtree_asset_tokens if t and len(t) <= 200)
     if _ingest_exact:
         ingested_asset_match.append({"asset_id": {"$in": _ingest_exact[:200]}})
+    # String range on timestamp misses some stored shapes (e.g. space instead of T). Use calendar-day
+    # regex fallbacks, then tighten to shift window when appending rows below.
+    _ingest_dates = []
+    _scan_d = range_start.date()
+    _end_d = range_end.date()
+    while _scan_d <= _end_d and len(_ingest_dates) < 45:
+        _ingest_dates.append(_scan_d.strftime("%Y-%m-%d"))
+        _scan_d += timedelta(days=1)
+    ingested_ts_match = [
+        {
+            "timestamp": {
+                "$gte": range_start.strftime("%Y-%m-%dT%H:%M:%S"),
+                "$lte": range_end.strftime("%Y-%m-%dT%H:%M:%S"),
+            }
+        },
+    ]
+    for _ds in _ingest_dates:
+        ingested_ts_match.append({"timestamp": {"$regex": f"^{re.escape(_ds)}"}})
     ingested_query = {
         "$and": [
             {"$or": ingested_asset_match},
-            {
-                "timestamp": {
-                    "$gte": range_start.strftime("%Y-%m-%dT%H:%M:%S"),
-                    "$lte": range_end.strftime("%Y-%m-%dT%H:%M:%S"),
-                }
-            },
+            {"$or": ingested_ts_match},
         ]
     }
     # Deduplicate: prefer entries with mooney_viscosity
@@ -554,11 +616,20 @@ async def get_production_dashboard(
                 pass
 
             ts = entry.get("timestamp", "")
-            time_label = ""
-            try:
-                time_label = datetime.fromisoformat(ts).strftime("%H:%M")
-            except Exception:
-                pass
+            ts_dt = None
+            if ts:
+                try:
+                    ts_dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                    if ts_dt.tzinfo is None:
+                        ts_dt = ts_dt.replace(tzinfo=timezone.utc)
+                except Exception:
+                    ts_dt = None
+            if ts_dt is None:
+                continue
+            if not (range_start <= ts_dt <= range_end):
+                continue
+
+            time_label = ts_dt.strftime("%H:%M")
 
             rpm = 0
             try: rpm = float(m.get("RPM", 0) or 0)
@@ -601,7 +672,7 @@ async def get_production_dashboard(
 
             production_log.append({
                 "time": time_label,
-                "datetime": ts,
+                "datetime": _serialize_datetime(ts_dt),
                 "submitted_by": "Log Ingestion",
                 "rpm": rpm, "feed": feed_val, "moisture": moisture, "energy": energy,
                 "mt1": mt1, "mt2": mt2, "mt3": mt3,
@@ -620,7 +691,7 @@ async def get_production_dashboard(
                     viscosity_values.append(visc_val)
                     viscosity_series.append({
                         "time": time_label,
-                        "datetime": ts,
+                        "datetime": _serialize_datetime(ts_dt),
                         "viscosity": visc_val,
                         "sample": entry.get("sample_id", ""),
                         "submission_id": entry.get("id", ""),
@@ -637,12 +708,12 @@ async def get_production_dashboard(
                 or (magnet_time_val and str(magnet_time_val).strip())
             )
             if has_magnet:
-                magnet_subs.append({"_parsed_time": datetime.fromisoformat(ts) if ts else None})
+                magnet_subs.append({"_parsed_time": ts_dt})
 
             # Screen changes — detect from status/remarks text
             status_text = str(entry.get("status") or "").lower()
             if "screen" in status_text and "change" in status_text:
-                screen_change_subs.append({"_parsed_time": datetime.fromisoformat(ts) if ts else None})
+                screen_change_subs.append({"_parsed_time": ts_dt})
 
             # Input material → big bag entries
             if entry.get("input_material"):
