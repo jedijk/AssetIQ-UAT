@@ -18,6 +18,7 @@ import { getBackendUrl } from "./lib/apiConfig";
 import { debugLog } from "./lib/debug";
 import "./App.css";
 import { AppShell } from "./components/AppShell";
+import { CapabilitiesProvider, useCapabilities } from "./core/performance";
 
 // iOS Safari can feel slower with too many small lazy chunks (waterfall + parse overhead).
 // Keep core routes eagerly loaded; lazy-load heavier/rare routes.
@@ -90,6 +91,14 @@ function isIOSDevice() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
   return /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && typeof document !== "undefined" && "ontouchend" in document);
+}
+
+function MotionWithCapabilities({ children }) {
+  const caps = useCapabilities();
+  const reduceMotion = isIOSDevice() || caps.animations === false;
+  return (
+    <MotionConfig reducedMotion={reduceMotion ? "always" : "user"}>{children}</MotionConfig>
+  );
 }
 
 // Current frontend version - update with each release
@@ -335,11 +344,11 @@ const MobileLayout = () => {
 function App() {
   // Check for version updates on app load
   useVersionCheck();
-  const reduceMotion = isIOSDevice();
-  
+
   return (
     <QueryClientProvider client={queryClient}>
-      <MotionConfig reducedMotion={reduceMotion ? "always" : "user"}>
+      <CapabilitiesProvider>
+        <MotionWithCapabilities>
         <ThemeProvider>
           <LanguageProvider>
             <AuthProvider>
@@ -455,7 +464,8 @@ function App() {
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>
-  </MotionConfig>
+        </MotionWithCapabilities>
+      </CapabilitiesProvider>
   </QueryClientProvider>
   );
 }

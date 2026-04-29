@@ -48,6 +48,7 @@ import { actionsAPI, feedbackAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
 import { AppErrorBoundary } from "./AppErrorBoundary";
+import { useCapabilities } from "../core/performance";
 
 const Layout = () => {
   const { user, logout, mustChangePassword, mustAcceptTerms } = useAuth();
@@ -58,6 +59,7 @@ const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const caps = useCapabilities();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Ensure only one header dropdown menu is open at once (mobile + desktop).
   const [openHeaderMenu, setOpenHeaderMenu] = useState(null); // "notifications" | "help" | "settings" | "profile" | null
@@ -418,12 +420,15 @@ const Layout = () => {
     }
   };
 
+  const bellPollMs = caps.realtimeUpdates ? 60_000 : 120_000;
+  const bellStaleMs = caps.realtimeUpdates ? 30_000 : 90_000;
+
   // Query overdue actions for notification bell
   const { data: overdueData } = useQuery({
     queryKey: ["overdue-actions"],
     queryFn: actionsAPI.getOverdue,
-    refetchInterval: 60000, // Refresh every minute
-    staleTime: 30000,
+    refetchInterval: bellPollMs,
+    staleTime: bellStaleMs,
   });
 
   const overdueActions = overdueData?.overdue_actions || [];
@@ -434,8 +439,8 @@ const Layout = () => {
   const { data: unreadFeedbackData } = useQuery({
     queryKey: ["unread-feedback-count"],
     queryFn: feedbackAPI.getUnreadCount,
-    refetchInterval: 60000, // Refresh every minute
-    staleTime: 30000,
+    refetchInterval: bellPollMs,
+    staleTime: bellStaleMs,
     enabled: canViewAllFeedback, // Only fetch for authorized users
   });
 
@@ -443,8 +448,8 @@ const Layout = () => {
   const { data: unreadResponsesData } = useQuery({
     queryKey: ["unread-responses-count"],
     queryFn: feedbackAPI.getUnreadResponsesCount,
-    refetchInterval: 60000, // Refresh every minute
-    staleTime: 30000,
+    refetchInterval: bellPollMs,
+    staleTime: bellStaleMs,
     enabled: !canViewAllFeedback && !!user, // Only for non-admin users
   });
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { threatsAPI, statsAPI } from "../lib/api";
@@ -62,6 +62,7 @@ import BackButton from "../components/BackButton";
 import { Skeleton } from "../components/ui/skeleton";
 import { VirtualList } from "../components/ui/VirtualList";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { useCapabilities } from "../core/performance";
 
 // Status options with colors and icons
 const STATUS_OPTIONS = [
@@ -131,6 +132,7 @@ const ThreatsPage = () => {
       return false;
     }
   })();
+  const caps = useCapabilities();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState([]); // Multi-select: array of selected statuses
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -360,29 +362,31 @@ const ThreatsPage = () => {
   });
 
   // Sort threats based on selected sort method
-  const sortedThreats = Array.isArray(filteredThreats) && filteredThreats.length > 0 
-    ? [...filteredThreats].sort((a, b) => {
-        if (sortBy === "rpn") {
-          // Sort by RPN (higher first), fall back to risk_score if no RPN
-          const rpnA = a?.fmea_rpn || a?.rpn || a?.failure_mode_data?.rpn || 0;
-          const rpnB = b?.fmea_rpn || b?.rpn || b?.failure_mode_data?.rpn || 0;
-          return rpnB - rpnA;
-        } else if (sortBy === "latest") {
-          // Sort by created_at (newest first)
-          const dateA = new Date(a?.created_at || 0);
-          const dateB = new Date(b?.created_at || 0);
-          return dateB - dateA;
-        } else if (sortBy === "oldest") {
-          // Sort by created_at (oldest first)
-          const dateA = new Date(a?.created_at || 0);
-          const dateB = new Date(b?.created_at || 0);
-          return dateA - dateB;
-        } else {
-          // Default: sort by business risk score (higher first)
-          return (b?.risk_score || 0) - (a?.risk_score || 0);
-        }
-      })
-    : [];
+  const sortedThreats = useMemo(() => {
+    if (!Array.isArray(filteredThreats) || filteredThreats.length === 0) return [];
+    return [...filteredThreats].sort((a, b) => {
+      if (sortBy === "rpn") {
+        const rpnA = a?.fmea_rpn || a?.rpn || a?.failure_mode_data?.rpn || 0;
+        const rpnB = b?.fmea_rpn || b?.rpn || b?.failure_mode_data?.rpn || 0;
+        return rpnB - rpnA;
+      }
+      if (sortBy === "latest") {
+        const dateA = new Date(a?.created_at || 0);
+        const dateB = new Date(b?.created_at || 0);
+        return dateB - dateA;
+      }
+      if (sortBy === "oldest") {
+        const dateA = new Date(a?.created_at || 0);
+        const dateB = new Date(b?.created_at || 0);
+        return dateA - dateB;
+      }
+      return (b?.risk_score || 0) - (a?.risk_score || 0);
+    });
+  }, [filteredThreats, sortBy]);
+
+  const displayThreats = useMemo(() => sortedThreats.slice(0, caps.maxListItems), [sortedThreats, caps.maxListItems]);
+  const threatsTruncated = Array.isArray(sortedThreats) && sortedThreats.length > caps.maxListItems;
+  const useVirtualThreatList = (isMobile && !isIOSLike) || caps.mode === "lite";
 
   const statCards = [
     {
@@ -435,7 +439,8 @@ const ThreatsPage = () => {
           {/* Mobile: Inline stats */}
           <div className="flex sm:hidden items-center gap-2 text-xs">
             <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">
-              {Array.isArray(sortedThreats) ? sortedThreats.length : 0}
+              {displayThreats.length}
+              {threatsTruncated ? "+" : ""}
             </span>
             {(stats?.critical_count || 0) > 0 && (
               <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats?.critical_count} critical</span>
@@ -671,7 +676,7 @@ const ThreatsPage = () => {
             </div>
           ))}
         </div>
-      ) : !Array.isArray(sortedThreats) || sortedThreats.length === 0 ? (
+      ) : !Array.isArray(displayThreats) || displayThreats.length === 0 ? (
         <div className="empty-state py-16" data-testid="no-threats-message">
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
             <CheckCircle className="w-8 h-8 text-slate-400" />
@@ -688,10 +693,16 @@ const ThreatsPage = () => {
         </div>
       ) : (
         <div className="priority-list" data-testid="threats-list">
-          {isMobile && !isIOSLike ? (
+          {threatsTruncated && (
+            <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Showing the first {caps.maxListItems} observations after sorting for responsiveness.
+              Use filters or search to narrow results.
+            </div>
+          )}
+          {useVirtualThreatList ? (
             <VirtualList
               className="h-[calc(100vh-220px)]"
-              data={sortedThreats}
+              data={displayThreats}
               itemContent={(idx, threat) => {
                 const EquipmentIcon = getEquipmentIcon(threat.equipment_type, threat.asset);
                 const rpnValue = threat.fmea_rpn || threat.rpn || threat.failure_mode_data?.rpn || null;
@@ -707,9 +718,9 @@ const ThreatsPage = () => {
                 return (
                   <motion.div
                     key={threat.id}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={caps.animations ? { opacity: 0, y: 10 } : false}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.01 }}
+                    transition={caps.animations ? { delay: idx * 0.01 } : { duration: 0 }}
                     onClick={() => navigate(`/threats/${threat.id}`)}
                     onMouseEnter={handleMouseEnter}
                     className={`priority-item group relative ${
@@ -788,7 +799,7 @@ const ThreatsPage = () => {
               }}
             />
           ) : (
-          sortedThreats.map((threat, idx) => {
+          displayThreats.map((threat, idx) => {
             const EquipmentIcon = getEquipmentIcon(threat.equipment_type, threat.asset);
             const rpnValue = threat.fmea_rpn || threat.rpn || threat.failure_mode_data?.rpn || null;
             
@@ -804,9 +815,9 @@ const ThreatsPage = () => {
             return (
             <motion.div
               key={threat.id}
-              initial={{ opacity: 0, y: 10 }}
+              initial={caps.animations ? { opacity: 0, y: 10 } : false}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.05 }}
+              transition={caps.animations ? { delay: idx * 0.05 } : { duration: 0 }}
               onClick={() => navigate(`/threats/${threat.id}`)}
               onMouseEnter={handleMouseEnter}
               className={`priority-item group relative ${
