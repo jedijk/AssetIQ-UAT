@@ -1606,7 +1606,7 @@ export default function ProductionDashboardPage() {
                   )}
                 </div>
               </div>
-              <div className="max-h-[200px] overflow-y-auto">
+              <div className={isMobile ? "" : "max-h-[200px] overflow-y-auto"}>
                 {data?.big_bag_entries?.length > 0 ? (
                   isMobile ? (
                     /* Mobile Card View for Big Bag */
@@ -1703,7 +1703,7 @@ export default function ProductionDashboardPage() {
                   )}
                 </div>
               </div>
-              <div className="max-h-[200px] overflow-y-auto">
+              <div className={isMobile ? "" : "max-h-[200px] overflow-y-auto"}>
                 {data?.insights?.length > 0 ? (
                   data.insights.map((ev) => <EventCard key={ev.id} event={ev} />)
                 ) : (
