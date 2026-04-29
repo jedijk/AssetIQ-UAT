@@ -123,7 +123,7 @@ def _normalize_template_doc(doc: dict) -> dict:
     out = dict(doc or {})
     out["width_mm"] = _coerce_float(out.get("width_mm", 50.0), default=50.0)
     out["height_mm"] = _coerce_float(out.get("height_mm", 30.0), default=30.0)
-    out["orientation"] = _coerce_choice(out.get("orientation", "portrait"), allowed_orientations, "portrait")
+    out["orientation"] = _coerce_choice(out.get("orientation", "landscape"), allowed_orientations, "landscape")
     out["preset"] = _coerce_choice(out.get("preset", "standard"), ALLOWED_PRESETS, "standard")
     out["font_size"] = _coerce_choice(out.get("font_size", "medium"), allowed_font_sizes, "medium")
     out["show_qr"] = _coerce_bool(out.get("show_qr", True), default=True)
@@ -165,7 +165,7 @@ class LabelTemplateCreate(BaseModel):
     description: Optional[str] = None
     width_mm: float = 50.0
     height_mm: float = 30.0
-    orientation: Literal["portrait", "landscape"] = "portrait"
+    orientation: Literal["portrait", "landscape"] = "landscape"
     preset: Literal["standard", "compact", "qr_only", "with_logo", "title_date_time", "blank"] = "standard"
     field_bindings: List[FieldBinding] = Field(default_factory=list)
     qr_config: QRConfig = Field(default_factory=QRConfig)
@@ -878,9 +878,10 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
 
 def _render_pdf(tpl: dict, datasets: List[dict], copies: int = 1, margin_offset_mm: float = 0.0) -> bytes:
     """Render a single-label-per-page PDF."""
+    tpl = _normalize_template_doc(dict(tpl or {}))
     w_mm = float(tpl.get("width_mm", 50))
     h_mm = float(tpl.get("height_mm", 30))
-    orientation = tpl.get("orientation", "portrait")
+    orientation = tpl.get("orientation", "landscape")
     page_w, page_h = w_mm * mm, h_mm * mm
     if orientation == "landscape" and page_w < page_h:
         page_w, page_h = page_h, page_w
@@ -929,7 +930,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
     tpl = _normalize_template_doc(tpl)
     w_mm = float(tpl.get("width_mm", 50))
     h_mm = float(tpl.get("height_mm", 30))
-    orientation = tpl.get("orientation", "portrait")
+    orientation = tpl.get("orientation", "landscape")
     preset = tpl.get("preset", "standard")
     bindings = [FieldBinding(**b) if isinstance(b, dict) else b for b in (tpl.get("field_bindings") or [])]
     qr_cfg = QRConfig(**(tpl.get("qr_config") or {}))

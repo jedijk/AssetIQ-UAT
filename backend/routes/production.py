@@ -207,7 +207,38 @@ async def get_production_dashboard(
         ]
     }
 
-    all_subs = await db.form_submissions.find(query, {"_id": 0}).to_list(1000)
+    # Pre-filter by submitted/created time around the visible range. A plain
+    # find().limit(1000) without sort or time scope can omit the newest rows when
+    # many Line-90 production forms exist (matches FormService pairing window).
+    broad_start = range_start - timedelta(days=7)
+    broad_end = range_end + timedelta(days=7)
+    broad_start_iso = broad_start.isoformat()
+    broad_end_iso = broad_end.isoformat()
+
+    time_window_or = [
+        {"submitted_at": {"$gte": broad_start, "$lte": broad_end}},
+        {"created_at": {"$gte": broad_start, "$lte": broad_end}},
+        {"submitted_at": {"$gte": broad_start_iso, "$lte": broad_end_iso}},
+        {"created_at": {"$gte": broad_start_iso, "$lte": broad_end_iso}},
+    ]
+    span_days = (range_end.date() - range_start.date()).days + 1
+    if span_days <= 120:
+        scan_day = range_start.date()
+        scan_end = range_end.date()
+        while scan_day <= scan_end:
+            day_prefix = scan_day.strftime("%Y-%m-%d")
+            time_window_or.append({"submitted_at": {"$regex": f"^{day_prefix}"}})
+            time_window_or.append({"created_at": {"$regex": f"^{day_prefix}"}})
+            scan_day += timedelta(days=1)
+
+    submissions_query = {
+        "$and": [
+            query,
+            {"$or": time_window_or},
+        ]
+    }
+
+    all_subs = await db.form_submissions.find(submissions_query, {"_id": 0}).to_list(8000)
 
     # Filter by date range
     submissions = []

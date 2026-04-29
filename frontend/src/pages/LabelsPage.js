@@ -64,7 +64,7 @@ const emptyTemplate = {
   description: "",
   width_mm: 50,
   height_mm: 30,
-  orientation: "portrait",
+  orientation: "landscape",
   preset: "standard",
   field_bindings: [
     { source: "asset_id" },
