@@ -184,6 +184,27 @@ export const formAPI = {
     }
     return { results: [] };
   },
+
+  /**
+   * Update values on a submission. Uses the Production endpoint because it supports
+   * both normal form submissions and ingested production log rows.
+   *
+   * @param {string} submissionId
+   * @param {object} values - key/value pairs. Keys can be field_label or field_id.
+   */
+  updateSubmission: async (submissionId, values = {}) => {
+    const response = await fetch(`${API_BASE_URL}/api/production/submission/${submissionId}`, {
+      method: "PATCH",
+      headers: withCsrf(getAuthHeaders()),
+      credentials: FETCH_CREDENTIALS,
+      body: JSON.stringify({ values }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Failed to update submission" }));
+      throw new Error(error.detail || "Failed to update submission");
+    }
+    return response.json();
+  },
 };
 
 export default formAPI;

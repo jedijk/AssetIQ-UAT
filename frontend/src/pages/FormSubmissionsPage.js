@@ -43,6 +43,7 @@ import {
   Printer,
   ChevronRight,
   Loader2,
+  Pencil,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -413,6 +414,8 @@ export default function FormSubmissionsPage() {
   const [loadingSubmission, setLoadingSubmission] = useState(false);
   const [viewingDocument, setViewingDocument] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editValues, setEditValues] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const location = useLocation();
 
@@ -422,10 +425,14 @@ export default function FormSubmissionsPage() {
     try {
       const fullSubmission = await fetchSubmission(submission.id);
       setSelectedSubmission(fullSubmission);
+      setEditMode(false);
+      setEditValues({});
     } catch (error) {
       console.error("Failed to fetch submission details:", error);
       // Fallback to the lightweight version if fetch fails
       setSelectedSubmission(submission);
+      setEditMode(false);
+      setEditValues({});
     } finally {
       setLoadingSubmission(false);
     }
@@ -509,6 +516,72 @@ export default function FormSubmissionsPage() {
       toast.error("Failed to delete submission");
     },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ submissionId, values }) => {
+      return formAPI.updateSubmission(submissionId, values);
+    },
+    onSuccess: async (_res, vars) => {
+      toast.success("Submission updated");
+      queryClient.invalidateQueries({ queryKey: ["form-submissions"] });
+      try {
+        const full = await fetchSubmission(vars.submissionId);
+        setSelectedSubmission(full);
+      } catch (_e) {
+        // ignore
+      }
+      setEditMode(false);
+      setEditValues({});
+    },
+    onError: (err) => {
+      toast.error(err?.message || "Failed to update submission");
+    },
+  });
+
+  const startEdit = () => {
+    if (!selectedSubmission) return;
+    const responsesAll = selectedSubmission?.values || selectedSubmission?.responses || [];
+    const next = {};
+    for (const r of responsesAll) {
+      if (!r) continue;
+      if (r.field_id === "__ai_scan_photo") continue;
+      const key = r.field_label || r.field_id;
+      if (!key) continue;
+      const isSignature = r.field_type === "signature" ||
+        (typeof r.value === "string" && r.value?.startsWith("data:image/png;base64,"));
+      const hasAttachment = r.attachment_url || r.file_url;
+      if (isSignature || hasAttachment) continue;
+      next[key] = r.value ?? "";
+    }
+    setEditValues(next);
+    setEditMode(true);
+  };
+
+  const cancelEdit = () => {
+    setEditMode(false);
+    setEditValues({});
+  };
+
+  const saveEdit = () => {
+    if (!selectedSubmission) return;
+    const responsesAll = selectedSubmission?.values || selectedSubmission?.responses || [];
+    const currentByKey = {};
+    for (const r of responsesAll) {
+      const k = r?.field_label || r?.field_id;
+      if (k) currentByKey[k] = r?.value ?? "";
+    }
+    const updates = {};
+    for (const [k, v] of Object.entries(editValues || {})) {
+      const cur = currentByKey[k];
+      if (String(cur ?? "") !== String(v ?? "")) updates[k] = v ?? "";
+    }
+    if (Object.keys(updates).length === 0) {
+      toast.info("No changes to save");
+      setEditMode(false);
+      return;
+    }
+    updateMutation.mutate({ submissionId: selectedSubmission.id, values: updates });
+  };
 
   const submissions = submissionsData?.submissions || [];
 
@@ -1010,6 +1083,48 @@ export default function FormSubmissionsPage() {
             >
               <ArrowLeft className="w-5 h-5 text-slate-600" />
             </button>
+            <div className="ml-auto flex items-center gap-2">
+              {selectedSubmission && !editMode && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-slate-600 hover:text-indigo-600"
+                  onClick={startEdit}
+                  disabled={updateMutation.isPending}
+                >
+                  <Pencil className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
+              )}
+              {selectedSubmission && editMode && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={cancelEdit}
+                    disabled={updateMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8"
+                    onClick={saveEdit}
+                    disabled={updateMutation.isPending}
+                  >
+                    {updateMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        Saving
+                      </>
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
           
           {/* Loading state */}
@@ -1180,6 +1295,7 @@ export default function FormSubmissionsPage() {
                           const hasAttachment = response.attachment_url || response.file_url;
                           const attachmentRawUrl = response.attachment_url || response.file_url || "";
                           const isImage = hasAttachment && /\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentRawUrl);
+                          const canEdit = editMode && !isSignature && !hasAttachment;
                           // Clean API path for AuthenticatedLightbox (handles auth via headers)
                           const attachmentApiPath = attachmentRawUrl && !attachmentRawUrl.startsWith('data:') && !attachmentRawUrl.startsWith('http')
                             ? `/api/storage/${attachmentRawUrl}`
@@ -1217,7 +1333,16 @@ export default function FormSubmissionsPage() {
                                   {(response.field_label || response.field_id || "").replace(/_/g, ' ')}
                                 </p>
                                 <p className="text-sm text-slate-500 mt-0.5">
-                                  {isSignature && response.value ? (
+                                  {canEdit ? (
+                                    <Input
+                                      value={editValues[(response.field_label || response.field_id) || ""] ?? ""}
+                                      onChange={(e) => {
+                                        const k = (response.field_label || response.field_id) || "";
+                                        setEditValues((prev) => ({ ...(prev || {}), [k]: e.target.value }));
+                                      }}
+                                      className="h-8 text-sm bg-white"
+                                    />
+                                  ) : isSignature && response.value ? (
                                     <button
                                       onClick={() => setViewingImage({ url: response.value, name: (response.field_label || "Signature").replace(/_/g, ' ') })}
                                       className="text-blue-600 hover:underline"
@@ -1463,6 +1588,7 @@ export default function FormSubmissionsPage() {
                   size="sm"
                   className="text-red-600 border-red-200 hover:bg-red-50"
                   onClick={() => setDeleteConfirm(selectedSubmission)}
+                    disabled={editMode || updateMutation.isPending}
                 >
                   <Trash2 className="w-4 h-4 mr-1" />
                   Delete
