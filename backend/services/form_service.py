@@ -1276,8 +1276,10 @@ class FormService:
         # - "Mooney Viscosity v2"
         #
         # Match broadly but still specific enough to avoid accidental cross-template pairing.
+        # NOTE: use a single backslash in the regex. `r"extruder\\s*..."` is WRONG:
+        # it becomes the literal pattern `extruder\s...` (broken matching).
         extruder_tpls = await self.db.form_templates.find(
-            {"name": {"$regex": r"extruder\\s*settings", "$options": "i"}},
+            {"name": {"$regex": r"extruder\s*settings", "$options": "i"}},
         ).to_list(200)
         visc_tpls = await self.db.form_templates.find(
             {"name": {"$regex": r"mooney.*viscos", "$options": "i"}},
@@ -1358,7 +1360,7 @@ class FormService:
                     {
                         "$or": [
                             {"form_template_id": {"$in": extruder_ids}},
-                            {"form_template_name": {"$regex": r"extruder\\s*settings", "$options": "i"}},
+                            {"form_template_name": {"$regex": r"extruder\s*settings", "$options": "i"}},
                         ]
                     },
                     {"$or": time_window_or},
@@ -1468,7 +1470,7 @@ class FormService:
                     f"[Viscosity Auto-Pair] skip: no extruder candidates and ingested fallback failed ({e}); "
                     f"day={day} visc={str(visc_doc.get('id',''))[:8]}"
                 )
-                return
+                return {"status": "skip", "reason": "ingested_fallback_failed", "detail": str(e), "day": str(day)}
 
         if not candidates:
             logger.info(
