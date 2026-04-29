@@ -1086,8 +1086,6 @@ async def repair_viscosity_pairing(
     Re-run viscosity auto-pairing for already-submitted Mooney samples on a given day.
     Useful when pairing logic changed or ingestion/form timing was off.
     """
-    _require_owner(current_user)
-
     try:
         target_day = datetime.strptime(date, "%Y-%m-%d").date()
     except ValueError:
@@ -1167,15 +1165,13 @@ async def viscosity_pairing_debug_report(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Owner-only: generate a detailed pairing report for analysis.
+    Generate a detailed pairing report for analysis (authenticated users).
     Includes:
     - extruder slots (forms + ingested)
     - viscosity slots (forms + ingested)
     - how the API would key each item (HH:MM)
     - which extruder slots are missing viscosity
     """
-    _require_owner(current_user)
-
     try:
         target_day = datetime.strptime(date, "%Y-%m-%d").date()
     except ValueError:

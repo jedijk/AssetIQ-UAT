@@ -31,6 +31,8 @@ import {
   Gauge,
   Zap,
   MessageCircle,
+  Printer,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -90,6 +92,8 @@ import { useProductionDashboardQuery } from "../hooks/production/useProductionDa
 import { useProductionDateRange } from "../features/production/hooks/useProductionDateRange";
 import { productionKeys } from "../features/production/queryKeys";
 import { MachineAnalysisPanel } from "../features/production/components/MachineAnalysisPanel";
+import { openPrintWindow } from "../lib/printLabel";
+import { formAPI } from "../components/forms/formAPI";
 
 // ──────────────────────────────────────────
 // KPI Card
@@ -555,6 +559,66 @@ export default function ProductionDashboardPage() {
 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { type, ids[], label }
+
+  /** Label reprint for extruder or viscosity submission (same flow as SubmissionRow). */
+  const [printingLogSubmissionId, setPrintingLogSubmissionId] = useState(null);
+
+  const handleProductionLogReprint = async (entry, isViscOnly, e) => {
+    if (e) e.stopPropagation();
+    const submissionId = isViscOnly ? entry._viscosity_submission_id : entry.submission_id;
+    if (!submissionId) {
+      toast.error("No submission linked to this row.");
+      return;
+    }
+    let preOpened = null;
+    try {
+      preOpened = openPrintWindow();
+    } catch (_err) {
+      /* ignore */
+    }
+    setPrintingLogSubmissionId(submissionId);
+    try {
+      const tpl = isViscOnly ? formTemplates?.viscosity : formTemplates?.extruder;
+      let cfg = tpl?.label_print_config;
+      if (!cfg?.enabled || !cfg?.label_template_id) {
+        if (tpl?.id) {
+          try {
+            const full = await formAPI.getTemplate(tpl.id);
+            cfg = full?.label_print_config || cfg;
+          } catch (_e) {
+            /* keep cfg */
+          }
+        }
+      }
+      const templateId = cfg?.label_template_id;
+      if (!cfg?.enabled || !templateId) {
+        toast.error("This form has no label template configured. Enable it in the form designer.");
+        if (preOpened && !preOpened.closed) preOpened.close();
+        return;
+      }
+      const { printLabel } = await import("../lib/printLabel");
+      const res = await printLabel(
+        {
+          template_id: templateId,
+          submission_id: submissionId,
+          copies: 1,
+        },
+        {
+          win: preOpened,
+          filename: `label-${String(submissionId).slice(0, 8)}.pdf`,
+        }
+      );
+      if (res.method === "window") toast.success("Label print dialog opened");
+      else if (res.mobile) toast.info("Label downloaded — use Share → Print");
+      else if (res.method === "download") toast.info("Print blocked — label downloaded.");
+      else toast.success("Print dialog opened");
+    } catch (err) {
+      if (preOpened && !preOpened.closed) preOpened.close();
+      toast.error(err?.response?.data?.detail || err?.message || "Print failed");
+    } finally {
+      setPrintingLogSubmissionId(null);
+    }
+  };
 
   // Mutation for updating a submission
   const updateSubmissionMutation = useMutation({
@@ -1063,34 +1127,30 @@ export default function ProductionDashboardPage() {
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
 
-            {/* Owner-only pairing repair (single-day only) */}
-            {user?.role === "owner" && !isMobile && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1"
-                onClick={runPairingRepair}
-                disabled={period !== "1d" || isFetching}
-                data-testid="pairing-repair-btn"
-                title="Re-run Mooney → Extruder pairing for this day"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> <span>Run pairing</span>
-              </Button>
-            )}
+            {/* Mooney ↔ Extruder pairing repair & debug (single-day only); all authenticated users */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1"
+              onClick={runPairingRepair}
+              disabled={period !== "1d" || isFetching}
+              data-testid="pairing-repair-btn"
+              title="Re-run Mooney → Extruder pairing for this day"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> <span className="hidden xs:inline">Run pairing</span>
+            </Button>
 
-            {user?.role === "owner" && !isMobile && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1"
-                onClick={downloadPairingDebugReport}
-                disabled={period !== "1d" || isFetching}
-                data-testid="pairing-debug-btn"
-                title="Download a JSON report explaining viscosity pairing for this day"
-              >
-                <Search className="w-3.5 h-3.5" /> <span>Debug pairing</span>
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1"
+              onClick={downloadPairingDebugReport}
+              disabled={period !== "1d" || isFetching}
+              data-testid="pairing-debug-btn"
+              title="Download a JSON report explaining viscosity pairing for this day"
+            >
+              <Search className="w-3.5 h-3.5" /> <span className="hidden xs:inline">Debug pairing</span>
+            </Button>
 
             {/* Date display - desktop only */}
             <span className="hidden sm:flex text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2 sm:px-3 h-8 items-center tabular-nums whitespace-nowrap" data-testid="date-display">
@@ -1637,6 +1697,25 @@ export default function ProductionDashboardPage() {
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleProductionLogReprint(entry, isViscOnly, e)}
+                              disabled={
+                                printingLogSubmissionId &&
+                                printingLogSubmissionId === (isViscOnly ? entry._viscosity_submission_id : entry.submission_id)
+                              }
+                              className="p-1 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 active:bg-slate-100 disabled:opacity-60"
+                              data-testid={`mobile-reprint-${timeKey || i}`}
+                              aria-label="Reprint label"
+                              title="Reprint label"
+                            >
+                              {printingLogSubmissionId &&
+                              printingLogSubmissionId === (isViscOnly ? entry._viscosity_submission_id : entry.submission_id) ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Printer className="w-3.5 h-3.5" />
+                              )}
+                            </button>
                           </div>
                         </div>
                         {isViscOnly ? (
@@ -1754,6 +1833,24 @@ export default function ProductionDashboardPage() {
                               title="Edit"
                             >
                               <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleProductionLogReprint(entry, isViscOnly, e)}
+                              disabled={
+                                !!printingLogSubmissionId &&
+                                printingLogSubmissionId === (isViscOnly ? entry._viscosity_submission_id : entry.submission_id)
+                              }
+                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors disabled:opacity-60"
+                              data-testid={`reprint-row-${timeKey || i}`}
+                              title="Reprint label"
+                            >
+                              {printingLogSubmissionId &&
+                              printingLogSubmissionId === (isViscOnly ? entry._viscosity_submission_id : entry.submission_id) ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Printer className="w-3.5 h-3.5" />
+                              )}
                             </button>
                             <button
                               onClick={() => {
