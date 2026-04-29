@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import logging
+import re
 import uuid
 
 from database import db
@@ -177,12 +178,43 @@ async def get_production_dashboard(
             ).to_list(200)
             equipment_ids.extend([gc["id"] for gc in grandchildren])
 
+    # Tags/names under Line-90 (e.g. EXU, 1U-20) for matching form `equipment_name`
+    # and ingested `production_logs.asset_id` — CSVs rarely use the literal "Line-90" string.
+    line90_subtree_asset_tokens = set()
+    if equipment_ids:
+        subtree_nodes = await db.equipment_nodes.find(
+            {"id": {"$in": list(dict.fromkeys(equipment_ids))}},
+            {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1},
+        ).to_list(500)
+        for n in subtree_nodes:
+            eid = (n.get("id") or "").strip()
+            if eid:
+                line90_subtree_asset_tokens.add(eid)
+            for key in ("name", "tag", "tag_number"):
+                v = (n.get(key) or "").strip()
+                if len(v) >= 2:
+                    line90_subtree_asset_tokens.add(v)
+
+    def _meaningful_line90_token(s: str) -> bool:
+        if len(s) >= 3:
+            return True
+        return any(ch.isdigit() for ch in s)
+
     equipment_match = [
         {"equipment_name": {"$regex": "Line.?90", "$options": "i"}},
         {"equipment_name": EQUIPMENT_NAME},
     ]
     if equipment_ids:
         equipment_match.append({"equipment_id": {"$in": equipment_ids}})
+    subtree_toks = sorted(
+        (t for t in line90_subtree_asset_tokens if _meaningful_line90_token(t)),
+        key=len,
+        reverse=True,
+    )
+    if subtree_toks:
+        alt = "|".join(re.escape(t) for t in subtree_toks[:48])
+        if alt:
+            equipment_match.append({"equipment_name": {"$regex": alt, "$options": "i"}})
 
     # Production forms without equipment are implicitly for Line-90
     # Include them in the query by adding conditions for empty/null equipment
@@ -430,56 +462,17 @@ async def get_production_dashboard(
             "notes": notes,
         })
 
-    # Calculate KPIs
-    avg_viscosity = round(sum(viscosity_values) / len(viscosity_values), 2) if viscosity_values else 0
-    if len(viscosity_values) > 1 and avg_viscosity > 0:
-        mean = sum(viscosity_values) / len(viscosity_values)
-        variance = sum((v - mean) ** 2 for v in viscosity_values) / (len(viscosity_values) - 1)
-        std_dev = variance ** 0.5
-        rsd = round((std_dev / mean) * 100, 2)
-    else:
-        rsd = 0
-
     # Waste calculation - only show reported waste; do not fabricate an estimate
     waste_kg = total_waste
     waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 and waste_kg > 0 else 0
     yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
 
-    # Runtime estimation
-    if len(production_log) >= 2:
-        first_t = production_log[0].get("datetime", "")
-        last_t = production_log[-1].get("datetime", "")
-        try:
-            t1 = datetime.fromisoformat(first_t)
-            t2 = datetime.fromisoformat(last_t)
-            runtime_hours = round((t2 - t1).total_seconds() / 3600, 2)
-        except Exception:
-            runtime_hours = round(len(production_log) * 0.25, 2)
-    else:
-        runtime_hours = round(len(production_log) * 0.25, 2)
-
-    # Build chart time series (waste + downtime over time)
+    # Viscosity + chart series filled after form rows and ingested logs are merged (see below).
+    avg_viscosity = 0
+    rsd = 0
+    runtime_hours = 0.0
     waste_downtime_series = []
-    for entry in production_log:
-        waste_downtime_series.append({
-            "time": entry["time"],
-            "waste": entry.get("waste", 0),
-            "downtime": 0,
-            "feed": entry.get("feed", 0),
-            "rpm": entry.get("rpm", 0),
-        })
-
-    # Build scatter data (Feed vs RPM vs Viscosity)
     scatter_data = []
-    for i, entry in enumerate(production_log):
-        visc = viscosity_values[i] if i < len(viscosity_values) else avg_viscosity
-        scatter_data.append({
-            "feed": entry.get("feed", 0),
-            "rpm": entry.get("rpm", 0),
-            "viscosity": visc,
-            "waste": entry.get("waste", 0),
-            "time": entry.get("time", ""),
-        })
 
     # Viscosity over time series
     viscosity_series = []
@@ -520,9 +513,20 @@ async def get_production_dashboard(
 
     # ── ALWAYS merge ingested production_logs data (not just as fallback) ──
     # This allows data uploaded via Log Ingestion to show alongside form submissions.
+    ingested_asset_match = [{"asset_id": {"$regex": "line.?90", "$options": "i"}}]
+    _ingest_exact = sorted(t for t in line90_subtree_asset_tokens if t and len(t) <= 200)
+    if _ingest_exact:
+        ingested_asset_match.append({"asset_id": {"$in": _ingest_exact[:200]}})
     ingested_query = {
-        "asset_id": {"$regex": "line.?90", "$options": "i"},
-        "timestamp": {"$gte": range_start.strftime("%Y-%m-%dT%H:%M:%S"), "$lte": range_end.strftime("%Y-%m-%dT%H:%M:%S")},
+        "$and": [
+            {"$or": ingested_asset_match},
+            {
+                "timestamp": {
+                    "$gte": range_start.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "$lte": range_end.strftime("%Y-%m-%dT%H:%M:%S"),
+                }
+            },
+        ]
     }
     # Deduplicate: prefer entries with mooney_viscosity
     pipeline = [
@@ -624,14 +628,6 @@ async def get_production_dashboard(
                 except (ValueError, TypeError):
                     pass
 
-            # Waste/downtime series
-            waste_downtime_series.append({
-                "time": time_label,
-                "datetime": ts,
-                "waste": 0, "downtime": 0,
-                "feed": feed_val, "rpm": rpm,
-            })
-
             # Magnet cleaning — detect from clean_magnet_status or clean_magnet_time
             magnet_status = str(entry.get("clean_magnet_status") or "").strip().lower()
             magnet_time_val = entry.get("clean_magnet_time")
@@ -671,24 +667,6 @@ async def get_production_dashboard(
         waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 else 0
         yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
 
-        avg_viscosity = round(sum(viscosity_values) / len(viscosity_values), 2) if viscosity_values else 0
-        if len(viscosity_values) > 1 and avg_viscosity > 0:
-            mean_v = sum(viscosity_values) / len(viscosity_values)
-            variance_v = sum((v - mean_v) ** 2 for v in viscosity_values) / (len(viscosity_values) - 1)
-            rsd = round((variance_v ** 0.5 / mean_v) * 100, 2)
-        else:
-            rsd = 0
-
-        if len(production_log) >= 2:
-            try:
-                t1 = datetime.fromisoformat(production_log[0]["datetime"])
-                t2 = datetime.fromisoformat(production_log[-1]["datetime"])
-                runtime_hours = round((t2 - t1).total_seconds() / 3600, 2)
-            except Exception:
-                runtime_hours = 0
-        else:
-            runtime_hours = 0
-
         # Update lot_info
         if big_bag_entries and not lot_info:
             lots = [e.get("lot_no", "") for e in big_bag_entries if e.get("lot_no")]
@@ -698,9 +676,57 @@ async def get_production_dashboard(
             if materials_list:
                 lot_info += f" {materials_list[0]}" if lot_info else materials_list[0]
 
-        # Update viscosity range
-        visc_min = min(viscosity_values) if viscosity_values else 55
-        visc_max = max(viscosity_values) if viscosity_values else 60
+    # Order log by time after merging form + ingested rows; rebuild series for charts/KPIs.
+    def _parse_entry_dt(entry):
+        raw = entry.get("datetime") or ""
+        if not raw:
+            return datetime.min.replace(tzinfo=timezone.utc)
+        try:
+            d = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            return d.replace(tzinfo=timezone.utc) if d.tzinfo is None else d
+        except Exception:
+            return datetime.min.replace(tzinfo=timezone.utc)
+
+    production_log.sort(key=_parse_entry_dt)
+
+    avg_viscosity = round(sum(viscosity_values) / len(viscosity_values), 2) if viscosity_values else 0
+    if len(viscosity_values) > 1 and avg_viscosity > 0:
+        mean_v = sum(viscosity_values) / len(viscosity_values)
+        variance_v = sum((v - mean_v) ** 2 for v in viscosity_values) / (len(viscosity_values) - 1)
+        rsd = round((variance_v ** 0.5 / mean_v) * 100, 2)
+    else:
+        rsd = 0
+
+    waste_downtime_series = []
+    for entry in production_log:
+        waste_downtime_series.append({
+            "time": entry["time"],
+            "waste": entry.get("waste", 0),
+            "downtime": 0,
+            "feed": entry.get("feed", 0),
+            "rpm": entry.get("rpm", 0),
+        })
+
+    scatter_data = []
+    for i, entry in enumerate(production_log):
+        visc = viscosity_values[i] if i < len(viscosity_values) else avg_viscosity
+        scatter_data.append({
+            "feed": entry.get("feed", 0),
+            "rpm": entry.get("rpm", 0),
+            "viscosity": visc,
+            "waste": entry.get("waste", 0),
+            "time": entry.get("time", ""),
+        })
+
+    if len(production_log) >= 2:
+        try:
+            t1 = _parse_entry_dt(production_log[0])
+            t2 = _parse_entry_dt(production_log[-1])
+            runtime_hours = round((t2 - t1).total_seconds() / 3600, 2)
+        except Exception:
+            runtime_hours = round(len(production_log) * 0.25, 2)
+    else:
+        runtime_hours = round(len(production_log) * 0.25, 2) if production_log else 0
 
     # Override Total Input and Total Waste with End of Shift sums when available
     # (This runs AFTER any ingested-data fallback so End of Shift always wins.)
