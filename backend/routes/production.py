@@ -244,7 +244,7 @@ async def get_production_dashboard(
         if target == EXTRUDER_FORM.lower():
             return ("extruder" in tpl) and ("setting" in tpl)
         if target == VISCOSITY_FORM.lower():
-            return ("mooney" in tpl) and ("viscos" in tpl)
+            return ("mooney" in tpl) and (("viscos" in tpl) or ("sample" in tpl))
         if target == BIG_BAG_FORM.lower():
             return ("big" in tpl) and ("bag" in tpl)
         if target == SCREEN_CHANGE_FORM.lower():
@@ -1098,7 +1098,7 @@ async def repair_viscosity_pairing(
 
     # Find Mooney viscosity submissions broadly (including versioned template names)
     visc_subs = await db.form_submissions.find(
-        {"form_template_name": {"$regex": r"mooney.*viscos", "$options": "i"}},
+        {"form_template_name": {"$regex": r"mooney.*(viscos|sample)", "$options": "i"}},
         {"_id": 0},
     ).to_list(2000)
 
@@ -1186,7 +1186,7 @@ async def viscosity_pairing_debug_report(
 
     # --- Form submissions ---
     subs = await db.form_submissions.find(
-        {"form_template_name": {"$regex": r"(extruder.*setting|mooney.*viscos)", "$options": "i"}},
+        {"form_template_name": {"$regex": r"(extruder.*setting|mooney.*(viscos|sample))", "$options": "i"}},
         {"_id": 0},
     ).to_list(5000)
 
@@ -1270,7 +1270,7 @@ async def viscosity_pairing_debug_report(
                 "form_date_time_parsed": _serialize_datetime(form_dt_parsed) if form_dt_parsed else "",
                 "submitted_at": str(s.get("submitted_at") or ""),
             })
-        if ("mooney" in tpl.lower()) and ("viscos" in tpl.lower()):
+        if ("mooney" in tpl.lower()) and (("viscos" in tpl.lower()) or ("sample" in tpl.lower())):
             meas, meas_key = _measurement(s)
             viscosity_forms.append({
                 "source": "form",

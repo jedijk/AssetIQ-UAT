@@ -596,7 +596,7 @@ class FormService:
         try:
             # Be flexible: production templates are often versioned (e.g. "Mooney viscosity v3").
             tpl_name_norm = (template.get("name") or "").strip().lower()
-            if "mooney" in tpl_name_norm and "viscos" in tpl_name_norm:
+            if "mooney" in tpl_name_norm and ("viscos" in tpl_name_norm or "sample" in tpl_name_norm):
                 await self._auto_pair_viscosity_to_extruder(doc)
         except Exception as e:
             logger.warning(f"Viscosity auto-pair failed for submission {doc.get('id')}: {e}")
@@ -1282,7 +1282,7 @@ class FormService:
             {"name": {"$regex": r"extruder\s*settings", "$options": "i"}},
         ).to_list(200)
         visc_tpls = await self.db.form_templates.find(
-            {"name": {"$regex": r"mooney.*viscos", "$options": "i"}},
+            {"name": {"$regex": r"mooney.*(viscos|sample)", "$options": "i"}},
         ).to_list(200)
         
         if not extruder_tpls:
@@ -1377,7 +1377,7 @@ class FormService:
                         {
                             "$or": [
                                 {"form_template_id": {"$in": visc_ids}},
-                                {"form_template_name": {"$regex": r"mooney.*viscos", "$options": "i"}},
+                                {"form_template_name": {"$regex": r"mooney.*(viscos|sample)", "$options": "i"}},
                             ]
                         },
                         {"$or": time_window_or},
