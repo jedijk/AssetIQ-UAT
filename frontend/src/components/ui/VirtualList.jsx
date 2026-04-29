@@ -34,6 +34,11 @@ function isIOSLikeDevice() {
   }
 }
 
+/** Virtuoso depends on ResizeObserver; many older WebViews lack it or mis-report size → blank list / crashes. */
+function hasResizeObserver() {
+  return typeof ResizeObserver !== "undefined";
+}
+
 export function VirtualList({
   data,
   itemContent,
@@ -44,7 +49,8 @@ export function VirtualList({
   disableVirtualization, // optional explicit override
 }) {
   const iOSLike = isIOSLikeDevice();
-  const shouldVirtualize = disableVirtualization === true ? false : !iOSLike;
+  const shouldVirtualize =
+    disableVirtualization === true ? false : !iOSLike && hasResizeObserver();
 
   const fallback = (
     <div className={className}>

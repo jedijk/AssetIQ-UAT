@@ -201,7 +201,7 @@ const ThreatsPage = () => {
   });
 
   // Fetch threats (fetch all, filter client-side for multi-select)
-  const { data: threats = [], isLoading, error: threatsError, isFetching } = useQuery({
+  const { data: threats = [], isLoading, error: threatsError, isFetching, refetch: refetchThreats } = useQuery({
     queryKey: ["threats"],
     queryFn: async () => {
       const result = await threatsAPI.getAll(null);
@@ -221,9 +221,9 @@ const ThreatsPage = () => {
     placeholderData: (previousData) => previousData, // Keep previous data while refetching
   });
 
-  // Prefetch first 10 observation details to prevent 520 errors
+  // Prefetch top observation details (desktop only — mobile radios / older CPUs choke on many parallel GETs)
   useEffect(() => {
-    if (threats && threats.length > 0) {
+    if (!threats?.length || isMobile) return;
       // Sort threats by current sort order and prefetch top 10
       const sortedThreats = [...threats].sort((a, b) => {
         if (sortBy === "rpn") {
@@ -248,8 +248,7 @@ const ThreatsPage = () => {
           });
         }, index * 200);
       });
-    }
-  }, [threats, sortBy, queryClient]);
+  }, [threats, sortBy, queryClient, isMobile]);
   
   // Log error if fetch fails - only show toast once
   const [errorShown, setErrorShown] = useState(false);
@@ -627,6 +626,30 @@ const ThreatsPage = () => {
       {/* Scrollable Content Area */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         <div className="max-w-7xl mx-auto">
+          {threatsError && !isLoading && (
+            <div
+              className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+              role="alert"
+              data-testid="threats-load-error"
+            >
+              <p className="font-medium">Could not load observations</p>
+              <p className="mt-1 text-amber-800/90">
+                Check your connection and try again. If this device is older, wait a few seconds after opening the app.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 border-amber-300 bg-white hover:bg-amber-100"
+                onClick={() => {
+                  setErrorShown(false);
+                  refetchThreats();
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
           {/* Threats List */}
           {isLoading ? (
         <div className="py-6 space-y-3" data-testid="threats-skeleton">

@@ -16,9 +16,11 @@ const MobileObservations = () => {
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: observations = [], isLoading } = useQuery({
+  const { data: observations = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["threats"],
     queryFn: () => threatsAPI.getAll(),
+    retry: 2,
+    staleTime: 60 * 1000,
   });
 
   const filteredObs = observations.filter((obs) => {
@@ -120,6 +122,20 @@ const MobileObservations = () => {
           <div className="loading-state">
             <div className="loading-spinner" />
             <span>Loading observations...</span>
+          </div>
+        ) : isError ? (
+          <div className="empty-state">
+            <Eye size={48} className="empty-icon" />
+            <p>Could not load observations</p>
+            <span>Check your connection and try again.</span>
+            <button
+              type="button"
+              className="retry-btn"
+              onClick={() => refetch()}
+              style={{ marginTop: "12px", padding: "8px 16px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "#fff" }}
+            >
+              Retry
+            </button>
           </div>
         ) : filteredObs.length === 0 ? (
           <div className="empty-state">
