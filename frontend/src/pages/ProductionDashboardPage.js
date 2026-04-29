@@ -1038,11 +1038,11 @@ export default function ProductionDashboardPage() {
   // Render
   // ──────────────────────────────────────────
   return (
-    <div className="bg-transparent space-y-5" data-testid="production-dashboard">
+    <div className="bg-transparent space-y-5 overflow-x-hidden" data-testid="production-dashboard">
       {/* ── Header ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 py-3 bg-white border-b border-slate-200">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
+        <div className={isMobile ? "hidden" : ""}>
           <h1 className="text-xl md:text-2xl font-bold text-slate-900" data-testid="production-title">
             Production Overview
           </h1>
@@ -1763,7 +1763,7 @@ export default function ProductionDashboardPage() {
 
             {/* Mobile Card View */}
             {isMobile ? (
-              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-2">
                 {filteredLog.length > 0 ? (
                   filteredLog.map((entry, i) => {
                     const anomaly = isAnomalyRow(entry);
