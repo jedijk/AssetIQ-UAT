@@ -2006,7 +2006,7 @@ export default function DashboardPage({ initialTab }) {
             <Button 
               onClick={() => {
                 setQuickViewSubmission(null);
-                navigate("/forms?tab=submissions");
+                navigate("/form-submissions");
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4"
             >
