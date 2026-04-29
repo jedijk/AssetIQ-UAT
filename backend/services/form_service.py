@@ -1190,7 +1190,7 @@ class FormService:
             "updated_at": self._serialize_datetime(doc.get("updated_at")),
         }
     
-    async def _auto_pair_viscosity_to_extruder(self, visc_doc: Dict[str, Any]) -> None:
+    async def _auto_pair_viscosity_to_extruder(self, visc_doc: Dict[str, Any], dry_run: bool = False) -> Optional[Dict[str, Any]]:
         """When a Mooney Viscosity sample is submitted, back-date its Date & Time to
         match the latest 'orphan' Extruder sample on the same date that still shows
         TBD (no viscosity paired at that HH:MM). This ensures the two show on the
@@ -1260,7 +1260,7 @@ class FormService:
             logger.info(
                 f"[Viscosity Auto-Pair] skip: cannot extract datetime from visc={str(visc_doc.get('id',''))[:8]}"
             )
-            return
+            return {"status": "skip", "reason": "no_visc_datetime"}
 
         # Date window: same calendar day (local time — use naive date from parsed value)
         day = visc_dt.date()
@@ -1287,7 +1287,7 @@ class FormService:
             logger.info(
                 f"[Viscosity Auto-Pair] skip: no extruder templates found for day={day} visc={str(visc_doc.get('id',''))[:8]}"
             )
-            return
+            return {"status": "skip", "reason": "no_extruder_templates", "day": str(day)}
 
         # Collect all possible template ID formats (UUID 'id' field and ObjectId '_id')
         def _add_template_id_variants(out: list, raw_id: Any):
@@ -1422,7 +1422,7 @@ class FormService:
             logger.info(
                 f"[Viscosity Auto-Pair] no-op: exact-time extruder exists at {visc_hhmm} (not paired); visc={str(visc_doc.get('id',''))[:8]}"
             )
-            return
+            return {"status": "noop", "reason": "exact_time_extruder_exists", "day": str(day), "time": visc_hhmm}
 
         # If there are no extruder form submissions to pair to, fall back to ingested production logs.
         # This happens when the extruder row the user sees comes from `production_logs` ingestion.
@@ -1474,7 +1474,7 @@ class FormService:
             logger.info(
                 f"[Viscosity Auto-Pair] skip: no orphan candidates (extruder+ingested) on day={day}; visc={str(visc_doc.get('id',''))[:8]}"
             )
-            return
+            return {"status": "skip", "reason": "no_candidates", "day": str(day)}
 
         # Primary preference: pair "backwards" to fill earlier extruder slots on the same day.
         # 1) pick the LATEST orphan extruder sample at-or-before the viscosity time
@@ -1538,6 +1538,18 @@ class FormService:
                     patched.append(v)
             new_values = patched
 
+        if dry_run:
+            # Dry-run: don't write, just report what would happen.
+            return {
+                "status": "would_pair",
+                "day": str(day),
+                "from": visc_hhmm,
+                "to": target_hhmm,
+                "paired_to": target_sub.get("id"),
+                "candidates": len(candidates),
+                "paired_times": len(paired_times),
+            }
+
         await self.submissions.update_one(
             {"id": visc_doc["id"]},
             {"$set": {"values": new_values, "auto_paired_to_extruder_id": target_sub.get("id")}}
@@ -1547,6 +1559,7 @@ class FormService:
             f"[Viscosity Auto-Pair] visc={visc_doc.get('id')[:8]} paired→ extruder={target_sub.get('id','')[:8]} "
             f"visc_time={visc_hhmm} → new_time={target_hhmm}"
         )
+        return {"status": "paired", "day": str(day), "from": visc_hhmm, "to": target_hhmm, "paired_to": target_sub.get("id")}
 
     def _serialize_submission(self, doc: Dict) -> Dict[str, Any]:
         """Serialize submission document."""

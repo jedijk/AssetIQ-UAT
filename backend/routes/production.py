@@ -1362,6 +1362,22 @@ async def viscosity_pairing_debug_report(
     else:
         report_payload_clipped = report_payload
 
+    # Add a dry-run pairing probe for each viscosity form submission in the report.
+    pairing_probe = {}
+    try:
+        from services.form_service import FormService
+        svc = FormService(db)
+        for v in viscosity_forms[:20]:
+            vid = v.get("id")
+            if not vid:
+                continue
+            sub = await db.form_submissions.find_one({"id": vid}, {"_id": 0})
+            if not sub:
+                continue
+            pairing_probe[vid] = await svc._auto_pair_viscosity_to_extruder(sub, dry_run=True)
+    except Exception as e:
+        pairing_probe = {"error": str(e)}
+
     return {
         "report_version": 2,
         "generated_at": _serialize_datetime(datetime.now(timezone.utc)),
@@ -1377,6 +1393,7 @@ async def viscosity_pairing_debug_report(
         "extruder_slots": extruder_slots,
         "viscosity_slots": viscosity_slots,
         "report_page_payload": report_payload_clipped,
+        "pairing_probe": pairing_probe,
     }
 
 
