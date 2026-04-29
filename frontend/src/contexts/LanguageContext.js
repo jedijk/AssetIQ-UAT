@@ -175,6 +175,13 @@ const en = {
     liteModeReloading: "Applying performance mode…",
     liteModeError: "Could not update performance preference.",
   },
+
+  // Release / product announcements (toasts)
+  announcements: {
+    liteModeTitle: "Performance update",
+    liteModeBody:
+      "Lite mode is now included: the app adapts automatically on older or low-memory devices for a smoother experience. Owners can turn lite mode on or off under Profile → Edit Profile.",
+  },
   
   // Common
   common: {
@@ -1417,6 +1424,12 @@ const nl = {
       "Eenvoudigere weergave en minder frequente achtergrondupdates in deze browser. Uitschakelen forceert volledige modus op dit apparaat.",
     liteModeReloading: "Prestatie-modus wordt toegepast…",
     liteModeError: "Kan voorkeur voor prestatie-modus niet bijwerken.",
+  },
+
+  announcements: {
+    liteModeTitle: "Prestatie-update",
+    liteModeBody:
+      "Lite-modus is toegevoegd: de app past zich automatisch aan op oudere apparaten of met weinig geheugen voor een vlottere ervaring. Eigenaren kunnen lite-modus aan of uit zetten via Profiel → Profiel bewerken.",
   },
   
   // Common

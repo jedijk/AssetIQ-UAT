@@ -19,6 +19,7 @@ import { debugLog } from "./lib/debug";
 import "./App.css";
 import { AppShell } from "./components/AppShell";
 import { CapabilitiesProvider, useCapabilities } from "./core/performance";
+import { ProductionReleaseToast } from "./components/ProductionReleaseToast";
 
 // iOS Safari can feel slower with too many small lazy chunks (waterfall + parse overhead).
 // Keep core routes eagerly loaded; lazy-load heavier/rare routes.
@@ -356,6 +357,7 @@ function App() {
                 <UndoProvider>
                   <BrowserRouter>
                     <AuthExpiredListener />
+                    <ProductionReleaseToast />
                     <Toaster 
                       position="top-center" 
                       richColors 
