@@ -105,21 +105,21 @@ const MachineAnalysisPanel = lazy(() =>
 // KPI Card
 // ──────────────────────────────────────────
 const KPICard = ({ icon: Icon, iconColor, label, value, unit, detail, detail2, trend, trendDirection }) => (
-  <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-1.5 min-w-0" data-testid={`kpi-${label.toLowerCase().replace(/\s+/g, '-')}`}>
-    <div className="flex items-center gap-2 mb-1">
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconColor || 'bg-slate-100'}`}>
-        <Icon className="w-4 h-4" />
+  <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 flex flex-col gap-1 sm:gap-1.5 min-w-0" data-testid={`kpi-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+    <div className="flex items-center gap-2 mb-0.5 sm:mb-1">
+      <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center ${iconColor || 'bg-slate-100'}`}>
+        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
       </div>
-      <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</span>
+      <span className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide leading-tight">{label}</span>
     </div>
-    <div className="flex items-baseline gap-1.5">
-      <span className="text-2xl font-bold text-slate-900 tabular-nums">{value}</span>
-      {unit && <span className="text-sm text-slate-500">{unit}</span>}
+    <div className="flex items-baseline gap-1">
+      <span className="text-lg sm:text-2xl font-bold text-slate-900 tabular-nums leading-none">{value}</span>
+      {unit && <span className="text-xs sm:text-sm text-slate-500">{unit}</span>}
     </div>
-    {detail && <p className="text-xs text-slate-500 truncate">{detail}</p>}
-    {detail2 && <p className="text-xs text-slate-400 truncate">{detail2}</p>}
+    {detail && <p className="text-[10px] sm:text-xs text-slate-500 truncate">{detail}</p>}
+    {detail2 && <p className="text-[10px] sm:text-xs text-slate-400 truncate">{detail2}</p>}
     {trend !== undefined && (
-      <span className={`text-xs font-medium ${trendDirection === 'up' ? 'text-emerald-600' : trendDirection === 'down' ? 'text-red-500' : 'text-slate-500'}`}>
+      <span className={`text-[10px] sm:text-xs font-medium ${trendDirection === 'up' ? 'text-emerald-600' : trendDirection === 'down' ? 'text-red-500' : 'text-slate-500'}`}>
         {trendDirection === 'up' ? '+' : ''}{trend}
       </span>
     )}
@@ -1040,7 +1040,7 @@ export default function ProductionDashboardPage() {
   return (
     <div className="bg-transparent space-y-5 overflow-x-hidden" data-testid="production-dashboard">
       {/* ── Header ── */}
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white border-b border-slate-200">
+      <div className="sticky top-0 z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white border-b border-slate-200 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className={isMobile ? "hidden" : ""}>
           <h1 className="text-xl md:text-2xl font-bold text-slate-900" data-testid="production-title">
@@ -1235,7 +1235,7 @@ export default function ProductionDashboardPage() {
       {!isLoading && (
         <>
           {/* ── KPI Cards ── */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" data-testid="kpi-grid">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3" data-testid="kpi-grid">
             <KPICard
               icon={Package}
               iconColor="bg-blue-50 text-blue-600"
