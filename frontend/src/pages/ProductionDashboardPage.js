@@ -1040,7 +1040,7 @@ export default function ProductionDashboardPage() {
   return (
     <div className="bg-transparent space-y-5 overflow-x-hidden" data-testid="production-dashboard">
       {/* ── Header ── */}
-      <div className="sticky top-0 z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white border-b border-slate-200 shadow-sm">
+      <div className="sticky top-0 z-[60] -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className={isMobile ? "hidden" : ""}>
           <h1 className="text-xl md:text-2xl font-bold text-slate-900" data-testid="production-title">
