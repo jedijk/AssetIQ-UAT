@@ -506,6 +506,13 @@ export default function ProductionDashboardPage() {
     capabilities: caps,
   });
 
+  const handleManualRefresh = () => {
+    queryClient.invalidateQueries({
+      queryKey: productionKeys.dashboard(period, fromStr, toStr, shift),
+      exact: true,
+    });
+  };
+
   const runPairingRepair = async () => {
     try {
       if (period !== "1d") {
@@ -1131,7 +1138,13 @@ export default function ProductionDashboardPage() {
             </Select>
 
             {/* Refresh */}
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => refetch()} data-testid="refresh-btn">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleManualRefresh}
+              data-testid="refresh-btn"
+            >
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
 

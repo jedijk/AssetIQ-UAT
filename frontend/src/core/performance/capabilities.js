@@ -66,7 +66,8 @@ export function buildCapabilities(backend = {}) {
   const maxListItems = mode === "lite" ? 20 : 100;
 
   const pollingIntervalMs = realtimeUpdates ? 15_000 : 45_000;
-  const dashboardPollingMs = realtimeUpdates ? 60_000 : 120_000;
+  /** Hint for layout/notifications; manufacturing dashboard hook uses its own fixed interval. */
+  const dashboardPollingMs = realtimeUpdates ? 60_000 : 90_000;
 
   return {
     mode,

@@ -8,7 +8,14 @@ export const productionAPI = {
     if (params.from_date) qs.append("from_date", params.from_date);
     if (params.to_date) qs.append("to_date", params.to_date);
     if (params.shift) qs.append("shift", params.shift);
-    const response = await api.get(`/production/dashboard?${qs.toString()}`);
+    // Bypass browser/CDN/proxy caching for live KPI data — same URL otherwise may return stale JSON.
+    qs.append("_cb", String(Date.now()));
+    const response = await api.get(`/production/dashboard?${qs.toString()}`, {
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    });
     return response.data;
   },
   getEvents: async (date, eventType) => {
