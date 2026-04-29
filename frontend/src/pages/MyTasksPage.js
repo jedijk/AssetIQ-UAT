@@ -109,7 +109,7 @@ import { imageAnalysisAPI } from "../lib/api";
 import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
 import { DISCIPLINES } from "../constants/disciplines";
 import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame";
-import TaskCard, { priorityColors, taskTypeIcons, SortableTaskCard } from "../components/task-execution/TaskCard";
+import TaskCard, { SortableTaskCard } from "../components/task-execution/TaskCard";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AppErrorBoundary } from "../components/AppErrorBoundary";
@@ -129,41 +129,40 @@ const sourceBadges = {
   recurring: { label: "Recurring", color: "bg-emerald-100 text-emerald-700" },
 };
 
-// Sortable Ad-hoc Plan Card Component
-const SortableAdhocPlanCard = ({ plan, tasksData, setSelectedTask, setViewMode, executeAdhocMutation }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: plan.id });
+/** Normalize API priority strings ("High" vs "high") for stable sort — avoids NaN comparators on older WebViews. */
+function taskPriorityRank(p) {
+  const key = String(p ?? "").toLowerCase();
+  const order = { critical: 0, high: 1, medium: 2, low: 3 };
+  return Object.prototype.hasOwnProperty.call(order, key) ? order[key] : 99;
+}
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 50 : undefined,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} {...attributes}>
-      <div
-        className={cn(
-          "bg-white rounded-lg border border-amber-200 p-4 hover:shadow-md transition-all",
-          isDragging && "shadow-lg ring-2 ring-amber-400 opacity-90"
-        )}
-        data-testid={`adhoc-plan-${plan.id}`}
-      >
+/** Shared ad-hoc plan body — drag handle omitted when `dragListeners` is null (mobile / no DnD). */
+const AdhocPlanCardContent = ({
+  plan,
+  tasksData,
+  setSelectedTask,
+  setViewMode,
+  executeAdhocMutation,
+  dragListeners,
+  isDragging,
+}) => (
+  <div
+    className={cn(
+      "bg-white rounded-lg border border-amber-200 p-4 hover:shadow-md transition-all",
+      isDragging && "shadow-lg ring-2 ring-amber-400 opacity-90"
+    )}
+    data-testid={`adhoc-plan-${plan.id}`}
+  >
         <div className="flex items-start justify-between gap-3">
-          {/* Drag Handle */}
-          <div 
-            {...listeners}
+          {dragListeners ? (
+          <div
+            {...dragListeners}
             className="flex-shrink-0 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 -ml-1 mr-1 mt-1 touch-none"
             onClick={(e) => e.stopPropagation()}
           >
             <GripVertical className="w-5 h-5" />
           </div>
+          ) : null}
           
           <div className="flex-1 min-w-0">
             {/* Title */}
@@ -248,7 +247,36 @@ const SortableAdhocPlanCard = ({ plan, tasksData, setSelectedTask, setViewMode, 
             )}
           </div>
         </div>
-      </div>
+  </div>
+);
+
+const SortableAdhocPlanCard = ({ plan, tasksData, setSelectedTask, setViewMode, executeAdhocMutation }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: plan.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <AdhocPlanCardContent
+        plan={plan}
+        tasksData={tasksData}
+        setSelectedTask={setSelectedTask}
+        setViewMode={setViewMode}
+        executeAdhocMutation={executeAdhocMutation}
+        dragListeners={listeners}
+        isDragging={isDragging}
+      />
     </div>
   );
 };
@@ -265,6 +293,16 @@ const MyTasksPage = () => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [viewMode, setViewMode] = useState("list"); // "list" or "execution"
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
+
+  const isMobileView = useIsMobile();
+  const uaTouch =
+    typeof navigator !== "undefined" &&
+    /android|iphone|ipad|ipod|webos|iemobile|opera mini/i.test(
+      (navigator.userAgent || "").toLowerCase()
+    );
+  /** @dnd-kit + Virtuoso-like deps often fault on older mobile WebViews — render plain lists instead. */
+  const canUseDnD =
+    typeof ResizeObserver !== "undefined" && !isMobileView && !uaTouch;
   
   // User-scoped localStorage keys for manual sorting
   const sortKey = user?.id ? `myTasks_manualSort_${user.id}` : "myTasks_manualSort";
@@ -731,11 +769,9 @@ const MyTasksPage = () => {
     if (aOverdue && !bOverdue) return -1;
     if (!aOverdue && bOverdue) return 1;
     
-    // Then by priority
-    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-    if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
-      return priorityOrder[a.priority] - priorityOrder[b.priority];
-    }
+    // Then by priority (API may send "High" / "Medium" — normalize)
+    const pr = taskPriorityRank(a.priority) - taskPriorityRank(b.priority);
+    if (pr !== 0) return pr;
     
     // Then by due date
     if (a.due_date && b.due_date) {
@@ -1098,11 +1134,11 @@ const MyTasksPage = () => {
               <Zap className="w-12 h-12 mx-auto text-amber-400 mb-3" />
               <h3 className="text-lg font-medium text-slate-900 mb-1">No ad-hoc plans available</h3>
               <p className="text-slate-500 mb-4">Create ad-hoc task plans in the Task Planner</p>
-              <Button variant="outline" onClick={() => setActiveFilter("today")}>
+              <Button variant="outline" onClick={() => setActiveFilter("open")}>
                 View scheduled tasks
               </Button>
             </div>
-          ) : (
+          ) : canUseDnD ? (
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -1125,6 +1161,21 @@ const MyTasksPage = () => {
                 ))}
               </SortableContext>
             </DndContext>
+          ) : (
+            <div className="space-y-3">
+              {sortedAdhocPlans.map((plan) => (
+                <AdhocPlanCardContent
+                  key={plan.id}
+                  plan={plan}
+                  tasksData={tasksData}
+                  setSelectedTask={setSelectedTask}
+                  setViewMode={setViewMode}
+                  executeAdhocMutation={executeAdhocMutation}
+                  dragListeners={null}
+                  isDragging={false}
+                />
+              ))}
+            </div>
           )
         ) : (
           // Regular Tasks View
@@ -1134,9 +1185,13 @@ const MyTasksPage = () => {
               <p className="text-slate-500">Loading tasks...</p>
             </div>
           ) : tasksError ? (
-            <div className="text-center py-12">
+            <div className="text-center py-12 px-4">
               <AlertCircle className="w-8 h-8 mx-auto text-red-400 mb-2" />
-              <p className="text-red-600">Failed to load tasks</p>
+              <p className="text-red-600 font-medium">Failed to load tasks</p>
+              <p className="text-sm text-slate-500 mt-2 mb-4">Check your connection and try again.</p>
+              <Button variant="outline" type="button" onClick={() => refetchTasks()}>
+                Retry
+              </Button>
             </div>
           ) : sortedTasks.length === 0 ? (
             <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-200">
@@ -1147,7 +1202,7 @@ const MyTasksPage = () => {
                 View open tasks
               </Button>
             </div>
-          ) : (
+          ) : canUseDnD ? (
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -1169,6 +1224,18 @@ const MyTasksPage = () => {
                 ))}
               </SortableContext>
             </DndContext>
+          ) : (
+            <div className="space-y-3">
+              {sortedTasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onOpen={handleOpenTask}
+                  onQuickComplete={handleQuickComplete}
+                  onDelete={handleDeleteTask}
+                />
+              ))}
+            </div>
           )
         )}
       </div>
@@ -1256,7 +1323,7 @@ const MyTasksPage = () => {
                 const sourceId = closureSuggestion?.source_id;
                 setClosureSuggestion(null);
                 if (sourceType === 'threat') {
-                  navigate(`/observations/${sourceId}`);
+                  navigate(`/threats/${sourceId}`);
                 } else if (sourceType === 'investigation') {
                   navigate(`/causal-engine?investigation=${sourceId}`);
                 }

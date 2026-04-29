@@ -30,6 +30,11 @@ const priorityColors = {
   low: "bg-green-100 text-green-800 border-green-300",
 };
 
+function priorityClassForBadge(priority) {
+  const k = String(priority ?? "").toLowerCase();
+  return priorityColors[k] || priorityColors.medium;
+}
+
 // Task type icon mapping
 const taskTypeIcons = {
   inspection: ClipboardList,
@@ -126,8 +131,8 @@ const TaskCard = ({ task, onOpen, onQuickComplete, onDelete, isDragging, dragHan
               variant="outline" 
               className={cn(
                 "text-xs", 
-                priorityColors[task.priority],
-                task.priority === "medium" && "hidden sm:flex"
+                priorityClassForBadge(task.priority),
+                String(task.priority ?? "").toLowerCase() === "medium" && "hidden sm:flex"
               )}
             >
               {task.priority}
