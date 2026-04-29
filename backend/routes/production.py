@@ -9,6 +9,7 @@ import logging
 import re
 import uuid
 
+from bson import ObjectId
 from database import db
 from auth import get_current_user
 
@@ -99,6 +100,39 @@ def parse_submitted_at(sub):
     return None
 
 
+def _parse_sample_datetime(val):
+    """Parse operator-entered sample time from form values (ISO, EU day-first, etc.)."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    try:
+        d = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        d = None
+    if d is None:
+        for fmt in (
+            "%d/%m/%Y %H:%M",
+            "%d-%m-%Y %H:%M",
+            "%d.%m.%Y %H:%M",
+            "%d/%m/%Y %H:%M:%S",
+            "%d-%m-%Y %H:%M:%S",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+        ):
+            try:
+                d = datetime.strptime(s[:25].strip(), fmt)
+                break
+            except (ValueError, TypeError):
+                continue
+    if d is None:
+        return None
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d
+
+
 @router.get("/production/dashboard")
 async def get_production_dashboard(
     date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format (single day, used if from_date not set)"),
@@ -149,9 +183,15 @@ async def get_production_dashboard(
 
     shift_config = SHIFTS.get(shift, SHIFTS["day"])
 
-    # Find Line-90 equipment ID and all ancestor/descendant IDs
+    # Find Line-90 equipment ID and all ancestor/descendant IDs (name OR tag — many sites tag the line, name the EXU)
+    _line90_pat = {"$regex": r"line\s*[-–]?\s*90", "$options": "i"}
     line90 = await db.equipment_nodes.find_one(
-        {"name": {"$regex": "Line.?90", "$options": "i"}}, {"_id": 0, "id": 1, "parent_id": 1}
+        {"$or": [
+            {"name": _line90_pat},
+            {"tag": _line90_pat},
+            {"tag_number": _line90_pat},
+        ]},
+        {"_id": 0, "id": 1, "parent_id": 1},
     )
     equipment_ids = []
     if line90:
@@ -215,6 +255,12 @@ async def get_production_dashboard(
         alt = "|".join(re.escape(t) for t in subtree_toks[:48])
         if alt:
             equipment_match.append({"equipment_name": {"$regex": alt, "$options": "i"}})
+    # Common shop-floor names when hierarchy is flat or equipment is not under Line-90 in DB
+    equipment_match.extend([
+        {"equipment_name": {"$regex": r"(?i)extrusion\s*unit"}},
+        {"equipment_name": {"$regex": r"(?i)\bexu\b"}},
+        {"equipment_name": {"$regex": r"(?i)1u[- ]?[0-9]"}},
+    ])
 
     # Query filter for template names: must match match_template() intent. Exact ^(…)$
     # omitted versioned / localized template titles, so the dashboard showed no rows.
@@ -276,17 +322,80 @@ async def get_production_dashboard(
         ]
     }
 
-    query = {
-        "$or": [
-            {
-                "$and": [
-                    flex_production_template,
-                    {"$or": equipment_match},
-                ]
-            },
-            forms_without_equipment,
-        ]
-    }
+    extruder_tpl_ids_str = set()
+    viscosity_tpl_ids_str = set()
+    big_bag_tpl_ids_str = set()
+    screen_tpl_ids_str = set()
+    magnet_tpl_ids_str = set()
+    eos_tpl_ids_str = set()
+
+    prod_tpl_id_values = []
+    try:
+        tpl_rows = await db.form_templates.find(
+            {"$or": flex_production_template["$or"]},
+            {"_id": 1, "id": 1, "name": 1},
+        ).to_list(400)
+        seen = set()
+        for t in tpl_rows:
+            nm = (t.get("name") or "").strip().lower()
+            id_strs = []
+            for key in ("_id", "id"):
+                v = t.get(key)
+                if v is None:
+                    continue
+                if isinstance(v, ObjectId):
+                    s = str(v)
+                    id_strs.append(s)
+                    if s not in seen:
+                        seen.add(s)
+                        prod_tpl_id_values.append(v)
+                else:
+                    s = str(v)
+                    id_strs.append(s)
+                    if s in seen:
+                        continue
+                    seen.add(s)
+                    prod_tpl_id_values.append(s)
+                    if len(s) == 24:
+                        try:
+                            o = ObjectId(s)
+                            prod_tpl_id_values.append(o)
+                        except Exception:
+                            pass
+            for sid in id_strs:
+                if ("extruder" in nm) and ("setting" in nm):
+                    extruder_tpl_ids_str.add(sid)
+                if ("mooney" in nm) and (("viscos" in nm) or ("sample" in nm)):
+                    viscosity_tpl_ids_str.add(sid)
+                if ("big" in nm) and ("bag" in nm):
+                    big_bag_tpl_ids_str.add(sid)
+                if ("screen" in nm) and ("change" in nm):
+                    screen_tpl_ids_str.add(sid)
+                if ("magnet" in nm) and ("clean" in nm):
+                    magnet_tpl_ids_str.add(sid)
+                if ("end" in nm) and ("shift" in nm):
+                    eos_tpl_ids_str.add(sid)
+    except Exception as e:
+        logger.warning("production dashboard: form_templates lookup failed: %s", e)
+
+    query_or = [
+        {
+            "$and": [
+                flex_production_template,
+                {"$or": equipment_match},
+            ]
+        },
+        forms_without_equipment,
+    ]
+    if prod_tpl_id_values:
+        query_or.append({
+            "$and": [
+                {"form_template_id": {"$in": prod_tpl_id_values}},
+                {"$or": equipment_match},
+            ]
+        })
+
+    query = {"$or": query_or}
 
     # Pre-filter by submitted/created time around the visible range. A plain
     # find().limit(1000) without sort or time scope can omit the newest rows when
@@ -321,38 +430,64 @@ async def get_production_dashboard(
 
     all_subs = await db.form_submissions.find(submissions_query, {"_id": 0}).to_list(8000)
 
-    # Filter by date range
+    # Filter by date range: include if submission time OR sample "Date & Time" falls in shift window.
+    # (Using only the form field can drop rows when it parses wrong or defaults outside the window.)
     submissions = []
     for sub in all_subs:
-        dt = parse_submitted_at(sub)
-        if dt is None:
+        dt_meta = parse_submitted_at(sub)
+        if dt_meta is None:
             continue
-        # Also check the Date & Time field inside values
+        if dt_meta.tzinfo is None:
+            dt_meta = dt_meta.replace(tzinfo=timezone.utc)
+
         date_time_val = extract_field(sub, "Date & Time")
-        if date_time_val:
-            try:
-                dt = datetime.fromisoformat(str(date_time_val).replace("Z", "+00:00"))
-            except Exception:
-                pass
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        if range_start <= dt <= range_end:
-            sub["_parsed_time"] = dt
-            submissions.append(sub)
+        dt_form = _parse_sample_datetime(date_time_val) if date_time_val else None
+
+        in_meta = range_start <= dt_meta <= range_end
+        in_form = dt_form is not None and range_start <= dt_form <= range_end
+        if not in_meta and not in_form:
+            continue
+
+        sub["_parsed_time"] = dt_form if in_form else dt_meta
+        submissions.append(sub)
 
     # Separate by form type.
     #
     # Production templates are often versioned / suffixed (e.g. "Extruder Settings v16"),
     # so we match by intent rather than exact equality, while keeping the historical
     # exact-name behavior as a fast path.
+    def _tid_str(sub):
+        tid = sub.get("form_template_id")
+        if tid is None:
+            return None
+        if isinstance(tid, ObjectId):
+            return str(tid)
+        s = str(tid).strip()
+        return s or None
+
     def match_template(sub, name: str):
-        tpl = (sub.get("form_template_name") or "").strip().lower()
         target = (name or "").strip().lower()
-        if not tpl or not target:
+        if not target:
+            return False
+        ts = _tid_str(sub)
+        if ts:
+            if target == EXTRUDER_FORM.lower() and ts in extruder_tpl_ids_str:
+                return True
+            if target == VISCOSITY_FORM.lower() and ts in viscosity_tpl_ids_str:
+                return True
+            if target == BIG_BAG_FORM.lower() and ts in big_bag_tpl_ids_str:
+                return True
+            if target == SCREEN_CHANGE_FORM.lower() and ts in screen_tpl_ids_str:
+                return True
+            if target == MAGNET_CLEANING_FORM.lower() and ts in magnet_tpl_ids_str:
+                return True
+            if target == END_OF_SHIFT_FORM.lower() and ts in eos_tpl_ids_str:
+                return True
+        tpl = (sub.get("form_template_name") or "").strip().lower()
+        if not tpl:
             return False
         if tpl == target:
             return True
-        # Flexible matching for known production forms
         if target == EXTRUDER_FORM.lower():
             return ("extruder" in tpl) and ("setting" in tpl)
         if target == VISCOSITY_FORM.lower():
@@ -566,6 +701,13 @@ async def get_production_dashboard(
     _ingest_exact = sorted(t for t in line90_subtree_asset_tokens if t and len(t) <= 200)
     if _ingest_exact:
         ingested_asset_match.append({"asset_id": {"$in": _ingest_exact[:200]}})
+    # Ingestion stores missing mapping as "unknown" or leaves field empty
+    ingested_asset_match.extend([
+        {"asset_id": "unknown"},
+        {"asset_id": None},
+        {"asset_id": ""},
+        {"asset_id": {"$exists": False}},
+    ])
     # String range on timestamp misses some stored shapes (e.g. space instead of T). Use calendar-day
     # regex fallbacks, then tighten to shift window when appending rows below.
     _ingest_dates = []
@@ -812,6 +954,17 @@ async def get_production_dashboard(
     visc_range_str = "55-60"
     if viscosity_values:
         visc_range_str = f"{min(viscosity_values):.1f}-{max(viscosity_values):.1f}"
+
+    if not production_log:
+        logger.warning(
+            "Production dashboard: empty production_log (all_subs=%s submissions=%s extruder=%s ingested=%s range=%s–%s)",
+            len(all_subs),
+            len(submissions),
+            len(extruder_subs),
+            len(ingested),
+            range_start.isoformat(),
+            range_end.isoformat(),
+        )
 
     return {
         "date": target_date.strftime("%Y-%m-%d"),
