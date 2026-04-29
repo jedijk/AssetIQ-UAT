@@ -169,6 +169,11 @@ const en = {
     editPhoto: "Edit Photo",
     uploading: "Uploading...",
     photoUpdated: "Photo updated successfully",
+    liteMode: "Lite performance mode",
+    liteModeHelp:
+      "Uses simpler visuals and less frequent background updates on this browser. Turning off forces full mode on this device.",
+    liteModeReloading: "Applying performance mode…",
+    liteModeError: "Could not update performance preference.",
   },
   
   // Common
@@ -1407,6 +1412,11 @@ const nl = {
     editPhoto: "Foto Bewerken",
     uploading: "Uploaden...",
     photoUpdated: "Foto succesvol bijgewerkt",
+    liteMode: "Lichte prestatie-modus",
+    liteModeHelp:
+      "Eenvoudigere weergave en minder frequente achtergrondupdates in deze browser. Uitschakelen forceert volledige modus op dit apparaat.",
+    liteModeReloading: "Prestatie-modus wordt toegepast…",
+    liteModeError: "Kan voorkeur voor prestatie-modus niet bijwerken.",
   },
   
   // Common

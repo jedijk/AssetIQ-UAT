@@ -7,13 +7,13 @@ import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database, ScrollText } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database, ScrollText, Gauge } from "lucide-react";
 import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { pageTransition, pageVariants, springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.4";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.5";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -40,6 +40,7 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
+import { Switch } from "./ui/switch";
 import { toast } from "sonner";
 import ChatSidebar from "./ChatSidebar";
 import ImageEditor from "./ImageEditor";
@@ -75,6 +76,7 @@ const Layout = () => {
   
   // Profile edit dialog state
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [profileLiteModeForced, setProfileLiteModeForced] = useState(false);
   const [profileForm, setProfileForm] = useState({
     name: "",
     position: "",
@@ -281,6 +283,15 @@ const Layout = () => {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!profileDialogOpen || user?.role !== "owner") return;
+    try {
+      setProfileLiteModeForced(localStorage.getItem("forceLiteMode") === "true");
+    } catch (_e) {
+      setProfileLiteModeForced(false);
+    }
+  }, [profileDialogOpen, user?.role]);
+
   // Open profile dialog and populate form
   const openProfileDialog = useCallback(() => {
     setProfileForm({
@@ -291,6 +302,26 @@ const Layout = () => {
     });
     setProfileDialogOpen(true);
   }, [user]);
+
+  const handleProfileLiteModeChange = useCallback(
+    (checked) => {
+      try {
+        if (checked) {
+          localStorage.setItem("forceLiteMode", "true");
+          localStorage.removeItem("forceFullMode");
+        } else {
+          localStorage.removeItem("forceLiteMode");
+          localStorage.setItem("forceFullMode", "true");
+        }
+        setProfileLiteModeForced(checked);
+        toast.success(t("profile.liteModeReloading") || "Applying performance mode…");
+        window.setTimeout(() => window.location.reload(), 120);
+      } catch (_e) {
+        toast.error(t("profile.liteModeError") || "Could not update performance preference.");
+      }
+    },
+    [t]
+  );
 
   // Save profile changes
   const handleSaveProfile = async () => {
@@ -1519,6 +1550,30 @@ const Layout = () => {
                 />
               </div>
             </div>
+
+            {user?.role === "owner" && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50/90 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1 min-w-0 pr-2">
+                    <Label htmlFor="profile-lite-mode" className="flex items-center gap-2 text-slate-900 cursor-pointer">
+                      <Gauge className="w-4 h-4 text-slate-500 shrink-0" aria-hidden />
+                      {t("profile.liteMode") || "Lite performance mode"}
+                    </Label>
+                    <p id="profile-lite-mode-desc" className="text-xs text-slate-500 leading-snug">
+                      {t("profile.liteModeHelp") ||
+                        "Applies on this browser only. Turning off forces full mode on this device."}
+                    </p>
+                  </div>
+                  <Switch
+                    id="profile-lite-mode"
+                    checked={profileLiteModeForced}
+                    onCheckedChange={handleProfileLiteModeChange}
+                    aria-describedby="profile-lite-mode-desc"
+                    data-testid="profile-lite-mode-switch"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
