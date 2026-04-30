@@ -869,7 +869,8 @@ export default function DashboardPage({ initialTab }) {
         
         {/* Dashboard Tab Buttons - Mobile Optimized */}
         <div className="flex items-center justify-between gap-4">
-          <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1">
+          <div className="max-w-full overflow-x-auto">
+            <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1 min-w-max">
             <button 
               onClick={() => setActiveTab("operational")}
               className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
@@ -921,6 +922,7 @@ export default function DashboardPage({ initialTab }) {
                 <span className="xs:hidden">Build</span>
               </button>
             )}
+          </div>
           </div>
           
           {/* Filter Button - Next to tabs, only on operational */}

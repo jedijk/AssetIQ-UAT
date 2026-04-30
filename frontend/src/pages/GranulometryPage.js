@@ -201,6 +201,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
     const sieveSizesSet = new Set();
     const bagKeys = [];
     const bagLabelByKey = new Map();
+    const bagDateByKey = new Map();
     const tableValuesPct = new Map(); // `${bagKey}::${size}` -> percentPassing
     const tableValuesWeight = new Map(); // `${bagKey}::${size}` -> weight retained
     const totalsByBag = new Map(); // bagKey -> total weight
@@ -213,6 +214,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
       const bagKey = `bag_${String(r.id || idx)}`;
       bagKeys.push(bagKey);
       bagLabelByKey.set(bagKey, label);
+      bagDateByKey.set(bagKey, dmy);
       recordByBagKey.set(bagKey, r);
 
       let totalW = 0;
@@ -264,6 +266,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
       sieveSizes,
       bagKeys,
       bagLabelByKey,
+      bagDateByKey,
       chartData,
       tableValuesPct,
       tableValuesWeight,
@@ -364,7 +367,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
               </div>
 
               {/* Chart */}
-              <div className="h-[360px] rounded-xl border border-slate-200 bg-white">
+              <div className="h-[280px] sm:h-[360px] rounded-xl border border-slate-200 bg-white">
                 {recordsQuery.isLoading ? (
                   <div className="p-4">
                     <Skeleton className="h-6 w-48 mb-3" />
@@ -373,12 +376,20 @@ export default function GranulometryPage({ embedded = false } = {}) {
                 ) : derived.chartData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-sm text-slate-500">No records to display.</div>
                 ) : (
-                  <div className="bg-white border border-slate-200 rounded-xl p-4 h-[360px]">
+                  <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 h-[280px] sm:h-[360px]">
                     <div className="text-xs text-slate-500 flex items-center gap-2 mb-2">
                       <BarChart3 className="w-4 h-4" /> Curve preview
                     </div>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={derived.chartData} margin={{ top: 28, right: 12, bottom: 34, left: 52 }}>
+                      <LineChart
+                        data={derived.chartData}
+                        margin={{
+                          top: 24,
+                          right: 10,
+                          bottom: 30,
+                          left: 48,
+                        }}
+                      >
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                         <XAxis
                           dataKey="sieveSize"
@@ -471,14 +482,29 @@ export default function GranulometryPage({ embedded = false } = {}) {
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
                           <tr>
-                            <th className="text-left px-3 py-2 text-xs font-semibold text-slate-700">Sieve (mm)</th>
+                            <th
+                              className="text-left px-3 py-2 text-xs font-semibold text-slate-700 align-bottom"
+                              rowSpan={2}
+                            >
+                              Sieve (mm)
+                            </th>
                             {derived.bagKeys.slice(0, 12).map((b) => (
                               <th key={b} className="text-right px-3 py-2 text-xs font-semibold text-slate-700 whitespace-nowrap">
-                                {derived.bagLabelByKey?.get(b) || b}
+                                {(derived.bagLabelByKey?.get(b) || b).replace(/\s*\([^)]+\)\s*$/, "")}
                               </th>
                             ))}
                             {derived.bagKeys.length > 12 && (
                               <th className="text-right px-3 py-2 text-xs font-semibold text-slate-400">…</th>
+                            )}
+                          </tr>
+                          <tr className="border-t border-slate-200">
+                            {derived.bagKeys.slice(0, 12).map((b) => (
+                              <th key={`${b}-date`} className="text-right px-3 py-1.5 text-[11px] font-medium text-slate-500 whitespace-nowrap">
+                                {derived.bagDateByKey?.get(b) || ""}
+                              </th>
+                            ))}
+                            {derived.bagKeys.length > 12 && (
+                              <th className="text-right px-3 py-1.5 text-[11px] font-medium text-slate-400"> </th>
                             )}
                           </tr>
                         </thead>
