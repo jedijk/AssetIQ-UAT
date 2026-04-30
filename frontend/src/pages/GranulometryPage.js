@@ -36,6 +36,22 @@ function ReportChartTooltip({ active, payload, label }) {
   );
 }
 
+function CompactLegend({ payload }) {
+  if (!payload?.length) return null;
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-slate-600 leading-tight px-1">
+      {payload.map((e) => (
+        <div key={e.dataKey} className="flex items-center gap-1.5 max-w-[220px]">
+          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: e.color }} />
+          <span className="truncate" title={e.value}>
+            {e.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function normalizeSieveRows(rows) {
   const cleaned = (rows || [])
     .map((r) => ({
@@ -364,7 +380,7 @@ export default function GranulometryPage() {
                         <XAxis
                           dataKey="sieveSize"
                           tick={{ fontSize: 11 }}
-                          tickFormatter={(v) => `${v} mm`}
+                          tickFormatter={(v) => `${v}`}
                           label={{
                             value: "Sieve (mm)",
                             position: "insideBottom",
@@ -384,7 +400,7 @@ export default function GranulometryPage() {
                           }}
                         />
                         <Tooltip content={<ReportChartTooltip />} />
-                        <Legend />
+                        <Legend content={<CompactLegend />} />
                         {showIndividual &&
                           derived.bagKeys.slice(0, 12).map((b, i) => (
                             <Line
@@ -462,12 +478,11 @@ export default function GranulometryPage() {
                             // Compute per-size mean/sd for conditional colors
                             const vals = derived.bagKeys
                               .map((b) => {
-                                const w = derived.tableValuesWeight.get(`${b}::${s}`);
-                                const t = derived.totalsByBag.get(b);
                                 if (tableMode === "percent") {
-                                  if (!Number.isFinite(w) || !Number.isFinite(t) || t <= 0) return NaN;
-                                  return (w / t) * 100;
+                                  const pct = derived.tableValuesPct.get(`${b}::${s}`);
+                                  return Number.isFinite(pct) ? pct : NaN;
                                 }
+                                const w = derived.tableValuesWeight.get(`${b}::${s}`);
                                 return w;
                               })
                               .filter((v) => Number.isFinite(v));
@@ -489,23 +504,19 @@ export default function GranulometryPage() {
                             return (
                               <tr key={s} className="border-b border-slate-100 last:border-b-0">
                                 <td className="px-3 py-2 text-slate-700 font-medium">
-                                  {s === 0 ? "PAN (0 mm)" : `${s} mm`}
+                                  {s === 0 ? "PAN (0)" : `${s}`}
                                 </td>
                                 {derived.bagKeys.slice(0, 12).map((b) => {
-                                  const w = derived.tableValuesWeight.get(`${b}::${s}`);
-                                  const t = derived.totalsByBag.get(b);
                                   const v =
                                     tableMode === "percent"
-                                      ? Number.isFinite(w) && Number.isFinite(t) && t > 0
-                                        ? (w / t) * 100
-                                        : NaN
-                                      : w;
+                                      ? derived.tableValuesPct.get(`${b}::${s}`)
+                                      : derived.tableValuesWeight.get(`${b}::${s}`);
                                   return (
                                     <td
                                       key={b}
                                       className={`px-3 py-2 text-right tabular-nums text-slate-900 ${colorFor(v)}`}
                                     >
-                                      {Number.isFinite(v) ? v.toFixed(2) : "—"}
+                                      {Number.isFinite(v) ? `${v.toFixed(2)}${tableMode === "percent" ? "%" : ""}` : "—"}
                                     </td>
                                   );
                                 })}
@@ -521,9 +532,7 @@ export default function GranulometryPage() {
                                 return (
                                   <td key={b} className="px-3 py-2 text-right text-xs font-semibold tabular-nums text-slate-900">
                                     {tableMode === "percent"
-                                      ? Number.isFinite(t) && t > 0
-                                        ? "100.00"
-                                        : "—"
+                                      ? "—"
                                       : Number.isFinite(t)
                                         ? t.toFixed(2)
                                         : "—"}
