@@ -140,7 +140,7 @@ function buildInsights({ sieveSizes, bagKeys, tableValues, avgBySize }) {
   return insights;
 }
 
-export default function GranulometryPage() {
+export default function GranulometryPage({ embedded = false } = {}) {
   const today = new Date().toISOString().slice(0, 10);
 
   const [fromDate, setFromDate] = useState(() => {
@@ -275,13 +275,15 @@ export default function GranulometryPage() {
   }, [records]);
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-slate-900">Granulometric analysis</h1>
-          <p className="text-sm text-slate-500">Built from “Granulometric analysis” form submissions.</p>
+    <div className={`${embedded ? "space-y-4" : "p-4 md:p-6 space-y-4"}`}>
+      {!embedded && (
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-slate-900">Granulometric analysis</h1>
+            <p className="text-sm text-slate-500">Built from “Granulometric analysis” form submissions.</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         {/* Analysis */}
@@ -402,7 +404,12 @@ export default function GranulometryPage() {
                           }}
                         />
                         <Tooltip content={<ReportChartTooltip />} />
-                        <Legend verticalAlign="top" align="left" content={<CompactLegend />} />
+                        <Legend
+                          verticalAlign="top"
+                          align="left"
+                          content={<CompactLegend />}
+                          wrapperStyle={{ paddingBottom: 10 }}
+                        />
                         {showIndividual &&
                           derived.bagKeys.slice(0, 12).map((b, i) => (
                             <Line
