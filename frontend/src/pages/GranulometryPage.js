@@ -1,16 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { AlertTriangle, BarChart3, Loader2 } from "lucide-react";
+import { AlertTriangle, BarChart3, Calendar, Info, Loader2, TrendingUp } from "lucide-react";
 
 import { granulometryAPI } from "../lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Checkbox } from "../components/ui/checkbox";
-import { Switch } from "../components/ui/switch";
 import { Skeleton } from "../components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
 
 function fmtPct(v) {
   if (!Number.isFinite(v)) return "—";
@@ -141,6 +139,9 @@ function buildInsights({ sieveSizes, bagKeys, tableValues, avgBySize }) {
 }
 
 export default function GranulometryPage({ embedded = false } = {}) {
+  const isLab = embedded;
+  const tableScrollRef = useRef(null);
+
   const today = new Date().toISOString().slice(0, 10);
 
   const [fromDate, setFromDate] = useState(() => {
@@ -193,6 +194,22 @@ export default function GranulometryPage({ embedded = false } = {}) {
     const pages = recordsQuery.data?.pages || [];
     return pages.flatMap((p) => p?.records || []);
   }, [recordsQuery.data]);
+
+  const toggleBag = (b) => {
+    setSelectedBags((prev) => {
+      const set = new Set(prev);
+      if (set.has(b)) set.delete(b);
+      else set.add(b);
+      return Array.from(set);
+    });
+  };
+
+  const onTableScroll = (e) => {
+    if (!recordsQuery.hasNextPage || recordsQuery.isFetchingNextPage) return;
+    const el = e.currentTarget;
+    const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (remaining < 220) recordsQuery.fetchNextPage();
+  };
 
   const derived = useMemo(() => {
     // Build a size union + per-bag value maps.

@@ -100,6 +100,15 @@ import { formAPI } from "../components/forms/formAPI";
 // ──────────────────────────────────────────
 // KPI Card
 // ──────────────────────────────────────────
+const formatHoursMinutes = (hoursLike) => {
+  const h = Number(hoursLike);
+  if (!Number.isFinite(h) || h <= 0) return "0h 0m";
+  const totalMinutes = Math.max(0, Math.round(h * 60));
+  const hh = Math.floor(totalMinutes / 60);
+  const mm = totalMinutes % 60;
+  return `${hh}h ${mm}m`;
+};
+
 const KPICard = ({ icon: Icon, iconColor, label, value, unit, detail, detail2, trend, trendDirection }) => (
   <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 flex flex-col gap-1 sm:gap-1.5 min-w-0" data-testid={`kpi-${label.toLowerCase().replace(/\s+/g, '-')}`}>
     <div className="flex items-center gap-2 mb-0.5 sm:mb-1">
@@ -1278,8 +1287,8 @@ export default function ProductionDashboardPage() {
               icon={Clock}
               iconColor="bg-slate-100 text-slate-600"
               label="Runtime"
-              value={kpis.runtime_hours || "0"}
-              unit="hours"
+              value={formatHoursMinutes(kpis.runtime_hours)}
+              unit=""
             />
           </div>
 
