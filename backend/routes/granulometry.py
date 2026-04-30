@@ -141,6 +141,9 @@ def _parse_dt_any(raw: Any) -> Optional[datetime]:
         return None
     if isinstance(raw, datetime):
         return raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+    # Unwrap structured values (e.g. { value: "2026-04-07" })
+    if isinstance(raw, dict) and "value" in raw:
+        raw = raw.get("value")
     s = str(raw).strip()
     if not s:
         return None
@@ -148,6 +151,11 @@ def _parse_dt_any(raw: Any) -> Optional[datetime]:
         # Accept "YYYY-MM-DD" and ISO datetimes
         if len(s) == 10 and s[4] == "-" and s[7] == "-":
             return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        # Accept EU date formats like "07.04.2026" or "07/04/2026"
+        if len(s) == 10 and s[2] in (".", "/") and s[5] in (".", "/"):
+            sep = s[2]
+            fmt = "%d.%m.%Y" if sep == "." else "%d/%m/%Y"
+            return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
         return datetime.fromisoformat(s.replace("Z", "+00:00"))
     except Exception:
         return None

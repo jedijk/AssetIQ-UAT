@@ -250,10 +250,11 @@ export default function GranulometryPage() {
       const row = { sieveSize: s };
       bagKeys.forEach((b) => {
         const v = tableValuesPct.get(`${b}::${s}`);
-        row[b] = Number.isFinite(v) ? v : null;
+        // Inverse percentage: plot % retained (100 - % passing)
+        row[b] = Number.isFinite(v) ? Math.max(0, Math.min(100, 100 - v)) : null;
       });
       const av = avgBySize.get(s);
-      row.__avg = Number.isFinite(av) ? av : null;
+      row.__avg = Number.isFinite(av) ? Math.max(0, Math.min(100, 100 - av)) : null;
       return row;
     });
 
@@ -375,7 +376,7 @@ export default function GranulometryPage() {
                       <BarChart3 className="w-4 h-4" /> Curve preview
                     </div>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={derived.chartData} margin={{ top: 8, right: 12, bottom: 18, left: 12 }}>
+                      <LineChart data={derived.chartData} margin={{ top: 8, right: 12, bottom: 18, left: 36 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                         <XAxis
                           dataKey="sieveSize"
@@ -395,7 +396,7 @@ export default function GranulometryPage() {
                           label={{
                             value: "Percentage (%)",
                             angle: -90,
-                            position: "insideLeft",
+                            position: "outsideLeft",
                             style: { fill: "#64748b", fontSize: 12 },
                           }}
                         />
@@ -479,8 +480,8 @@ export default function GranulometryPage() {
                             const vals = derived.bagKeys
                               .map((b) => {
                                 if (tableMode === "percent") {
-                                  const pct = derived.tableValuesPct.get(`${b}::${s}`);
-                                  return Number.isFinite(pct) ? pct : NaN;
+                                  const pctPassing = derived.tableValuesPct.get(`${b}::${s}`);
+                                  return Number.isFinite(pctPassing) ? Math.max(0, Math.min(100, 100 - pctPassing)) : NaN;
                                 }
                                 const w = derived.tableValuesWeight.get(`${b}::${s}`);
                                 return w;
@@ -509,7 +510,10 @@ export default function GranulometryPage() {
                                 {derived.bagKeys.slice(0, 12).map((b) => {
                                   const v =
                                     tableMode === "percent"
-                                      ? derived.tableValuesPct.get(`${b}::${s}`)
+                                      ? (() => {
+                                          const pctPassing = derived.tableValuesPct.get(`${b}::${s}`);
+                                          return Number.isFinite(pctPassing) ? Math.max(0, Math.min(100, 100 - pctPassing)) : NaN;
+                                        })()
                                       : derived.tableValuesWeight.get(`${b}::${s}`);
                                   return (
                                     <td
