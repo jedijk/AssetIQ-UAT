@@ -376,7 +376,7 @@ export default function GranulometryPage() {
                       <BarChart3 className="w-4 h-4" /> Curve preview
                     </div>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={derived.chartData} margin={{ top: 8, right: 12, bottom: 18, left: 36 }}>
+                      <LineChart data={derived.chartData} margin={{ top: 28, right: 12, bottom: 34, left: 52 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                         <XAxis
                           dataKey="sieveSize"
@@ -384,8 +384,8 @@ export default function GranulometryPage() {
                           tickFormatter={(v) => `${v}`}
                           label={{
                             value: "Sieve (mm)",
-                            position: "insideBottom",
-                            offset: -8,
+                            position: "bottom",
+                            offset: 12,
                             style: { fill: "#64748b", fontSize: 12 },
                           }}
                         />
@@ -397,11 +397,12 @@ export default function GranulometryPage() {
                             value: "Percentage (%)",
                             angle: -90,
                             position: "outsideLeft",
+                            offset: 18,
                             style: { fill: "#64748b", fontSize: 12 },
                           }}
                         />
                         <Tooltip content={<ReportChartTooltip />} />
-                        <Legend content={<CompactLegend />} />
+                        <Legend verticalAlign="top" align="left" content={<CompactLegend />} />
                         {showIndividual &&
                           derived.bagKeys.slice(0, 12).map((b, i) => (
                             <Line
