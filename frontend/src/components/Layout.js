@@ -13,7 +13,7 @@ import { pageTransition, pageVariants, springPresets } from "./animations/consta
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.5";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.6";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -123,7 +123,7 @@ const Layout = () => {
           localStorage.setItem(STORAGE_KEY, "true");
 
           toast.success(`AssetIQ updated to v${APP_VERSION}`, {
-            description: "New Label Print feature — design labels and print directly from form submissions. Plus mobile print support, form field bindings, and bug fixes.",
+            description: "New: Lab dashboard (Granulometric analysis). Plus Label Print — design labels and print directly from form submissions, mobile print support, form field bindings, and bug fixes.",
             duration: 4500,
           });
         }

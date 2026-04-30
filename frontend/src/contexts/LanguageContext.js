@@ -180,7 +180,7 @@ const en = {
   announcements: {
     liteModeTitle: "Performance update",
     liteModeBody:
-      "Lite mode is now included: the app adapts automatically on older or low-memory devices for a smoother experience. Owners can turn lite mode on or off under Profile → Edit Profile.",
+      "Lite mode is now included: the app adapts automatically on older or low-memory devices for a smoother experience. New: Lab dashboard (Granulometric analysis). Owners can turn lite mode on or off under Profile → Edit Profile.",
   },
   
   // Common
@@ -1429,7 +1429,7 @@ const nl = {
   announcements: {
     liteModeTitle: "Prestatie-update",
     liteModeBody:
-      "Lite-modus is toegevoegd: de app past zich automatisch aan op oudere apparaten of met weinig geheugen voor een vlottere ervaring. Eigenaren kunnen lite-modus aan of uit zetten via Profiel → Profiel bewerken.",
+      "Lite-modus is toegevoegd: de app past zich automatisch aan op oudere apparaten of met weinig geheugen voor een vlottere ervaring. Nieuw: Lab-dashboard (granulometrische analyse). Eigenaren kunnen lite-modus aan of uit zetten via Profiel → Profiel bewerken.",
   },
   
   // Common

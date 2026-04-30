@@ -12,6 +12,7 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Switch } from "../components/ui/switch";
 import { Skeleton } from "../components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 function fmtPct(v) {
   if (!Number.isFinite(v)) return "—";
@@ -144,6 +145,7 @@ function buildInsights({ sieveSizes, bagKeys, tableValues, avgBySize }) {
 export default function GranulometryPage({ embedded = false } = {}) {
   const isLab = embedded;
   const tableScrollRef = useRef(null);
+  const isMobile = useIsMobile();
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -230,7 +232,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
     records.forEach((r, idx) => {
       const bb = r.bigBagNo || "Unknown";
       const dmy = fmtDmy(r.sampleDate || r.recordedDate);
-      const label = `Bag ${bb}${dmy ? ` (${dmy})` : ""}`;
+      const label = `Bag ${bb}`;
       const bagKey = `bag_${String(r.id || idx)}`;
       bagKeys.push(bagKey);
       bagLabelByKey.set(bagKey, label);
@@ -374,7 +376,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
                         type="date"
                         value={fromDate}
                         onChange={(e) => setFromDate(e.target.value)}
-                        className="w-full h-10 pl-10 text-sm bg-white"
+                        className="w-full h-10 pl-10 text-xs sm:text-sm bg-white"
                         aria-label="From date"
                       />
                     </div>
@@ -385,7 +387,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
                         type="date"
                         value={toDate}
                         onChange={(e) => setToDate(e.target.value)}
-                        className="w-full h-10 pl-10 text-sm bg-white"
+                        className="w-full h-10 pl-10 text-xs sm:text-sm bg-white"
                         aria-label="To date"
                       />
                     </div>
@@ -466,31 +468,53 @@ export default function GranulometryPage({ embedded = false } = {}) {
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart
                           data={derived.chartData}
-                          margin={{ top: 56, right: 12, bottom: 30, left: 60 }}
+                          margin={{
+                            top: isMobile ? 52 : 56,
+                            right: 12,
+                            bottom: isMobile ? 16 : 30,
+                            left: isMobile ? 28 : 60,
+                          }}
                         >
                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                           <XAxis
                             dataKey="sieveSize"
-                            tick={{ fontSize: 11 }}
+                            tick={{ fontSize: isMobile ? 10 : 11 }}
                             tickFormatter={(v) => `${v}`}
-                            label={{
-                              value: "Sieve (mm)",
-                              position: "bottom",
-                              offset: 12,
-                              style: { fill: "#64748b", fontSize: 12 },
-                            }}
+                            interval={isMobile ? "preserveStartEnd" : undefined}
+                            minTickGap={isMobile ? 18 : 8}
+                            tickMargin={isMobile ? 6 : 4}
+                            axisLine={{ stroke: "#e2e8f0" }}
+                            tickLine={false}
+                            label={
+                              isMobile
+                                ? undefined
+                                : {
+                                    value: "Sieve (mm)",
+                                    position: "bottom",
+                                    offset: 12,
+                                    style: { fill: "#64748b", fontSize: 12 },
+                                  }
+                            }
                           />
                           <YAxis
-                            tick={{ fontSize: 11 }}
+                            width={isMobile ? 34 : undefined}
+                            tick={{ fontSize: isMobile ? 10 : 11 }}
                             domain={[0, 100]}
                             tickFormatter={(v) => `${v}%`}
-                            label={{
-                              value: "Percentage (%)",
-                              angle: -90,
-                              position: "outsideLeft",
-                              offset: 26,
-                              style: { fill: "#64748b", fontSize: 12 },
-                            }}
+                            tickMargin={isMobile ? 6 : 4}
+                            axisLine={{ stroke: "#e2e8f0" }}
+                            tickLine={false}
+                            label={
+                              isMobile
+                                ? undefined
+                                : {
+                                    value: "Percentage (%)",
+                                    angle: -90,
+                                    position: "outsideLeft",
+                                    offset: 26,
+                                    style: { fill: "#64748b", fontSize: 12 },
+                                  }
+                            }
                           />
                           <Tooltip content={<ReportChartTooltip />} />
                           <Legend
@@ -687,7 +711,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
                             </th>
                             {derived.bagKeys.slice(0, 12).map((b) => (
                               <th key={b} className="text-right px-3 py-2 text-xs font-semibold text-slate-700 whitespace-nowrap">
-                                {(derived.bagLabelByKey?.get(b) || b).replace(/\s*\([^)]+\)\s*$/, "")}
+                                {derived.bagLabelByKey?.get(b) || b}
                               </th>
                             ))}
                             {derived.bagKeys.length > 12 && (
