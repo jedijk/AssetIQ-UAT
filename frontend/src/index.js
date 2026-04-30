@@ -1,7 +1,12 @@
+// Load polyfills FIRST for older browser support
+import "./lib/polyfills";
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
+import GlobalErrorBoundary from "./components/GlobalErrorBoundary";
+import SafeMode, { isSafeModeRequested } from "./components/SafeMode";
 import { installGlobalDebugHooks, debugLog } from "./lib/debug";
 import { installPerfObservers, PERF_ENABLED } from "./lib/perf";
 
@@ -10,19 +15,31 @@ import { installPerfObservers, PERF_ENABLED } from "./lib/perf";
 if (typeof window !== 'undefined') {
   const OriginalResizeObserver = window.ResizeObserver;
   
-  window.ResizeObserver = class PatchedResizeObserver extends OriginalResizeObserver {
-    constructor(callback) {
-      const patchedCallback = (entries, observer) => {
-        // Wrap callback in requestAnimationFrame to prevent loop errors
-        window.requestAnimationFrame(() => {
-          if (typeof callback === 'function') {
-            callback(entries, observer);
-          }
-        });
+  // Only patch if ResizeObserver exists (polyfill may have provided it)
+  if (OriginalResizeObserver) {
+    try {
+      window.ResizeObserver = class PatchedResizeObserver extends OriginalResizeObserver {
+        constructor(callback) {
+          const patchedCallback = (entries, observer) => {
+            // Wrap callback in requestAnimationFrame to prevent loop errors
+            window.requestAnimationFrame(() => {
+              if (typeof callback === 'function') {
+                try {
+                  callback(entries, observer);
+                } catch (e) {
+                  console.warn('ResizeObserver callback error:', e);
+                }
+              }
+            });
+          };
+          super(patchedCallback);
+        }
       };
-      super(patchedCallback);
+    } catch (e) {
+      // If patching fails (some older browsers), keep original
+      console.warn('Could not patch ResizeObserver:', e);
     }
-  };
+  }
   
   // Suppress console.error for ResizeObserver messages
   const originalError = console.error;
@@ -272,25 +289,80 @@ window.addEventListener("unhandledrejection", (e) => {
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
+// Check if safe mode is requested via URL parameter (?safe=1)
+const SAFE_MODE = isSafeModeRequested();
+if (SAFE_MODE) {
+  debugLog("safe_mode_activated", { url: window.location.href });
+}
+
 // iOS standalone webapps are more sensitive to timing/memory edge cases; avoid
-// StrictMode double-invocation to reduce “random white screen” reports.
-const appTree = IOS_WEBAPP_STANDALONE ? <App /> : (
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// StrictMode double-invocation to reduce white screen reports.
+let appTree;
+if (SAFE_MODE) {
+  // Safe mode: minimal UI for debugging
+  appTree = <SafeMode />;
+} else if (IOS_WEBAPP_STANDALONE) {
+  // iOS standalone: skip StrictMode, wrap with GlobalErrorBoundary
+  appTree = (
+    <GlobalErrorBoundary>
+      <App />
+    </GlobalErrorBoundary>
+  );
+} else {
+  // Normal mode: StrictMode + GlobalErrorBoundary
+  appTree = (
+    <React.StrictMode>
+      <GlobalErrorBoundary>
+        <App />
+      </GlobalErrorBoundary>
+    </React.StrictMode>
+  );
+}
 root.render(appTree);
 
 // Boot watchdog: if the app fails to mount, show the recovery UI instead of a blank screen.
+// Enhanced with multiple checks and shorter timeout for older devices.
 try {
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !SAFE_MODE) {
+    const bootStartTime = Date.now();
+    
+    // First check at 3 seconds (catch early failures)
     setTimeout(() => {
       const el = document.getElementById("root");
       const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
       if (!hasContent) {
-        debugLog("boot_blank_screen", { ios_webapp: IOS_WEBAPP_STANDALONE });
-        showBootError("The app started but did not render. Tap Reload to recover.");
+        debugLog("boot_blank_screen_early", { 
+          ios_webapp: IOS_WEBAPP_STANDALONE,
+          elapsed: Date.now() - bootStartTime,
+        });
+      }
+    }, 3000);
+    
+    // Second check - show error if still blank
+    setTimeout(() => {
+      const el = document.getElementById("root");
+      const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
+      if (!hasContent) {
+        debugLog("boot_blank_screen", { 
+          ios_webapp: IOS_WEBAPP_STANDALONE,
+          elapsed: Date.now() - bootStartTime,
+        });
+        showBootError("The app started but did not render. Tap Reload to recover, or add ?safe=1 to URL for Safe Mode.");
       }
     }, IOS_WEBAPP_STANDALONE ? 4500 : 6500);
+    
+    // Final watchdog at 12 seconds
+    setTimeout(() => {
+      const el = document.getElementById("root");
+      const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
+      const innerText = el?.innerText || "";
+      if (!hasContent || innerText.length < 50) {
+        debugLog("boot_watchdog_final", { 
+          hasContent,
+          innerTextLength: innerText.length,
+          elapsed: Date.now() - bootStartTime,
+        });
+      }
+    }, 12000);
   }
 } catch (_e) {}
