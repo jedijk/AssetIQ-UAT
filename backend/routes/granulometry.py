@@ -233,43 +233,50 @@ async def list_granulometry_form_records(
     limit: int = Query(50, ge=1, le=250),
     current_user: dict = Depends(get_current_user),
 ):
-    # Broad query by template name; then filter by extracted Date of test and/or submitted_at window.
+    # IMPORTANT:
+    # Filter semantics should follow the *form's* "Date of test", not submitted_at.
+    # Operators can submit later/retroactively, which breaks submitted_at-based ranges.
     query: Dict[str, Any] = {"form_template_name": {"$regex": f"^{FORM_TEMPLATE_NAME}.*$", "$options": "i"}}
 
-    # Use submitted_at window for paging efficiency (values are hard to index).
-    if from_date or to_date:
-        start = _to_utc_midnight(_parse_date(from_date)) if from_date else None
-        end = _to_utc_midnight(_parse_date(to_date)) if to_date else None
-        if start and end and end < start:
-            raise HTTPException(status_code=400, detail="to_date must be >= from_date")
-        dt_q = {}
-        if start:
-            dt_q["$gte"] = start
-        if end:
-            dt_q["$lte"] = end.replace(hour=23, minute=59, second=59)
+    start_day = _parse_date(from_date) if from_date else None
+    end_day = _parse_date(to_date) if to_date else None
+    if start_day and end_day and end_day < start_day:
+        raise HTTPException(status_code=400, detail="to_date must be >= from_date")
 
-        query["$or"] = [
-            {"submitted_at": dt_q},
-            {"created_at": dt_q},
-            {"submitted_at": {"$regex": f"^{(from_date or to_date or '').strip()}"}},
-        ]
+    # Fetch a bounded window of recent submissions, then filter strictly in Python using extracted Date of test.
+    # This trades some DB efficiency for correctness across mixed submitted_at types and retro-entry.
+    raw = await db.form_submissions.find(query, {"_id": 0}).sort("submitted_at", -1).to_list(5000)
 
-    raw = await db.form_submissions.find(query, {"_id": 0}).sort("submitted_at", -1).skip(skip).limit(limit).to_list(limit)
-    records = []
+    cleaned_bags = None
+    if bigBagNo:
+        cleaned_bags = {str(b or "").strip() for b in bigBagNo if str(b or "").strip()}
+
+    filtered: List[Dict[str, Any]] = []
     for s in raw:
         rec = _serialize_form_record(s)
         if not rec:
             continue
-        # Optional big bag filter (done post-parse)
-        if bigBagNo:
-            cleaned = {str(b or "").strip() for b in bigBagNo if str(b or "").strip()}
-            if cleaned and rec.get("bigBagNo") not in cleaned:
-                continue
-        records.append(rec)
 
-    # Total count: approximate for pagination (count_documents on query)
-    total = await db.form_submissions.count_documents(query)
-    return {"total": total, "records": records, "skip": skip, "limit": limit}
+        # Date range filter on extracted sampleDate
+        if start_day or end_day:
+            try:
+                rday = _parse_date(str(rec.get("sampleDate") or rec.get("recordedDate") or ""))
+            except HTTPException:
+                continue
+            if start_day and rday < start_day:
+                continue
+            if end_day and rday > end_day:
+                continue
+
+        # Optional big bag filter
+        if cleaned_bags and rec.get("bigBagNo") not in cleaned_bags:
+            continue
+
+        filtered.append(rec)
+
+    total = len(filtered)
+    page = filtered[skip: skip + limit]
+    return {"total": total, "records": page, "skip": skip, "limit": limit}
 
 
 @router.get("/granulometry/form-big-bags")
