@@ -95,11 +95,7 @@ import { useCapabilities } from "../core/performance";
 import { openPrintWindow } from "../lib/printLabel";
 import { formAPI } from "../components/forms/formAPI";
 
-const MachineAnalysisPanel = lazy(() =>
-  import("../features/production/components/MachineAnalysisPanel").then((m) => ({
-    default: m.MachineAnalysisPanel,
-  }))
-);
+// MachineAnalysisPanel removed per request (AI Machine Settings Analysis)
 
 // ──────────────────────────────────────────
 // KPI Card
@@ -2014,22 +2010,7 @@ export default function ProductionDashboardPage() {
         </>
       )}
 
-      {/* ── Machine Settings Analysis ── */}
-      {caps.complexCharts ? (
-        <Suspense
-          fallback={
-            <div className="flex justify-center py-10 text-slate-400" data-testid="machine-analysis-loading">
-              <Loader2 className="w-6 h-6 animate-spin" aria-hidden />
-            </div>
-          }
-        >
-          <MachineAnalysisPanel fromDate={fromStr} toDate={toStr} period={period} />
-        </Suspense>
-      ) : (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-xs text-slate-600" data-testid="machine-analysis-lite-placeholder">
-          Machine settings analysis is reduced in performance mode to keep this device responsive. KPIs and logs above are unchanged.
-        </div>
-      )}
+      {/* ── Machine Settings Analysis removed ── */}
       <Dialog open={showAddEvent} onOpenChange={setShowAddEvent}>
         <DialogContent className="max-w-md" data-testid="add-event-dialog">
           <DialogHeader>
