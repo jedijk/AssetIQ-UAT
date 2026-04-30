@@ -359,10 +359,30 @@ export default function GranulometryPage() {
                       <BarChart3 className="w-4 h-4" /> Curve preview
                     </div>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={derived.chartData} margin={{ top: 8, right: 12, bottom: 8, left: 12 }}>
+                      <LineChart data={derived.chartData} margin={{ top: 8, right: 12, bottom: 18, left: 12 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                        <XAxis dataKey="sieveSize" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} />
+                        <XAxis
+                          dataKey="sieveSize"
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => `${v} mm`}
+                          label={{
+                            value: "Sieve (mm)",
+                            position: "insideBottom",
+                            offset: -8,
+                            style: { fill: "#64748b", fontSize: 12 },
+                          }}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11 }}
+                          domain={[0, 100]}
+                          tickFormatter={(v) => `${v}%`}
+                          label={{
+                            value: "Percentage (%)",
+                            angle: -90,
+                            position: "insideLeft",
+                            style: { fill: "#64748b", fontSize: 12 },
+                          }}
+                        />
                         <Tooltip content={<ReportChartTooltip />} />
                         <Legend />
                         {showIndividual &&
@@ -425,7 +445,7 @@ export default function GranulometryPage() {
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
                           <tr>
-                            <th className="text-left px-3 py-2 text-xs font-semibold text-slate-700">Sieve</th>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-slate-700">Sieve (mm)</th>
                             {derived.bagKeys.slice(0, 12).map((b) => (
                               <th key={b} className="text-right px-3 py-2 text-xs font-semibold text-slate-700 whitespace-nowrap">
                                 {derived.bagLabelByKey?.get(b) || b}
@@ -467,7 +487,9 @@ export default function GranulometryPage() {
 
                             return (
                               <tr key={s} className="border-b border-slate-100 last:border-b-0">
-                                <td className="px-3 py-2 text-slate-700 font-medium">{s}</td>
+                                <td className="px-3 py-2 text-slate-700 font-medium">
+                                  {s === 0 ? "PAN (0 mm)" : `${s} mm`}
+                                </td>
                                 {derived.bagKeys.slice(0, 12).map((b) => {
                                   const w = derived.tableValuesWeight.get(`${b}::${s}`);
                                   const t = derived.totalsByBag.get(b);
