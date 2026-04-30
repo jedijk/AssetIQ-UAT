@@ -300,8 +300,8 @@ export default function GranulometryPage({ embedded = false } = {}) {
   return (
     <div
       className={[
-        embedded ? "space-y-4" : "p-4 md:p-6 space-y-4",
-        isLab ? "rounded-2xl bg-slate-50/60 p-3 sm:p-4 border border-slate-200" : "",
+        embedded ? "space-y-4 sm:space-y-5" : "p-4 md:p-6 space-y-4",
+        isLab ? "bg-transparent" : "",
       ].join(" ")}
     >
       {!embedded && (
@@ -316,14 +316,14 @@ export default function GranulometryPage({ embedded = false } = {}) {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         {/* Analysis */}
         <div className="xl:col-span-12 space-y-4">
-          <Card className={isLab ? "rounded-2xl border-slate-200 shadow-sm bg-white" : ""}>
-            <CardHeader className="pb-3">
+          <Card className={isLab ? "rounded-xl border border-slate-200 shadow-none bg-white" : ""}>
+            <CardHeader className={isLab ? "p-3 sm:p-4 pb-2 sm:pb-3" : "pb-3"}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
-                  <CardTitle className={`${isLab ? "text-[15px]" : "text-base"} flex items-center gap-2`}>
+                  <CardTitle className={`${isLab ? "text-sm sm:text-[15px]" : "text-base"} flex items-center gap-2`}>
                     <BarChart3 className="w-4 h-4 text-slate-600" /> % Passing curves
                   </CardTitle>
-                  <CardDescription className={isLab ? "text-xs" : ""}>
+                  <CardDescription className={isLab ? "text-[11px] sm:text-xs" : ""}>
                     Compare bags across sieve sizes. Toggle individual vs average.
                   </CardDescription>
                 </div>
@@ -343,13 +343,13 @@ export default function GranulometryPage({ embedded = false } = {}) {
                   >
                     <ToggleGroupItem
                       value="individual"
-                      className={`${isLab ? "h-8 px-2 text-xs data-[state=on]:bg-slate-900 data-[state=on]:text-white" : ""}`}
+                      className={`${isLab ? "h-8 px-2 text-xs data-[state=on]:bg-blue-600 data-[state=on]:text-white" : ""}`}
                     >
                       Individual
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value="average"
-                      className={`${isLab ? "h-8 px-2 text-xs data-[state=on]:bg-slate-900 data-[state=on]:text-white" : ""}`}
+                      className={`${isLab ? "h-8 px-2 text-xs data-[state=on]:bg-blue-600 data-[state=on]:text-white" : ""}`}
                     >
                       Average
                     </ToggleGroupItem>
@@ -357,17 +357,17 @@ export default function GranulometryPage({ embedded = false } = {}) {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className={isLab ? "p-3 sm:p-4 pt-0 space-y-3 sm:space-y-4" : "space-y-4"}>
               {/* Filters */}
-              <div className={isLab ? "flex items-start justify-start" : ""}>
+              <div className={isLab ? "flex items-start justify-start w-full" : ""}>
                 <div
                   className={
                     isLab
-                      ? "flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm max-w-full"
+                      ? "w-full flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-2.5 py-2 max-w-full"
                       : "grid grid-cols-1 md:grid-cols-12 gap-3"
                   }
                 >
-                  <div className={isLab ? "relative" : "md:col-span-3 space-y-1.5"}>
+                  <div className={isLab ? "relative flex-1 min-w-[140px] sm:flex-none sm:w-[150px]" : "md:col-span-3 space-y-1.5"}>
                     {!isLab && <Label>From</Label>}
                     {isLab && (
                       <Calendar className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -376,12 +376,12 @@ export default function GranulometryPage({ embedded = false } = {}) {
                       type="date"
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
-                      className={isLab ? "w-[150px] h-8 pl-8 text-xs" : ""}
+                      className={isLab ? "w-full h-10 pl-8 text-sm bg-white" : ""}
                       aria-label="From date"
                     />
                   </div>
 
-                  <div className={isLab ? "relative" : "md:col-span-3 space-y-1.5"}>
+                  <div className={isLab ? "relative flex-1 min-w-[140px] sm:flex-none sm:w-[150px]" : "md:col-span-3 space-y-1.5"}>
                     {!isLab && <Label>To</Label>}
                     {isLab && (
                       <Calendar className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -390,22 +390,22 @@ export default function GranulometryPage({ embedded = false } = {}) {
                       type="date"
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
-                      className={isLab ? "w-[150px] h-8 pl-8 text-xs" : ""}
+                      className={isLab ? "w-full h-10 pl-8 text-sm bg-white" : ""}
                       aria-label="To date"
                     />
                   </div>
 
                   {isLab && <div className="h-6 w-px bg-slate-200 hidden sm:block" />}
 
-                  <div className={isLab ? "flex items-center gap-2 min-w-[240px]" : "md:col-span-6 space-y-1.5"}>
+                  <div className={isLab ? "w-full sm:flex-1 flex items-center gap-2 min-w-0" : "md:col-span-6 space-y-1.5"}>
                     {!isLab && <Label>Bag No.</Label>}
                     {isLab && <span className="text-xs text-slate-600 whitespace-nowrap">Bag No.</span>}
 
-                    <div className={isLab ? "flex-1" : "rounded-xl border border-slate-200 bg-white p-3"}>
+                    <div className={isLab ? "flex-1 min-w-0" : "rounded-xl border border-slate-200 bg-white p-3"}>
                       {bigBagsQuery.isLoading ? (
                         <Skeleton className="h-5 w-48" />
                       ) : isLab ? (
-                        <div className="max-h-20 overflow-auto flex flex-wrap gap-1.5 pr-1">
+                        <div className="max-h-16 sm:max-h-20 overflow-auto flex flex-wrap gap-1.5 pr-1">
                           {(bigBagsQuery.data?.bigBags || []).slice(0, 80).map((b) => {
                             const active = selectedBags.includes(b);
                             return (
@@ -414,9 +414,9 @@ export default function GranulometryPage({ embedded = false } = {}) {
                                 key={b}
                                 onClick={() => toggleBag(b)}
                                 className={[
-                                  "text-[11px] px-2 py-1 rounded-full border transition-colors",
+                                  "text-[11px] px-2 py-1 rounded-full border transition-colors touch-manipulation",
                                   active
-                                    ? "border-slate-900 bg-slate-900 text-white"
+                                    ? "border-blue-600 bg-blue-600 text-white"
                                     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
                                 ].join(" ")}
                               >
@@ -473,7 +473,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
                         variant="outline"
                         size="sm"
                         onClick={() => setSelectedBags([])}
-                        className="h-8 px-2 text-xs rounded-lg"
+                        className="h-9 px-2 text-xs rounded-lg"
                       >
                         Clear
                       </Button>
@@ -485,43 +485,103 @@ export default function GranulometryPage({ embedded = false } = {}) {
               {/* Chart */}
               <div
                 className={[
-                  isLab ? "h-[340px] sm:h-[460px]" : "h-[280px] sm:h-[360px]",
-                  "rounded-xl border border-slate-200 bg-white",
+                  isLab ? "h-[300px] sm:h-[460px]" : "h-[280px] sm:h-[360px]",
+                  isLab
+                    ? "rounded-xl border border-slate-200 bg-white p-3 sm:p-4 flex flex-col"
+                    : "rounded-xl border border-slate-200 bg-white",
                 ].join(" ")}
               >
                 {recordsQuery.isLoading ? (
-                  <div className="p-4">
+                  <div className={isLab ? "flex-1 min-h-0" : "p-4"}>
                     <Skeleton className="h-6 w-48 mb-3" />
-                    <Skeleton className="h-[280px] w-full" />
+                    <Skeleton className="h-[220px] sm:h-[300px] w-full" />
                   </div>
                 ) : derived.chartData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-sm text-slate-500">No records to display.</div>
-                ) : (
-                  <div className={`bg-white border border-slate-200 rounded-xl ${isLab ? "p-5" : "p-3 sm:p-4"} h-full`}>
-                    {isLab && (
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-slate-900">Curves</div>
-                          <div className="text-xs text-slate-500">
-                            Multiple lines per bag. Average is shown as a darker line.
-                          </div>
+                ) : isLab ? (
+                  <>
+                    <div className="flex items-start justify-between gap-3 mb-2 sm:mb-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-900">Curves</div>
+                        <div className="text-[11px] sm:text-xs text-slate-500">
+                          Multiple lines per bag. Average is shown as a darker line.
                         </div>
                       </div>
-                    )}
-                    {!isLab && (
-                      <div className="text-xs text-slate-500 flex items-center gap-2 mb-2">
-                        <BarChart3 className="w-4 h-4" /> Curve preview
-                      </div>
-                    )}
+                    </div>
+                    <div className="flex-1 min-h-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={derived.chartData}
+                          margin={{ top: 32, right: 12, bottom: 30, left: 60 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis
+                            dataKey="sieveSize"
+                            tick={{ fontSize: 11 }}
+                            tickFormatter={(v) => `${v}`}
+                            label={{
+                              value: "Sieve (mm)",
+                              position: "bottom",
+                              offset: 12,
+                              style: { fill: "#64748b", fontSize: 12 },
+                            }}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 11 }}
+                            domain={[0, 100]}
+                            tickFormatter={(v) => `${v}%`}
+                            label={{
+                              value: "Percentage (%)",
+                              angle: -90,
+                              position: "outsideLeft",
+                              offset: 26,
+                              style: { fill: "#64748b", fontSize: 12 },
+                            }}
+                          />
+                          <Tooltip content={<ReportChartTooltip />} />
+                          <Legend
+                            verticalAlign="top"
+                            align="left"
+                            content={<CompactLegend />}
+                            wrapperStyle={{ position: "absolute", top: 8, left: 12, paddingBottom: 0 }}
+                          />
+                          {showIndividual &&
+                            derived.bagKeys.slice(0, 12).map((b, i) => (
+                              <Line
+                                key={b}
+                                type="monotone"
+                                dataKey={b}
+                                name={derived.bagLabelByKey?.get(b) || b}
+                                stroke={palette(i)}
+                                strokeWidth={2.5}
+                                dot={false}
+                                connectNulls
+                              />
+                            ))}
+                          {showAverage && (
+                            <Line
+                              type="monotone"
+                              dataKey="__avg"
+                              name="Average"
+                              stroke="#111827"
+                              strokeWidth={3.25}
+                              dot={false}
+                              connectNulls
+                            />
+                          )}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 h-full">
+                    <div className="text-xs text-slate-500 flex items-center gap-2 mb-2">
+                      <BarChart3 className="w-4 h-4" /> Curve preview
+                    </div>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={derived.chartData}
-                        margin={{
-                          top: isLab ? 40 : 24,
-                          right: 14,
-                          bottom: isLab ? 36 : 30,
-                          left: isLab ? 54 : 48,
-                        }}
+                        margin={{ top: 24, right: 10, bottom: 30, left: 48 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke={isLab ? "#e2e8f0" : "#f1f5f9"} />
                         <XAxis
@@ -589,13 +649,13 @@ export default function GranulometryPage({ embedded = false } = {}) {
               </div>
 
               {/* Table + insights */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                <Card className={`lg:col-span-8 ${isLab ? "rounded-2xl border-slate-200 shadow-sm bg-white" : ""}`}>
-                  <CardHeader className="pb-3">
+              <div className={isLab ? "grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4" : "grid grid-cols-1 lg:grid-cols-12 gap-4"}>
+                <Card className={`lg:col-span-8 ${isLab ? "rounded-xl border border-slate-200 shadow-none bg-white" : ""}`}>
+                  <CardHeader className={isLab ? "p-3 sm:p-4 pb-2 sm:pb-3" : "pb-3"}>
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
-                        <CardTitle className={`${isLab ? "text-[15px]" : "text-base"}`}>Table</CardTitle>
-                        <CardDescription className={isLab ? "text-xs" : ""}>
+                        <CardTitle className={`${isLab ? "text-sm sm:text-[15px]" : "text-base"}`}>Table</CardTitle>
+                        <CardDescription className={isLab ? "text-[11px] sm:text-xs" : ""}>
                           Rows are sieve sizes; columns are big bags. Cell values are{" "}
                           {tableMode === "percent" ? "% of total sample" : "the raw weights from the form"}.
                         </CardDescription>
@@ -615,13 +675,13 @@ export default function GranulometryPage({ embedded = false } = {}) {
                           >
                             <ToggleGroupItem
                               value="weight"
-                              className="h-8 px-2 text-xs data-[state=on]:bg-slate-900 data-[state=on]:text-white"
+                              className="h-8 px-2 text-xs data-[state=on]:bg-blue-600 data-[state=on]:text-white"
                             >
                               Weights
                             </ToggleGroupItem>
                             <ToggleGroupItem
                               value="percent"
-                              className="h-8 px-2 text-xs data-[state=on]:bg-slate-900 data-[state=on]:text-white"
+                              className="h-8 px-2 text-xs data-[state=on]:bg-blue-600 data-[state=on]:text-white"
                             >
                               %
                             </ToggleGroupItem>
@@ -643,12 +703,12 @@ export default function GranulometryPage({ embedded = false } = {}) {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className={isLab ? "p-3 sm:p-4 pt-0" : ""}>
                     <div
                       ref={tableScrollRef}
                       onScroll={isLab ? onTableScroll : undefined}
                       className={[
-                        isLab ? "max-h-[520px]" : "",
+                        isLab ? "max-h-[60vh] sm:max-h-[520px] -mx-1 px-1" : "",
                         "overflow-auto rounded-xl border border-slate-200",
                       ].join(" ")}
                     >
@@ -780,16 +840,16 @@ export default function GranulometryPage({ embedded = false } = {}) {
                   </CardContent>
                 </Card>
 
-                <Card className={`lg:col-span-4 ${isLab ? "rounded-2xl border-slate-200 shadow-sm bg-white" : ""}`}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className={`${isLab ? "text-[15px]" : "text-base"} flex items-center gap-2`}>
+                <Card className={`lg:col-span-4 ${isLab ? "rounded-xl border border-slate-200 shadow-none bg-white" : ""}`}>
+                  <CardHeader className={isLab ? "p-3 sm:p-4 pb-2 sm:pb-3" : "pb-3"}>
+                    <CardTitle className={`${isLab ? "text-sm sm:text-[15px]" : "text-base"} flex items-center gap-2`}>
                       <AlertTriangle className="w-4 h-4 text-slate-600" /> Insights
                     </CardTitle>
-                    <CardDescription className={isLab ? "text-xs" : ""}>
+                    <CardDescription className={isLab ? "text-[11px] sm:text-xs" : ""}>
                       Automatic flags based on deviation and curve sanity checks.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-2">
+                  <CardContent className={isLab ? "p-3 sm:p-4 pt-0 space-y-2" : "space-y-2"}>
                     {derived.insights.map((t, i) => {
                       if (!isLab) {
                         return (
