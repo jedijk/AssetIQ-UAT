@@ -298,7 +298,12 @@ export default function GranulometryPage({ embedded = false } = {}) {
   }, [records]);
 
   return (
-    <div className={`${embedded ? "space-y-4" : "p-4 md:p-6 space-y-4"}`}>
+    <div
+      className={[
+        embedded ? "space-y-4" : "p-4 md:p-6 space-y-4",
+        isLab ? "rounded-2xl bg-slate-50/60 p-3 sm:p-4 border border-slate-200" : "",
+      ].join(" ")}
+    >
       {!embedded && (
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
@@ -311,83 +316,179 @@ export default function GranulometryPage({ embedded = false } = {}) {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         {/* Analysis */}
         <div className="xl:col-span-12 space-y-4">
-          <Card>
+          <Card className={isLab ? "rounded-2xl border-slate-200 shadow-sm bg-white" : ""}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
-                  <CardTitle className="text-base flex items-center gap-2">
+                  <CardTitle className={`${isLab ? "text-[15px]" : "text-base"} flex items-center gap-2`}>
                     <BarChart3 className="w-4 h-4 text-slate-600" /> % Passing curves
                   </CardTitle>
-                  <CardDescription>Compare bags across sieve sizes. Toggle individual vs average.</CardDescription>
+                  <CardDescription className={isLab ? "text-xs" : ""}>
+                    Compare bags across sieve sizes. Toggle individual vs average.
+                  </CardDescription>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Switch checked={showIndividual} onCheckedChange={setShowIndividual} />
-                    <span className="text-sm text-slate-700">Individual</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch checked={showAverage} onCheckedChange={setShowAverage} />
-                    <span className="text-sm text-slate-700">Average</span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <ToggleGroup
+                    type="multiple"
+                    value={[...(showIndividual ? ["individual"] : []), ...(showAverage ? ["average"] : [])]}
+                    onValueChange={(vals) => {
+                      const set = new Set(vals || []);
+                      setShowIndividual(set.has("individual"));
+                      setShowAverage(set.has("average"));
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className={`${isLab ? "rounded-lg border border-slate-200 bg-white shadow-sm px-1" : ""}`}
+                    aria-label="Series visibility"
+                  >
+                    <ToggleGroupItem
+                      value="individual"
+                      className={`${isLab ? "h-8 px-2 text-xs data-[state=on]:bg-slate-900 data-[state=on]:text-white" : ""}`}
+                    >
+                      Individual
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="average"
+                      className={`${isLab ? "h-8 px-2 text-xs data-[state=on]:bg-slate-900 data-[state=on]:text-white" : ""}`}
+                    >
+                      Average
+                    </ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <div className="md:col-span-3 space-y-1.5">
-                  <Label>From</Label>
-                  <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-                </div>
-                <div className="md:col-span-3 space-y-1.5">
-                  <Label>To</Label>
-                  <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-                </div>
-                <div className="md:col-span-6 space-y-1.5">
-                  <Label>Bag No.</Label>
-                  <div className="rounded-xl border border-slate-200 bg-white p-3">
-                    {bigBagsQuery.isLoading ? (
-                      <Skeleton className="h-5 w-48" />
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {(bigBagsQuery.data?.bigBags || []).slice(0, 60).map((b) => {
-                          const checked = selectedBags.includes(b);
-                          return (
-                            <label key={b} className="flex items-center gap-2 text-xs px-2 py-1 rounded-full border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                              <Checkbox
-                                checked={checked}
-                                onCheckedChange={(next) => {
-                                  const will = !!next;
-                                  setSelectedBags((prev) => {
-                                    const set = new Set(prev);
-                                    if (will) set.add(b);
-                                    else set.delete(b);
-                                    return Array.from(set);
-                                  });
-                                }}
-                              />
-                              <span className="text-slate-700">{b}</span>
-                            </label>
-                          );
-                        })}
-                        {(bigBagsQuery.data?.bigBags || []).length === 0 && (
-                          <span className="text-xs text-slate-500">No bags found in this date range.</span>
-                        )}
-                      </div>
+              <div className={isLab ? "flex items-start justify-start" : ""}>
+                <div
+                  className={
+                    isLab
+                      ? "flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm max-w-full"
+                      : "grid grid-cols-1 md:grid-cols-12 gap-3"
+                  }
+                >
+                  <div className={isLab ? "relative" : "md:col-span-3 space-y-1.5"}>
+                    {!isLab && <Label>From</Label>}
+                    {isLab && (
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     )}
-                    {selectedBags.length > 0 && (
-                      <div className="mt-2">
-                        <Button variant="outline" size="sm" onClick={() => setSelectedBags([])}>
-                          Clear selection
-                        </Button>
-                      </div>
+                    <Input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className={isLab ? "w-[150px] h-8 pl-8 text-xs" : ""}
+                      aria-label="From date"
+                    />
+                  </div>
+
+                  <div className={isLab ? "relative" : "md:col-span-3 space-y-1.5"}>
+                    {!isLab && <Label>To</Label>}
+                    {isLab && (
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    )}
+                    <Input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className={isLab ? "w-[150px] h-8 pl-8 text-xs" : ""}
+                      aria-label="To date"
+                    />
+                  </div>
+
+                  {isLab && <div className="h-6 w-px bg-slate-200 hidden sm:block" />}
+
+                  <div className={isLab ? "flex items-center gap-2 min-w-[240px]" : "md:col-span-6 space-y-1.5"}>
+                    {!isLab && <Label>Bag No.</Label>}
+                    {isLab && <span className="text-xs text-slate-600 whitespace-nowrap">Bag No.</span>}
+
+                    <div className={isLab ? "flex-1" : "rounded-xl border border-slate-200 bg-white p-3"}>
+                      {bigBagsQuery.isLoading ? (
+                        <Skeleton className="h-5 w-48" />
+                      ) : isLab ? (
+                        <div className="max-h-20 overflow-auto flex flex-wrap gap-1.5 pr-1">
+                          {(bigBagsQuery.data?.bigBags || []).slice(0, 80).map((b) => {
+                            const active = selectedBags.includes(b);
+                            return (
+                              <button
+                                type="button"
+                                key={b}
+                                onClick={() => toggleBag(b)}
+                                className={[
+                                  "text-[11px] px-2 py-1 rounded-full border transition-colors",
+                                  active
+                                    ? "border-slate-900 bg-slate-900 text-white"
+                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                                ].join(" ")}
+                              >
+                                {b}
+                              </button>
+                            );
+                          })}
+                          {(bigBagsQuery.data?.bigBags || []).length === 0 && (
+                            <span className="text-xs text-slate-500">No bags found in this date range.</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {(bigBagsQuery.data?.bigBags || []).slice(0, 60).map((b) => {
+                            const checked = selectedBags.includes(b);
+                            return (
+                              <label
+                                key={b}
+                                className="flex items-center gap-2 text-xs px-2 py-1 rounded-full border border-slate-200 hover:bg-slate-50 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(next) => {
+                                    const will = !!next;
+                                    setSelectedBags((prev) => {
+                                      const set = new Set(prev);
+                                      if (will) set.add(b);
+                                      else set.delete(b);
+                                      return Array.from(set);
+                                    });
+                                  }}
+                                />
+                                <span className="text-slate-700">{b}</span>
+                              </label>
+                            );
+                          })}
+                          {(bigBagsQuery.data?.bigBags || []).length === 0 && (
+                            <span className="text-xs text-slate-500">No bags found in this date range.</span>
+                          )}
+                        </div>
+                      )}
+
+                      {selectedBags.length > 0 && !isLab && (
+                        <div className="mt-2">
+                          <Button variant="outline" size="sm" onClick={() => setSelectedBags([])}>
+                            Clear selection
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {isLab && selectedBags.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedBags([])}
+                        className="h-8 px-2 text-xs rounded-lg"
+                      >
+                        Clear
+                      </Button>
                     )}
                   </div>
                 </div>
               </div>
 
               {/* Chart */}
-              <div className="h-[280px] sm:h-[360px] rounded-xl border border-slate-200 bg-white">
+              <div
+                className={[
+                  isLab ? "h-[340px] sm:h-[460px]" : "h-[280px] sm:h-[360px]",
+                  "rounded-xl border border-slate-200 bg-white",
+                ].join(" ")}
+              >
                 {recordsQuery.isLoading ? (
                   <div className="p-4">
                     <Skeleton className="h-6 w-48 mb-3" />
@@ -396,21 +497,33 @@ export default function GranulometryPage({ embedded = false } = {}) {
                 ) : derived.chartData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-sm text-slate-500">No records to display.</div>
                 ) : (
-                  <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 h-[280px] sm:h-[360px]">
-                    <div className="text-xs text-slate-500 flex items-center gap-2 mb-2">
-                      <BarChart3 className="w-4 h-4" /> Curve preview
-                    </div>
+                  <div className={`bg-white border border-slate-200 rounded-xl ${isLab ? "p-5" : "p-3 sm:p-4"} h-full`}>
+                    {isLab && (
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-slate-900">Curves</div>
+                          <div className="text-xs text-slate-500">
+                            Multiple lines per bag. Average is shown as a darker line.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {!isLab && (
+                      <div className="text-xs text-slate-500 flex items-center gap-2 mb-2">
+                        <BarChart3 className="w-4 h-4" /> Curve preview
+                      </div>
+                    )}
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={derived.chartData}
                         margin={{
-                          top: 24,
-                          right: 10,
-                          bottom: 30,
-                          left: 48,
+                          top: isLab ? 40 : 24,
+                          right: 14,
+                          bottom: isLab ? 36 : 30,
+                          left: isLab ? 54 : 48,
                         }}
                       >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <CartesianGrid strokeDasharray="3 3" stroke={isLab ? "#e2e8f0" : "#f1f5f9"} />
                         <XAxis
                           dataKey="sieveSize"
                           tick={{ fontSize: 11 }}
@@ -439,7 +552,11 @@ export default function GranulometryPage({ embedded = false } = {}) {
                           verticalAlign="top"
                           align="left"
                           content={<CompactLegend />}
-                          wrapperStyle={{ paddingBottom: 10 }}
+                          wrapperStyle={
+                            isLab
+                              ? { position: "absolute", top: 8, left: 12, paddingBottom: 0 }
+                              : { paddingBottom: 10 }
+                          }
                         />
                         {showIndividual &&
                           derived.bagKeys.slice(0, 12).map((b, i) => (
@@ -449,7 +566,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
                               dataKey={b}
                               name={derived.bagLabelByKey?.get(b) || b}
                               stroke={palette(i)}
-                              strokeWidth={2}
+                              strokeWidth={isLab ? 2.5 : 2}
                               dot={false}
                               connectNulls
                             />
@@ -460,7 +577,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
                             dataKey="__avg"
                             name="Average"
                             stroke="#111827"
-                            strokeWidth={3}
+                            strokeWidth={isLab ? 3.25 : 3}
                             dot={false}
                             connectNulls
                           />
@@ -473,32 +590,68 @@ export default function GranulometryPage({ embedded = false } = {}) {
 
               {/* Table + insights */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                <Card className="lg:col-span-8">
+                <Card className={`lg:col-span-8 ${isLab ? "rounded-2xl border-slate-200 shadow-sm bg-white" : ""}`}>
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
-                        <CardTitle className="text-base">Table</CardTitle>
-                        <CardDescription>
+                        <CardTitle className={`${isLab ? "text-[15px]" : "text-base"}`}>Table</CardTitle>
+                        <CardDescription className={isLab ? "text-xs" : ""}>
                           Rows are sieve sizes; columns are big bags. Cell values are{" "}
                           {tableMode === "percent" ? "% of total sample" : "the raw weights from the form"}.
                         </CardDescription>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs ${tableMode === "weight" ? "text-slate-900 font-semibold" : "text-slate-500"}`}>
-                          Weights
-                        </span>
-                        <Switch
-                          checked={tableMode === "percent"}
-                          onCheckedChange={(v) => setTableMode(v ? "percent" : "weight")}
-                        />
-                        <span className={`text-xs ${tableMode === "percent" ? "text-slate-900 font-semibold" : "text-slate-500"}`}>
-                          %
-                        </span>
+                        {isLab ? (
+                          <ToggleGroup
+                            type="single"
+                            value={tableMode}
+                            onValueChange={(v) => {
+                              if (v) setTableMode(v);
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg border border-slate-200 bg-white shadow-sm px-1"
+                            aria-label="Table mode"
+                          >
+                            <ToggleGroupItem
+                              value="weight"
+                              className="h-8 px-2 text-xs data-[state=on]:bg-slate-900 data-[state=on]:text-white"
+                            >
+                              Weights
+                            </ToggleGroupItem>
+                            <ToggleGroupItem
+                              value="percent"
+                              className="h-8 px-2 text-xs data-[state=on]:bg-slate-900 data-[state=on]:text-white"
+                            >
+                              %
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+                        ) : (
+                          <>
+                            <span className={`text-xs ${tableMode === "weight" ? "text-slate-900 font-semibold" : "text-slate-500"}`}>
+                              Weights
+                            </span>
+                            <Switch
+                              checked={tableMode === "percent"}
+                              onCheckedChange={(v) => setTableMode(v ? "percent" : "weight")}
+                            />
+                            <span className={`text-xs ${tableMode === "percent" ? "text-slate-900 font-semibold" : "text-slate-500"}`}>
+                              %
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="overflow-auto rounded-xl border border-slate-200">
+                    <div
+                      ref={tableScrollRef}
+                      onScroll={isLab ? onTableScroll : undefined}
+                      className={[
+                        isLab ? "max-h-[520px]" : "",
+                        "overflow-auto rounded-xl border border-slate-200",
+                      ].join(" ")}
+                    >
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
                           <tr>
@@ -551,14 +704,22 @@ export default function GranulometryPage({ embedded = false } = {}) {
                               if (!Number.isFinite(v) || !Number.isFinite(mean)) return "bg-white";
                               const effectiveSd = sd > 0.25 ? sd : 2.0; // small-sd guard
                               const z = Math.abs((v - mean) / effectiveSd);
-                              if (z <= 1) return "bg-emerald-50";
-                              if (z <= 2) return "bg-amber-50";
-                              return "bg-rose-50";
+                              if (!isLab) {
+                                if (z <= 1) return "bg-emerald-50";
+                                if (z <= 2) return "bg-amber-50";
+                                return "bg-rose-50";
+                              }
+                              if (z <= 1) return "bg-slate-50/60";
+                              if (z <= 2) return "bg-indigo-50/45";
+                              return "bg-rose-50/45";
                             };
 
                             return (
-                              <tr key={s} className="border-b border-slate-100 last:border-b-0">
-                                <td className="px-3 py-2 text-slate-700 font-medium">
+                              <tr
+                                key={s}
+                                className={`border-b border-slate-100 last:border-b-0 ${isLab ? "hover:bg-slate-50/40 transition-colors" : ""}`}
+                              >
+                                <td className={`px-3 ${isLab ? "py-3" : "py-2"} text-slate-700 font-medium`}>
                                   {s === 0 ? "PAN (0)" : `${s}`}
                                 </td>
                                 {derived.bagKeys.slice(0, 12).map((b) => {
@@ -572,13 +733,13 @@ export default function GranulometryPage({ embedded = false } = {}) {
                                   return (
                                     <td
                                       key={b}
-                                      className={`px-3 py-2 text-right tabular-nums text-slate-900 ${colorFor(v)}`}
+                                      className={`px-3 ${isLab ? "py-3" : "py-2"} text-right tabular-nums text-slate-900 ${colorFor(v)}`}
                                     >
                                       {Number.isFinite(v) ? `${v.toFixed(2)}${tableMode === "percent" ? "%" : ""}` : "—"}
                                     </td>
                                   );
                                 })}
-                                {derived.bagKeys.length > 12 && <td className="px-3 py-2 text-right text-slate-400">…</td>}
+                                {derived.bagKeys.length > 12 && <td className={`px-3 ${isLab ? "py-3" : "py-2"} text-right text-slate-400`}>…</td>}
                               </tr>
                             );
                           })}
@@ -610,43 +771,79 @@ export default function GranulometryPage({ embedded = false } = {}) {
                         </tbody>
                       </table>
                     </div>
+                    {isLab && recordsQuery.isFetchingNextPage && (
+                      <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Loading more…
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
-                <Card className="lg:col-span-4">
+                <Card className={`lg:col-span-4 ${isLab ? "rounded-2xl border-slate-200 shadow-sm bg-white" : ""}`}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
+                    <CardTitle className={`${isLab ? "text-[15px]" : "text-base"} flex items-center gap-2`}>
                       <AlertTriangle className="w-4 h-4 text-slate-600" /> Insights
                     </CardTitle>
-                    <CardDescription>Automatic flags based on deviation and curve sanity checks.</CardDescription>
+                    <CardDescription className={isLab ? "text-xs" : ""}>
+                      Automatic flags based on deviation and curve sanity checks.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {derived.insights.map((t, i) => (
-                      <div key={i} className="text-sm text-slate-700">
-                        - {t}
-                      </div>
-                    ))}
+                    {derived.insights.map((t, i) => {
+                      if (!isLab) {
+                        return (
+                          <div key={i} className="text-sm text-slate-700">
+                            - {t}
+                          </div>
+                        );
+                      }
+
+                      const lower = String(t || "").toLowerCase();
+                      const variant =
+                        lower.includes("outlier") || lower.includes("non-monotonic")
+                          ? "warning"
+                          : lower.includes("good") || lower.includes("monotonic")
+                            ? "success"
+                            : "info";
+                      const meta =
+                        variant === "warning"
+                          ? { Icon: AlertTriangle, border: "border-l-amber-400", iconColor: "text-amber-600", bg: "bg-amber-50/30" }
+                          : variant === "success"
+                            ? { Icon: TrendingUp, border: "border-l-emerald-400", iconColor: "text-emerald-600", bg: "bg-emerald-50/20" }
+                            : { Icon: Info, border: "border-l-sky-400", iconColor: "text-sky-600", bg: "bg-sky-50/20" };
+                      return (
+                        <div
+                          key={i}
+                          className={`rounded-xl border border-slate-200 ${meta.bg} ${meta.border} border-l-2 p-3 flex items-start gap-2`}
+                        >
+                          <meta.Icon className={`w-4 h-4 mt-0.5 ${meta.iconColor}`} />
+                          <div className="text-sm text-slate-700 leading-snug">{t}</div>
+                        </div>
+                      );
+                    })}
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Pagination */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-xs text-slate-500">
-                  Showing <span className="font-medium text-slate-700">{records.length}</span> record(s)
+              {!isLab && (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs text-slate-500">
+                    Showing <span className="font-medium text-slate-700">{records.length}</span> record(s)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => recordsQuery.fetchNextPage()}
+                      disabled={!recordsQuery.hasNextPage || recordsQuery.isFetchingNextPage}
+                      className="gap-2"
+                    >
+                      {recordsQuery.isFetchingNextPage ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      Load more
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => recordsQuery.fetchNextPage()}
-                    disabled={!recordsQuery.hasNextPage || recordsQuery.isFetchingNextPage}
-                    className="gap-2"
-                  >
-                    {recordsQuery.isFetchingNextPage ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    Load more
-                  </Button>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
