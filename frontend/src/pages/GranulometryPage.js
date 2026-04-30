@@ -319,7 +319,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         {/* Analysis */}
         <div className="xl:col-span-12 space-y-4">
-          <Card className={isLab ? "rounded-xl border border-slate-200 shadow-none bg-white" : ""}>
+          <Card className={isLab ? "rounded-xl border border-slate-200 shadow-none bg-white overflow-hidden" : ""}>
             <CardHeader className={isLab ? "p-3 sm:p-4 pb-2 sm:pb-3" : "pb-3"}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
@@ -360,19 +360,19 @@ export default function GranulometryPage({ embedded = false } = {}) {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className={isLab ? "p-3 sm:p-4 pt-0 space-y-3 sm:space-y-4" : "space-y-4"}>
+            <CardContent className={isLab ? "p-3 sm:p-4 pt-0 space-y-3 sm:space-y-4 overflow-hidden" : "space-y-4"}>
               {/* Filters */}
-              <div className={isLab ? "flex items-start justify-start w-full" : ""}>
+              <div className={isLab ? "flex items-start justify-start w-full overflow-hidden" : ""}>
                 <div
                   className={
                     isLab
-                      ? "w-full flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-2.5 py-2 max-w-full"
+                      ? "w-full flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-2.5 py-2 overflow-hidden box-border"
                       : "grid grid-cols-1 md:grid-cols-12 gap-3"
                   }
                 >
-                  <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2 w-full">
-                    <div className="relative">
-                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2 w-full overflow-hidden">
+                    <div className="relative min-w-0">
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
                       <Input
                         type="date"
                         value={fromDate}
@@ -382,8 +382,8 @@ export default function GranulometryPage({ embedded = false } = {}) {
                       />
                     </div>
 
-                    <div className="relative">
-                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <div className="relative min-w-0">
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
                       <Input
                         type="date"
                         value={toDate}
