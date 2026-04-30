@@ -391,6 +391,7 @@ export default function GranulometryPage() {
                               key={b}
                               type="monotone"
                               dataKey={b}
+                              name={derived.bagLabelByKey?.get(b) || b}
                               stroke={palette(i)}
                               strokeWidth={2}
                               dot={false}
