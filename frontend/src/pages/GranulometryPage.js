@@ -304,6 +304,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
       className={[
         embedded ? "space-y-4 sm:space-y-5" : "p-4 md:p-6 space-y-4",
         isLab ? "bg-transparent" : "",
+        "overflow-x-hidden max-w-full",
       ].join(" ")}
     >
       {!embedded && (

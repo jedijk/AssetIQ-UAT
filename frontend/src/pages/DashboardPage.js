@@ -848,7 +848,7 @@ export default function DashboardPage({ initialTab }) {
   const openObservations = observationsByStatus["Open"] || 0;
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col" data-testid="dashboard-page">
+    <div className="h-[calc(100vh-64px)] flex flex-col overflow-x-hidden" data-testid="dashboard-page">
       {/* Fixed Header with Tabs - Condensed */}
       <div className="flex-shrink-0 px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
         <div className="flex items-center justify-between mb-2">
@@ -1526,7 +1526,7 @@ export default function DashboardPage({ initialTab }) {
 
           {/* Lab Tab */}
           {activeTab === "lab" && (
-            <div className="animate-fade-in">
+            <div className="animate-fade-in overflow-x-hidden">
               <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4">
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center">

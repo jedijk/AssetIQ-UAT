@@ -880,7 +880,7 @@ const MyTasksPage = () => {
   if (viewMode === "execution" && selectedTask) {
     return (
       <motion.div
-        className="h-[calc(100vh-64px)] bg-slate-50"
+        className="h-[calc(100vh-64px)] bg-slate-50 overflow-x-hidden"
         variants={pageVariants}
         initial="initial"
         animate="animate"

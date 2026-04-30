@@ -332,7 +332,7 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" data-testid="form-execution-dialog">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden" data-testid="form-execution-dialog">
         <DialogHeader>
           <DialogTitle>{submissionId ? `Edit ${templateName}` : templateName}</DialogTitle>
         </DialogHeader>

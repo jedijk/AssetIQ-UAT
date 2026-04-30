@@ -1438,7 +1438,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
 
   // Main Task Execution View
   return (
-    <div className="h-full flex flex-col bg-slate-50 overscroll-contain">
+    <div className="h-full flex flex-col bg-slate-50 overscroll-contain overflow-x-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b border-slate-200 bg-white/95 backdrop-blur sticky top-0 z-10 pt-[calc(env(safe-area-inset-top,0px)+16px)]">
         <Button variant="ghost" size="sm" onClick={onBack} data-testid="back-btn">
