@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { BarChart3, GripVertical, Hash, Plus, Sparkles, Trash2, Copy, Pencil, Maximize2, Minimize2 } from "lucide-react";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import { BarChart3, GripVertical, Hash, Plus, Sparkles, Trash2, Copy, Pencil, Maximize2, Minimize2, Table2, TrendingUp, Layers, AlertTriangle } from "lucide-react";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line } from "recharts";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
@@ -114,6 +114,7 @@ const SOURCES = [
 const DISPLAY_TYPES = [
   { key: "kpi", label: "KPI" },
   { key: "bar", label: "Bar chart" },
+  { key: "line", label: "Line chart" },
   { key: "table", label: "Table" },
 ];
 
@@ -135,7 +136,9 @@ const METRICS = {
     { key: "form_submissions_total", label: "Form submissions (total)", defaultDisplay: "kpi" },
     { key: "form_submissions_warnings", label: "Form submissions with warnings", defaultDisplay: "kpi" },
     { key: "form_submissions_critical", label: "Form submissions with critical", defaultDisplay: "kpi" },
+    { key: "form_submissions_issues", label: "Issues & warnings", defaultDisplay: "bar" },
     { key: "form_submissions_by_form", label: "Form submissions by form", defaultDisplay: "bar" },
+    { key: "form_submissions_trend", label: "Trends over time", defaultDisplay: "line" },
     { key: "form_field_value_distribution", label: "Field values (distribution)", defaultDisplay: "bar" },
   ],
 };
@@ -181,7 +184,9 @@ function computePreview(
     form_submissions_total: "Counts all submitted forms.",
     form_submissions_warnings: "Counts submitted forms that have warnings.",
     form_submissions_critical: "Counts submitted forms that have critical items.",
+    form_submissions_issues: "Shows warnings and critical issues from submitted forms.",
     form_submissions_by_form: "Groups form submissions by form name.",
+    form_submissions_trend: "Shows how submissions change over time.",
     form_field_value_distribution: "Shows the most common values for the selected form field(s).",
   };
   const why = whyByMetric[metricKey] || "Generated from your selections.";
@@ -205,7 +210,7 @@ function computePreview(
     return { kind: "kpi", title: widgetTitle, why, value };
   }
 
-  // Bar charts + tables
+  // Bar charts + tables + line charts
   if (metricKey === "overdue_by_owner") {
     const overdue = actions.filter(isActionOverdue);
     const byOwner = countBy(overdue, (a) => a?.assignee || a?.owner_id || a?.owner || "Unassigned");
@@ -239,6 +244,35 @@ function computePreview(
     }));
     rows.sort((a, b) => b.value - a.value);
     return { kind: displayType === "table" ? "table" : "bar", title: widgetTitle, why, series: rows.slice(0, 10) };
+  }
+
+  if (metricKey === "form_submissions_issues") {
+    const warnings = formSubmissions.filter((s) => !!(s?.has_warnings ?? s?.hasWarnings)).length;
+    const critical = formSubmissions.filter((s) => !!(s?.has_critical ?? s?.hasCritical)).length;
+    const rows = [
+      { label: "Warnings", value: warnings },
+      { label: "Critical", value: critical },
+    ];
+    return { kind: displayType === "table" ? "table" : "bar", title: widgetTitle, why, series: rows };
+  }
+
+  if (metricKey === "form_submissions_trend") {
+    const subs = formTemplateId
+      ? formSubmissions.filter((s) => (s?.form_template_id || s?.template_id || s?.templateId) === formTemplateId)
+      : formSubmissions;
+    const dayKey = (s) => {
+      const raw = s?.submitted_at || s?.created_at || s?.submittedAt || s?.createdAt || "";
+      const d = new Date(raw);
+      if (isNaN(d)) return "";
+      return d.toISOString().slice(0, 10);
+    };
+    const byDay = countBy(subs, (s) => dayKey(s) || "Unknown");
+    const rows = Array.from(byDay.entries())
+      .filter(([k]) => k !== "Unknown")
+      .map(([k, v]) => ({ label: k, value: v }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .slice(-14);
+    return { kind: "line", title: widgetTitle, why, series: rows };
   }
 
   if (metricKey === "form_field_value_distribution") {
@@ -284,6 +318,96 @@ function computePreview(
   return { kind: "bar", title: widgetTitle, why, series: [] };
 }
 
+function withMockPreview(preview, config) {
+  const p = preview || {};
+  if (p.kind === "kpi") {
+    const v = Number.isFinite(p.value) ? p.value : 0;
+    return { ...p, value: v === 0 ? 128 : v };
+  }
+  const series = Array.isArray(p.series) ? p.series : [];
+  if (series.length > 0) return p;
+  const labelBase = config?.intentKey || "Sample";
+  if (p.kind === "line") {
+    return {
+      ...p,
+      kind: "line",
+      series: Array.from({ length: 8 }).map((_, i) => ({
+        label: `Day ${i + 1}`,
+        value: Math.max(1, Math.round(20 + 8 * Math.sin(i / 2))),
+      })),
+    };
+  }
+  return {
+    ...p,
+    series: [
+      { label: `${labelBase} A`, value: 12 },
+      { label: `${labelBase} B`, value: 8 },
+      { label: `${labelBase} C`, value: 5 },
+    ],
+  };
+}
+
+const INTENTS = [
+  {
+    key: "total_submissions",
+    label: "Total submissions",
+    desc: "How many forms were submitted",
+    icon: Hash,
+  },
+  {
+    key: "issues_warnings",
+    label: "Issues & warnings",
+    desc: "Warnings and critical items",
+    icon: AlertTriangle,
+  },
+  {
+    key: "trends_over_time",
+    label: "Trends over time",
+    desc: "How activity changes over time",
+    icon: TrendingUp,
+  },
+  {
+    key: "submissions_by_form",
+    label: "Submissions by form",
+    desc: "Which forms are used most",
+    icon: BarChart3,
+  },
+];
+
+const VISUALS = [
+  { key: "kpi", label: "KPI card", desc: "Single number", icon: Hash },
+  { key: "table", label: "Table", desc: "List + counts", icon: Table2 },
+  { key: "bar", label: "Bar chart", desc: "Compare categories", icon: BarChart3 },
+  { key: "line", label: "Line chart", desc: "Trend over time", icon: TrendingUp },
+];
+
+const BUILDER_TEMPLATES = [
+  {
+    key: "inspection_overview",
+    label: "Inspection overview",
+    desc: "Submissions by form (last 30 days)",
+    preset: { intentKey: "submissions_by_form", displayType: "bar" },
+  },
+  {
+    key: "safety_issues",
+    label: "Safety issues",
+    desc: "Warnings vs critical",
+    preset: { intentKey: "issues_warnings", displayType: "bar" },
+  },
+  {
+    key: "daily_activity",
+    label: "Daily activity",
+    desc: "Trend line of submissions",
+    preset: { intentKey: "trends_over_time", displayType: "line" },
+  },
+  {
+    key: "form_performance",
+    label: "Form performance",
+    desc: "Top forms by usage",
+    preset: { intentKey: "submissions_by_form", displayType: "table" },
+  },
+];
+
 function SortableWidgetCard({
   id,
   widget,
@@ -302,7 +426,7 @@ function SortableWidgetCard({
     transition,
   };
 
-  const p = computePreview(
+  const p0 = computePreview(
     {
       sourceKey: widget.sourceKey,
       metricKey: widget.metricKey,
@@ -314,6 +438,7 @@ function SortableWidgetCard({
     },
     data
   );
+  const p = withMockPreview(p0, { intentKey: widget.metricKey });
 
   return (
     <div
@@ -410,6 +535,18 @@ function SortableWidgetCard({
       <div className="p-4">
         {p.kind === "kpi" ? (
           <ReportKPICard label={p.title} value={p.value ?? 0} unit="" detail="KPI" />
+        ) : p.kind === "line" ? (
+          <div className="h-[240px] bg-white border border-slate-200 rounded-xl p-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={p.series || []} margin={{ top: 8, right: 12, bottom: 8, left: 12 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip content={<ReportChartTooltip />} />
+                <Line type="monotone" dataKey="value" stroke="#4f46e5" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         ) : p.kind === "table" ? (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div className="px-3 py-2 border-b border-slate-200 text-xs text-slate-500 flex items-center justify-between">
@@ -470,6 +607,9 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
   const [metricKey, setMetricKey] = useState(defaultMetricFor("actions"));
   const [displayType, setDisplayType] = useState("kpi");
   const [title, setTitle] = useState("");
+
+  const [intentKey, setIntentKey] = useState("total_submissions");
+  const [customizeOpen, setCustomizeOpen] = useState(false);
 
   const [selectedFormTemplateId, setSelectedFormTemplateId] = useState("");
   const [selectedFormFieldIds, setSelectedFormFieldIds] = useState([]);
@@ -556,11 +696,57 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
     if (def?.defaultDisplay) setDisplayType(def.defaultDisplay);
   }, [sourceKey, metricKey]);
 
+  const mostUsedFormTemplateId = useMemo(() => {
+    const subs = formSubmissions || [];
+    const by = countBy(subs, (s) => s?.form_template_id || s?.template_id || s?.templateId || "");
+    let best = "";
+    let bestCount = 0;
+    for (const [k, v] of by.entries()) {
+      if (!k) continue;
+      if (v > bestCount) {
+        best = k;
+        bestCount = v;
+      }
+    }
+    return best || "";
+  }, [formSubmissions]);
+
+  const applyIntent = (nextIntentKey) => {
+    setIntentKey(nextIntentKey);
+    setSourceKey("forms");
+    setTitle("");
+    if (nextIntentKey === "total_submissions") {
+      setMetricKey("form_submissions_total");
+      setDisplayType("kpi");
+      setSelectedFormTemplateId("");
+    } else if (nextIntentKey === "issues_warnings") {
+      setMetricKey("form_submissions_issues");
+      setDisplayType("bar");
+      setSelectedFormTemplateId("");
+    } else if (nextIntentKey === "submissions_by_form") {
+      setMetricKey("form_submissions_by_form");
+      setDisplayType("bar");
+      setSelectedFormTemplateId("");
+    } else if (nextIntentKey === "trends_over_time") {
+      setMetricKey("form_submissions_trend");
+      setDisplayType("line");
+      // Auto-select a template if available so the chart looks meaningful
+      setSelectedFormTemplateId(mostUsedFormTemplateId || "");
+    }
+  };
+
+  const applyTemplatePreset = (preset) => {
+    const ik = preset?.intentKey || "total_submissions";
+    applyIntent(ik);
+    if (preset?.displayType) setDisplayType(preset.displayType);
+    setCustomizeOpen(false);
+  };
+
   const data = useMemo(
     () => ({ actions, observations, investigations, users, formTemplates, formSubmissions, formSubmissionsTotal }),
     [actions, observations, investigations, users, formTemplates, formSubmissions, formSubmissionsTotal]
   );
-  const preview = useMemo(
+  const previewRaw = useMemo(
     () =>
       computePreview(
         {
@@ -584,6 +770,16 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
       selectedFormXAxisFieldId,
       data,
     ]
+  );
+  const preview = useMemo(
+    () =>
+      withMockPreview(previewRaw, {
+        intentKey,
+        sourceKey,
+        metricKey,
+        displayType,
+      }),
+    [previewRaw, intentKey, sourceKey, metricKey, displayType]
   );
 
   const recommendations = useMemo(() => (METRICS[sourceKey] || []).slice(0, 4), [sourceKey]);
@@ -673,7 +869,15 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
             </div>
           </div>
         </div>
-        <Button onClick={() => setOpen(true)} className="gap-2" data-testid="add-widget">
+        <Button
+          onClick={() => {
+            setCustomizeOpen(false);
+            applyIntent("total_submissions");
+            setOpen(true);
+          }}
+          className="gap-2"
+          data-testid="add-widget"
+        >
           <Plus className="w-4 h-4" /> Add widget
         </Button>
       </div>
@@ -683,7 +887,14 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
           <p className="text-base font-semibold text-slate-900">Build your first dashboard</p>
           <p className="text-sm text-slate-500 mt-1">Add a KPI card or chart in seconds.</p>
           <div className="mt-4">
-            <Button onClick={() => setOpen(true)} className="gap-2">
+            <Button
+              onClick={() => {
+                setCustomizeOpen(false);
+                applyIntent("total_submissions");
+                setOpen(true);
+              }}
+              className="gap-2"
+            >
               <Plus className="w-4 h-4" /> Add widget
             </Button>
           </div>
@@ -731,7 +942,16 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
         </div>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (v) {
+            setCustomizeOpen(false);
+            applyIntent("total_submissions");
+          }
+          setOpen(v);
+        }}
+      >
         <DialogContent className="max-w-4xl w-[95vw]">
           <DialogHeader>
             <DialogTitle>Build a widget</DialogTitle>
@@ -740,196 +960,242 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Builder steps */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary">Step 1: Choose data</Badge>
-                <Badge variant="secondary">Step 2: Choose display</Badge>
-                <Badge variant="secondary">Step 3: Choose metric</Badge>
-                <Badge variant="secondary">Step 4: (Optional) Filters</Badge>
-              </div>
-
+              {/* Templates */}
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-slate-900">What do you want to measure?</p>
-                <Select value={sourceKey} onValueChange={setSourceKey}>
-                  <SelectTrigger className="h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SOURCES.map((s) => (
-                      <SelectItem key={s.key} value={s.key}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-slate-900">How do you want to display it?</p>
-                <Select value={displayType} onValueChange={setDisplayType}>
-                  <SelectTrigger className="h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DISPLAY_TYPES.map((d) => (
-                      <SelectItem key={d.key} value={d.key}>
-                        {d.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-slate-900">Choose a metric</p>
-                <div className="flex flex-wrap gap-2">
-                  {recommendations.map((m) => (
+                <p className="text-sm font-semibold text-slate-900">Start from template</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {BUILDER_TEMPLATES.map((tpl) => (
                     <button
-                      key={m.key}
+                      key={tpl.key}
                       type="button"
-                      onClick={() => setMetricKey(m.key)}
-                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                        metricKey === m.key
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                      }`}
-                      data-testid="metric-chip"
+                      onClick={() => applyTemplatePreset(tpl.preset)}
+                      className="text-left bg-white border border-slate-200 rounded-xl p-3 hover:border-indigo-300 hover:shadow-sm transition-all"
+                      data-testid={`tpl-${tpl.key}`}
                     >
-                      {m.label}
+                      <p className="text-sm font-semibold text-slate-900">{tpl.label}</p>
+                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{tpl.desc}</p>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {sourceKey === "forms" && (
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-slate-900">Which form?</p>
-                    <Select
-                      value={selectedFormTemplateId}
-                      onValueChange={(v) => {
-                        setSelectedFormTemplateId(v);
-                        setSelectedFormFieldIds([]);
-                        setSelectedFormXAxisFieldId("");
-                        // Encourage a field-based metric when user starts configuring fields
-                        if (metricKey === "form_submissions_total") setMetricKey("form_field_value_distribution");
-                        setDisplayType("bar");
-                      }}
-                    >
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder={formTemplates.length ? "Select a form" : "No forms found"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {formTemplates.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name || t.title || t.id}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-slate-900">Pick field(s)</p>
-                    <div className="bg-white border border-slate-200 rounded-xl p-3 max-h-44 overflow-auto">
-                      {selectedFormTemplateId ? (
-                        (formTemplates.find((t) => t.id === selectedFormTemplateId)?.fields || []).length > 0 ? (
-                          <div className="space-y-2">
-                            {(formTemplates.find((t) => t.id === selectedFormTemplateId)?.fields || []).map((f) => {
-                              const checked = selectedFormFieldIds.includes(f.id);
-                              return (
-                                <label key={f.id} className="flex items-center gap-2 text-sm text-slate-700">
-                                  <Checkbox
-                                    checked={checked}
-                                    onCheckedChange={(next) => {
-                                      const willCheck = !!next;
-                                      setSelectedFormFieldIds((prev) => {
-                                        const set = new Set(prev || []);
-                                        if (willCheck) set.add(f.id);
-                                        else set.delete(f.id);
-                                        return Array.from(set);
-                                      });
-                                      setMetricKey("form_field_value_distribution");
-                                      setDisplayType("bar");
-                                    }}
-                                  />
-                                  <span className="truncate" title={f.label || f.id}>
-                                    {f.label || f.id}
-                                  </span>
-                                </label>
-                              );
-                            })}
+              {/* Step 1: Intent */}
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-slate-900">What do you want to track?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {INTENTS.map((it) => {
+                    const selected = intentKey === it.key;
+                    const Icon = it.icon || Layers;
+                    return (
+                      <button
+                        key={it.key}
+                        type="button"
+                        onClick={() => applyIntent(it.key)}
+                        className={`text-left rounded-xl border p-3 transition-all ${
+                          selected
+                            ? "bg-indigo-50 border-indigo-300 shadow-sm"
+                            : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
+                        }`}
+                        data-testid={`intent-${it.key}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                              selected ? "bg-indigo-600 text-white" : "bg-slate-50 text-slate-700"
+                            }`}
+                          >
+                            <Icon className="w-4 h-4" />
                           </div>
-                        ) : (
-                          <div className="text-xs text-slate-500">This form has no fields.</div>
-                        )
-                      ) : (
-                        <div className="text-xs text-slate-500">Select a form to choose fields.</div>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs text-slate-500">
-                        Selected: <span className="font-medium text-slate-700">{selectedFormFieldIds.length}</span>
-                      </div>
-                      {selectedFormFieldIds.length > 0 && (
-                        <button
-                          type="button"
-                          className="text-xs text-slate-600 hover:text-slate-900 underline"
-                          onClick={() => {
-                            setSelectedFormFieldIds([]);
-                            setSelectedFormXAxisFieldId("");
-                          }}
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 leading-tight">{it.label}</p>
+                            <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{it.desc}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-slate-900">X-axis</p>
-                    <Select
-                      value={selectedFormXAxisFieldId}
-                      onValueChange={(v) => {
-                        setSelectedFormXAxisFieldId(v);
-                        setMetricKey("form_field_value_distribution");
-                        if (displayType === "kpi") setDisplayType("bar");
-                      }}
-                      disabled={selectedFormFieldIds.length === 0}
-                    >
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder={selectedFormFieldIds.length ? "Select X-axis field" : "Select field(s) first"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(formTemplates.find((t) => t.id === selectedFormTemplateId)?.fields || [])
-                          .filter((f) => selectedFormFieldIds.includes(f.id))
-                          .map((f) => (
-                            <SelectItem key={f.id} value={f.id}>
-                              {f.label || f.id}
+              {/* Step 2: Visualization */}
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-slate-900">How should it look?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {VISUALS.map((v) => {
+                    const selected = displayType === v.key;
+                    const Icon = v.icon || BarChart3;
+                    return (
+                      <button
+                        key={v.key}
+                        type="button"
+                        onClick={() => setDisplayType(v.key)}
+                        className={`text-left rounded-xl border p-3 transition-all ${
+                          selected
+                            ? "bg-slate-900 border-slate-900 text-white"
+                            : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
+                        }`}
+                        data-testid={`viz-${v.key}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                              selected ? "bg-white/10 text-white" : "bg-slate-50 text-slate-700"
+                            }`}
+                          >
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className={`text-sm font-semibold leading-tight ${selected ? "text-white" : "text-slate-900"}`}>
+                              {v.label}
+                            </p>
+                            <p className={`text-xs mt-0.5 line-clamp-2 ${selected ? "text-slate-200" : "text-slate-500"}`}>
+                              {v.desc}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Customize */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                <button
+                  type="button"
+                  onClick={() => setCustomizeOpen((p) => !p)}
+                  className="w-full px-3 py-2 flex items-center justify-between text-left"
+                  data-testid="customize-toggle"
+                >
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-slate-500" />
+                    <span className="text-sm font-semibold text-slate-900">Customize</span>
+                    <span className="text-xs text-slate-500">(optional)</span>
+                  </div>
+                  <span className="text-xs text-slate-500">{customizeOpen ? "Hide" : "Show"}</span>
+                </button>
+                {customizeOpen && (
+                  <div className="px-3 pb-3 space-y-3">
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-slate-900">Form</p>
+                      <Select
+                        value={selectedFormTemplateId}
+                        onValueChange={(v) => {
+                          setSelectedFormTemplateId(v);
+                          setSelectedFormFieldIds([]);
+                          setSelectedFormXAxisFieldId("");
+                          if (metricKey === "form_submissions_total") setMetricKey("form_field_value_distribution");
+                        }}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder={formTemplates.length ? "Select a form" : "Loading forms…"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {formTemplates.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name || t.title || t.id}
                             </SelectItem>
                           ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-slate-500">
-                      Choose which field’s values become the categories on the chart/table.
-                    </p>
-                  </div>
-                </div>
-              )}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-slate-900">Name (optional)</p>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={metricDef(sourceKey, metricKey)?.label || "Widget"} />
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-slate-900">Break it down by</p>
+                      <div className="bg-white border border-slate-200 rounded-xl p-3 max-h-44 overflow-auto">
+                        {selectedFormTemplateId ? (
+                          (formTemplates.find((t) => t.id === selectedFormTemplateId)?.fields || []).length > 0 ? (
+                            <div className="space-y-2">
+                              {(formTemplates.find((t) => t.id === selectedFormTemplateId)?.fields || []).map((f) => {
+                                const checked = selectedFormFieldIds.includes(f.id);
+                                return (
+                                  <label key={f.id} className="flex items-center gap-2 text-sm text-slate-700">
+                                    <Checkbox
+                                      checked={checked}
+                                      onCheckedChange={(next) => {
+                                        const willCheck = !!next;
+                                        setSelectedFormFieldIds((prev) => {
+                                          const set = new Set(prev || []);
+                                          if (willCheck) set.add(f.id);
+                                          else set.delete(f.id);
+                                          return Array.from(set);
+                                        });
+                                        setMetricKey("form_field_value_distribution");
+                                        if (displayType === "kpi") setDisplayType("bar");
+                                      }}
+                                    />
+                                    <span className="truncate" title={f.label || f.id}>
+                                      {f.label || f.id}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-slate-500">This form has no fields.</div>
+                          )
+                        ) : (
+                          <div className="text-xs text-slate-500">Select a form to choose fields.</div>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs text-slate-500">
+                          Selected: <span className="font-medium text-slate-700">{selectedFormFieldIds.length}</span>
+                        </div>
+                        {selectedFormFieldIds.length > 0 && (
+                          <button
+                            type="button"
+                            className="text-xs text-slate-600 hover:text-slate-900 underline"
+                            onClick={() => {
+                              setSelectedFormFieldIds([]);
+                              setSelectedFormXAxisFieldId("");
+                            }}
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-slate-900">Group by</p>
+                      <Select
+                        value={selectedFormXAxisFieldId}
+                        onValueChange={(v) => {
+                          setSelectedFormXAxisFieldId(v);
+                          setMetricKey("form_field_value_distribution");
+                          if (displayType === "kpi") setDisplayType("bar");
+                        }}
+                        disabled={selectedFormFieldIds.length === 0}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder={selectedFormFieldIds.length ? "Select a field" : "Select fields first"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(formTemplates.find((t) => t.id === selectedFormTemplateId)?.fields || [])
+                            .filter((f) => selectedFormFieldIds.includes(f.id))
+                            .map((f) => (
+                              <SelectItem key={f.id} value={f.id}>
+                                {f.label || f.id}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-slate-500">Choose how to group the results.</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2 pt-2">
                 <Button onClick={saveWidget} data-testid="save-widget">
-                  Save widget
+                  Add to dashboard
                 </Button>
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
                 <div className="ml-auto text-xs text-slate-400 flex items-center gap-1.5">
-                  <BarChart3 className="w-4 h-4" /> Live preview updates as you choose
+                  <Sparkles className="w-4 h-4" /> Live preview updates instantly
                 </div>
               </div>
             </div>
@@ -950,6 +1216,21 @@ export function SmartDashboardBuilderPanel({ actions, observations, investigatio
               <div className="p-4">
                 {preview.kind === "kpi" ? (
                   <ReportKPICard label={preview.title} value={preview.value ?? 0} unit="" detail="KPI preview" />
+                ) : preview.kind === "line" ? (
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 h-[320px]">
+                    <div className="text-xs text-slate-500 flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-4 h-4" /> Preview trend
+                    </div>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={preview.series || []} margin={{ top: 8, right: 12, bottom: 8, left: 12 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip content={<ReportChartTooltip />} />
+                        <Line type="monotone" dataKey="value" stroke="#4f46e5" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 ) : preview.kind === "table" ? (
                   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <div className="px-3 py-2 border-b border-slate-200 text-xs text-slate-500 flex items-center justify-between">
