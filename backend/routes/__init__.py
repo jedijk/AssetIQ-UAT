@@ -38,6 +38,7 @@ from routes.gdpr import router as gdpr_router
 from routes.labels import router as labels_router
 from routes.audit_log import router as audit_log_router
 from routes.config_performance import router as config_performance_router
+from routes.granulometry import router as granulometry_router
 
 all_routers = [
     auth_router,
@@ -77,4 +78,5 @@ all_routers = [
     labels_router,
     audit_log_router,
     config_performance_router,
+    granulometry_router,
 ]

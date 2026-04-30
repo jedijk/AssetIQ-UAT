@@ -20,5 +20,6 @@ export { definitionsAPI, preferencesAPI, userStatsAPI } from "./apis/definitions
 export { productionAPI, getErrorMessage } from "./apis/production";
 export { gdprAPI } from "./apis/gdpr";
 export { labelsAPI } from "./apis/labels";
+export { granulometryAPI } from "./apis/granulometry";
 
 export { api as default } from "./apiClient";

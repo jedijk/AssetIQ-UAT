@@ -64,6 +64,7 @@ const SettingsPrivacyPage = lazy(() => import("./pages/SettingsPrivacyPage"));
 const SettingsDeletionRequestsPage = lazy(() => import("./pages/SettingsDeletionRequestsPage"));
 const SettingsConsentManagementPage = lazy(() => import("./pages/SettingsConsentManagementPage"));
 const SettingsAuditLogPage = lazy(() => import("./pages/SettingsAuditLogPage"));
+const GranulometryPage = lazy(() => import("./pages/GranulometryPage"));
 
 function RouteFallback() {
   return (
@@ -427,6 +428,7 @@ function App() {
                 <Route path="my-tasks" element={<Suspense fallback={<RouteFallback />}><MyTasksPage /></Suspense>} />
                 <Route path="forms" element={<Navigate to="/tasks?tab=forms" replace />} />
                 <Route path="form-submissions" element={<Suspense fallback={<RouteFallback />}><FormSubmissionsPage /></Suspense>} />
+                <Route path="granulometry" element={<Suspense fallback={<RouteFallback />}><GranulometryPage /></Suspense>} />
                 <Route path="labels" element={<Navigate to="/settings/labels" replace />} />
                 <Route path="decision-engine" element={<Suspense fallback={<RouteFallback />}><UnderDevelopmentPage /></Suspense>} />
                 <Route path="feedback" element={<Suspense fallback={<RouteFallback />}><FeedbackPage /></Suspense>} />
