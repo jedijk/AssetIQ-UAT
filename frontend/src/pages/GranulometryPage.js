@@ -369,25 +369,25 @@ export default function GranulometryPage({ embedded = false } = {}) {
                       : "grid grid-cols-1 md:grid-cols-12 gap-3"
                   }
                 >
-                  <div className="flex flex-wrap items-center gap-2 w-full">
-                    <div className="relative flex-1 min-w-[120px] max-w-[180px] sm:flex-none sm:w-[150px]">
-                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2 w-full">
+                    <div className="relative">
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <Input
                         type="date"
                         value={fromDate}
                         onChange={(e) => setFromDate(e.target.value)}
-                        className="w-full h-9 sm:h-10 pl-9 sm:pl-10 pr-2 text-xs sm:text-sm bg-white"
+                        className="w-full h-9 sm:h-10 pl-9 pr-2 text-xs sm:text-sm bg-white"
                         aria-label="From date"
                       />
                     </div>
 
-                    <div className="relative flex-1 min-w-[120px] max-w-[180px] sm:flex-none sm:w-[150px]">
-                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <div className="relative">
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <Input
                         type="date"
                         value={toDate}
                         onChange={(e) => setToDate(e.target.value)}
-                        className="w-full h-9 sm:h-10 pl-9 sm:pl-10 pr-2 text-xs sm:text-sm bg-white"
+                        className="w-full h-9 sm:h-10 pl-9 pr-2 text-xs sm:text-sm bg-white"
                         aria-label="To date"
                       />
                     </div>
