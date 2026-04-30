@@ -137,6 +137,15 @@ export default function GranulometryPage() {
 
   const [showIndividual, setShowIndividual] = useState(true);
   const [showAverage, setShowAverage] = useState(true);
+  const [tableMode, setTableMode] = useState("weight"); // "weight" | "percent"
+
+  const fmtDmy = (iso) => {
+    const s = String(iso || "").slice(0, 10);
+    if (!s || s.length !== 10) return "";
+    const [y, m, d] = s.split("-");
+    if (!y || !m || !d) return "";
+    return `${d}.${m}.${y}`;
+  };
 
   const bigBagsQuery = useQuery({
     queryKey: ["granulometry", "form-big-bags", { fromDate, toDate }],
@@ -182,9 +191,12 @@ export default function GranulometryPage() {
     const recordByBagKey = new Map(); // bigBag -> record
 
     records.forEach((r, idx) => {
-      const bagKey = r.bigBagNo || `Bag ${idx + 1}`;
+      const bb = r.bigBagNo || "Unknown";
+      const dmy = fmtDmy(r.sampleDate || r.recordedDate);
+      const label = `Bag ${bb}${dmy ? ` (${dmy})` : ""}`;
+      const bagKey = `bag_${String(r.id || idx)}`;
       bagKeys.push(bagKey);
-      bagLabelByKey.set(bagKey, bagKey);
+      bagLabelByKey.set(bagKey, label);
       recordByBagKey.set(bagKey, r);
 
       let totalW = 0;
@@ -234,6 +246,7 @@ export default function GranulometryPage() {
     return {
       sieveSizes,
       bagKeys,
+      bagLabelByKey,
       chartData,
       tableValuesPct,
       tableValuesWeight,
@@ -385,8 +398,27 @@ export default function GranulometryPage() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 <Card className="lg:col-span-8">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Table</CardTitle>
-                    <CardDescription>Rows are sieve sizes; columns are big bags. Cell values are the raw weights from the form.</CardDescription>
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <CardTitle className="text-base">Table</CardTitle>
+                        <CardDescription>
+                          Rows are sieve sizes; columns are big bags. Cell values are{" "}
+                          {tableMode === "percent" ? "% of total sample" : "the raw weights from the form"}.
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs ${tableMode === "weight" ? "text-slate-900 font-semibold" : "text-slate-500"}`}>
+                          Weights
+                        </span>
+                        <Switch
+                          checked={tableMode === "percent"}
+                          onCheckedChange={(v) => setTableMode(v ? "percent" : "weight")}
+                        />
+                        <span className={`text-xs ${tableMode === "percent" ? "text-slate-900 font-semibold" : "text-slate-500"}`}>
+                          %
+                        </span>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="overflow-auto rounded-xl border border-slate-200">
@@ -396,7 +428,7 @@ export default function GranulometryPage() {
                             <th className="text-left px-3 py-2 text-xs font-semibold text-slate-700">Sieve</th>
                             {derived.bagKeys.slice(0, 12).map((b) => (
                               <th key={b} className="text-right px-3 py-2 text-xs font-semibold text-slate-700 whitespace-nowrap">
-                                {b}
+                                {derived.bagLabelByKey?.get(b) || b}
                               </th>
                             ))}
                             {derived.bagKeys.length > 12 && (
@@ -408,7 +440,15 @@ export default function GranulometryPage() {
                           {derived.sieveSizes.map((s) => {
                             // Compute per-size mean/sd for conditional colors
                             const vals = derived.bagKeys
-                              .map((b) => derived.tableValuesWeight.get(`${b}::${s}`))
+                              .map((b) => {
+                                const w = derived.tableValuesWeight.get(`${b}::${s}`);
+                                const t = derived.totalsByBag.get(b);
+                                if (tableMode === "percent") {
+                                  if (!Number.isFinite(w) || !Number.isFinite(t) || t <= 0) return NaN;
+                                  return (w / t) * 100;
+                                }
+                                return w;
+                              })
                               .filter((v) => Number.isFinite(v));
                             const mean = vals.length ? vals.reduce((a, c) => a + c, 0) / vals.length : NaN;
                             const sd =
@@ -429,7 +469,14 @@ export default function GranulometryPage() {
                               <tr key={s} className="border-b border-slate-100 last:border-b-0">
                                 <td className="px-3 py-2 text-slate-700 font-medium">{s}</td>
                                 {derived.bagKeys.slice(0, 12).map((b) => {
-                                  const v = derived.tableValuesWeight.get(`${b}::${s}`);
+                                  const w = derived.tableValuesWeight.get(`${b}::${s}`);
+                                  const t = derived.totalsByBag.get(b);
+                                  const v =
+                                    tableMode === "percent"
+                                      ? Number.isFinite(w) && Number.isFinite(t) && t > 0
+                                        ? (w / t) * 100
+                                        : NaN
+                                      : w;
                                   return (
                                     <td
                                       key={b}
@@ -450,7 +497,13 @@ export default function GranulometryPage() {
                                 const t = derived.totalsByBag.get(b);
                                 return (
                                   <td key={b} className="px-3 py-2 text-right text-xs font-semibold tabular-nums text-slate-900">
-                                    {Number.isFinite(t) ? t.toFixed(2) : "—"}
+                                    {tableMode === "percent"
+                                      ? Number.isFinite(t) && t > 0
+                                        ? "100.00"
+                                        : "—"
+                                      : Number.isFinite(t)
+                                        ? t.toFixed(2)
+                                        : "—"}
                                   </td>
                                 );
                               })}
