@@ -111,11 +111,28 @@ def _serialize_record(doc: Dict[str, Any]) -> Dict[str, Any]:
 
 def _extract_submission_field(sub: Dict[str, Any], wanted_labels: List[str]) -> Optional[Any]:
     wl = {str(x).strip().lower() for x in wanted_labels if x}
+
+    def _norm(s: Any) -> str:
+        return str(s or "").strip().lower()
+
+    def _unwrap(val: Any) -> Any:
+        # Some frontends store structured values (e.g. { value: "BB-1" })
+        if isinstance(val, dict) and "value" in val:
+            return val.get("value")
+        return val
+
     for v in (sub.get("values") or sub.get("responses") or []) or []:
-        label = str(v.get("field_label", "")).strip().lower()
-        fid = str(v.get("field_id", "")).strip().lower()
+        label = _norm(v.get("field_label", ""))
+        fid = _norm(v.get("field_id", ""))
+
+        # Exact match
         if label in wl or fid in wl:
-            return v.get("value")
+            return _unwrap(v.get("value"))
+
+        # Fuzzy match: allow partials (e.g. "Big Bag No." vs "Big Bag No")
+        if any(w and (w in label or w in fid) for w in wl):
+            return _unwrap(v.get("value"))
+
     return None
 
 
@@ -145,7 +162,18 @@ def _serialize_form_record(sub: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
 
-    big_bag = _extract_submission_field(sub, ["Big Bag No.", "Big Bag No", "big bag no", "bigbagno"])
+    # Big bag is sometimes stored with different punctuation/spacing; fall back to a broad contains-match.
+    big_bag = _extract_submission_field(sub, ["Big Bag No.", "Big Bag No", "big bag no", "bigbagno", "big_bag", "bigbag"])
+    if not big_bag:
+        # last-resort scan
+        for v in (sub.get("values") or sub.get("responses") or []) or []:
+            label = str(v.get("field_label", "")).strip().lower()
+            fid = str(v.get("field_id", "")).strip().lower()
+            if ("big" in label and "bag" in label) or ("big" in fid and "bag" in fid):
+                big_bag = v.get("value")
+                if isinstance(big_bag, dict) and "value" in big_bag:
+                    big_bag = big_bag.get("value")
+                break
     big_bag_no = str(big_bag or "").strip()
 
     sieves = []

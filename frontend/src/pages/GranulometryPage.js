@@ -170,11 +170,15 @@ export default function GranulometryPage() {
   }, [recordsQuery.data]);
 
   const derived = useMemo(() => {
-    // Build a size union + per-bag value map using server-computed percentPassing.
+    // Build a size union + per-bag value maps.
+    // - chart uses server-computed percentPassing
+    // - table shows raw form-entered weights, with totals per bag
     const sieveSizesSet = new Set();
     const bagKeys = [];
     const bagLabelByKey = new Map();
-    const tableValues = new Map(); // `${bagKey}::${size}` -> percentPassing
+    const tableValuesPct = new Map(); // `${bagKey}::${size}` -> percentPassing
+    const tableValuesWeight = new Map(); // `${bagKey}::${size}` -> weight retained
+    const totalsByBag = new Map(); // bagKey -> total weight
     const recordByBagKey = new Map(); // bigBag -> record
 
     records.forEach((r, idx) => {
@@ -182,12 +186,24 @@ export default function GranulometryPage() {
       bagKeys.push(bagKey);
       bagLabelByKey.set(bagKey, bagKey);
       recordByBagKey.set(bagKey, r);
+
+      let totalW = 0;
+      (r.sieves || []).forEach((sv) => {
+        const s = Number(sv.sieveSize);
+        const w = Number(sv.weight);
+        if (!Number.isFinite(s) || !Number.isFinite(w)) return;
+        sieveSizesSet.add(s);
+        tableValuesWeight.set(`${bagKey}::${s}`, w);
+        totalW += w;
+      });
+      totalsByBag.set(bagKey, totalW);
+
       (r.percentPassing || []).forEach((pt) => {
         const s = Number(pt.sieveSize);
         const v = Number(pt.percentPassing);
         if (!Number.isFinite(s) || !Number.isFinite(v)) return;
         sieveSizesSet.add(s);
-        tableValues.set(`${bagKey}::${s}`, v);
+        tableValuesPct.set(`${bagKey}::${s}`, v);
       });
     });
 
@@ -196,7 +212,7 @@ export default function GranulometryPage() {
     const avgBySize = new Map();
     sieveSizes.forEach((s) => {
       const vals = bagKeys
-        .map((b) => tableValues.get(`${b}::${s}`))
+        .map((b) => tableValuesPct.get(`${b}::${s}`))
         .filter((v) => Number.isFinite(v));
       const avg = vals.length ? vals.reduce((a, c) => a + c, 0) / vals.length : NaN;
       avgBySize.set(s, avg);
@@ -205,7 +221,7 @@ export default function GranulometryPage() {
     const chartData = sieveSizes.map((s) => {
       const row = { sieveSize: s };
       bagKeys.forEach((b) => {
-        const v = tableValues.get(`${b}::${s}`);
+        const v = tableValuesPct.get(`${b}::${s}`);
         row[b] = Number.isFinite(v) ? v : null;
       });
       const av = avgBySize.get(s);
@@ -213,9 +229,19 @@ export default function GranulometryPage() {
       return row;
     });
 
-    const insights = buildInsights({ sieveSizes, bagKeys, tableValues, avgBySize });
+    const insights = buildInsights({ sieveSizes, bagKeys, tableValues: tableValuesPct, avgBySize });
 
-    return { sieveSizes, bagKeys, chartData, tableValues, avgBySize, insights, recordByBagKey };
+    return {
+      sieveSizes,
+      bagKeys,
+      chartData,
+      tableValuesPct,
+      tableValuesWeight,
+      totalsByBag,
+      avgBySize,
+      insights,
+      recordByBagKey,
+    };
   }, [records]);
 
   return (
@@ -360,7 +386,7 @@ export default function GranulometryPage() {
                 <Card className="lg:col-span-8">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Table</CardTitle>
-                    <CardDescription>Rows are sieve sizes; columns are big bags. Cell values are % passing.</CardDescription>
+                    <CardDescription>Rows are sieve sizes; columns are big bags. Cell values are the raw weights from the form.</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="overflow-auto rounded-xl border border-slate-200">
@@ -382,7 +408,7 @@ export default function GranulometryPage() {
                           {derived.sieveSizes.map((s) => {
                             // Compute per-size mean/sd for conditional colors
                             const vals = derived.bagKeys
-                              .map((b) => derived.tableValues.get(`${b}::${s}`))
+                              .map((b) => derived.tableValuesWeight.get(`${b}::${s}`))
                               .filter((v) => Number.isFinite(v));
                             const mean = vals.length ? vals.reduce((a, c) => a + c, 0) / vals.length : NaN;
                             const sd =
@@ -403,7 +429,7 @@ export default function GranulometryPage() {
                               <tr key={s} className="border-b border-slate-100 last:border-b-0">
                                 <td className="px-3 py-2 text-slate-700 font-medium">{s}</td>
                                 {derived.bagKeys.slice(0, 12).map((b) => {
-                                  const v = derived.tableValues.get(`${b}::${s}`);
+                                  const v = derived.tableValuesWeight.get(`${b}::${s}`);
                                   return (
                                     <td
                                       key={b}
@@ -417,6 +443,20 @@ export default function GranulometryPage() {
                               </tr>
                             );
                           })}
+                          {derived.sieveSizes.length > 0 && (
+                            <tr className="bg-slate-50 border-t border-slate-200">
+                              <td className="px-3 py-2 text-xs font-semibold text-slate-700">Total</td>
+                              {derived.bagKeys.slice(0, 12).map((b) => {
+                                const t = derived.totalsByBag.get(b);
+                                return (
+                                  <td key={b} className="px-3 py-2 text-right text-xs font-semibold tabular-nums text-slate-900">
+                                    {Number.isFinite(t) ? t.toFixed(2) : "—"}
+                                  </td>
+                                );
+                              })}
+                              {derived.bagKeys.length > 12 && <td className="px-3 py-2 text-right text-slate-400">…</td>}
+                            </tr>
+                          )}
                           {derived.sieveSizes.length === 0 && (
                             <tr>
                               <td colSpan={3} className="px-3 py-8 text-center text-sm text-slate-500">
