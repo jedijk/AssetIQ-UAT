@@ -108,6 +108,25 @@ def test_viscosity_pairing():
             got4 = await _dt_value(vid4)
             assert got4.endswith("T10:00"), f"Case 4 expected T10:00 (no cross-date pair), got {got4}"
 
+            # ── Case 5: default-midnight values datetime → prefer submitted_at ──
+            # Extruder sample submitted at 06:09 but Date & Time defaulted to 00:00 in values.
+            # Viscosity sample at 06:09 should see an exact-time extruder and no-op (not "no_candidates").
+            d = datetime(2026, 1, 8, 6, 9, tzinfo=timezone.utc)
+            ext_mid = str(uuid.uuid4())
+            await db.form_submissions.insert_one({
+                "id": ext_mid,
+                "form_template_id": ext_tpl["id"],
+                "values": [
+                    {"field_id": "date_&_time", "field_label": "Date & Time", "value": d.replace(hour=0, minute=0).strftime("%Y-%m-%dT%H:%M")},
+                    {"field_id": "rpm", "field_label": "RPM", "value": "500"},
+                ],
+                "submitted_at": d,
+                "_test_tag": tag,
+            })
+            vid5, vdoc5 = await _mk_visc(d)
+            probe = await svc._auto_pair_viscosity_to_extruder(vdoc5, dry_run=True)
+            assert probe and probe.get("status") in ("noop", "would_pair", "paired"), f"Case 5 expected pairing probe, got {probe}"
+
             return "ok"
         finally:
             # Cleanup

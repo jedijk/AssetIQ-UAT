@@ -1201,6 +1201,22 @@ class FormService:
         from dateutil import parser as _date_parser
 
         def _extract_dt(sub: Dict) -> Optional[datetime]:
+            """Extract the effective sample datetime for pairing.
+
+            Preference order:
+            - Date/Time field in `values`
+            - submitted_at
+            - created_at
+
+            Heuristic:
+            Some production templates default their Date/Time field to midnight (00:00)
+            even when the operator submits at the real sample time. When the values
+            datetime looks like a default midnight but submitted_at is clearly later
+            on the same day, prefer submitted_at to avoid false "exact time" matches.
+            """
+
+            dt_from_values = None
+
             # Try "Date & Time" (or similar) in values first
             for v in sub.get("values", []) or []:
                 label = str(v.get("field_label", "")).strip().lower()
@@ -1216,28 +1232,41 @@ class FormService:
                     raw = v.get("value")
                     if raw:
                         try:
-                            return _date_parser.parse(str(raw))
+                            dt_from_values = _date_parser.parse(str(raw))
+                            break
                         except Exception:
                             pass
-            # Fallback to submitted_at
-            sa = sub.get("submitted_at")
-            if isinstance(sa, datetime):
-                return sa
-            if sa:
+
+            def _parse_dt(v) -> Optional[datetime]:
+                if isinstance(v, datetime):
+                    return v
+                if not v:
+                    return None
                 try:
-                    return _date_parser.parse(str(sa).replace("Z", "+00:00"))
+                    return _date_parser.parse(str(v).replace("Z", "+00:00"))
+                except Exception:
+                    return None
+
+            dt_submitted = _parse_dt(sub.get("submitted_at"))
+            dt_created = _parse_dt(sub.get("created_at"))
+            dt_fallback = dt_submitted or dt_created
+
+            if dt_from_values and dt_submitted:
+                # If values datetime is midnight but submitted time is later same-day,
+                # treat it as a defaulted field and use submitted_at.
+                try:
+                    if (
+                        dt_from_values.date() == dt_submitted.date()
+                        and dt_from_values.hour == 0
+                        and dt_from_values.minute == 0
+                        and (dt_submitted.hour != 0 or dt_submitted.minute != 0)
+                        and abs((dt_submitted - dt_from_values).total_seconds()) >= 2 * 3600
+                    ):
+                        return dt_submitted
                 except Exception:
                     pass
-            # Fallback to created_at
-            ca = sub.get("created_at")
-            if isinstance(ca, datetime):
-                return ca
-            if ca:
-                try:
-                    return _date_parser.parse(str(ca).replace("Z", "+00:00"))
-                except Exception:
-                    pass
-            return None
+
+            return dt_from_values or dt_fallback
 
         def _extract_measurement(sub: Dict) -> Optional[float]:
             # Best-effort extraction of the viscosity measurement value from the submission values.
