@@ -21,6 +21,8 @@ from services.storage_service import put_object_async, get_object_async, MIME_TY
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Granulometry"])
 
+FORM_TEMPLATE_NAME = "Granulometric analysis"
+
 
 def _parse_date(d: str) -> _date:
     try:
@@ -106,6 +108,158 @@ def _serialize_record(doc: Dict[str, Any]) -> Dict[str, Any]:
         "createdByName": doc.get("created_by_name") or "",
         "updatedAt": doc.get("updated_at"),
     }
+
+def _extract_submission_field(sub: Dict[str, Any], wanted_labels: List[str]) -> Optional[Any]:
+    wl = {str(x).strip().lower() for x in wanted_labels if x}
+    for v in (sub.get("values") or sub.get("responses") or []) or []:
+        label = str(v.get("field_label", "")).strip().lower()
+        fid = str(v.get("field_id", "")).strip().lower()
+        if label in wl or fid in wl:
+            return v.get("value")
+    return None
+
+
+def _parse_dt_any(raw: Any) -> Optional[datetime]:
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, datetime):
+        return raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+    s = str(raw).strip()
+    if not s:
+        return None
+    try:
+        # Accept "YYYY-MM-DD" and ISO datetimes
+        if len(s) == 10 and s[4] == "-" and s[7] == "-":
+            return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _serialize_form_record(sub: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    # Date of test: required-ish
+    dt_raw = _extract_submission_field(sub, ["Date of test", "date of test", "date"])
+    dt = _parse_dt_any(dt_raw) or _parse_dt_any(sub.get("submitted_at")) or _parse_dt_any(sub.get("created_at"))
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    big_bag = _extract_submission_field(sub, ["Big Bag No.", "Big Bag No", "big bag no", "bigbagno"])
+    big_bag_no = str(big_bag or "").strip()
+
+    sieves = []
+    for v in (sub.get("values") or sub.get("responses") or []) or []:
+        label_raw = str(v.get("field_label", "")).strip()
+        fid_raw = str(v.get("field_id", "")).strip()
+        label = label_raw or fid_raw
+        if not label:
+            continue
+        key = label.strip().upper()
+        if key in ("DATE OF TEST", "BIG BAG NO.", "BIG BAG NO"):
+            continue
+
+        sieve_size = None
+        if key == "PAN":
+            sieve_size = 0.0
+        else:
+            try:
+                # labels are often like "0.250"
+                sieve_size = float(label.strip())
+            except Exception:
+                sieve_size = None
+
+        if sieve_size is None:
+            continue
+
+        raw_val = v.get("value")
+        try:
+            w = float(raw_val) if raw_val not in (None, "") else 0.0
+        except Exception:
+            w = 0.0
+        sieves.append({"sieveSize": sieve_size, "weight": max(0.0, w)})
+
+    sieves.sort(key=lambda x: x["sieveSize"])
+
+    sample_day = dt.date().isoformat()
+    return {
+        "id": sub.get("id") or "",
+        "recordedDate": sample_day,
+        "sampleDate": sample_day,
+        "bigBagNo": big_bag_no or "Unknown",
+        "sieves": sieves,
+        "percentPassing": _compute_percent_passing(sieves),
+        "imageUrl": "",
+        "createdAt": str(sub.get("submitted_at") or sub.get("created_at") or ""),
+        "createdByName": str(sub.get("submitted_by_name") or sub.get("submitted_by") or ""),
+        "updatedAt": str(sub.get("updated_at") or ""),
+    }
+
+
+@router.get("/granulometry/form-records")
+async def list_granulometry_form_records(
+    from_date: Optional[str] = Query(None, description="YYYY-MM-DD (filter by submitted_at date)"),
+    to_date: Optional[str] = Query(None, description="YYYY-MM-DD (filter by submitted_at date)"),
+    bigBagNo: Optional[List[str]] = Query(None, description="Repeatable bag filter"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=250),
+    current_user: dict = Depends(get_current_user),
+):
+    # Broad query by template name; then filter by extracted Date of test and/or submitted_at window.
+    query: Dict[str, Any] = {"form_template_name": {"$regex": f"^{FORM_TEMPLATE_NAME}.*$", "$options": "i"}}
+
+    # Use submitted_at window for paging efficiency (values are hard to index).
+    if from_date or to_date:
+        start = _to_utc_midnight(_parse_date(from_date)) if from_date else None
+        end = _to_utc_midnight(_parse_date(to_date)) if to_date else None
+        if start and end and end < start:
+            raise HTTPException(status_code=400, detail="to_date must be >= from_date")
+        dt_q = {}
+        if start:
+            dt_q["$gte"] = start
+        if end:
+            dt_q["$lte"] = end.replace(hour=23, minute=59, second=59)
+
+        query["$or"] = [
+            {"submitted_at": dt_q},
+            {"created_at": dt_q},
+            {"submitted_at": {"$regex": f"^{(from_date or to_date or '').strip()}"}},
+        ]
+
+    raw = await db.form_submissions.find(query, {"_id": 0}).sort("submitted_at", -1).skip(skip).limit(limit).to_list(limit)
+    records = []
+    for s in raw:
+        rec = _serialize_form_record(s)
+        if not rec:
+            continue
+        # Optional big bag filter (done post-parse)
+        if bigBagNo:
+            cleaned = {str(b or "").strip() for b in bigBagNo if str(b or "").strip()}
+            if cleaned and rec.get("bigBagNo") not in cleaned:
+                continue
+        records.append(rec)
+
+    # Total count: approximate for pagination (count_documents on query)
+    total = await db.form_submissions.count_documents(query)
+    return {"total": total, "records": records, "skip": skip, "limit": limit}
+
+
+@router.get("/granulometry/form-big-bags")
+async def list_granulometry_form_big_bags(
+    from_date: Optional[str] = Query(None, description="YYYY-MM-DD (filter by submitted_at date)"),
+    to_date: Optional[str] = Query(None, description="YYYY-MM-DD (filter by submitted_at date)"),
+    current_user: dict = Depends(get_current_user),
+):
+    res = await list_granulometry_form_records(
+        from_date=from_date,
+        to_date=to_date,
+        bigBagNo=None,
+        skip=0,
+        limit=250,
+        current_user=current_user,
+    )
+    bags = sorted({r.get("bigBagNo") for r in (res.get("records") or []) if r.get("bigBagNo")})
+    return {"bigBags": bags}
 
 
 @router.post("/granulometry/records")

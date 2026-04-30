@@ -1,8 +1,7 @@
-import { useMemo, useRef, useState } from "react";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { AlertTriangle, BarChart3, Camera, FileUp, Loader2, Plus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { AlertTriangle, BarChart3, Loader2 } from "lucide-react";
 
 import { granulometryAPI } from "../lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -126,20 +125,7 @@ function buildInsights({ sieveSizes, bagKeys, tableValues, avgBySize }) {
 }
 
 export default function GranulometryPage() {
-  const qc = useQueryClient();
-  const fileRef = useRef(null);
-
   const today = new Date().toISOString().slice(0, 10);
-  const [recordedDate, setRecordedDate] = useState(today);
-  const [sampleDate, setSampleDate] = useState(today);
-  const [bigBagNo, setBigBagNo] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [sieves, setSieves] = useState([
-    { sieveSize: 0.25, weight: 0 },
-    { sieveSize: 0.5, weight: 0 },
-    { sieveSize: 1, weight: 0 },
-    { sieveSize: 2, weight: 0 },
-  ]);
 
   const [fromDate, setFromDate] = useState(() => {
     const d = new Date();
@@ -151,18 +137,17 @@ export default function GranulometryPage() {
 
   const [showIndividual, setShowIndividual] = useState(true);
   const [showAverage, setShowAverage] = useState(true);
-  const [selectedRecordId, setSelectedRecordId] = useState("");
 
   const bigBagsQuery = useQuery({
-    queryKey: ["granulometry", "big-bags", { fromDate, toDate }],
-    queryFn: () => granulometryAPI.listBigBags({ fromDate, toDate }),
+    queryKey: ["granulometry", "form-big-bags", { fromDate, toDate }],
+    queryFn: () => granulometryAPI.listFormBigBags({ fromDate, toDate }),
     staleTime: 60_000,
   });
 
   const recordsQuery = useInfiniteQuery({
-    queryKey: ["granulometry", "records", { fromDate, toDate, selectedBags }],
+    queryKey: ["granulometry", "form-records", { fromDate, toDate, selectedBags }],
     queryFn: ({ pageParam }) =>
-      granulometryAPI.listRecords({
+      granulometryAPI.listFormRecords({
         fromDate,
         toDate,
         bigBagNos: selectedBags,
@@ -184,36 +169,13 @@ export default function GranulometryPage() {
     return pages.flatMap((p) => p?.records || []);
   }, [recordsQuery.data]);
 
-  const selectedRecord = useMemo(() => records.find((r) => r.id === selectedRecordId) || null, [records, selectedRecordId]);
-
-  const uploadImageMutation = useMutation({
-    mutationFn: (file) => granulometryAPI.uploadImage(file),
-    onSuccess: (data) => {
-      if (data?.imageUrl) setImageUrl(data.imageUrl);
-      toast.success("Image uploaded");
-    },
-    onError: (e) => toast.error(String(e?.message || "Image upload failed")),
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (payload) => granulometryAPI.createRecord(payload),
-    onSuccess: () => {
-      toast.success("Record saved");
-      qc.invalidateQueries({ queryKey: ["granulometry", "records"] });
-      setBigBagNo("");
-      setImageUrl("");
-      setSieves((prev) => prev.map((r) => ({ ...r, weight: 0 })));
-    },
-    onError: (e) => toast.error(String(e?.response?.data?.detail || e?.message || "Save failed")),
-  });
-
   const derived = useMemo(() => {
     // Build a size union + per-bag value map using server-computed percentPassing.
     const sieveSizesSet = new Set();
     const bagKeys = [];
     const bagLabelByKey = new Map();
     const tableValues = new Map(); // `${bagKey}::${size}` -> percentPassing
-    const recordByBagKey = new Map();
+    const recordByBagKey = new Map(); // bigBag -> record
 
     records.forEach((r, idx) => {
       const bagKey = r.bigBagNo || `Bag ${idx + 1}`;
@@ -256,188 +218,18 @@ export default function GranulometryPage() {
     return { sieveSizes, bagKeys, chartData, tableValues, avgBySize, insights, recordByBagKey };
   }, [records]);
 
-  const localPercentPassingPreview = useMemo(() => computePercentPassingFromWeights(sieves), [sieves]);
-
-  const onSave = () => {
-    const payload = {
-      recordedDate,
-      sampleDate,
-      bigBagNo: bigBagNo.trim(),
-      sieves: normalizeSieveRows(sieves),
-      imageUrl: imageUrl || "",
-    };
-    if (!payload.bigBagNo) {
-      toast.error("Big bag number is required");
-      return;
-    }
-    if (!payload.sieves.length) {
-      toast.error("Add at least one sieve row");
-      return;
-    }
-    createMutation.mutate(payload);
-  };
-
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold text-slate-900">Granulometric analysis</h1>
-          <p className="text-sm text-slate-500">Manual entry → instant curve + comparisons.</p>
+          <p className="text-sm text-slate-500">Built from “Granulometric analysis” form submissions.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-        {/* Entry */}
-        <Card className="xl:col-span-4">
-          <CardHeader>
-            <CardTitle className="text-base">New record</CardTitle>
-            <CardDescription>Enter sieve weights and optionally attach an image.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Recorded date</Label>
-                <Input type="date" value={recordedDate} onChange={(e) => setRecordedDate(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Sample date</Label>
-                <Input type="date" value={sampleDate} onChange={(e) => setSampleDate(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Big bag no</Label>
-              <Input value={bigBagNo} onChange={(e) => setBigBagNo(e.target.value)} placeholder="e.g. BB-1021" />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-slate-900">Sieves</div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => setSieves((prev) => [...prev, { sieveSize: 0, weight: 0 }])}
-                >
-                  <Plus className="w-4 h-4" /> Add row
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                {sieves.map((r, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-5">
-                      <Input
-                        inputMode="decimal"
-                        placeholder="Sieve size"
-                        value={String(r.sieveSize ?? "")}
-                        onChange={(e) =>
-                          setSieves((prev) => prev.map((x, i) => (i === idx ? { ...x, sieveSize: e.target.value } : x)))
-                        }
-                      />
-                    </div>
-                    <div className="col-span-5">
-                      <Input
-                        inputMode="decimal"
-                        placeholder="Weight"
-                        value={String(r.weight ?? "")}
-                        onChange={(e) =>
-                          setSieves((prev) => prev.map((x, i) => (i === idx ? { ...x, weight: e.target.value } : x)))
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2 flex justify-end">
-                      <button
-                        type="button"
-                        className="p-2 rounded-lg hover:bg-slate-50 text-slate-400 hover:text-red-500"
-                        onClick={() => setSieves((prev) => prev.filter((_, i) => i !== idx))}
-                        aria-label="Remove row"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs text-slate-500 mb-1">Preview: % passing</div>
-                <div className="flex flex-wrap gap-2">
-                  {localPercentPassingPreview.slice(0, 8).map((p) => (
-                    <span key={p.sieveSize} className="text-xs px-2 py-1 rounded-full bg-white border border-slate-200 text-slate-700">
-                      {p.sieveSize}: {fmtPct(p.percentPassing)}
-                    </span>
-                  ))}
-                  {localPercentPassingPreview.length === 0 && <span className="text-xs text-slate-500">Add sieve rows.</span>}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-slate-900">Image</div>
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      uploadImageMutation.mutate(f);
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => fileRef.current?.click()}
-                    disabled={uploadImageMutation.isPending}
-                  >
-                    {uploadImageMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileUp className="w-4 h-4" />}
-                    Upload
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Image URL (optional)</Label>
-                <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="/api/granulometry/images/…" />
-              </div>
-
-              {imageUrl ? (
-                <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
-                  <div className="px-3 py-2 border-b border-slate-200 text-xs text-slate-500 flex items-center gap-2">
-                    <Camera className="w-4 h-4" /> Preview
-                  </div>
-                  <img src={imageUrl} alt="Granulometry upload preview" className="w-full max-h-56 object-contain bg-white" />
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <Button onClick={onSave} disabled={createMutation.isPending} className="gap-2">
-                {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                Save record
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setBigBagNo("");
-                  setImageUrl("");
-                  setSieves((prev) => prev.map((r) => ({ ...r, weight: 0 })));
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Analysis */}
-        <div className="xl:col-span-8 space-y-4">
+        <div className="xl:col-span-12 space-y-4">
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -544,10 +336,6 @@ export default function GranulometryPage() {
                               strokeWidth={2}
                               dot={false}
                               connectNulls
-                              onClick={() => {
-                                const rec = derived.recordByBagKey.get(b);
-                                if (rec?.id) setSelectedRecordId(rec.id);
-                              }}
                             />
                           ))}
                         {showAverage && (
@@ -616,13 +404,10 @@ export default function GranulometryPage() {
                                 <td className="px-3 py-2 text-slate-700 font-medium">{s}</td>
                                 {derived.bagKeys.slice(0, 12).map((b) => {
                                   const v = derived.tableValues.get(`${b}::${s}`);
-                                  const rec = derived.recordByBagKey.get(b);
                                   return (
                                     <td
                                       key={b}
-                                      className={`px-3 py-2 text-right tabular-nums text-slate-900 ${colorFor(v)} cursor-pointer`}
-                                      onClick={() => rec?.id && setSelectedRecordId(rec.id)}
-                                      title="Click to view record image"
+                                      className={`px-3 py-2 text-right tabular-nums text-slate-900 ${colorFor(v)}`}
                                     >
                                       {Number.isFinite(v) ? v.toFixed(2) : "—"}
                                     </td>
@@ -661,42 +446,6 @@ export default function GranulometryPage() {
                   </CardContent>
                 </Card>
               </div>
-
-              {/* Image panel */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Image panel</CardTitle>
-                  <CardDescription>Click a table cell or chart line to select a record.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {selectedRecord ? (
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                      <div className="md:col-span-4">
-                        <div className="text-sm font-semibold text-slate-900">{selectedRecord.bigBagNo}</div>
-                        <div className="text-xs text-slate-500 mt-1">
-                          Sample: {selectedRecord.sampleDate} • Recorded: {selectedRecord.recordedDate}
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1">By {selectedRecord.createdByName || "—"}</div>
-                      </div>
-                      <div className="md:col-span-8">
-                        {selectedRecord.imageUrl ? (
-                          <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
-                            <img src={selectedRecord.imageUrl} alt="Granulometry record" className="w-full max-h-80 object-contain bg-white" />
-                          </div>
-                        ) : (
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-500 text-center">
-                            No image attached for this record.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-500 text-center">
-                      Select a record to see its image.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
 
               {/* Pagination */}
               <div className="flex items-center justify-between gap-3">

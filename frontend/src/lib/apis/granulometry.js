@@ -1,6 +1,27 @@
 import { api } from "../apiClient";
 
 export const granulometryAPI = {
+  listFormRecords: async ({ fromDate, toDate, bigBagNos, skip = 0, limit = 50 } = {}) => {
+    const params = new URLSearchParams();
+    if (fromDate) params.set("from_date", fromDate);
+    if (toDate) params.set("to_date", toDate);
+    (bigBagNos || []).forEach((b) => {
+      if (b) params.append("bigBagNo", b);
+    });
+    params.set("skip", String(skip));
+    params.set("limit", String(limit));
+    const res = await api.get(`/granulometry/form-records?${params.toString()}`);
+    return res.data;
+  },
+
+  listFormBigBags: async ({ fromDate, toDate } = {}) => {
+    const params = new URLSearchParams();
+    if (fromDate) params.set("from_date", fromDate);
+    if (toDate) params.set("to_date", toDate);
+    const res = await api.get(`/granulometry/form-big-bags?${params.toString()}`);
+    return res.data;
+  },
+
   listRecords: async ({ fromDate, toDate, bigBagNos, skip = 0, limit = 50 } = {}) => {
     const params = new URLSearchParams();
     if (fromDate) params.set("from_date", fromDate);
