@@ -363,120 +363,74 @@ export default function GranulometryPage({ embedded = false } = {}) {
                 <div
                   className={
                     isLab
-                      ? "w-full flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-2.5 py-2 max-w-full"
+                      ? "w-full flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-2.5 py-2 max-w-full"
                       : "grid grid-cols-1 md:grid-cols-12 gap-3"
                   }
                 >
-                  <div className={isLab ? "relative w-[150px] max-w-full" : "md:col-span-3 space-y-1.5"}>
-                    {!isLab && <Label>From</Label>}
-                    {isLab && (
-                      <Calendar className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    )}
-                    <Input
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      className={isLab ? "w-full h-10 pl-8 text-sm bg-white" : ""}
-                      aria-label="From date"
-                    />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative w-[150px] max-w-full">
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Input
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => setFromDate(e.target.value)}
+                        className="w-full h-10 pl-9 text-sm bg-white"
+                        aria-label="From date"
+                      />
+                    </div>
+
+                    <div className="relative w-[150px] max-w-full">
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Input
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        className="w-full h-10 pl-9 text-sm bg-white"
+                        aria-label="To date"
+                      />
+                    </div>
                   </div>
 
-                  <div className={isLab ? "relative w-[150px] max-w-full" : "md:col-span-3 space-y-1.5"}>
-                    {!isLab && <Label>To</Label>}
-                    {isLab && (
-                      <Calendar className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    )}
-                    <Input
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      className={isLab ? "w-full h-10 pl-8 text-sm bg-white" : ""}
-                      aria-label="To date"
-                    />
-                  </div>
-
-                  {isLab && <div className="h-6 w-px bg-slate-200 hidden sm:block" />}
-
-                  <div className={isLab ? "w-full sm:flex-1 flex items-center gap-2 min-w-0" : "md:col-span-6 space-y-1.5"}>
-                    {!isLab && <Label>Bag No.</Label>}
-                    {isLab && <span className="text-xs text-slate-600 whitespace-nowrap">Bag No.</span>}
-
-                    <div className={isLab ? "flex-1 min-w-0" : "rounded-xl border border-slate-200 bg-white p-3"}>
-                      {bigBagsQuery.isLoading ? (
-                        <Skeleton className="h-5 w-48" />
-                      ) : isLab ? (
-                        <div className="max-h-16 sm:max-h-20 overflow-auto flex flex-wrap gap-1.5 pr-1">
-                          {(bigBagsQuery.data?.bigBags || []).slice(0, 80).map((b) => {
-                            const active = selectedBags.includes(b);
-                            return (
-                              <button
-                                type="button"
-                                key={b}
-                                onClick={() => toggleBag(b)}
-                                className={[
-                                  "text-[10px] px-1.5 py-0.5 sm:text-[11px] sm:px-2 sm:py-1 rounded-full border transition-colors touch-manipulation",
-                                  active
-                                    ? "border-blue-600 bg-blue-600 text-white"
-                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                                ].join(" ")}
-                              >
-                                {b}
-                              </button>
-                            );
-                          })}
-                          {(bigBagsQuery.data?.bigBags || []).length === 0 && (
-                            <span className="text-xs text-slate-500">No bags found in this date range.</span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {(bigBagsQuery.data?.bigBags || []).slice(0, 60).map((b) => {
-                            const checked = selectedBags.includes(b);
-                            return (
-                              <label
-                                key={b}
-                                className="flex items-center gap-2 text-xs px-2 py-1 rounded-full border border-slate-200 hover:bg-slate-50 cursor-pointer"
-                              >
-                                <Checkbox
-                                  checked={checked}
-                                  onCheckedChange={(next) => {
-                                    const will = !!next;
-                                    setSelectedBags((prev) => {
-                                      const set = new Set(prev);
-                                      if (will) set.add(b);
-                                      else set.delete(b);
-                                      return Array.from(set);
-                                    });
-                                  }}
-                                />
-                                <span className="text-slate-700">{b}</span>
-                              </label>
-                            );
-                          })}
-                          {(bigBagsQuery.data?.bigBags || []).length === 0 && (
-                            <span className="text-xs text-slate-500">No bags found in this date range.</span>
-                          )}
-                        </div>
-                      )}
-
-                      {selectedBags.length > 0 && !isLab && (
-                        <div className="mt-2">
-                          <Button variant="outline" size="sm" onClick={() => setSelectedBags([])}>
-                            Clear selection
-                          </Button>
-                        </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-2">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <span className="text-xs font-medium text-slate-600">Bag No.</span>
+                      {selectedBags.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBags([])}
+                          className="text-[11px] text-slate-500 hover:text-slate-700"
+                        >
+                          Clear
+                        </button>
                       )}
                     </div>
 
-                    {isLab && selectedBags.length > 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedBags([])}
-                        className="h-9 px-2 text-xs rounded-lg"
-                      >
-                        Clear
-                      </Button>
+                    {bigBagsQuery.isLoading ? (
+                      <Skeleton className="h-5 w-48" />
+                    ) : (
+                      <div className="max-h-20 overflow-auto flex flex-wrap gap-1 pr-1">
+                        {(bigBagsQuery.data?.bigBags || []).slice(0, 120).map((b) => {
+                          const active = selectedBags.includes(b);
+                          return (
+                            <button
+                              type="button"
+                              key={b}
+                              onClick={() => toggleBag(b)}
+                              className={[
+                                "text-[10px] px-1 py-0.5 rounded-full border transition-colors touch-manipulation",
+                                active
+                                  ? "border-blue-600 bg-blue-600 text-white"
+                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                              ].join(" ")}
+                            >
+                              {b}
+                            </button>
+                          );
+                        })}
+                        {(bigBagsQuery.data?.bigBags || []).length === 0 && (
+                          <span className="text-xs text-slate-500">No bags found in this date range.</span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
