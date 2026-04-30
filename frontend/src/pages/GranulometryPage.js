@@ -367,7 +367,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
                       : "grid grid-cols-1 md:grid-cols-12 gap-3"
                   }
                 >
-                  <div className={isLab ? "relative flex-1 min-w-[140px] sm:flex-none sm:w-[150px]" : "md:col-span-3 space-y-1.5"}>
+                  <div className={isLab ? "relative w-[150px] max-w-full" : "md:col-span-3 space-y-1.5"}>
                     {!isLab && <Label>From</Label>}
                     {isLab && (
                       <Calendar className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -381,7 +381,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
                     />
                   </div>
 
-                  <div className={isLab ? "relative flex-1 min-w-[140px] sm:flex-none sm:w-[150px]" : "md:col-span-3 space-y-1.5"}>
+                  <div className={isLab ? "relative w-[150px] max-w-full" : "md:col-span-3 space-y-1.5"}>
                     {!isLab && <Label>To</Label>}
                     {isLab && (
                       <Calendar className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -414,7 +414,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
                                 key={b}
                                 onClick={() => toggleBag(b)}
                                 className={[
-                                  "text-[11px] px-2 py-1 rounded-full border transition-colors touch-manipulation",
+                                  "text-[10px] px-1.5 py-0.5 sm:text-[11px] sm:px-2 sm:py-1 rounded-full border transition-colors touch-manipulation",
                                   active
                                     ? "border-blue-600 bg-blue-600 text-white"
                                     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
@@ -512,7 +512,7 @@ export default function GranulometryPage({ embedded = false } = {}) {
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart
                           data={derived.chartData}
-                          margin={{ top: 32, right: 12, bottom: 30, left: 60 }}
+                          margin={{ top: 56, right: 12, bottom: 30, left: 60 }}
                         >
                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                           <XAxis
@@ -543,7 +543,17 @@ export default function GranulometryPage({ embedded = false } = {}) {
                             verticalAlign="top"
                             align="left"
                             content={<CompactLegend />}
-                            wrapperStyle={{ position: "absolute", top: 8, left: 12, paddingBottom: 0 }}
+                            wrapperStyle={{
+                              position: "absolute",
+                              top: 8,
+                              left: 12,
+                              paddingBottom: 0,
+                              background: "rgba(255,255,255,0.9)",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: 10,
+                              padding: "6px 8px",
+                              backdropFilter: "blur(6px)",
+                            }}
                           />
                           {showIndividual &&
                             derived.bagKeys.slice(0, 12).map((b, i) => (
