@@ -11,7 +11,7 @@ export default defineConfig({
     ['json', { outputFile: './test-results/results.json' }],
   ],
   use: {
-    baseURL: process.env.REACT_APP_BACKEND_URL || 'https://form-print-test.preview.emergentagent.com',
+    baseURL: process.env.REACT_APP_BACKEND_URL || 'https://mobile-date-picker-2.preview.emergentagent.com',
     screenshot: 'on',
     trace: 'on-first-retry',
     headless: true,
