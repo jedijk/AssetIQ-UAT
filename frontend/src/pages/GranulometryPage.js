@@ -302,7 +302,7 @@ export default function GranulometryPage() {
                   <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
                 </div>
                 <div className="md:col-span-6 space-y-1.5">
-                  <Label>Big bag no (multi-select)</Label>
+                  <Label>Bag No.</Label>
                   <div className="rounded-xl border border-slate-200 bg-white p-3">
                     {bigBagsQuery.isLoading ? (
                       <Skeleton className="h-5 w-48" />
