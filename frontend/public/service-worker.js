@@ -77,7 +77,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets - cache first, fallback to network
+  // Navigations (HTML shell) must be network-first to avoid "Loading chunk failed"
+  // after a deployment where the cached HTML references non-existent new chunk files.
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirstStrategy(request));
+    return;
+  }
+
+  // Never cache build artifacts that change every deploy; let the browser fetch fresh.
+  // If we cache these, we can serve an old HTML that references missing chunks.
+  const isBuildAsset =
+    url.pathname.startsWith('/static/js/') ||
+    url.pathname.startsWith('/static/css/') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css');
+  if (isBuildAsset) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
+  // Other static assets (images, manifest, etc.) - cache first, fallback to network
   event.respondWith(cacheFirstStrategy(request));
 });
 
