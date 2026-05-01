@@ -3,6 +3,7 @@ import { useAuth } from "./AuthContext";
 import { permissionsAPI } from "../lib/api";
 
 const PermissionsContext = createContext(null);
+const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
 
 // Feature to nav path mapping
 const FEATURE_PATHS = {
@@ -42,7 +43,9 @@ export const PermissionsProvider = ({ children }) => {
 
   // Fetch permissions when user logs in
   useEffect(() => {
-    if (user && token) {
+    // In cookie-auth mode, `token` is intentionally null, but the backend session is valid.
+    // We still need to load permissions for route gating and nav visibility.
+    if (user && (AUTH_MODE === "cookie" || token)) {
       fetchPermissions();
     } else {
       setPermissions(null);
@@ -90,7 +93,7 @@ export const PermissionsProvider = ({ children }) => {
 
   // Refresh permissions (call after role change)
   const refreshPermissions = useCallback(() => {
-    if (user && token) {
+    if (user && (AUTH_MODE === "cookie" || token)) {
       fetchPermissions();
     }
   }, [user, token, fetchPermissions]);
