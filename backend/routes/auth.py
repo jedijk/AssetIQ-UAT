@@ -119,9 +119,9 @@ async def record_login_attempt(email: str, success: bool, ip_address: str = None
         # Clear failed attempts on successful login
         await db.login_attempts.delete_one({"email": email_lower})
         
-        # Update last_login on user
+        # Update last_login on user (case-insensitive email match)
         await db.users.update_one(
-            {"email": email_lower},
+            {"email": {"$regex": f"^{email_lower}$", "$options": "i"}},
             {"$set": {"last_login": now.isoformat()}}
         )
         
@@ -318,7 +318,11 @@ async def login(request: Request, credentials: UserLogin, response: Response):
         )
     
     try:
-        user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
+        # Case-insensitive email lookup
+        user = await db.users.find_one(
+            {"email": {"$regex": f"^{credentials.email}$", "$options": "i"}}, 
+            {"_id": 0}
+        )
         logger.info(f"Login attempt for {credentials.email}: user_found={user is not None}")
     except Exception as e:
         logger.error(f"Database error during login: {e}")

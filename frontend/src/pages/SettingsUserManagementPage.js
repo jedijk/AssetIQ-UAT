@@ -190,13 +190,17 @@ const SettingsUserManagementPage = () => {
     queryFn: () => rbacAPI.getUsers({
       search: search || undefined,
       role: roleFilter !== "all" ? roleFilter : undefined
-    })
+    }),
+    staleTime: 0, // Always consider data stale to ensure fresh data
+    refetchOnWindowFocus: true, // Refetch when window is focused
   });
   
   // Pending users query
   const { data: pendingData, isLoading: pendingLoading, refetch: refetchPending } = useQuery({
     queryKey: ["pending-users"],
     queryFn: rbacAPI.getPendingUsers,
+    staleTime: 0, // Always consider data stale
+    refetchOnWindowFocus: true,
   });
 
   const { data: rolesData } = useQuery({
@@ -253,8 +257,10 @@ const SettingsUserManagementPage = () => {
   // Mutations
   const updateRoleMutation = useMutation({
     mutationFn: rbacAPI.updateUserRole,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+    onSuccess: async () => {
+      // Invalidate and refetch to ensure fresh data
+      await queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+      await refetch();
       toast.success("Role updated successfully");
       setChangeRoleUser(null);
     },
@@ -263,8 +269,9 @@ const SettingsUserManagementPage = () => {
 
   const updateStatusMutation = useMutation({
     mutationFn: rbacAPI.updateUserStatus,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+      await refetch();
       toast.success(data.is_active ? "User activated" : "User deactivated");
     },
     onError: () => toast.error("Failed to update status")
@@ -272,8 +279,9 @@ const SettingsUserManagementPage = () => {
 
   const updateProfileMutation = useMutation({
     mutationFn: rbacAPI.updateUserProfile,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+      await refetch();
       toast.success("Profile updated successfully");
       setEditingUser(null);
     },

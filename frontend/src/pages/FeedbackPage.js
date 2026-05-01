@@ -191,9 +191,12 @@ const FeedbackPage = () => {
   const recordingIntervalRef = useRef(null);
 
   // Query: Get feedback based on view mode
-  const { data: feedbackData, isLoading } = useQuery({
+  const { data: feedbackData, isLoading, error: feedbackError, refetch } = useQuery({
     queryKey: ["feedback", viewMode],
     queryFn: () => viewMode === 'all' && canViewAll ? feedbackAPI.getAllFeedback() : feedbackAPI.getMyFeedback(),
+    staleTime: 0, // Always fetch fresh data
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
 
   // Mark responses as seen when user views their feedback (not for admins viewing all)
@@ -918,6 +921,28 @@ const FeedbackPage = () => {
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
           {renderFormContent(true)}
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if query failed
+  if (feedbackError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 max-w-md w-full text-center">
+          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-6 h-6 text-red-500" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">
+            {t("feedback.loadError") || "Unable to load feedback"}
+          </h2>
+          <p className="text-sm text-slate-500 mb-4">
+            {feedbackError?.message || "An error occurred while loading feedback data."}
+          </p>
+          <Button onClick={() => refetch()} className="w-full">
+            {t("common.retry") || "Try Again"}
+          </Button>
         </div>
       </div>
     );

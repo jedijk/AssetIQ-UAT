@@ -120,17 +120,20 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   const [deleteRoleConfirm, setDeleteRoleConfirm] = useState(null);
 
   // Fetch permissions
-  const { data: permissionsData, isLoading, error } = useQuery({
+  const { data: permissionsData, isLoading, error, refetch } = useQuery({
     queryKey: ["permissions"],
     queryFn: permissionsAPI.getAll,
     retry: 1,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnWindowFocus: true,
   });
 
   // Update permission mutation
   const updateMutation = useMutation({
     mutationFn: permissionsAPI.patchPermission,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["permissions"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["permissions"] });
+      await refetch();
       toast.success("Permission updated");
     },
     onError: (error) => {
@@ -141,8 +144,9 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   // Create role mutation
   const createRoleMutation = useMutation({
     mutationFn: permissionsAPI.createRole,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["permissions"] });
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ["permissions"] });
+      await refetch();
       toast.success(data.message || "Role created successfully");
       setShowCreateRoleDialog(false);
       setNewRole({ name: "", display_name: "", description: "", base_role: "viewer" });
@@ -159,8 +163,9 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   // Delete role mutation
   const deleteRoleMutation = useMutation({
     mutationFn: permissionsAPI.deleteRole,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["permissions"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["permissions"] });
+      await refetch();
       toast.success("Role deleted");
       setSelectedRole("admin");
     },
@@ -172,8 +177,9 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   // Reset permissions mutation
   const resetMutation = useMutation({
     mutationFn: permissionsAPI.reset,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["permissions"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["permissions"] });
+      await refetch();
       toast.success("Permissions reset to defaults");
     },
     onError: (error) => {
