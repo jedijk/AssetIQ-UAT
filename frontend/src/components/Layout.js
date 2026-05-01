@@ -789,14 +789,12 @@ const Layout = () => {
               }}
               data-testid="app-logo-link"
             >
-              <img 
-                src="/logo.png" 
-                alt="AssetIQ" 
-                className="w-8 h-8 rounded-lg"
+              <img
+                src="/assetiq-wordmark.png"
+                alt="AssetIQ"
+                className="h-7 sm:h-8 w-auto object-contain"
+                data-testid="app-logo"
               />
-              <span className="text-base font-semibold text-slate-900 dark:text-white" data-testid="app-logo">
-                AssetIQ
-              </span>
             </div>
 
             {/* Desktop Navigation - Scrollable on smaller screens */}
