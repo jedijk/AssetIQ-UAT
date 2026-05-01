@@ -2,7 +2,7 @@
  * NotificationSettings - Component to manage push notification preferences
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, BellOff, BellRing, Check, AlertTriangle, Smartphone, Clock, FileText, Eye, Search, Calendar } from 'lucide-react';
+import { Bell, BellOff, BellRing, Check, AlertTriangle, Smartphone, Clock, FileText, Eye, Search, Calendar, Share, Plus } from 'lucide-react';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -15,6 +15,9 @@ import {
   saveNotificationSettings,
   notify,
   unsubscribeFromPush,
+  isIOS,
+  isStandalone,
+  getNotificationSupportInfo,
 } from '../services/notificationService';
 
 export function NotificationSettings({ compact = false }) {
@@ -23,11 +26,13 @@ export function NotificationSettings({ compact = false }) {
   const [settings, setSettings] = useState(getNotificationSettings());
   const [loading, setLoading] = useState(false);
   const [testSent, setTestSent] = useState(false);
+  const [supportInfo, setSupportInfo] = useState({});
 
   useEffect(() => {
     setSupported(isNotificationSupported());
     setPermission(getPermissionStatus());
     setSettings(getNotificationSettings());
+    setSupportInfo(getNotificationSupportInfo());
   }, []);
 
   const handleEnableNotifications = async () => {
@@ -73,6 +78,55 @@ export function NotificationSettings({ compact = false }) {
   };
 
   if (!supported) {
+    // iOS requires PWA installation
+    if (supportInfo.requiresInstall) {
+      return (
+        <Card>
+          <CardContent className="py-6">
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Smartphone className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900">Install the app for notifications</p>
+                  <p className="text-sm text-slate-600 mt-1">
+                    On iPhone/iPad, push notifications require installing the app to your home screen.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-medium text-slate-700">How to install:</p>
+                <ol className="text-sm text-slate-600 space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 text-xs font-bold">1</span>
+                    <span>Tap the <Share className="w-4 h-4 inline text-blue-600" /> Share button in Safari</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 text-xs font-bold">2</span>
+                    <span>Scroll down and tap <strong>"Add to Home Screen"</strong></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 text-xs font-bold">3</span>
+                    <span>Tap <strong>"Add"</strong> in the top right corner</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 text-xs font-bold">4</span>
+                    <span>Open the app from your home screen and enable notifications</span>
+                  </li>
+                </ol>
+              </div>
+              
+              <p className="text-xs text-slate-500">
+                Requires iOS 16.4 or later. After installing, you'll be able to receive notifications even when the app is closed.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
     return (
       <Card>
         <CardContent className="py-6">

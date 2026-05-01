@@ -1,6 +1,11 @@
 /**
  * Push Notification Service
  * Handles browser push notification permissions, subscriptions, and local notifications
+ * 
+ * Platform Support:
+ * - Android (Chrome/Firefox/Edge): Full support
+ * - iOS Safari (16.4+): Requires PWA (Add to Home Screen)
+ * - Desktop browsers: Full support
  */
 
 const NOTIFICATION_SETTINGS_KEY = 'assetiq_notification_settings';
@@ -19,17 +24,63 @@ const DEFAULT_SETTINGS = {
 };
 
 /**
+ * Detect if running on iOS
+ */
+export function isIOS() {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+/**
+ * Detect if running as installed PWA (standalone mode)
+ */
+export function isStandalone() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true ||
+    document.referrer.includes('android-app://');
+}
+
+/**
  * Check if notifications are supported
  */
 export function isNotificationSupported() {
+  if (typeof window === 'undefined') return false;
+  
+  // iOS requires PWA mode for notifications
+  if (isIOS() && !isStandalone()) {
+    return false;
+  }
+  
   return 'Notification' in window && 'serviceWorker' in navigator;
+}
+
+/**
+ * Get detailed notification support info
+ */
+export function getNotificationSupportInfo() {
+  const ios = isIOS();
+  const standalone = isStandalone();
+  const supported = isNotificationSupported();
+  const permission = getPermissionStatus();
+  
+  return {
+    supported,
+    permission,
+    isIOS: ios,
+    isStandalone: standalone,
+    requiresInstall: ios && !standalone,
+    canEnable: supported && permission !== 'denied',
+  };
 }
 
 /**
  * Get current notification permission status
  */
 export function getPermissionStatus() {
-  if (!isNotificationSupported()) return 'unsupported';
+  if (!('Notification' in window)) return 'unsupported';
+  if (isIOS() && !isStandalone()) return 'requires-install';
   return Notification.permission; // 'default', 'granted', 'denied'
 }
 
