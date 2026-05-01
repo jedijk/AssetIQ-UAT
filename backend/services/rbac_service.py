@@ -15,8 +15,19 @@ from typing import Optional, List, Dict, Any
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+# Production DB name used for auth/user identity in some deployments.
+# We keep this local (instead of importing from auth.py) to avoid circular imports.
+try:
+    from database import client, AVAILABLE_DATABASES, get_request_db
+    _PROD_DB_NAME = AVAILABLE_DATABASES.get("production", {}).get("name", "assetiq")
+except Exception:
+    client = None
+    get_request_db = None
+    _PROD_DB_NAME = "assetiq"
 
 # Role definitions with permissions
 ROLES = {
@@ -217,8 +228,14 @@ class RBACService:
         """Update a user's role."""
         if new_role not in ROLES:
             raise ValueError(f"Invalid role: {new_role}")
-        
-        # Try both 'id' and 'user_id' fields for compatibility
+
+        # Update in the request-scoped DB first.
+        # In some deployments, authentication resolves users from production DB even when
+        # the request DB env is "uat". If we only update the request DB, the change won't
+        # reflect for permission checks that read the prod user record.
+        #
+        # To keep behavior consistent, we also attempt the same update in production DB
+        # when it is different from the current request DB.
         result = await self.users.update_one(
             {"$or": [{"id": user_id}, {"user_id": user_id}]},
             {
@@ -229,8 +246,31 @@ class RBACService:
                 }
             }
         )
-        
-        if result.modified_count > 0:
+
+        modified_any = result.modified_count > 0
+
+        # Best-effort: also update production DB users collection if available and distinct.
+        try:
+            if client is not None and get_request_db is not None:
+                current_db = get_request_db()
+                current_name = getattr(current_db, "name", None)
+                if current_name and current_name != _PROD_DB_NAME:
+                    prod_users = client[_PROD_DB_NAME]["users"]
+                    prod_res = await prod_users.update_one(
+                        {"$or": [{"id": user_id}, {"user_id": user_id}]},
+                        {
+                            "$set": {
+                                "role": new_role,
+                                "role_updated_at": datetime.now(timezone.utc),
+                                "role_updated_by": updated_by
+                            }
+                        }
+                    )
+                    modified_any = modified_any or (prod_res.modified_count > 0)
+        except Exception as e:
+            logger.warning(f"Best-effort prod role update failed: {type(e).__name__}: {e}")
+
+        if modified_any:
             return await self.get_user(user_id)
         return None
     
