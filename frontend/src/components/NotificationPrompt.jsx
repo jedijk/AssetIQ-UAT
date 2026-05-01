@@ -53,12 +53,12 @@ export function NotificationPrompt() {
       return true;
     };
 
-    // Delay showing the prompt to not interrupt the initial experience
+    // Delay showing the prompt - immediate for better visibility
     const timer = setTimeout(() => {
       const shouldShow = checkVisibility();
       setVisible(shouldShow);
       setShowIOSGuide(isIOS() && !isStandalone());
-    }, 5000);
+    }, 1500); // Reduced to 1.5 seconds for faster prompt
 
     return () => clearTimeout(timer);
   }, []);

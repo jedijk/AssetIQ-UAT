@@ -11,9 +11,9 @@
 const NOTIFICATION_SETTINGS_KEY = 'assetiq_notification_settings';
 const SUBSCRIPTION_KEY = 'assetiq_push_subscription';
 
-// Default notification settings
+// Default notification settings - enabled by default
 const DEFAULT_SETTINGS = {
-  enabled: false,
+  enabled: true,  // Enabled by default
   overdueActions: true,
   newTasks: true,
   formReminders: true,
@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS = {
   investigationUpdates: true,
   dailySummary: false,
   sound: true,
+  autoPrompted: false,  // Track if we've auto-prompted
 };
 
 /**
@@ -98,6 +99,7 @@ export async function requestPermission() {
       // Save settings
       const settings = getNotificationSettings();
       settings.enabled = true;
+      settings.autoPrompted = true;
       saveNotificationSettings(settings);
       
       // Subscribe to push notifications
@@ -105,11 +107,51 @@ export async function requestPermission() {
       
       return { success: true, permission };
     }
+    
+    // Mark as prompted even if denied
+    const settings = getNotificationSettings();
+    settings.autoPrompted = true;
+    saveNotificationSettings(settings);
+    
     return { success: false, permission };
   } catch (error) {
     console.error('Failed to request notification permission:', error);
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * Auto-request permission (called on login)
+ * Only prompts once per user
+ */
+export async function autoRequestPermission() {
+  if (!isNotificationSupported()) return false;
+  
+  // Check if already granted or denied
+  const permission = getPermissionStatus();
+  if (permission === 'granted') {
+    // Already granted, ensure settings are enabled
+    const settings = getNotificationSettings();
+    if (!settings.enabled) {
+      settings.enabled = true;
+      saveNotificationSettings(settings);
+    }
+    return true;
+  }
+  
+  if (permission === 'denied' || permission === 'requires-install') {
+    return false;
+  }
+  
+  // Check if we've already auto-prompted this user
+  const settings = getNotificationSettings();
+  if (settings.autoPrompted) {
+    return false;
+  }
+  
+  // Request permission
+  const result = await requestPermission();
+  return result.success;
 }
 
 /**

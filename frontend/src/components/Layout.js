@@ -12,6 +12,7 @@ import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { pageTransition, pageVariants, springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
+import { useAutoEnableNotifications } from "../hooks/useAutoEnableNotifications";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
 const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.6";
@@ -473,6 +474,9 @@ const Layout = () => {
     observations: [], // Observations will be passed from relevant pages
     enabled: !!user,
   });
+
+  // Auto-request notification permission on login
+  useAutoEnableNotifications();
 
   // Query unread feedback count for owner/admin/manager
   const canViewAllFeedback = ["owner", "admin", "manager"].includes(user?.role);
