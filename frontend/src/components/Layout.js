@@ -11,6 +11,7 @@ import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLef
 import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { pageTransition, pageVariants, springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
+import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
 const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.6";
@@ -464,6 +465,14 @@ const Layout = () => {
 
   const overdueActions = overdueData?.overdue_actions || [];
   const overdueCount = overdueData?.count || 0;
+
+  // Trigger push notifications for overdue actions and other events
+  useNotificationTriggers({
+    actions: overdueActions,
+    tasks: [], // Tasks will be passed from MyTasksPage context
+    observations: [], // Observations will be passed from relevant pages
+    enabled: !!user,
+  });
 
   // Query unread feedback count for owner/admin/manager
   const canViewAllFeedback = ["owner", "admin", "manager"].includes(user?.role);

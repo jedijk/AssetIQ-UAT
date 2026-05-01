@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { format, isToday, isBefore, startOfDay, parseISO } from "date-fns";
+import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
 import {
   DndContext,
   closestCenter,
@@ -465,6 +466,14 @@ const MyTasksPage = () => {
     refetchOnWindowFocus: true, // Refetch when window regains focus
     staleTime: 5000, // Consider data stale after 5 seconds for faster updates
     retry: offlineStatus.isOnline ? 3 : 0,
+  });
+
+  // Trigger push notifications for new tasks assigned to this user
+  useNotificationTriggers({
+    tasks: tasksData?.tasks || [],
+    actions: [],
+    observations: [],
+    enabled: !!user,
   });
   
   // Complete task mutation with offline support

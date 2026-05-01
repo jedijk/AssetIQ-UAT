@@ -4,8 +4,10 @@ import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { threatsAPI, statsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { usePermissions } from "../contexts/PermissionsContext";
+import { useAuth } from "../contexts/AuthContext";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
 import { 
   AlertTriangle, 
   TrendingUp, 
@@ -121,6 +123,7 @@ const ThreatsPage = () => {
   const queryClient = useQueryClient();
   const { t } = useLanguage();
   const { hasPermission } = usePermissions();
+  const { user } = useAuth();
   const isMobile = useIsMobile();
   // iOS Safari has had rare crashes in virtualized list rendering; disable
   // virtualization on iOS to avoid blank-screen runtime TypeErrors.
@@ -222,6 +225,14 @@ const ThreatsPage = () => {
     refetchOnWindowFocus: false, // Don't refetch when window regains focus
     refetchInterval: false, // Disable automatic background refetching
     placeholderData: (previousData) => previousData, // Keep previous data while refetching
+  });
+
+  // Trigger push notifications for high-severity observations
+  useNotificationTriggers({
+    observations: threats || [],
+    tasks: [],
+    actions: [],
+    enabled: !!user,
   });
 
   // Prefetch top observation details (desktop only — mobile radios / older CPUs choke on many parallel GETs)
