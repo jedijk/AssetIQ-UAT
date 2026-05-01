@@ -52,6 +52,7 @@ import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 import { useCapabilities } from "../core/performance";
+import { notify, getNotificationSettings, isNotificationSupported, getPermissionStatus } from "../services/notificationService";
 
 const Layout = () => {
   const { user, logout, mustChangePassword, mustAcceptTerms } = useAuth();
@@ -501,6 +502,65 @@ const Layout = () => {
   const unreadResponsesCount = unreadResponsesData?.unread_count || 0;
   const totalNotificationCount = overdueCount + 
     (canViewAllFeedback ? unreadFeedbackCount : unreadResponsesCount);
+
+  // Local push-style notification when new feedback arrives (owner/admin/manager)
+  const lastUnreadFeedbackRef = useRef(0);
+  useEffect(() => {
+    if (!canViewAllFeedback) return;
+
+    const prev = lastUnreadFeedbackRef.current || 0;
+    lastUnreadFeedbackRef.current = unreadFeedbackCount;
+
+    // Only notify on increments (new items)
+    if (unreadFeedbackCount <= prev) return;
+
+    try {
+      const settings = getNotificationSettings();
+      const canNotify =
+        settings.enabled &&
+        isNotificationSupported() &&
+        getPermissionStatus() === "granted";
+      if (!canNotify) return;
+    } catch (_e) {
+      return;
+    }
+
+    const delta = unreadFeedbackCount - prev;
+    notify.system(
+      "New feedback submitted",
+      `${delta} new feedback ${delta === 1 ? "item" : "items"} received`,
+      "/feedback"
+    );
+  }, [canViewAllFeedback, unreadFeedbackCount]);
+
+  // Local notification when a user receives feedback responses
+  const lastUnreadResponsesRef = useRef(0);
+  useEffect(() => {
+    if (canViewAllFeedback) return;
+
+    const prev = lastUnreadResponsesRef.current || 0;
+    lastUnreadResponsesRef.current = unreadResponsesCount;
+
+    if (unreadResponsesCount <= prev) return;
+
+    try {
+      const settings = getNotificationSettings();
+      const canNotify =
+        settings.enabled &&
+        isNotificationSupported() &&
+        getPermissionStatus() === "granted";
+      if (!canNotify) return;
+    } catch (_e) {
+      return;
+    }
+
+    const delta = unreadResponsesCount - prev;
+    notify.system(
+      "New feedback response",
+      `${delta} new ${delta === 1 ? "response" : "responses"} to your feedback`,
+      "/feedback"
+    );
+  }, [canViewAllFeedback, unreadResponsesCount]);
 
   // Handler to mark feedback as read (for owners)
   const handleMarkFeedbackRead = async (e) => {
