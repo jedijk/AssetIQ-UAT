@@ -9,7 +9,7 @@ from fastapi import Depends, HTTPException, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 
-from database import db, client, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS
+from database import db, client, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS, get_request_db, AVAILABLE_DATABASES
 
 security = HTTPBearer(auto_error=False)
 
@@ -18,9 +18,7 @@ AUTH_COOKIE_NAME = os.environ.get("AUTH_COOKIE_NAME", "assetiq_token")
 CSRF_COOKIE_NAME = os.environ.get("CSRF_COOKIE_NAME", "assetiq_csrf")
 ALLOW_COOKIE_AUTH = os.environ.get("ALLOW_COOKIE_AUTH", "true").lower() == "true"
 
-# Always use production database for user authentication
-# This ensures tokens work across database environments
-AUTH_DB = client[os.environ.get("DB_NAME", "assetiq")]
+PRODUCTION_DB_NAME = AVAILABLE_DATABASES.get("production", {}).get("name", "assetiq")
 
 
 def hash_password(password: str) -> str:
@@ -48,8 +46,20 @@ async def _validate_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id")
-        # Always use AUTH_DB (production) for user lookup
-        user = await AUTH_DB.users.find_one({"id": user_id}, {"_id": 0})
+        # Lookup the user in the *request-scoped* database so role/permissions reflect
+        # the active environment (production vs UAT) selected by middleware.
+        user = None
+        try:
+            request_db = get_request_db()
+            user = await request_db.users.find_one({"id": user_id}, {"_id": 0})
+        except Exception:
+            user = None
+
+        # Backwards-compatible fallback: if the user isn't found in the current env,
+        # fall back to production so tokens remain usable across environments.
+        if not user:
+            prod_db = client[PRODUCTION_DB_NAME]
+            user = await prod_db.users.find_one({"id": user_id}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         return user
