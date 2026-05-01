@@ -22,6 +22,36 @@ class GlobalErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     this.setState({ errorInfo });
+
+    // Auto-recover from chunk load errors (stale caches after deploy), especially on iOS.
+    // Do this once per tab session to avoid reload loops.
+    try {
+      const msg = String(error?.message || error || "");
+      const isChunk =
+        msg.includes("Loading chunk") ||
+        msg.includes("ChunkLoadError") ||
+        msg.includes("dynamically imported module");
+      if (isChunk) {
+        const key = "assetiq_chunk_reload_attempted";
+        const already = (() => {
+          try {
+            return sessionStorage.getItem(key) === "true";
+          } catch (_e) {
+            return false;
+          }
+        })();
+        if (!already) {
+          try {
+            sessionStorage.setItem(key, "true");
+          } catch (_e) {}
+          debugLog("chunk_error_autoreload", { message: msg });
+          // Give the error UI a brief moment to paint, then clear caches + reload.
+          setTimeout(() => {
+            this.handleReload();
+          }, 300);
+        }
+      }
+    } catch (_e) {}
     
     // Log the error for debugging
     try {
@@ -85,6 +115,10 @@ class GlobalErrorBoundary extends React.Component {
     if (this.state.hasError) {
       const { error, retryCount } = this.state;
       const errorMessage = String(error?.message || 'Unknown error');
+      const isChunkError =
+        errorMessage.includes("Loading chunk") ||
+        errorMessage.includes("ChunkLoadError") ||
+        errorMessage.includes("dynamically imported module");
       const showRetry = retryCount < 2;
 
       return (
@@ -130,7 +164,9 @@ class GlobalErrorBoundary extends React.Component {
               lineHeight: '1.5',
               color: '#64748b',
             }}>
-              The app encountered an error. This can happen on older devices or with slow connections.
+              {isChunkError
+                ? "A new version was deployed while this browser still had an older one cached. Reloading will fix it."
+                : "The app encountered an error. This can happen on older devices or with slow connections."}
             </p>
 
             {/* Error details (collapsed) */}
