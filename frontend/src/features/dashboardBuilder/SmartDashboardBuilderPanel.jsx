@@ -775,7 +775,7 @@ export function SmartDashboardBuilderPanel({ actions = [], observations = [], in
     metricKey: selectedMetric,
     displayType: selectedDisplay,
     title: widgetTitle,
-    formTemplateId: selectedFormId,
+    formTemplateId: selectedFormId === "__all__" ? "" : selectedFormId,
     formFieldId: selectedFieldId,
   }), [selectedSource, selectedMetric, selectedDisplay, widgetTitle, selectedFormId, selectedFieldId]);
 
@@ -806,7 +806,7 @@ export function SmartDashboardBuilderPanel({ actions = [], observations = [], in
         displayType: selectedDisplay,
         title: widgetTitle || metric?.label || "Widget",
         size: "normal",
-        formTemplateId: selectedFormId,
+        formTemplateId: selectedFormId === "__all__" ? "" : selectedFormId,
         formFieldId: selectedFieldId,
       },
       ...prev,
@@ -863,7 +863,9 @@ export function SmartDashboardBuilderPanel({ actions = [], observations = [], in
   const updateTitle = (id, title) => setWidgets((prev) => prev.map((w) => w.id === id ? { ...w, title } : w));
   const toggleSize = (id) => setWidgets((prev) => prev.map((w) => w.id === id ? { ...w, size: w.size === "wide" ? "normal" : "wide" } : w));
 
-  const selectedFormTemplate = formTemplates.find((t) => t.id === selectedFormId);
+  const selectedFormTemplate = selectedFormId && selectedFormId !== "__all__" 
+    ? formTemplates.find((t) => t.id === selectedFormId) 
+    : null;
 
   return (
     <div className="space-y-4">
@@ -1063,7 +1065,7 @@ export function SmartDashboardBuilderPanel({ actions = [], observations = [], in
                         <SelectValue placeholder="Select a form (optional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All forms</SelectItem>
+                        <SelectItem value="__all__">All forms</SelectItem>
                         {formTemplates.map((t) => (
                           <SelectItem key={t.id} value={t.id}>{t.name || t.title}</SelectItem>
                         ))}

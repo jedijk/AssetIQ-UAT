@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { SettingsSection, SettingsCard, SettingsRow } from "./SettingsPage";
+import { NotificationSettings } from "../components/NotificationSettings";
 
 // Notification frequency options
 const FREQUENCY_OPTIONS = [
@@ -108,6 +109,9 @@ export default function SettingsNotificationsPage() {
       title="Notifications"
       description="Configure how and when you receive alerts and updates"
     >
+      {/* Browser Push Notifications */}
+      <NotificationSettings />
+
       {/* Notification Channels */}
       <SettingsCard 
         title="Notification Channels" 

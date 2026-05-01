@@ -13,6 +13,7 @@ import ChangePasswordDialog from "./components/ChangePasswordDialog";
 import TermsAcceptanceDialog from "./components/TermsAcceptanceDialog";
 import FirstLoginFlow from "./components/FirstLoginFlow";
 import LandscapeBlocker from "./components/LandscapeBlocker";
+import NotificationPrompt from "./components/NotificationPrompt";
 import { useEffect } from "react";
 import { getBackendUrl } from "./lib/apiConfig";
 import { debugLog } from "./lib/debug";
@@ -462,6 +463,7 @@ function App() {
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            <NotificationPrompt />
             </BrowserRouter>
           </UndoProvider>
         </PermissionsProvider>
