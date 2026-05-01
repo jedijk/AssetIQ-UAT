@@ -9,10 +9,24 @@ const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "co
 // Current terms/privacy version - increment when terms change
 const CURRENT_TERMS_VERSION = "1.0";
 
+function getDbEnvHeaders() {
+  // Keep auth-related calls consistent with the main API client, which uses this header
+  // to select the active database environment (production vs UAT).
+  try {
+    const dbEnv = localStorage.getItem("database_environment");
+    return dbEnv ? { "X-Database-Environment": dbEnv } : {};
+  } catch (_e) {
+    return {};
+  }
+}
+
 // Fetch user preferences and cache them for date formatting
 const fetchAndCachePreferences = async (API_URL) => {
   try {
-    const response = await axios.get(`${API_URL}/users/me/preferences`);
+    const response = await axios.get(`${API_URL}/users/me/preferences`, {
+      headers: getDbEnvHeaders(),
+      withCredentials: AUTH_MODE === "cookie",
+    });
     if (response.data) {
       updateCachedPreferences(response.data);
     }
@@ -45,7 +59,11 @@ export const AuthProvider = ({ children }) => {
     if (AUTH_MODE === "cookie" && remote) {
       try {
         const API_URL = getApiUrl();
-        await axios.post(`${API_URL}/auth/logout`, {}, { withCredentials: true });
+        await axios.post(
+          `${API_URL}/auth/logout`,
+          {},
+          { withCredentials: true, headers: getDbEnvHeaders() }
+        );
       } catch (_e) {}
     }
     localStorage.removeItem("token");
@@ -61,7 +79,10 @@ export const AuthProvider = ({ children }) => {
   const fetchUser = useCallback(async () => {
     try {
       const API_URL = getApiUrl();
-      const response = await axios.get(`${API_URL}/auth/me`);
+      const response = await axios.get(`${API_URL}/auth/me`, {
+        headers: getDbEnvHeaders(),
+        withCredentials: AUTH_MODE === "cookie",
+      });
       setUser(response.data);
       setMustChangePassword(response.data.must_change_password || false);
 
@@ -232,16 +253,21 @@ export const AuthProvider = ({ children }) => {
   const acceptTerms = async () => {
     const API_URL = getApiUrl();
     try {
-      const response = await axios.post(`${API_URL}/gdpr/accept-terms`, {
-        terms_version: CURRENT_TERMS_VERSION
-      });
+      const response = await axios.post(
+        `${API_URL}/gdpr/accept-terms`,
+        { terms_version: CURRENT_TERMS_VERSION },
+        { headers: getDbEnvHeaders(), withCredentials: AUTH_MODE === "cookie" }
+      );
 
       // CRITICAL: re-fetch the canonical user state from backend so the
       // terms version we just persisted is reflected in the UI. Previously we
       // only updated local state optimistically, which could drift out of sync
       // if /auth/me was called again by another effect.
       try {
-        const meResponse = await axios.get(`${API_URL}/auth/me`);
+        const meResponse = await axios.get(`${API_URL}/auth/me`, {
+          headers: getDbEnvHeaders(),
+          withCredentials: AUTH_MODE === "cookie",
+        });
         setUser(meResponse.data);
         const serverVersion = meResponse.data?.terms_accepted_version;
         // Only close the dialog if backend actually confirms the acceptance
