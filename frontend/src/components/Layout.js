@@ -795,7 +795,8 @@ const Layout = () => {
                 className="w-8 h-8 rounded-lg"
               />
               <span className="text-base font-semibold text-slate-900 dark:text-white" data-testid="app-logo">
-                AssetIQ
+                <span>Asset</span>
+                <span className="text-blue-600 dark:text-blue-400">IQ</span>
               </span>
             </div>
 
