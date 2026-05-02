@@ -3,8 +3,7 @@ import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import simpleModeLogoUrl from "../assets/images/logo-simple-mode.png";
-import { bundledAssetUrl } from "../lib/bundledAssetUrl";
+import { publicAssetUrl } from "../lib/assetUrl";
 
 const haptic = () => {
   try {
@@ -84,7 +83,7 @@ export default function OperatorLandingPage() {
       <div className="flex flex-col flex-1 items-center justify-center w-full max-w-lg mx-auto gap-10">
         <div className="flex flex-col items-center text-center w-full">
           <img
-            src={bundledAssetUrl(simpleModeLogoUrl)}
+            src={publicAssetUrl("/logo-simple-mode.png")}
             alt="AssetIQ"
             className="w-full max-w-[min(100%,320px)] h-auto object-contain mx-auto select-none"
             width={320}

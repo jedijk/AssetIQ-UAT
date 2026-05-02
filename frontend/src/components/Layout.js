@@ -13,8 +13,7 @@ import { pageTransition, pageVariants, springPresets } from "./animations/consta
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
 import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
 import { useAutoEnableNotifications } from "../hooks/useAutoEnableNotifications";
-import brandLogoUrl from "../assets/images/logo.png";
-import { bundledAssetUrl } from "../lib/bundledAssetUrl";
+import { publicAssetUrl } from "../lib/assetUrl";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
 const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.6";
@@ -792,7 +791,7 @@ const Layout = () => {
               data-testid="app-logo-link"
             >
               <img 
-                src={bundledAssetUrl(brandLogoUrl)} 
+                src={publicAssetUrl("/logo.png")} 
                 alt="AssetIQ" 
                 className="w-8 h-8 rounded-lg"
               />
