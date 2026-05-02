@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "../lib/apiConfig";
 import simpleModeLogoUrl from "../assets/images/logo-simple-mode.png";
+import { bundledAssetUrl } from "../lib/bundledAssetUrl";
 
 const haptic = () => {
   try {
@@ -83,7 +84,7 @@ export default function OperatorLandingPage() {
       <div className="flex flex-col flex-1 items-center justify-center w-full max-w-lg mx-auto gap-10">
         <div className="flex flex-col items-center text-center w-full">
           <img
-            src={simpleModeLogoUrl}
+            src={bundledAssetUrl(simpleModeLogoUrl)}
             alt="AssetIQ"
             className="w-full max-w-[min(100%,320px)] h-auto object-contain mx-auto select-none"
             width={320}
