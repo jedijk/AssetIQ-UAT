@@ -76,18 +76,26 @@ export default function OperatorLandingPage() {
 
   return (
     <div
-      className="flex flex-col items-center justify-center min-h-[calc(100vh-52px)] px-6 pb-8 bg-slate-50"
+      className="flex flex-col min-h-[calc(100vh-52px)] px-6 pb-8 pt-6 bg-slate-50"
       data-testid="operator-landing"
     >
-      <div className="mb-10 text-center">
-        <img src="/logo.png" alt="AssetIQ" className="w-14 h-14 rounded-xl mx-auto mb-3" />
-        <h1 className="text-xl font-semibold text-slate-900">
-          {getGreeting()}{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">What would you like to do?</p>
-      </div>
+      <div className="flex flex-col flex-1 items-center justify-center w-full max-w-lg mx-auto gap-10">
+        <div className="flex flex-col items-center text-center w-full">
+          <img
+            src="/logo-simple-mode.png"
+            alt="AssetIQ"
+            className="w-full max-w-[min(100%,320px)] h-auto object-contain mx-auto select-none"
+            width={320}
+            height={140}
+            decoding="async"
+          />
+          <h1 className="text-xl font-semibold text-slate-900 mt-8">
+            {getGreeting()}{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">What would you like to do?</p>
+        </div>
 
-      <div className="flex flex-col gap-4 w-full max-w-xs">
+      <div className="flex flex-col gap-4 w-full max-w-xs shrink-0">
         <button
           onClick={handleClick(() => navigate("/my-tasks"))}
           className="relative flex items-center justify-center gap-3 rounded-2xl p-6 bg-orange-400 text-white w-full shadow-lg shadow-orange-400/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
@@ -121,6 +129,7 @@ export default function OperatorLandingPage() {
             <span className="text-sm font-semibold tracking-wide">Production</span>
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
