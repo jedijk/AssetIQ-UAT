@@ -1,14 +1,9 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "../lib/apiConfig";
 import { publicAssetUrl } from "../lib/assetUrl";
-
-/** Built at module load — PUBLIC_URL is fixed at build time */
-const CENTER_LOGO_PRIMARY = publicAssetUrl("/logo-simple-mode.png");
-const CENTER_LOGO_FALLBACK = publicAssetUrl("/logo.png");
 
 const haptic = () => {
   try {
@@ -61,8 +56,6 @@ const fetchTaskCounts = async () => {
 export default function OperatorLandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [centerLogoSrc, setCenterLogoSrc] = useState(CENTER_LOGO_PRIMARY);
-
   const { data: taskCounts } = useQuery({
     queryKey: ["operatorTaskCounts"],
     queryFn: fetchTaskCounts,
@@ -89,17 +82,12 @@ export default function OperatorLandingPage() {
       <div className="flex flex-col flex-1 items-center justify-center w-full max-w-lg mx-auto gap-10">
         <div className="flex flex-col items-center text-center w-full">
           <img
-            src={centerLogoSrc}
+            src={publicAssetUrl("/logo.png")}
             alt=""
-            className="w-full max-w-[min(100%,320px)] h-auto object-contain mx-auto select-none"
-            width={320}
-            height={140}
+            className="w-36 h-36 sm:w-44 sm:h-44 object-contain mx-auto select-none drop-shadow-sm"
+            width={176}
+            height={176}
             decoding="async"
-            onError={() =>
-              setCenterLogoSrc((prev) =>
-                prev === CENTER_LOGO_FALLBACK ? prev : CENTER_LOGO_FALLBACK
-              )
-            }
           />
           <h1 className="text-xl font-semibold text-slate-900 mt-8">
             {getGreeting()}{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
