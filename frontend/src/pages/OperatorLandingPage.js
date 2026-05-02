@@ -1,9 +1,14 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "../lib/apiConfig";
 import { publicAssetUrl } from "../lib/assetUrl";
+
+/** Built at module load — PUBLIC_URL is fixed at build time */
+const CENTER_LOGO_PRIMARY = publicAssetUrl("/logo-simple-mode.png");
+const CENTER_LOGO_FALLBACK = publicAssetUrl("/logo.png");
 
 const haptic = () => {
   try {
@@ -56,6 +61,7 @@ const fetchTaskCounts = async () => {
 export default function OperatorLandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [centerLogoSrc, setCenterLogoSrc] = useState(CENTER_LOGO_PRIMARY);
 
   const { data: taskCounts } = useQuery({
     queryKey: ["operatorTaskCounts"],
@@ -83,12 +89,17 @@ export default function OperatorLandingPage() {
       <div className="flex flex-col flex-1 items-center justify-center w-full max-w-lg mx-auto gap-10">
         <div className="flex flex-col items-center text-center w-full">
           <img
-            src={publicAssetUrl("/logo-simple-mode.png")}
-            alt="AssetIQ"
+            src={centerLogoSrc}
+            alt=""
             className="w-full max-w-[min(100%,320px)] h-auto object-contain mx-auto select-none"
             width={320}
             height={140}
             decoding="async"
+            onError={() =>
+              setCenterLogoSrc((prev) =>
+                prev === CENTER_LOGO_FALLBACK ? prev : CENTER_LOGO_FALLBACK
+              )
+            }
           />
           <h1 className="text-xl font-semibold text-slate-900 mt-8">
             {getGreeting()}{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
@@ -104,11 +115,17 @@ export default function OperatorLandingPage() {
         >
           <ClipboardCheck className="w-8 h-8" strokeWidth={2} />
           <span className="text-sm font-semibold tracking-wide">My Tasks</span>
-          {badge > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-1.5 shadow-md" data-testid="tasks-badge">
-              {badge > 99 ? "99+" : badge}
-            </span>
-          )}
+          <span
+            className={`absolute -top-2 -right-2 text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-1.5 shadow-md ${
+              badge > 0
+                ? "bg-red-500 text-white"
+                : "bg-white/90 text-orange-700 border border-orange-200/80"
+            }`}
+            data-testid="tasks-badge"
+            aria-label={`Open tasks: ${badge}`}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
         </button>
 
         <div className="grid grid-cols-2 gap-4">
