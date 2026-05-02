@@ -52,9 +52,11 @@ export function VirtualList({
   const shouldVirtualize =
     disableVirtualization === true ? false : !iOSLike && hasResizeObserver();
 
+  const safeData = Array.isArray(data) ? data : [];
+
   const fallback = (
     <div className={className}>
-      {(Array.isArray(data) ? data : []).map((item, idx) => (
+      {safeData.map((item, idx) => (
         <React.Fragment key={item?.id ?? item?._id ?? idx}>
           {itemContent(idx, item)}
         </React.Fragment>
@@ -66,16 +68,21 @@ export function VirtualList({
     return fallback;
   }
 
+  // react-virtuoso: passing optional props as explicit `undefined` breaks internal state
+  // (e.g. accessing components.EmptyPlaceholder). Omit unset props instead.
+  // See https://github.com/petyosi/react-virtuoso/issues/777
+  const virtuosoProps = {
+    data: safeData,
+    itemContent,
+    overscan,
+    increaseViewportBy,
+    ...(components != null ? { components } : {}),
+  };
+
   return (
     <VirtuosoErrorBoundary fallback={fallback}>
       <div className={className}>
-        <Virtuoso
-          data={data}
-          itemContent={itemContent}
-          overscan={overscan}
-          increaseViewportBy={increaseViewportBy}
-          components={components}
-        />
+        <Virtuoso {...virtuosoProps} />
       </div>
     </VirtuosoErrorBoundary>
   );
