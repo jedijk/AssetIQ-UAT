@@ -14,6 +14,11 @@ const haptic = () => {
   } catch {}
 };
 
+function tasksFromMyTasksPayload(payload) {
+  if (Array.isArray(payload)) return payload;
+  return payload?.tasks ?? [];
+}
+
 const fetchTaskCounts = async () => {
   const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
   const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
@@ -33,9 +38,18 @@ const fetchTaskCounts = async () => {
   ]);
   const openData = await openRes.json();
   const overdueData = await overdueRes.json();
-  const open = Array.isArray(openData) ? openData.length : (openData.tasks?.length ?? openData.count ?? 0);
-  const overdue = Array.isArray(overdueData) ? overdueData.length : (overdueData.tasks?.length ?? overdueData.count ?? 0);
-  return { open, overdue, total: open + overdue };
+  const openTasks = tasksFromMyTasksPayload(openData);
+  const overdueTasks = tasksFromMyTasksPayload(overdueData);
+  // open + overdue double-counts: e.g. pending tasks with past due_date appear in both lists (see my_tasks.py filters).
+  const seenIds = new Set();
+  for (const t of [...openTasks, ...overdueTasks]) {
+    if (t?.id != null && t.id !== "") seenIds.add(String(t.id));
+  }
+  return {
+    open: openTasks.length,
+    overdue: overdueTasks.length,
+    total: seenIds.size,
+  };
 };
 
 export default function OperatorLandingPage() {
