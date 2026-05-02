@@ -746,6 +746,14 @@ async def background_startup():
         
         if connected:
             logger.info("MongoDB connected successfully")
+
+            # Ensure primary owner role in UAT DB (auth reads request DB first; UAT must have role=owner there)
+            try:
+                from database import client, AVAILABLE_DATABASES
+                from scripts.ensure_uat_owner import ensure_uat_primary_owner
+                await ensure_uat_primary_owner(client, AVAILABLE_DATABASES)
+            except Exception as e:
+                logger.warning(f"UAT owner bootstrap skipped: {e}")
             
             # Initialize MongoDB file storage
             try:
